@@ -338,8 +338,9 @@ func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput, inpu
 		sessionFile:    sessionFile,
 	}
 
-	existingContent := terminalOutput.display.GetAll()
-	if existingContent != "" {
+	hasExistingContent := len(terminalOutput.display.Messages) > 0
+	if hasExistingContent {
+		existingContent := terminalOutput.display.GetAll()
 		wrapped := wordwrap(existingContent, display.Width)
 		newlineCount := strings.Count(wrapped, "\n")
 		display.SetContent(wrapped)
@@ -668,9 +669,13 @@ func (m *Terminal) getInputForEditor() string {
 func (m *Terminal) updateDisplayContent() {
 	newContent := m.terminalOutput.display.GetAll()
 
-	// Check if we've moved past the welcome message
-	if m.showingWelcome && newContent != m.welcomeText {
-		m.showingWelcome = false
+	// If showing welcome, only switch to real content when it actually exists
+	if m.showingWelcome {
+		if newContent != "" && newContent != m.welcomeText {
+			m.showingWelcome = false
+		} else {
+			return
+		}
 	}
 
 	// Wordwrap to viewport width for proper word boundary wrapping
