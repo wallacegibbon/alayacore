@@ -23,16 +23,17 @@ type WebSocketAdaptor struct {
 	AgentFactory AgentFactory
 	BaseURL      string
 	ModelName    string
+	SessionFile  string
 	Server       *http.Server
 }
 
 // NewWebSocketAdaptor creates a new WebSocket adaptor that listens on the given port
 // Each client gets its own agent session
-func NewWebSocketAdaptor(port string, factory AgentFactory, baseURL, modelName string) *WebSocketAdaptor {
+func NewWebSocketAdaptor(port string, factory AgentFactory, baseURL, modelName, sessionFile string) *WebSocketAdaptor {
 	mux := http.NewServeMux()
 
 	// Handle WebSocket
-	mux.HandleFunc("/ws", handleWebSocket(factory, baseURL, modelName))
+	mux.HandleFunc("/ws", handleWebSocket(factory, baseURL, modelName, sessionFile))
 
 	// Serve embedded index.html
 	mux.HandleFunc("/", serveIndex)
@@ -46,6 +47,7 @@ func NewWebSocketAdaptor(port string, factory AgentFactory, baseURL, modelName s
 		AgentFactory: factory,
 		BaseURL:      baseURL,
 		ModelName:    modelName,
+		SessionFile:  sessionFile,
 		Server:       server,
 	}
 }
@@ -64,7 +66,7 @@ func (a *WebSocketAdaptor) Start() {
 }
 
 // handleWebSocket handles WebSocket connections with per-client sessions
-func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.ResponseWriter, *http.Request) {
+func handleWebSocket(factory AgentFactory, baseURL, modelName, sessionFile string) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -80,11 +82,20 @@ func handleWebSocket(factory AgentFactory, baseURL, modelName string) func(http.
 		}
 		defer close(output.closeCh)
 
-		// Create a new agent, processor, and session for this client
+		// Create a new agent and processor for this client
 		agent := factory()
 		processor := agentpkg.NewProcessorWithIO(agent, input, output)
-		session := agentpkg.NewSession(agent, baseURL, modelName, processor)
+
+		// Load or create session
+		session, _ := agentpkg.LoadOrNewSession(agent, baseURL, modelName, processor, sessionFile)
 		output.session = session
+
+		// Display loaded messages if session has any
+		if len(session.Messages) > 0 {
+			session.DisplayMessages()
+			// Force flush to ensure all messages are written to display buffer
+			processor.Output.Flush()
+		}
 
 		// Read loop - handles client input and blocks until connection closes
 		for {
