@@ -594,11 +594,3 @@ func (s *Session) GetSetTodos(fn func(todo.TodoList) todo.TodoList) todo.TodoLis
 	s.sendTodoList()
 	return result
 }
-
-func (s *Session) GetTodoBridge() interface {
-	GetTodos() todo.TodoList
-	SetTodos(todo.TodoList)
-	GetSetTodos(func(todo.TodoList) todo.TodoList) todo.TodoList
-} {
-	return s
-}
