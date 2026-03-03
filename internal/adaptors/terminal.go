@@ -55,7 +55,6 @@ func (d *DisplayBuffer) GetAll() string {
 // TerminalAdaptor is a terminal adaptor with a Terminal interface
 type TerminalAdaptor struct {
 	Config      *app.Config
-	processor   *agentpkg.Processor
 	session     *agentpkg.Session
 	sessionFile string
 }
@@ -78,9 +77,6 @@ func (a *TerminalAdaptor) Start() {
 	// Create input and output streams
 	inputStream := stream.NewChanInput(10)
 	terminalOutput := newTerminalOutput()
-	processor := agentpkg.NewProcessorWithIO(nil, inputStream, terminalOutput)
-	a.processor = processor
-
 	// Load or create session
 	a.session, a.sessionFile = agentpkg.LoadOrNewSession(
 		a.Config.Model,
@@ -88,7 +84,8 @@ func (a *TerminalAdaptor) Start() {
 		a.Config.SystemPrompt,
 		a.Config.Cfg.BaseURL,
 		a.Config.Cfg.ModelName,
-		a.processor,
+		inputStream,
+		terminalOutput,
 		a.sessionFile,
 	)
 
@@ -96,7 +93,7 @@ func (a *TerminalAdaptor) Start() {
 	if len(a.session.Messages) > 0 {
 		a.session.DisplayMessages()
 		// Force flush to ensure all messages are written to display buffer
-		processor.Output.Flush()
+		a.session.Output.Flush()
 	}
 
 	t := NewTerminal(a.session, terminalOutput, inputStream, a.sessionFile)
@@ -431,9 +428,9 @@ func (m *Terminal) renderTodos() string {
 	}
 
 	todoStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#f9e2af"))                  // Yellow
-	pendingStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086"))             // Dimmed white
+	pendingStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086"))               // Dimmed white
 	inProgressStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1")).Bold(true) // Green bold
-	completedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6a8a6a"))          // Dimmed green
+	completedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6a8a6a"))             // Dimmed green
 
 	var sb strings.Builder
 	sb.WriteString(todoStyle.Render("TODO LIST"))

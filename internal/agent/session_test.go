@@ -66,14 +66,14 @@ func TestSaveAndLoadSession(t *testing.T) {
 	}
 
 	// Create a minimal session for testing
-	processor := NewProcessor(nil)
 	session := &Session{
-		Processor:     processor,
 		Messages:      sessionData.Messages,
 		BaseURL:       sessionData.BaseURL,
 		ModelName:     sessionData.ModelName,
 		TotalSpent:    sessionData.TotalSpent,
 		ContextTokens: sessionData.ContextTokens,
+		Input:         &stream.NopInput{},
+		Output:        &stream.NopOutput{},
 		taskQueue:     make(chan Task, 10),
 	}
 
@@ -135,11 +135,11 @@ func TestLoadLatestSession_WithFiles(t *testing.T) {
 		}
 
 		// Create a minimal session
-		processor := NewProcessor(nil)
 		session := &Session{
-			Processor: processor,
 			BaseURL:   data.BaseURL,
 			ModelName: data.ModelName,
+			Input:     &stream.NopInput{},
+			Output:    &stream.NopOutput{},
 			taskQueue: make(chan Task, 10),
 		}
 
@@ -157,12 +157,11 @@ func TestLoadLatestSession_WithFiles(t *testing.T) {
 func TestLoadOrNewSession(t *testing.T) {
 	// Use nil for model since we're just testing session creation
 	var model fantasy.LanguageModel = nil
-	processor := NewProcessor(nil)
 	baseTools := []fantasy.AgentTool{}
 	systemPrompt := "test system prompt"
 
 	// Test creating a new session without specifying session file
-	session, sessionFile := LoadOrNewSession(model, baseTools, systemPrompt, "https://api.test.com", "test-model", processor, "")
+	session, sessionFile := LoadOrNewSession(model, baseTools, systemPrompt, "https://api.test.com", "test-model", &stream.NopInput{}, &stream.NopOutput{}, "")
 	if session == nil {
 		t.Fatal("LoadOrNewSession returned nil session")
 	}
@@ -197,11 +196,10 @@ func TestLoadOrNewSession(t *testing.T) {
 func TestDisplayMessages(t *testing.T) {
 	// Create a mock output to capture displayed messages
 	mockOutput := &mockOutput{}
-	processor := NewProcessorWithIO(nil, &stream.NopInput{}, mockOutput)
 
 	// Create a session with some messages
 	session := &Session{
-		Processor: processor,
+		Output: mockOutput,
 		Messages: []fantasy.Message{
 			{
 				Role:    fantasy.MessageRoleUser,

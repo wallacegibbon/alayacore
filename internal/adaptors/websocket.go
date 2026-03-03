@@ -79,9 +79,6 @@ func handleWebSocket(cfg *app.Config) func(http.ResponseWriter, *http.Request) {
 		}
 		defer close(output.closeCh)
 
-		// Create processor for this client
-		processor := agentpkg.NewProcessorWithIO(nil, input, output)
-
 		// Load or create session
 		session, _ := agentpkg.LoadOrNewSession(
 			cfg.Model,
@@ -89,7 +86,8 @@ func handleWebSocket(cfg *app.Config) func(http.ResponseWriter, *http.Request) {
 			cfg.SystemPrompt,
 			cfg.Cfg.BaseURL,
 			cfg.Cfg.ModelName,
-			processor,
+			input,
+			output,
 			cfg.Cfg.Session,
 		)
 		output.session = session
@@ -98,7 +96,7 @@ func handleWebSocket(cfg *app.Config) func(http.ResponseWriter, *http.Request) {
 		if len(session.Messages) > 0 {
 			session.DisplayMessages()
 			// Force flush to ensure all messages are written to display buffer
-			processor.Output.Flush()
+			session.Output.Flush()
 		}
 
 		// Read loop - handles client input and blocks until connection closes
