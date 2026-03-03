@@ -55,7 +55,6 @@ func (d *DisplayBuffer) GetAll() string {
 // TerminalAdaptor is a terminal adaptor with a Terminal interface
 type TerminalAdaptor struct {
 	Config      *app.Config
-	session     *agentpkg.Session
 	sessionFile string
 }
 
@@ -78,7 +77,8 @@ func (a *TerminalAdaptor) Start() {
 	inputStream := stream.NewChanInput(10)
 	terminalOutput := newTerminalOutput()
 	// Load or create session
-	a.session, a.sessionFile = agentpkg.LoadOrNewSession(
+	var session *agentpkg.Session
+	session, a.sessionFile = agentpkg.LoadOrNewSession(
 		a.Config.Model,
 		a.Config.AgentTools,
 		a.Config.SystemPrompt,
@@ -89,14 +89,7 @@ func (a *TerminalAdaptor) Start() {
 		a.sessionFile,
 	)
 
-	// Display loaded messages if session has any
-	if len(a.session.Messages) > 0 {
-		a.session.DisplayMessages()
-		// Force flush to ensure all messages are written to display buffer
-		a.session.Output.Flush()
-	}
-
-	t := NewTerminal(a.session, terminalOutput, inputStream, a.sessionFile)
+	t := NewTerminal(session, terminalOutput, inputStream, a.sessionFile)
 
 	p := tea.NewProgram(t, tea.WithAltScreen(), tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
 	p.Run()
@@ -109,6 +102,8 @@ type terminalOutput struct {
 	mu         sync.Mutex
 	updateChan chan struct{}
 	status     string // Status bar content from TagSystem
+	todos      todo.TodoList
+	inProgress bool // Whether session has task in progress
 
 	textStyle        lipgloss.Style
 	userInputStyle   lipgloss.Style
@@ -211,6 +206,7 @@ func (w *terminalOutput) writeColored(tag byte, value string) {
 	case stream.TagSystem:
 		var info agentpkg.SystemInfo
 		if err := json.Unmarshal([]byte(value), &info); err == nil {
+			w.inProgress = info.InProgress
 			baseStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#45475a"))
 			queueStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#f38ba8")).Bold(true)
 			if info.QueueCount > 0 {
@@ -222,7 +218,7 @@ func (w *terminalOutput) writeColored(tag byte, value string) {
 		}
 		return
 	case stream.TagTodo:
-		// Update todos from session - handled by Terminal's update loop
+		json.Unmarshal([]byte(value), &w.todos)
 		return
 	case stream.TagPromptStart:
 		w.display.Append(strings.TrimRight(w.promptStyle.Render("> ")+w.userInputStyle.Render(value), " "))
@@ -360,9 +356,9 @@ func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput, inpu
 	return m
 }
 
-// updateTodos updates the cached todos from the session
+// updateTodos updates the cached todos from terminalOutput
 func (m *Terminal) updateTodos() {
-	m.todos = m.session.GetTodos()
+	m.todos = m.terminalOutput.todos
 	m.updateDisplayHeight()
 }
 
@@ -499,7 +495,7 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.updateDisplayContent()
 		m.updateStatus()
 		m.updateTodos()
-		if m.session != nil && m.session.IsInProgress() {
+		if m.terminalOutput.inProgress {
 			return m, tea.Tick(50*time.Millisecond, func(t time.Time) tea.Msg {
 				return tickMsg{}
 			})

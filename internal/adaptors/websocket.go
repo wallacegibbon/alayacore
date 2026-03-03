@@ -92,13 +92,6 @@ func handleWebSocket(cfg *app.Config) func(http.ResponseWriter, *http.Request) {
 		)
 		output.session = session
 
-		// Display loaded messages if session has any
-		if len(session.Messages) > 0 {
-			session.DisplayMessages()
-			// Force flush to ensure all messages are written to display buffer
-			session.Output.Flush()
-		}
-
 		// Read loop - handles client input and blocks until connection closes
 		for {
 			_, message, err := conn.ReadMessage()

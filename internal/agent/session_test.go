@@ -78,8 +78,8 @@ func TestSaveAndLoadSession(t *testing.T) {
 	}
 
 	// Save session
-	if err := session.SaveSession(sessionPath); err != nil {
-		t.Fatalf("SaveSession failed: %v", err)
+	if err := session.saveSessionToFile(sessionPath); err != nil {
+		t.Fatalf("saveSessionToFile failed: %v", err)
 	}
 
 	// Verify file exists
@@ -143,7 +143,7 @@ func TestLoadLatestSession_WithFiles(t *testing.T) {
 			taskQueue: make(chan Task, 10),
 		}
 
-		if err := session.SaveSession(filename); err != nil {
+		if err := session.saveSessionToFile(filename); err != nil {
 			t.Fatalf("Failed to save session %d: %v", i, err)
 		}
 	}
@@ -176,7 +176,7 @@ func TestLoadOrNewSession(t *testing.T) {
 
 	// Test manual save to a specific file
 	testFile := "/tmp/test-session.json"
-	if err := session.SaveSession(testFile); err != nil {
+	if err := session.saveSessionToFile(testFile); err != nil {
 		t.Errorf("Failed to save session: %v", err)
 	}
 	defer os.Remove(testFile) // Clean up test file
@@ -193,7 +193,7 @@ func TestLoadOrNewSession(t *testing.T) {
 	}
 }
 
-func TestDisplayMessages(t *testing.T) {
+func Test_displayMessages(t *testing.T) {
 	// Create a mock output to capture displayed messages
 	mockOutput := &mockOutput{}
 
@@ -214,11 +214,11 @@ func TestDisplayMessages(t *testing.T) {
 	}
 
 	// Display messages should not panic
-	session.DisplayMessages()
+	session.displayMessages()
 
 	// Verify that output was written
 	if mockOutput.writeCount == 0 {
-		t.Error("DisplayMessages did not write any output")
+		t.Error("displayMessages did not write any output")
 	}
 }
 

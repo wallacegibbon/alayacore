@@ -32,6 +32,7 @@ type SystemInfo struct {
 	ContextTokens int64 `json:"context"`
 	TotalTokens   int64 `json:"total"`
 	QueueCount    int   `json:"queue"`
+	InProgress    bool  `json:"in_progress"`
 }
 
 type Session struct {
@@ -80,6 +81,13 @@ func RestoreFromSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTo
 	}
 	session.initAgent(model, baseTools, systemPrompt)
 	go session.readFromInput()
+
+	// Display loaded messages if session has any
+	if len(session.Messages) > 0 {
+		session.displayMessages()
+		session.Output.Flush()
+	}
+
 	return session
 }
 
@@ -103,8 +111,6 @@ func LoadOrNewSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool
 	}
 	return NewSession(model, baseTools, systemPrompt, baseURL, modelName, input, output, sessionFile), sessionFile
 }
-
-func (s *Session) IsInProgress() bool { return s.inProgress }
 
 func (s *Session) submitTask(task Task) {
 	if s.queueTask(task) {
@@ -140,7 +146,11 @@ func (s *Session) getQueuedTask() (Task, bool) {
 
 func (s *Session) runAsync() {
 	s.inProgress = true
-	defer func() { s.inProgress = false }()
+	s.sendSystemInfo()
+	defer func() {
+		s.inProgress = false
+		s.sendSystemInfo()
+	}()
 	for {
 		task, ok := s.getQueuedTask()
 		if !ok {
@@ -303,7 +313,7 @@ func (s *Session) saveSession(args []string) {
 		s.writeError("usage: /save [filename]")
 		return
 	}
-	if err := s.SaveSession(filepath); err != nil {
+	if err := s.saveSessionToFile(filepath); err != nil {
 		s.writeError(fmt.Sprintf("failed to save session: %v", err))
 	} else {
 		s.writeNotify(fmt.Sprintf("Session saved to %s", filepath))
@@ -358,6 +368,7 @@ func (s *Session) sendSystemInfo() {
 		ContextTokens: s.ContextTokens,
 		TotalTokens:   s.TotalSpent.TotalTokens,
 		QueueCount:    len(s.taskQueue),
+		InProgress:    s.inProgress,
 	}
 	data, _ := json.Marshal(info)
 	stream.WriteTLV(s.Output, stream.TagSystem, string(data))
@@ -509,7 +520,7 @@ func LoadSession(path string) (*SessionData, error) {
 	return &sessionData, nil
 }
 
-func (s *Session) SaveSession(path string) error {
+func (s *Session) saveSessionToFile(path string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	messagesToSave := s.Messages
@@ -535,7 +546,7 @@ func (s *Session) SaveSession(path string) error {
 	return nil
 }
 
-func (s *Session) DisplayMessages() {
+func (s *Session) displayMessages() {
 	if s.Output == nil {
 		return
 	}
@@ -584,13 +595,4 @@ func (s *Session) SetTodos(todos todo.TodoList) {
 	s.Todos = todos
 	s.mu.Unlock()
 	s.sendTodoList()
-}
-
-func (s *Session) GetSetTodos(fn func(todo.TodoList) todo.TodoList) todo.TodoList {
-	s.mu.Lock()
-	result := fn(s.Todos)
-	s.Todos = result
-	s.mu.Unlock()
-	s.sendTodoList()
-	return result
 }
