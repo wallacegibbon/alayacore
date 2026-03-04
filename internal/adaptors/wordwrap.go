@@ -27,13 +27,13 @@ func wordwrap(text string, width int) string {
 			continue
 		}
 
-		// Break middle at width limit
+		// Break middle at width limit - simple character-by-character without word boundaries
 		for len(middle) > 0 {
 			breakAt := 0
 			currentWidth := 0
 
 			for breakAt < len(middle) {
-				// Note: middle should not contain escape sequences at start/end, but skip just in case
+				// Skip escape sequences in the middle (shouldn't happen but just in case)
 				skip := skipEscapeSequence(middle[breakAt:])
 				if skip > 0 {
 					breakAt += skip
@@ -50,51 +50,7 @@ func wordwrap(text string, width int) string {
 				breakAt++
 			}
 
-			// Find last space before breakAt for word boundary
-			lastSpace := -1
-			for i := breakAt - 1; i >= 0; i-- {
-				if middle[i] == ' ' {
-					lastSpace = i
-					break
-				}
-			}
-
-			// Orphan prevention: if the segment after the last space is very short,
-			// consider packing it onto the current line instead
-			if lastSpace > 0 {
-				segmentAfter := middle[lastSpace+1:]
-				afterWidth := lipgloss.Width(segmentAfter)
-
-				// If remaining segment is very short (< 30% of width), check if we can pack it
-				if afterWidth < width*3/10 {
-					// Check if the current line is not already too full
-					beforeWidth := lipgloss.Width(middle[:lastSpace])
-
-					// If we can fit the remaining segment on the current line without going too far over width,
-					// pack it together with the previous segment
-					if beforeWidth+afterWidth <= width*12/10 { // Allow going up to 120% of width
-						// Pack the segments together: find the space before lastSpace
-						prevSpace := -1
-						for i := lastSpace - 1; i >= 0; i-- {
-							if middle[i] == ' ' {
-								prevSpace = i
-								break
-							}
-						}
-						if prevSpace > 0 {
-							lastSpace = prevSpace
-						} else {
-							// No previous space, use all remaining text on this line
-							breakAt = len(middle)
-						}
-					}
-				}
-
-				if breakAt != len(middle) {
-					breakAt = lastSpace + 1
-				}
-			}
-
+			// Ensure we make progress even if the first character exceeds width
 			if breakAt == 0 {
 				breakAt = 1
 			}
