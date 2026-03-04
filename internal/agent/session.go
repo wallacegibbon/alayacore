@@ -95,7 +95,24 @@ func (s *Session) initAgent(model fantasy.LanguageModel, baseTools []fantasy.Age
 	todoReadTool := tools.NewTodoReadTool(s)
 	todoWriteTool := tools.NewTodoWriteTool(s)
 	allTools := append(baseTools, todoReadTool, todoWriteTool)
-	s.Agent = fantasy.NewAgent(model, fantasy.WithTools(allTools...), fantasy.WithSystemPrompt(systemPrompt))
+	s.Agent = fantasy.NewAgent(model,
+		fantasy.WithTools(allTools...),
+		fantasy.WithSystemPrompt(systemPrompt),
+		fantasy.WithPrepareStep(func(ctx context.Context, opts fantasy.PrepareStepFunctionOptions) (context.Context, fantasy.PrepareStepResult, error) {
+			result := fantasy.PrepareStepResult{
+				Model:    opts.Model,
+				Messages: opts.Messages,
+			}
+
+			// Inject system reminder as the latest input (at the end)
+			if reminder := s.generateSystemReminder(); reminder != "" {
+				reminderMsg := fantasy.NewUserMessage(reminder)
+				result.Messages = append(opts.Messages, reminderMsg)
+			}
+
+			return ctx, result, nil
+		}),
+	)
 }
 
 func LoadOrNewSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt, baseURL, modelName string, input stream.Input, output stream.Output, sessionFile string) (*Session, string) {
@@ -210,11 +227,6 @@ func (s *Session) handleUserPrompt(ctx context.Context, prompt string) {
 	s.Messages = append(s.Messages, fantasy.NewUserMessage(prompt))
 	messagesForAPI := make([]fantasy.Message, len(s.Messages)-1)
 	copy(messagesForAPI, s.Messages[:len(s.Messages)-1])
-
-	// Inject system reminder
-	if reminder := s.generateSystemReminder(); reminder != "" {
-		messagesForAPI = append(messagesForAPI, fantasy.NewUserMessage(reminder))
-	}
 
 	assistantMsg, usage, err := s.processPrompt(ctx, prompt, messagesForAPI)
 	if err != nil {
