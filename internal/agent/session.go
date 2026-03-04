@@ -168,10 +168,15 @@ func (s *Session) runAsync() {
 			s.handleCommandSync(ctx, t.Command)
 		}
 		if ctx.Err() == context.Canceled {
-			s.Messages = append(s.Messages, fantasy.Message{
-				Role:    fantasy.MessageRoleAssistant,
-				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "The user canceled."}},
-			})
+			// Only add "user canceled" message if no assistant message was saved
+			// (i.e., cancellation happened before any tool calls completed)
+			lastMsg := s.Messages[len(s.Messages)-1]
+			if lastMsg.Role == fantasy.MessageRoleUser {
+				s.Messages = append(s.Messages, fantasy.Message{
+					Role:    fantasy.MessageRoleAssistant,
+					Content: []fantasy.MessagePart{fantasy.TextPart{Text: "The user canceled."}},
+				})
+			}
 			s.cancelCurrent = nil
 			continue
 		}
@@ -179,12 +184,47 @@ func (s *Session) runAsync() {
 	}
 }
 
+func (s *Session) generateSystemReminder() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Only generate reminder if there are todos
+	if len(s.Todos) == 0 {
+		return ""
+	}
+
+	var sb strings.Builder
+	sb.WriteString("<system_reminder>")
+
+	// Add todo list info
+	sb.WriteString("Current todos:\n")
+	for _, t := range s.Todos {
+		fmt.Fprintf(&sb, "- [%s] %s\n", t.Status, t.Content)
+	}
+
+	sb.WriteString("</system_reminder>")
+	return sb.String()
+}
+
 func (s *Session) handleUserPrompt(ctx context.Context, prompt string) {
 	s.Messages = append(s.Messages, fantasy.NewUserMessage(prompt))
 	messagesForAPI := make([]fantasy.Message, len(s.Messages)-1)
 	copy(messagesForAPI, s.Messages[:len(s.Messages)-1])
+
+	// Inject system reminder
+	if reminder := s.generateSystemReminder(); reminder != "" {
+		messagesForAPI = append(messagesForAPI, fantasy.NewUserMessage(reminder))
+	}
+
 	assistantMsg, usage, err := s.processPrompt(ctx, prompt, messagesForAPI)
 	if err != nil {
+		// Track usage even on error (tokens were still spent)
+		s.trackUsage(usage)
+		// Save partial assistant message if it has content (tool calls, etc.)
+		// This preserves valuable work done before cancellation
+		if assistantMsg.Role != "" {
+			s.Messages = append(s.Messages, assistantMsg)
+		}
 		s.writeError(err.Error())
 		return
 	}
