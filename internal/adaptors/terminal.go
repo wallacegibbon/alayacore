@@ -292,22 +292,23 @@ func (w *terminalOutput) colorizeTool(value string) string {
 
 // Terminal is the main Terminal model
 type Terminal struct {
-	session          *agentpkg.Session
-	terminalOutput   *terminalOutput
-	streamInput      *stream.ChanInput
-	display          viewport.Model
-	input            textinput.Model
-	quitting         bool
-	confirmDialog    bool
-	focusedWindow    string        // "display" or "input"
-	userScrolledAway bool          // true after user manually scrolls up
-	windowWidth      int           // actual window width
-	windowHeight     int           // actual window height
-	editorContent    string        // content from external editor with newlines preserved
-	showingWelcome   bool          // true while welcome text is still displayed
-	welcomeText      string        // colored welcome text for comparison
-	sessionFile      string        // session file path for saving on quit
-	todos            todo.TodoList // cached todos for display
+	session             *agentpkg.Session
+	terminalOutput      *terminalOutput
+	streamInput         *stream.ChanInput
+	display             viewport.Model
+	input               textinput.Model
+	quitting            bool
+	confirmDialog       bool
+	cancelConfirmDialog bool
+	focusedWindow       string        // "display" or "input"
+	userScrolledAway    bool          // true after user manually scrolls up
+	windowWidth         int           // actual window width
+	windowHeight        int           // actual window height
+	editorContent       string        // content from external editor with newlines preserved
+	showingWelcome      bool          // true while welcome text is still displayed
+	welcomeText         string        // colored welcome text for comparison
+	sessionFile         string        // session file path for saving on quit
+	todos               todo.TodoList // cached todos for display
 
 	inputStyle  lipgloss.Style
 	statusStyle lipgloss.Style
@@ -531,7 +532,7 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Handle confirm dialog
+	// Handle confirm dialog for quit
 	if m.confirmDialog {
 		switch msg.String() {
 		case "y", "Y":
@@ -541,6 +542,21 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "n", "N", "esc", "ctrl+c":
 			m.confirmDialog = false
+			m.input.SetValue("")
+			return m, nil
+		}
+		return m, nil
+	}
+
+	// Handle confirm dialog for cancel
+	if m.cancelConfirmDialog {
+		switch msg.String() {
+		case "y", "Y":
+			m.cancelConfirmDialog = false
+			// Send /cancel command to session
+			return m, m.submitCommand("cancel", false)
+		case "n", "N", "esc", "ctrl+c":
+			m.cancelConfirmDialog = false
 			m.input.SetValue("")
 			return m, nil
 		}
@@ -606,8 +622,9 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	switch msg.String() {
 	case "ctrl+g":
-		// Cancel current request
-		return m, m.submitCommand("cancel", false)
+		// Show cancel confirmation dialog
+		m.cancelConfirmDialog = true
+		return m, nil
 	case "ctrl+c":
 		// If input window is focused, clear input
 		if m.focusedWindow == "input" {
@@ -647,6 +664,10 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if command, found := strings.CutPrefix(prompt, "/"); found {
 			if command == "quit" || command == "exit" {
 				m.confirmDialog = true
+				return m, nil
+			}
+			if command == "cancel" {
+				m.cancelConfirmDialog = true
 				return m, nil
 			}
 			return m, m.submitCommand(command, true)
@@ -864,6 +885,12 @@ func (m *Terminal) View() tea.View {
 			Width(max(0, windowWidth-4)).
 			Foreground(lipgloss.Color("#f38ba8")).
 			Bold(true).Render("Confirm exit? Press y/n")
+		sb.WriteString(borderStyle.Render(confirmText))
+	} else if m.cancelConfirmDialog {
+		confirmText := lipgloss.NewStyle().
+			Width(max(0, windowWidth-4)).
+			Foreground(lipgloss.Color("#f38ba8")).
+			Bold(true).Render("Confirm cancel? Press y/n")
 		sb.WriteString(borderStyle.Render(confirmText))
 	} else {
 		sb.WriteString(borderStyle.Render(m.inputStyle.Width(max(0, windowWidth-4)).Render(m.input.View())))

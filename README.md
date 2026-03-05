@@ -113,13 +113,14 @@ When running the Terminal version:
 | `Ctrl+U` | Scroll up half page (when display focused) |
 | `/` | Switch to input with "/" prefix (when display focused) |
 | `Ctrl+C` | Clear input (when input focused) |
-| `Ctrl+G` | Cancel current request |
+| `Ctrl+G` | Cancel current request (with confirmation) |
+| `/cancel` | Cancel current request (with confirmation) |
 | `/quit`, `/exit` | Exit with confirmation (press y/n) |
 
 ## Session Commands
 
 - `/save [filename]` - Save session to file
-- `/cancel` - Cancel current request and clear todos
+- `/cancel` - Cancel current request and clear todos (with confirmation)
 - `/summarize` - Summarize conversation to reduce token usage
 - `/quit`, `/exit` - Exit with confirmation
 

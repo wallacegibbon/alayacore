@@ -316,18 +316,37 @@ func TestCtrlGTriggersCancel(t *testing.T) {
 
 	model, cmd := terminal.Update(msg)
 
-	// Should return a model and a command
+	// Should return a model and no command (just shows dialog)
 	if model == nil {
 		t.Fatal("Update returned nil model")
 	}
 
-	if cmd == nil {
-		t.Fatal("Ctrl+G should emit cancel command")
+	if cmd != nil {
+		t.Fatal("Ctrl+G should not emit command immediately, should show confirm dialog")
+	}
+
+	// Cancel confirmation dialog should be shown
+	if !terminal.cancelConfirmDialog {
+		t.Error("Ctrl+G should set cancelConfirmDialog to true")
 	}
 
 	// Input should remain unchanged
 	if terminal.input.Value() != "test input text" {
 		t.Errorf("Input should remain unchanged after Ctrl+G, got %q", terminal.input.Value())
+	}
+
+	// Test confirming the dialog by pressing 'y'
+	msg = tea.KeyPressMsg(tea.Key{Code: 'y'})
+	model, cmd = terminal.Update(msg)
+
+	// Now should emit cancel command
+	if cmd == nil {
+		t.Fatal("Pressing 'y' should emit cancel command")
+	}
+
+	// Cancel dialog should be closed
+	if terminal.cancelConfirmDialog {
+		t.Error("Cancel dialog should be closed after confirming")
 	}
 }
 

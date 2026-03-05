@@ -102,7 +102,7 @@ CoreClaw allows you to save and restore conversations manually using session fil
 ```sh
 /save                    # Save to current session file (if set with --session)
 /save ~/mysession.json    # Save to specific file
-/cancel                  # Cancel current request and clear todos
+/cancel                  # Cancel current request and clear todos (with confirmation)
 /summarize              # Summarize the entire conversation to a single message
 ```
 
@@ -167,7 +167,8 @@ When running the Terminal version:
 | `Ctrl+U` | Scroll up half page (when display focused) |
 | `/` | Switch to input with "/" prefix (when display focused) |
 | `Ctrl+C` | Clear input (when input focused) |
-| `Ctrl+G` | Cancel current request |
+| `Ctrl+G` | Cancel current request (with confirmation) |
+| `/cancel` | Cancel current request (with confirmation) |
 | `/quit`, `/exit` | Exit with confirmation (press y/n) |
 
 

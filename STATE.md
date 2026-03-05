@@ -225,6 +225,18 @@ For this project, simplicity is more important than efficiency.
   - Updated ANSI reset sequence test to accept both `\x1b[0m` and `\x1b[m` (equivalent in v2)
   - All tests pass, project builds successfully
 
+- ✅ **Added confirmation dialog for /cancel command**
+  - **Problem**: `/cancel` command executed immediately without confirmation, potentially interrupting work accidentally
+  - **Solution**: Added confirmation dialog similar to `/quit` for `/cancel` command
+  - **Implementation**:
+    - Added `cancelConfirmDialog` bool field to Terminal struct
+    - Updated `/cancel` command handling to show confirmation dialog
+    - Updated Ctrl+G key binding to show confirmation dialog instead of sending command directly
+    - Updated `handleKeyMsg()` to handle both quit and cancel confirmation dialogs
+    - Updated `View()` to show "Confirm cancel? Press y/n" message when cancelConfirmDialog is true
+  - **Testing**: Updated `TestCtrlGTriggersCancel` to verify dialog is shown and confirmed before sending command
+  - **Documentation**: Updated AGENTS.md and README.md to note `/cancel` requires confirmation
+
 ### Architecture
 - **Provider Types**: `anthropic` (native Anthropic API), `openai` (OpenAI-compatible)
 - **Tools**: read_file, todo_read, todo_write, write_file, activate_skill, posix_shell
