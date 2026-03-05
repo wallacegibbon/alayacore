@@ -12,6 +12,7 @@ import (
 // TodoWriter is an interface for writing todos
 type TodoWriter interface {
 	SetTodos(todos todo.TodoList)
+	GetTodos() todo.TodoList
 }
 
 // TodoWriteInput represents the input for the todo_write tool
@@ -31,7 +32,7 @@ func NewTodoWriteTool(todoWriter TodoWriter) fantasy.AgentTool {
 
 			var todos todo.TodoList
 			if err := json.Unmarshal([]byte(input.Todos), &todos); err != nil {
-				return fantasy.NewTextErrorResponse("invalid todos JSON: " + err.Error()), nil
+				return fantasy.NewTextErrorResponse("invalid todos JSON: "+err.Error()), nil
 			}
 
 			// Validate todo items
@@ -51,6 +52,43 @@ func NewTodoWriteTool(todoWriter TodoWriter) fantasy.AgentTool {
 				}
 			}
 
+			// Get current todos
+			currentTodos := todoWriter.GetTodos()
+
+			// If there are existing todos, validate that only status changes are made
+			if len(currentTodos) > 0 {
+				// Build a map of current todos by content
+				currentMap := make(map[string]todo.TodoItem, len(currentTodos))
+				for _, item := range currentTodos {
+					currentMap[item.Content] = item
+				}
+
+				// Check each incoming todo
+				for i, item := range todos {
+					existing, found := currentMap[item.Content]
+					if !found {
+						return fantasy.NewTextErrorResponse(fmt.Sprintf("todo item at index %d: content \"%s\" not found in existing todo list. New items cannot be added after initial creation.", i, item.Content)), nil
+					}
+					// Check if active_form changed
+					if item.ActiveForm != existing.ActiveForm {
+						return fantasy.NewTextErrorResponse(fmt.Sprintf("todo item at index %d: active_form cannot be changed (was \"%s\", got \"%s\")", i, existing.ActiveForm, item.ActiveForm)), nil
+					}
+					// Status changes are allowed
+					todos[i].Status = item.Status
+				}
+
+				// Check for missing items (items in current but not in new list)
+				newMap := make(map[string]bool, len(todos))
+				for _, item := range todos {
+					newMap[item.Content] = true
+				}
+				for _, existing := range currentTodos {
+					if !newMap[existing.Content] {
+						return fantasy.NewTextErrorResponse(fmt.Sprintf("todo item \"%s\" is missing from the new list. All existing items must be included.", existing.Content)), nil
+					}
+				}
+			}
+
 			// Set todos via session (this will send TagTodo to adaptors)
 			todoWriter.SetTodos(todos)
 
@@ -67,7 +105,7 @@ func NewTodoWriteTool(todoWriter TodoWriter) fantasy.AgentTool {
 				return fantasy.NewTextResponse("All tasks completed! Todo list cleared."), nil
 			}
 
-			return fantasy.NewTextResponse("Todo list updated with " + fmt.Sprintf("%d", len(todos)) + " items"), nil
+			return fantasy.NewTextResponse("Todo list updated with "+fmt.Sprintf("%d", len(todos))+" items"), nil
 		},
 	)
 }
