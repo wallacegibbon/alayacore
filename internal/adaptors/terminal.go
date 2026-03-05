@@ -358,7 +358,8 @@ func (m *Terminal) handleConfirmDialog(msg tea.KeyMsg) (tea.Cmd, bool) {
 		switch msg.String() {
 		case "y", "Y":
 			m.cancelConfirmDialog = false
-			return m.submitCommand("cancel", false), true
+			m.input.SetValue("")
+			return m.submitCommand("cancel", true), true
 		case "n", "N", "esc", "ctrl+c":
 			m.cancelConfirmDialog = false
 			m.input.SetValue("")
