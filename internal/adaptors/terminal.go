@@ -488,7 +488,7 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.windowWidth = msg.Width
 		m.windowHeight = msg.Height
 		m.display.SetWidth(max(0, msg.Width-8)) // Leave room for padding (4 on each side)
-		m.input.SetWidth(max(0, msg.Width-4))  // Leave room for border padding (2 on each side)
+		m.input.SetWidth(max(0, msg.Width-4))   // Leave room for border padding (2 on each side)
 		m.updateDisplayHeight()
 		m.centerWelcomeText()
 		m.updateTodos()

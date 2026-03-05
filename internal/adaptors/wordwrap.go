@@ -27,15 +27,20 @@ func wordwrap(text string, width int) string {
 			continue
 		}
 
+		// Track cumulative escape sequences for proper styling across wrapped lines
+		currentEscapes := prefix
+
 		// Break middle at width limit - simple character-by-character without word boundaries
 		for len(middle) > 0 {
 			breakAt := 0
 			currentWidth := 0
 
 			for breakAt < len(middle) {
-				// Skip escape sequences in the middle (shouldn't happen but just in case)
+				// Track escape sequences to maintain styling across line breaks
 				skip := skipEscapeSequence(middle[breakAt:])
 				if skip > 0 {
+					// Update cumulative escape sequences for next line
+					currentEscapes += middle[breakAt : breakAt+skip]
 					breakAt += skip
 					continue
 				}
@@ -55,8 +60,8 @@ func wordwrap(text string, width int) string {
 				breakAt = 1
 			}
 
-			// Write prefix + this segment + suffix
-			result.WriteString(prefix)
+			// Write cumulative escapes + this segment + suffix
+			result.WriteString(currentEscapes)
 			result.WriteString(middle[:breakAt])
 			result.WriteString(suffix)
 			result.WriteString("\n")
