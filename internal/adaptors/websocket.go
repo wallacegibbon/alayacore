@@ -20,49 +20,37 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-// WebSocketAdaptor connects WebSocket to the agent processor
+// WebSocketAdaptor connects WebSocket clients to agent sessions.
 type WebSocketAdaptor struct {
 	Config *app.Config
 	Server *http.Server
 }
 
-// NewWebSocketAdaptor creates a new WebSocket adaptor that listens on the given port
-// Each client gets its own agent session
+// NewWebSocketAdaptor creates a WebSocket server. Each client gets its own agent session.
 func NewWebSocketAdaptor(port string, cfg *app.Config) *WebSocketAdaptor {
 	mux := http.NewServeMux()
-
-	// Handle WebSocket
 	mux.HandleFunc("/ws", handleWebSocket(cfg))
-
-	// Serve embedded index.html
 	mux.HandleFunc("/", serveIndex)
-
-	server := &http.Server{
-		Addr:    port,
-		Handler: mux,
-	}
 
 	return &WebSocketAdaptor{
 		Config: cfg,
-		Server: server,
+		Server: &http.Server{Addr: port, Handler: mux},
 	}
 }
 
-// serveIndex serves the embedded index.html
+// Start begins listening in a goroutine.
+func (a *WebSocketAdaptor) Start() {
+	go a.Server.ListenAndServe()
+}
+
+// serveIndex serves the embedded chat UI.
 func serveIndex(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	html := strings.Replace(string(indexHTML), "{{welcome}}", WelcomeText, 1)
 	w.Write([]byte(html))
 }
 
-// Start starts the WebSocket server in a goroutine
-func (a *WebSocketAdaptor) Start() {
-	go func() {
-		a.Server.ListenAndServe()
-	}()
-}
-
-// handleWebSocket handles WebSocket connections with per-client sessions
+// handleWebSocket upgrades HTTP to WebSocket and runs a session.
 func handleWebSocket(cfg *app.Config) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -71,85 +59,78 @@ func handleWebSocket(cfg *app.Config) func(http.ResponseWriter, *http.Request) {
 		}
 		defer conn.Close()
 
-		// Create per-client streams
 		input := stream.NewChanInput(100)
-		output := &clientOutput{
-			conn:    conn,
-			closeCh: make(chan struct{}),
-		}
-		defer close(output.closeCh)
+		defer input.Close() // Signal session's readFromInput to exit
 
-		// Load or create session
-		session, _ := agentpkg.LoadOrNewSession(
-			cfg.Model,
-			cfg.AgentTools,
-			cfg.SystemPrompt,
-			cfg.Cfg.BaseURL,
-			cfg.Cfg.ModelName,
-			input,
-			output,
-			cfg.Cfg.Session,
-		)
-		output.session = session
+		output := newClientOutput(conn)
 
-		// Read loop - handles client input and blocks until connection closes
-		for {
-			_, message, err := conn.ReadMessage()
-			if err != nil {
-				return
-			}
+		// Each connection gets its own agent session.
+		agentpkg.LoadOrNewSession(cfg.Model, cfg.AgentTools, cfg.SystemPrompt, cfg.Cfg.BaseURL, cfg.Cfg.ModelName, input, output, cfg.Cfg.Session)
 
-			if len(message) == 0 {
-				continue
-			}
-
-			// Decode TLV to check for /quit command
-			if len(message) >= 5 {
-				tag := message[0]
-				length := uint32(message[1])<<24 | uint32(message[2])<<16 | uint32(message[3])<<8 | uint32(message[4])
-				if len(message) >= 5+int(length) {
-					value := string(message[5 : 5+length])
-					// Ignore /quit and /exit commands from web client
-					if tag == 'A' && (value == "/quit" || value == "/exit") {
-						continue
-					}
-				}
-			}
-
-			// Client already encoded as TLV, pass through raw data
-			input.EmitRawData(message)
-		}
+		readMessages(conn, input)
 	}
 }
 
-// clientOutput implements stream.Output for a single WebSocket client
-type clientOutput struct {
-	conn    *websocket.Conn
-	session *agentpkg.Session
-	mu      sync.Mutex
-	closeCh chan struct{}
+// readMessages reads TLV messages from conn and forwards to input.
+func readMessages(conn *websocket.Conn, input *stream.ChanInput) {
+	for {
+		_, message, err := conn.ReadMessage()
+		if err != nil {
+			return
+		}
+		if len(message) == 0 {
+			continue
+		}
+
+		// Filter out /quit and /exit commands from web client.
+		if tag, value, ok := parseTLV(message); ok && tag == stream.TagUserText {
+			if value == "/quit" || value == "/exit" {
+				continue
+			}
+		}
+
+		input.Emit(message)
+	}
 }
 
-// Write implements stream.Output
+// parseTLV extracts tag and value from a TLV-encoded message.
+// Returns ok=false if message is too short.
+func parseTLV(message []byte) (tag byte, value string, ok bool) {
+	if len(message) < 5 {
+		return 0, "", false
+	}
+	tag = message[0]
+	length := uint32(message[1])<<24 | uint32(message[2])<<16 | uint32(message[3])<<8 | uint32(message[4])
+	if len(message) < 5+int(length) {
+		return 0, "", false
+	}
+	return tag, string(message[5 : 5+length]), true
+}
+
+// clientOutput implements stream.Output for a WebSocket connection.
+type clientOutput struct {
+	conn *websocket.Conn
+	mu   sync.Mutex
+}
+
+func newClientOutput(conn *websocket.Conn) *clientOutput {
+	return &clientOutput{conn: conn}
+}
+
 func (o *clientOutput) Write(p []byte) (n int, err error) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	err = o.conn.WriteMessage(websocket.BinaryMessage, p)
-	if err != nil {
+	if err = o.conn.WriteMessage(websocket.BinaryMessage, p); err != nil {
 		return 0, err
 	}
 	return len(p), nil
 }
 
-// WriteString implements stream.Output
 func (o *clientOutput) WriteString(s string) (int, error) {
 	return o.Write([]byte(s))
 }
 
-// Flush implements stream.Output
-func (o *clientOutput) Flush() error {
-	return nil
-}
+func (o *clientOutput) Flush() error { return nil }
 
 //go:embed chat.html
 var indexHTML []byte

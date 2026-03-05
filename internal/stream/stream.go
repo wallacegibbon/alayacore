@@ -19,21 +19,49 @@ const (
 	TagTodo          = 'F' // Todo list updates (JSON wrapped in TagTodo)
 )
 
-// ChanInput implements Input using a channel for writing
-// Useful for adaptors that need to queue data from a separate goroutine
+// ChanInput implements Input using a channel.
 type ChanInput struct {
-	Ch  chan []byte
+	ch  chan []byte
 	buf []byte
 }
 
-// NewChanInput creates a new ChanInput with specified buffer size
+// NewChanInput creates a ChanInput with the given buffer size.
 func NewChanInput(bufferSize int) *ChanInput {
-	return &ChanInput{
-		Ch: make(chan []byte, bufferSize),
-	}
+	return &ChanInput{ch: make(chan []byte, bufferSize)}
 }
 
-// EncodeTLV creates a TLV-encoded byte slice
+// Close closes the input channel, causing Read to return EOF.
+func (i *ChanInput) Close() error {
+	close(i.ch)
+	return nil
+}
+
+// Read implements Input. Returns io.EOF when the channel is closed.
+func (i *ChanInput) Read(p []byte) (n int, err error) {
+	if len(i.buf) > 0 {
+		n = copy(p, i.buf)
+		i.buf = i.buf[n:]
+		return n, nil
+	}
+
+	msg, ok := <-i.ch
+	if !ok {
+		return 0, io.EOF
+	}
+
+	i.buf = msg
+	n = copy(p, i.buf)
+	i.buf = i.buf[n:]
+	return n, nil
+}
+
+// Emit sends data to the input channel.
+func (i *ChanInput) Emit(data []byte) error {
+	i.ch <- data
+	return nil
+}
+
+// EncodeTLV creates a TLV-encoded byte slice.
 func EncodeTLV(tag byte, value string) []byte {
 	data := []byte(value)
 	length := int32(len(data))
@@ -46,36 +74,9 @@ func EncodeTLV(tag byte, value string) []byte {
 	return msg
 }
 
-// EmitTLVData writes a TLV-encoded message to the input
-func (i *ChanInput) EmitTLVData(tag byte, value string) error {
-	i.Ch <- EncodeTLV(tag, value)
-	return nil
-}
-
-// EmitRawData writes raw bytes to the input channel
-// Useful when the data is already TLV-encoded (e.g., from WebSocket client)
-func (i *ChanInput) EmitRawData(data []byte) error {
-	i.Ch <- data
-	return nil
-}
-
-// Read implements Input interface (used by processor)
-func (i *ChanInput) Read(p []byte) (n int, err error) {
-	if len(i.buf) > 0 {
-		n = copy(p, i.buf)
-		i.buf = i.buf[n:]
-		return n, nil
-	}
-
-	msg, ok := <-i.Ch
-	if !ok {
-		return 0, nil
-	}
-
-	i.buf = msg
-	n = copy(p, i.buf)
-	i.buf = i.buf[n:]
-	return n, nil
+// EmitTLV writes a TLV-encoded message to the input.
+func (i *ChanInput) EmitTLV(tag byte, value string) error {
+	return i.Emit(EncodeTLV(tag, value))
 }
 
 // WriteTLV writes a TLV message to the output

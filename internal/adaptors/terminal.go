@@ -344,7 +344,7 @@ func (m *Terminal) handleConfirmDialog(msg tea.KeyMsg) (tea.Cmd, bool) {
 		switch msg.String() {
 		case "y", "Y":
 			m.quitting = true
-			close(m.streamInput.Ch)
+			m.streamInput.Close()
 			return tea.Quit, true
 		case "n", "N", "esc", "ctrl+c":
 			m.confirmDialog = false
@@ -478,7 +478,7 @@ func (m *Terminal) handleSubmit() tea.Cmd {
 	}
 
 	// Submit prompt
-	m.streamInput.EmitTLVData(stream.TagUserText, prompt)
+	m.streamInput.EmitTLV(stream.TagUserText, prompt)
 	m.input.SetValue("")
 	m.updateStatus()
 
@@ -491,7 +491,7 @@ func (m *Terminal) updateStatus() {}
 
 func (m *Terminal) submitCommand(command string, clearInput bool) tea.Cmd {
 	// Send command as TLV to session
-	m.streamInput.EmitTLVData(stream.TagUserText, "/"+command)
+	m.streamInput.EmitTLV(stream.TagUserText, "/"+command)
 	if clearInput {
 		m.input.SetValue("")
 	}

@@ -18,6 +18,7 @@ import (
 	"github.com/wallacegibbon/coreclaw/internal/tools"
 )
 
+// Task represents a unit of work for the session.
 type Task interface{ isTask() }
 
 type UserPrompt string
@@ -28,6 +29,7 @@ type CommandPrompt struct{ Command string }
 
 func (CommandPrompt) isTask() {}
 
+// SystemInfo holds session state for clients.
 type SystemInfo struct {
 	ContextTokens int64 `json:"context"`
 	TotalTokens   int64 `json:"total"`
@@ -35,6 +37,7 @@ type SystemInfo struct {
 	InProgress    bool  `json:"in_progress"`
 }
 
+// Session manages conversation state and task execution.
 type Session struct {
 	Messages      []fantasy.Message
 	Agent         fantasy.Agent
@@ -46,14 +49,43 @@ type Session struct {
 	Todos         todo.TodoList
 	Input         stream.Input
 	Output        stream.Output
+
 	taskQueue     chan Task
 	inProgress    bool
 	cancelCurrent func()
 	mu            sync.Mutex
 }
 
+// SessionData is the persisted form of a Session.
+type SessionData struct {
+	BaseURL       string            `json:"base_url"`
+	ModelName     string            `json:"model_name"`
+	Messages      []fantasy.Message `json:"messages"`
+	TotalSpent    fantasy.Usage     `json:"total_spent"`
+	ContextTokens int64             `json:"context_tokens"`
+	Todos         todo.TodoList     `json:"todos"`
+	CreatedAt     time.Time         `json:"created_at"`
+	UpdatedAt     time.Time         `json:"updated_at"`
+}
+
+// ============================================================================
+// Session Lifecycle
+// ============================================================================
+
+// LoadOrNewSession loads a session from file or creates a new one.
+func LoadOrNewSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt, baseURL, modelName string, input stream.Input, output stream.Output, sessionFile string) (*Session, string) {
+	sessionFile = expandPath(sessionFile)
+	if sessionFile != "" {
+		if data, err := LoadSession(sessionFile); err == nil {
+			return RestoreFromSession(model, baseTools, systemPrompt, baseURL, modelName, input, output, data, sessionFile), sessionFile
+		}
+	}
+	return NewSession(model, baseTools, systemPrompt, baseURL, modelName, input, output, sessionFile), sessionFile
+}
+
+// NewSession creates a fresh session.
 func NewSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt, baseURL, modelName string, input stream.Input, output stream.Output, sessionFile string) *Session {
-	session := &Session{
+	s := &Session{
 		BaseURL:     baseURL,
 		ModelName:   modelName,
 		SessionFile: sessionFile,
@@ -61,89 +93,115 @@ func NewSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, syst
 		Output:      output,
 		taskQueue:   make(chan Task, 10),
 	}
-	session.initAgent(model, baseTools, systemPrompt)
-	go session.readFromInput()
-	return session
+	s.initAgent(model, baseTools, systemPrompt)
+	go s.readFromInput()
+	return s
 }
 
-func RestoreFromSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt, baseURL, modelName string, input stream.Input, output stream.Output, sessionData *SessionData, sessionFile string) *Session {
-	session := &Session{
-		Messages:      sessionData.Messages,
+// RestoreFromSession creates a session from saved data.
+func RestoreFromSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt, baseURL, modelName string, input stream.Input, output stream.Output, data *SessionData, sessionFile string) *Session {
+	s := &Session{
+		Messages:      data.Messages,
 		BaseURL:       baseURL,
 		ModelName:     modelName,
 		SessionFile:   sessionFile,
-		TotalSpent:    sessionData.TotalSpent,
-		ContextTokens: sessionData.ContextTokens,
-		Todos:         sessionData.Todos,
+		TotalSpent:    data.TotalSpent,
+		ContextTokens: data.ContextTokens,
+		Todos:         data.Todos,
 		Input:         input,
 		Output:        output,
 		taskQueue:     make(chan Task, 10),
 	}
-	session.initAgent(model, baseTools, systemPrompt)
-	go session.readFromInput()
+	s.initAgent(model, baseTools, systemPrompt)
+	go s.readFromInput()
 
-	// Display loaded messages if session has any
-	if len(session.Messages) > 0 {
-		session.displayMessages()
-		session.Output.Flush()
+	if len(s.Messages) > 0 {
+		s.displayMessages()
+		s.Output.Flush()
 	}
-
-	return session
+	return s
 }
 
 func (s *Session) initAgent(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt string) {
-	todoReadTool := tools.NewTodoReadTool(s)
-	todoWriteTool := tools.NewTodoWriteTool(s)
-	allTools := append(baseTools, todoReadTool, todoWriteTool)
+	allTools := append(baseTools,
+		tools.NewTodoReadTool(s),
+		tools.NewTodoWriteTool(s),
+	)
 	s.Agent = fantasy.NewAgent(model,
 		fantasy.WithTools(allTools...),
 		fantasy.WithSystemPrompt(systemPrompt),
-		fantasy.WithPrepareStep(func(ctx context.Context, opts fantasy.PrepareStepFunctionOptions) (context.Context, fantasy.PrepareStepResult, error) {
-			result := fantasy.PrepareStepResult{
-				Model:    opts.Model,
-				Messages: opts.Messages,
-			}
-
-			// Inject system reminder as the latest input (at the end)
-			if reminder := s.generateSystemReminder(); reminder != "" {
-				reminderMsg := fantasy.NewUserMessage(reminder)
-				result.Messages = append(opts.Messages, reminderMsg)
-			}
-
-			return ctx, result, nil
-		}),
+		fantasy.WithPrepareStep(s.prepareStep),
 	)
 }
 
-func LoadOrNewSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt, baseURL, modelName string, input stream.Input, output stream.Output, sessionFile string) (*Session, string) {
-	sessionFile = expandPath(sessionFile)
-	var sessionData *SessionData
-	if sessionFile != "" {
-		if data, err := LoadSession(sessionFile); err == nil {
-			sessionData = data
+func (s *Session) prepareStep(ctx context.Context, opts fantasy.PrepareStepFunctionOptions) (context.Context, fantasy.PrepareStepResult, error) {
+	result := fantasy.PrepareStepResult{
+		Model:    opts.Model,
+		Messages: opts.Messages,
+	}
+	if reminder := s.generateSystemReminder(); reminder != "" {
+		result.Messages = append(opts.Messages, fantasy.NewUserMessage(reminder))
+	}
+	return ctx, result, nil
+}
+
+func (s *Session) generateSystemReminder() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if len(s.Todos) == 0 {
+		return ""
+	}
+
+	var sb strings.Builder
+	sb.WriteString("<system_reminder>\nCurrent todos:\n")
+	for _, t := range s.Todos {
+		fmt.Fprintf(&sb, "- [%s] %s\n", t.Status, t.Content)
+	}
+	sb.WriteString("</system_reminder>")
+	return sb.String()
+}
+
+// ============================================================================
+// Input Processing
+// ============================================================================
+
+func (s *Session) readFromInput() {
+	for {
+		tag, value, err := stream.ReadTLV(s.Input)
+		if err != nil {
+			return // Input closed
+		}
+		if tag != stream.TagUserText {
+			s.writeError(fmt.Sprintf("Invalid input tag: %c (only %c is allowed)", tag, stream.TagUserText))
+			continue
+		}
+		if len(value) > 0 && value[0] == '/' {
+			s.submitCommand(value[1:])
+		} else {
+			s.submitTask(UserPrompt(value))
 		}
 	}
-	if sessionData != nil {
-		return RestoreFromSession(model, baseTools, systemPrompt, baseURL, modelName, input, output, sessionData, sessionFile), sessionFile
-	}
-	return NewSession(model, baseTools, systemPrompt, baseURL, modelName, input, output, sessionFile), sessionFile
 }
+
+// ============================================================================
+// Task Queue
+// ============================================================================
 
 func (s *Session) submitTask(task Task) {
-	if s.queueTask(task) {
-		if s.inProgress {
-			s.writeNotify("[Queued] Previous task in progress. Will run after completion.")
-			s.sendSystemInfo()
-		}
-		if !s.inProgress {
-			go s.runAsync()
-		}
-	} else {
+	if !s.tryQueueTask(task) {
 		s.writeNotify("[Busy] Cannot queue, try again shortly.")
+		return
+	}
+	if s.inProgress {
+		s.writeNotify("[Queued] Previous task in progress. Will run after completion.")
+		s.sendSystemInfo()
+	} else {
+		go s.runTaskQueue()
 	}
 }
 
-func (s *Session) queueTask(task Task) bool {
+func (s *Session) tryQueueTask(task Task) bool {
 	select {
 	case s.taskQueue <- task:
 		return true
@@ -152,93 +210,126 @@ func (s *Session) queueTask(task Task) bool {
 	}
 }
 
-func (s *Session) getQueuedTask() (Task, bool) {
-	select {
-	case task, ok := <-s.taskQueue:
-		return task, ok
-	default:
-		return nil, false
-	}
-}
-
-func (s *Session) runAsync() {
+func (s *Session) runTaskQueue() {
 	s.inProgress = true
 	s.sendSystemInfo()
 	defer func() {
 		s.inProgress = false
 		s.sendSystemInfo()
 	}()
+
 	for {
-		task, ok := s.getQueuedTask()
-		if !ok {
-			break
+		select {
+		case task := <-s.taskQueue:
+			s.runTask(task)
+		default:
+			return // Queue empty
 		}
-		s.sendSystemInfo()
-		ctx, cancel := context.WithCancel(context.Background())
-		s.cancelCurrent = cancel
-		switch t := task.(type) {
-		case UserPrompt:
-			s.signalPromptStart(string(t))
-			s.handleUserPrompt(ctx, string(t))
-		case CommandPrompt:
-			s.signalCommandStart(t.Command)
-			s.handleCommandSync(ctx, t.Command)
-		}
-		if ctx.Err() == context.Canceled {
-			// Only add "user canceled" message if no assistant message was saved
-			// (i.e., cancellation happened before any tool calls completed)
-			lastMsg := s.Messages[len(s.Messages)-1]
-			if lastMsg.Role == fantasy.MessageRoleUser {
-				s.Messages = append(s.Messages, fantasy.Message{
-					Role:    fantasy.MessageRoleAssistant,
-					Content: []fantasy.MessagePart{fantasy.TextPart{Text: "The user canceled."}},
-				})
-			}
-			s.cancelCurrent = nil
-			continue
-		}
-		s.cancelCurrent = nil
 	}
 }
 
-func (s *Session) generateSystemReminder() string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (s *Session) runTask(task Task) {
+	s.sendSystemInfo()
+	ctx, cancel := context.WithCancel(context.Background())
+	s.cancelCurrent = cancel
+	defer func() { s.cancelCurrent = nil }()
 
-	// Only generate reminder if there are todos
-	if len(s.Todos) == 0 {
-		return ""
+	switch t := task.(type) {
+	case UserPrompt:
+		s.signalPromptStart(string(t))
+		s.handleUserPrompt(ctx, string(t))
+	case CommandPrompt:
+		s.signalCommandStart(t.Command)
+		s.handleCommandSync(ctx, t.Command)
 	}
 
-	var sb strings.Builder
-	sb.WriteString("<system_reminder>")
-
-	// Add todo list info
-	sb.WriteString("Current todos:\n")
-	for _, t := range s.Todos {
-		fmt.Fprintf(&sb, "- [%s] %s\n", t.Status, t.Content)
+	if ctx.Err() == context.Canceled {
+		s.appendCancelMessage()
 	}
-
-	sb.WriteString("</system_reminder>")
-	return sb.String()
 }
+
+func (s *Session) appendCancelMessage() {
+	if len(s.Messages) == 0 {
+		return
+	}
+	if s.Messages[len(s.Messages)-1].Role == fantasy.MessageRoleUser {
+		s.Messages = append(s.Messages, fantasy.Message{
+			Role:    fantasy.MessageRoleAssistant,
+			Content: []fantasy.MessagePart{fantasy.TextPart{Text: "The user canceled."}},
+		})
+	}
+}
+
+// ============================================================================
+// Prompt Handling
+// ============================================================================
 
 func (s *Session) handleUserPrompt(ctx context.Context, prompt string) {
 	s.Messages = append(s.Messages, fantasy.NewUserMessage(prompt))
-	messagesForAPI := make([]fantasy.Message, len(s.Messages)-1)
-	copy(messagesForAPI, s.Messages[:len(s.Messages)-1])
+	history := s.Messages[:len(s.Messages)-1]
 
-	assistantMsg, usage, err := s.processPrompt(ctx, prompt, messagesForAPI)
+	msg, usage, err := s.processPrompt(ctx, prompt, history)
 	if err != nil {
-		// Track usage even on error (tokens were still spent)
 		s.trackUsage(usage)
 		s.writeError(err.Error())
 		return
 	}
 	s.trackUsage(usage)
-	if assistantMsg.Role != "" {
-		s.Messages = append(s.Messages, assistantMsg)
+	if msg.Role != "" {
+		s.Messages = append(s.Messages, msg)
 	}
+}
+
+func (s *Session) processPrompt(ctx context.Context, prompt string, history []fantasy.Message) (fantasy.Message, fantasy.Usage, error) {
+	call := fantasy.AgentStreamCall{Prompt: prompt}
+	if len(history) > 0 {
+		call.Messages = history
+	}
+
+	call.OnTextDelta = func(_, text string) error {
+		stream.WriteTLV(s.Output, stream.TagAssistantText, text)
+		s.Output.Flush()
+		return nil
+	}
+	call.OnTextEnd = func(_ string) error {
+		stream.WriteTLV(s.Output, stream.TagStreamGap, "")
+		return nil
+	}
+	call.OnReasoningDelta = func(_, text string) error {
+		stream.WriteTLV(s.Output, stream.TagReasoning, text)
+		s.Output.Flush()
+		return nil
+	}
+	call.OnReasoningEnd = func(_ string, _ fantasy.ReasoningContent) error {
+		stream.WriteTLV(s.Output, stream.TagStreamGap, "")
+		return nil
+	}
+	call.OnToolCall = func(tc fantasy.ToolCallContent) error {
+		s.writeToolCall(tc.ToolName, tc.Input)
+		stream.WriteTLV(s.Output, stream.TagStreamGap, "")
+		s.Output.Flush()
+		return nil
+	}
+
+	result, err := s.Agent.Stream(ctx, call)
+	if err != nil {
+		return fantasy.Message{}, fantasy.Usage{}, err
+	}
+	s.Output.Flush()
+
+	return s.extractAssistantMessage(result), result.TotalUsage, nil
+}
+
+func (s *Session) extractAssistantMessage(result *fantasy.AgentResult) fantasy.Message {
+	if result == nil || len(result.Steps) == 0 {
+		return fantasy.Message{}
+	}
+	for _, msg := range result.Steps[len(result.Steps)-1].Messages {
+		if msg.Role == fantasy.MessageRoleAssistant {
+			return msg
+		}
+	}
+	return fantasy.Message{}
 }
 
 func (s *Session) trackUsage(usage fantasy.Usage) {
@@ -250,58 +341,14 @@ func (s *Session) trackUsage(usage fantasy.Usage) {
 	s.sendSystemInfo()
 }
 
-func (s *Session) processPrompt(ctx context.Context, prompt string, messages []fantasy.Message) (fantasy.Message, fantasy.Usage, error) {
-	streamCall := fantasy.AgentStreamCall{Prompt: prompt}
-	if len(messages) > 0 {
-		streamCall.Messages = messages
-	}
-	streamCall.OnTextDelta = func(id, text string) error {
-		stream.WriteTLV(s.Output, stream.TagAssistantText, text)
-		s.Output.Flush()
-		return nil
-	}
-	streamCall.OnTextEnd = func(id string) error {
-		stream.WriteTLV(s.Output, stream.TagStreamGap, "")
-		return nil
-	}
-	streamCall.OnReasoningDelta = func(id, text string) error {
-		stream.WriteTLV(s.Output, stream.TagReasoning, text)
-		s.Output.Flush()
-		return nil
-	}
-	streamCall.OnReasoningEnd = func(id string, reasoning fantasy.ReasoningContent) error {
-		stream.WriteTLV(s.Output, stream.TagStreamGap, "")
-		return nil
-	}
-	streamCall.OnToolCall = func(tc fantasy.ToolCallContent) error {
-		s.writeToolCall(tc.ToolName, tc.Input)
-		stream.WriteTLV(s.Output, stream.TagStreamGap, "")
-		s.Output.Flush()
-		return nil
-	}
-	agentResult, err := s.Agent.Stream(ctx, streamCall)
-	if err != nil {
-		return fantasy.Message{}, fantasy.Usage{}, err
-	}
-	s.Output.Flush()
-	var assistantMsg fantasy.Message
-	if agentResult != nil && len(agentResult.Steps) > 0 {
-		lastStep := agentResult.Steps[len(agentResult.Steps)-1]
-		for _, msg := range lastStep.Messages {
-			if msg.Role == fantasy.MessageRoleAssistant {
-				assistantMsg = msg
-				break
-			}
-		}
-	}
-	return assistantMsg, agentResult.TotalUsage, nil
-}
+// ============================================================================
+// Command Handling
+// ============================================================================
 
 func (s *Session) submitCommand(cmd string) {
-	switch cmd {
-	case "summarize":
+	if cmd == "summarize" {
 		s.submitTask(CommandPrompt{Command: cmd})
-	default:
+	} else {
 		s.handleCommandSync(context.Background(), cmd)
 	}
 }
@@ -312,6 +359,7 @@ func (s *Session) handleCommandSync(ctx context.Context, cmd string) {
 		s.writeError("empty command")
 		return
 	}
+
 	switch parts[0] {
 	case "summarize":
 		s.summarize(ctx)
@@ -334,65 +382,44 @@ func (s *Session) cancelTask() {
 }
 
 func (s *Session) summarize(ctx context.Context) {
-	summarizePrompt := "Please summarize the conversation above in a concise manner. Return ONLY the summary, no introductions or explanations."
-	assistantMsg, usage, err := s.processPrompt(ctx, summarizePrompt, s.Messages)
+	prompt := "Please summarize the conversation above in a concise manner. Return ONLY the summary, no introductions or explanations."
+	msg, usage, err := s.processPrompt(ctx, prompt, s.Messages)
 	if err != nil {
 		s.writeError(err.Error())
 		return
 	}
-	s.Messages = []fantasy.Message{assistantMsg}
+	s.Messages = []fantasy.Message{msg}
 	s.trackUsage(usage)
 	s.ContextTokens = usage.OutputTokens
 	s.sendSystemInfo()
 }
 
 func (s *Session) saveSession(args []string) {
-	var filepath string
-	if len(args) == 0 {
+	var path string
+	switch len(args) {
+	case 0:
 		if s.SessionFile == "" {
 			s.writeError("no session file set and no filename provided")
 			return
 		}
-		filepath = s.SessionFile
-	} else if len(args) == 1 {
-		filepath = expandPath(args[0])
-	} else {
+		path = s.SessionFile
+	case 1:
+		path = expandPath(args[0])
+	default:
 		s.writeError("usage: /save [filename]")
 		return
 	}
-	if err := s.saveSessionToFile(filepath); err != nil {
+
+	if err := s.saveSessionToFile(path); err != nil {
 		s.writeError(fmt.Sprintf("failed to save session: %v", err))
 	} else {
-		s.writeNotify(fmt.Sprintf("Session saved to %s", filepath))
+		s.writeNotify(fmt.Sprintf("Session saved to %s", path))
 	}
 }
 
-func (s *Session) readFromInput() {
-	for {
-		tag, value, err := stream.ReadTLV(s.Input)
-		if err != nil {
-			return
-		}
-		if tag == stream.TagUserText {
-			if len(value) > 0 && value[0] == '/' {
-				s.submitCommand(value[1:])
-			} else {
-				s.submitTask(UserPrompt(value))
-			}
-		} else {
-			s.writeError(fmt.Sprintf("Invalid input tag: %c (only %c is allowed)", tag, stream.TagUserText))
-		}
-	}
-}
-
-func (s *Session) writeGapped(tag byte, msg string) {
-	if s.Output != nil {
-		stream.WriteTLV(s.Output, stream.TagStreamGap, "")
-		stream.WriteTLV(s.Output, tag, msg)
-		stream.WriteTLV(s.Output, stream.TagStreamGap, "")
-		s.Output.Flush()
-	}
-}
+// ============================================================================
+// Output Helpers
+// ============================================================================
 
 func (s *Session) signalPromptStart(prompt string) {
 	s.writeGapped(stream.TagPromptStart, prompt)
@@ -410,7 +437,26 @@ func (s *Session) writeNotify(msg string) {
 	s.writeGapped(stream.TagNotify, msg)
 }
 
+func (s *Session) writeGapped(tag byte, msg string) {
+	if s.Output == nil {
+		return
+	}
+	stream.WriteTLV(s.Output, stream.TagStreamGap, "")
+	stream.WriteTLV(s.Output, tag, msg)
+	stream.WriteTLV(s.Output, stream.TagStreamGap, "")
+	s.Output.Flush()
+}
+
+func (s *Session) writeToolCall(toolName, input string) {
+	if value := formatToolCall(toolName, input); value != "" {
+		stream.WriteTLV(s.Output, stream.TagTool, value)
+	}
+}
+
 func (s *Session) sendSystemInfo() {
+	if s.Output == nil {
+		return
+	}
 	info := SystemInfo{
 		ContextTokens: s.ContextTokens,
 		TotalTokens:   s.TotalSpent.TotalTokens,
@@ -430,33 +476,30 @@ func (s *Session) sendTodoList() {
 	s.Output.Flush()
 }
 
-func (s *Session) writeToolCall(toolName, input string) {
-	if value := formatToolCall(toolName, input); value != "" {
-		stream.WriteTLV(s.Output, stream.TagTool, value)
-	}
-}
+// ============================================================================
+// Tool Call Formatting
+// ============================================================================
 
 func formatToolCall(toolName, input string) string {
-	var value string
 	switch toolName {
 	case "posix_shell":
 		if cmd := extractJSONField(input, "command"); cmd != "" {
-			value = fmt.Sprintf("%s: %s", toolName, formatCommon(cmd))
+			return fmt.Sprintf("%s: %s", toolName, escapeNewlines(cmd))
 		}
 	case "activate_skill":
 		if name := extractJSONField(input, "name"); name != "" {
-			value = fmt.Sprintf("%s: %s", toolName, name)
+			return fmt.Sprintf("%s: %s", toolName, name)
 		}
 	case "read_file", "write_file":
 		if path := extractJSONField(input, "path"); path != "" {
-			value = fmt.Sprintf("%s: %s", toolName, path)
+			return fmt.Sprintf("%s: %s", toolName, path)
 		}
 	case "todo_read":
-		value = "todo_read: Reading todo list"
+		return "todo_read: Reading todo list"
 	case "todo_write":
-		value = "todo_write: Updating todo list"
+		return "todo_write: Updating todo list"
 	}
-	return value
+	return ""
 }
 
 func extractJSONField(input, field string) string {
@@ -467,11 +510,187 @@ func extractJSONField(input, field string) string {
 	return m[field]
 }
 
-func formatCommon(cmd string) string {
-	cmd = strings.ReplaceAll(cmd, "\n", "\\n")
-	cmd = strings.ReplaceAll(cmd, "\t", "\\t")
-	return cmd
+func escapeNewlines(s string) string {
+	s = strings.ReplaceAll(s, "\n", "\\n")
+	s = strings.ReplaceAll(s, "\t", "\\t")
+	return s
 }
+
+// ============================================================================
+// Todo Access
+// ============================================================================
+
+func (s *Session) GetTodos() todo.TodoList { return s.Todos }
+
+func (s *Session) SetTodos(todos todo.TodoList) {
+	s.mu.Lock()
+	s.Todos = todos
+	s.mu.Unlock()
+	s.sendTodoList()
+}
+
+// ============================================================================
+// Persistence
+// ============================================================================
+
+func LoadSession(path string) (*SessionData, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read session file: %w", err)
+	}
+	var sd SessionData
+	if err := json.Unmarshal(data, &sd); err != nil {
+		return nil, fmt.Errorf("failed to parse session data: %w", err)
+	}
+	return &sd, nil
+}
+
+func LoadLatestSession() (*SessionData, string, error) {
+	dir, err := GetSessionsDir()
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to get sessions directory: %w", err)
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, "", nil
+		}
+		return nil, "", fmt.Errorf("failed to read sessions directory: %w", err)
+	}
+
+	var files []os.FileInfo
+	for _, entry := range entries {
+		if !entry.IsDir() && filepath.Ext(entry.Name()) == ".json" {
+			if info, err := entry.Info(); err == nil {
+				files = append(files, info)
+			}
+		}
+	}
+
+	if len(files) == 0 {
+		return nil, "", nil
+	}
+
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].ModTime().After(files[j].ModTime())
+	})
+
+	latestPath := filepath.Join(dir, files[0].Name())
+	data, err := LoadSession(latestPath)
+	if err != nil {
+		return nil, "", err
+	}
+	return data, latestPath, nil
+}
+
+func (s *Session) saveSessionToFile(path string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	msgs := s.Messages
+	if len(msgs) > 0 && msgs[len(msgs)-1].Role == fantasy.MessageRoleUser {
+		msgs = msgs[:len(msgs)-1]
+	}
+
+	data := SessionData{
+		BaseURL:       s.BaseURL,
+		ModelName:     s.ModelName,
+		Messages:      msgs,
+		TotalSpent:    s.TotalSpent,
+		ContextTokens: s.ContextTokens,
+		Todos:         s.Todos,
+		UpdatedAt:     time.Now(),
+	}
+
+	raw, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal session data: %w", err)
+	}
+	if err := os.WriteFile(path, raw, 0644); err != nil {
+		return fmt.Errorf("failed to write session file: %w", err)
+	}
+	return nil
+}
+
+func GetSessionsDir() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	dir := filepath.Join(home, ".coreclaw", "sessions")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", err
+	}
+	return dir, nil
+}
+
+func GenerateSessionFilename() string {
+	return time.Now().Format("2006-01-02-150405-1.json")
+}
+
+// ============================================================================
+// Message Display (for session restore)
+// ============================================================================
+
+func (s *Session) displayMessages() {
+	if s.Output == nil {
+		return
+	}
+	for _, msg := range s.Messages {
+		switch msg.Role {
+		case fantasy.MessageRoleUser:
+			s.displayUserMessage(msg)
+		case fantasy.MessageRoleAssistant:
+			s.displayAssistantMessage(msg)
+		case fantasy.MessageRoleTool:
+			s.displayToolMessage(msg)
+		}
+	}
+}
+
+func (s *Session) displayUserMessage(msg fantasy.Message) {
+	var text string
+	for _, part := range msg.Content {
+		if tp, ok := part.(fantasy.TextPart); ok {
+			text += tp.Text
+		}
+	}
+	if text != "" {
+		s.signalPromptStart(text)
+	}
+}
+
+func (s *Session) displayAssistantMessage(msg fantasy.Message) {
+	for _, part := range msg.Content {
+		switch p := part.(type) {
+		case fantasy.TextPart:
+			stream.WriteTLV(s.Output, stream.TagAssistantText, p.Text)
+			stream.WriteTLV(s.Output, stream.TagStreamGap, "")
+			s.Output.Flush()
+		case fantasy.ReasoningPart:
+			stream.WriteTLV(s.Output, stream.TagReasoning, p.Text)
+			stream.WriteTLV(s.Output, stream.TagStreamGap, "")
+			s.Output.Flush()
+		}
+	}
+}
+
+func (s *Session) displayToolMessage(msg fantasy.Message) {
+	for _, part := range msg.Content {
+		if tc, ok := part.(fantasy.ToolCallPart); ok {
+			if info := formatToolCall(tc.ToolName, tc.Input); info != "" {
+				stream.WriteTLV(s.Output, stream.TagTool, info)
+				stream.WriteTLV(s.Output, stream.TagStreamGap, "")
+				s.Output.Flush()
+			}
+		}
+	}
+}
+
+// ============================================================================
+// Path Utilities
+// ============================================================================
 
 func expandPath(path string) string {
 	if !strings.HasPrefix(path, "~") {
@@ -485,161 +704,4 @@ func expandPath(path string) string {
 		return usr.HomeDir
 	}
 	return filepath.Join(usr.HomeDir, path[1:])
-}
-
-type SessionData struct {
-	BaseURL       string            `json:"base_url"`
-	ModelName     string            `json:"model_name"`
-	Messages      []fantasy.Message `json:"messages"`
-	TotalSpent    fantasy.Usage     `json:"total_spent"`
-	ContextTokens int64             `json:"context_tokens"`
-	Todos         todo.TodoList     `json:"todos"`
-	CreatedAt     time.Time         `json:"created_at"`
-	UpdatedAt     time.Time         `json:"updated_at"`
-}
-
-func GetSessionsDir() (string, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	sessionsDir := filepath.Join(homeDir, ".coreclaw", "sessions")
-	if err := os.MkdirAll(sessionsDir, 0755); err != nil {
-		return "", err
-	}
-	return sessionsDir, nil
-}
-
-func GenerateSessionFilename() string {
-	return time.Now().Format("2006-01-02-150405-1.json")
-}
-
-func LoadLatestSession() (*SessionData, string, error) {
-	sessionsDir, err := GetSessionsDir()
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to get sessions directory: %w", err)
-	}
-	entries, err := os.ReadDir(sessionsDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, "", nil
-		}
-		return nil, "", fmt.Errorf("failed to read sessions directory: %w", err)
-	}
-	if len(entries) == 0 {
-		return nil, "", nil
-	}
-	var sessionFiles []os.FileInfo
-	for _, entry := range entries {
-		if !entry.IsDir() && filepath.Ext(entry.Name()) == ".json" {
-			if info, err := entry.Info(); err == nil {
-				sessionFiles = append(sessionFiles, info)
-			}
-		}
-	}
-	if len(sessionFiles) == 0 {
-		return nil, "", nil
-	}
-	sort.Slice(sessionFiles, func(i, j int) bool {
-		return sessionFiles[i].ModTime().After(sessionFiles[j].ModTime())
-	})
-	latestPath := filepath.Join(sessionsDir, sessionFiles[0].Name())
-	data, err := os.ReadFile(latestPath)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to read session file: %w", err)
-	}
-	var sessionData SessionData
-	if err := json.Unmarshal(data, &sessionData); err != nil {
-		return nil, "", fmt.Errorf("failed to parse session data: %w", err)
-	}
-	return &sessionData, latestPath, nil
-}
-
-func LoadSession(path string) (*SessionData, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read session file: %w", err)
-	}
-	var sessionData SessionData
-	if err := json.Unmarshal(data, &sessionData); err != nil {
-		return nil, fmt.Errorf("failed to parse session data: %w", err)
-	}
-	return &sessionData, nil
-}
-
-func (s *Session) saveSessionToFile(path string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	messagesToSave := s.Messages
-	if len(s.Messages) > 0 && s.Messages[len(s.Messages)-1].Role == fantasy.MessageRoleUser {
-		messagesToSave = s.Messages[:len(s.Messages)-1]
-	}
-	sessionData := SessionData{
-		BaseURL:       s.BaseURL,
-		ModelName:     s.ModelName,
-		Messages:      messagesToSave,
-		TotalSpent:    s.TotalSpent,
-		ContextTokens: s.ContextTokens,
-		Todos:         s.Todos,
-		UpdatedAt:     time.Now(),
-	}
-	data, err := json.MarshalIndent(sessionData, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal session data: %w", err)
-	}
-	if err := os.WriteFile(path, data, 0644); err != nil {
-		return fmt.Errorf("failed to write session file: %w", err)
-	}
-	return nil
-}
-
-func (s *Session) displayMessages() {
-	if s.Output == nil {
-		return
-	}
-	for _, msg := range s.Messages {
-		switch msg.Role {
-		case fantasy.MessageRoleUser:
-			var userText string
-			for _, part := range msg.Content {
-				if textPart, ok := part.(fantasy.TextPart); ok {
-					userText += textPart.Text
-				}
-			}
-			if userText != "" {
-				s.signalPromptStart(userText)
-			}
-		case fantasy.MessageRoleAssistant:
-			for _, part := range msg.Content {
-				if textPart, ok := part.(fantasy.TextPart); ok {
-					stream.WriteTLV(s.Output, stream.TagAssistantText, textPart.Text)
-					stream.WriteTLV(s.Output, stream.TagStreamGap, "")
-					s.Output.Flush()
-				} else if reasoningPart, ok := part.(fantasy.ReasoningPart); ok {
-					stream.WriteTLV(s.Output, stream.TagReasoning, reasoningPart.Text)
-					stream.WriteTLV(s.Output, stream.TagStreamGap, "")
-					s.Output.Flush()
-				}
-			}
-		case fantasy.MessageRoleTool:
-			for _, part := range msg.Content {
-				if toolCall, ok := part.(fantasy.ToolCallPart); ok {
-					if toolInfo := formatToolCall(toolCall.ToolName, toolCall.Input); toolInfo != "" {
-						stream.WriteTLV(s.Output, stream.TagTool, toolInfo)
-						stream.WriteTLV(s.Output, stream.TagStreamGap, "")
-						s.Output.Flush()
-					}
-				}
-			}
-		}
-	}
-}
-
-func (s *Session) GetTodos() todo.TodoList { return s.Todos }
-
-func (s *Session) SetTodos(todos todo.TodoList) {
-	s.mu.Lock()
-	s.Todos = todos
-	s.mu.Unlock()
-	s.sendTodoList()
 }
