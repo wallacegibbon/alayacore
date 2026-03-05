@@ -165,7 +165,7 @@ func TestRenderMultiline(t *testing.T) {
 
 	output := newTerminalOutput()
 	// Use existing reasoning style which should produce ANSI codes
-	style := output.reasoningStyle
+	style := output.styles.Reasoning
 	// First test direct rendering
 	direct := style.Render("test")
 	t.Logf("Direct render: %q, bytes: %v", direct, []byte(direct))

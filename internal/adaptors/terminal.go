@@ -1,13 +1,9 @@
 package adaptors
 
 import (
-	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
-	"sync"
 	"time"
 
 	"charm.land/bubbles/v2/textinput"
@@ -20,37 +16,6 @@ import (
 	"github.com/wallacegibbon/coreclaw/internal/stream"
 	"github.com/wallacegibbon/coreclaw/internal/todo"
 )
-
-const (
-	tempFilePrefix = "coreclaw-input-*.txt"
-)
-
-// DisplayBuffer holds text to display in Terminal
-type DisplayBuffer struct {
-	mu       sync.Mutex
-	Messages []string
-}
-
-// NewDisplayBuffer creates a new display buffer
-func NewDisplayBuffer() *DisplayBuffer {
-	return &DisplayBuffer{
-		Messages: []string{},
-	}
-}
-
-// Append adds text to the display buffer
-func (d *DisplayBuffer) Append(text string) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	d.Messages = append(d.Messages, text)
-}
-
-// GetAll returns all messages joined together
-func (d *DisplayBuffer) GetAll() string {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	return strings.Join(d.Messages, "")
-}
 
 // TerminalAdaptor is a terminal adaptor with a Terminal interface
 type TerminalAdaptor struct {
@@ -95,140 +60,6 @@ func (a *TerminalAdaptor) Start() {
 	p.Run()
 }
 
-// terminalOutput writes to the Terminal display with TLV support
-type terminalOutput struct {
-	display    *DisplayBuffer
-	buffer     []byte
-	mu         sync.Mutex
-	updateChan chan struct{}
-	status     string // Status bar content from TagSystem
-	todos      todo.TodoList
-	inProgress bool // Whether session has task in progress
-
-	textStyle        lipgloss.Style
-	userInputStyle   lipgloss.Style
-	toolStyle        lipgloss.Style
-	toolContentStyle lipgloss.Style
-	reasoningStyle   lipgloss.Style
-	errorStyle       lipgloss.Style
-	systemStyle      lipgloss.Style
-	promptStyle      lipgloss.Style
-}
-
-func newTerminalOutput() *terminalOutput {
-	return &terminalOutput{
-		display:          NewDisplayBuffer(),
-		updateChan:       make(chan struct{}, 1),
-		textStyle:        lipgloss.NewStyle().Foreground(lipgloss.Color("#cdd6f4")).Bold(true),
-		userInputStyle:   lipgloss.NewStyle().Foreground(lipgloss.Color("#89d4fa")).Bold(true),
-		toolStyle:        lipgloss.NewStyle().Foreground(lipgloss.Color("#f9e2af")),
-		toolContentStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#89d4fa")),
-		reasoningStyle:   lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086")).Italic(true),
-		errorStyle:       lipgloss.NewStyle().Foreground(lipgloss.Color("#f38ba8")),
-		systemStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086")),
-		promptStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1")).Bold(true),
-	}
-}
-
-func (w *terminalOutput) Write(p []byte) (n int, err error) {
-	w.mu.Lock()
-	w.buffer = append(w.buffer, p...)
-	w.processBuffer()
-	w.mu.Unlock()
-	return len(p), nil
-}
-
-func (w *terminalOutput) WriteString(s string) (int, error) {
-	return w.Write([]byte(s))
-}
-
-func (w *terminalOutput) Flush() error {
-	return nil
-}
-
-func (w *terminalOutput) processBuffer() {
-	for len(w.buffer) >= 5 {
-		tag := w.buffer[0]
-
-		length := int32(binary.BigEndian.Uint32(w.buffer[1:5]))
-
-		if len(w.buffer) < 5+int(length) {
-			break
-		}
-
-		value := string(w.buffer[5 : 5+length])
-		w.writeColored(tag, value)
-
-		w.buffer = w.buffer[5+length:]
-	}
-}
-
-func (w *terminalOutput) renderMultiline(style lipgloss.Style, value string, trimRight bool) string {
-	lines := strings.Split(value, "\n")
-	for i, line := range lines {
-		rendered := style.Render(line)
-		if trimRight {
-			rendered = strings.TrimRight(rendered, " ")
-		}
-		lines[i] = rendered
-	}
-	return strings.Join(lines, "\n")
-}
-
-func (w *terminalOutput) writeColored(tag byte, value string) {
-	triggerUpdate := func() {
-		select {
-		case w.updateChan <- struct{}{}:
-		default:
-		}
-	}
-
-	switch tag {
-	case stream.TagAssistantText, stream.TagTool, stream.TagReasoning, stream.TagError, stream.TagNotify, stream.TagSystem, stream.TagPromptStart, stream.TagStreamGap, stream.TagTodo:
-		triggerUpdate()
-	}
-
-	output := func(style lipgloss.Style, text string) string {
-		return strings.TrimRight(w.renderMultiline(style, text, true), " ")
-	}
-
-	switch tag {
-	case stream.TagAssistantText:
-		w.display.Append(output(w.textStyle, value))
-	case stream.TagTool:
-		w.display.Append(strings.TrimRight(w.colorizeTool(value), " "))
-	case stream.TagReasoning:
-		w.display.Append(output(w.reasoningStyle, value))
-	case stream.TagError:
-		w.display.Append(output(w.errorStyle, value))
-	case stream.TagNotify:
-		w.display.Append(output(w.systemStyle, value))
-	case stream.TagSystem:
-		var info agentpkg.SystemInfo
-		if err := json.Unmarshal([]byte(value), &info); err == nil {
-			w.inProgress = info.InProgress
-			baseStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#45475a"))
-			queueStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#f38ba8")).Bold(true)
-			if info.QueueCount > 0 {
-				queueNum := queueStyle.Render(fmt.Sprintf("%d", info.QueueCount))
-				w.status = baseStyle.Render("Queue: ") + queueNum + baseStyle.Render(fmt.Sprintf(" | Context: %d | Total: %d", info.ContextTokens, info.TotalTokens))
-			} else {
-				w.status = baseStyle.Render(fmt.Sprintf("Context: %d | Total: %d", info.ContextTokens, info.TotalTokens))
-			}
-		}
-		return
-	case stream.TagTodo:
-		json.Unmarshal([]byte(value), &w.todos)
-		return
-	case stream.TagPromptStart:
-		w.display.Append(strings.TrimRight(w.promptStyle.Render("> ")+w.userInputStyle.Render(value), " "))
-	case stream.TagStreamGap:
-		w.display.Append("\n")
-	default:
-		w.display.Append(value)
-	}
-}
-
 // colorizeWelcomeText applies gradient coloring to the ASCII art
 func colorizeWelcomeText(text string) string {
 	lines := strings.Split(text, "\n")
@@ -256,40 +87,6 @@ func colorizeWelcomeText(text string) string {
 	return result.String()
 }
 
-func (w *terminalOutput) colorizeTool(value string) string {
-	lines := strings.Split(value, "\n")
-	if len(lines) == 1 {
-		// Single line: original logic
-		colonIdx := strings.Index(value, ":")
-		if colonIdx > 0 {
-			toolName := value[:colonIdx]
-			rest := value[colonIdx:]
-			return strings.TrimRight(w.toolStyle.Render(toolName), " ") + strings.TrimRight(w.toolContentStyle.Render(rest), " ")
-		}
-		return strings.TrimRight(w.toolStyle.Render(value), " ")
-	}
-
-	// Multiline: first line may contain colon
-	firstLine := lines[0]
-	colonIdx := strings.Index(firstLine, ":")
-	var result strings.Builder
-	if colonIdx > 0 {
-		toolName := firstLine[:colonIdx]
-		restFirst := firstLine[colonIdx:]
-		result.WriteString(strings.TrimRight(w.toolStyle.Render(toolName), " "))
-		result.WriteString(strings.TrimRight(w.toolContentStyle.Render(restFirst), " "))
-	} else {
-		// No colon in first line, treat entire first line as tool name
-		result.WriteString(strings.TrimRight(w.toolStyle.Render(firstLine), " "))
-	}
-	// Remaining lines: apply toolContentStyle (continuation of tool output)
-	for _, line := range lines[1:] {
-		result.WriteString("\n")
-		result.WriteString(strings.TrimRight(w.toolContentStyle.Render(line), " "))
-	}
-	return result.String()
-}
-
 // Terminal is the main Terminal model
 type Terminal struct {
 	session             *agentpkg.Session
@@ -309,9 +106,8 @@ type Terminal struct {
 	welcomeText         string        // colored welcome text for comparison
 	sessionFile         string        // session file path for saving on quit
 	todos               todo.TodoList // cached todos for display
-
-	inputStyle  lipgloss.Style
-	statusStyle lipgloss.Style
+	styles              *Styles       // UI styles
+	editor              *Editor       // external editor handler
 }
 
 // NewTerminal creates a new Terminal model
@@ -320,11 +116,9 @@ func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput, inpu
 	input.Placeholder = "Enter your prompt..."
 	input.Focus()
 	input.Prompt = "> "
-	input.SetWidth(76) // Initial width (80 - 4 for border padding)
+	input.SetWidth(76)
 
-	inputStyle := lipgloss.NewStyle()
-	statusStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#45475a"))
-
+	styles := DefaultStyles()
 	coloredWelcome := colorizeWelcomeText(WelcomeText)
 	display := viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
 
@@ -335,11 +129,11 @@ func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput, inpu
 		display:        display,
 		input:          input,
 		windowWidth:    80,
-		inputStyle:     inputStyle,
-		statusStyle:    statusStyle,
+		styles:         styles,
 		focusedWindow:  "input",
 		welcomeText:    coloredWelcome,
 		sessionFile:    sessionFile,
+		editor:         NewEditor(),
 	}
 
 	hasExistingContent := len(terminalOutput.display.Messages) > 0
@@ -383,11 +177,7 @@ func (m *Terminal) updateDisplayHeight() {
 		// Get raw content and word-wrap to count lines
 		rawContent := m.terminalOutput.display.GetAll()
 		wrapped := lipgloss.Wrap(rawContent, m.display.Width(), " ")
-		totalLines := strings.Count(wrapped, "\n") + 1 // content may have trailing newline
-		// Ensure totalLines is at least 1
-		if totalLines < 1 {
-			totalLines = 1
-		}
+		totalLines := max(1, strings.Count(wrapped, "\n")+1)
 
 		topLine := m.display.YOffset()
 		var newTopLine int
@@ -425,13 +215,8 @@ func (m *Terminal) renderTodos() string {
 		return ""
 	}
 
-	todoStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#f9e2af"))                  // Yellow
-	pendingStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086"))               // Dimmed white
-	inProgressStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1")).Bold(true) // Green bold
-	completedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6a8a6a"))             // Dimmed green
-
 	var sb strings.Builder
-	sb.WriteString(todoStyle.Render("TODO LIST"))
+	sb.WriteString(m.styles.TodoHeader.Render("TODO LIST"))
 	sb.WriteString("\n")
 
 	for i, item := range m.todos {
@@ -440,13 +225,13 @@ func (m *Terminal) renderTodos() string {
 
 		switch item.Status {
 		case "pending":
-			statusStyle = pendingStyle
+			statusStyle = m.styles.Pending
 			todoText = fmt.Sprintf("%d. %s", i+1, item.Content)
 		case "in_progress":
-			statusStyle = inProgressStyle
+			statusStyle = m.styles.InProgress
 			todoText = fmt.Sprintf("%d. %s", i+1, item.ActiveForm)
 		case "completed":
-			statusStyle = completedStyle
+			statusStyle = m.styles.Completed
 			todoText = fmt.Sprintf("%d. %s", i+1, item.Content)
 		}
 
@@ -465,11 +250,6 @@ func (m *Terminal) Init() tea.Cmd {
 }
 
 type tickMsg struct{}
-
-type editorFinishedMsg struct {
-	content string
-	err     error
-}
 
 // Update handles messages
 func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -506,20 +286,10 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case editorFinishedMsg:
 		if msg.err != nil {
-			m.terminalOutput.display.Append(m.terminalOutput.errorStyle.Render(fmt.Sprintf("Editor error: %v", msg.err)))
+			m.terminalOutput.AppendError("Editor error: %v", msg.err)
 		} else if msg.content != "" {
 			m.editorContent = msg.content
-			lineCount := strings.Count(msg.content, "\n") + 1
-			preview := strings.Fields(msg.content)
-			var previewText string
-			if len(preview) > 0 && len(preview[0]) > 20 {
-				previewText = preview[0][:20] + "..."
-			} else if len(preview) > 0 {
-				previewText = preview[0]
-			} else {
-				previewText = "(empty)"
-			}
-			m.input.SetValue(fmt.Sprintf("[%d lines] %s (press Enter to send)", lineCount, previewText))
+			m.input.SetValue(FormatEditorContent(msg.content))
 			m.input.CursorEnd()
 			m.input.Focus()
 		}
@@ -532,159 +302,30 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Handle confirm dialog for quit
-	if m.confirmDialog {
-		switch msg.String() {
-		case "y", "Y":
-			m.quitting = true
-			// Close input channel to stop session's readFromInput
-			close(m.streamInput.Ch)
-			return m, tea.Quit
-		case "n", "N", "esc", "ctrl+c":
-			m.confirmDialog = false
-			m.input.SetValue("")
-			return m, nil
-		}
-		return m, nil
-	}
-
-	// Handle confirm dialog for cancel
-	if m.cancelConfirmDialog {
-		switch msg.String() {
-		case "y", "Y":
-			m.cancelConfirmDialog = false
-			// Send /cancel command to session
-			return m, m.submitCommand("cancel", false)
-		case "n", "N", "esc", "ctrl+c":
-			m.cancelConfirmDialog = false
-			m.input.SetValue("")
-			return m, nil
-		}
-		return m, nil
+	// Handle confirmation dialogs first
+	if cmd, handled := m.handleConfirmDialog(msg); handled {
+		return m, cmd
 	}
 
 	// Handle Tab to switch focus
 	if msg.String() == "tab" {
-		if m.focusedWindow == "display" {
-			m.focusedWindow = "input"
-			m.input.Focus()
-		} else {
-			m.focusedWindow = "display"
-			m.input.Blur()
-		}
+		m.toggleFocus()
 		return m, nil
 	}
 
-	// Handle j/k for display window scrolling
+	// Handle display window scrolling
 	if m.focusedWindow == "display" {
-		switch msg.String() {
-		case "j":
-			m.display.ScrollDown(1)
-			// Check if now at bottom
-			if m.display.AtBottom() {
-				m.userScrolledAway = false
-			} else {
-				m.userScrolledAway = true
-			}
-			return m, nil
-		case "k":
-			m.display.ScrollUp(1)
-			m.userScrolledAway = true
-			return m, nil
-		case "G":
-			m.display.GotoBottom()
-			m.userScrolledAway = false
-			return m, nil
-		case "g":
-			m.display.GotoTop()
-			m.userScrolledAway = true
-			return m, nil
-		case "ctrl+d":
-			m.display.ScrollDown(m.display.Height() / 2)
-			if m.display.AtBottom() {
-				m.userScrolledAway = false
-			} else {
-				m.userScrolledAway = true
-			}
-			return m, nil
-		case "ctrl+u":
-			m.display.ScrollUp(m.display.Height() / 2)
-			m.userScrolledAway = true
-			return m, nil
-		case "/":
-			m.focusedWindow = "input"
-			m.input.Focus()
-			m.input.SetValue("/")
-			m.input.CursorEnd()
-			return m, nil
+		if cmd, handled := m.handleDisplayKeys(msg); handled {
+			return m, cmd
 		}
 	}
 
-	switch msg.String() {
-	case "ctrl+g":
-		// Show cancel confirmation dialog
-		m.cancelConfirmDialog = true
-		return m, nil
-	case "ctrl+c":
-		// If input window is focused, clear input
-		if m.focusedWindow == "input" {
-			m.input.SetValue("")
-			m.editorContent = ""
-			return m, nil
-		}
-		// Otherwise, do nothing
-		return m, nil
-	case "ctrl+u":
-		// If input window is focused, disable Ctrl+U (prevent textinput's clear line behavior)
-		if m.focusedWindow == "input" {
-			return m, nil
-		}
-	case "ctrl+s":
-		// Save session
-		return m, m.submitCommand("save", false)
-	case "ctrl+o":
-		// Open external editor for multi-line input
-		return m, m.openEditor()
-	case "enter":
-		var prompt string
-
-		// Check if we have editor content to submit
-		if m.editorContent != "" {
-			prompt = m.editorContent
-			m.editorContent = ""
-		} else {
-			prompt = m.input.Value()
-		}
-
-		if prompt == "" {
-			return m, nil
-		}
-
-		// Handle commands
-		if command, found := strings.CutPrefix(prompt, "/"); found {
-			if command == "quit" || command == "exit" {
-				m.confirmDialog = true
-				return m, nil
-			}
-			if command == "cancel" {
-				m.cancelConfirmDialog = true
-				return m, nil
-			}
-			return m, m.submitCommand(command, true)
-		}
-
-		// Submit prompt as TLV to input stream - session handles queuing
-		m.streamInput.EmitTLVData(stream.TagUserText, prompt)
-
-		m.input.SetValue("")
-		m.updateStatus()
-
-		// Start ticking to check for updates during processing
-		return m, tea.Tick(50*time.Millisecond, func(t time.Time) tea.Msg {
-			return tickMsg{}
-		})
+	// Handle global shortcuts
+	if cmd, handled := m.handleGlobalKeys(msg); handled {
+		return m, cmd
 	}
 
+	// Update input
 	oldValue := m.input.Value()
 	m.input, _ = m.input.Update(msg)
 	newValue := m.input.Value()
@@ -695,6 +336,155 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+// handleConfirmDialog handles quit and cancel confirmation dialogs
+func (m *Terminal) handleConfirmDialog(msg tea.KeyMsg) (tea.Cmd, bool) {
+	if m.confirmDialog {
+		switch msg.String() {
+		case "y", "Y":
+			m.quitting = true
+			close(m.streamInput.Ch)
+			return tea.Quit, true
+		case "n", "N", "esc", "ctrl+c":
+			m.confirmDialog = false
+			m.input.SetValue("")
+			return nil, true
+		}
+		return nil, true
+	}
+
+	if m.cancelConfirmDialog {
+		switch msg.String() {
+		case "y", "Y":
+			m.cancelConfirmDialog = false
+			return m.submitCommand("cancel", false), true
+		case "n", "N", "esc", "ctrl+c":
+			m.cancelConfirmDialog = false
+			m.input.SetValue("")
+			return nil, true
+		}
+		return nil, true
+	}
+
+	return nil, false
+}
+
+// toggleFocus switches between display and input windows
+func (m *Terminal) toggleFocus() {
+	if m.focusedWindow == "display" {
+		m.focusedWindow = "input"
+		m.input.Focus()
+	} else {
+		m.focusedWindow = "display"
+		m.input.Blur()
+	}
+}
+
+// handleDisplayKeys handles key events when display window is focused
+func (m *Terminal) handleDisplayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
+	switch msg.String() {
+	case "j":
+		m.scrollDown(1)
+		return nil, true
+	case "k":
+		m.display.ScrollUp(1)
+		m.userScrolledAway = true
+		return nil, true
+	case "G":
+		m.display.GotoBottom()
+		m.userScrolledAway = false
+		return nil, true
+	case "g":
+		m.display.GotoTop()
+		m.userScrolledAway = true
+		return nil, true
+	case "ctrl+d":
+		m.scrollDown(m.display.Height() / 2)
+		return nil, true
+	case "ctrl+u":
+		m.display.ScrollUp(m.display.Height() / 2)
+		m.userScrolledAway = true
+		return nil, true
+	case "/":
+		m.focusedWindow = "input"
+		m.input.Focus()
+		m.input.SetValue("/")
+		m.input.CursorEnd()
+		return nil, true
+	}
+	return nil, false
+}
+
+// scrollDown scrolls the display and updates userScrolledAway
+func (m *Terminal) scrollDown(lines int) {
+	m.display.ScrollDown(lines)
+	m.userScrolledAway = !m.display.AtBottom()
+}
+
+// handleGlobalKeys handles global keyboard shortcuts
+func (m *Terminal) handleGlobalKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
+	switch msg.String() {
+	case "ctrl+g":
+		m.cancelConfirmDialog = true
+		return nil, true
+	case "ctrl+c":
+		if m.focusedWindow == "input" {
+			m.input.SetValue("")
+			m.editorContent = ""
+		}
+		return nil, true
+	case "ctrl+u":
+		// Disable Ctrl+U in input window
+		if m.focusedWindow == "input" {
+			return nil, true
+		}
+	case "ctrl+s":
+		return m.submitCommand("save", false), true
+	case "ctrl+o":
+		return m.editor.Open(m.getInputForEditor()), true
+	case "enter":
+		return m.handleSubmit(), true
+	}
+	return nil, false
+}
+
+// handleSubmit processes the input when Enter is pressed
+func (m *Terminal) handleSubmit() tea.Cmd {
+	var prompt string
+
+	if m.editorContent != "" {
+		prompt = m.editorContent
+		m.editorContent = ""
+	} else {
+		prompt = m.input.Value()
+	}
+
+	if prompt == "" {
+		return nil
+	}
+
+	// Handle commands
+	if command, found := strings.CutPrefix(prompt, "/"); found {
+		if command == "quit" || command == "exit" {
+			m.confirmDialog = true
+			return nil
+		}
+		if command == "cancel" {
+			m.cancelConfirmDialog = true
+			return nil
+		}
+		return m.submitCommand(command, true)
+	}
+
+	// Submit prompt
+	m.streamInput.EmitTLVData(stream.TagUserText, prompt)
+	m.input.SetValue("")
+	m.updateStatus()
+
+	return tea.Tick(50*time.Millisecond, func(t time.Time) tea.Msg {
+		return tickMsg{}
+	})
 }
 
 func (m *Terminal) updateStatus() {}
@@ -756,55 +546,6 @@ func (m *Terminal) centerWelcomeText() {
 	m.display.SetContent(strings.Join(centeredLines, "\n"))
 }
 
-func (m *Terminal) openEditor() tea.Cmd {
-	editorCmd := getEditorCommand(os.Getenv("EDITOR"))
-
-	if editorCmd == "" {
-		return func() tea.Msg {
-			return editorFinishedMsg{content: "", err: fmt.Errorf("no editor found (tried: vim, vi, nano)")}
-		}
-	}
-
-	tmpFile, err := os.CreateTemp("", tempFilePrefix)
-	if err != nil {
-		return func() tea.Msg {
-			return editorFinishedMsg{content: "", err: err}
-		}
-	}
-
-	tmpFileName := tmpFile.Name()
-
-	existingContent := m.getInputForEditor()
-
-	if existingContent != "" {
-		if _, err := tmpFile.WriteString(existingContent); err != nil {
-			tmpFile.Close()
-			os.Remove(tmpFileName)
-			return func() tea.Msg {
-				return editorFinishedMsg{content: "", err: err}
-			}
-		}
-	}
-	tmpFile.Close()
-
-	cmd := exec.Command(editorCmd, tmpFileName)
-
-	return tea.ExecProcess(cmd, func(err error) tea.Msg {
-		defer os.Remove(tmpFileName)
-
-		if err != nil {
-			return editorFinishedMsg{content: "", err: err}
-		}
-
-		content, readErr := os.ReadFile(tmpFileName)
-		if readErr != nil {
-			return editorFinishedMsg{content: "", err: readErr}
-		}
-
-		return editorFinishedMsg{content: string(content), err: nil}
-	})
-}
-
 // getInputForEditor returns the content to pre-populate in the editor
 // If editorContent is set (from a previous Ctrl+O), use that.
 // Otherwise, use the current input value.
@@ -846,10 +587,7 @@ func (m *Terminal) View() tea.View {
 	focused := m.focusedWindow == "input"
 	borderColor := map[bool]string{true: "#89d4fa", false: "#45475a"}[focused]
 
-	borderStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color(borderColor)).
-		Padding(0, 1)
+	borderStyle := m.styles.InputBorder.BorderForeground(lipgloss.Color(borderColor)).Padding(0, 1)
 
 	styles := textinput.DefaultStyles(true)
 	styles.Focused.Prompt = lipgloss.NewStyle().Foreground(lipgloss.Color(borderColor)).Bold(true)
@@ -870,30 +608,20 @@ func (m *Terminal) View() tea.View {
 	// Add todo list between display and input
 	todos := m.renderTodos()
 	if todos != "" {
-		todoInnerStyle := lipgloss.NewStyle().
-			Width(max(0, windowWidth-4))
-		todoBorderStyle := lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("#6c7086")).
-			Padding(0, 1)
+		todoInnerStyle := lipgloss.NewStyle().Width(max(0, windowWidth-4))
+		todoBorderStyle := m.styles.TodoBorder.Padding(0, 1)
 		sb.WriteString(todoBorderStyle.Render(todoInnerStyle.Render(todos)))
 		sb.WriteString("\n")
 	}
 
 	if m.confirmDialog {
-		confirmText := lipgloss.NewStyle().
-			Width(max(0, windowWidth-4)).
-			Foreground(lipgloss.Color("#f38ba8")).
-			Bold(true).Render("Confirm exit? Press y/n")
+		confirmText := m.styles.Confirm.Width(max(0, windowWidth-4)).Render("Confirm exit? Press y/n")
 		sb.WriteString(borderStyle.Render(confirmText))
 	} else if m.cancelConfirmDialog {
-		confirmText := lipgloss.NewStyle().
-			Width(max(0, windowWidth-4)).
-			Foreground(lipgloss.Color("#f38ba8")).
-			Bold(true).Render("Confirm cancel? Press y/n")
+		confirmText := m.styles.Confirm.Width(max(0, windowWidth-4)).Render("Confirm cancel? Press y/n")
 		sb.WriteString(borderStyle.Render(confirmText))
 	} else {
-		sb.WriteString(borderStyle.Render(m.inputStyle.Width(max(0, windowWidth-4)).Render(m.input.View())))
+		sb.WriteString(borderStyle.Render(m.styles.Input.Width(max(0, windowWidth-4)).Render(m.input.View())))
 	}
 
 	sb.WriteString("\n")
@@ -907,20 +635,3 @@ func (m *Terminal) View() tea.View {
 var (
 	_ tea.Model = (*Terminal)(nil)
 )
-
-// getEditorCommand returns the editor command to use
-// First checks EDITOR env var, then tries vim, vi, nano in order
-func getEditorCommand(editorCmd string) string {
-	if editorCmd != "" {
-		return editorCmd
-	}
-
-	for _, editor := range []string{"vim", "vi", "nano"} {
-		path, err := exec.LookPath(editor)
-		if err == nil {
-			return path
-		}
-	}
-
-	return ""
-}
