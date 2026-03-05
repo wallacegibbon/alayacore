@@ -286,13 +286,25 @@ func (s *Session) processPrompt(ctx context.Context, prompt string, history []fa
 		call.Messages = history
 	}
 
+	var currentBlock string // tracks current content block id
+
+	call.OnTextStart = func(id string) error {
+		if currentBlock != "" {
+			stream.WriteTLV(s.Output, stream.TagStreamGap, "")
+		}
+		currentBlock = id
+		return nil
+	}
 	call.OnTextDelta = func(_, text string) error {
 		stream.WriteTLV(s.Output, stream.TagAssistantText, text)
 		s.Output.Flush()
 		return nil
 	}
-	call.OnTextEnd = func(_ string) error {
-		stream.WriteTLV(s.Output, stream.TagStreamGap, "")
+	call.OnReasoningStart = func(id string, _ fantasy.ReasoningContent) error {
+		if currentBlock != "" {
+			stream.WriteTLV(s.Output, stream.TagStreamGap, "")
+		}
+		currentBlock = id
 		return nil
 	}
 	call.OnReasoningDelta = func(_, text string) error {
@@ -300,13 +312,12 @@ func (s *Session) processPrompt(ctx context.Context, prompt string, history []fa
 		s.Output.Flush()
 		return nil
 	}
-	call.OnReasoningEnd = func(_ string, _ fantasy.ReasoningContent) error {
-		stream.WriteTLV(s.Output, stream.TagStreamGap, "")
-		return nil
-	}
 	call.OnToolCall = func(tc fantasy.ToolCallContent) error {
+		if currentBlock != "" {
+			stream.WriteTLV(s.Output, stream.TagStreamGap, "")
+		}
+		currentBlock = tc.ToolCallID
 		s.writeToolCall(tc.ToolName, tc.Input)
-		stream.WriteTLV(s.Output, stream.TagStreamGap, "")
 		s.Output.Flush()
 		return nil
 	}
@@ -662,15 +673,22 @@ func (s *Session) displayUserMessage(msg fantasy.Message) {
 }
 
 func (s *Session) displayAssistantMessage(msg fantasy.Message) {
+	first := true
 	for _, part := range msg.Content {
 		switch p := part.(type) {
 		case fantasy.TextPart:
+			if !first {
+				stream.WriteTLV(s.Output, stream.TagStreamGap, "")
+			}
+			first = false
 			stream.WriteTLV(s.Output, stream.TagAssistantText, p.Text)
-			stream.WriteTLV(s.Output, stream.TagStreamGap, "")
 			s.Output.Flush()
 		case fantasy.ReasoningPart:
+			if !first {
+				stream.WriteTLV(s.Output, stream.TagStreamGap, "")
+			}
+			first = false
 			stream.WriteTLV(s.Output, stream.TagReasoning, p.Text)
-			stream.WriteTLV(s.Output, stream.TagStreamGap, "")
 			s.Output.Flush()
 		}
 	}
@@ -680,8 +698,8 @@ func (s *Session) displayToolMessage(msg fantasy.Message) {
 	for _, part := range msg.Content {
 		if tc, ok := part.(fantasy.ToolCallPart); ok {
 			if info := formatToolCall(tc.ToolName, tc.Input); info != "" {
-				stream.WriteTLV(s.Output, stream.TagTool, info)
 				stream.WriteTLV(s.Output, stream.TagStreamGap, "")
+				stream.WriteTLV(s.Output, stream.TagTool, info)
 				s.Output.Flush()
 			}
 		}
