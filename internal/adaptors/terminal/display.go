@@ -278,36 +278,49 @@ func (m *DisplayModel) SetWindowCursor(index int) {
 }
 
 // MoveWindowCursorDown moves the window cursor down by one window.
-func (m *DisplayModel) MoveWindowCursorDown() {
+// Returns true if the cursor moved, false if already at the last window.
+func (m *DisplayModel) MoveWindowCursorDown() bool {
 	windowCount := m.windowBuffer.GetWindowCount()
 	if windowCount == 0 {
-		return
+		return false
 	}
-	if m.windowCursor < 0 || m.windowCursor >= windowCount-1 {
-		m.windowCursor = windowCount - 1
-		m.userMovedCursorAway = false // reached last window, resume auto-follow
+	// Already at last window, don't move
+	if m.windowCursor == windowCount-1 {
+		return false
+	}
+	// If cursor is invalid or before last, move down
+	if m.windowCursor < 0 {
+		m.windowCursor = 0
 	} else {
 		m.windowCursor++
-		if m.windowCursor < windowCount-1 {
-			m.userMovedCursorAway = true // moved away from last window
+		if m.windowCursor == windowCount-1 {
+			m.userMovedCursorAway = false // reached last window, resume auto-follow
 		} else {
-			m.userMovedCursorAway = false // reached last window
+			m.userMovedCursorAway = true
 		}
 	}
+	return true
 }
 
 // MoveWindowCursorUp moves the window cursor up by one window.
-func (m *DisplayModel) MoveWindowCursorUp() {
+// Returns true if the cursor moved, false if already at the first window.
+func (m *DisplayModel) MoveWindowCursorUp() bool {
 	windowCount := m.windowBuffer.GetWindowCount()
 	if windowCount == 0 {
-		return
+		return false
 	}
-	if m.windowCursor <= 0 {
+	// Already at first window, don't move
+	if m.windowCursor == 0 {
+		return false
+	}
+	// If cursor is invalid, set to first
+	if m.windowCursor < 0 {
 		m.windowCursor = 0
-	} else {
-		m.windowCursor--
+		return true
 	}
+	m.windowCursor--
 	m.userMovedCursorAway = true // moving up always means moving away from last
+	return true
 }
 
 // EnsureCursorVisible scrolls the viewport to make the cursor window fully visible.
