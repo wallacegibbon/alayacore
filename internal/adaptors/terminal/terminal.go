@@ -139,6 +139,11 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.status.SetStatus(m.terminalOutput.status)
 		m.todo.SetTodos(m.terminalOutput.todos)
 		m.updateDisplayHeight()
+		// Update cursor to last window if no cursor set
+		if m.display.GetWindowCursor() < 0 {
+			m.display.SetCursorToLastWindow()
+			m.display.updateContent()
+		}
 	default:
 	}
 
@@ -271,22 +276,24 @@ func (m *Terminal) toggleFocus() {
 func (m *Terminal) handleDisplayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 	switch msg.String() {
 	case "j":
-		m.display.scrollDown(1)
+		m.display.MoveWindowCursorDown()
+		m.display.EnsureCursorVisible()
+		m.display.updateContent()
 		return nil, true
 	case "k":
-		m.display.ScrollUp(1)
+		m.display.MoveWindowCursorUp()
+		m.display.EnsureCursorVisible()
+		m.display.updateContent()
 		return nil, true
 	case "G":
 		m.display.GotoBottom()
+		m.display.SetCursorToLastWindow()
+		m.display.updateContent()
 		return nil, true
 	case "g":
 		m.display.GotoTop()
-		return nil, true
-	case "ctrl+d":
-		m.display.scrollDown(m.display.GetHeight() / 2)
-		return nil, true
-	case "ctrl+u":
-		m.display.ScrollUp(m.display.GetHeight() / 2)
+		m.display.SetWindowCursor(0)
+		m.display.updateContent()
 		return nil, true
 	case ":":
 		m.focusedWindow = "input"
@@ -312,9 +319,7 @@ func (m *Terminal) handleGlobalKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 		}
 		return nil, true
 	case "ctrl+u":
-		if m.focusedWindow == "input" {
-			return nil, true
-		}
+		return nil, true
 	case "ctrl+s":
 		return m.submitCommand("save", false), true
 	case "ctrl+o":

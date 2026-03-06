@@ -17,14 +17,14 @@ type Window struct {
 
 // WindowBuffer holds a sequence of windows in order of creation.
 type WindowBuffer struct {
-	mu      sync.Mutex
-	Windows []*Window
-	// mapping from ID to window index for fast lookup
-	idIndex map[string]int
-	// width of windows (same as input box width)
-	width int
-	// border style template
+	mu          sync.Mutex
+	Windows     []*Window
+	idIndex     map[string]int
+	width       int
 	borderStyle lipgloss.Style
+	cursorStyle lipgloss.Style
+	lineHeights []int // cached line heights for each window (after rendering)
+	totalLines  int   // total lines across all windows
 }
 
 // NewWindowBuffer creates a new window buffer with given width.
@@ -34,11 +34,20 @@ func NewWindowBuffer(width int) *WindowBuffer {
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("#6c7086")).
 		Padding(0, 1)
+
+	// Highlighted border for cursor
+	cursorBorder := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#89b4fa")).
+		Padding(0, 1)
+
 	return &WindowBuffer{
 		Windows:     []*Window{},
 		idIndex:     make(map[string]int),
 		width:       width,
 		borderStyle: dimmedBorder,
+		cursorStyle: cursorBorder,
+		lineHeights: []int{},
 	}
 }
 
@@ -75,27 +84,34 @@ func (wb *WindowBuffer) AppendOrUpdate(id string, tag byte, content string) {
 
 // GetAll returns the concatenated rendered windows as a single string.
 // Each window is rendered with its border and padded to the current width.
-func (wb *WindowBuffer) GetAll() string {
+// If cursorIndex >= 0, that window is highlighted with cursor border style.
+func (wb *WindowBuffer) GetAll(cursorIndex int) string {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 
 	var sb strings.Builder
+	wb.lineHeights = make([]int, len(wb.Windows))
+	wb.totalLines = 0
+
 	for i, w := range wb.Windows {
 		if i > 0 {
 			sb.WriteString("\n")
 		}
-		// Wrap content to fit inside border (width - 2 for borders?).
-		// The border style has Padding(0,1) which adds 1 space left/right.
-		// The border itself takes 2 columns left+right? Actually border characters count as 1 column.
-		// We'll let lipgloss handle sizing by setting width on the style.
-		// We need to set width of the inner content area: wb.width - 2 (border) - 2 (padding)???
-		// For simplicity, we apply the border style with width wb.width.
-		// lipgloss will automatically fit content within available space.
-		innerWidth := max(0, wb.width-4) // width - 2 (border) - 2 (padding)
-		// Ensure content does not exceed inner width? lipgloss.Wrap will handle.
+		innerWidth := max(0, wb.width-4)
 		wrapped := lipgloss.Wrap(w.Content, innerWidth, " ")
-		styled := w.Style.Width(wb.width).Render(wrapped)
+
+		// Use cursor style for highlighted window
+		style := w.Style
+		if i == cursorIndex {
+			style = wb.cursorStyle
+		}
+		styled := style.Width(wb.width).Render(wrapped)
 		sb.WriteString(styled)
+
+		// Track line height for this window
+		lineCount := strings.Count(styled, "\n") + 1
+		wb.lineHeights[i] = lineCount
+		wb.totalLines += lineCount
 	}
 	return sb.String()
 }
@@ -106,4 +122,52 @@ func (wb *WindowBuffer) Clear() {
 	defer wb.mu.Unlock()
 	wb.Windows = nil
 	wb.idIndex = make(map[string]int)
+	wb.lineHeights = nil
+	wb.totalLines = 0
+}
+
+// GetWindowCount returns the number of windows.
+func (wb *WindowBuffer) GetWindowCount() int {
+	wb.mu.Lock()
+	defer wb.mu.Unlock()
+	return len(wb.Windows)
+}
+
+// GetWindowStartLine returns the starting line number (0-indexed) for the window at given index.
+func (wb *WindowBuffer) GetWindowStartLine(windowIndex int) int {
+	wb.mu.Lock()
+	defer wb.mu.Unlock()
+
+	if windowIndex < 0 || windowIndex >= len(wb.lineHeights) {
+		return 0
+	}
+
+	startLine := 0
+	for i := 0; i < windowIndex; i++ {
+		startLine += wb.lineHeights[i]
+	}
+	return startLine
+}
+
+// GetWindowEndLine returns the ending line number (0-indexed, exclusive) for the window at given index.
+func (wb *WindowBuffer) GetWindowEndLine(windowIndex int) int {
+	wb.mu.Lock()
+	defer wb.mu.Unlock()
+
+	if windowIndex < 0 || windowIndex >= len(wb.lineHeights) {
+		return 0
+	}
+
+	endLine := 0
+	for i := 0; i <= windowIndex; i++ {
+		endLine += wb.lineHeights[i]
+	}
+	return endLine
+}
+
+// GetTotalLines returns the total number of lines across all windows.
+func (wb *WindowBuffer) GetTotalLines() int {
+	wb.mu.Lock()
+	defer wb.mu.Unlock()
+	return wb.totalLines
 }

@@ -272,6 +272,21 @@ For this project, simplicity is more important than efficiency.
   - **Testing**: All tests pass after removal.
   - **Documentation**: Updated STATE.md to remove TagStreamGap references.
 
+- ✅ **Window Cursor feature for navigating between windows**
+  - **Problem**: Users had no way to visually track or navigate between different windows in the display area.
+  - **Solution**: Added a Window Cursor that highlights one window at a time with a bright border, and `j`/`k` keys to navigate (like vi).
+  - **Implementation**:
+    - Added `windowCursor` field to `DisplayModel` (index of selected window, -1 for none)
+    - Added `cursorStyle` to `WindowBuffer` with bright blue border (`#89b4fa`)
+    - Updated `GetAll()` to accept cursorIndex parameter and highlight the selected window
+    - Added window line height tracking in `WindowBuffer` for scroll synchronization
+    - Added cursor management methods: `MoveWindowCursorUp()`, `MoveWindowCursorDown()`, `SetCursorToLastWindow()`, `EnsureCursorVisible()`
+    - `j`/`k` moves window cursor down/up (when display focused)
+    - `g`/`G` jumps to first/last window
+    - Cursor defaults to last window and updates when new windows are created
+  - **Testing**: All existing tests pass; cursorIndex parameter added to test calls.
+  - **Documentation**: Updated AGENTS.md and README.md with window cursor controls.
+
 ### Architecture
 - **Provider Types**: `anthropic` (native Anthropic API), `openai` (OpenAI-compatible)
 - **Tools**: read_file, todo_read, todo_write, edit_file, write_file, activate_skill, posix_shell

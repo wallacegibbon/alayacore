@@ -145,7 +145,7 @@ func TestEditorFinishedMsgWithError(t *testing.T) {
 		t.Errorf("Input should remain unchanged on error, got '%s'", terminal.input.Value())
 	}
 
-	displayContent := terminal.terminalOutput.windowBuffer.GetAll()
+	displayContent := terminal.terminalOutput.windowBuffer.GetAll(-1)
 	if displayContent == "" {
 		t.Error("Expected error message in display")
 	}
@@ -437,7 +437,7 @@ func TestWindowBufferRendering(t *testing.T) {
 	// Add a window with some content
 	wb.AppendOrUpdate("test1", stream.TagAssistantText, "Hello world")
 	// Get rendered output
-	rendered := wb.GetAll()
+	rendered := wb.GetAll(-1)
 	// Check that border characters appear (rounded border)
 	if !strings.Contains(rendered, "╭") || !strings.Contains(rendered, "╮") ||
 		!strings.Contains(rendered, "╰") || !strings.Contains(rendered, "╯") {
@@ -450,7 +450,7 @@ func TestWindowBufferRendering(t *testing.T) {
 	// Check width constraint: count lines? Not needed.
 	// Add another window and ensure ordering
 	wb.AppendOrUpdate("test2", stream.TagReasoning, "Reasoning content")
-	rendered2 := wb.GetAll()
+	rendered2 := wb.GetAll(-1)
 	// Should have two windows separated by newline
 	// Count border top lines? Simpler: ensure both contents appear
 	if !strings.Contains(rendered2, "Hello world") || !strings.Contains(rendered2, "Reasoning content") {
@@ -541,7 +541,7 @@ func TestWindowBufferWidth(t *testing.T) {
 	const totalWidth = 50
 	wb := NewWindowBuffer(totalWidth)
 	wb.AppendOrUpdate("test", stream.TagAssistantText, "Hello")
-	rendered := wb.GetAll()
+	rendered := wb.GetAll(-1)
 	// Find first line (top border)
 	lines := strings.Split(rendered, "\n")
 	if len(lines) == 0 {
@@ -578,7 +578,7 @@ func TestWindowBufferWidthMatchesInput(t *testing.T) {
 			wb := NewWindowBuffer(inputTotalWidth)
 			// Create a window
 			wb.AppendOrUpdate("test", stream.TagAssistantText, "Content")
-			rendered := wb.GetAll()
+			rendered := wb.GetAll(-1)
 			// Extract top border line
 			lines := strings.Split(rendered, "\n")
 			if len(lines) == 0 {

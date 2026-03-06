@@ -160,12 +160,10 @@ When running the Terminal version:
 | `Enter` | Submit prompt (when input focused) |
 | `Ctrl+S` | Save session to file |
 | `Ctrl+O` | Open external editor for multi-line input |
-| `j` | Scroll down 1 line (when display focused) |
-| `k` | Scroll up 1 line (when display focused) |
+| `j` | Move window cursor down (when display focused) |
+| `k` | Move window cursor up (when display focused) |
 | `g` | Go to top of display (when display focused) |
 | `G` | Go to bottom of display (when display focused) |
-| `Ctrl+D` | Scroll down half page (when display focused) |
-| `Ctrl+U` | Scroll up half page (when display focused) |
 | `:` | Switch to input with ":" prefix (when display focused) |
 | `Ctrl+C` | Clear input (when input focused) |
 | `Ctrl+G` | Cancel current request (with confirmation) |
@@ -178,6 +176,14 @@ CoreClaw's terminal adaptor organizes concurrent streams into separate windows w
 - **Stream ID suffix**: To prevent collisions across conversation turns, stream IDs include a monotonic suffix (e.g., `0-1`, `1-1` for first turn; `0-2`, `1-2` for second turn). This ensures each turn's content appears in distinct windows while keeping related deltas grouped within a turn.
 - **Width synchronization**: All windows match the input box width for consistent layout.
 - **Delta routing**: Content with stream ID prefix `[:id:]` is routed to the appropriate window via `parseStreamID()`.
+
+### Window Cursor
+
+The Window Cursor highlights one window in the display area with a brighter border. Use `j` and `k` keys to navigate between windows.
+
+- **Default position**: The cursor defaults to the last window and updates automatically when new windows are created.
+- **Scroll synchronization**: When using `g`, `G`, `Ctrl+D`, or `Ctrl+U`, the cursor follows the scroll movement to remain visible.
+- **Highlighted border**: The selected window displays a bright blue border (`#89b4fa`) instead of the dimmed default (`#6c7086`).
 
 ## Skills System
 

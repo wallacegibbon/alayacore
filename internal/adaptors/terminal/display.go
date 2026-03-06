@@ -26,6 +26,7 @@ type DisplayModel struct {
 	styles           *Styles
 	width            int
 	height           int
+	windowCursor     int // index of the currently selected window (-1 means no selection)
 }
 
 // NewDisplayModel creates a new display model
@@ -42,6 +43,7 @@ func NewDisplayModel(windowBuffer *WindowBuffer, styles *Styles) DisplayModel {
 		styles:         styles,
 		width:          80,
 		height:         20,
+		windowCursor:   -1,
 	}
 }
 
@@ -111,7 +113,7 @@ func (m DisplayModel) YOffset() int {
 
 // updateContent updates the viewport content from the window buffer
 func (m *DisplayModel) updateContent() {
-	newContent := m.windowBuffer.GetAll()
+	newContent := m.windowBuffer.GetAll(m.windowCursor)
 
 	if m.showingWelcome {
 		if newContent != "" && newContent != m.welcomeText {
@@ -218,7 +220,7 @@ func (m *DisplayModel) UpdateHeightForTodos(totalHeight int, todoCount int) {
 	oldHeight := m.viewport.Height()
 
 	if oldHeight != newHeight {
-		rawContent := m.windowBuffer.GetAll()
+		rawContent := m.windowBuffer.GetAll(m.windowCursor)
 		totalLines := max(1, strings.Count(rawContent, "\n")+1)
 
 		topLine := m.viewport.YOffset()
@@ -249,3 +251,82 @@ func (m *DisplayModel) UpdateHeightForTodos(totalHeight int, todoCount int) {
 }
 
 var _ tea.Model = (*DisplayModel)(nil)
+
+// GetWindowCursor returns the current window cursor index (-1 if none).
+func (m *DisplayModel) GetWindowCursor() int {
+	return m.windowCursor
+}
+
+// SetWindowCursor sets the window cursor to a specific index.
+// Pass -1 to deselect all windows.
+func (m *DisplayModel) SetWindowCursor(index int) {
+	windowCount := m.windowBuffer.GetWindowCount()
+	if index < -1 {
+		index = -1
+	} else if index >= windowCount {
+		index = windowCount - 1
+	}
+	m.windowCursor = index
+}
+
+// MoveWindowCursorDown moves the window cursor down by one window.
+func (m *DisplayModel) MoveWindowCursorDown() {
+	windowCount := m.windowBuffer.GetWindowCount()
+	if windowCount == 0 {
+		return
+	}
+	if m.windowCursor < 0 || m.windowCursor >= windowCount-1 {
+		m.windowCursor = windowCount - 1
+	} else {
+		m.windowCursor++
+	}
+}
+
+// MoveWindowCursorUp moves the window cursor up by one window.
+func (m *DisplayModel) MoveWindowCursorUp() {
+	windowCount := m.windowBuffer.GetWindowCount()
+	if windowCount == 0 {
+		return
+	}
+	if m.windowCursor <= 0 {
+		m.windowCursor = 0
+	} else {
+		m.windowCursor--
+	}
+}
+
+// EnsureCursorVisible scrolls the viewport to make the cursor window visible.
+func (m *DisplayModel) EnsureCursorVisible() {
+	if m.windowCursor < 0 {
+		return
+	}
+
+	startLine := m.windowBuffer.GetWindowStartLine(m.windowCursor)
+	endLine := m.windowBuffer.GetWindowEndLine(m.windowCursor)
+
+	viewportTop := m.viewport.YOffset()
+	viewportHeight := m.viewport.Height()
+	viewportBottom := viewportTop + viewportHeight
+
+	// If window is above viewport, scroll up
+	if startLine < viewportTop {
+		m.viewport.SetYOffset(startLine)
+		return
+	}
+
+	// If window is below viewport, scroll down
+	if endLine > viewportBottom {
+		newTop := endLine - viewportHeight
+		m.viewport.SetYOffset(newTop)
+	}
+}
+
+// SetCursorToLastWindow sets the cursor to the last window.
+func (m *DisplayModel) SetCursorToLastWindow() {
+	windowCount := m.windowBuffer.GetWindowCount()
+	if windowCount == 0 {
+		m.windowCursor = -1
+	} else {
+		m.windowCursor = windowCount - 1
+	}
+}

@@ -105,8 +105,8 @@ When running the Terminal version:
 | `Enter` | Submit prompt (when input focused) |
 | `Ctrl+S` | Save session to file |
 | `Ctrl+O` | Open external editor for multi-line input |
-| `j` | Scroll down 1 line (when display focused) |
-| `k` | Scroll up 1 line (when display focused) |
+| `j` | Move window cursor down (when display focused) |
+| `k` | Move window cursor up (when display focused) |
 | `g` | Go to top of display (when display focused) |
 | `G` | Go to bottom of display (when display focused) |
 | `Ctrl+D` | Scroll down half page (when display focused) |
@@ -119,6 +119,10 @@ When running the Terminal version:
 ## Window Container
 
 The terminal organizes concurrent streams into separate windows with synchronized widths. Stream IDs include monotonic suffixes to prevent collisions across conversation turns.
+
+### Window Cursor
+
+A Window Cursor highlights one window with a bright border. Use `J`/`K` to navigate. The cursor stays visible during scrolling and defaults to the newest window.
 
 ## Session Commands
 
