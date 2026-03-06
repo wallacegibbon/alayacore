@@ -78,8 +78,8 @@ func TestEditorFinishedMsg(t *testing.T) {
 	}
 
 	// editorContent should preserve original content
-	if terminal.editorContent != "test content from editor" {
-		t.Errorf("Expected editorContent 'test content from editor', got '%s'", terminal.editorContent)
+	if terminal.input.editorContent != "test content from editor" {
+		t.Errorf("Expected editorContent 'test content from editor', got '%s'", terminal.input.editorContent)
 	}
 }
 
@@ -98,31 +98,31 @@ func TestEditorFinishedMsgWithWhitespace(t *testing.T) {
 	}
 
 	// editorContent should preserve all whitespace including leading/trailing spaces
-	if terminal.editorContent != "  content with leading and trailing spaces  \n" {
-		t.Errorf("Expected to preserve all whitespace, got '%s'", terminal.editorContent)
+	if terminal.input.editorContent != "  content with leading and trailing spaces  \n" {
+		t.Errorf("Expected to preserve all whitespace, got '%s'", terminal.input.editorContent)
 	}
 }
 
 func TestEditorContentSubmittedOnEnter(t *testing.T) {
 	terminal := NewTerminal(nil, NewTerminalOutput(), stream.NewChanInput(10), "")
-	terminal.editorContent = "line1\nline2\nline3"
+	terminal.input.editorContent = "line1\nline2\nline3"
 
 	// editorContent is cleared before submission when Enter is pressed
 	// This test verifies the logic flow that checks editorContent first
-	if terminal.editorContent != "line1\nline2\nline3" {
-		t.Errorf("Expected editorContent to be set before Enter, got '%s'", terminal.editorContent)
+	if terminal.input.editorContent != "line1\nline2\nline3" {
+		t.Errorf("Expected editorContent to be set before Enter, got '%s'", terminal.input.editorContent)
 	}
 }
 
 func TestEditorContentUsedInsteadOfInputValue(t *testing.T) {
 	terminal := NewTerminal(nil, NewTerminalOutput(), stream.NewChanInput(10), "")
-	terminal.editorContent = "editor content"
+	terminal.input.editorContent = "editor content"
 	terminal.input.SetValue("input value")
 
 	// When editorContent is set, it should be used instead of input value
 	// This is verified by checking that editorContent has the right value
-	if terminal.editorContent != "editor content" {
-		t.Errorf("Expected editorContent to be 'editor content', got '%s'", terminal.editorContent)
+	if terminal.input.editorContent != "editor content" {
+		t.Errorf("Expected editorContent to be 'editor content', got '%s'", terminal.input.editorContent)
 	}
 }
 

@@ -1,0 +1,221 @@
+package terminal
+
+import (
+	"strings"
+
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+)
+
+// InputMsg represents messages from the input component
+type InputMsg struct {
+	Type    string
+	Content string
+}
+
+// InputModel handles text input and editor interactions
+type InputModel struct {
+	input         textinput.Model
+	focused       bool
+	editorContent string
+	editor        *Editor
+	styles        *Styles
+	width         int
+}
+
+// NewInputModel creates a new input model
+func NewInputModel(styles *Styles) InputModel {
+	input := textinput.New()
+	input.Placeholder = "Enter your prompt..."
+	input.Focus()
+	input.Prompt = "> "
+	input.SetWidth(76)
+
+	return InputModel{
+		input:   input,
+		focused: true,
+		editor:  NewEditor(),
+		styles:  styles,
+		width:   80,
+	}
+}
+
+// Init initializes the input model
+func (m InputModel) Init() tea.Cmd {
+	return nil
+}
+
+// Update handles messages for the input model
+func (m InputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.input.SetWidth(max(0, msg.Width-8))
+	case InputMsg:
+		switch msg.Type {
+		case "focus":
+			m.focused = true
+			m.input.Focus()
+		case "blur":
+			m.focused = false
+			m.input.Blur()
+		case "toggle_focus":
+			m.focused = !m.focused
+			if m.focused {
+				m.input.Focus()
+			} else {
+				m.input.Blur()
+			}
+		case "clear":
+			m.input.SetValue("")
+			m.editorContent = ""
+		case "set_value":
+			m.input.SetValue(msg.Content)
+			m.input.CursorEnd()
+		}
+	case editorFinishedMsg:
+		if msg.err != nil {
+			return m, nil
+		}
+		if msg.content != "" {
+			m.editorContent = msg.content
+			m.input.SetValue(FormatEditorContent(msg.content))
+			m.input.CursorEnd()
+			m.input.Focus()
+		}
+	}
+
+	oldValue := m.input.Value()
+	m.input, _ = m.input.Update(msg)
+	newValue := m.input.Value()
+
+	if m.editorContent != "" && oldValue != newValue && !strings.HasPrefix(oldValue, "[") {
+		m.editorContent = ""
+	}
+
+	return m, nil
+}
+
+// View renders the input field
+func (m InputModel) View() tea.View {
+	borderColor := "#89d4fa"
+	if !m.focused {
+		borderColor = "#45475a"
+	}
+
+	styles := textinput.DefaultStyles(true)
+	styles.Focused.Prompt = lipgloss.NewStyle().Foreground(lipgloss.Color(borderColor)).Bold(true)
+	styles.Blurred.Prompt = lipgloss.NewStyle().Foreground(lipgloss.Color(borderColor)).Bold(true)
+	if m.focused {
+		styles.Focused.Text = lipgloss.NewStyle()
+		styles.Blurred.Text = lipgloss.NewStyle()
+	} else {
+		styles.Focused.Text = lipgloss.NewStyle().Foreground(lipgloss.Color("#45475a"))
+		styles.Blurred.Text = lipgloss.NewStyle().Foreground(lipgloss.Color("#45475a"))
+	}
+	m.input.SetStyles(styles)
+
+	return tea.NewView(m.input.View())
+}
+
+// Focus sets focus on the input
+func (m *InputModel) Focus() {
+	m.focused = true
+	m.input.Focus()
+}
+
+// Blur removes focus from the input
+func (m *InputModel) Blur() {
+	m.focused = false
+	m.input.Blur()
+}
+
+// IsFocused returns whether the input is focused
+func (m InputModel) IsFocused() bool {
+	return m.focused
+}
+
+// Value returns the current input value
+func (m InputModel) Value() string {
+	return m.input.Value()
+}
+
+// SetValue sets the input value
+func (m *InputModel) SetValue(value string) {
+	m.input.SetValue(value)
+}
+
+// Clear clears the input and editor content
+func (m *InputModel) Clear() {
+	m.input.SetValue("")
+	m.editorContent = ""
+}
+
+// GetPrompt returns the actual prompt text (editor content or input value)
+func (m InputModel) GetPrompt() string {
+	if m.editorContent != "" {
+		return m.editorContent
+	}
+	return m.input.Value()
+}
+
+// GetEditorContent returns the editor content
+func (m InputModel) GetEditorContent() string {
+	return m.editorContent
+}
+
+// ClearEditorContent clears the editor content
+func (m *InputModel) ClearEditorContent() {
+	m.editorContent = ""
+}
+
+// OpenEditor opens the external editor
+func (m InputModel) OpenEditor() tea.Cmd {
+	content := m.editorContent
+	if content == "" {
+		content = m.input.Value()
+	}
+	return m.editor.Open(content)
+}
+
+// RenderWithBorder renders the input with a border
+func (m InputModel) RenderWithBorder(confirmDialog bool, confirmText string) string {
+	borderColor := "#89d4fa"
+	if !m.focused {
+		borderColor = "#45475a"
+	}
+
+	borderStyle := m.styles.InputBorder.BorderForeground(lipgloss.Color(borderColor)).Padding(0, 1)
+
+	if confirmDialog {
+		confirmStyled := m.styles.Confirm.Width(max(0, m.width-4)).Render(confirmText)
+		return borderStyle.Render(confirmStyled)
+	}
+
+	return borderStyle.Render(m.styles.Input.Width(max(0, m.width-4)).Render(m.input.View()))
+}
+
+// SetWidth sets the input width
+func (m *InputModel) SetWidth(width int) {
+	m.width = width
+	m.input.SetWidth(max(0, width-8))
+}
+
+// CursorEnd moves cursor to end
+func (m *InputModel) CursorEnd() {
+	m.input.CursorEnd()
+}
+
+// updateFromMsg handles a message and updates internal state (non-tea.Model interface)
+func (m *InputModel) updateFromMsg(msg tea.Msg) {
+	oldValue := m.input.Value()
+	m.input, _ = m.input.Update(msg)
+	newValue := m.input.Value()
+
+	if m.editorContent != "" && oldValue != newValue && !strings.HasPrefix(oldValue, "[") {
+		m.editorContent = ""
+	}
+}
+
+var _ tea.Model = (*InputModel)(nil)

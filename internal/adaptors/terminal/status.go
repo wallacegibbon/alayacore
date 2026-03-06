@@ -1,0 +1,69 @@
+package terminal
+
+import (
+	tea "charm.land/bubbletea/v2"
+)
+
+// StatusMsg represents messages for the status component
+type StatusMsg struct {
+	Status string
+}
+
+// StatusModel handles the status bar display
+type StatusModel struct {
+	status string
+	styles *Styles
+	width  int
+}
+
+// NewStatusModel creates a new status model
+func NewStatusModel(styles *Styles) StatusModel {
+	return StatusModel{
+		status: "",
+		styles: styles,
+		width:  80,
+	}
+}
+
+// Init initializes the status model
+func (m StatusModel) Init() tea.Cmd {
+	return nil
+}
+
+// Update handles messages for the status model
+func (m StatusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case StatusMsg:
+		m.status = msg.Status
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+	}
+	return m, nil
+}
+
+// View renders the status bar
+func (m StatusModel) View() tea.View {
+	return tea.NewView(m.styles.Status.Width(max(0, m.width-4)).Padding(0, 1).Render(m.status))
+}
+
+// SetStatus updates the status text
+func (m *StatusModel) SetStatus(status string) {
+	m.status = status
+}
+
+// GetStatus returns the current status
+func (m StatusModel) GetStatus() string {
+	return m.status
+}
+
+// SetWidth sets the width for rendering
+func (m *StatusModel) SetWidth(width int) {
+	m.width = width
+}
+
+// RenderString returns the rendered status string
+func (m StatusModel) RenderString() string {
+	return m.styles.Status.Width(max(0, m.width-4)).Padding(0, 1).Render(m.status)
+}
+
+var _ tea.Model = (*StatusModel)(nil)
