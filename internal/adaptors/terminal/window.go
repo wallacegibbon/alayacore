@@ -32,16 +32,16 @@ type WindowBuffer struct {
 
 // NewWindowBuffer creates a new window buffer with given width.
 func NewWindowBuffer(width int) *WindowBuffer {
-	// Dimmed border: rounded border with subtle color
+	// Dimmed border: rounded border with invisible color (matches background)
 	dimmedBorder := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#6c7086")).
+		BorderForeground(lipgloss.Color("#1e1e2e")).
 		Padding(0, 1)
 
 	// Highlighted border for cursor
 	cursorBorder := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#89b4fa")).
+		BorderForeground(lipgloss.Color("#fab387")).
 		Padding(0, 1)
 
 	return &WindowBuffer{

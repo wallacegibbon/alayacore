@@ -265,11 +265,14 @@ func (m *Terminal) handleConfirmDialog(msg tea.KeyMsg) (tea.Cmd, bool) {
 func (m *Terminal) toggleFocus() {
 	if m.focusedWindow == "display" {
 		m.focusedWindow = "input"
+		m.display.SetDisplayFocused(false)
 		m.input.Focus()
 	} else {
 		m.focusedWindow = "display"
+		m.display.SetDisplayFocused(true)
 		m.input.Blur()
 	}
+	m.display.updateContent()
 }
 
 // handleDisplayKeys handles key events when display window is focused

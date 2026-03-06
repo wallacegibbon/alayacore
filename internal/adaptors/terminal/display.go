@@ -28,6 +28,7 @@ type DisplayModel struct {
 	height              int
 	windowCursor        int  // index of the currently selected window (-1 means no selection)
 	userMovedCursorAway bool // true if user manually moved cursor away from last window
+	displayFocused      bool // true when display has focus (for showing cursor highlight)
 }
 
 // NewDisplayModel creates a new display model
@@ -46,6 +47,7 @@ func NewDisplayModel(windowBuffer *WindowBuffer, styles *Styles) DisplayModel {
 		height:              20,
 		windowCursor:        -1,
 		userMovedCursorAway: false,
+		displayFocused:      false,
 	}
 }
 
@@ -108,6 +110,11 @@ func (m *DisplayModel) SetWidth(width int) {
 	m.viewport.SetWidth(max(0, width))
 }
 
+// SetDisplayFocused sets whether the display is focused (for cursor highlight)
+func (m *DisplayModel) SetDisplayFocused(focused bool) {
+	m.displayFocused = focused
+}
+
 // YOffset returns the current scroll position
 func (m DisplayModel) YOffset() int {
 	return m.viewport.YOffset()
@@ -115,7 +122,11 @@ func (m DisplayModel) YOffset() int {
 
 // updateContent updates the viewport content from the window buffer
 func (m *DisplayModel) updateContent() {
-	newContent := m.windowBuffer.GetAll(m.windowCursor)
+	cursorIndex := -1
+	if m.displayFocused {
+		cursorIndex = m.windowCursor
+	}
+	newContent := m.windowBuffer.GetAll(cursorIndex)
 
 	if m.showingWelcome {
 		if newContent != "" && newContent != m.welcomeText {

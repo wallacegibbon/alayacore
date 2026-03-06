@@ -36,7 +36,7 @@ func DefaultStyles() *Styles {
 		Text:        baseStyle.Foreground(lipgloss.Color("#cdd6f4")).Bold(true),
 		UserInput:   baseStyle.Foreground(lipgloss.Color("#89d4fa")).Bold(true),
 		Tool:        baseStyle.Foreground(lipgloss.Color("#f9e2af")),
-		ToolContent: baseStyle.Foreground(lipgloss.Color("#89d4fa")),
+		ToolContent: baseStyle.Foreground(lipgloss.Color("#6c7086")),
 		Reasoning:   baseStyle.Foreground(lipgloss.Color("#6c7086")).Italic(true),
 		Error:       baseStyle.Foreground(lipgloss.Color("#f38ba8")),
 		System:      baseStyle.Foreground(lipgloss.Color("#6c7086")),
