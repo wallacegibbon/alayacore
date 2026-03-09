@@ -74,6 +74,7 @@ coreclaw --type anthropic --base-url http://localhost:11434 --api-key=xxx --mode
 - `-system string` - Override system prompt
 - `-skill string` - Skills directory path (can be specified multiple times)
 - `-session string` - Session file path to load/save conversations
+- `-proxy string` - HTTP proxy URL (supports HTTP, HTTPS, and SOCKS5 proxies, e.g., `http://127.0.0.1:7890` or `socks5://127.0.0.1:1080`)
 
 
 ## Session Persistence

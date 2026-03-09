@@ -56,6 +56,7 @@ Flags:
   -skill strings     Skills directory path (can be specified multiple times)
   -addr string       Server address to listen on (default ":8080")
   -session string    Session file path to load/save conversations
+  -proxy string      HTTP proxy URL (supports HTTP, HTTPS, and SOCKS5)
   -debug-api         Write raw API requests and responses to log file
   -version           Show version information
   -help              Show help information
@@ -66,5 +67,6 @@ Examples:
   coreclaw-web --type openai --base-url http://localhost:11434/v1 --api-key xxx --model llama3 --addr :9090
   coreclaw-web --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o --session ~/my-session.json
   coreclaw-web --type openai --base-url http://localhost:11434/v1 --api-key xxx --model llama3 --skill ./skills1 --skill ./skills2
+  coreclaw-web --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o --proxy socks5://127.0.0.1:1080
 `)
 }

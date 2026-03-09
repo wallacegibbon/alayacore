@@ -2,17 +2,22 @@ package debug
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httputil"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/net/proxy"
 )
 
 var (
@@ -259,4 +264,58 @@ func NewHTTPClient() *http.Client {
 			Transport: http.DefaultTransport,
 		},
 	}
+}
+
+// NewHTTPClientWithProxy creates an HTTP client with proxy support
+// Supports HTTP, HTTPS, and SOCKS5 proxies
+func NewHTTPClientWithProxy(proxyURL string) (*http.Client, error) {
+	proxyParsed, err := url.Parse(proxyURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid proxy URL: %w", err)
+	}
+
+	transport := &http.Transport{}
+
+	switch proxyParsed.Scheme {
+	case "socks5", "socks5h":
+		// SOCKS5 proxy
+		var auth *proxy.Auth
+		if proxyParsed.User != nil {
+			password, _ := proxyParsed.User.Password()
+			auth = &proxy.Auth{
+				User:     proxyParsed.User.Username(),
+				Password: password,
+			}
+		}
+		dialer, err := proxy.SOCKS5("tcp", proxyParsed.Host, auth, proxy.Direct)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create SOCKS5 dialer: %w", err)
+		}
+		transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return dialer.Dial(network, addr)
+		}
+	default:
+		// HTTP/HTTPS proxy
+		transport.Proxy = http.ProxyURL(proxyParsed)
+	}
+
+	return &http.Client{
+		Transport: transport,
+	}, nil
+}
+
+// NewHTTPClientWithProxyAndDebug creates an HTTP client with both proxy and debug logging
+func NewHTTPClientWithProxyAndDebug(proxyURL string) (*http.Client, error) {
+	client, err := NewHTTPClientWithProxy(proxyURL)
+	if err != nil {
+		return nil, err
+	}
+
+	Enable()
+	// Wrap the transport with debug logging
+	client.Transport = &DebugTransport{
+		Transport: client.Transport,
+	}
+
+	return client, nil
 }

@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"charm.land/fantasy"
@@ -56,7 +57,7 @@ func Setup(cfg *config.Settings) (*Config, error) {
 		return nil, fmt.Errorf("failed to get provider config: %w", err)
 	}
 
-	provider, err := CreateProvider(providerConfig.Provider, providerConfig.APIKey, providerConfig.BaseURL, cfg.DebugAPI)
+	provider, err := CreateProvider(providerConfig.Provider, providerConfig.APIKey, providerConfig.BaseURL, cfg.DebugAPI, cfg.Proxy)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create provider: %w", err)
 	}
@@ -105,19 +106,19 @@ func (c *Config) AgentFactory() func() fantasy.Agent {
 }
 
 // CreateProvider creates a provider based on type
-func CreateProvider(provider, apiKey, baseURL string, debugAPI bool) (interface {
+func CreateProvider(provider, apiKey, baseURL string, debugAPI bool, proxyURL string) (interface {
 	LanguageModel(context.Context, string) (fantasy.LanguageModel, error)
 }, error) {
 	switch provider {
 	case "anthropic":
-		return CreateAnthropicProvider(apiKey, baseURL, debugAPI)
+		return CreateAnthropicProvider(apiKey, baseURL, debugAPI, proxyURL)
 	default:
-		return CreateOpenAIProvider(apiKey, baseURL, debugAPI)
+		return CreateOpenAIProvider(apiKey, baseURL, debugAPI, proxyURL)
 	}
 }
 
 // CreateAnthropicProvider creates an Anthropic provider
-func CreateAnthropicProvider(apiKey, baseURL string, debugAPI bool) (interface {
+func CreateAnthropicProvider(apiKey, baseURL string, debugAPI bool, proxyURL string) (interface {
 	LanguageModel(context.Context, string) (fantasy.LanguageModel, error)
 }, error) {
 	var opts []anthropic.Option
@@ -125,14 +126,26 @@ func CreateAnthropicProvider(apiKey, baseURL string, debugAPI bool) (interface {
 	if baseURL != "" {
 		opts = append(opts, anthropic.WithBaseURL(baseURL))
 	}
-	if debugAPI {
+	if proxyURL != "" {
+		var client *http.Client
+		var err error
+		if debugAPI {
+			client, err = debugpkg.NewHTTPClientWithProxyAndDebug(proxyURL)
+		} else {
+			client, err = debugpkg.NewHTTPClientWithProxy(proxyURL)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to create HTTP client with proxy: %w", err)
+		}
+		opts = append(opts, anthropic.WithHTTPClient(client))
+	} else if debugAPI {
 		opts = append(opts, anthropic.WithHTTPClient(debugpkg.NewHTTPClient()))
 	}
 	return anthropic.New(opts...)
 }
 
 // CreateOpenAIProvider creates an OpenAI-compatible provider
-func CreateOpenAIProvider(apiKey, baseURL string, debugAPI bool) (interface {
+func CreateOpenAIProvider(apiKey, baseURL string, debugAPI bool, proxyURL string) (interface {
 	LanguageModel(context.Context, string) (fantasy.LanguageModel, error)
 }, error) {
 	// Use openaicompat for non-OpenAI URLs (Ollama, LM Studio, DeepSeek, etc.)
@@ -140,7 +153,19 @@ func CreateOpenAIProvider(apiKey, baseURL string, debugAPI bool) (interface {
 	if !strings.Contains(baseURL, "api.openai.com") {
 		var opts []openaicompat.Option
 		opts = append(opts, openaicompat.WithAPIKey(apiKey), openaicompat.WithBaseURL(baseURL))
-		if debugAPI {
+		if proxyURL != "" {
+			var client *http.Client
+			var err error
+			if debugAPI {
+				client, err = debugpkg.NewHTTPClientWithProxyAndDebug(proxyURL)
+			} else {
+				client, err = debugpkg.NewHTTPClientWithProxy(proxyURL)
+			}
+			if err != nil {
+				return nil, fmt.Errorf("failed to create HTTP client with proxy: %w", err)
+			}
+			opts = append(opts, openaicompat.WithHTTPClient(client))
+		} else if debugAPI {
 			opts = append(opts, openaicompat.WithHTTPClient(debugpkg.NewHTTPClient()))
 		}
 		return openaicompat.New(opts...)
@@ -149,7 +174,19 @@ func CreateOpenAIProvider(apiKey, baseURL string, debugAPI bool) (interface {
 	// Use native OpenAI provider for api.openai.com
 	var opts []openai.Option
 	opts = append(opts, openai.WithAPIKey(apiKey), openai.WithBaseURL(baseURL))
-	if debugAPI {
+	if proxyURL != "" {
+		var client *http.Client
+		var err error
+		if debugAPI {
+			client, err = debugpkg.NewHTTPClientWithProxyAndDebug(proxyURL)
+		} else {
+			client, err = debugpkg.NewHTTPClientWithProxy(proxyURL)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to create HTTP client with proxy: %w", err)
+		}
+		opts = append(opts, openai.WithHTTPClient(client))
+	} else if debugAPI {
 		opts = append(opts, openai.WithHTTPClient(debugpkg.NewHTTPClient()))
 	}
 	return openai.New(opts...)

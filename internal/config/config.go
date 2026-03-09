@@ -40,6 +40,7 @@ type Settings struct {
 	Skills       []string
 	Addr         string
 	Session      string
+	Proxy        string
 }
 
 // Parse parses CLI flags and returns settings
@@ -56,6 +57,7 @@ func Parse() *Settings {
 	flag.Var(skill, "skill", "Skill path (can be specified multiple times)")
 	addr := flag.String("addr", ":8080", "Server address to listen on (for web server)")
 	session := flag.String("session", "", "Session file path to load/save conversations")
+	proxy := flag.String("proxy", "", "HTTP proxy URL (e.g., http://127.0.0.1:7890 or socks5://127.0.0.1:1080)")
 	flag.Parse()
 
 	// Collect skill paths
@@ -73,6 +75,7 @@ func Parse() *Settings {
 		Skills:       skillPaths,
 		Addr:         *addr,
 		Session:      *session,
+		Proxy:        *proxy,
 	}
 
 	return s

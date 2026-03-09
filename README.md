@@ -73,6 +73,7 @@ coreclaw-web --type anthropic --base-url https://api.anthropic.com --api-key $AN
 - `-system string` - Override system prompt
 - `-skill string` - Skills directory path (can be specified multiple times)
 - `-session string` - Session file path to load/save conversations
+- `-proxy string` - HTTP proxy URL (supports HTTP, HTTPS, and SOCKS5, e.g., `http://127.0.0.1:7890` or `socks5://127.0.0.1:1080`)
 - `-debug-api` - Write raw API requests and responses to log file
 - `-version` - Show version information
 - `-help` - Show help information
@@ -94,6 +95,7 @@ coreclaw-web --type anthropic --base-url https://api.anthropic.com --api-key $AN
 - Web server with WebSocket support and chat UI
 - Todo list management for task tracking
 - Session file persistence
+- HTTP/HTTPS/SOCKS5 proxy support
 
 ## Terminal Controls
 
