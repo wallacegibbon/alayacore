@@ -16,18 +16,24 @@ type Window struct {
 	Content string         // accumulated content (styled)
 	Style   lipgloss.Style // border style (dimmed)
 	Wrapped bool           // true if window is in wrapped (3-row) mode
+
+	// Cached rendering state
+	lastContentLen int    // length of content when last rendered (for quick change detection)
+	cachedRender   string // cached rendered output
 }
 
 // WindowBuffer holds a sequence of windows in order of creation.
 type WindowBuffer struct {
-	mu          sync.Mutex
-	Windows     []*Window
-	idIndex     map[string]int
-	width       int
-	borderStyle lipgloss.Style
-	cursorStyle lipgloss.Style
-	lineHeights []int // cached line heights for each window (after rendering)
-	totalLines  int   // total lines across all windows
+	mu           sync.Mutex
+	Windows      []*Window
+	idIndex      map[string]int
+	width        int
+	borderStyle  lipgloss.Style
+	cursorStyle  lipgloss.Style
+	lineHeights  []int  // cached line heights for each window (after rendering)
+	totalLines   int    // total lines across all windows
+	dirty        bool   // true if content has changed and needs re-render
+	cachedRender string // cached full render of all windows
 }
 
 // NewWindowBuffer creates a new window buffer with given width.
@@ -58,7 +64,10 @@ func NewWindowBuffer(width int) *WindowBuffer {
 func (wb *WindowBuffer) SetWidth(width int) {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
-	wb.width = width
+	if wb.width != width {
+		wb.width = width
+		wb.dirty = true
+	}
 }
 
 // AppendOrUpdate adds content to an existing window identified by id,
@@ -73,6 +82,7 @@ func (wb *WindowBuffer) AppendOrUpdate(id string, tag byte, content string) {
 		// Append to existing window
 		window := wb.Windows[idx]
 		window.Content += content
+		wb.dirty = true
 		return
 	}
 	// Create new window - reasoning windows are wrapped by default
@@ -85,6 +95,7 @@ func (wb *WindowBuffer) AppendOrUpdate(id string, tag byte, content string) {
 	}
 	wb.Windows = append(wb.Windows, window)
 	wb.idIndex[id] = len(wb.Windows) - 1
+	wb.dirty = true
 }
 
 // GetAll returns the concatenated rendered windows as a single string.
@@ -95,6 +106,35 @@ func (wb *WindowBuffer) GetAll(cursorIndex int) string {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 
+	// Check if we need to re-render
+	needsRender := wb.dirty
+	if !needsRender {
+		// Check if any window content has changed (quick length check)
+		for _, w := range wb.Windows {
+			if len(w.Content) != w.lastContentLen {
+				needsRender = true
+				break
+			}
+		}
+	}
+
+	if needsRender {
+		wb.rebuildCache()
+		wb.dirty = false
+	}
+
+	// If no cursor or cursor out of range, return cached render
+	if cursorIndex < 0 || cursorIndex >= len(wb.Windows) {
+		return wb.cachedRender
+	}
+
+	// Cursor is active - rebuild with cursor highlighting on just that window
+	// We use the cached wrapped content but apply different border style
+	return wb.renderWithCursor(cursorIndex)
+}
+
+// rebuildCache rebuilds the cached render for all windows (without cursor)
+func (wb *WindowBuffer) rebuildCache() {
 	var sb strings.Builder
 	wb.lineHeights = make([]int, len(wb.Windows))
 	wb.totalLines = 0
@@ -104,46 +144,73 @@ func (wb *WindowBuffer) GetAll(cursorIndex int) string {
 			sb.WriteString("\n")
 		}
 		innerWidth := max(0, wb.width-4)
+		contentToRender := wb.renderWindowContent(w, innerWidth)
 
-		var contentToRender string
-		if w.Wrapped {
-			// In wrapped mode, show only last 3 lines
-			wrappedContent := lipgloss.Wrap(w.Content, innerWidth, " ")
-			totalLines := strings.Count(wrappedContent, "\n") + 1
+		styled := w.Style.Width(wb.width).Render(contentToRender)
+		sb.WriteString(styled)
 
-			// Only show wrap indicator if window has more than 3 lines
-			if totalLines > 3 {
-				contentToRender = wb.getLastLines(w.Content, innerWidth, 3)
-				wrapIndicator := lipgloss.NewStyle().
-					Background(lipgloss.Color("#45475a")).
-					Render(" Wrapped - Space to expand ")
-				if contentToRender != "" {
-					contentToRender = wrapIndicator + "\n" + contentToRender
-				} else {
-					contentToRender = wrapIndicator
-				}
-			} else {
-				// Window has 3 or fewer lines, just show content without indicator
-				contentToRender = wrappedContent
-			}
-		} else {
-			contentToRender = lipgloss.Wrap(w.Content, innerWidth, " ")
+		// Track line height and cache rendered content
+		lineCount := strings.Count(styled, "\n") + 1
+		wb.lineHeights[i] = lineCount
+		wb.totalLines += lineCount
+		w.cachedRender = styled
+		w.lastContentLen = len(w.Content)
+	}
+	wb.cachedRender = sb.String()
+}
+
+// renderWithCursor renders all windows with cursor highlighting on the specified window
+func (wb *WindowBuffer) renderWithCursor(cursorIndex int) string {
+	var sb strings.Builder
+
+	for i, w := range wb.Windows {
+		if i > 0 {
+			sb.WriteString("\n")
 		}
 
-		// Determine style based on cursor state
+		// Use cached render for non-cursor windows
+		if i != cursorIndex && w.cachedRender != "" && len(w.Content) == w.lastContentLen {
+			sb.WriteString(w.cachedRender)
+			continue
+		}
+
+		// Render cursor window (or uncached window) with appropriate style
+		innerWidth := max(0, wb.width-4)
+		contentToRender := wb.renderWindowContent(w, innerWidth)
+
 		style := w.Style
 		if i == cursorIndex {
 			style = wb.cursorStyle
 		}
 		styled := style.Width(wb.width).Render(contentToRender)
 		sb.WriteString(styled)
-
-		// Track line height for this window
-		lineCount := strings.Count(styled, "\n") + 1
-		wb.lineHeights[i] = lineCount
-		wb.totalLines += lineCount
 	}
 	return sb.String()
+}
+
+// renderWindowContent renders the content of a window (wrapping, truncation for wrapped mode)
+func (wb *WindowBuffer) renderWindowContent(w *Window, innerWidth int) string {
+	if w.Wrapped {
+		// In wrapped mode, show only last 3 visual lines
+		// Grab last 3 logical lines (enough since wrapping only expands, never merges)
+		lastLinesRaw := getLastLines(w.Content, 3)
+		wrappedContent := lipgloss.Wrap(lastLinesRaw, innerWidth, " ")
+
+		// Show wrap indicator if original content was truncated
+		if len(lastLinesRaw) < len(w.Content) {
+			contentToRender := getLastLines(wrappedContent, 3)
+			wrapIndicator := lipgloss.NewStyle().
+				Background(lipgloss.Color("#45475a")).
+				Render(" Wrapped - Space to expand ")
+			if contentToRender != "" {
+				return wrapIndicator + "\n" + contentToRender
+			}
+			return wrapIndicator
+		}
+		// Content fits in 3 logical lines, just show wrapped content
+		return wrappedContent
+	}
+	return lipgloss.Wrap(w.Content, innerWidth, " ")
 }
 
 // Clear removes all windows.
@@ -154,6 +221,8 @@ func (wb *WindowBuffer) Clear() {
 	wb.idIndex = make(map[string]int)
 	wb.lineHeights = nil
 	wb.totalLines = 0
+	wb.cachedRender = ""
+	wb.dirty = true
 }
 
 // GetWindowCount returns the number of windows.
@@ -213,16 +282,25 @@ func (wb *WindowBuffer) ToggleWrap(windowIndex int) bool {
 	}
 
 	wb.Windows[windowIndex].Wrapped = !wb.Windows[windowIndex].Wrapped
+	wb.dirty = true
 	return true
 }
 
-// getLastLines returns the last n lines of content after wrapping.
-// It wraps the content first, then extracts the last n lines.
-func (wb *WindowBuffer) getLastLines(content string, innerWidth, n int) string {
-	wrapped := lipgloss.Wrap(content, innerWidth, " ")
-	lines := strings.Split(wrapped, "\n")
-	if len(lines) <= n {
-		return wrapped
+// getLastLines returns the last n lines from an already-wrapped string.
+// It finds the nth-to-last newline and returns everything after it.
+func getLastLines(wrapped string, n int) string {
+	if n <= 0 {
+		return ""
 	}
-	return strings.Join(lines[len(lines)-n:], "\n")
+	idx := len(wrapped)
+	for i := 0; i < n && idx > 0; i++ {
+		idx = strings.LastIndex(wrapped[:idx], "\n")
+		if idx == -1 {
+			return wrapped
+		}
+	}
+	if idx >= 0 && idx < len(wrapped) {
+		return wrapped[idx+1:]
+	}
+	return wrapped
 }
