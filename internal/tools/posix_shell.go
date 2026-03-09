@@ -38,8 +38,9 @@ func NewPosixShellTool() fantasy.AgentTool {
 				return fantasy.NewTextErrorResponse("parse error: " + err.Error()), nil
 			}
 
+			cwd, _ := os.Getwd()
 			runner, err := interp.New(
-				interp.Dir("/"),
+				interp.Dir(cwd),
 				interp.Env(expand.ListEnviron(os.Environ()...)),
 				interp.StdIO(os.Stdin, &stdout, &stderr),
 				interp.ExecHandlers(),
