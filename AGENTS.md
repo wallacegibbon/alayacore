@@ -85,7 +85,7 @@ CoreClaw allows you to save and restore conversations manually using session fil
 
 - **Manual-save**: Sessions are saved only when you use `:save [filename]` or press `Ctrl+S`
 - **Load**: On startup, CoreClaw creates a new empty session unless you specify `--session` to load an existing one
-- **Path expansion**: Paths like `~/mysession.json` are expanded to your home directory
+- **Path expansion**: Paths like `~/mysession.md` are expanded to your home directory
 
 ### What's Saved
 
@@ -102,7 +102,7 @@ CoreClaw allows you to save and restore conversations manually using session fil
 
 ```sh
 :save                    # Save to current session file (if set with --session)
-:save ~/mysession.json    # Save to specific file
+:save ~/mysession.md    # Save to specific file
 :cancel                  # Cancel current request and clear todos (with confirmation)
 :summarize              # Summarize the entire conversation to a single message
 ```
@@ -113,7 +113,7 @@ You can load an existing session using the `--session` flag:
 
 ```sh
 # Load a specific session file
-coreclaw --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o --session ~/mysession.json
+coreclaw --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o --session ~/mysession.md
 
 # Start fresh with a new session (default behavior)
 coreclaw --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o

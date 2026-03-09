@@ -56,7 +56,7 @@ Examples:
   coreclaw --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
   coreclaw --type anthropic --base-url https://api.anthropic.com --api-key $ANTHROPIC_API_KEY --model claude-sonnet-4
   coreclaw --type openai --base-url http://localhost:11434/v1 --api-key xxx --model llama3
-  coreclaw --type openai --base-url http://localhost:11434/v1 --api-key xxx --model llama3 --session ~/mysession.json
+  coreclaw --type openai --base-url http://localhost:11434/v1 --api-key xxx --model llama3 --session ~/mysession.md
   coreclaw --type openai --base-url http://localhost:11434/v1 --api-key xxx --model llama3 --skill ./skills1 --skill ./skills2
   coreclaw --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o --proxy http://127.0.0.1:7890
 

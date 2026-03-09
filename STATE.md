@@ -356,7 +356,7 @@ main.go        - coreclaw entry point
 ./coreclaw --skill ./skills --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
 
 # Run with session persistence
-./coreclaw --session ~/mysession.json --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
+./coreclaw --session ~/mysession.md --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
 
 # Show help
 ./coreclaw --help

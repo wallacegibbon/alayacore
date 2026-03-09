@@ -114,10 +114,12 @@ When running the Terminal version:
 | `g` | Go to top of display (when display focused) |
 | `G` | Go to bottom of display (when display focused) |
 | `:` | Switch to input with ":" prefix (when display focused) |
+| `Space` | Toggle wrap mode for active window (when display focused) |
 | `Ctrl+C` | Clear input (when input focused) |
 | `Ctrl+G` | Cancel current request (with confirmation) |
 | `:cancel` | Cancel current request (with confirmation) |
 | `:quit`, `:q` | Exit with confirmation (press y/n) |
+
 ## Window Container
 
 The terminal organizes concurrent streams into separate windows with synchronized widths. Stream IDs include monotonic suffixes to prevent collisions across conversation turns.
@@ -128,7 +130,7 @@ A Window Cursor highlights one window with a bright border. Use `j`/`k` to navig
 
 ## Session Commands
 
-- `:save [filename]` - Save session to file
+- `:save [filename]` - Save session to file (uses `--session` path if no filename)
 - `:cancel` - Cancel current request and clear todos (with confirmation)
 - `:summarize` - Summarize conversation to reduce token usage
 - `:quit`, `:q` - Exit with confirmation
