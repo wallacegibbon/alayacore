@@ -37,13 +37,14 @@ func TestGenerateSessionFilename(t *testing.T) {
 		t.Fatal("GenerateSessionFilename returned empty string")
 	}
 
-	// Check format: YYYY-MM-DD-HHMMSS-1.json
-	if len(filename) < 23 || filename[len(filename)-5:] != ".json" {
-		t.Fatalf("Invalid filename format: %s", filename)
+	// Check format ends with -1.md
+	if !strings.HasSuffix(filename, "-1.md") {
+		t.Fatalf("Invalid filename format: %s (expected to end with -1.md)", filename)
 	}
 
-	// Parse to verify it's a valid date
-	parsed, err := time.Parse("2006-01-02-150405-1.json", filename)
+	// Parse to verify it's a valid date (prefix before the -1.md suffix)
+	baseFilename := strings.TrimSuffix(filename, "-1.md")
+	parsed, err := time.Parse("2006-01-02-150405", baseFilename)
 	if err != nil {
 		t.Fatalf("Failed to parse filename as date: %v", err)
 	}
@@ -56,7 +57,7 @@ func TestGenerateSessionFilename(t *testing.T) {
 
 func TestSaveAndLoadSession(t *testing.T) {
 	tmpDir := t.TempDir()
-	sessionPath := filepath.Join(tmpDir, "test-session.json")
+	sessionPath := filepath.Join(tmpDir, "test-session.md")
 
 	// Create test session data
 	sessionData := &SessionData{
@@ -129,8 +130,8 @@ func TestLoadLatestSession_WithFiles(t *testing.T) {
 
 	// Create multiple session files
 	now := time.Now()
-	for i := 0; i < 3; i++ {
-		filename := filepath.Join(tmpDir, now.Add(time.Duration(i)*time.Minute).Format("2006-01-02-1504.json"))
+	for i := range 3 {
+		filename := filepath.Join(tmpDir, now.Add(time.Duration(i)*time.Minute).Format("2006-01-02-1504.md"))
 		data := &SessionData{
 			BaseURL:   "https://api.test.com",
 			ModelName: "test-model",
@@ -177,7 +178,7 @@ func TestLoadOrNewSession(t *testing.T) {
 	}
 
 	// Test manual save to a specific file
-	testFile := "/tmp/test-session.json"
+	testFile := "/tmp/test-session.md"
 	if err := session.saveSessionToFile(testFile); err != nil {
 		t.Errorf("Failed to save session: %v", err)
 	}
@@ -298,5 +299,290 @@ func TestGenerateSystemReminder_Empty(t *testing.T) {
 	// Should return empty string when there are no todos
 	if reminder != "" {
 		t.Errorf("generateSystemReminder should return empty string, got: %s", reminder)
+	}
+}
+
+func TestSaveAndLoadSession_WithMessages(t *testing.T) {
+	tmpDir := t.TempDir()
+	sessionPath := filepath.Join(tmpDir, "test-messages.md")
+
+	// Create session with messages
+	session := &Session{
+		Messages: []fantasy.Message{
+			{
+				Role:    fantasy.MessageRoleUser,
+				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Hello, world!"}},
+			},
+			{
+				Role:    fantasy.MessageRoleAssistant,
+				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Hi there!"}},
+			},
+			{
+				Role: fantasy.MessageRoleAssistant,
+				Content: []fantasy.MessagePart{
+					fantasy.TextPart{Text: "Let me help you."},
+					fantasy.ReasoningPart{Text: "User needs help..."},
+				},
+			},
+		},
+		BaseURL:       "https://api.test.com/v1",
+		ModelName:     "test-model",
+		TotalSpent:    fantasy.Usage{TotalTokens: 250, InputTokens: 100, OutputTokens: 150},
+		ContextTokens: 200,
+		Todos: []todo.TodoItem{
+			{Content: "Task 1", Status: "pending", ActiveForm: "Doing task 1"},
+		},
+		Input:     &stream.NopInput{},
+		Output:    &stream.NopOutput{},
+		taskQueue: make(chan Task, 10),
+	}
+
+	// Save
+	if err := session.saveSessionToFile(sessionPath); err != nil {
+		t.Fatalf("saveSessionToFile failed: %v", err)
+	}
+
+	// Load
+	loaded, err := LoadSession(sessionPath)
+	if err != nil {
+		t.Fatalf("LoadSession failed: %v", err)
+	}
+
+	// Verify metadata
+	if loaded.BaseURL != session.BaseURL {
+		t.Errorf("BaseURL mismatch: got %s, want %s", loaded.BaseURL, session.BaseURL)
+	}
+	if loaded.ModelName != session.ModelName {
+		t.Errorf("ModelName mismatch: got %s, want %s", loaded.ModelName, session.ModelName)
+	}
+	if loaded.TotalSpent.TotalTokens != session.TotalSpent.TotalTokens {
+		t.Errorf("TotalTokens mismatch: got %d, want %d", loaded.TotalSpent.TotalTokens, session.TotalSpent.TotalTokens)
+	}
+	if loaded.ContextTokens != session.ContextTokens {
+		t.Errorf("ContextTokens mismatch: got %d, want %d", loaded.ContextTokens, session.ContextTokens)
+	}
+
+	// Verify todos
+	if len(loaded.Todos) != len(session.Todos) {
+		t.Fatalf("Todos count mismatch: got %d, want %d", len(loaded.Todos), len(session.Todos))
+	}
+	if loaded.Todos[0].Content != session.Todos[0].Content {
+		t.Errorf("Todo content mismatch: got %s, want %s", loaded.Todos[0].Content, session.Todos[0].Content)
+	}
+
+	// Verify messages - note: reasoning becomes separate message in file format
+	// Original: 3 messages (user, assistant, assistant+reasoning)
+	// Stored: 4 messages (user, assistant text, assistant text, assistant reasoning)
+	if len(loaded.Messages) != 4 {
+		t.Fatalf("Message count mismatch: got %d, want 4", len(loaded.Messages))
+	}
+
+	// Check first user message
+	if loaded.Messages[0].Role != fantasy.MessageRoleUser {
+		t.Errorf("First message role mismatch: got %s", loaded.Messages[0].Role)
+	}
+	if len(loaded.Messages[0].Content) != 1 {
+		t.Fatalf("First message content parts: got %d", len(loaded.Messages[0].Content))
+	}
+	if tp, ok := loaded.Messages[0].Content[0].(fantasy.TextPart); !ok || tp.Text != "Hello, world!" {
+		t.Errorf("First message content mismatch: got %v", loaded.Messages[0].Content[0])
+	}
+
+	// Check second message (assistant text "Hi there!")
+	if loaded.Messages[1].Role != fantasy.MessageRoleAssistant {
+		t.Errorf("Second message role mismatch: got %s", loaded.Messages[1].Role)
+	}
+
+	// Check third message (assistant text "Let me help you.")
+	if loaded.Messages[2].Role != fantasy.MessageRoleAssistant {
+		t.Errorf("Third message role mismatch: got %s", loaded.Messages[2].Role)
+	}
+	if tp, ok := loaded.Messages[2].Content[0].(fantasy.TextPart); !ok || tp.Text != "Let me help you." {
+		t.Errorf("Third message content mismatch: got %v", loaded.Messages[2].Content[0])
+	}
+
+	// Check fourth message (reasoning)
+	if loaded.Messages[3].Role != fantasy.MessageRoleAssistant {
+		t.Errorf("Fourth message role mismatch: got %s", loaded.Messages[3].Role)
+	}
+	if _, ok := loaded.Messages[3].Content[0].(fantasy.ReasoningPart); !ok {
+		t.Errorf("Fourth message should be ReasoningPart")
+	}
+}
+
+func TestMarkdownFormat_HumanReadable(t *testing.T) {
+	tmpDir := t.TempDir()
+	sessionPath := filepath.Join(tmpDir, "readable.md")
+
+	session := &Session{
+		Messages: []fantasy.Message{
+			{
+				Role:    fantasy.MessageRoleUser,
+				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Hello!\nHow are you?"}},
+			},
+			{
+				Role:    fantasy.MessageRoleAssistant,
+				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "I'm doing well, thanks!"}},
+			},
+		},
+		BaseURL:    "https://api.example.com/v1",
+		ModelName:  "gpt-4",
+		TotalSpent: fantasy.Usage{TotalTokens: 100},
+		Input:      &stream.NopInput{},
+		Output:     &stream.NopOutput{},
+		taskQueue:  make(chan Task, 10),
+	}
+
+	if err := session.saveSessionToFile(sessionPath); err != nil {
+		t.Fatalf("saveSessionToFile failed: %v", err)
+	}
+
+	// Read raw file content
+	raw, err := os.ReadFile(sessionPath)
+	if err != nil {
+		t.Fatalf("ReadFile failed: %v", err)
+	}
+	content := string(raw)
+
+	// Verify YAML frontmatter is human-readable
+	if !strings.Contains(content, "base_url:") {
+		t.Error("Missing base_url in frontmatter")
+	}
+	if !strings.Contains(content, "model_name:") {
+		t.Error("Missing model_name in frontmatter")
+	}
+
+	// Verify message content is preserved (after NUL separators)
+	if !strings.Contains(content, "Hello!") {
+		t.Error("Missing user message content")
+	}
+	if !strings.Contains(content, "I'm doing well") {
+		t.Error("Missing assistant message content")
+	}
+}
+
+func TestReasoningOnlyMessage(t *testing.T) {
+	tmpDir := t.TempDir()
+	sessionPath := filepath.Join(tmpDir, "reasoning-only.md")
+
+	// Session with assistant message that only has reasoning (no text)
+	session := &Session{
+		Messages: []fantasy.Message{
+			{
+				Role:    fantasy.MessageRoleUser,
+				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "What is lisp?"}},
+			},
+			{
+				Role:    fantasy.MessageRoleAssistant,
+				Content: []fantasy.MessagePart{fantasy.ReasoningPart{Text: "The user is asking about Lisp. I should explain it."}},
+			},
+		},
+		BaseURL:   "https://api.example.com/v1",
+		ModelName: "gpt-4",
+		Input:     &stream.NopInput{},
+		Output:    &stream.NopOutput{},
+		taskQueue: make(chan Task, 10),
+	}
+
+	if err := session.saveSessionToFile(sessionPath); err != nil {
+		t.Fatalf("saveSessionToFile failed: %v", err)
+	}
+
+	// Load and verify
+	loaded, err := LoadSession(sessionPath)
+	if err != nil {
+		t.Fatalf("LoadSession failed: %v", err)
+	}
+
+	if len(loaded.Messages) != 2 {
+		t.Fatalf("Expected 2 messages, got %d", len(loaded.Messages))
+	}
+
+	// Check first message
+	if loaded.Messages[0].Role != fantasy.MessageRoleUser {
+		t.Errorf("First message should be user, got %s", loaded.Messages[0].Role)
+	}
+
+	// Check second message (reasoning only)
+	if loaded.Messages[1].Role != fantasy.MessageRoleAssistant {
+		t.Errorf("Second message should be assistant, got %s", loaded.Messages[1].Role)
+	}
+	if len(loaded.Messages[1].Content) != 1 {
+		t.Fatalf("Second message should have 1 part, got %d", len(loaded.Messages[1].Content))
+	}
+	if rp, ok := loaded.Messages[1].Content[0].(fantasy.ReasoningPart); !ok {
+		t.Errorf("Second message part should be ReasoningPart")
+	} else if !strings.Contains(rp.Text, "asking about Lisp") {
+		t.Errorf("Reasoning text mismatch: %s", rp.Text)
+	}
+}
+
+func TestTextAndReasoningInSameMessage(t *testing.T) {
+	tmpDir := t.TempDir()
+	sessionPath := filepath.Join(tmpDir, "text-and-reasoning.md")
+
+	// Session with assistant message that has both reasoning and text
+	// Note: In the file format, these become separate messages
+	session := &Session{
+		Messages: []fantasy.Message{
+			{
+				Role:    fantasy.MessageRoleUser,
+				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "What is lisp?"}},
+			},
+			{
+				Role: fantasy.MessageRoleAssistant,
+				Content: []fantasy.MessagePart{
+					fantasy.ReasoningPart{Text: "Let me explain Lisp."},
+					fantasy.TextPart{Text: "Lisp is a family of programming languages."},
+				},
+			},
+		},
+		BaseURL:   "https://api.example.com/v1",
+		ModelName: "gpt-4",
+		Input:     &stream.NopInput{},
+		Output:    &stream.NopOutput{},
+		taskQueue: make(chan Task, 10),
+	}
+
+	if err := session.saveSessionToFile(sessionPath); err != nil {
+		t.Fatalf("saveSessionToFile failed: %v", err)
+	}
+
+	// Load and verify
+	loaded, err := LoadSession(sessionPath)
+	if err != nil {
+		t.Fatalf("LoadSession failed: %v", err)
+	}
+
+	// Reasoning and text are stored as separate messages in the file format
+	if len(loaded.Messages) != 3 {
+		t.Fatalf("Expected 3 messages (user, reasoning, assistant text), got %d", len(loaded.Messages))
+	}
+
+	// Check first message is user
+	if loaded.Messages[0].Role != fantasy.MessageRoleUser {
+		t.Errorf("First message should be user, got %s", loaded.Messages[0].Role)
+	}
+
+	// Check second message is reasoning (stored as assistant with ReasoningPart)
+	if loaded.Messages[1].Role != fantasy.MessageRoleAssistant {
+		t.Errorf("Second message should be assistant, got %s", loaded.Messages[1].Role)
+	}
+	if len(loaded.Messages[1].Content) != 1 {
+		t.Fatalf("Second message should have 1 part, got %d", len(loaded.Messages[1].Content))
+	}
+	if _, ok := loaded.Messages[1].Content[0].(fantasy.ReasoningPart); !ok {
+		t.Errorf("Second message part should be ReasoningPart, got %T", loaded.Messages[1].Content[0])
+	}
+
+	// Check third message is assistant text
+	if loaded.Messages[2].Role != fantasy.MessageRoleAssistant {
+		t.Errorf("Third message should be assistant, got %s", loaded.Messages[2].Role)
+	}
+	if len(loaded.Messages[2].Content) != 1 {
+		t.Fatalf("Third message should have 1 part, got %d", len(loaded.Messages[2].Content))
+	}
+	if _, ok := loaded.Messages[2].Content[0].(fantasy.TextPart); !ok {
+		t.Errorf("Third message part should be TextPart, got %T", loaded.Messages[2].Content[0])
 	}
 }
