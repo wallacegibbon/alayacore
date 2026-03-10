@@ -7,12 +7,12 @@ import (
 
 // Message tags for TLV protocol
 const (
-	TagUserText      = 'A' // User text input
-	TagAssistantText = 'B' // Assistant text output
-	TagReasoning     = 'C' // Reasoning/thinking content
-	TagTool          = 'D' // Tool call output
+	TagUserText      = 'U' // User text input
+	TagAssistantText = 'A' // Assistant text output
+	TagReasoning     = 'R' // Reasoning/thinking content
+	TagTool          = 'T' // Tool call output
 	TagError         = 'E' // Error messages
-	TagTodo          = 'F' // Todo list updates (JSON wrapped in TagTodo)
+	TagTodo          = 'P' // Todo list updates (JSON wrapped in TagTodo)
 	TagNotify        = 'N' // Notification messages
 	TagSystem        = 'S' // System messages (queue status, etc.)
 )

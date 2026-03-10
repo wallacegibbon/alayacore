@@ -308,11 +308,11 @@
         }
 
         function handleTLV(tag, value) {
-            if (tag === 'B' || tag === 'C' || tag === 'D') {
+            if (tag === 'A' || tag === 'R' || tag === 'T') {
                 // Delta messages with stream ID prefix
                 const {id, content} = parseStreamID(value);
                 const streamId = id || ('unknown-' + Date.now());
-                const streamType = tag === 'B' ? 'assistant' : tag === 'C' ? 'reasoning' : 'tool';
+                const streamType = tag === 'A' ? 'assistant' : tag === 'R' ? 'reasoning' : 'tool';
                 if (currentStreams[streamId]) {
                     // Append to existing stream
                     currentStreams[streamId].value += content;
@@ -355,9 +355,9 @@
                     // Not JSON, display as plain system message
                     addMessage('system', value);
                 }
-            } else if (tag === 'A') {
+            } else if (tag === 'U') {
                 addMessage('user', value);
-            } else if (tag === 'F') {
+            } else if (tag === 'P') {
                 // TagTodo: update todo list
                 updateTodos(value);
             }
@@ -415,16 +415,16 @@
         function sendMessage() {
             const text = prompt.value.trim();
             if (!text) return;
-            sendTLV('A', text);
+            sendTLV('U', text);
             prompt.value = '';
         }
 
         function sendCancelCommand() {
-            sendTLV('A', ':cancel');
+            sendTLV('U', ':cancel');
         }
 
         function sendSaveCommand() {
-            sendTLV('A', ':save');
+            sendTLV('U', ':save');
         }
 
         send.addEventListener('click', sendMessage);
