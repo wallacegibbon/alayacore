@@ -184,8 +184,8 @@ For this project, simplicity is more important than efficiency.
   - **Problem**: When todo box appears, one row disappears from top of display box; when todo box disappears, row returns.
   - **Root cause**: `updateDisplayHeight()` changed viewport height without adjusting YOffset appropriately.
   - **Solution**: Added YOffset adjustment based on scroll state:
-    - Auto-scroll mode (`userScrolledAway = false`): keep bottom line constant
-    - Manual scroll mode (`userScrolledAway = true`): keep top line constant
+    - Follow mode (cursor on last window): keep bottom line constant
+    - Unfollow mode (cursor away from last window): keep top line constant
   - **Implementation**: Updated `updateDisplayHeight()` with proper line counting and clamping.
   - **Testing**: Added `TestMissingTopRowWhenTodoAppears`, `TestAutoScrollKeepsBottomWhenTodoAppears`, `TestTodoToggleScrollConsistency`.
 
@@ -319,6 +319,13 @@ For this project, simplicity is more important than efficiency.
 - ✅ **Cursor-only border swap**
   - When cursor highlights a window, reuse cachedInnerContent and apply cursor border
   - Avoids lipgloss.Wrap on cursor change (j/k navigation)
+
+- ✅ **Simplified Window Cursor follow logic**
+  - Follow = when new message window is appended, cursor points to that new window
+  - Unfollow when cursor leaves last window (k, g, H, L, M, etc.)
+  - userMovedCursorAway tracks "user moved away"; at tick time cursor index is stale (new windows already added), so we need this flag for follow
+  - Removed userScrolledAway; viewport follow and cursor follow both use userMovedCursorAway
+  - UpdateHeightForTodos uses same logic: keep bottom when following, keep top when not
 
 - ✅ **Terminal adaptor refactor for clarity and maintainability**
   - Added doc.go with package-level architecture docs (message flow, key files)

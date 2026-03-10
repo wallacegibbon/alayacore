@@ -156,7 +156,7 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.status.SetStatus(m.out.status)
 				m.todo.SetTodos(m.out.todos)
 				m.updateDisplayHeight()
-				if !m.display.UserMovedCursorAway() {
+				if m.display.shouldFollow() {
 					m.display.SetCursorToLastWindow()
 				}
 				m.display.updateContent()

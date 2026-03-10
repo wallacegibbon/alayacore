@@ -186,8 +186,8 @@ CoreClaw's terminal adaptor organizes concurrent streams into separate windows w
 The Window Cursor highlights one window in the display area with a brighter border. Use `j` and `k` keys to navigate between windows.
 
 - **Default position**: The cursor defaults to the last window and updates automatically when new windows are created.
+- **Auto-follow**: When new message windows are appended, cursor moves to the new window and viewport scrolls to bottom. Leaving the last window (k, g, H, L, M, etc.) disables follow; pressing G or j to return to the last window re-enables it.
 - **Focus-dependent highlighting**: The orange border cursor only appears when the display area is focused (Tab to switch between display and input).
-- **Scroll synchronization**: When using `g` or `G`, the cursor follows the scroll movement to remain visible.
 - **Highlighted border**: The selected window displays an orange border (`#fab387`) when the display area is focused. Unselected windows have invisible borders that match the background, preserving layout when windows are selected.
 - **Wrap mode**: Press `Space` to toggle the active window between normal and wrap mode. In wrap mode, the window shows only the last 3 lines of content, displaying the newest content. Wrapped windows display a `Wrapped - Space to expand` indicator with a subtle background color.
 

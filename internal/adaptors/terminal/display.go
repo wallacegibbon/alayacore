@@ -13,7 +13,6 @@ import (
 // DisplayModel holds the viewport over WindowBuffer content.
 type DisplayModel struct {
 	viewport            viewport.Model
-	userScrolledAway    bool
 	showingWelcome      bool
 	welcomeText         string
 	windowBuffer        *WindowBuffer
@@ -21,7 +20,7 @@ type DisplayModel struct {
 	width               int
 	height              int
 	windowCursor        int    // index of the currently selected window (-1 means no selection)
-	userMovedCursorAway bool   // true if user manually moved cursor away from last window
+	userMovedCursorAway bool   // true when user moved cursor away from last (k, g, H, L, M, etc.)
 	displayFocused      bool   // true when display has focus (for showing cursor highlight)
 	lastContent         string // cached content to avoid unnecessary updates
 }
@@ -41,7 +40,7 @@ func NewDisplayModel(windowBuffer *WindowBuffer, styles *Styles) DisplayModel {
 		width:               DefaultWidth,
 		height:              DefaultHeight,
 		windowCursor:        -1,
-		userMovedCursorAway: false,
+		userMovedCursorAway: false, // follow by default
 		displayFocused:      false,
 	}
 }
@@ -117,15 +116,14 @@ func (m *DisplayModel) updateContent() {
 	m.lastContent = newContent
 
 	m.viewport.SetContent(newContent)
-	if !m.userScrolledAway {
+	if m.shouldFollow() {
 		m.viewport.GotoBottom()
 	}
 }
 
-// ScrollDown scrolls down by lines and updates userScrolledAway.
+// ScrollDown scrolls down by lines.
 func (m *DisplayModel) ScrollDown(lines int) {
 	m.viewport.ScrollDown(lines)
-	m.userScrolledAway = !m.viewport.AtBottom()
 }
 
 // centerWelcomeText centers the welcome text in the viewport
@@ -187,19 +185,16 @@ func (m DisplayModel) AtBottom() bool {
 // ScrollUp scrolls up by lines
 func (m *DisplayModel) ScrollUp(lines int) {
 	m.viewport.ScrollUp(lines)
-	m.userScrolledAway = true
 }
 
 // GotoBottom goes to bottom
 func (m *DisplayModel) GotoBottom() {
 	m.viewport.GotoBottom()
-	m.userScrolledAway = false
 }
 
 // GotoTop goes to top
 func (m *DisplayModel) GotoTop() {
 	m.viewport.GotoTop()
-	m.userScrolledAway = true
 }
 
 // UpdateHeightForTodos adjusts height based on todo visibility
@@ -218,11 +213,11 @@ func (m *DisplayModel) UpdateHeightForTodos(totalHeight int, todoCount int) {
 		topLine := m.viewport.YOffset()
 		var newTopLine int
 
-		if m.userScrolledAway {
-			newTopLine = topLine
-		} else {
+		if m.shouldFollow() {
 			bottomLine := topLine + oldHeight - 1
 			newTopLine = bottomLine - newHeight + 1
+		} else {
+			newTopLine = topLine
 		}
 
 		maxTopLine := max(0, totalLines-newHeight)
@@ -244,6 +239,12 @@ func (m *DisplayModel) UpdateHeightForTodos(totalHeight int, todoCount int) {
 
 var _ tea.Model = (*DisplayModel)(nil)
 
+// shouldFollow returns true when viewport and cursor should auto-follow new content.
+// Follow when user has not moved cursor away from last window (k, g, H, L, M, etc.).
+func (m *DisplayModel) shouldFollow() bool {
+	return !m.userMovedCursorAway
+}
+
 // GetWindowCursor returns the current window cursor index (-1 if none).
 func (m *DisplayModel) GetWindowCursor() int {
 	return m.windowCursor
@@ -259,7 +260,6 @@ func (m *DisplayModel) SetWindowCursor(index int) {
 		index = windowCount - 1
 	}
 	m.windowCursor = index
-	// Update userMovedCursorAway based on whether we're at the last window
 	if windowCount > 0 && index == windowCount-1 {
 		m.userMovedCursorAway = false
 	} else if index >= 0 {
@@ -283,11 +283,11 @@ func (m *DisplayModel) MoveWindowCursorDown() bool {
 		m.windowCursor = 0
 	} else {
 		m.windowCursor++
-		if m.windowCursor == windowCount-1 {
-			m.userMovedCursorAway = false // reached last window, resume auto-follow
-		} else {
-			m.userMovedCursorAway = true
-		}
+	}
+	if m.windowCursor == windowCount-1 {
+		m.userMovedCursorAway = false
+	} else {
+		m.userMovedCursorAway = true
 	}
 	return true
 }
@@ -309,7 +309,7 @@ func (m *DisplayModel) MoveWindowCursorUp() bool {
 		return true
 	}
 	m.windowCursor--
-	m.userMovedCursorAway = true // moving up always means moving away from last
+	m.userMovedCursorAway = true
 	return true
 }
 
@@ -329,7 +329,6 @@ func (m *DisplayModel) EnsureCursorVisible() {
 	// If window is above viewport, scroll up to show it
 	if startLine < viewportTop {
 		m.viewport.SetYOffset(startLine)
-		m.userScrolledAway = true
 		return
 	}
 
@@ -337,7 +336,6 @@ func (m *DisplayModel) EnsureCursorVisible() {
 	if endLine > viewportBottom {
 		newTop := endLine - viewportHeight
 		m.viewport.SetYOffset(newTop)
-		m.userScrolledAway = true
 	}
 }
 
@@ -348,13 +346,8 @@ func (m *DisplayModel) SetCursorToLastWindow() {
 		m.windowCursor = -1
 	} else {
 		m.windowCursor = windowCount - 1
-		m.userMovedCursorAway = false // cursor is now following the last window
+		m.userMovedCursorAway = false
 	}
-}
-
-// UserMovedCursorAway returns true if the user has manually moved the cursor away from the last window.
-func (m *DisplayModel) UserMovedCursorAway() bool {
-	return m.userMovedCursorAway
 }
 
 // ToggleWindowWrap toggles the wrap state of the currently selected window.
@@ -414,13 +407,22 @@ func (m *DisplayModel) MoveWindowCursorToBottom() bool {
 		// If this window overlaps with viewport bottom
 		if startLine < viewportBottom && endLine >= viewportBottom {
 			m.windowCursor = i
-			m.userMovedCursorAway = true
+			// Only set userMovedCursorAway if not selecting the actual last window
+			if i < windowCount-1 {
+				m.userMovedCursorAway = true
+			} else {
+				m.userMovedCursorAway = false
+			}
 			return true
 		}
 		// If this window is above viewport bottom (last visible window)
 		if endLine <= viewportBottom {
 			m.windowCursor = i
-			m.userMovedCursorAway = true
+			if i < windowCount-1 {
+				m.userMovedCursorAway = true
+			} else {
+				m.userMovedCursorAway = false
+			}
 			return true
 		}
 	}
@@ -444,7 +446,7 @@ func (m *DisplayModel) MoveWindowCursorToCenter() bool {
 		// If this window contains the center line
 		if startLine <= viewportCenter && endLine > viewportCenter {
 			m.windowCursor = i
-			m.userMovedCursorAway = true
+			m.userMovedCursorAway = (i < windowCount-1)
 			return true
 		}
 		// If past the center, pick the previous window (or this one if first)
@@ -456,6 +458,6 @@ func (m *DisplayModel) MoveWindowCursorToCenter() bool {
 	}
 	// If center is past all windows, select the last one
 	m.windowCursor = windowCount - 1
-	m.userMovedCursorAway = true
+	m.userMovedCursorAway = false
 	return true
 }
