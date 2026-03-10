@@ -327,22 +327,22 @@ func (wb *WindowBuffer) renderWindowContent(w *Window, innerWidth int) string {
 			firstLine := lines[0]
 			lastLine := lines[len(lines)-1]
 
-			// Create dashed wrap indicator with text on left, dashes on right
-			wrapText := "Wrapped - Space to expand "
-			dashChar := "┈" // Light quadruple dash horizontal (U+2508)
+			// Create wrap indicator with text on left, subtle separator on right
+			wrapText := "Wrapped - Space to expand"
 			textWidth := lipgloss.Width(wrapText)
 			remainingWidth := innerWidth - textWidth
 
 			var wrapIndicator string
 			if remainingWidth > 0 {
-				dashes := strings.Repeat(dashChar, remainingWidth)
+				// Use a subtle dotted separator
+				separator := strings.Repeat("·", remainingWidth)
 				wrapIndicator = lipgloss.NewStyle().
-					Foreground(lipgloss.Color("#585b70")).
-					Render(wrapText + dashes)
+					Foreground(lipgloss.Color("#45475a")).
+					Render(wrapText + separator)
 			} else {
-				// Text is too long, just show it without dashes
+				// Text is too long, just show it without separator
 				wrapIndicator = lipgloss.NewStyle().
-					Foreground(lipgloss.Color("#585b70")).
+					Foreground(lipgloss.Color("#45475a")).
 					Render(wrapText)
 			}
 			return firstLine + "\n" + wrapIndicator + "\n" + lastLine
