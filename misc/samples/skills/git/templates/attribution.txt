@@ -1,4 +1,0 @@
-
-Generated with CoreClaw
-
-Assisted-by: GLM-5 via CoreClaw <https://github.com/wallacegibbon/coreclaw>
