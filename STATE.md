@@ -201,6 +201,23 @@ For this project, simplicity is more important than efficiency.
   - **Implementation**: Added early return in `handleKeyMsg()` when `focusedWindow == "input"` and key is Ctrl+U
   - **Testing**: Added `TestCtrlUDoesNothingInInput` to verify input remains unchanged after Ctrl+U in input window
 
+- ✅ **Fixed ContextTokens calculation for provider context limits**
+  - **Problem**: `ContextTokens` was being set to `OutputTokens` (generated tokens), but API providers limit based on input context size (InputTokens - the messages sent to the API)
+  - **Root cause**: Incorrect assumption that output tokens represented context usage; different providers have different context limits based on input tokens
+  - **Solution**: Changed `trackUsage()` to set `ContextTokens = usage.InputTokens` (the actual context size sent to API)
+  - **Implementation**:
+    - Updated `trackUsage()` in session.go to use `InputTokens` instead of accumulating `OutputTokens`
+  - **Result**: Context token count now accurately reflects the context size that counts toward provider limits
+
+- ✅ **Fixed ContextTokens not updating after :summarize command**
+  - **Problem**: After running `:summarize`, the `ContextTokens` value remained at the old (large) value instead of reflecting the new (smaller) summarized context
+  - **Root cause**: During summarization, `trackUsage()` was called with the full conversation's token count, setting `ContextTokens` to the large value. Then `s.Messages` was replaced with just the summary (much smaller), but `ContextTokens` was never updated to reflect this change
+  - **Solution**: After replacing `s.Messages` with the summary, update `ContextTokens` to reflect the new context size using the `OutputTokens` from the summarization call (which approximates the summary message size)
+  - **Implementation**:
+    - Modified `summarize()` to capture the `usage` return value from `processPrompt()`
+    - Added logic to set `s.ContextTokens = usage.OutputTokens` after message replacement (if OutputTokens > 0)
+  - **Result**: Context token count now correctly decreases after summarization, showing the smaller context size of the summarized conversation
+
 - ✅ **Upgraded to bubbletea/lipgloss/bubbles v2.x**
   - Updated go.mod with v2 versions from charm.land vanity domain:
     - charm.land/bubbletea/v2@v2.0.1

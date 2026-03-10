@@ -280,13 +280,11 @@ func (s *Session) handleUserPrompt(ctx context.Context, prompt string) {
 	s.Messages = append(s.Messages, fantasy.NewUserMessage(prompt))
 	history := s.Messages[:len(s.Messages)-1]
 
-	msg, usage, err := s.processPrompt(ctx, prompt, history)
+	msg, _, err := s.processPrompt(ctx, prompt, history)
 	if err != nil {
-		s.trackUsage(usage)
 		s.writeError(err.Error())
 		return
 	}
-	s.trackUsage(usage)
 	if msg.Role != "" {
 		s.Messages = append(s.Messages, msg)
 	}
@@ -312,6 +310,10 @@ func (s *Session) processPrompt(ctx context.Context, prompt string, history []fa
 
 	call.OnStepStart = func(step int) error {
 		stepCount = step
+		return nil
+	}
+	call.OnStepFinish = func(stepResult fantasy.StepResult) error {
+		s.trackUsage(stepResult.Usage)
 		return nil
 	}
 
@@ -359,7 +361,9 @@ func (s *Session) trackUsage(usage fantasy.Usage) {
 	s.TotalSpent.OutputTokens += usage.OutputTokens
 	s.TotalSpent.TotalTokens += usage.TotalTokens
 	s.TotalSpent.ReasoningTokens += usage.ReasoningTokens
-	s.ContextTokens += usage.TotalTokens
+	// ContextTokens tracks the total context size (input tokens sent to API)
+	// This is what counts toward provider context limits
+	s.ContextTokens = usage.InputTokens
 	s.sendSystemInfo()
 }
 
@@ -411,8 +415,12 @@ func (s *Session) summarize(ctx context.Context) {
 		return
 	}
 	s.Messages = []fantasy.Message{msg}
-	s.trackUsage(usage)
-	s.ContextTokens = usage.OutputTokens
+	// After summarization, the context is just the summary message.
+	// Estimate the new context size based on output tokens (the generated summary).
+	// This is an approximation, but more accurate than keeping the old (large) value.
+	if usage.OutputTokens > 0 {
+		s.ContextTokens = usage.OutputTokens
+	}
 	s.sendSystemInfo()
 }
 
