@@ -186,6 +186,7 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.hasFocus = false
 		m.display.SetDisplayFocused(false)
 		m.input.Blur()
+		m.display.updateContent() // re-render without cursor highlight
 		return m, nil
 	case tea.FocusMsg:
 		// User switched back to this program
@@ -196,6 +197,7 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.input.Focus()
 		}
+		m.display.updateContent() // re-render with cursor if display focused
 		return m, nil
 	}
 
