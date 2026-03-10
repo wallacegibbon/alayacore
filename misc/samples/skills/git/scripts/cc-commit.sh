@@ -80,6 +80,10 @@ fi
 
 # Check for amend mode - don't add attribution when amending
 if [[ " ${GIT_ARGS[*]} " =~ " --amend " ]]; then
+	# Auto-add --no-edit to prevent interactive editor from spawning
+	if [[ ! " ${GIT_ARGS[*]} " =~ " --no-edit " ]]; then
+		GIT_ARGS+=("--no-edit")
+	fi
 	exec git commit "${GIT_ARGS[@]}" "${EXTRA_ARGS[@]}"
 fi
 
