@@ -288,6 +288,17 @@ For this project, simplicity is more important than efficiency.
   - **Testing**: All existing tests pass; cursorIndex parameter added to test calls.
   - **Documentation**: Updated AGENTS.md and README.md with window cursor controls.
 
+- ✅ **Terminal focus/blur handling**
+  - **Problem**: When user switched away from the program (e.g., to another tmux window or application), the display and input retained their focused appearance, which was visually confusing.
+  - **Solution**: Added handlers for Bubble Tea v2's `FocusMsg` and `BlurMsg` to lose focus when switching away and restore it when switching back.
+  - **Implementation**:
+    - Added `hasFocus` field to `Terminal` struct to track application focus state
+    - Added `tea.BlurMsg` handler: sets `hasFocus = false`, calls `display.SetDisplayFocused(false)`, calls `input.Blur()`
+    - Added `tea.FocusMsg` handler: sets `hasFocus = true`, restores focus to previously focused window (display or input)
+    - Initialized `hasFocus = true` in `NewTerminal()` since program starts with focus
+    - **Critical fix**: Added `v.ReportFocus = true` in `View()` method to enable focus event reporting (without this, FocusMsg/BlurMsg are never sent)
+  - **Result**: Both display border and input prompt now appear dimmed when user switches away; focus is restored when switching back.
+
 ### Architecture
 - **Provider Types**: `anthropic` (native Anthropic API), `openai` (OpenAI-compatible)
 - **Tools**: read_file, todo_read, todo_write, edit_file, write_file, activate_skill, posix_shell

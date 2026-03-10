@@ -101,6 +101,7 @@ type Terminal struct {
 	windowHeight        int
 	sessionFile         string
 	styles              *Styles
+	hasFocus            bool // tracks whether the terminal has application focus
 }
 
 // NewTerminal creates a new Terminal model
@@ -119,6 +120,7 @@ func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput, inpu
 		styles:         styles,
 		focusedWindow:  "input",
 		sessionFile:    sessionFile,
+		hasFocus:       true, // program starts with focus
 	}
 
 	return m
@@ -171,6 +173,22 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.input.editorContent = msg.content
 			m.input.SetValue(FormatEditorContent(msg.content))
 			m.input.CursorEnd()
+			m.input.Focus()
+		}
+		return m, nil
+	case tea.BlurMsg:
+		// User switched away from this program (e.g., to another tmux window)
+		m.hasFocus = false
+		m.display.SetDisplayFocused(false)
+		m.input.Blur()
+		return m, nil
+	case tea.FocusMsg:
+		// User switched back to this program
+		m.hasFocus = true
+		// Restore focus to the previously focused window
+		if m.focusedWindow == "display" {
+			m.display.SetDisplayFocused(true)
+		} else {
 			m.input.Focus()
 		}
 		return m, nil
@@ -439,6 +457,7 @@ func (m *Terminal) View() tea.View {
 
 	v := tea.NewView(sb.String())
 	v.AltScreen = true
+	v.ReportFocus = true // Enable focus/blur events when user switches applications
 	return v
 }
 
