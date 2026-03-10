@@ -135,14 +135,17 @@ type tickMsg struct{}
 func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	select {
 	case <-m.terminalOutput.updateChan:
-		m.status.SetStatus(m.terminalOutput.status)
-		m.todo.SetTodos(m.terminalOutput.todos)
-		m.updateDisplayHeight()
-		// Update cursor to last window if user hasn't moved it away
-		if !m.display.UserMovedCursorAway() {
-			m.display.SetCursorToLastWindow()
+		// Only update if there's actual content
+		if m.terminalOutput.windowBuffer.GetWindowCount() > 0 {
+			m.status.SetStatus(m.terminalOutput.status)
+			m.todo.SetTodos(m.terminalOutput.todos)
+			m.updateDisplayHeight()
+			// Update cursor to last window if user hasn't moved it away
+			if !m.display.UserMovedCursorAway() {
+				m.display.SetCursorToLastWindow()
+			}
+			m.display.updateContent()
 		}
-		m.display.updateContent()
 	default:
 	}
 
@@ -152,11 +155,11 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		return m.handleWindowSize(msg)
 	case tickMsg:
-		m.display.updateContent()
+		// Only update status and todos on tick, not content (content updates via updateChan)
 		m.status.SetStatus(m.terminalOutput.status)
 		m.todo.SetTodos(m.terminalOutput.todos)
 		if m.terminalOutput.inProgress {
-			return m, tea.Tick(50*time.Millisecond, func(t time.Time) tea.Msg {
+			return m, tea.Tick(500*time.Millisecond, func(t time.Time) tea.Msg {
 				return tickMsg{}
 			})
 		}
@@ -230,6 +233,7 @@ func (m *Terminal) handleConfirmDialog(msg tea.KeyMsg) (tea.Cmd, bool) {
 		case "y", "Y":
 			m.quitting = true
 			m.streamInput.Close()
+			m.terminalOutput.Close()
 			return tea.Quit, true
 		case "n", "N", "esc", "ctrl+c":
 			m.confirmDialog = false

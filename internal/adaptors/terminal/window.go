@@ -241,11 +241,17 @@ func (wb *WindowBuffer) renderWithCursor(cursorIndex int) string {
 		innerWidth := max(0, wb.width-4)
 		contentToRender := wb.renderWindowContent(w, innerWidth)
 
-		style := w.Style
+		// Use cursor style only for the cursor window
+		var styled string
 		if i == cursorIndex {
-			style = wb.cursorStyle
+			styled = wb.cursorStyle.Width(wb.width).Render(contentToRender)
+		} else {
+			styled = w.Style.Width(wb.width).Render(contentToRender)
+			// Cache the non-cursor render for future use
+			w.cachedRender = styled
+			w.cachedWidth = wb.width
+			w.lastContentLen = len(w.Content)
 		}
-		styled := style.Width(wb.width).Render(contentToRender)
 		sb.WriteString(styled)
 	}
 	return sb.String()

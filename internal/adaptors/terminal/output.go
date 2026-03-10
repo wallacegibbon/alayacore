@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"charm.land/lipgloss/v2"
 
@@ -16,22 +17,63 @@ import (
 
 // terminalOutput writes to the Terminal display with TLV support
 type terminalOutput struct {
-	windowBuffer *WindowBuffer
-	buffer       []byte
-	mu           sync.Mutex
-	updateChan   chan struct{}
-	status       string        // Status bar content from TagSystem
-	todos        todo.TodoList // Current todo list
-	inProgress   bool          // Whether session has task in progress
-	styles       *Styles       // UI styles
-	nextWindowID int           // Monotonic counter for generating window IDs
+	windowBuffer  *WindowBuffer
+	buffer        []byte
+	mu            sync.Mutex
+	updateChan    chan struct{}
+	done          chan struct{}  // Signal goroutine to stop
+	status        string        // Status bar content from TagSystem
+	todos         todo.TodoList // Current todo list
+	inProgress    bool          // Whether session has task in progress
+	styles        *Styles       // UI styles
+	nextWindowID  int           // Monotonic counter for generating window IDs
+	pendingUpdate bool          // Whether there's a pending update to flush
+	lastUpdate    time.Time     // Last time an update was sent
+	updateMu      sync.Mutex    // Mutex for update throttling
 }
 
+const updateThrottleInterval = 100 * time.Millisecond
+
 func NewTerminalOutput() *terminalOutput {
-	return &terminalOutput{
+	to := &terminalOutput{
 		windowBuffer: NewWindowBuffer(80), // default width, will be updated later
 		updateChan:   make(chan struct{}, 1),
+		done:         make(chan struct{}),
 		styles:       DefaultStyles(),
+		lastUpdate:   time.Now(),
+	}
+	// Start background update flusher
+	go to.updateFlusher()
+	return to
+}
+
+// Close stops the background goroutine and cleans up resources
+func (w *terminalOutput) Close() error {
+	close(w.done)
+	return nil
+}
+
+// updateFlusher periodically flushes pending updates
+func (w *terminalOutput) updateFlusher() {
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-w.done:
+			return
+		case <-ticker.C:
+			w.updateMu.Lock()
+			if w.pendingUpdate && time.Since(w.lastUpdate) >= updateThrottleInterval {
+				w.pendingUpdate = false
+				w.lastUpdate = time.Now()
+				select {
+				case w.updateChan <- struct{}{}:
+				default:
+				}
+			}
+			w.updateMu.Unlock()
+		}
 	}
 }
 
@@ -137,13 +179,25 @@ func (w *terminalOutput) writeColored(tag byte, value string) {
 }
 
 // triggerUpdateForTag sends an update signal for tags that modify the display
+// Uses throttling to batch rapid updates together
 func (w *terminalOutput) triggerUpdateForTag(tag byte) {
 	switch tag {
 	case stream.TagAssistantText, stream.TagTool, stream.TagReasoning, stream.TagError,
 		stream.TagNotify, stream.TagSystem, stream.TagUserText, stream.TagTodo:
-		select {
-		case w.updateChan <- struct{}{}:
-		default:
+		w.updateMu.Lock()
+		defer w.updateMu.Unlock()
+
+		// If enough time has passed since last update, send immediately
+		if time.Since(w.lastUpdate) >= updateThrottleInterval {
+			w.lastUpdate = time.Now()
+			w.pendingUpdate = false
+			select {
+			case w.updateChan <- struct{}{}:
+			default:
+			}
+		} else {
+			// Mark that we have a pending update
+			w.pendingUpdate = true
 		}
 	}
 }

@@ -26,9 +26,10 @@ type DisplayModel struct {
 	styles              *Styles
 	width               int
 	height              int
-	windowCursor        int  // index of the currently selected window (-1 means no selection)
-	userMovedCursorAway bool // true if user manually moved cursor away from last window
-	displayFocused      bool // true when display has focus (for showing cursor highlight)
+	windowCursor        int    // index of the currently selected window (-1 means no selection)
+	userMovedCursorAway bool   // true if user manually moved cursor away from last window
+	displayFocused      bool   // true when display has focus (for showing cursor highlight)
+	lastContent         string // cached content to avoid unnecessary updates
 }
 
 // NewDisplayModel creates a new display model
@@ -135,6 +136,12 @@ func (m *DisplayModel) updateContent() {
 			return
 		}
 	}
+
+	// Skip update if content hasn't changed
+	if newContent == m.lastContent {
+		return
+	}
+	m.lastContent = newContent
 
 	m.viewport.SetContent(newContent)
 	if !m.userScrolledAway {
