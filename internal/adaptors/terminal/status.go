@@ -4,12 +4,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-// StatusMsg represents messages for the status component
-type StatusMsg struct {
-	Status string
-}
-
-// StatusModel handles the status bar display
+// StatusModel shows the status bar (token usage, etc).
 type StatusModel struct {
 	status string
 	styles *Styles
@@ -21,7 +16,7 @@ func NewStatusModel(styles *Styles) StatusModel {
 	return StatusModel{
 		status: "",
 		styles: styles,
-		width:  80,
+		width:  DefaultWidth,
 	}
 }
 
@@ -33,8 +28,6 @@ func (m StatusModel) Init() tea.Cmd {
 // Update handles messages for the status model
 func (m StatusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case StatusMsg:
-		m.status = msg.Status
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 	}

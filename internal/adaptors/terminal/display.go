@@ -10,13 +10,7 @@ import (
 	"github.com/wallacegibbon/coreclaw/internal/adaptors/common"
 )
 
-// DisplayMsg represents messages specific to the display component
-type DisplayMsg struct {
-	Type    string
-	Content string
-}
-
-// DisplayModel handles the main content viewport
+// DisplayModel holds the viewport over WindowBuffer content.
 type DisplayModel struct {
 	viewport            viewport.Model
 	userScrolledAway    bool
@@ -35,7 +29,7 @@ type DisplayModel struct {
 // NewDisplayModel creates a new display model
 func NewDisplayModel(windowBuffer *WindowBuffer, styles *Styles) DisplayModel {
 	coloredWelcome := colorizeWelcomeText(common.WelcomeText)
-	vp := viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
+	vp := viewport.New(viewport.WithWidth(DefaultWidth), viewport.WithHeight(DefaultHeight))
 	vp.SetContent(coloredWelcome)
 
 	return DisplayModel{
@@ -44,8 +38,8 @@ func NewDisplayModel(windowBuffer *WindowBuffer, styles *Styles) DisplayModel {
 		welcomeText:         coloredWelcome,
 		windowBuffer:        windowBuffer,
 		styles:              styles,
-		width:               80,
-		height:              20,
+		width:               DefaultWidth,
+		height:              DefaultHeight,
 		windowCursor:        -1,
 		userMovedCursorAway: false,
 		displayFocused:      false,
@@ -57,34 +51,13 @@ func (m DisplayModel) Init() tea.Cmd {
 	return nil
 }
 
-// Update handles messages for the display
+// Update handles messages for the display (WindowSizeMsg only; content updates via updateContent)
 func (m DisplayModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.viewport.SetWidth(max(0, msg.Width))
 		m.centerWelcomeText()
-	case DisplayMsg:
-		switch msg.Type {
-		case "content_update":
-			m.updateContent()
-		case "scroll_down":
-			m.ScrollDown(1)
-		case "scroll_up":
-			m.viewport.ScrollUp(1)
-			m.userScrolledAway = true
-		case "goto_bottom":
-			m.viewport.GotoBottom()
-			m.userScrolledAway = false
-		case "goto_top":
-			m.viewport.GotoTop()
-			m.userScrolledAway = true
-		case "scroll_half_down":
-			m.ScrollDown(m.viewport.Height() / 2)
-		case "scroll_half_up":
-			m.viewport.ScrollUp(m.viewport.Height() / 2)
-			m.userScrolledAway = true
-		}
 	}
 	return m, nil
 }
@@ -231,9 +204,9 @@ func (m *DisplayModel) GotoTop() {
 
 // UpdateHeightForTodos adjusts height based on todo visibility
 func (m *DisplayModel) UpdateHeightForTodos(totalHeight int, todoCount int) {
-	height := totalHeight - 4 // Subtract input (3) + status (1)
+	height := totalHeight - LayoutGap
 	if todoCount > 0 {
-		height -= (1 + todoCount + 2) // header + items + borders
+		height -= TodoHeaderRows + todoCount + TodoBorderRows
 	}
 
 	newHeight := max(0, height)

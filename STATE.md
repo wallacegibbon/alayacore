@@ -310,6 +310,13 @@ For this project, simplicity is more important than efficiency.
     - GetTotalLines() ensures cache is built when dirty, returns line count only
     - Update throttle increased 100ms → 150ms
 
+- ✅ **Terminal adaptor refactor for clarity and maintainability**
+  - Added doc.go with package-level architecture docs (message flow, key files)
+  - Added constants.go: DefaultWidth/Height, LayoutGap, TodoHeaderRows, timing constants
+  - Renamed terminalOutput → outputWriter (clearer role: TLV parser, io.Writer)
+  - Removed dead code: DisplayMsg, InputMsg, StatusMsg, TodoMsg and their handlers
+  - Added section comments in terminal.go: Adaptor, Terminal model, Message handling, Key bindings, Layout
+
 ### Architecture
 - **Provider Types**: `anthropic` (native Anthropic API), `openai` (OpenAI-compatible)
 - **Tools**: read_file, todo_read, todo_write, edit_file, write_file, activate_skill, posix_shell

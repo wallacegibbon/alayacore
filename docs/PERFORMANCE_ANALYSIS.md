@@ -6,13 +6,13 @@ When large amounts of delta data arrive or many message windows are stacked, the
 ## Root Causes (identified)
 
 ### 1. **Update() blocks key handling on display refresh** (Critical)
-**Location**: `internal/adaptors/terminal/terminal.go:137-152`
+**Location**: `internal/adaptors/terminal/terminal.go`
 
 The `Update()` method processes `updateChan` **before** handling the incoming message (e.g., `tea.KeyMsg`):
 
 ```go
 select {
-case <-m.terminalOutput.updateChan:
+case <-m.out.updateChan:
     // Heavy work: GetAll(), updateDisplayHeight(), updateContent()
     ...
 default:

@@ -15,8 +15,9 @@ import (
 	"github.com/wallacegibbon/coreclaw/internal/todo"
 )
 
-// terminalOutput writes to the Terminal display with TLV support
-type terminalOutput struct {
+// outputWriter parses TLV from the session and writes styled content to the WindowBuffer.
+// It implements io.Writer for the agent/session output stream.
+type outputWriter struct {
 	windowBuffer  *WindowBuffer
 	buffer        []byte
 	mu            sync.Mutex
@@ -32,11 +33,9 @@ type terminalOutput struct {
 	updateMu      sync.Mutex    // Mutex for update throttling
 }
 
-const updateThrottleInterval = 150 * time.Millisecond
-
-func NewTerminalOutput() *terminalOutput {
-	to := &terminalOutput{
-		windowBuffer: NewWindowBuffer(80), // default width, will be updated later
+func NewTerminalOutput() *outputWriter {
+	to := &outputWriter{
+		windowBuffer: NewWindowBuffer(DefaultWidth),
 		updateChan:   make(chan struct{}, 1),
 		done:         make(chan struct{}),
 		styles:       DefaultStyles(),
@@ -48,14 +47,14 @@ func NewTerminalOutput() *terminalOutput {
 }
 
 // Close stops the background goroutine and cleans up resources
-func (w *terminalOutput) Close() error {
+func (w *outputWriter) Close() error {
 	close(w.done)
 	return nil
 }
 
 // updateFlusher periodically flushes pending updates
-func (w *terminalOutput) updateFlusher() {
-	ticker := time.NewTicker(50 * time.Millisecond)
+func (w *outputWriter) updateFlusher() {
+	ticker := time.NewTicker(FlusherInterval)
 	defer ticker.Stop()
 
 	for {
@@ -64,7 +63,7 @@ func (w *terminalOutput) updateFlusher() {
 			return
 		case <-ticker.C:
 			w.updateMu.Lock()
-			if w.pendingUpdate && time.Since(w.lastUpdate) >= updateThrottleInterval {
+			if w.pendingUpdate && time.Since(w.lastUpdate) >= UpdateThrottleInterval {
 				w.pendingUpdate = false
 				w.lastUpdate = time.Now()
 				select {
@@ -77,7 +76,7 @@ func (w *terminalOutput) updateFlusher() {
 	}
 }
 
-func (w *terminalOutput) Write(p []byte) (n int, err error) {
+func (w *outputWriter) Write(p []byte) (n int, err error) {
 	w.mu.Lock()
 	w.buffer = append(w.buffer, p...)
 	w.processBuffer()
@@ -85,23 +84,23 @@ func (w *terminalOutput) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-func (w *terminalOutput) WriteString(s string) (int, error) {
+func (w *outputWriter) WriteString(s string) (int, error) {
 	return w.Write([]byte(s))
 }
 
-func (w *terminalOutput) Flush() error {
+func (w *outputWriter) Flush() error {
 	return nil
 }
 
 // AppendError adds an error message to the display buffer with error styling
-func (w *terminalOutput) AppendError(format string, args ...any) {
+func (w *outputWriter) AppendError(format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	id := w.generateWindowID()
 	w.windowBuffer.AppendOrUpdate(id, stream.TagError, w.styles.Error.Render(msg))
 }
 
 // processBuffer parses TLV-encoded data from the buffer
-func (w *terminalOutput) processBuffer() {
+func (w *outputWriter) processBuffer() {
 	for len(w.buffer) >= 5 {
 		tag := w.buffer[0]
 		length := int32(binary.BigEndian.Uint32(w.buffer[1:5]))
@@ -117,7 +116,7 @@ func (w *terminalOutput) processBuffer() {
 }
 
 // writeColored writes styled content based on the TLV tag
-func (w *terminalOutput) writeColored(tag byte, value string) {
+func (w *outputWriter) writeColored(tag byte, value string) {
 	w.triggerUpdateForTag(tag)
 
 	output := func(style lipgloss.Style, text string) string {
@@ -180,7 +179,7 @@ func (w *terminalOutput) writeColored(tag byte, value string) {
 
 // triggerUpdateForTag sends an update signal for tags that modify the display
 // Uses throttling to batch rapid updates together
-func (w *terminalOutput) triggerUpdateForTag(tag byte) {
+func (w *outputWriter) triggerUpdateForTag(tag byte) {
 	switch tag {
 	case stream.TagAssistantText, stream.TagTool, stream.TagReasoning, stream.TagError,
 		stream.TagNotify, stream.TagSystem, stream.TagUserText, stream.TagTodo:
@@ -188,7 +187,7 @@ func (w *terminalOutput) triggerUpdateForTag(tag byte) {
 		defer w.updateMu.Unlock()
 
 		// If enough time has passed since last update, send immediately
-		if time.Since(w.lastUpdate) >= updateThrottleInterval {
+		if time.Since(w.lastUpdate) >= UpdateThrottleInterval {
 			w.lastUpdate = time.Now()
 			w.pendingUpdate = false
 			select {
@@ -203,7 +202,7 @@ func (w *terminalOutput) triggerUpdateForTag(tag byte) {
 }
 
 // handleSystemTag processes system information tags
-func (w *terminalOutput) handleSystemTag(value string) {
+func (w *outputWriter) handleSystemTag(value string) {
 	var info agentpkg.SystemInfo
 	if err := json.Unmarshal([]byte(value), &info); err == nil {
 		w.inProgress = info.InProgress
@@ -212,7 +211,7 @@ func (w *terminalOutput) handleSystemTag(value string) {
 }
 
 // renderMultiline applies a style to each line of text
-func (w *terminalOutput) renderMultiline(style lipgloss.Style, value string, trimRight bool) string {
+func (w *outputWriter) renderMultiline(style lipgloss.Style, value string, trimRight bool) string {
 	lines := strings.Split(value, "\n")
 	for i, line := range lines {
 		rendered := style.Render(line)
@@ -225,7 +224,7 @@ func (w *terminalOutput) renderMultiline(style lipgloss.Style, value string, tri
 }
 
 // colorizeTool applies tool-specific styling to tool output
-func (w *terminalOutput) colorizeTool(value string) string {
+func (w *outputWriter) colorizeTool(value string) string {
 	lines := strings.Split(value, "\n")
 	if len(lines) == 1 {
 		return w.colorizeSingleLineTool(value)
@@ -233,7 +232,7 @@ func (w *terminalOutput) colorizeTool(value string) string {
 	return w.colorizeMultiLineTool(lines)
 }
 
-func (w *terminalOutput) colorizeSingleLineTool(value string) string {
+func (w *outputWriter) colorizeSingleLineTool(value string) string {
 	colonIdx := strings.Index(value, ":")
 	if colonIdx > 0 {
 		toolName := value[:colonIdx]
@@ -243,7 +242,7 @@ func (w *terminalOutput) colorizeSingleLineTool(value string) string {
 	return strings.TrimRight(w.styles.Tool.Render(value), " ")
 }
 
-func (w *terminalOutput) colorizeMultiLineTool(lines []string) string {
+func (w *outputWriter) colorizeMultiLineTool(lines []string) string {
 	var result strings.Builder
 	firstLine := lines[0]
 	colonIdx := strings.Index(firstLine, ":")
@@ -273,7 +272,7 @@ func (w *terminalOutput) colorizeMultiLineTool(lines []string) string {
 
 // parseRawDiff checks if content is an edit_file with raw diff data.
 // Returns (path, lines) if it's a raw diff, or ("", nil) otherwise.
-func (w *terminalOutput) parseRawDiff(content string) (string, []DiffLinePair) {
+func (w *outputWriter) parseRawDiff(content string) (string, []DiffLinePair) {
 	lines := strings.Split(content, "\n")
 	if len(lines) < 2 {
 		return "", nil
@@ -311,7 +310,7 @@ func (w *terminalOutput) parseRawDiff(content string) (string, []DiffLinePair) {
 
 // parseStreamID extracts stream ID prefix from value.
 // Format: "[:id:]content". Returns id, content, true if prefix found.
-func (w *terminalOutput) parseStreamID(value string) (string, string, bool) {
+func (w *outputWriter) parseStreamID(value string) (string, string, bool) {
 	const prefixStart = "[:"
 	const prefixEnd = ":]"
 	if !strings.HasPrefix(value, prefixStart) {
@@ -327,12 +326,12 @@ func (w *terminalOutput) parseStreamID(value string) (string, string, bool) {
 }
 
 // generateWindowID returns a unique window ID for non-delta messages.
-func (w *terminalOutput) generateWindowID() string {
+func (w *outputWriter) generateWindowID() string {
 	w.nextWindowID++
 	return fmt.Sprintf("win%d", w.nextWindowID)
 }
 
 // SetWindowWidth updates the window buffer width.
-func (w *terminalOutput) SetWindowWidth(width int) {
+func (w *outputWriter) SetWindowWidth(width int) {
 	w.windowBuffer.SetWidth(width)
 }

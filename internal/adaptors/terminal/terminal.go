@@ -13,7 +13,9 @@ import (
 	"github.com/wallacegibbon/coreclaw/internal/stream"
 )
 
-// TerminalAdaptor is a terminal adaptor with a Terminal interface
+// --- Adaptor (entry point) ---
+
+// TerminalAdaptor starts the TUI; use from main/app.
 type TerminalAdaptor struct {
 	Config      *app.Config
 	sessionFile string
@@ -54,6 +56,8 @@ func (a *TerminalAdaptor) Start() {
 	p.Run()
 }
 
+// --- Terminal model ---
+
 // colorizeWelcomeText applies gradient coloring to the ASCII art
 func colorizeWelcomeText(text string) string {
 	lines := strings.Split(text, "\n")
@@ -81,11 +85,11 @@ func colorizeWelcomeText(text string) string {
 	return result.String()
 }
 
-// Terminal is the main Terminal model that composes all components
+// Terminal is the main Bubble Tea model; composes display, input, todo, status.
 type Terminal struct {
-	session        *agentpkg.Session
-	terminalOutput *terminalOutput
-	streamInput    *stream.ChanInput
+	session     *agentpkg.Session
+	out         *outputWriter
+	streamInput *stream.ChanInput
 
 	display DisplayModel
 	todo    TodoModel
@@ -105,18 +109,18 @@ type Terminal struct {
 }
 
 // NewTerminal creates a new Terminal model
-func NewTerminal(session *agentpkg.Session, terminalOutput *terminalOutput, inputStream *stream.ChanInput, sessionFile string) *Terminal {
+func NewTerminal(session *agentpkg.Session, out *outputWriter, inputStream *stream.ChanInput, sessionFile string) *Terminal {
 	styles := DefaultStyles()
 
 	m := &Terminal{
-		session:        session,
-		terminalOutput: terminalOutput,
-		streamInput:    inputStream,
-		display:        NewDisplayModel(terminalOutput.windowBuffer, styles),
+		session:     session,
+		out:         out,
+		streamInput: inputStream,
+		display:     NewDisplayModel(out.windowBuffer, styles),
 		todo:           NewTodoModel(styles),
 		input:          NewInputModel(styles),
 		status:         NewStatusModel(styles),
-		windowWidth:    80,
+		windowWidth:    DefaultWidth,
 		styles:         styles,
 		focusedWindow:  "input",
 		sessionFile:    sessionFile,
@@ -131,9 +135,11 @@ func (m *Terminal) Init() tea.Cmd {
 	return nil
 }
 
+// --- Message handling ---
+
 type tickMsg struct{}
 
-// Update handles messages
+// Update routes messages; KeyMsg first for responsive input (see PERFORMANCE_ANALYSIS.md).
 func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Process user-facing messages FIRST to avoid blocking keyboard input.
 	// Display updates run after so keypress returns immediately.
@@ -145,10 +151,10 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tickMsg:
 		// Drain pending display updates (non-blocking) so streaming content appears
 		select {
-		case <-m.terminalOutput.updateChan:
-			if m.terminalOutput.windowBuffer.GetWindowCount() > 0 {
-				m.status.SetStatus(m.terminalOutput.status)
-				m.todo.SetTodos(m.terminalOutput.todos)
+		case <-m.out.updateChan:
+			if m.out.windowBuffer.GetWindowCount() > 0 {
+				m.status.SetStatus(m.out.status)
+				m.todo.SetTodos(m.out.todos)
 				m.updateDisplayHeight()
 				if !m.display.UserMovedCursorAway() {
 					m.display.SetCursorToLastWindow()
@@ -156,18 +162,18 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.display.updateContent()
 			}
 		default:
-			m.status.SetStatus(m.terminalOutput.status)
-			m.todo.SetTodos(m.terminalOutput.todos)
+			m.status.SetStatus(m.out.status)
+			m.todo.SetTodos(m.out.todos)
 		}
-		if m.terminalOutput.inProgress {
-			return m, tea.Tick(500*time.Millisecond, func(t time.Time) tea.Msg {
+		if m.out.inProgress {
+			return m, tea.Tick(TickInterval, func(t time.Time) tea.Msg {
 				return tickMsg{}
 			})
 		}
 		return m, nil
 	case editorFinishedMsg:
 		if msg.err != nil {
-			m.terminalOutput.AppendError("Editor error: %v", msg.err)
+			m.out.AppendError("Editor error: %v", msg.err)
 		} else if msg.content != "" {
 			m.input.editorContent = msg.content
 			m.input.SetValue(FormatEditorContent(msg.content))
@@ -197,11 +203,13 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// --- Key bindings ---
+
 // handleWindowSize handles window resize events
 func (m *Terminal) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	m.windowWidth = msg.Width
 	m.windowHeight = msg.Height
-	m.terminalOutput.SetWindowWidth(max(0, msg.Width))
+	m.out.SetWindowWidth(max(0, msg.Width))
 	m.display.SetWidth(max(0, msg.Width))
 	m.input.SetWidth(max(0, msg.Width))
 	m.todo.SetWidth(max(0, msg.Width))
@@ -250,7 +258,7 @@ func (m *Terminal) handleConfirmDialog(msg tea.KeyMsg) (tea.Cmd, bool) {
 		case "y", "Y":
 			m.quitting = true
 			m.streamInput.Close()
-			m.terminalOutput.Close()
+			m.out.Close()
 			return tea.Quit, true
 		case "n", "N", "esc", "ctrl+c":
 			m.confirmDialog = false
@@ -406,7 +414,7 @@ func (m *Terminal) handleSubmit() tea.Cmd {
 	m.streamInput.EmitTLV(stream.TagUserText, prompt)
 	m.input.SetValue("")
 
-	return tea.Tick(50*time.Millisecond, func(t time.Time) tea.Msg {
+	return tea.Tick(SubmitTickDelay, func(t time.Time) tea.Msg {
 		return tickMsg{}
 	})
 }
@@ -416,10 +424,12 @@ func (m *Terminal) submitCommand(command string, clearInput bool) tea.Cmd {
 	if clearInput {
 		m.input.SetValue("")
 	}
-	return tea.Tick(50*time.Millisecond, func(t time.Time) tea.Msg {
+	return tea.Tick(SubmitTickDelay, func(t time.Time) tea.Msg {
 		return tickMsg{}
 	})
 }
+
+// --- Layout ---
 
 // updateDisplayHeight updates the display viewport height based on window size and todo visibility
 func (m *Terminal) updateDisplayHeight() {

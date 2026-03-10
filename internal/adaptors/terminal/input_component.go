@@ -8,13 +8,7 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-// InputMsg represents messages from the input component
-type InputMsg struct {
-	Type    string
-	Content string
-}
-
-// InputModel handles text input and editor interactions
+// InputModel handles text input and editor integration.
 type InputModel struct {
 	input         textinput.Model
 	focused       bool
@@ -37,7 +31,7 @@ func NewInputModel(styles *Styles) InputModel {
 		focused: true,
 		editor:  NewEditor(),
 		styles:  styles,
-		width:   80,
+		width:   DefaultWidth,
 	}
 }
 
@@ -52,28 +46,6 @@ func (m InputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.input.SetWidth(max(0, msg.Width-8))
-	case InputMsg:
-		switch msg.Type {
-		case "focus":
-			m.focused = true
-			m.input.Focus()
-		case "blur":
-			m.focused = false
-			m.input.Blur()
-		case "toggle_focus":
-			m.focused = !m.focused
-			if m.focused {
-				m.input.Focus()
-			} else {
-				m.input.Blur()
-			}
-		case "clear":
-			m.input.SetValue("")
-			m.editorContent = ""
-		case "set_value":
-			m.input.SetValue(msg.Content)
-			m.input.CursorEnd()
-		}
 	case editorFinishedMsg:
 		if msg.err != nil {
 			return m, nil

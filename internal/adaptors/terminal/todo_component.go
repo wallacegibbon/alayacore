@@ -10,12 +10,7 @@ import (
 	"github.com/wallacegibbon/coreclaw/internal/todo"
 )
 
-// TodoMsg represents messages for the todo component
-type TodoMsg struct {
-	Todos todo.TodoList
-}
-
-// TodoModel handles the todo list display
+// TodoModel displays the todo list when present.
 type TodoModel struct {
 	todos  todo.TodoList
 	styles *Styles
@@ -26,7 +21,7 @@ type TodoModel struct {
 func NewTodoModel(styles *Styles) TodoModel {
 	return TodoModel{
 		styles: styles,
-		width:  80,
+		width:  DefaultWidth,
 	}
 }
 
@@ -38,8 +33,6 @@ func (m TodoModel) Init() tea.Cmd {
 // Update handles messages for the todo model
 func (m TodoModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case TodoMsg:
-		m.todos = msg.Todos
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 	}
