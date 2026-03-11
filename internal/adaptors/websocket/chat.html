@@ -63,30 +63,6 @@
             justify-content: center;
             min-height: 100%;
         }
-        #todo-list {
-            border: 2px solid #45475a;
-            border-radius: 8px;
-            padding: 10px;
-            margin-bottom: 5px;
-            background: #1e1e2e;
-            display: none;
-        }
-        #todo-list.has-todos {
-            display: block;
-        }
-        #todo-list-header {
-            font-weight: bold;
-            color: #f9e2af;
-            margin-bottom: 8px;
-            font-size: 14px;
-        }
-        .todo-item {
-            padding: 4px 0;
-            font-size: 13px;
-        }
-        .todo-pending { color: #6c7086; }
-        .todo-in-progress { color: #a6e3a1; font-weight: bold; }
-        .todo-completed { color: #6a8a6a; }
         #input-area {
             display: flex;
             gap: 10px;
@@ -134,10 +110,6 @@
             </pre>
         </div>
     </div>
-    <div id="todo-list">
-        <div id="todo-list-header">TODO LIST</div>
-        <div id="todo-items"></div>
-    </div>
     <div id="input-area" class="disabled">
         <input type="text" id="prompt" placeholder="Enter your prompt..." autocomplete="off" disabled>
         <button id="send" disabled>Send</button>
@@ -151,8 +123,6 @@
         const status = document.getElementById('status');
         const connection = document.getElementById('connection');
         const inputArea = document.getElementById('input-area');
-        const todoList = document.getElementById('todo-list');
-        const todoItems = document.getElementById('todo-items');
 
         const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = protocol + '//' + location.host + '/ws';
@@ -262,35 +232,6 @@
             }
         }
 
-        function updateTodos(value) {
-            try {
-                const todos = JSON.parse(value);
-                if (todos.length === 0) {
-                    todoList.classList.remove('has-todos');
-                    todoItems.innerHTML = '';
-                    return;
-                }
-
-                todoList.classList.add('has-todos');
-                todoItems.innerHTML = todos.map((todo, index) => {
-                    let text = '';
-                    let className = '';
-
-                    if (todo.status === 'in_progress') {
-                        text = `${index + 1}. ${todo.active_form}`;
-                        className = 'todo-in-progress';
-                    } else {
-                        text = `${index + 1}. ${todo.content}`;
-                        className = todo.status === 'completed' ? 'todo-completed' : 'todo-pending';
-                    }
-
-                    return `<div class="todo-item ${className}">${escapeHtml(text)}</div>`;
-                }).join('');
-            } catch (e) {
-                console.error('Failed to parse todos:', e);
-            }
-        }
-
         // Parse stream ID prefix from value. Format: "[:id:]content"
         function parseStreamID(value) {
             const prefixStart = "[:";
@@ -357,9 +298,6 @@
                 }
             } else if (tag === 'U') {
                 addMessage('user', value);
-            } else if (tag === 'P') {
-                // TagTodo: update todo list
-                updateTodos(value);
             }
         }
 

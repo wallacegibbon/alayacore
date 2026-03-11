@@ -81,7 +81,7 @@ alayacore-web --type anthropic --base-url https://api.anthropic.com --api-key $A
 
 ## Features
 
-- Tools: read_file, todo_read, todo_write, edit_file, write_file, activate_skill, posix_shell
+- Tools: read_file, edit_file, write_file, activate_skill, posix_shell
 - Multi-step conversations with tool calls
 - Token usage tracking
 - Error handling for command execution
@@ -94,7 +94,6 @@ alayacore-web --type anthropic --base-url https://api.anthropic.com --api-key $A
 - API debug mode for HTTP requests and responses
 - Skills system (agentskills.io compatible)
 - Web server with WebSocket support and chat UI
-- Todo list management for task tracking
 - Session file persistence
 - HTTP/HTTPS/SOCKS5 proxy support
 
@@ -136,7 +135,7 @@ A Window Cursor highlights one window with a bright border. Use `j`/`k` to navig
 ## Session Commands
 
 - `:save [filename]` - Save session to file (uses `--session` path if no filename)
-- `:cancel` - Cancel current request and clear todos (with confirmation)
+- `:cancel` - Cancel current request (with confirmation)
 - `:summarize` - Summarize conversation to reduce token usage
 - `:quit`, `:q` - Exit with confirmation
 

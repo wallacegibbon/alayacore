@@ -12,7 +12,6 @@ import (
 
 	agentpkg "github.com/wallacegibbon/alayacore/internal/agent"
 	"github.com/wallacegibbon/alayacore/internal/stream"
-	"github.com/wallacegibbon/alayacore/internal/todo"
 )
 
 // outputWriter parses TLV from the session and writes styled content to the WindowBuffer.
@@ -24,7 +23,6 @@ type outputWriter struct {
 	updateChan         chan struct{}
 	done               chan struct{}         // Signal goroutine to stop
 	status             string                // Status bar content from TagSystem
-	todos              todo.TodoList         // Current todo list
 	inProgress         bool                  // Whether session has task in progress
 	styles             *Styles               // UI styles
 	nextWindowID       int                   // Monotonic counter for generating window IDs
@@ -172,10 +170,6 @@ func (w *outputWriter) writeColored(tag byte, value string) {
 		w.handleSystemTag(value)
 		return
 
-	case stream.TagTodo:
-		json.Unmarshal([]byte(value), &w.todos)
-		return
-
 	case stream.TagUserText:
 		id := w.generateWindowID()
 		styled := strings.TrimRight(w.styles.Prompt.Render("> ")+w.styles.UserInput.Render(value), " ")
@@ -192,7 +186,7 @@ func (w *outputWriter) writeColored(tag byte, value string) {
 func (w *outputWriter) triggerUpdateForTag(tag byte) {
 	switch tag {
 	case stream.TagAssistantText, stream.TagTool, stream.TagReasoning, stream.TagError,
-		stream.TagNotify, stream.TagSystem, stream.TagUserText, stream.TagTodo:
+		stream.TagNotify, stream.TagSystem, stream.TagUserText:
 		w.updateMu.Lock()
 		defer w.updateMu.Unlock()
 

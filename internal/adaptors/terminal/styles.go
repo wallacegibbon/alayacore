@@ -19,16 +19,9 @@ type Styles struct {
 	DiffSep     lipgloss.Style // dimmed separator |
 
 	// Display styles
-	Input  lipgloss.Style
-	Status lipgloss.Style
-
-	// Todo styles
-	TodoHeader  lipgloss.Style
-	Pending     lipgloss.Style
-	InProgress  lipgloss.Style
-	Completed   lipgloss.Style
+	Input       lipgloss.Style
+	Status      lipgloss.Style
 	Confirm     lipgloss.Style
-	TodoBorder  lipgloss.Style
 	InputBorder lipgloss.Style
 }
 
@@ -51,16 +44,9 @@ func DefaultStyles() *Styles {
 		DiffSep:     baseStyle.Foreground(lipgloss.Color("#6c7086")),
 
 		// Display styles
-		Input:  baseStyle,
-		Status: baseStyle.Foreground(lipgloss.Color("#45475a")),
-
-		// Todo styles
-		TodoHeader:  baseStyle.Foreground(lipgloss.Color("#f9e2af")),
-		Pending:     baseStyle.Foreground(lipgloss.Color("#6c7086")),
-		InProgress:  baseStyle.Foreground(lipgloss.Color("#a6e3a1")).Bold(true),
-		Completed:   baseStyle.Foreground(lipgloss.Color("#6a8a6a")),
+		Input:       baseStyle,
+		Status:      baseStyle.Foreground(lipgloss.Color("#45475a")),
 		Confirm:     baseStyle.Foreground(lipgloss.Color("#f38ba8")).Bold(true),
-		TodoBorder:  baseStyle.Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#6c7086")),
 		InputBorder: baseStyle.Border(lipgloss.RoundedBorder()),
 	}
 }

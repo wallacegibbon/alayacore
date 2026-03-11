@@ -1,7 +1,7 @@
 # AlayaCore Project Status
 
 ## Overview
-AlayaCore is a minimal AI Agent that can handle toolcalling. It provides seven tools: `read_file` (supports line range), `todo_read`, `todo_write`, `edit_file` (search/replace), `write_file`, `activate_skill`, and `posix_shell`.
+AlayaCore is a minimal AI Agent that can handle toolcalling. It provides five tools: `read_file` (supports line range), `edit_file` (search/replace), `write_file`, `activate_skill`, and `posix_shell`.
 All skills are based on these tools.
 
 For this project, simplicity is more important than efficiency.
@@ -77,7 +77,7 @@ For this project, simplicity is more important than efficiency.
   - Test coverage for parsing, discovery, and activation
 - ✅ IOStream abstraction layer
   - Input/Output interfaces in internal/stream/stream.go
-  - TLV protocol (TagAssistantText='A', TagTool='T', TagReasoning='R', TagError='E', TagNotify='N', TagSystem='S', TagUserText='U', TagTodo='P', TagModel='M')
+  - TLV protocol (TagAssistantText='A', TagTool='T', TagReasoning='R', TagError='E', TagNotify='N', TagSystem='S', TagUserText='U', TagModel='M')
   - Buffered reads/writes with Flush() method
   - ChanInput helper for channel-based input with configurable buffer
   - WriteTLV/ReadTLV functions for encoding/decoding
@@ -111,13 +111,6 @@ For this project, simplicity is more important than efficiency.
   - Wordwrap preserves ANSI escape sequences across line breaks
 - ✅ Terminal viewport initial position
   - Session content displays at correct scroll position when loading from file
-- ✅ Todo system with display and runtime management
-  - todo_read and todo_write tools for task planning
-  - Terminal displays todos between display and input boxes
-  - Dynamic height adjustment when todos appear/disappear
-  - Status-based coloring: white (pending), green/italic (in-progress), green (completed)
-  - Runtime-only - todos preserved on :cancel, not persisted to session files
-
 - ✅ **Upgraded to bubbletea/lipgloss/bubbles v2.x**
   - Updated go.mod with v2 versions from charm.land vanity domain
   - Fixed breaking API changes (View(), KeyMsg, Viewport, textinput styles)
@@ -178,22 +171,15 @@ For this project, simplicity is more important than efficiency.
   - Added doc.go with package-level architecture docs
   - Added constants.go for timing and layout constants
   - Renamed terminalOutput → outputWriter
-  - Removed dead code: DisplayMsg, InputMsg, StatusMsg, TodoMsg
-
-- ✅ **Todo list loop detection**
-  - Detects when agent repeatedly writes the same todo list without making progress
-  - Returns helpful error message to guide agent out of the loop
-  - Prevents agent from getting stuck in planning loops
-  - Added `LastWrittenTodos` tracking to Session struct
-  - Added `GetLastWrittenTodos` and `SetLastWrittenTodos` methods to TodoWriter interface
+  - Removed dead code: DisplayMsg, InputMsg, StatusMsg
 
 ### Architecture
 - **Provider Types**: `anthropic` (native Anthropic API), `openai` (OpenAI-compatible)
-- **Tools**: read_file, todo_read, todo_write, edit_file, write_file, activate_skill, posix_shell
+- **Tools**: read_file, edit_file, write_file, activate_skill, posix_shell
 - **Framework**: charm.land/fantasy
 - **UI Styling**: Raw ANSI escape codes (lightweight, no padding)
 - **Stream Protocol**: TLV (Tag-Length-Value) for structured output
-  - Session-to-user: TagAssistantText, TagTool, TagReasoning, TagError, TagSystem (JSON), TagNotify, TagUserText, TagTodo
+  - Session-to-user: TagAssistantText, TagTool, TagReasoning, TagError, TagSystem (JSON), TagNotify, TagUserText
   - User-to-session: TagUserText
   - Session validates and unwraps user TLV messages
   - TagSystem contains JSON-encoded SystemInfo struct with token usage, queue, and model info:
@@ -210,8 +196,7 @@ internal/
   provider/    - Provider configuration (API keys, endpoints)
   skills/      - Skills system (discovery, parsing, activation)
   stream/      - IOStream interfaces and TLV protocol
-  todo/        - Todo list management for task planning
-  tools/       - Tool implementations (posix_shell, read_file, edit_file, write_file, activate_skill, todo_read, todo_write)
+  tools/       - Tool implementations (posix_shell, read_file, edit_file, write_file, activate_skill)
 cmd/alayacore-web/       - alayacore-web entry point
 main.go        - alayacore entry point
 ```
@@ -265,7 +250,7 @@ main.go        - alayacore entry point
 
 ### Session Commands
 - `:save [filename]` - Save session to file (uses configured session file if no filename provided)
-- `:cancel` - Cancel current request and clear todo list
+- `:cancel` - Cancel current request
 - `:summarize` - Summarize the entire conversation to a single message to reduce token usage
 - `:quit`, `:q` - Exit with confirmation
 

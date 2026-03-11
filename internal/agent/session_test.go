@@ -9,7 +9,6 @@ import (
 
 	"charm.land/fantasy"
 	"github.com/wallacegibbon/alayacore/internal/stream"
-	"github.com/wallacegibbon/alayacore/internal/todo"
 )
 
 func TestGetSessionsDir(t *testing.T) {
@@ -245,63 +244,6 @@ func (m *mockOutput) Flush() error {
 	return nil
 }
 
-func TestGenerateSystemReminder(t *testing.T) {
-	session := &Session{
-		Todos: []todo.TodoItem{
-			{Content: "Test task 1", Status: "pending"},
-			{Content: "Test task 2", Status: "in_progress"},
-			{Content: "Test task 3", Status: "completed"},
-		},
-		Input:     &stream.NopInput{},
-		Output:    &stream.NopOutput{},
-		taskQueue: make(chan Task, 10),
-	}
-
-	reminder := session.generateSystemReminder()
-
-	// Verify basic structure
-	if reminder == "" {
-		t.Fatal("generateSystemReminder returned empty string")
-	}
-
-	// Check for XML tags
-	if !strings.Contains(reminder, "<system_reminder>") || !strings.Contains(reminder, "</system_reminder>") {
-		t.Errorf("Reminder missing XML tags: %s", reminder)
-	}
-
-	// Check that all todos are included
-	if !strings.Contains(reminder, "Test task 1") {
-		t.Error("Reminder should include pending todo")
-	}
-	if !strings.Contains(reminder, "Test task 2") {
-		t.Error("Reminder should include in_progress todo")
-	}
-	if !strings.Contains(reminder, "Test task 3") {
-		t.Error("Reminder should include completed todos")
-	}
-
-	// Check that context tokens are NOT included
-	if strings.Contains(reminder, "context") || strings.Contains(reminder, "token") {
-		t.Error("Reminder should not include context usage information")
-	}
-}
-
-func TestGenerateSystemReminder_Empty(t *testing.T) {
-	session := &Session{
-		Todos:     []todo.TodoItem{},
-		Input:     &stream.NopInput{},
-		Output:    &stream.NopOutput{},
-		taskQueue: make(chan Task, 10),
-	}
-
-	reminder := session.generateSystemReminder()
-
-	// Should return empty string when there are no todos
-	if reminder != "" {
-		t.Errorf("generateSystemReminder should return empty string, got: %s", reminder)
-	}
-}
-
 func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 	tmpDir := t.TempDir()
 	sessionPath := filepath.Join(tmpDir, "test-messages.md")
@@ -329,12 +271,9 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 		ModelName:     "test-model",
 		TotalSpent:    fantasy.Usage{TotalTokens: 250, InputTokens: 100, OutputTokens: 150},
 		ContextTokens: 200,
-		Todos: []todo.TodoItem{
-			{Content: "Task 1", Status: "pending", ActiveForm: "Doing task 1"},
-		},
-		Input:     &stream.NopInput{},
-		Output:    &stream.NopOutput{},
-		taskQueue: make(chan Task, 10),
+		Input:         &stream.NopInput{},
+		Output:        &stream.NopOutput{},
+		taskQueue:     make(chan Task, 10),
 	}
 
 	// Save
@@ -360,14 +299,6 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 	}
 	if loaded.ContextTokens != session.ContextTokens {
 		t.Errorf("ContextTokens mismatch: got %d, want %d", loaded.ContextTokens, session.ContextTokens)
-	}
-
-	// Verify todos
-	if len(loaded.Todos) != len(session.Todos) {
-		t.Fatalf("Todos count mismatch: got %d, want %d", len(loaded.Todos), len(session.Todos))
-	}
-	if loaded.Todos[0].Content != session.Todos[0].Content {
-		t.Errorf("Todo content mismatch: got %s, want %s", loaded.Todos[0].Content, session.Todos[0].Content)
 	}
 
 	// Verify messages - note: reasoning becomes separate message in file format

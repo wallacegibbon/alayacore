@@ -15,8 +15,6 @@ import (
 
 	"charm.land/fantasy"
 	"github.com/wallacegibbon/alayacore/internal/stream"
-	"github.com/wallacegibbon/alayacore/internal/todo"
-	"github.com/wallacegibbon/alayacore/internal/tools"
 	"gopkg.in/yaml.v3"
 )
 
@@ -45,19 +43,17 @@ type SystemInfo struct {
 
 // Session manages conversation state and task execution.
 type Session struct {
-	Messages         []fantasy.Message
-	Agent            fantasy.Agent
-	BaseURL          string
-	ModelName        string
-	SessionFile      string
-	TotalSpent       fantasy.Usage
-	ContextTokens    int64
-	ContextLimit     int64
-	Todos            todo.TodoList
-	LastWrittenTodos todo.TodoList // For loop detection
-	Input            stream.Input
-	Output           stream.Output
-	ModelManager     *ModelManager
+	Messages      []fantasy.Message
+	Agent         fantasy.Agent
+	BaseURL       string
+	ModelName     string
+	SessionFile   string
+	TotalSpent    fantasy.Usage
+	ContextTokens int64
+	ContextLimit  int64
+	Input         stream.Input
+	Output        stream.Output
+	ModelManager  *ModelManager
 
 	taskQueue     chan Task
 	inProgress    bool
@@ -82,7 +78,6 @@ type SessionData struct {
 	Messages      []fantasy.Message
 	TotalSpent    fantasy.Usage
 	ContextTokens int64
-	Todos         todo.TodoList
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }
@@ -129,7 +124,6 @@ func RestoreFromSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTo
 		TotalSpent:    data.TotalSpent,
 		ContextTokens: data.ContextTokens,
 		ContextLimit:  contextLimit,
-		Todos:         data.Todos,
 		Input:         input,
 		Output:        output,
 		ModelManager:  NewModelManager(),
@@ -146,14 +140,9 @@ func RestoreFromSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTo
 }
 
 func (s *Session) initAgent(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt string) {
-	allTools := append(baseTools,
-		tools.NewTodoReadTool(s),
-		tools.NewTodoWriteTool(s),
-	)
 	s.Agent = fantasy.NewAgent(model,
-		fantasy.WithTools(allTools...),
+		fantasy.WithTools(baseTools...),
 		fantasy.WithSystemPrompt(systemPrompt),
-		fantasy.WithPrepareStep(s.prepareStep),
 	)
 }
 
@@ -167,37 +156,7 @@ func (s *Session) SwitchModel(model fantasy.LanguageModel, baseURL, modelName st
 	s.initAgent(model, baseTools, systemPrompt)
 }
 
-func (s *Session) prepareStep(ctx context.Context, opts fantasy.PrepareStepFunctionOptions) (context.Context, fantasy.PrepareStepResult, error) {
-	result := fantasy.PrepareStepResult{
-		Model:    opts.Model,
-		Messages: opts.Messages,
-	}
-	if reminder := s.generateSystemReminder(); reminder != "" {
-		result.Messages = append(opts.Messages, fantasy.NewUserMessage(reminder))
-	}
-	return ctx, result, nil
-}
-
-func (s *Session) generateSystemReminder() string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if len(s.Todos) == 0 {
-		return ""
-	}
-
-	var sb strings.Builder
-	sb.WriteString("<system_reminder>\nCurrent todos:\n")
-	for _, t := range s.Todos {
-		fmt.Fprintf(&sb, "- [%s] %s\n", t.Status, t.Content)
-	}
-	sb.WriteString("</system_reminder>")
-	return sb.String()
-}
-
-// ============================================================================
-// Input Processing
-// ============================================================================
+// SwitchModel switches the session to use a new model
 
 func (s *Session) readFromInput() {
 	for {
@@ -428,7 +387,6 @@ func (s *Session) handleCommandSync(ctx context.Context, cmd string) {
 func (s *Session) cancelTask() {
 	if s.inProgress && s.cancelCurrent != nil {
 		s.cancelCurrent()
-		s.SetTodos(todo.TodoList{})
 		return
 	}
 	s.writeError("nothing to cancel")
@@ -620,14 +578,6 @@ func (s *Session) sendSystemInfoWithModel(model *ModelConfig) {
 	s.Output.Flush()
 }
 
-func (s *Session) sendTodoList() {
-	s.mu.Lock()
-	data, _ := json.Marshal(s.Todos)
-	s.mu.Unlock()
-	stream.WriteTLV(s.Output, stream.TagTodo, string(data))
-	s.Output.Flush()
-}
-
 // ============================================================================
 // Tool Call Formatting
 // ============================================================================
@@ -701,14 +651,6 @@ func formatToolCall(toolName, input string) string {
 		}
 
 		return strings.Join(lines, "\n")
-	case "todo_read":
-		return "todo_read: Reading todo list"
-	case "todo_write":
-		if todos, ok := fields["todos"].(string); ok && todos != "" {
-			truncated := truncateString(todos, 50)
-			return fmt.Sprintf("%s: %s", toolName, truncated)
-		}
-		return "todo_write: Updating todo list"
 	}
 	return ""
 }
@@ -724,31 +666,6 @@ func escapeNewlines(s string) string {
 	s = strings.ReplaceAll(s, "\n", "\\n")
 	s = strings.ReplaceAll(s, "\t", "\\t")
 	return s
-}
-
-// ============================================================================
-// Todo Access
-// ============================================================================
-
-func (s *Session) GetTodos() todo.TodoList { return s.Todos }
-
-func (s *Session) SetTodos(todos todo.TodoList) {
-	s.mu.Lock()
-	s.Todos = todos
-	s.mu.Unlock()
-	s.sendTodoList()
-}
-
-func (s *Session) GetLastWrittenTodos() todo.TodoList {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.LastWrittenTodos
-}
-
-func (s *Session) SetLastWrittenTodos(todos todo.TodoList) {
-	s.mu.Lock()
-	s.LastWrittenTodos = todos
-	s.mu.Unlock()
 }
 
 // ============================================================================
@@ -817,7 +734,6 @@ func (s *Session) saveSessionToFile(path string) error {
 		Messages:      msgs,
 		TotalSpent:    s.TotalSpent,
 		ContextTokens: s.ContextTokens,
-		Todos:         s.Todos,
 		UpdatedAt:     time.Now(),
 	}
 
@@ -951,16 +867,6 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 	buf.Write(metaBytes)
 	buf.WriteString("---\n")
 
-	// Write todos if present
-	if len(data.Todos) > 0 {
-		todoBytes, err := yaml.Marshal(map[string]todo.TodoList{"todos": data.Todos})
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal todos: %w", err)
-		}
-		buf.Write(todoBytes)
-		buf.WriteString("\n")
-	}
-
 	// Write messages - each message is a separate NUL-separated entry
 	for _, msg := range data.Messages {
 		for _, part := range msg.Content {
@@ -1038,23 +944,6 @@ func parseSessionMarkdown(data []byte) (*SessionData, error) {
 		ContextTokens: meta.ContextTokens,
 		CreatedAt:     meta.CreatedAt,
 		UpdatedAt:     meta.UpdatedAt,
-	}
-
-	// Check for todos section in body (before first NUL)
-	todosEnd := strings.Index(body, msgSep)
-	todosSection := body
-	if todosEnd != -1 {
-		todosSection = body[:todosEnd]
-		body = body[todosEnd:]
-	}
-
-	if strings.Contains(todosSection, "todos:") {
-		var todoWrapper struct {
-			Todos todo.TodoList `yaml:"todos"`
-		}
-		if err := yaml.Unmarshal([]byte(todosSection), &todoWrapper); err == nil {
-			sd.Todos = todoWrapper.Todos
-		}
 	}
 
 	// Parse messages

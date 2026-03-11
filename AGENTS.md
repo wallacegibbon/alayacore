@@ -56,8 +56,6 @@ AlayaCore provides the following tools (ordered from safest to most dangerous):
 | Tool | Description |
 |------|-------------|
 | `read_file` | Read the contents of a file. Supports optional line range. |
-| `todo_read` | Read the current todo list |
-| `todo_write` | Write or update the todo list |
 | `edit_file` | Apply search/replace edit to a file |
 | `write_file` | Create a new file or replace entire file content |
 | `activate_skill` | Load and execute a skill |
@@ -86,9 +84,7 @@ AlayaCore provides the following tools (ordered from safest to most dangerous):
 Tools must be ordered from safest to most dangerous:
 
 1. `read_file` - Read file contents
-2. `todo_read` - Read todo list
-3. `todo_write` - Write/update todo list
-4. `edit_file` - Apply search/replace edit to a file
-5. `write_file` - Create or replace files
-6. `activate_skill` - Load and execute skills
-7. `posix_shell` - Execute shell commands (most dangerous)
+2. `edit_file` - Apply search/replace edit to a file
+3. `write_file` - Create or replace files
+4. `activate_skill` - Load and execute skills
+5. `posix_shell` - Execute shell commands (most dangerous)

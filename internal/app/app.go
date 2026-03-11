@@ -28,18 +28,7 @@ RULES:
 - Never assume - verify with tools
 - Check <available_skills> below; activate relevant ones using the activate_skill tool
 - When running skill scripts, cd to the skill's directory first (e.g., cd /path/to/skill && ./scripts/script.sh)
-- Do NOT use find to locate scripts - use the path from SKILL.md
-
-PLANNING RULES:
-- For ANY non-trivial task (anything beyond a simple single action):
-  1. First, read the current todo list with todo_read
-  2. Create or update your plan using todo_write with content, active_form (present continuous), and status (pending/in_progress/completed)
-     - IMPORTANT: The "content" field must remain EXACTLY THE SAME when updating status. Only change the "status" field.
-     - Example: content="Install dependencies", active_form="Installing dependencies"
-     - When updating to in_progress: content="Install dependencies", status="in_progress" (content unchanged)
-     - When updating to completed: content="Install dependencies", status="completed" (content unchanged)
-  3. Execute tasks while updating todo status as you go
-- For trivial tasks (single simple action like "what's in this file?"), you may proceed directly without planning`
+- Do NOT use find to locate scripts - use the path from SKILL.md`
 
 // Config holds the common app configuration
 type Config struct {

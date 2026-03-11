@@ -11,10 +11,6 @@ const (
 	InputRows  = 3
 	StatusRows = 1
 	LayoutGap  = 4 // input + status + newlines between sections
-
-	// Todo box: header + items + borders
-	TodoHeaderRows = 1
-	TodoBorderRows = 2
 )
 
 // Timing constants

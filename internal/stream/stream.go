@@ -12,7 +12,6 @@ const (
 	TagReasoning     = 'R' // Reasoning/thinking content
 	TagTool          = 'T' // Tool call output
 	TagError         = 'E' // Error messages
-	TagTodo          = 'P' // Todo list updates (JSON wrapped in TagTodo)
 	TagNotify        = 'N' // Notification messages
 	TagSystem        = 'S' // System messages (queue status, model info, etc.)
 )

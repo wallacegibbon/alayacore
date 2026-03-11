@@ -24,7 +24,7 @@ AlayaCore allows you to save and restore conversations manually using session fi
 ```sh
 :save                    # Save to current session file (if set with --session)
 :save ~/mysession.md    # Save to specific file
-:cancel                  # Cancel current request and clear todos (with confirmation)
+:cancel                  # Cancel current request (with confirmation)
 :summarize              # Summarize the entire conversation to a single message
 ```
 

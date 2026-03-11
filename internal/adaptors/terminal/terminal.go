@@ -8,7 +8,6 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 
 	agentpkg "github.com/wallacegibbon/alayacore/internal/agent"
 	"github.com/wallacegibbon/alayacore/internal/app"
@@ -71,7 +70,7 @@ func (a *TerminalAdaptor) Start() {
 
 // --- Terminal model ---
 
-// Terminal is the main Bubble Tea model; composes display, input, todo, status.
+// Terminal is the main Bubble Tea model; composes display, input, status.
 type Terminal struct {
 	session     *agentpkg.Session
 	out         *outputWriter
@@ -79,7 +78,6 @@ type Terminal struct {
 	appConfig   *app.Config
 
 	display       DisplayModel
-	todo          TodoModel
 	input         InputModel
 	status        StatusModel
 	modelSelector *ModelSelector
@@ -106,7 +104,6 @@ func NewTerminal(session *agentpkg.Session, out *outputWriter, inputStream *stre
 		streamInput:   inputStream,
 		appConfig:     appCfg,
 		display:       NewDisplayModel(out.windowBuffer, styles),
-		todo:          NewTodoModel(styles),
 		input:         NewInputModel(styles),
 		status:        NewStatusModel(styles),
 		modelSelector: NewModelSelector(styles),
@@ -144,7 +141,6 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case <-m.out.updateChan:
 			if m.out.windowBuffer.GetWindowCount() > 0 {
 				m.status.SetStatus(m.out.status)
-				m.todo.SetTodos(m.out.todos)
 				m.updateDisplayHeight()
 				if m.display.shouldFollow() {
 					m.display.SetCursorToLastWindow()
@@ -161,7 +157,6 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		default:
 			m.status.SetStatus(m.out.status)
-			m.todo.SetTodos(m.out.todos)
 		}
 		if m.out.inProgress {
 			return m, tea.Tick(TickInterval, func(t time.Time) tea.Msg {
@@ -226,7 +221,6 @@ func (m *Terminal) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 	m.out.SetWindowWidth(max(0, msg.Width))
 	m.display.SetWidth(max(0, msg.Width))
 	m.input.SetWidth(max(0, msg.Width))
-	m.todo.SetWidth(max(0, msg.Width))
 	m.status.SetWidth(max(0, msg.Width))
 	m.updateDisplayHeight()
 	m.display.centerWelcomeText()
@@ -519,9 +513,9 @@ func (m *Terminal) applyModelSwitch(model *agentpkg.ModelConfig) {
 
 // --- Layout ---
 
-// updateDisplayHeight updates the display viewport height based on window size and todo visibility
+// updateDisplayHeight updates the display viewport height based on window size
 func (m *Terminal) updateDisplayHeight() {
-	m.display.UpdateHeightForTodos(m.windowHeight, m.todo.Count())
+	m.display.UpdateHeight(m.windowHeight)
 }
 
 // View renders the Terminal
@@ -530,14 +524,6 @@ func (m *Terminal) View() tea.View {
 
 	sb.WriteString(m.display.View().Content)
 	sb.WriteString("\n")
-
-	todos := m.todo.RenderString()
-	if todos != "" {
-		todoInnerStyle := lipgloss.NewStyle().Width(max(0, m.windowWidth-4))
-		todoBorderStyle := m.styles.TodoBorder.Padding(0, 1)
-		sb.WriteString(todoBorderStyle.Render(todoInnerStyle.Render(todos)))
-		sb.WriteString("\n")
-	}
 
 	confirmText := ""
 	if m.confirmDialog {

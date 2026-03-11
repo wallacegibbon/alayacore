@@ -7,7 +7,6 @@
 //   - WindowBuffer: holds message windows (reasoning, text, tools); renders on demand
 //   - DisplayModel: viewport over WindowBuffer content; handles scroll and window cursor
 //   - InputModel: text input for prompts and commands
-//   - TodoModel: todo list display (when present)
 //   - StatusModel: token usage and status bar
 //
 // # Message Flow

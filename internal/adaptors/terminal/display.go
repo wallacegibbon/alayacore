@@ -196,43 +196,10 @@ func (m *DisplayModel) GotoTop() {
 	m.viewport.GotoTop()
 }
 
-// UpdateHeightForTodos adjusts height based on todo visibility
-func (m *DisplayModel) UpdateHeightForTodos(totalHeight int, todoCount int) {
-	height := totalHeight - LayoutGap
-	if todoCount > 0 {
-		height -= TodoHeaderRows + todoCount + TodoBorderRows
-	}
-
-	newHeight := max(0, height)
-	oldHeight := m.viewport.Height()
-
-	if oldHeight != newHeight {
-		totalLines := max(1, m.windowBuffer.GetTotalLines())
-
-		topLine := m.viewport.YOffset()
-		var newTopLine int
-
-		if m.shouldFollow() {
-			bottomLine := topLine + oldHeight - 1
-			newTopLine = bottomLine - newHeight + 1
-		} else {
-			newTopLine = topLine
-		}
-
-		maxTopLine := max(0, totalLines-newHeight)
-		if newTopLine > maxTopLine {
-			newTopLine = maxTopLine
-		}
-		if newTopLine < 0 {
-			newTopLine = 0
-		}
-
-		m.viewport.SetHeight(newHeight)
-		m.viewport.SetYOffset(newTopLine)
-	} else {
-		m.viewport.SetHeight(newHeight)
-	}
-
+// UpdateHeight sets the viewport height based on total window height
+func (m *DisplayModel) UpdateHeight(totalHeight int) {
+	height := max(0, totalHeight-LayoutGap)
+	m.viewport.SetHeight(height)
 	m.updateContent()
 }
 

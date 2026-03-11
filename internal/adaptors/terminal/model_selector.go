@@ -160,12 +160,12 @@ func (ms *ModelSelector) View() tea.View {
 func (ms *ModelSelector) renderList() string {
 	var sb strings.Builder
 
-	title := ms.styles.TodoHeader.Render("SELECT MODEL")
+	title := ms.styles.Tool.Render("SELECT MODEL")
 	sb.WriteString(title)
 	sb.WriteString("\n\n")
 
 	if len(ms.models) == 0 {
-		sb.WriteString(ms.styles.Pending.Render("No models configured."))
+		sb.WriteString(ms.styles.System.Render("No models configured."))
 		sb.WriteString("\n")
 		sb.WriteString(ms.styles.System.Render("Press 'e' to edit the model config file."))
 	} else {
@@ -174,9 +174,9 @@ func (ms *ModelSelector) renderList() string {
 			prefix := "  "
 			if i == ms.selectedIdx {
 				prefix = "> "
-				line = fmt.Sprintf("%s%s", prefix, ms.styles.InProgress.Render(m.Name))
+				line = fmt.Sprintf("%s%s", prefix, ms.styles.Text.Render(m.Name))
 			} else {
-				line = fmt.Sprintf("%s%s", prefix, ms.styles.Pending.Render(m.Name))
+				line = fmt.Sprintf("%s%s", prefix, ms.styles.System.Render(m.Name))
 			}
 			sb.WriteString(line)
 			sb.WriteString("\n")
