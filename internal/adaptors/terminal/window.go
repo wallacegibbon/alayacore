@@ -317,37 +317,25 @@ func (wb *WindowBuffer) renderWindowContent(w *Window, innerWidth int) string {
 	}
 
 	if w.Wrapped {
-		// In wrapped mode, show first line, wrap indicator, and last line
+		// In wrapped mode, show up to 5 lines
 		wrappedContent := lipgloss.Wrap(w.Content, innerWidth, " ")
 
-		// Check if content spans more than 3 lines (needs truncation)
+		// Check if content spans more than 5 lines (needs truncation)
 		lines := strings.Split(wrappedContent, "\n")
-		if len(lines) > 3 {
-			// Show: first line, wrap indicator, last line
+		if len(lines) > 5 {
+			// Show: first line, dotted separator, last 3 lines (5 lines total)
 			firstLine := lines[0]
-			lastLine := lines[len(lines)-1]
+			lastThreeLines := lines[len(lines)-3:]
 
-			// Create wrap indicator with text on left, subtle separator on right
-			wrapText := "Wrapped - Space to expand"
-			textWidth := lipgloss.Width(wrapText)
-			remainingWidth := innerWidth - textWidth
+			// Create subtle dotted separator across full width
+			wrapIndicator := lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#45475a")).
+				Render(strings.Repeat("·", innerWidth))
 
-			var wrapIndicator string
-			if remainingWidth > 0 {
-				// Use a subtle dotted separator
-				separator := strings.Repeat("·", remainingWidth)
-				wrapIndicator = lipgloss.NewStyle().
-					Foreground(lipgloss.Color("#45475a")).
-					Render(wrapText + separator)
-			} else {
-				// Text is too long, just show it without separator
-				wrapIndicator = lipgloss.NewStyle().
-					Foreground(lipgloss.Color("#45475a")).
-					Render(wrapText)
-			}
-			return firstLine + "\n" + wrapIndicator + "\n" + lastLine
+			// Show first line, separator, last 3 lines
+			return firstLine + "\n" + wrapIndicator + "\n" + strings.Join(lastThreeLines, "\n")
 		}
-		// Content fits in 3 lines or less, just show wrapped content
+		// Content fits in 5 lines or less, just show wrapped content
 		return wrappedContent
 	}
 	return lipgloss.Wrap(w.Content, innerWidth, " ")
