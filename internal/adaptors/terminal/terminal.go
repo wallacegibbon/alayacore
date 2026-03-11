@@ -9,9 +9,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	agentpkg "github.com/wallacegibbon/alayacore/internal/agent"
-	"github.com/wallacegibbon/alayacore/internal/app"
-	"github.com/wallacegibbon/alayacore/internal/stream"
+	agentpkg "github.com/alayacore/alayacore/internal/agent"
+	"github.com/alayacore/alayacore/internal/app"
+	"github.com/alayacore/alayacore/internal/stream"
 )
 
 // --- Adaptor (entry point) ---

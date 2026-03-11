@@ -9,10 +9,10 @@ import (
 
 	_ "embed"
 
-	"github.com/wallacegibbon/alayacore/internal/adaptors/common"
-	agentpkg "github.com/wallacegibbon/alayacore/internal/agent"
-	"github.com/wallacegibbon/alayacore/internal/app"
-	"github.com/wallacegibbon/alayacore/internal/stream"
+	"github.com/alayacore/alayacore/internal/adaptors/common"
+	agentpkg "github.com/alayacore/alayacore/internal/agent"
+	"github.com/alayacore/alayacore/internal/app"
+	"github.com/alayacore/alayacore/internal/stream"
 )
 
 var upgrader = websocket.Upgrader{

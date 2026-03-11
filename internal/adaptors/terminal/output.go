@@ -10,8 +10,8 @@ import (
 
 	"charm.land/lipgloss/v2"
 
-	agentpkg "github.com/wallacegibbon/alayacore/internal/agent"
-	"github.com/wallacegibbon/alayacore/internal/stream"
+	agentpkg "github.com/alayacore/alayacore/internal/agent"
+	"github.com/alayacore/alayacore/internal/stream"
 )
 
 // outputWriter parses TLV from the session and writes styled content to the WindowBuffer.

@@ -11,10 +11,10 @@ import (
 	"charm.land/fantasy/providers/anthropic"
 	"charm.land/fantasy/providers/openai"
 	"charm.land/fantasy/providers/openaicompat"
-	"github.com/wallacegibbon/alayacore/internal/config"
-	debugpkg "github.com/wallacegibbon/alayacore/internal/debug"
-	"github.com/wallacegibbon/alayacore/internal/skills"
-	"github.com/wallacegibbon/alayacore/internal/tools"
+	"github.com/alayacore/alayacore/internal/config"
+	debugpkg "github.com/alayacore/alayacore/internal/debug"
+	"github.com/alayacore/alayacore/internal/skills"
+	"github.com/alayacore/alayacore/internal/tools"
 )
 
 const DefaultSystemPrompt = `You are AlayaCore, an AI assistant with POSIX shell and some other tool access.

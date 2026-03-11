@@ -11,7 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	agentpkg "github.com/wallacegibbon/alayacore/internal/agent"
+	agentpkg "github.com/alayacore/alayacore/internal/agent"
 )
 
 // ModelConfig represents a model configuration

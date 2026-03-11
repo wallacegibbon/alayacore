@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"charm.land/fantasy"
-	"github.com/wallacegibbon/alayacore/internal/stream"
+	"github.com/alayacore/alayacore/internal/stream"
 	"gopkg.in/yaml.v3"
 )
 

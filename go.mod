@@ -1,4 +1,4 @@
-module github.com/wallacegibbon/alayacore
+module github.com/alayacore/alayacore
 
 go 1.26.0
 

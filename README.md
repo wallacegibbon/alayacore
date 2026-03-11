@@ -9,14 +9,14 @@ For this project, simplicity is more important than efficiency.
 ## Installation
 
 ```sh
-go install github.com/wallacegibbon/alayacore@latest
-go install github.com/wallacegibbon/alayacore/cmd/alayacore-web@latest
+go install github.com/alayacore/alayacore@latest
+go install github.com/alayacore/alayacore/cmd/alayacore-web@latest
 ```
 
 Or build from source:
 
 ```sh
-git clone https://github.com/wallacegibbon/alayacore.git
+git clone https://github.com/alayacore/alayacore.git
 cd alayacore
 go build
 go build ./cmd/alayacore-web/

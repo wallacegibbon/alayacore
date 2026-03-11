@@ -7,7 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/wallacegibbon/alayacore/internal/adaptors/common"
+	"github.com/alayacore/alayacore/internal/adaptors/common"
 )
 
 // DisplayModel holds the viewport over WindowBuffer content.

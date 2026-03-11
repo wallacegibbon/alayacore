@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/wallacegibbon/alayacore/internal/adaptors/terminal"
-	"github.com/wallacegibbon/alayacore/internal/app"
-	"github.com/wallacegibbon/alayacore/internal/config"
+	"github.com/alayacore/alayacore/internal/adaptors/terminal"
+	"github.com/alayacore/alayacore/internal/app"
+	"github.com/alayacore/alayacore/internal/config"
 )
 
 func main() {

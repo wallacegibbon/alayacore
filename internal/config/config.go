@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/wallacegibbon/alayacore/internal/provider"
+	"github.com/alayacore/alayacore/internal/provider"
 )
 
 // stringSlice implements flag.Value for multiple string flags

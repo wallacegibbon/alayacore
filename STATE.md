@@ -9,7 +9,7 @@ For this project, simplicity is more important than efficiency.
 ## Implementation Status
 
 ### Completed
-- ✅ Go module initialized (github.com/wallacegibbon/alayacore)
+- ✅ Go module initialized (github.com/alayacore/alayacore)
 - ✅ fantasy dependency added (v0.11.0)
 - ✅ Direct stdin reading for terminal input
 - ✅ Basic agent structure with OpenAI provider

@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"charm.land/fantasy"
-	"github.com/wallacegibbon/alayacore/internal/skills"
+	"github.com/alayacore/alayacore/internal/skills"
 )
 
 // ActivateSkillInput represents the input for the activate_skill tool

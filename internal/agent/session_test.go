@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"charm.land/fantasy"
-	"github.com/wallacegibbon/alayacore/internal/stream"
+	"github.com/alayacore/alayacore/internal/stream"
 )
 
 func TestGetSessionsDir(t *testing.T) {
