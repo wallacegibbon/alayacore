@@ -108,6 +108,7 @@ When running the Terminal version:
 | `Enter` | Submit prompt (when input focused) |
 | `Ctrl+S` | Save session to file |
 | `Ctrl+O` | Open external editor for multi-line input |
+| `Ctrl+L` | Open model selector UI |
 | `j` | Move window cursor down (when display focused) |
 | `k` | Move window cursor up (when display focused) |
 | `J` | Move screen down (when display focused) |
@@ -138,6 +139,12 @@ A Window Cursor highlights one window with a bright border. Use `j`/`k` to navig
 - `:cancel` - Cancel current request and clear todos (with confirmation)
 - `:summarize` - Summarize conversation to reduce token usage
 - `:quit`, `:q` - Exit with confirmation
+
+## Model Management Commands
+
+- `:model_get_all` - List all saved model configurations
+- `:model_set <name>` - Switch to a saved model configuration
+- `:model_load` - Load model configurations from default config file
 
 ## Project Status
 

@@ -24,6 +24,7 @@ When running the Terminal version:
 | `Enter` | Submit prompt (when input focused) |
 | `Ctrl+S` | Save session to file |
 | `Ctrl+O` | Open external editor for multi-line input |
+| `Ctrl+L` | Open model selector UI |
 | `:` | Switch to input with ":" prefix (when display focused) |
 | `Space` | Toggle wrap mode for active window (when display focused) |
 | `Ctrl+C` | Clear input (when input focused) |
@@ -35,3 +36,6 @@ When running the Terminal version:
 |---------|--------|
 | `:cancel` | Cancel current request (with confirmation) |
 | `:quit`, `:q` | Exit with confirmation (press y/n) |
+| `:model_get_all` | List all saved model configurations |
+| `:model_set <name>` | Switch to a saved model configuration |
+| `:model_load` | Load model configurations from default config file |
