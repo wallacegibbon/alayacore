@@ -201,13 +201,14 @@ For this project, simplicity is more important than efficiency.
   - **Implementation**: Added early return in `handleKeyMsg()` when `focusedWindow == "input"` and key is Ctrl+U
   - **Testing**: Added `TestCtrlUDoesNothingInInput` to verify input remains unchanged after Ctrl+U in input window
 
-- ✅ **Fixed ContextTokens calculation for provider context limits**
-  - **Problem**: `ContextTokens` was being set to `OutputTokens` (generated tokens), but API providers limit based on input context size (InputTokens - the messages sent to the API)
-  - **Root cause**: Incorrect assumption that output tokens represented context usage; different providers have different context limits based on input tokens
-  - **Solution**: Changed `trackUsage()` to set `ContextTokens = usage.InputTokens` (the actual context size sent to API)
+- ✅ **Fixed ContextTokens calculation for tracking conversation history size**
+  - **Problem**: `ContextTokens` was being set to `OutputTokens` (generated tokens), which doesn't reflect the conversation history size
+  - **Root cause**: `ContextTokens` should track the cumulative conversation history size, not the tokens generated in the current API call
+  - **Solution**: Changed `trackUsage()` to set `ContextTokens = usage.InputTokens` because InputTokens includes all historical messages sent to the API
+  - **Why InputTokens**: Each API call's InputTokens contains the full conversation history (system prompt + all previous messages + current user message), so it accurately reflects how large the conversation has grown
   - **Implementation**:
     - Updated `trackUsage()` in session.go to use `InputTokens` instead of accumulating `OutputTokens`
-  - **Result**: Context token count now accurately reflects the context size that counts toward provider limits
+  - **Result**: Context token count now accurately tracks conversation history size for deciding when to summarize
 
 - ✅ **Fixed ContextTokens not updating after :summarize command**
   - **Problem**: After running `:summarize`, the `ContextTokens` value remained at the old (large) value instead of reflecting the new (smaller) summarized context
