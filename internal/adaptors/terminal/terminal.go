@@ -165,6 +165,8 @@ func (m *Terminal) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 	m.display.SetWidth(max(0, msg.Width))
 	m.input.SetWidth(max(0, msg.Width))
 	m.status.SetWidth(max(0, msg.Width))
+	// Keep model selector box within current screen bounds so borders render fully.
+	m.modelSelector.SetSize(msg.Width, msg.Height)
 	m.updateDisplayHeight()
 	m.display.centerWelcomeText()
 	return m, nil

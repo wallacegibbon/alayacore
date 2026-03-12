@@ -88,7 +88,10 @@ func (ms *ModelSelector) State() ModelSelectorState {
 
 // SetSize sets the dimensions
 func (ms *ModelSelector) SetSize(width, height int) {
-	ms.width = min(width-4, 80)
+	if width > 0 {
+		// Use 80% of the terminal width for the selector window.
+		ms.width = width * 4 / 5
+	}
 	ms.height = min(height-4, 30)
 }
 
@@ -269,7 +272,9 @@ func truncate(s string, maxLen int) string {
 
 // SetWidth sets the width
 func (ms *ModelSelector) SetWidth(width int) {
-	ms.width = min(width-4, 80)
+	if width > 0 {
+		ms.width = width * 4 / 5
+	}
 }
 
 // HandleKey handles key events directly (for integration with Terminal)
