@@ -62,7 +62,12 @@ func NewTerminal(session *agentpkg.Session, out *outputWriter, inputStream *stre
 
 // Init initializes the Terminal
 func (m *Terminal) Init() tea.Cmd {
-	return nil
+	// Start the periodic tick loop immediately so we can process
+	// session updates (e.g. model switches) even before the user
+	// submits the first prompt.
+	return tea.Tick(TickInterval, func(t time.Time) tea.Msg {
+		return tickMsg{}
+	})
 }
 
 // --- Message handling ---

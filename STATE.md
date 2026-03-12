@@ -266,6 +266,10 @@ For this project, simplicity is more important than efficiency.
   - Added session shutdown signaling to prevent goroutine leaks when input closes
   - Locked usage/context updates to avoid inconsistent TagSystem snapshots
   - Split monolithic `session.go` into focused files (tasks, prompt streaming, commands, output/system info, persistence, markdown)
+ - ✅ **Always-on terminal tick loop**
+   - Terminal `Init` now starts the periodic tick loop immediately
+   - Model switches from the selector (`Ctrl+L` → `enter`) are applied right away, even before the first prompt is sent
+   - Keeps status/model info in sync without requiring an initial user submit
 
 ### Architecture
 - **Provider Types**: `anthropic` (native Anthropic API), `openai` (OpenAI-compatible)
