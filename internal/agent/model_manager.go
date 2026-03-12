@@ -80,7 +80,12 @@ func (mm *ModelManager) LoadFromFile(path string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil // No file yet, that's OK
+			// Create empty config file
+			emptyData := []byte("{\n  \"models\": [],\n  \"active_index\": -1\n}\n")
+			if writeErr := os.WriteFile(path, emptyData, 0600); writeErr != nil {
+				return writeErr
+			}
+			return nil
 		}
 		return err
 	}
