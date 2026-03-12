@@ -216,6 +216,7 @@ For this project, simplicity is more important than efficiency.
   - Added constants.go for timing and layout constants
   - Renamed terminalOutput → outputWriter
   - Removed dead code: DisplayMsg, InputMsg, StatusMsg
+  - Extracted TerminalAdaptor entrypoint into adaptor_entry.go to keep Tea model focused
   - Clarified WebSocket/terminal adaptor responsibilities and config reload flow
 
 - ✅ **Model selector focus management**

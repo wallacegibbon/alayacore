@@ -18,6 +18,7 @@
 //
 // # Key Files
 //
+//   - adaptor_entry.go: TerminalAdaptor entry point used by main/app
 //   - terminal.go: main Tea model, message routing, key bindings
 //   - output.go: TLV parsing, styling, WindowBuffer updates
 //   - window.go: WindowBuffer (windows with borders, wrap, diff), Window struct
