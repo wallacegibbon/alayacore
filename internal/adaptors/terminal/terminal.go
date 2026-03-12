@@ -85,6 +85,7 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleWindowSize(msg)
 	case tickMsg:
 		// Drain pending display updates (non-blocking) so streaming content appears
+		var cmd tea.Cmd
 		select {
 		case <-m.out.updateChan:
 			if m.out.windowBuffer.GetWindowCount() > 0 {
@@ -100,16 +101,17 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.applyModelSwitch(activeModel)
 			}
 			// Update model selector if models changed (via TagSystem, not direct access)
-			if models := m.out.GetModels(); len(models) > 0 {
-				m.modelSelector.LoadModels(models, m.out.GetActiveModelID())
-			}
+			cmd = m.modelSelector.LoadModels(m.out.GetModels(), m.out.GetActiveModelID())
 		default:
 			m.status.SetStatus(m.out.status)
 		}
 		// Always keep ticking to check for model switches and other updates
-		return m, tea.Tick(TickInterval, func(t time.Time) tea.Msg {
-			return tickMsg{}
-		})
+		return m, tea.Batch(
+			tea.Tick(TickInterval, func(t time.Time) tea.Msg {
+				return tickMsg{}
+			}),
+			cmd,
+		)
 	case editorFinishedMsg:
 		if msg.err != nil {
 			m.out.AppendError("Editor error: %v", msg.err)
@@ -181,9 +183,8 @@ func (m *Terminal) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Handle model selector input when open
 	if m.modelSelector.IsOpen() {
-		key := msg.String()
-		// Handle all keys in list mode
-		m.modelSelector.HandleKey(key)
+		// Handle KeyMsg directly (needed for textinput to work properly)
+		m.modelSelector.HandleKeyMsg(msg)
 		// Check if a model was selected
 		if m.modelSelector.ConsumeModelSelected() {
 			m.switchToSelectedModel()

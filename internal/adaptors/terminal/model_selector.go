@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
@@ -21,6 +22,12 @@ type ModelConfig struct {
 	APIKey       string `json:"api_key,omitempty"` // Omitted in responses for security
 	ModelName    string `json:"model_name"`
 	ContextLimit int    `json:"context_limit"` // Maximum context length (0 means unlimited)
+
+	// Pre-computed lowercase versions for fast search (not persisted)
+	nameLower         string
+	protocolTypeLower string
+	modelNameLower    string
+	baseURLLower      string
 }
 
 // ModelSelectorState represents the current state of the model selector
@@ -35,20 +42,31 @@ const (
 // NOTE: ModelSelector NEVER writes to the model config file.
 // Users must edit the file with a text editor (press 'e').
 type ModelSelector struct {
-	state             ModelSelectorState
-	models            []ModelConfig
-	selectedIdx       int // Selected model in list
-	width             int
-	height            int
-	styles            *Styles
-	activeModel       *ModelConfig // Currently active model
-	modelJustSelected bool         // True if model was just selected this frame
-	openModelFile     bool         // True if user requested to open model file
-	reloadModels      bool         // True if user requested to reload models
+	state              ModelSelectorState
+	models             []ModelConfig
+	filteredModels     []ModelConfig // Models after filtering
+	selectedIdx        int           // Selected model in list
+	scrollIdx          int           // Scroll position for model list
+	lastSearchValue    string        // Last search value (for optimization)
+	lastModelCount     int           // Last model count (for optimization)
+	width              int
+	height             int
+	styles             *Styles
+	activeModel        *ModelConfig    // Currently active model
+	modelJustSelected  bool            // True if model was just selected this frame
+	openModelFile      bool            // True if user requested to open model file
+	reloadModels       bool            // True if user requested to reload models
+	searchInput        textinput.Model // Search input field
+	searchInputFocused bool            // True if search input has focus, false if list has focus
 }
 
 // NewModelSelector creates a new model selector
 func NewModelSelector(styles *Styles) *ModelSelector {
+	searchInput := textinput.New()
+	searchInput.Placeholder = "Search models..."
+	searchInput.Prompt = "/ "
+	searchInput.SetWidth(50)
+
 	ms := &ModelSelector{
 		state:       ModelSelectorClosed,
 		models:      []ModelConfig{},
@@ -56,6 +74,7 @@ func NewModelSelector(styles *Styles) *ModelSelector {
 		styles:      styles,
 		width:       60,
 		height:      20,
+		searchInput: searchInput,
 	}
 	// Note: We don't load models here anymore - they're loaded from ModelManager
 	return ms
@@ -69,10 +88,18 @@ func (ms *ModelSelector) IsOpen() bool {
 // Open opens the model selector in list mode
 func (ms *ModelSelector) Open() {
 	ms.state = ModelSelectorList
-	if len(ms.models) == 0 {
+	// Reset search input and filter
+	ms.searchInput.SetValue("")
+	ms.lastSearchValue = "" // Reset last search value
+	ms.searchInputFocused = true
+	ms.searchInput.Focus()
+	ms.updateSearchInputStyles()
+	ms.scrollIdx = 0 // Reset scroll position
+	ms.updateFilteredModels()
+	if len(ms.filteredModels) == 0 {
 		ms.selectedIdx = 0
-	} else if ms.selectedIdx >= len(ms.models) {
-		ms.selectedIdx = len(ms.models) - 1
+	} else if ms.selectedIdx >= len(ms.filteredModels) {
+		ms.selectedIdx = len(ms.filteredModels) - 1
 	}
 }
 
@@ -91,6 +118,10 @@ func (ms *ModelSelector) SetSize(width, height int) {
 	if width > 0 {
 		// Use 80% of the terminal width for the selector window.
 		ms.width = width * 4 / 5
+		// Set search input width to match main input
+		// Main input: textinput width = width-8, after border/padding = width-4 visible
+		// Search input uses same textinput width = width-8, with border/padding = width-4 visible
+		ms.searchInput.SetWidth(max(0, width-8))
 	}
 	ms.height = min(height-4, 30)
 }
@@ -114,31 +145,131 @@ func (ms *ModelSelector) updateList(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "up", "k":
-			if ms.selectedIdx > 0 {
-				ms.selectedIdx--
+		case "tab":
+			// Toggle focus between search input and list
+			ms.searchInputFocused = !ms.searchInputFocused
+			if ms.searchInputFocused {
+				ms.searchInput.Focus()
+				ms.updateSearchInputStyles()
+			} else {
+				ms.searchInput.Blur()
+				ms.updateSearchInputStyles()
 			}
-		case "down", "j":
-			if ms.selectedIdx < len(ms.models)-1 {
-				ms.selectedIdx++
-			}
+			return ms, nil
 		case "enter":
-			if len(ms.models) > 0 && ms.selectedIdx >= 0 {
-				ms.activeModel = &ms.models[ms.selectedIdx]
+			if ms.searchInputFocused {
+				// If search input is focused, enter selects the first model and closes
+				if len(ms.filteredModels) > 0 {
+					ms.activeModel = &ms.filteredModels[0]
+					ms.modelJustSelected = true
+					ms.state = ModelSelectorClosed
+				}
+				return ms, nil
+			}
+			// If list is focused, select the currently highlighted model
+			if len(ms.filteredModels) > 0 && ms.selectedIdx >= 0 {
+				ms.activeModel = &ms.filteredModels[ms.selectedIdx]
 				ms.modelJustSelected = true
 				ms.state = ModelSelectorClosed
 			}
+			return ms, nil
 		case "e":
 			// Open model file with $EDITOR
 			ms.openModelFile = true
+			return ms, nil
 		case "r":
 			// Reload models from file
 			ms.reloadModels = true
+			return ms, nil
 		case "esc", "q":
 			ms.state = ModelSelectorClosed
+			return ms, nil
+		case "up", "k":
+			if !ms.searchInputFocused && ms.selectedIdx > 0 {
+				ms.selectedIdx--
+			}
+			return ms, nil
+		case "down", "j":
+			if !ms.searchInputFocused && ms.selectedIdx < len(ms.filteredModels)-1 {
+				ms.selectedIdx++
+			}
+			return ms, nil
+		default:
+			// Character keys and other keys: pass to search input and handle filtering
+			oldSearchValue := ms.searchInput.Value()
+			ms.searchInput, _ = ms.searchInput.Update(msg)
+			newSearchValue := ms.searchInput.Value()
+
+			// Update filtered models when search changes
+			if oldSearchValue != newSearchValue {
+				ms.updateFilteredModels()
+				// Reset selected index if needed
+				if ms.selectedIdx >= len(ms.filteredModels) {
+					if len(ms.filteredModels) > 0 {
+						ms.selectedIdx = len(ms.filteredModels) - 1
+					} else {
+						ms.selectedIdx = 0
+					}
+				}
+			}
+			return ms, nil
 		}
 	}
+
 	return ms, nil
+}
+
+// updateFilteredModels updates the filtered models based on search input
+func (ms *ModelSelector) updateFilteredModels() {
+	searchValue := ms.searchInput.Value()
+
+	// Optimization: only re-filter if search value has actually changed
+	if searchValue == ms.lastSearchValue {
+		return
+	}
+	ms.lastSearchValue = searchValue
+
+	searchTerm := strings.ToLower(searchValue)
+	if searchTerm == "" {
+		ms.filteredModels = make([]ModelConfig, len(ms.models))
+		copy(ms.filteredModels, ms.models)
+		ms.scrollIdx = 0 // Reset scroll position when showing all models
+	} else {
+		// Fast filtering using pre-computed lowercase fields
+		ms.filteredModels = make([]ModelConfig, 0, len(ms.models))
+		for _, model := range ms.models {
+			if strings.Contains(model.nameLower, searchTerm) ||
+				strings.Contains(model.protocolTypeLower, searchTerm) ||
+				strings.Contains(model.modelNameLower, searchTerm) ||
+				strings.Contains(model.baseURLLower, searchTerm) {
+				ms.filteredModels = append(ms.filteredModels, model)
+			}
+		}
+		ms.scrollIdx = 0 // Reset scroll position when filtering
+	}
+
+	// Ensure selected index is within bounds (IMPORTANT: must run after filtering)
+	if len(ms.filteredModels) == 0 {
+		ms.selectedIdx = 0
+	} else if ms.selectedIdx >= len(ms.filteredModels) {
+		ms.selectedIdx = len(ms.filteredModels) - 1
+	}
+}
+
+// updateSearchInputStyles updates the search input styles based on focus state
+// This should only be called when focus changes, not on every render
+func (ms *ModelSelector) updateSearchInputStyles() {
+	var styles textinput.Styles
+	if ms.searchInputFocused {
+		styles = textinput.DefaultStyles(true)
+		styles.Focused.Prompt = lipgloss.NewStyle().Foreground(lipgloss.Color("#89d4fa")).Bold(true)
+		styles.Focused.Placeholder = lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086"))
+	} else {
+		styles = textinput.DefaultStyles(false)
+		styles.Blurred.Prompt = lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086"))
+		styles.Blurred.Placeholder = lipgloss.NewStyle().Foreground(lipgloss.Color("#45475a"))
+	}
+	ms.searchInput.SetStyles(styles)
 }
 
 // View renders the model selector
@@ -149,48 +280,89 @@ func (ms *ModelSelector) View() tea.View {
 
 	content := ms.renderList()
 
-	// Create centered overlay
-	boxStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#89b4fa")).
-		Padding(1, 2).
-		Width(ms.width).
-		MaxHeight(ms.height)
-
-	return tea.NewView(lipgloss.NewStyle().Padding(1, 2).Render(boxStyle.Render(content)))
+	// No outer border - just render content centered
+	return tea.NewView(lipgloss.NewStyle().Padding(1, 2).Render(content))
 }
 
 // renderList renders the model list
 func (ms *ModelSelector) renderList() string {
 	var sb strings.Builder
 
-	title := ms.styles.Tool.Render("SELECT MODEL")
-	sb.WriteString(title)
+	// Render search input (styles are already set when focus changes)
+	searchInputView := ms.searchInput.View()
+
+	// Add border (always shown, with different color based on focus state)
+	borderColor := "#89d4fa"
+	if !ms.searchInputFocused {
+		borderColor = "#45475a"
+	}
+	searchInputView = lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(borderColor)).
+		Padding(0, 1).
+		Render(searchInputView)
+
+	sb.WriteString(searchInputView)
 	sb.WriteString("\n\n")
 
+	// Render model list with border and fixed height
+	var listContent strings.Builder
+	listHeight := 15 // Fixed height for model list content (not including border/padding)
+
 	if len(ms.models) == 0 {
-		sb.WriteString(ms.styles.System.Render("No models configured."))
-		sb.WriteString("\n")
-		sb.WriteString(ms.styles.System.Render("Press 'e' to edit the model config file."))
+		listContent.WriteString(ms.styles.System.Render("No models configured."))
+		listContent.WriteString("\n")
+		listContent.WriteString(ms.styles.System.Render("Press 'e' to edit the model config file."))
+	} else if len(ms.filteredModels) == 0 {
+		listContent.WriteString(ms.styles.System.Render("No models match your search."))
+		listContent.WriteString("\n")
+		listContent.WriteString(ms.styles.System.Render("Clear the search to see all models."))
 	} else {
-		for i, m := range ms.models {
+		// Calculate visible range based on scroll position
+		startIdx := ms.scrollIdx
+		endIdx := min(startIdx+listHeight, len(ms.filteredModels))
+
+		// Ensure selected item is visible
+		if ms.selectedIdx < startIdx {
+			startIdx = ms.selectedIdx
+			endIdx = min(startIdx+listHeight, len(ms.filteredModels))
+			ms.scrollIdx = startIdx
+		} else if ms.selectedIdx >= endIdx {
+			endIdx = ms.selectedIdx + 1
+			startIdx = max(0, endIdx-listHeight)
+			ms.scrollIdx = startIdx
+		}
+
+		// Render visible items
+		for i := startIdx; i < endIdx; i++ {
+			m := ms.filteredModels[i]
 			var line string
 			prefix := "  "
-			if i == ms.selectedIdx {
+			if i == ms.selectedIdx && !ms.searchInputFocused {
 				prefix = "> "
 				line = fmt.Sprintf("%s%s", prefix, ms.styles.Text.Render(m.Name))
 			} else {
 				line = fmt.Sprintf("%s%s", prefix, ms.styles.System.Render(m.Name))
 			}
-			sb.WriteString(line)
-			sb.WriteString("\n")
+			listContent.WriteString(line)
+			listContent.WriteString("\n")
 		}
 	}
 
+	// Add border around model list (same width as search input, fixed height)
+	listStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#45475a")).
+		Padding(0, 1).
+		Width(lipgloss.Width(searchInputView)).
+		Height(listHeight + 2) // +2 for border/padding
+	listView := listStyle.Render(listContent.String())
+
+	sb.WriteString(listView)
 	sb.WriteString("\n")
 	sb.WriteString(ms.styles.System.Render("─── Commands ───"))
 	sb.WriteString("\n")
-	sb.WriteString(ms.styles.System.Render("e: edit file  r: reload  enter: select  esc: close"))
+	sb.WriteString(ms.styles.System.Render("tab: switch focus  e: edit file  r: reload  enter: select  esc: close"))
 
 	return sb.String()
 }
@@ -240,25 +412,65 @@ func (ms *ModelSelector) GetModels() []ModelConfig {
 // SetModels sets the models list
 func (ms *ModelSelector) SetModels(models []ModelConfig) {
 	ms.models = models
+	// Pre-compute lowercase fields for all models
+	for i := range ms.models {
+		ms.models[i].nameLower = strings.ToLower(ms.models[i].Name)
+		ms.models[i].protocolTypeLower = strings.ToLower(ms.models[i].ProtocolType)
+		ms.models[i].modelNameLower = strings.ToLower(ms.models[i].ModelName)
+		ms.models[i].baseURLLower = strings.ToLower(ms.models[i].BaseURL)
+	}
+	ms.updateFilteredModels()
 }
 
 // LoadModels loads models from a list of ModelInfo (from TagSystem)
-func (ms *ModelSelector) LoadModels(models []agentpkg.ModelInfo, activeID string) {
+// Returns a command to trigger view refresh
+func (ms *ModelSelector) LoadModels(models []agentpkg.ModelInfo, activeID string) tea.Cmd {
+	// Optimization: only reload if model count changed (simple change detection)
+	if len(models) == ms.lastModelCount && len(ms.models) == len(models) && ms.lastModelCount > 0 {
+		// Models likely haven't changed, just check if active model changed
+		if activeID != "" {
+			for i, m := range ms.models {
+				if m.ID == activeID && ms.activeModel == nil {
+					ms.activeModel = &ms.models[i]
+					ms.selectedIdx = i
+					break
+				}
+			}
+		}
+		// Return command to trigger view refresh even if no change
+		return func() tea.Msg {
+			return nil
+		}
+	}
+
+	// Models have changed, reload them
+	ms.lastModelCount = len(models)
 	ms.models = make([]ModelConfig, len(models))
 	for i, m := range models {
 		ms.models[i] = ModelConfig{
-			ID:           m.ID,
-			Name:         m.Name,
-			ProtocolType: m.ProtocolType,
-			BaseURL:      m.BaseURL,
-			ModelName:    m.ModelName,
-			ContextLimit: m.ContextLimit,
+			ID:                m.ID,
+			Name:              m.Name,
+			ProtocolType:      m.ProtocolType,
+			BaseURL:           m.BaseURL,
+			ModelName:         m.ModelName,
+			ContextLimit:      m.ContextLimit,
+			nameLower:         strings.ToLower(m.Name),
+			protocolTypeLower: strings.ToLower(m.ProtocolType),
+			modelNameLower:    strings.ToLower(m.ModelName),
+			baseURLLower:      strings.ToLower(m.BaseURL),
 		}
 		// Set active model
 		if m.ID == activeID {
 			ms.activeModel = &ms.models[i]
 			ms.selectedIdx = i
 		}
+	}
+	// Update filtered models
+	ms.updateFilteredModels()
+
+	// Return command to trigger view refresh
+	return func() tea.Msg {
+		return nil
 	}
 }
 
@@ -275,6 +487,23 @@ func (ms *ModelSelector) SetWidth(width int) {
 	if width > 0 {
 		ms.width = width * 4 / 5
 	}
+}
+
+// HandleKeyMsg handles key events as tea.KeyMsg (for textinput integration)
+func (ms *ModelSelector) HandleKeyMsg(msg tea.KeyMsg) bool {
+	if ms.state == ModelSelectorClosed {
+		if msg.String() == "ctrl+l" {
+			ms.Open()
+			return true
+		}
+		return false
+	}
+
+	switch ms.state {
+	case ModelSelectorList:
+		return ms.handleListKeyMsg(msg)
+	}
+	return false
 }
 
 // HandleKey handles key events directly (for integration with Terminal)
@@ -294,6 +523,100 @@ func (ms *ModelSelector) HandleKey(key string) bool {
 	return false
 }
 
+// handleListKeyMsg handles KeyMsg in list mode, returns true if handled
+func (ms *ModelSelector) handleListKeyMsg(msg tea.KeyMsg) bool {
+	key := msg.String()
+
+	// TAB: Switch focus between search input and list
+	if key == "tab" {
+		ms.searchInputFocused = !ms.searchInputFocused
+		if ms.searchInputFocused {
+			ms.searchInput.Focus()
+		} else {
+			ms.searchInput.Blur()
+		}
+		return true
+	}
+
+	// If search input is focused, let it handle the key
+	if ms.searchInputFocused {
+		// Check search value before update
+		oldSearchValue := ms.searchInput.Value()
+
+		// Update search input
+		var cmd tea.Cmd
+		ms.searchInput, cmd = ms.searchInput.Update(msg)
+		if cmd != nil {
+			// Execute the command if any
+			cmd()
+		}
+
+		// Only update filtered models if search value actually changed
+		newSearchValue := ms.searchInput.Value()
+		if oldSearchValue != newSearchValue {
+			ms.updateFilteredModels()
+			// Reset selected index if needed
+			if ms.selectedIdx >= len(ms.filteredModels) {
+				if len(ms.filteredModels) > 0 {
+					ms.selectedIdx = len(ms.filteredModels) - 1
+				} else {
+					ms.selectedIdx = 0
+				}
+			}
+		}
+
+		// Handle special keys
+		switch key {
+		case "enter":
+			// Select first filtered model when enter is pressed in search
+			if len(ms.filteredModels) > 0 {
+				ms.selectedIdx = 0
+				ms.activeModel = &ms.filteredModels[0]
+				ms.modelJustSelected = true
+				ms.state = ModelSelectorClosed
+			}
+			return true
+		case "esc", "q":
+			ms.state = ModelSelectorClosed
+			return true
+		}
+		return true
+	}
+
+	// List is focused - handle navigation and other keys
+	switch key {
+	case "up", "k":
+		if ms.selectedIdx > 0 {
+			ms.selectedIdx--
+		}
+		return true
+	case "down", "j":
+		if ms.selectedIdx < len(ms.filteredModels)-1 {
+			ms.selectedIdx++
+		}
+		return true
+	case "enter":
+		if len(ms.filteredModels) > 0 && ms.selectedIdx >= 0 {
+			ms.activeModel = &ms.filteredModels[ms.selectedIdx]
+			ms.modelJustSelected = true
+			ms.state = ModelSelectorClosed
+		}
+		return true
+	case "e":
+		// Open model file with $EDITOR
+		ms.openModelFile = true
+		return true
+	case "r":
+		// Reload models from file
+		ms.reloadModels = true
+		return true
+	case "esc", "q":
+		ms.state = ModelSelectorClosed
+		return true
+	}
+	return false
+}
+
 // handleListKey handles keys in list mode, returns true if handled
 func (ms *ModelSelector) handleListKey(key string) bool {
 	switch key {
@@ -303,13 +626,13 @@ func (ms *ModelSelector) handleListKey(key string) bool {
 		}
 		return true
 	case "down", "j":
-		if ms.selectedIdx < len(ms.models)-1 {
+		if ms.selectedIdx < len(ms.filteredModels)-1 {
 			ms.selectedIdx++
 		}
 		return true
 	case "enter":
-		if len(ms.models) > 0 && ms.selectedIdx >= 0 {
-			ms.activeModel = &ms.models[ms.selectedIdx]
+		if len(ms.filteredModels) > 0 && ms.selectedIdx >= 0 {
+			ms.activeModel = &ms.filteredModels[ms.selectedIdx]
 			ms.modelJustSelected = true
 			ms.state = ModelSelectorClosed
 		}
@@ -338,15 +661,8 @@ func (ms *ModelSelector) RenderOverlay(baseContent string, screenWidth, screenHe
 
 	content := ms.renderList()
 
-	// Create the box with content
-	boxStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#89b4fa")).
-		Padding(1, 2).
-		Width(ms.width).
-		MaxHeight(ms.height)
-
-	box := boxStyle.Render(content)
+	// No outer border - just use the content
+	box := content
 
 	// Get actual rendered box dimensions
 	boxWidth := lipgloss.Width(box)
@@ -379,15 +695,8 @@ func (ms *ModelSelector) RenderString() string {
 
 	content := ms.renderList()
 
-	// Create bordered box
-	boxStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#89b4fa")).
-		Padding(1, 2).
-		Width(ms.width).
-		MaxHeight(ms.height)
-
-	return boxStyle.Render(content)
+	// No outer border - just return content
+	return content
 }
 
 // OpenModelConfigFile opens the model config file in the user's editor

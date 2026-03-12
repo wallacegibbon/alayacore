@@ -195,6 +195,15 @@ For this project, simplicity is more important than efficiency.
   - Program exits with helpful error if no models are available
   - **All CLI arguments are optional** - can run with just `alayacore` if models.conf exists
   - Located in `internal/adaptors/terminal/model_selector.go`
+  - **Search/Filter Functionality:**
+    - Search input box above model list with "/ " prompt and "Search models..." placeholder
+    - Real-time case-insensitive filtering across model name, protocol type, model name, and base URL
+    - TAB key switches focus between search input and model list
+    - Search input always has border (blue #89d4fa when focused, gray #45475a when blurred)
+    - Search input and model list have same width as main input box
+    - Fixed height model list (15 items) with scrolling support
+    - Performance optimized with pre-computed lowercase fields and smart filtering
+    - No outer border on model window; only model list has border
 
 - ✅ **Runtime Configuration for persisting active model**
   - `runtime.conf` file stores runtime data that changes during execution
