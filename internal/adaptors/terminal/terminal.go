@@ -54,20 +54,14 @@ func (a *TerminalAdaptor) Start() {
 		a.Config.Cfg.RuntimeConfig,
 	)
 
-	// Load active model from runtime.conf if available
-	if a.Config.Model == nil && session.RuntimeManager != nil {
-		activeModelName := session.RuntimeManager.GetActiveModel()
-		if activeModelName != "" {
-			// Find and set active model by name
-			if err := session.ModelManager.SetActiveByName(activeModelName); err == nil {
-				// Successfully set active model from runtime.conf
-			}
-		}
-	}
+	// Wait for initial system info from session
+	// Session will send TagSystem with HasModels, ModelConfigPath, and ActiveModelConfig
+	// We need to give the session time to send this
+	time.Sleep(100 * time.Millisecond)
 
 	// Check if we have any models available
-	if !session.ModelManager.HasModels() {
-		modelPath := session.ModelManager.GetFilePath()
+	if !terminalOutput.HasModels() {
+		modelPath := terminalOutput.GetModelConfigPath()
 		fmt.Fprintln(os.Stderr, "")
 		fmt.Fprintln(os.Stderr, "Error: No models configured.")
 		fmt.Fprintln(os.Stderr, "")
@@ -93,8 +87,10 @@ context_limit: 32768`)
 	}
 
 	// If no CLI model was provided, switch to the active model from config
+	// This requires direct session access because we need to create provider/model objects
+	// using proxy/debug settings that are only available to the adaptor.
 	if a.Config.Model == nil {
-		activeModel := session.ModelManager.GetActive()
+		activeModel := terminalOutput.GetActiveModel()
 		if activeModel != nil {
 			provider, err := app.CreateProvider(activeModel.ProtocolType, activeModel.APIKey, activeModel.BaseURL, a.Config.Cfg.DebugAPI, a.Config.Cfg.Proxy)
 			if err != nil {
@@ -102,20 +98,24 @@ context_limit: 32768`)
 				os.Exit(1)
 			}
 
-			model, err := provider.LanguageModel(context.Background(), activeModel.ModelName)
+			newModel, err := provider.LanguageModel(context.Background(), activeModel.ModelName)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error: Failed to create language model: %v\n\n", err)
 				os.Exit(1)
 			}
 
-			session.SwitchModel(model, activeModel.BaseURL, activeModel.ModelName, a.Config.AgentTools, a.Config.SystemPrompt)
+			// Switch the session to the active model from config
+			// This direct call is necessary during initialization (before main loop starts)
+			session.SwitchModel(newModel, activeModel.BaseURL, activeModel.ModelName, a.Config.AgentTools, a.Config.SystemPrompt)
 		}
 	}
 
 	t := NewTerminal(session, terminalOutput, inputStream, a.sessionFile, a.Config)
 
-	// Initialize model selector from session's model manager
-	t.modelSelector.LoadFromManager(session.ModelManager)
+	// Initialize model selector from outputWriter (which gets data from TagSystem)
+	if models := terminalOutput.GetModels(); len(models) > 0 {
+		t.modelSelector.LoadModels(models, terminalOutput.GetActiveModelID())
+	}
 
 	p := tea.NewProgram(t, tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
 	p.Run()
@@ -204,9 +204,9 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if activeModel := m.out.GetActiveModel(); activeModel != nil {
 				m.applyModelSwitch(activeModel)
 			}
-			// Update model selector if models changed
+			// Update model selector if models changed (via TagSystem, not direct access)
 			if models := m.out.GetModels(); len(models) > 0 {
-				m.modelSelector.LoadFromManager(m.session.ModelManager)
+				m.modelSelector.LoadModels(models, m.out.GetActiveModelID())
 			}
 		default:
 			m.status.SetStatus(m.out.status)
@@ -539,7 +539,8 @@ func (m *Terminal) switchToSelectedModel() {
 
 // openModelConfigFile opens the model config file with $EDITOR using shared Editor
 func (m *Terminal) openModelConfigFile() tea.Cmd {
-	path := m.session.ModelManager.GetFilePath()
+	// Get model config path from TagSystem data (not direct session access)
+	path := m.out.GetModelConfigPath()
 	if path == "" {
 		return func() tea.Msg {
 			return FileEditorFinishedMsg{Path: "", Err: fmt.Errorf("no model config file path configured")}
@@ -549,7 +550,14 @@ func (m *Terminal) openModelConfigFile() tea.Cmd {
 	return m.input.editor.OpenFile(path)
 }
 
-// applyModelSwitch applies a model switch from a model_set response
+// applyModelSwitch applies a model switch from a model_set response.
+// This is the only place where the adaptor calls session.SwitchModel() directly.
+// This is necessary because provider/model creation requires proxy and debug settings
+// that are only available to the adaptor, not the session. The flow is:
+// 1. Terminal sends :model_set <id> via TLV (TagUserText)
+// 2. Session handles command and sends TagSystem with ActiveModelConfig (includes API key)
+// 3. Adaptor creates provider/model objects and calls SwitchModel
+// 4. Session state is updated with new model
 func (m *Terminal) applyModelSwitch(model *agentpkg.ModelConfig) {
 	if model == nil || m.appConfig == nil {
 		return
@@ -568,13 +576,9 @@ func (m *Terminal) applyModelSwitch(model *agentpkg.ModelConfig) {
 		return
 	}
 
-	// Switch the session to the new model
+	// Switch the session to the new model.
+	// This direct call is necessary because only the adaptor can create providers.
 	m.session.SwitchModel(newModel, model.BaseURL, model.ModelName, m.appConfig.AgentTools, m.appConfig.SystemPrompt)
-
-	// Save the active model name to runtime config
-	if m.session.RuntimeManager != nil {
-		_ = m.session.RuntimeManager.SetActiveModel(model.Name)
-	}
 
 	// Show notification
 	m.out.WriteNotify("Switched to model: " + model.Name + " (" + model.ModelName + ")")

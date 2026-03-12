@@ -96,8 +96,14 @@ For this project, simplicity is more important than efficiency.
   - Focused window has bright border (#89d4fa), unfocused has dimmed border (#45475a)
   - When display focused: j/k move window cursor; J/K scroll screen
 - ✅ TLV protocol for user-to-session communication
-  - Added TagUserText='A' for user text input from client to session
+  - Added TagUserText='U' for user text input from client to session
   - Session reads TLV messages from input stream and unwraps TagUserText
+- ✅ Adaptor refactoring: TLV-only communication
+  - Adaptors communicate with session through TLV messages only
+  - Removed direct ModelManager access from terminal adaptor
+  - Model info (models list, active ID, config path) comes from TagSystem
+  - Model switching uses TLV flow: :model_set → TagSystem with ActiveModelConfig → adaptor creates provider
+  - Only exception: SwitchModel() called directly by adaptor for provider creation (requires proxy/debug settings)
 - ✅ Simplified auto-summarize mechanism
   - Removed `skipAutoSummarize` flag and `prependTasks` function
   - Auto-summarize now runs synchronously before processing user prompt
@@ -234,6 +240,19 @@ For this project, simplicity is more important than efficiency.
   - Simplified main.go and internal/app/app.go initialization
   - Updated README.md and AGENTS.md to reflect config file-only workflow
   - Updated CLI help text and documentation
+
+- ✅ **Fixed nil model panic on startup**
+  - When no CLI model is provided, session is created with nil model
+  - initAgent() now sends ActiveModelConfig via TagSystem if there's an active model from runtime.conf
+  - Terminal adaptor receives the config and calls SwitchModel() to set up the provider
+  - Previously, sendSystemInfo() was called without ActiveModelConfig, causing GetActiveModel() to return nil
+  - This resulted in SwitchModel() never being called, leaving the Agent with a nil model
+  - Panic occurred when user sent a prompt: Agent.Stream() with nil model
+- ✅ **Fixed deadlock in SwitchModel**
+  - SwitchModel() was holding mutex lock while calling initAgent()
+  - initAgent() calls sendSystemInfoWithModel() which tries to acquire the same mutex
+  - Fixed by releasing mutex before calling initAgent()
+  - Pattern: lock → update fields → unlock → call methods that may need the lock
 
 ### Architecture
 - **Provider Types**: `anthropic` (native Anthropic API), `openai` (OpenAI-compatible)

@@ -200,9 +200,28 @@ A Window Cursor highlights one window with a bright border. Use `j`/`k` to navig
 - `:model_set <name>` - Switch to a saved model configuration
 - `:model_load` - Load model configurations from default config file
 
+## Architecture
+
+Adaptors communicate with the session through TLV messages, ensuring clean separation:
+
+```
+┌──────────────┐    TLV Messages     ┌──────────────┐
+│   Adaptor    │ ◄─────────────────► │    Session   │
+│ (Terminal/   │    TagUserText 'U'  │              │
+│  WebSocket)  │    TagSystem 'S'    │              │
+│              │    TagNotify 'N'    │              │
+│              │    TagError 'E'     │              │
+│              │    ...              │              │
+└──────────────┘                     └──────────────┘
+       │
+       └── Only calls SwitchModel() when responding to
+           TagSystem with ActiveModelConfig (requires
+           provider creation with proxy/debug settings)
+```
+
 ## Project Status
 
-See [STATE.md](STATE.md) for detailed implementation status and architecture.
+See [STATE.md](STATE.md) for detailed implementation status.
 
 ## License
 

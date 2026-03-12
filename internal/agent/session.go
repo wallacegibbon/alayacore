@@ -38,6 +38,9 @@ type SystemInfo struct {
 	Models            []ModelInfo  `json:"models,omitempty"`
 	ActiveModelID     string       `json:"active_model_id,omitempty"`
 	ActiveModelConfig *ModelConfig `json:"active_model_config,omitempty"` // Full config (with API key), only when model changes
+	ActiveModelName   string       `json:"active_model_name,omitempty"`   // Name of active model
+	HasModels         bool         `json:"has_models"`                    // Whether models are configured
+	ModelConfigPath   string       `json:"model_config_path,omitempty"`   // Path to models.conf
 }
 
 // Session manages conversation state and task execution.
@@ -54,6 +57,8 @@ type Session struct {
 	Output         stream.Output
 	ModelManager   *ModelManager
 	RuntimeManager *RuntimeManager
+	baseTools      []fantasy.AgentTool
+	systemPrompt   string
 
 	taskQueue     []Task
 	taskAvailable chan struct{}
@@ -101,16 +106,18 @@ func LoadOrNewSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool
 // NewSession creates a fresh session.
 func NewSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt, baseURL, modelName string, input stream.Input, output stream.Output, sessionFile string, contextLimit int64, modelConfigPath, runtimeConfigPath string) *Session {
 	s := &Session{
-		BaseURL:        baseURL,
-		ModelName:      modelName,
-		SessionFile:    sessionFile,
-		ContextLimit:   contextLimit,
-		Input:          input,
-		Output:         output,
-		ModelManager:   NewModelManager(modelConfigPath),
+		BaseURL:      baseURL,
+		ModelName:    modelName,
+		SessionFile:  sessionFile,
+		ContextLimit: contextLimit,
+		Input:        input,
+		Output:       output,
+		ModelManager: NewModelManager(modelConfigPath),
 		RuntimeManager: NewRuntimeManager(runtimeConfigPath, modelConfigPath),
-		taskQueue:      make([]Task, 0),
-		taskAvailable:  make(chan struct{}, 1),
+		baseTools:    baseTools,
+		systemPrompt: systemPrompt,
+		taskQueue:    make([]Task, 0),
+		taskAvailable: make(chan struct{}, 1),
 	}
 	s.initAgent(model, baseTools, systemPrompt)
 	go s.readFromInput()
@@ -131,6 +138,8 @@ func RestoreFromSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTo
 		Output:         output,
 		ModelManager:   NewModelManager(modelConfigPath),
 		RuntimeManager: NewRuntimeManager(runtimeConfigPath, modelConfigPath),
+		baseTools:      baseTools,
+		systemPrompt:   systemPrompt,
 		taskQueue:      make([]Task, 0),
 		taskAvailable:  make(chan struct{}, 1),
 	}
@@ -149,15 +158,41 @@ func (s *Session) initAgent(model fantasy.LanguageModel, baseTools []fantasy.Age
 		fantasy.WithTools(baseTools...),
 		fantasy.WithSystemPrompt(systemPrompt),
 	)
+	// Initialize model manager with active model from runtime config
+	s.initModelManager()
+	// Send initial system info to adaptor
+	// If model is nil and there's an active model config, send full config for adaptor to switch
+	if model == nil && s.ModelManager != nil {
+		if activeModel := s.ModelManager.GetActive(); activeModel != nil {
+			s.sendSystemInfoWithModel(activeModel)
+			return
+		}
+	}
+	s.sendSystemInfo()
+}
+
+// initModelManager initializes the ModelManager by setting the active model from runtime config
+// This is called during session initialization and after loading models
+func (s *Session) initModelManager() {
+	if s.ModelManager == nil || s.RuntimeManager == nil {
+		return
+	}
+
+	// Load active model name from runtime.conf
+	activeModelName := s.RuntimeManager.GetActiveModel()
+	if activeModelName != "" {
+		// Set active model by name in ModelManager
+		_ = s.ModelManager.SetActiveByName(activeModelName)
+	}
 }
 
 // SwitchModel switches the session to use a new model
 func (s *Session) SwitchModel(model fantasy.LanguageModel, baseURL, modelName string, baseTools []fantasy.AgentTool, systemPrompt string) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	s.BaseURL = baseURL
 	s.ModelName = modelName
+	s.mu.Unlock()
+
 	s.initAgent(model, baseTools, systemPrompt)
 }
 
@@ -513,6 +548,11 @@ func (s *Session) handleModelSet(args []string) {
 		return
 	}
 
+	// Save active model name to runtime manager for persistence
+	if s.RuntimeManager != nil {
+		_ = s.RuntimeManager.SetActiveModel(model.Name)
+	}
+
 	// Send system info with full model config (terminal needs API key to switch)
 	s.sendSystemInfoWithModel(model)
 }
@@ -533,6 +573,9 @@ func (s *Session) handleModelLoad() {
 		s.writeError(fmt.Sprintf("failed to load models: %v", err))
 		return
 	}
+
+	// Restore active model from runtime config
+	s.initModelManager()
 
 	// Send system info with model list to adaptor via TagSystem
 	s.sendSystemInfo()
@@ -578,9 +621,18 @@ func (s *Session) sendSystemInfo() {
 	}
 	var models []ModelInfo
 	var activeID string
+	var activeModelName string
+	var modelConfigPath string
+	var hasModels bool
+
 	if s.ModelManager != nil {
 		models = s.ModelManager.GetModels()
 		activeID = s.ModelManager.GetActiveID()
+		if activeModel := s.ModelManager.GetActive(); activeModel != nil {
+			activeModelName = activeModel.Name
+		}
+		modelConfigPath = s.ModelManager.GetFilePath()
+		hasModels = s.ModelManager.HasModels()
 	}
 	s.mu.Lock()
 	queueCount := len(s.taskQueue)
@@ -588,13 +640,16 @@ func (s *Session) sendSystemInfo() {
 	s.mu.Unlock()
 
 	info := SystemInfo{
-		ContextTokens: s.ContextTokens,
-		ContextLimit:  s.ContextLimit,
-		TotalTokens:   s.TotalSpent.TotalTokens,
-		QueueCount:    queueCount,
-		InProgress:    inProgress,
-		Models:        models,
-		ActiveModelID: activeID,
+		ContextTokens:   s.ContextTokens,
+		ContextLimit:    s.ContextLimit,
+		TotalTokens:     s.TotalSpent.TotalTokens,
+		QueueCount:      queueCount,
+		InProgress:      inProgress,
+		Models:          models,
+		ActiveModelID:   activeID,
+		ActiveModelName: activeModelName,
+		HasModels:       hasModels,
+		ModelConfigPath: modelConfigPath,
 	}
 	data, _ := json.Marshal(info)
 	stream.WriteTLV(s.Output, stream.TagSystem, string(data))
@@ -608,9 +663,18 @@ func (s *Session) sendSystemInfoWithModel(model *ModelConfig) {
 	}
 	var models []ModelInfo
 	var activeID string
+	var activeModelName string
+	var modelConfigPath string
+	var hasModels bool
+
 	if s.ModelManager != nil {
 		models = s.ModelManager.GetModels()
 		activeID = s.ModelManager.GetActiveID()
+		if model != nil {
+			activeModelName = model.Name
+		}
+		modelConfigPath = s.ModelManager.GetFilePath()
+		hasModels = s.ModelManager.HasModels()
 	}
 	s.mu.Lock()
 	queueCount := len(s.taskQueue)
@@ -626,6 +690,9 @@ func (s *Session) sendSystemInfoWithModel(model *ModelConfig) {
 		Models:            models,
 		ActiveModelID:     activeID,
 		ActiveModelConfig: model,
+		ActiveModelName:   activeModelName,
+		HasModels:         hasModels,
+		ModelConfigPath:   modelConfigPath,
 	}
 	data, _ := json.Marshal(info)
 	stream.WriteTLV(s.Output, stream.TagSystem, string(data))

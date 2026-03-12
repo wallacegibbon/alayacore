@@ -32,6 +32,9 @@ type outputWriter struct {
 	models             []agentpkg.ModelInfo  // Current model list
 	activeModelID      string                // Current active model ID
 	pendingModelConfig *agentpkg.ModelConfig // Full config from model_set (with API key)
+	hasModels          bool                  // Whether models are configured
+	modelConfigPath    string                // Path to models.conf
+	activeModelName    string                // Name of active model
 }
 
 func NewTerminalOutput() *outputWriter {
@@ -219,6 +222,9 @@ func (w *outputWriter) handleSystemTag(value string) {
 		// Store model info
 		w.models = info.Models
 		w.activeModelID = info.ActiveModelID
+		w.hasModels = info.HasModels
+		w.modelConfigPath = info.ModelConfigPath
+		w.activeModelName = info.ActiveModelName
 		// If full config is provided, store it for the terminal to pick up
 		if info.ActiveModelConfig != nil {
 			w.pendingModelConfig = info.ActiveModelConfig
@@ -252,6 +258,27 @@ func (w *outputWriter) GetActiveModelID() string {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return w.activeModelID
+}
+
+// HasModels returns whether models are configured
+func (w *outputWriter) HasModels() bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.hasModels
+}
+
+// GetModelConfigPath returns the path to the model config file
+func (w *outputWriter) GetModelConfigPath() string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.modelConfigPath
+}
+
+// GetActiveModelName returns the name of the active model
+func (w *outputWriter) GetActiveModelName() string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.activeModelName
 }
 
 // renderMultiline applies a style to each line of text

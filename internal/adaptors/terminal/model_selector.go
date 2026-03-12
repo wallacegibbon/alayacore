@@ -239,13 +239,8 @@ func (ms *ModelSelector) SetModels(models []ModelConfig) {
 	ms.models = models
 }
 
-// LoadFromManager loads models from the session's ModelManager
-func (ms *ModelSelector) LoadFromManager(mm *agentpkg.ModelManager) {
-	if mm == nil {
-		return
-	}
-
-	models := mm.GetModels()
+// LoadModels loads models from a list of ModelInfo (from TagSystem)
+func (ms *ModelSelector) LoadModels(models []agentpkg.ModelInfo, activeID string) {
 	ms.models = make([]ModelConfig, len(models))
 	for i, m := range models {
 		ms.models[i] = ModelConfig{
@@ -257,17 +252,9 @@ func (ms *ModelSelector) LoadFromManager(mm *agentpkg.ModelManager) {
 			ContextLimit: m.ContextLimit,
 		}
 		// Set active model
-		if m.IsActive {
+		if m.ID == activeID {
 			ms.activeModel = &ms.models[i]
 			ms.selectedIdx = i
-		}
-	}
-
-	// Also get API keys from the manager
-	for i, m := range mm.GetModels() {
-		fullModel := mm.GetModel(m.ID)
-		if fullModel != nil {
-			ms.models[i].APIKey = fullModel.APIKey
 		}
 	}
 }
