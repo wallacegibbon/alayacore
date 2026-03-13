@@ -306,6 +306,9 @@ For this project, simplicity is more important than efficiency.
   - Simplified code by removing async loading logic (isLoading, NewLoadingTerminal, sessionLoadedMsg, handleSessionLoaded)
   - Better reliability at the cost of slightly slower startup for large session files
   - Complete history maintained for better context preservation and session persistence
+  - Gets actual terminal size using golang.org/x/term before loading session
+  - Passes initial width and height to terminal to ensure correct initial rendering
+  - Window resize events are handled normally after the tea program starts
 
 ### Architecture
 - **Provider Types**: `anthropic` (native Anthropic API), `openai` (OpenAI-compatible)

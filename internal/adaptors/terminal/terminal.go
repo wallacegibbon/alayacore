@@ -38,7 +38,7 @@ type Terminal struct {
 }
 
 // NewTerminal creates a new Terminal model
-func NewTerminal(session *agentpkg.Session, out *outputWriter, inputStream *stream.ChanInput, sessionFile string, appCfg *app.Config) *Terminal {
+func NewTerminal(session *agentpkg.Session, out *outputWriter, inputStream *stream.ChanInput, sessionFile string, appCfg *app.Config, initialWidth, initialHeight int) *Terminal {
 	styles := DefaultStyles()
 
 	m := &Terminal{
@@ -50,12 +50,22 @@ func NewTerminal(session *agentpkg.Session, out *outputWriter, inputStream *stre
 		input:         NewInputModel(styles),
 		status:        NewStatusModel(styles),
 		modelSelector: NewModelSelector(styles),
-		windowWidth:   DefaultWidth,
+		windowWidth:   initialWidth,
+		windowHeight:  initialHeight,
 		styles:        styles,
 		focusedWindow: "input",
 		sessionFile:   sessionFile,
 		hasFocus:      true, // program starts with focus
 	}
+
+	// Set initial width on all components
+	m.display.SetWidth(initialWidth)
+	m.input.SetWidth(initialWidth)
+	m.status.SetWidth(initialWidth)
+	m.modelSelector.SetSize(initialWidth, initialHeight)
+
+	// Set initial display height
+	m.updateDisplayHeight()
 
 	return m
 }
