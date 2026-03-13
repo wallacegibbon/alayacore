@@ -6,10 +6,8 @@ package terminal
 // on the Tea model and view logic.
 
 import (
-	"context"
 	"fmt"
 	"os"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -42,6 +40,22 @@ func (a *TerminalAdaptor) Start() {
 	inputStream := stream.NewChanInput(10)
 	terminalOutput := NewTerminalOutput()
 
+	// Create terminal in loading state first
+	t := NewLoadingTerminal(inputStream, terminalOutput, a.sessionFile, a.Config)
+
+	// Create the program
+	p := tea.NewProgram(t, tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
+
+	// Start async session loading with a reference to the program for quitting on error
+	go a.loadSessionAsync(t, inputStream, terminalOutput, p)
+
+	// Run the program (this blocks until quit)
+	p.Run()
+}
+
+// loadSessionAsync loads the session in the background and sends a message when done.
+// If there's an error (e.g., no models configured), it quits the program.
+func (a *TerminalAdaptor) loadSessionAsync(t *Terminal, inputStream *stream.ChanInput, terminalOutput *outputWriter, p *tea.Program) {
 	session, sessionFile := agentpkg.LoadOrNewSession(
 		a.Config.Model,
 		a.Config.AgentTools,
@@ -57,13 +71,11 @@ func (a *TerminalAdaptor) Start() {
 	)
 	a.sessionFile = sessionFile
 
-	// Wait briefly for initial system info from session.
-	// Session will send TagSystem with HasModels, ModelConfigPath,
-	// and ActiveModelConfig; the terminal UI relies on this.
-	time.Sleep(100 * time.Millisecond)
-
 	// Check if we have any models available.
 	if !terminalOutput.HasModels() {
+		// Send error message to terminal and quit
+		p.Send(sessionLoadedMsg{err: fmt.Errorf("no models configured")})
+		// Also print to stderr for visibility
 		modelPath := terminalOutput.GetModelConfigPath()
 		fmt.Fprintln(os.Stderr, "")
 		fmt.Fprintln(os.Stderr, "Error: No models configured.")
@@ -86,40 +98,22 @@ api_key: "your-api-key"
 model_name: "gpt-oss:20b"
 context_limit: 32768`)
 		fmt.Fprintln(os.Stderr, "")
-		os.Exit(1)
+		p.Quit()
+		return
 	}
 
-	// If no CLI model was provided, switch to the active model from config.
-	// This requires direct session access because we need to create
-	// provider/model objects using proxy/debug settings that are only
-	// available to the adaptor.
+	// Get active model for later use
+	var activeModel *agentpkg.ModelConfig
 	if a.Config.Model == nil {
-		if activeModel := terminalOutput.GetActiveModel(); activeModel != nil {
-			provider, err := app.CreateProvider(activeModel.ProtocolType, activeModel.APIKey, activeModel.BaseURL, a.Config.Cfg.DebugAPI, a.Config.Cfg.Proxy)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error: Failed to create provider: %v\n\n", err)
-				os.Exit(1)
-			}
-
-			newModel, err := provider.LanguageModel(context.Background(), activeModel.ModelName)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error: Failed to create language model: %v\n\n", err)
-				os.Exit(1)
-			}
-
-			// Switch the session to the active model from config.
-			// This direct call is necessary during initialization (before main loop starts).
-			session.SwitchModel(newModel, activeModel.BaseURL, activeModel.ModelName, a.Config.AgentTools, a.Config.SystemPrompt)
-		}
+		activeModel = terminalOutput.GetActiveModel()
 	}
 
-	t := NewTerminal(session, terminalOutput, inputStream, a.sessionFile, a.Config)
-
-	// Initialize model selector from outputWriter (which gets data from TagSystem).
-	if models := terminalOutput.GetModels(); len(models) > 0 {
-		t.modelSelector.LoadModels(models, terminalOutput.GetActiveModelID())
-	}
-
-	p := tea.NewProgram(t, tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
-	p.Run()
+	// Send session loaded message to the terminal
+	p.Send(sessionLoadedMsg{
+		session:       session,
+		sessionFile:   sessionFile,
+		activeModel:   activeModel,
+		models:        terminalOutput.GetModels(),
+		activeModelID: terminalOutput.GetActiveModelID(),
+	})
 }

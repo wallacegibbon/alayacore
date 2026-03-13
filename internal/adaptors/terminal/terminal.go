@@ -7,6 +7,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	agentpkg "github.com/alayacore/alayacore/internal/agent"
 	"github.com/alayacore/alayacore/internal/app"
@@ -35,6 +36,10 @@ type Terminal struct {
 	sessionFile         string
 	styles              *Styles
 	hasFocus            bool // tracks whether the terminal has application focus
+
+	// Loading state for async session initialization
+	isLoading      bool
+	loadingMessage string
 }
 
 // NewTerminal creates a new Terminal model
@@ -60,8 +65,43 @@ func NewTerminal(session *agentpkg.Session, out *outputWriter, inputStream *stre
 	return m
 }
 
+// NewLoadingTerminal creates a Terminal in loading state for async session initialization.
+// The terminal starts with a loading message and transitions to normal state when the
+// sessionLoadedMsg is received.
+func NewLoadingTerminal(inputStream *stream.ChanInput, out *outputWriter, sessionFile string, appCfg *app.Config) *Terminal {
+	styles := DefaultStyles()
+
+	m := &Terminal{
+		session:        nil, // Will be set when session loads
+		out:            out,
+		streamInput:    inputStream,
+		appConfig:      appCfg,
+		display:        NewDisplayModel(out.windowBuffer, styles),
+		input:          NewInputModel(styles),
+		status:         NewStatusModel(styles),
+		modelSelector:  NewModelSelector(styles),
+		windowWidth:    DefaultWidth,
+		styles:         styles,
+		focusedWindow:  "input",
+		sessionFile:    sessionFile,
+		hasFocus:       true,
+		isLoading:      true,
+		loadingMessage: "Loading session...",
+	}
+
+	return m
+}
+
 // Init initializes the Terminal
 func (m *Terminal) Init() tea.Cmd {
+	// If we're in loading state, return tick immediately
+	// The session loading command is handled separately
+	if m.isLoading {
+		return tea.Tick(TickInterval, func(t time.Time) tea.Msg {
+			return tickMsg{}
+		})
+	}
+
 	// Start the periodic tick loop immediately so we can process
 	// session updates (e.g. model switches) even before the user
 	// submits the first prompt.
@@ -74,8 +114,23 @@ func (m *Terminal) Init() tea.Cmd {
 
 type tickMsg struct{}
 
+// sessionLoadedMsg is sent when async session loading completes
+type sessionLoadedMsg struct {
+	session       *agentpkg.Session
+	sessionFile   string
+	activeModel   *agentpkg.ModelConfig
+	models        []agentpkg.ModelInfo
+	activeModelID string
+	err           error
+}
+
 // Update routes messages; KeyMsg first for responsive input (see PERFORMANCE_ANALYSIS.md).
 func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Handle session loaded message first (for async initialization)
+	if sl, ok := msg.(sessionLoadedMsg); ok {
+		return m.handleSessionLoaded(sl)
+	}
+
 	// Process user-facing messages FIRST to avoid blocking keyboard input.
 	// Display updates run after so keypress returns immediately.
 	switch msg := msg.(type) {
@@ -177,6 +232,45 @@ func (m *Terminal) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 	m.updateDisplayHeight()
 	m.display.centerWelcomeText()
 	return m, nil
+}
+
+// handleSessionLoaded handles the async session loading completion
+func (m *Terminal) handleSessionLoaded(msg sessionLoadedMsg) (tea.Model, tea.Cmd) {
+	if msg.err != nil {
+		// Loading failed - show error and quit
+		m.isLoading = false
+		m.loadingMessage = fmt.Sprintf("Error loading session: %v", msg.err)
+		return m, tea.Quit
+	}
+
+	// Session loaded successfully
+	m.session = msg.session
+	m.sessionFile = msg.sessionFile
+	m.isLoading = false
+
+	// Initialize model selector from loaded models
+	if len(msg.models) > 0 {
+		m.modelSelector.LoadModels(msg.models, msg.activeModelID)
+	}
+
+	// Apply active model if needed
+	if msg.activeModel != nil && m.appConfig.Model == nil {
+		m.applyModelSwitch(msg.activeModel)
+	}
+
+	// Update display with any loaded messages
+	if m.out.windowBuffer.GetWindowCount() > 0 {
+		m.status.SetStatus(m.out.status)
+		m.updateDisplayHeight()
+		if m.display.shouldFollow() {
+			m.display.SetCursorToLastWindow()
+		}
+		m.display.updateContent()
+	}
+
+	return m, tea.Tick(TickInterval, func(t time.Time) tea.Msg {
+		return tickMsg{}
+	})
 }
 
 // handleKeyMsg handles keyboard input
@@ -493,6 +587,11 @@ func (m *Terminal) updateDisplayHeight() {
 
 // View renders the Terminal
 func (m *Terminal) View() tea.View {
+	// Show loading screen during async session initialization
+	if m.isLoading {
+		return m.renderLoadingView()
+	}
+
 	var sb strings.Builder
 
 	sb.WriteString(m.display.View().Content)
@@ -526,6 +625,35 @@ func (m *Terminal) View() tea.View {
 	v := tea.NewView(baseContent)
 	v.AltScreen = true
 	v.ReportFocus = true // Enable focus/blur events when user switches applications
+	return v
+}
+
+// renderLoadingView renders a simple loading screen
+func (m *Terminal) renderLoadingView() tea.View {
+	loadingStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("15")).
+		Background(lipgloss.Color("62")).
+		Padding(1, 3).
+		Bold(true)
+
+	msg := m.loadingMessage
+	if msg == "" {
+		msg = "Loading..."
+	}
+
+	// Center the loading message on screen
+	content := loadingStyle.Render(msg)
+
+	// Pad to fill screen
+	lines := strings.Count(content, "\n") + 1
+	height := m.windowHeight - lines
+	if height > 0 {
+		content += strings.Repeat("\n", height)
+	}
+
+	v := tea.NewView(content)
+	v.AltScreen = true
+	v.ReportFocus = true
 	return v
 }
 

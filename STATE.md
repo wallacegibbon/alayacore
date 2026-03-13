@@ -298,6 +298,19 @@ For this project, simplicity is more important than efficiency.
    - Removed unnecessary abstractions: `extractAllMessages` and `extractAssistantMessage`
    - Simplified `summarize()` to directly use `processPromptWithResult`
    - Users can now naturally continue tasks with any prompt (e.g., "continue", "go on")
+
+- ✅ **Async session loading with loading screen**
+  - Terminal initializes immediately with a loading message
+  - Session loads in background goroutine while UI is responsive
+  - Shows "Loading session..." message during initialization
+  - Large session files no longer block terminal startup
+  - Handles errors gracefully (no models configured, etc.) and quits if needed
+  - Added `isLoading` and `loadingMessage` fields to Terminal struct
+  - Added `sessionLoadedMsg` message type for async completion
+  - Added `NewLoadingTerminal()` constructor for loading state
+  - Added `renderLoadingView()` for loading screen rendering
+  - Added `handleSessionLoaded()` to process completion message
+  - Window resize events processed before session loads
    - Complete history maintained for better context preservation and session persistence
 
 ### Architecture
