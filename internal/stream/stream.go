@@ -10,15 +10,17 @@ import (
 	"io"
 )
 
-// Message tags for TLV protocol.
+// Message tags for TLV protocol (2-byte tags).
 const (
-	TagUserText      = 'U' // User text input
-	TagAssistantText = 'A' // Assistant text output
-	TagReasoning     = 'R' // Reasoning/thinking content
-	TagTool          = 'T' // Tool call output
-	TagError         = 'E' // Error messages
-	TagNotify        = 'N' // Notification messages
-	TagSystem        = 'S' // System messages (queue status, model info, etc.)
+	TagUserText      = "TU" // User text input
+	TagAssistantText = "TA" // Assistant text output
+	TagReasoning     = "TR" // Reasoning/thinking content
+	TagToolShow      = "FS" // Tool call output for display (adaptors)
+	TagToolCall      = "FC" // Tool call for session saving/loading
+	TagToolResult    = "FR" // Tool result for session saving/loading
+	TagError         = "ER" // Error messages
+	TagNotify        = "SN" // Notification messages (simple string)
+	TagSystem        = "SD" // System messages (complex data, queue status, model info, etc.)
 )
 
 // ChanInput implements Input using a channel of raw TLV-encoded messages.
@@ -64,38 +66,40 @@ func (i *ChanInput) Emit(data []byte) error {
 }
 
 // EncodeTLV creates a TLV-encoded byte slice.
-func EncodeTLV(tag byte, value string) []byte {
+// Format: [2-byte tag][4-byte length][value]
+func EncodeTLV(tag string, value string) []byte {
 	data := []byte(value)
 	length := int32(len(data))
 
-	msg := make([]byte, 5+length)
-	msg[0] = tag
-	binary.BigEndian.PutUint32(msg[1:], uint32(length))
-	copy(msg[5:], data)
+	msg := make([]byte, 6+length)
+	msg[0] = tag[0]
+	msg[1] = tag[1]
+	binary.BigEndian.PutUint32(msg[2:], uint32(length))
+	copy(msg[6:], data)
 
 	return msg
 }
 
 // EmitTLV writes a TLV-encoded message to the input.
-func (i *ChanInput) EmitTLV(tag byte, value string) error {
+func (i *ChanInput) EmitTLV(tag string, value string) error {
 	return i.Emit(EncodeTLV(tag, value))
 }
 
 // WriteTLV writes a TLV message to the output.
-func WriteTLV(output Output, tag byte, value string) error {
+func WriteTLV(output Output, tag string, value string) error {
 	_, err := output.Write(EncodeTLV(tag, value))
 	return err
 }
 
 // ReadTLV reads a single TLV-framed message from input.
 // It blocks until a full frame has been read or an error occurs.
-func ReadTLV(input Input) (byte, string, error) {
-	header := make([]byte, 5)
+func ReadTLV(input Input) (string, string, error) {
+	header := make([]byte, 6)
 	if _, err := io.ReadFull(input, header); err != nil {
-		return 0, "", err
+		return "", "", err
 	}
-	tag := header[0]
-	length := binary.BigEndian.Uint32(header[1:])
+	tag := string(header[0:2])
+	length := binary.BigEndian.Uint32(header[2:])
 
 	if length == 0 {
 		return tag, "", nil
@@ -103,7 +107,7 @@ func ReadTLV(input Input) (byte, string, error) {
 
 	valueBuf := make([]byte, length)
 	if _, err := io.ReadFull(input, valueBuf); err != nil {
-		return 0, "", err
+		return "", "", err
 	}
 
 	return tag, string(valueBuf), nil

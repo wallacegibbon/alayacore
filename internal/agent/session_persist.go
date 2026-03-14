@@ -87,7 +87,7 @@ func (s *Session) displayAssistantMessage(msg fantasy.Message) {
 			s.Output.Flush()
 		case fantasy.ToolCallPart:
 			if info := formatToolCall(p.ToolName, p.Input); info != "" {
-				stream.WriteTLV(s.Output, stream.TagTool, info)
+				stream.WriteTLV(s.Output, stream.TagToolShow, info)
 				s.Output.Flush()
 			}
 		}
@@ -98,7 +98,7 @@ func (s *Session) displayToolMessage(msg fantasy.Message) {
 	for _, part := range msg.Content {
 		if tc, ok := part.(fantasy.ToolCallPart); ok {
 			if info := formatToolCall(tc.ToolName, tc.Input); info != "" {
-				stream.WriteTLV(s.Output, stream.TagTool, info)
+				stream.WriteTLV(s.Output, stream.TagToolShow, info)
 				s.Output.Flush()
 			}
 		}

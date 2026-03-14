@@ -487,10 +487,10 @@ func TestWindowBufferNonDeltaMessages(t *testing.T) {
 	}
 	// Ensure tags are correct
 	if windows[0].Tag != stream.TagError {
-		t.Errorf("Expected TagError, got %d", windows[0].Tag)
+		t.Errorf("Expected TagError, got %s", windows[0].Tag)
 	}
 	if windows[1].Tag != stream.TagNotify {
-		t.Errorf("Expected TagNotify, got %d", windows[1].Tag)
+		t.Errorf("Expected TagNotify, got %s", windows[1].Tag)
 	}
 }
 

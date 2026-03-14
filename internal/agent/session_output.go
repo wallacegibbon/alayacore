@@ -26,7 +26,7 @@ func (s *Session) writeNotify(msg string) {
 	s.writeGapped(stream.TagNotify, msg)
 }
 
-func (s *Session) writeGapped(tag byte, msg string) {
+func (s *Session) writeGapped(tag string, msg string) {
 	if s.Output == nil {
 		return
 	}
@@ -36,7 +36,7 @@ func (s *Session) writeGapped(tag byte, msg string) {
 
 func (s *Session) writeToolCall(toolName, input, id string) {
 	if value := formatToolCall(toolName, input); value != "" {
-		stream.WriteTLV(s.Output, stream.TagTool, "[:"+id+":]"+value)
+		stream.WriteTLV(s.Output, stream.TagToolShow, "[:"+id+":]"+value)
 	}
 }
 

@@ -112,22 +112,22 @@ func (w *outputWriter) WriteNotify(msg string) {
 
 // processBuffer parses TLV-encoded data from the buffer
 func (w *outputWriter) processBuffer() {
-	for len(w.buffer) >= 5 {
-		tag := w.buffer[0]
-		length := int32(binary.BigEndian.Uint32(w.buffer[1:5]))
+	for len(w.buffer) >= 6 {
+		tag := string(w.buffer[0:2])
+		length := int32(binary.BigEndian.Uint32(w.buffer[2:6]))
 
-		if len(w.buffer) < 5+int(length) {
+		if len(w.buffer) < 6+int(length) {
 			break
 		}
 
-		value := string(w.buffer[5 : 5+length])
+		value := string(w.buffer[6 : 6+length])
 		w.writeColored(tag, value)
-		w.buffer = w.buffer[5+length:]
+		w.buffer = w.buffer[6+length:]
 	}
 }
 
 // writeColored writes styled content based on the TLV tag
-func (w *outputWriter) writeColored(tag byte, value string) {
+func (w *outputWriter) writeColored(tag string, value string) {
 	w.triggerUpdateForTag(tag)
 
 	output := func(style lipgloss.Style, text string) string {
@@ -135,7 +135,7 @@ func (w *outputWriter) writeColored(tag byte, value string) {
 	}
 
 	switch tag {
-	case stream.TagAssistantText, stream.TagReasoning, stream.TagTool:
+	case stream.TagAssistantText, stream.TagReasoning, stream.TagToolShow:
 		// Delta messages with stream ID prefix
 		id, content, ok := w.parseStreamID(value)
 		if !ok {
@@ -149,7 +149,7 @@ func (w *outputWriter) writeColored(tag byte, value string) {
 			styled = output(w.styles.Text, content)
 		case stream.TagReasoning:
 			styled = output(w.styles.Reasoning, content)
-		case stream.TagTool:
+		case stream.TagToolShow:
 			// Check if this is an edit_file with raw diff data
 			if diffPath, diffLines := w.parseRawDiff(content); diffLines != nil {
 				w.windowBuffer.AppendDiff(id, diffPath, diffLines)
@@ -186,9 +186,9 @@ func (w *outputWriter) writeColored(tag byte, value string) {
 
 // triggerUpdateForTag sends an update signal for tags that modify the display
 // Uses throttling to batch rapid updates together
-func (w *outputWriter) triggerUpdateForTag(tag byte) {
+func (w *outputWriter) triggerUpdateForTag(tag string) {
 	switch tag {
-	case stream.TagAssistantText, stream.TagTool, stream.TagReasoning, stream.TagError,
+	case stream.TagAssistantText, stream.TagToolShow, stream.TagReasoning, stream.TagError,
 		stream.TagNotify, stream.TagSystem, stream.TagUserText:
 		w.updateMu.Lock()
 		defer w.updateMu.Unlock()

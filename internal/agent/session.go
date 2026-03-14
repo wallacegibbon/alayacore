@@ -246,7 +246,7 @@ func (s *Session) readFromInput() {
 			return // Input closed
 		}
 		if tag != stream.TagUserText {
-			s.writeError(fmt.Sprintf("Invalid input tag: %c (only %c is allowed)", tag, stream.TagUserText))
+			s.writeError(fmt.Sprintf("Invalid input tag: %s (only %s is allowed)", tag, stream.TagUserText))
 			continue
 		}
 		if len(value) > 0 && value[0] == ':' {

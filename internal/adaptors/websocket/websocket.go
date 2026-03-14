@@ -99,16 +99,16 @@ func readMessages(conn *websocket.Conn, input *stream.ChanInput) {
 
 // parseTLV extracts tag and value from a TLV-encoded message.
 // Returns ok=false if message is too short.
-func parseTLV(message []byte) (tag byte, value string, ok bool) {
-	if len(message) < 5 {
-		return 0, "", false
+func parseTLV(message []byte) (tag string, value string, ok bool) {
+	if len(message) < 6 {
+		return "", "", false
 	}
-	tag = message[0]
-	length := uint32(message[1])<<24 | uint32(message[2])<<16 | uint32(message[3])<<8 | uint32(message[4])
-	if len(message) < 5+int(length) {
-		return 0, "", false
+	tag = string(message[0:2])
+	length := uint32(message[2])<<24 | uint32(message[3])<<16 | uint32(message[4])<<8 | uint32(message[5])
+	if len(message) < 6+int(length) {
+		return "", "", false
 	}
-	return tag, string(message[5 : 5+length]), true
+	return tag, string(message[6 : 6+length]), true
 }
 
 // clientOutput implements stream.Output for a WebSocket connection.

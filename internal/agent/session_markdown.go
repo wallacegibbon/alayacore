@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"charm.land/fantasy"
+	"github.com/alayacore/alayacore/internal/stream"
 	"gopkg.in/yaml.v3"
 )
 
@@ -17,14 +18,8 @@ import (
 
 // Session file uses TLV (Tag-Length-Value) encoding to avoid recursion issues
 // when session files contain tool results that might include session-like content.
-// The format is: 1-byte tag + 4-byte length (big-endian) + content
-const (
-	TagSessionUser       byte = 'U' // User text
-	TagSessionAssistant  byte = 'A' // Assistant text
-	TagSessionReasoning  byte = 'R' // Reasoning/thinking content
-	TagSessionToolCall   byte = 'C' // Tool call from assistant
-	TagSessionToolResult byte = 'T' // Tool result
-)
+// The format is: 2-byte tag + 4-byte length (big-endian) + content
+// Tags are shared with stream package for consistency.
 
 // Deprecated: old NUL-based separator (kept for backward compat during migration)
 const msgSep = "\x00"
@@ -58,14 +53,14 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 		for _, part := range msg.Content {
 			switch p := part.(type) {
 			case fantasy.TextPart:
-				tag := TagSessionUser
+				tag := stream.TagUserText
 				if msg.Role == fantasy.MessageRoleAssistant {
-					tag = TagSessionAssistant
+					tag = stream.TagAssistantText
 				}
 				writeTLV(&binaryBuf, tag, p.Text)
 
 			case fantasy.ReasoningPart:
-				writeTLV(&binaryBuf, TagSessionReasoning, p.Text)
+				writeTLV(&binaryBuf, stream.TagReasoning, p.Text)
 
 			case fantasy.ToolCallPart:
 				// Encode tool call as JSON
@@ -78,7 +73,7 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 				if err != nil {
 					return nil, fmt.Errorf("failed to marshal tool call: %w", err)
 				}
-				writeTLV(&binaryBuf, TagSessionToolCall, string(jsonData))
+				writeTLV(&binaryBuf, stream.TagToolCall, string(jsonData))
 
 			case fantasy.ToolResultPart:
 				// Encode tool result as JSON
@@ -90,7 +85,7 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 				if err != nil {
 					return nil, fmt.Errorf("failed to marshal tool result: %w", err)
 				}
-				writeTLV(&binaryBuf, TagSessionToolResult, string(jsonData))
+				writeTLV(&binaryBuf, stream.TagToolResult, string(jsonData))
 			}
 		}
 	}
@@ -99,13 +94,14 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 	return []byte(buf.String()), nil
 }
 
-// writeTLV writes a TLV-encoded entry with separator: \n\n + 1-byte tag + 4-byte length + content
-func writeTLV(buf *strings.Builder, tag byte, content string) {
+// writeTLV writes a TLV-encoded entry with separator: \n\n + 2-byte tag + 4-byte length + content
+func writeTLV(buf *strings.Builder, tag string, content string) {
 	data := []byte(content)
 	length := int32(len(data))
 
 	buf.WriteString("\n\n") // Separator for readability
-	buf.WriteByte(tag)
+	buf.WriteByte(tag[0])
+	buf.WriteByte(tag[1])
 	binary.Write(buf, binary.BigEndian, length)
 	buf.Write(data)
 }
@@ -199,14 +195,15 @@ func parseMessagesTLV(body string) ([]fantasy.Message, error) {
 			}
 		}
 
-		// Read tag
-		tag, err := reader.ReadByte()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
+		// Read tag (2 bytes)
+		tagBytes := make([]byte, 2)
+		if _, err := io.ReadFull(reader, tagBytes); err != nil {
+			if err == io.EOF {
+				break
+			}
 			return nil, fmt.Errorf("failed to read tag: %w", err)
 		}
+		tag := string(tagBytes)
 
 		// Read length (4 bytes big-endian)
 		var length int32
@@ -231,21 +228,21 @@ func parseMessagesTLV(body string) ([]fantasy.Message, error) {
 		newMessage := false
 
 		switch tag {
-		case TagSessionUser:
+		case stream.TagUserText:
 			newMessage = true
 			msgRole = fantasy.MessageRoleUser
 			msgPart = fantasy.TextPart{Text: string(content)}
 
-		case TagSessionAssistant:
+		case stream.TagAssistantText:
 			newMessage = true
 			msgRole = fantasy.MessageRoleAssistant
 			msgPart = fantasy.TextPart{Text: string(content)}
 
-		case TagSessionReasoning:
+		case stream.TagReasoning:
 			msgRole = fantasy.MessageRoleAssistant
 			msgPart = fantasy.ReasoningPart{Text: string(content)}
 
-		case TagSessionToolCall:
+		case stream.TagToolCall:
 			msgRole = fantasy.MessageRoleAssistant
 			var tc toolCallData
 			if err := json.Unmarshal(content, &tc); err != nil {
@@ -257,7 +254,7 @@ func parseMessagesTLV(body string) ([]fantasy.Message, error) {
 				Input:      tc.Input,
 			}
 
-		case TagSessionToolResult:
+		case stream.TagToolResult:
 			msgRole = fantasy.MessageRoleTool
 			var tr toolResultData
 			if err := json.Unmarshal(content, &tr); err != nil {
@@ -269,7 +266,7 @@ func parseMessagesTLV(body string) ([]fantasy.Message, error) {
 			}
 
 		default:
-			return nil, fmt.Errorf("unknown tag: %d (%c)", tag, tag)
+			return nil, fmt.Errorf("unknown tag: %s", tag)
 		}
 
 		// Create new message or append to current

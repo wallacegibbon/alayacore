@@ -14,7 +14,7 @@ const fullRebuild = -2 // dirtyIndex value meaning all windows need re-render
 // Window represents a single display window with border and content.
 type Window struct {
 	ID      string         // stream ID or generated unique ID
-	Tag     byte           // TLV tag that created this window
+	Tag     string         // TLV tag that created this window
 	Content string         // accumulated content (styled)
 	Style   lipgloss.Style // border style (dimmed)
 	Wrapped bool           // true if window is in wrapped (3-row) mode
@@ -106,7 +106,7 @@ func (wb *WindowBuffer) Width() int {
 // or creates a new window if id not found.
 // tag is the TLV tag, content is the styled string (already styled by writeColored).
 // Reasoning windows are wrapped by default.
-func (wb *WindowBuffer) AppendOrUpdate(id string, tag byte, content string) {
+func (wb *WindowBuffer) AppendOrUpdate(id string, tag string, content string) {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 
@@ -143,7 +143,7 @@ func (wb *WindowBuffer) AppendDiff(id string, path string, lines []DiffLinePair)
 	// Create window with diff
 	window := &Window{
 		ID:    id,
-		Tag:   stream.TagTool,
+		Tag:   stream.TagToolShow,
 		Style: wb.borderStyle,
 		Diff:  diff,
 	}
