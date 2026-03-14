@@ -77,7 +77,10 @@ For this project, simplicity is more important than efficiency.
   - Test coverage for parsing, discovery, and activation
 - ✅ IOStream abstraction layer
   - Input/Output interfaces in internal/stream/stream.go
-  - TLV protocol (TagTextAssistant="TA", TagFunctionShow="FS", TagTextReasoning="TR", TagSystemError="SE", TagSystemNotify="SN", TagSystemData="SD", TagTextUser="TU")
+  - TLV protocol with 2-byte tags:
+    - Text: TagTextUser="TU", TagTextAssistant="TA", TagTextReasoning="TR"
+    - Function: TagFunctionShow="FS", TagFunctionCall="FC", TagFunctionResult="FR"
+    - System: TagSystemError="SE", TagSystemNotify="SN", TagSystemData="SD"
   - Buffered reads/writes with Flush() method
   - ChanInput helper for channel-based input with configurable buffer
   - WriteTLV/ReadTLV functions for encoding/decoding (ReadTLV uses io.ReadFull to avoid partial frames)
@@ -315,8 +318,11 @@ For this project, simplicity is more important than efficiency.
 - **Tools**: read_file, edit_file, write_file, activate_skill, posix_shell
 - **Framework**: charm.land/fantasy
 - **UI Styling**: Raw ANSI escape codes (lightweight, no padding)
-- **Stream Protocol**: TLV (Tag-Length-Value) for structured output
-  - Session-to-user: TagTextAssistant, TagFunctionShow, TagTextReasoning, TagSystemError, TagSystemData (JSON), TagSystemNotify, TagTextUser
+- **Stream Protocol**: TLV (Tag-Length-Value) for structured output with 2-byte tags:
+  - Text: TagTextUser, TagTextAssistant, TagTextReasoning
+  - Function: TagFunctionShow, TagFunctionCall, TagFunctionResult
+  - System: TagSystemError, TagSystemNotify, TagSystemData (JSON)
+  - Session-to-user: TagTextAssistant, TagFunctionShow, TagTextReasoning, TagSystemError, TagSystemData, TagSystemNotify
   - User-to-session: TagTextUser
   - Session validates and unwraps user TLV messages
   - TagSystemData contains JSON-encoded SystemInfo struct with token usage, queue, and model info:

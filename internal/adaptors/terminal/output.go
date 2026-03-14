@@ -135,8 +135,8 @@ func (w *outputWriter) writeColored(tag string, value string) {
 	}
 
 	switch tag {
+	// Text content tags (delta messages with stream ID prefix)
 	case stream.TagTextAssistant, stream.TagTextReasoning, stream.TagFunctionShow:
-		// Delta messages with stream ID prefix
 		id, content, ok := w.parseStreamID(value)
 		if !ok {
 			// Should not happen, but fallback
@@ -159,6 +159,7 @@ func (w *outputWriter) writeColored(tag string, value string) {
 		}
 		w.windowBuffer.AppendOrUpdate(id, tag, styled)
 
+	// System tags
 	case stream.TagSystemError:
 		id := w.generateWindowID()
 		styled := output(w.styles.Error, value)
@@ -173,6 +174,7 @@ func (w *outputWriter) writeColored(tag string, value string) {
 		w.handleSystemTag(value)
 		return
 
+	// User text tag
 	case stream.TagTextUser:
 		id := w.generateWindowID()
 		styled := strings.TrimRight(w.styles.Prompt.Render("> ")+w.styles.UserInput.Render(value), " ")
@@ -188,8 +190,11 @@ func (w *outputWriter) writeColored(tag string, value string) {
 // Uses throttling to batch rapid updates together
 func (w *outputWriter) triggerUpdateForTag(tag string) {
 	switch tag {
-	case stream.TagTextAssistant, stream.TagFunctionShow, stream.TagTextReasoning, stream.TagSystemError,
-		stream.TagSystemNotify, stream.TagSystemData, stream.TagTextUser:
+	// Text content tags
+	case stream.TagTextAssistant, stream.TagTextReasoning, stream.TagTextUser,
+		stream.TagFunctionShow,
+	// System tags
+		stream.TagSystemError, stream.TagSystemNotify, stream.TagSystemData:
 		w.updateMu.Lock()
 		defer w.updateMu.Unlock()
 

@@ -205,14 +205,17 @@ A Window Cursor highlights one window with a bright border. Use `j`/`k` to navig
 Adaptors communicate with the session through TLV messages, ensuring clean separation:
 
 ```
-┌──────────────┐    TLV Messages      ┌──────────────┐
-│   Adaptor    │ ◄─────────────────► │    Session   │
-│ (Terminal/   │    TagTextUser "TU"  │              │
-│  WebSocket)  │    TagSystemData "SD"│              │
-│              │    TagSystemNotify "SN" │           │
-│              │    TagSystemError "SE" │            │
-│              │    ...               │              │
-└──────────────┘                      └──────────────┘
+┌──────────────┐    TLV Messages          ┌──────────────┐
+│   Adaptor    │ ◄──────────────────────► │   Session    │
+│ (Terminal/   │    Text:                 │              │
+│  WebSocket)  │      TagTextUser "TU"    │              │
+│              │    Function:             │              │
+│              │      TagFunctionShow "FS"│              │
+│              │    System:               │              │
+│              │      TagSystemData "SD"  │              │
+│              │      TagSystemNotify "SN"│              │
+│              │      TagSystemError "SE" │              │
+└──────────────┘                          └──────────────┘
        │
        └── Only calls SwitchModel() when responding to
            TagSystemData with ActiveModelConfig (requires

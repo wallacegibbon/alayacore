@@ -52,6 +52,7 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 	for _, msg := range data.Messages {
 		for _, part := range msg.Content {
 			switch p := part.(type) {
+			// Text content tags
 			case fantasy.TextPart:
 				tag := stream.TagTextUser
 				if msg.Role == fantasy.MessageRoleAssistant {
@@ -62,6 +63,7 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 			case fantasy.ReasoningPart:
 				writeTLV(&binaryBuf, stream.TagTextReasoning, p.Text)
 
+			// Function tags
 			case fantasy.ToolCallPart:
 				// Encode tool call as JSON
 				tc := toolCallData{
@@ -228,6 +230,7 @@ func parseMessagesTLV(body string) ([]fantasy.Message, error) {
 		newMessage := false
 
 		switch tag {
+		// Text content tags
 		case stream.TagTextUser:
 			newMessage = true
 			msgRole = fantasy.MessageRoleUser
@@ -242,6 +245,7 @@ func parseMessagesTLV(body string) ([]fantasy.Message, error) {
 			msgRole = fantasy.MessageRoleAssistant
 			msgPart = fantasy.ReasoningPart{Text: string(content)}
 
+		// Function tags
 		case stream.TagFunctionCall:
 			msgRole = fantasy.MessageRoleAssistant
 			var tc toolCallData
