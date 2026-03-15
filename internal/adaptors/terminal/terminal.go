@@ -193,14 +193,14 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Handle model selector input when open
 	if m.modelSelector.IsOpen() {
 		// Handle KeyMsg directly (needed for textinput to work properly)
-		m.modelSelector.HandleKeyMsg(msg)
+		cmd := m.modelSelector.HandleKeyMsg(msg)
 		// Check if a model was selected
 		if m.modelSelector.ConsumeModelSelected() {
 			m.switchToSelectedModel()
 		}
 		// Check if user wants to open model file
 		if m.modelSelector.ConsumeOpenModelFile() {
-			return m, m.openModelConfigFile()
+			return m, tea.Batch(cmd, m.openModelConfigFile())
 		}
 		// Check if user wants to reload models
 		if m.modelSelector.ConsumeReloadModels() {
@@ -215,7 +215,7 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			m.display.updateContent()
 		}
-		return m, nil
+		return m, cmd
 	}
 
 	if cmd, handled := m.handleConfirmDialog(msg); handled {

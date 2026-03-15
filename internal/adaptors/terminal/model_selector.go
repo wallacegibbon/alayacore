@@ -90,7 +90,7 @@ func (ms *ModelSelector) Open() {
 	ms.state = ModelSelectorList
 	// Reset search input and filter
 	ms.searchInput.SetValue("")
-	ms.lastSearchValue = "" // Reset last search value
+	ms.lastSearchValue = "\x00" // Force update by using a value that won't match empty string
 	ms.searchInputFocused = true
 	ms.searchInput.Focus()
 	ms.updateSearchInputStyles()
@@ -144,9 +144,10 @@ func (ms *ModelSelector) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (ms *ModelSelector) updateList(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "tab":
-			// Toggle focus between search input and list
+		keyStr := msg.String()
+
+		// TAB always works to switch focus
+		if keyStr == "tab" {
 			ms.searchInputFocused = !ms.searchInputFocused
 			if ms.searchInputFocused {
 				ms.searchInput.Focus()
@@ -156,7 +157,10 @@ func (ms *ModelSelector) updateList(msg tea.Msg) (tea.Model, tea.Cmd) {
 				ms.updateSearchInputStyles()
 			}
 			return ms, nil
-		case "enter":
+		}
+
+		// ENTER always works to select
+		if keyStr == "enter" {
 			if ms.searchInputFocused {
 				// If search input is focused, enter selects the first model and closes
 				if len(ms.filteredModels) > 0 {
@@ -173,29 +177,17 @@ func (ms *ModelSelector) updateList(msg tea.Msg) (tea.Model, tea.Cmd) {
 				ms.state = ModelSelectorClosed
 			}
 			return ms, nil
-		case "e":
-			// Open model file with $EDITOR
-			ms.openModelFile = true
-			return ms, nil
-		case "r":
-			// Reload models from file
-			ms.reloadModels = true
-			return ms, nil
-		case "esc", "q":
-			ms.state = ModelSelectorClosed
-			return ms, nil
-		case "up", "k":
-			if !ms.searchInputFocused && ms.selectedIdx > 0 {
-				ms.selectedIdx--
+		}
+
+		// When search input is focused, all other keys go to search input
+		// Exception: ESC always closes the selector
+		if ms.searchInputFocused {
+			// ESC always closes the selector
+			if keyStr == "esc" {
+				ms.state = ModelSelectorClosed
+				return ms, nil
 			}
-			return ms, nil
-		case "down", "j":
-			if !ms.searchInputFocused && ms.selectedIdx < len(ms.filteredModels)-1 {
-				ms.selectedIdx++
-			}
-			return ms, nil
-		default:
-			// Character keys and other keys: pass to search input and handle filtering
+
 			oldSearchValue := ms.searchInput.Value()
 			ms.searchInput, _ = ms.searchInput.Update(msg)
 			newSearchValue := ms.searchInput.Value()
@@ -211,6 +203,31 @@ func (ms *ModelSelector) updateList(msg tea.Msg) (tea.Model, tea.Cmd) {
 						ms.selectedIdx = 0
 					}
 				}
+			}
+			return ms, nil
+		}
+
+		// When list is focused, handle navigation and commands
+		switch keyStr {
+		case "e":
+			// Open model file with $EDITOR
+			ms.openModelFile = true
+			return ms, nil
+		case "r":
+			// Reload models from file
+			ms.reloadModels = true
+			return ms, nil
+		case "esc", "q":
+			ms.state = ModelSelectorClosed
+			return ms, nil
+		case "up", "k":
+			if ms.selectedIdx > 0 {
+				ms.selectedIdx--
+			}
+			return ms, nil
+		case "down", "j":
+			if ms.selectedIdx < len(ms.filteredModels)-1 {
+				ms.selectedIdx++
 			}
 			return ms, nil
 		}
@@ -362,7 +379,11 @@ func (ms *ModelSelector) renderList() string {
 	sb.WriteString("\n")
 	sb.WriteString(ms.styles.System.Render("─── Commands ───"))
 	sb.WriteString("\n")
-	sb.WriteString(ms.styles.System.Render("tab: switch focus  e: edit file  r: reload  enter: select  esc: close"))
+	if ms.searchInputFocused {
+		sb.WriteString(ms.styles.System.Render("tab: switch focus  enter: select first"))
+	} else {
+		sb.WriteString(ms.styles.System.Render("tab: switch focus  e: edit file  r: reload  enter: select  esc/q: close"))
+	}
 
 	return sb.String()
 }
@@ -490,20 +511,21 @@ func (ms *ModelSelector) SetWidth(width int) {
 }
 
 // HandleKeyMsg handles key events as tea.KeyMsg (for textinput integration)
-func (ms *ModelSelector) HandleKeyMsg(msg tea.KeyMsg) bool {
+// Returns a command that should be executed by the Terminal
+func (ms *ModelSelector) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	if ms.state == ModelSelectorClosed {
 		if msg.String() == "ctrl+l" {
 			ms.Open()
-			return true
+			return nil
 		}
-		return false
+		return nil
 	}
 
 	switch ms.state {
 	case ModelSelectorList:
 		return ms.handleListKeyMsg(msg)
 	}
-	return false
+	return nil
 }
 
 // HandleKey handles key events directly (for integration with Terminal)
@@ -523,8 +545,8 @@ func (ms *ModelSelector) HandleKey(key string) bool {
 	return false
 }
 
-// handleListKeyMsg handles KeyMsg in list mode, returns true if handled
-func (ms *ModelSelector) handleListKeyMsg(msg tea.KeyMsg) bool {
+// handleListKeyMsg handles KeyMsg in list mode, returns a command
+func (ms *ModelSelector) handleListKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	key := msg.String()
 
 	// TAB: Switch focus between search input and list
@@ -532,24 +554,28 @@ func (ms *ModelSelector) handleListKeyMsg(msg tea.KeyMsg) bool {
 		ms.searchInputFocused = !ms.searchInputFocused
 		if ms.searchInputFocused {
 			ms.searchInput.Focus()
+			ms.updateSearchInputStyles()
 		} else {
 			ms.searchInput.Blur()
+			ms.updateSearchInputStyles()
 		}
-		return true
+		return nil
 	}
 
 	// If search input is focused, let it handle the key
 	if ms.searchInputFocused {
+		// ESC always closes the selector
+		if key == "esc" {
+			ms.state = ModelSelectorClosed
+			return nil
+		}
+
 		// Check search value before update
 		oldSearchValue := ms.searchInput.Value()
 
-		// Update search input
+		// Update search input and get the command
 		var cmd tea.Cmd
 		ms.searchInput, cmd = ms.searchInput.Update(msg)
-		if cmd != nil {
-			// Execute the command if any
-			cmd()
-		}
 
 		// Only update filtered models if search value actually changed
 		newSearchValue := ms.searchInput.Value()
@@ -565,9 +591,8 @@ func (ms *ModelSelector) handleListKeyMsg(msg tea.KeyMsg) bool {
 			}
 		}
 
-		// Handle special keys
-		switch key {
-		case "enter":
+		// Handle enter key to select first model
+		if key == "enter" {
 			// Select first filtered model when enter is pressed in search
 			if len(ms.filteredModels) > 0 {
 				ms.selectedIdx = 0
@@ -575,12 +600,11 @@ func (ms *ModelSelector) handleListKeyMsg(msg tea.KeyMsg) bool {
 				ms.modelJustSelected = true
 				ms.state = ModelSelectorClosed
 			}
-			return true
-		case "esc", "q":
-			ms.state = ModelSelectorClosed
-			return true
+			return nil
 		}
-		return true
+
+		// Return the command from textinput for proper rendering
+		return cmd
 	}
 
 	// List is focused - handle navigation and other keys
@@ -589,32 +613,32 @@ func (ms *ModelSelector) handleListKeyMsg(msg tea.KeyMsg) bool {
 		if ms.selectedIdx > 0 {
 			ms.selectedIdx--
 		}
-		return true
+		return nil
 	case "down", "j":
 		if ms.selectedIdx < len(ms.filteredModels)-1 {
 			ms.selectedIdx++
 		}
-		return true
+		return nil
 	case "enter":
 		if len(ms.filteredModels) > 0 && ms.selectedIdx >= 0 {
 			ms.activeModel = &ms.filteredModels[ms.selectedIdx]
 			ms.modelJustSelected = true
 			ms.state = ModelSelectorClosed
 		}
-		return true
+		return nil
 	case "e":
 		// Open model file with $EDITOR
 		ms.openModelFile = true
-		return true
+		return nil
 	case "r":
 		// Reload models from file
 		ms.reloadModels = true
-		return true
+		return nil
 	case "esc", "q":
 		ms.state = ModelSelectorClosed
-		return true
+		return nil
 	}
-	return false
+	return nil
 }
 
 // handleListKey handles keys in list mode, returns true if handled
