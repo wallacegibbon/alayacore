@@ -385,6 +385,31 @@ func (ms *ModelSelector) RenderOverlay(baseContent string, screenWidth, screenHe
 
 // --- Helpers ---
 
+// fuzzyMatch checks if all characters in the search term appear in order
+// (but not necessarily consecutively) in the target string.
+// Both strings should be lowercase for case-insensitive matching.
+//
+// Examples:
+//   - fuzzyMatch("zhipuglm5", "zhipu / glm-5") → true (all chars appear in order)
+//   - fuzzyMatch("glm5", "zhipu / glm-5") → true (partial match)
+//   - fuzzyMatch("glmzhipu", "zhipu / glm-5") → false (wrong order)
+func fuzzyMatch(search, target string) bool {
+	if search == "" {
+		return true
+	}
+	if len(search) > len(target) {
+		return false
+	}
+
+	searchIdx := 0
+	for i := 0; i < len(target) && searchIdx < len(search); i++ {
+		if search[searchIdx] == target[i] {
+			searchIdx++
+		}
+	}
+	return searchIdx == len(search)
+}
+
 func (ms *ModelSelector) updateFilteredModels() {
 	search := ms.searchInput.Value()
 	if search == ms.lastSearchValue {
@@ -399,10 +424,10 @@ func (ms *ModelSelector) updateFilteredModels() {
 		term := strings.ToLower(search)
 		ms.filteredModels = ms.filteredModels[:0]
 		for _, m := range ms.models {
-			if strings.Contains(m.nameLower, term) ||
-				strings.Contains(m.protocolTypeLower, term) ||
-				strings.Contains(m.modelNameLower, term) ||
-				strings.Contains(m.baseURLLower, term) {
+			if fuzzyMatch(term, m.nameLower) ||
+				fuzzyMatch(term, m.protocolTypeLower) ||
+				fuzzyMatch(term, m.modelNameLower) ||
+				fuzzyMatch(term, m.baseURLLower) {
 				ms.filteredModels = append(ms.filteredModels, m)
 			}
 		}
