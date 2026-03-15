@@ -264,6 +264,25 @@ func (m *DisplayModel) EnsureCursorVisible() {
 	}
 }
 
+// ValidateCursor ensures the window cursor is within valid bounds and visible.
+// This should be called after resize events when window layout changes.
+func (m *DisplayModel) ValidateCursor() {
+	windowCount := m.windowBuffer.GetWindowCount()
+
+	// Clamp cursor to valid range
+	if m.windowCursor >= windowCount {
+		m.windowCursor = windowCount - 1
+	}
+	if m.windowCursor < -1 {
+		m.windowCursor = -1
+	}
+
+	// Ensure cursor is visible if we have a valid cursor
+	if m.windowCursor >= 0 && windowCount > 0 {
+		m.EnsureCursorVisible()
+	}
+}
+
 // SetCursorToLastWindow sets the cursor to the last window.
 func (m *DisplayModel) SetCursorToLastWindow() {
 	windowCount := m.windowBuffer.GetWindowCount()

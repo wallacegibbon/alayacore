@@ -431,5 +431,15 @@ main.go        - alayacore entry point
   - This ensures `shouldFollow()` returns false, preserving the scroll position across focus switches
   - Located in `internal/adaptors/terminal/display.go` (new method) and `internal/adaptors/terminal/terminal.go` (key handling)
 
+- ✅ **Fixed window cursor going out of screen during terminal resize**
+  - Problem: When user resizes the terminal window, the window cursor could point to an invalid window index or a window outside the visible viewport
+  - Root cause: Window heights change during resize (text re-wrapping), but cursor position wasn't validated
+  - Solution: Added `ValidateCursor()` method to DisplayModel that:
+    - Clamps cursor index to valid range [-1, windowCount-1]
+    - Ensures cursor window is visible on screen (calls `EnsureCursorVisible()`)
+  - Called from `handleWindowSize()` in terminal.go after updating display height
+  - Added tests: `TestValidateCursor_ClampsOutOfRangeCursor`, `TestValidateCursor_HandlesNegativeCursor`, `TestValidateCursor_HandlesEmptyBuffer`, `TestValidateCursor_KeepsValidCursor`
+  - Located in `internal/adaptors/terminal/display.go` (new method) and `internal/adaptors/terminal/terminal.go` (resize handler)
+
 ## Next Steps
 - Add more sophisticated skills built on posix_shell tool

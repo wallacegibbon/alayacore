@@ -147,6 +147,9 @@ func (m *Terminal) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 	m.modelSelector.SetSize(msg.Width, msg.Height)
 	m.updateDisplayHeight()
 
+	// Validate cursor position after resize (window heights may have changed)
+	m.display.ValidateCursor()
+
 	return m, nil
 }
 
