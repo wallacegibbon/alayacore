@@ -233,11 +233,11 @@ func (w *outputWriter) handleSystemTag(value string) {
 		// If full config is provided, store it for the terminal to pick up
 		if info.ActiveModelConfig != nil {
 			w.pendingModelConfig = info.ActiveModelConfig
-			// Signal update so tick handler picks up the model switch
-			select {
-			case w.updateChan <- struct{}{}:
-			default:
-			}
+		}
+		// Signal update so tick handler picks up model changes
+		select {
+		case w.updateChan <- struct{}{}:
+		default:
 		}
 	}
 }
