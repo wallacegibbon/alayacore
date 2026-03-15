@@ -262,6 +262,13 @@ For this project, simplicity is more important than efficiency.
   - Removed related tests: `TestGetSessionsDir`, `TestGenerateSessionFilename`, `TestLoadLatestSession_EmptyDir`, `TestLoadLatestSession_WithFiles`
   - Cleaned up unused imports (`sort`, `time`)
   - Session persistence now handled via explicit file paths only (no directory scanning)
+- ✅ **Session persistence only saves messages and updated_at**
+  - Removed model_name, base_url (sessions can work with multiple models)
+  - Removed total_tokens, context_tokens (transient state that changes with `:summarize`)
+  - Removed created_at (not useful)
+  - Kept updated_at (useful for knowing when session was last saved)
+  - Updated docs/sessions.md to clarify what is and isn't saved
+  - Model selection is controlled by runtime.conf, not session files
 - ✅ **Migrated to config file-only model configuration**
   - Removed CLI flags: --api-key, --base-url, --model, --type
   - Model configuration now only supported via ~/.alayacore/model.conf file

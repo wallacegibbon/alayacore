@@ -26,10 +26,8 @@ func (s *Session) saveSessionToFile(path string) error {
 	defer s.mu.Unlock()
 
 	data := SessionData{
-		Messages:      s.Messages,
-		TotalSpent:    s.TotalSpent,
-		ContextTokens: s.ContextTokens,
-		UpdatedAt:     time.Now(),
+		Messages:  s.Messages,
+		UpdatedAt: time.Now(),
 	}
 
 	raw, err := formatSessionMarkdown(&data)

@@ -35,19 +35,15 @@ func TestSaveAndLoadSession(t *testing.T) {
 
 	// Create test session data
 	sessionData := &SessionData{
-		Messages:      []fantasy.Message{},
-		TotalSpent:    fantasy.Usage{TotalTokens: 100},
-		ContextTokens: 50,
+		Messages: []fantasy.Message{},
 	}
 
 	// Create a minimal session for testing
 	session := &Session{
-		Messages:      sessionData.Messages,
-		TotalSpent:    sessionData.TotalSpent,
-		ContextTokens: sessionData.ContextTokens,
-		Input:         &stream.NopInput{},
-		Output:        &stream.NopOutput{},
-		taskQueue:     make([]QueueItem, 0),
+		Messages:  sessionData.Messages,
+		Input:     &stream.NopInput{},
+		Output:    &stream.NopOutput{},
+		taskQueue: make([]QueueItem, 0),
 	}
 
 	// Save session
@@ -67,12 +63,8 @@ func TestSaveAndLoadSession(t *testing.T) {
 	}
 
 	// Verify data
-	if loadedData.TotalSpent.TotalTokens != sessionData.TotalSpent.TotalTokens {
-		t.Errorf("TotalTokens mismatch: got %d, want %d", loadedData.TotalSpent.TotalTokens, sessionData.TotalSpent.TotalTokens)
-	}
-
-	if loadedData.ContextTokens != sessionData.ContextTokens {
-		t.Errorf("ContextTokens mismatch: got %d, want %d", loadedData.ContextTokens, sessionData.ContextTokens)
+	if len(loadedData.Messages) != len(sessionData.Messages) {
+		t.Errorf("Messages mismatch: got %d, want %d", len(loadedData.Messages), len(sessionData.Messages))
 	}
 }
 
@@ -181,11 +173,9 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 				},
 			},
 		},
-		TotalSpent:    fantasy.Usage{TotalTokens: 250, InputTokens: 100, OutputTokens: 150},
-		ContextTokens: 200,
-		Input:         &stream.NopInput{},
-		Output:        &stream.NopOutput{},
-		taskQueue:     make([]QueueItem, 0),
+		Input:     &stream.NopInput{},
+		Output:    &stream.NopOutput{},
+		taskQueue: make([]QueueItem, 0),
 	}
 
 	// Save
@@ -197,14 +187,6 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 	loaded, err := LoadSession(sessionPath)
 	if err != nil {
 		t.Fatalf("LoadSession failed: %v", err)
-	}
-
-	// Verify metadata
-	if loaded.TotalSpent.TotalTokens != session.TotalSpent.TotalTokens {
-		t.Errorf("TotalTokens mismatch: got %d, want %d", loaded.TotalSpent.TotalTokens, session.TotalSpent.TotalTokens)
-	}
-	if loaded.ContextTokens != session.ContextTokens {
-		t.Errorf("ContextTokens mismatch: got %d, want %d", loaded.ContextTokens, session.ContextTokens)
 	}
 
 	// Verify messages - TLV format preserves message structure
@@ -260,10 +242,9 @@ func TestMarkdownFormat_HumanReadable(t *testing.T) {
 				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "I'm doing well, thanks!"}},
 			},
 		},
-		TotalSpent: fantasy.Usage{TotalTokens: 100},
-		Input:      &stream.NopInput{},
-		Output:     &stream.NopOutput{},
-		taskQueue:  make([]QueueItem, 0),
+		Input:     &stream.NopInput{},
+		Output:    &stream.NopOutput{},
+		taskQueue: make([]QueueItem, 0),
 	}
 
 	if err := session.saveSessionToFile(sessionPath); err != nil {
@@ -278,8 +259,8 @@ func TestMarkdownFormat_HumanReadable(t *testing.T) {
 	content := string(raw)
 
 	// Verify YAML frontmatter is human-readable
-	if !strings.Contains(content, "total_tokens:") {
-		t.Error("Missing total_tokens in frontmatter")
+	if !strings.Contains(content, "updated_at:") {
+		t.Error("Missing updated_at in frontmatter")
 	}
 
 	// Verify message content is preserved (after NUL separators)
@@ -831,10 +812,9 @@ func TestTLVFormatRecursionProtection(t *testing.T) {
 				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Here's the file content..."}},
 			},
 		},
-		TotalSpent: fantasy.Usage{TotalTokens: 100},
-		Input:      &stream.NopInput{},
-		Output:     &stream.NopOutput{},
-		taskQueue:  make([]QueueItem, 0),
+		Input:     &stream.NopInput{},
+		Output:    &stream.NopOutput{},
+		taskQueue: make([]QueueItem, 0),
 	}
 
 	// Save

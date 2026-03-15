@@ -31,10 +31,7 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 
 	// Write YAML frontmatter
 	meta := SessionMeta{
-		TotalTokens:   data.TotalSpent.TotalTokens,
-		ContextTokens: data.ContextTokens,
-		CreatedAt:     data.CreatedAt,
-		UpdatedAt:     data.UpdatedAt,
+		UpdatedAt: data.UpdatedAt,
 	}
 
 	metaBytes, err := yaml.Marshal(meta)
@@ -143,10 +140,7 @@ func parseSessionMarkdown(data []byte) (*SessionData, error) {
 	}
 
 	sd := &SessionData{
-		TotalSpent:    fantasy.Usage{TotalTokens: meta.TotalTokens},
-		ContextTokens: meta.ContextTokens,
-		CreatedAt:     meta.CreatedAt,
-		UpdatedAt:     meta.UpdatedAt,
+		UpdatedAt: meta.UpdatedAt,
 	}
 
 	// Parse messages - try TLV first, fall back to legacy format

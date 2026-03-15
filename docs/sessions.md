@@ -14,12 +14,13 @@ AlayaCore allows you to save and restore conversations manually using session fi
 - Message history (user prompts and assistant responses)
 - Reasoning/thinking content
 - Tool calls and their results
-- Token usage statistics (total and context)
-- Provider configuration (BaseURL, ModelName)
+- Last updated timestamp
 
 ## What's Not Saved
 
 - Streamed output display state
+- Model configuration (BaseURL, ModelName) - sessions can work with multiple models during their lifecycle
+- Token usage statistics (total and context) - transient state that changes with `:summarize`
 
 ## Session Commands
 
@@ -54,11 +55,6 @@ Session files use a hybrid format:
 
 ```
 ---
-base_url: https://api.openai.com/v1
-model_name: gpt-4o
-total_tokens: 1234
-context_tokens: 500
-created_at: 2024-01-15T10:30:00Z
 updated_at: 2024-01-15T10:45:00Z
 ---
 

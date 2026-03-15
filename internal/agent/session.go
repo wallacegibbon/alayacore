@@ -107,19 +107,13 @@ type Session struct {
 
 // SessionMeta is the YAML frontmatter metadata.
 type SessionMeta struct {
-	TotalTokens   int64     `yaml:"total_tokens"`
-	ContextTokens int64     `yaml:"context_tokens"`
-	CreatedAt     time.Time `yaml:"created_at"`
-	UpdatedAt     time.Time `yaml:"updated_at"`
+	UpdatedAt time.Time `yaml:"updated_at"`
 }
 
 // SessionData is the persisted form of a Session.
 type SessionData struct {
-	Messages      []fantasy.Message
-	TotalSpent    fantasy.Usage
-	ContextTokens int64
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	Messages  []fantasy.Message
+	UpdatedAt time.Time
 }
 
 // ============================================================================
@@ -166,8 +160,6 @@ func RestoreFromSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTo
 	s := &Session{
 		Messages:       data.Messages,
 		SessionFile:    sessionFile,
-		TotalSpent:     data.TotalSpent,
-		ContextTokens:  data.ContextTokens,
 		ContextLimit:   contextLimit,
 		Input:          input,
 		Output:         output,
