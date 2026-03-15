@@ -441,5 +441,12 @@ main.go        - alayacore entry point
   - Added tests: `TestValidateCursor_ClampsOutOfRangeCursor`, `TestValidateCursor_HandlesNegativeCursor`, `TestValidateCursor_HandlesEmptyBuffer`, `TestValidateCursor_KeepsValidCursor`
   - Located in `internal/adaptors/terminal/display.go` (new method) and `internal/adaptors/terminal/terminal.go` (resize handler)
 
+- ✅ **Fixed viewport scroll position corruption after window resize**
+  - Problem: When terminal window is resized, the display jumps to wrong scroll position; pressing 'j' or 'k' keys would fix it
+  - Root cause: In `updateContent()`, after `SetContent()` re-renders content at new width, the code was forcibly restoring the old YOffset value which could be invalid for the new content dimensions
+  - The viewport's `SetContent()` method automatically adjusts YOffset if it exceeds `maxYOffset()` for the new content, but this adjustment was being overwritten
+  - Solution: Removed the code that restores the old YOffset; now we trust `SetContent()`'s automatic adjustment and only call `GotoBottom()` when in follow mode
+  - Located in `internal/adaptors/terminal/display.go` in the `updateContent()` method
+
 ## Next Steps
 - Add more sophisticated skills built on posix_shell tool

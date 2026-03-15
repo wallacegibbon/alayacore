@@ -150,6 +150,9 @@ func (m *Terminal) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 	// Validate cursor position after resize (window heights may have changed)
 	m.display.ValidateCursor()
 
+	// Re-render display content with new width (windowBuffer was marked dirty by SetWindowWidth)
+	m.display.updateContent()
+
 	return m, nil
 }
 

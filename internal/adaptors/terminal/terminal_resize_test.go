@@ -1,6 +1,7 @@
 package terminal
 
 import (
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -74,5 +75,47 @@ func TestTerminalResizeClampsCursor(t *testing.T) {
 	// Should be clamped to last window (index 1)
 	if cursor != 1 {
 		t.Errorf("Expected cursor clamped to 1 (last window), got %d", cursor)
+	}
+}
+
+// TestTerminalResizeUpdatesDisplayContent tests that display content is
+// immediately re-rendered when the terminal is resized (fixes blank display bug).
+func TestTerminalResizeUpdatesDisplayContent(t *testing.T) {
+	// Create a terminal with initial size
+	output := NewTerminalOutput()
+	input := stream.NewChanInput(10)
+	terminal := NewTerminal(nil, output, input, "", nil, 80, 24)
+
+	// Add content that will wrap differently at different widths
+	longContent := "This is a long line of text that will wrap differently depending on the terminal width"
+	output.windowBuffer.AppendOrUpdate("window-1", stream.TagTextAssistant, longContent)
+
+	// Get the initial view
+	terminal.display.updateContent()
+	initialView := terminal.display.View()
+	initialLines := strings.Count(initialView.String(), "\n")
+
+	// Simulate a resize to a narrower width
+	resizeMsg := tea.WindowSizeMsg{
+		Width:  40, // Narrower terminal
+		Height: 24,
+	}
+
+	model, _ := terminal.Update(resizeMsg)
+	terminal = model.(*Terminal)
+
+	// Get the view after resize
+	resizedView := terminal.display.View()
+	resizedLines := strings.Count(resizedView.String(), "\n")
+
+	// The content should have been re-rendered with the new width
+	// With a narrower width, the content should wrap to more lines
+	if resizedLines <= initialLines {
+		t.Errorf("Expected more lines after resize to narrower width (initial: %d, resized: %d)", initialLines, resizedLines)
+	}
+
+	// Verify the window buffer width was updated
+	if output.windowBuffer.Width() != 40 {
+		t.Errorf("Expected window buffer width to be 40, got %d", output.windowBuffer.Width())
 	}
 }

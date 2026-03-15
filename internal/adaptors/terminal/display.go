@@ -115,18 +115,15 @@ func (m *DisplayModel) updateContent() {
 	}
 	m.lastContent = newContent
 
-	// Preserve current scroll position before setting new content
-	// (SetContent may reset YOffset)
-	currentYOffset := m.viewport.YOffset()
-
 	m.viewport.SetContent(newContent)
 
-	// Restore scroll position or sync to bottom based on follow mode
+	// Sync to bottom if in follow mode.
+	// Note: SetContent already adjusts YOffset if it's beyond maxYOffset(),
+	// so we don't need to restore the old YOffset when not in follow mode.
+	// This fixes a bug where restoring an invalid old YOffset after resize
+	// would cause the display to jump to the wrong position.
 	if m.shouldFollow() {
 		m.viewport.GotoBottom()
-	} else {
-		// Restore the preserved scroll position
-		m.viewport.SetYOffset(currentYOffset)
 	}
 }
 
