@@ -227,6 +227,13 @@ func (m *Terminal) handleBlur() (tea.Model, tea.Cmd) {
 func (m *Terminal) handleFocus() (tea.Model, tea.Cmd) {
 	m.hasFocus = true
 
+	// If model selector is open, don't restore focus to main input
+	// The model selector maintains its own focus state
+	if m.modelSelector.IsOpen() {
+		m.display.updateContent()
+		return m, nil
+	}
+
 	// Restore focus to the previously focused window
 	if m.focusedWindow == "display" {
 		m.display.SetDisplayFocused(true)

@@ -242,6 +242,7 @@ For this project, simplicity is more important than efficiency.
   - Input and display windows lose focus when model selector is shown
   - Focus is restored to previously focused window when model selector closes
   - Provides better visual feedback and prevents accidental input
+  - Fixed: Main input no longer gains focus when external editor closes while model selector is open
 
 - ✅ **Model selector keyboard handling improvements**
   - Fixed command handling: `q`, `e`, `r` only work when list is focused, not when search input is focused
