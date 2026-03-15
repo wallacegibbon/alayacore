@@ -35,8 +35,6 @@ func TestSaveAndLoadSession(t *testing.T) {
 
 	// Create test session data
 	sessionData := &SessionData{
-		BaseURL:       "https://api.test.com/v1",
-		ModelName:     "test-model",
 		Messages:      []fantasy.Message{},
 		TotalSpent:    fantasy.Usage{TotalTokens: 100},
 		ContextTokens: 50,
@@ -45,8 +43,6 @@ func TestSaveAndLoadSession(t *testing.T) {
 	// Create a minimal session for testing
 	session := &Session{
 		Messages:      sessionData.Messages,
-		BaseURL:       sessionData.BaseURL,
-		ModelName:     sessionData.ModelName,
 		TotalSpent:    sessionData.TotalSpent,
 		ContextTokens: sessionData.ContextTokens,
 		Input:         &stream.NopInput{},
@@ -71,14 +67,6 @@ func TestSaveAndLoadSession(t *testing.T) {
 	}
 
 	// Verify data
-	if loadedData.BaseURL != sessionData.BaseURL {
-		t.Errorf("BaseURL mismatch: got %s, want %s", loadedData.BaseURL, sessionData.BaseURL)
-	}
-
-	if loadedData.ModelName != sessionData.ModelName {
-		t.Errorf("ModelName mismatch: got %s, want %s", loadedData.ModelName, sessionData.ModelName)
-	}
-
 	if loadedData.TotalSpent.TotalTokens != sessionData.TotalSpent.TotalTokens {
 		t.Errorf("TotalTokens mismatch: got %d, want %d", loadedData.TotalSpent.TotalTokens, sessionData.TotalSpent.TotalTokens)
 	}
@@ -95,7 +83,7 @@ func TestLoadOrNewSession(t *testing.T) {
 	systemPrompt := "test system prompt"
 
 	// Test creating a new session without specifying session file
-	session, sessionFile := LoadOrNewSession(model, baseTools, systemPrompt, "https://api.test.com", "test-model", &stream.NopInput{}, &stream.NopOutput{}, "", 0, "", "", false, "")
+	session, sessionFile := LoadOrNewSession(model, baseTools, systemPrompt, &stream.NopInput{}, &stream.NopOutput{}, "", 0, "", "", false, "")
 	if session == nil {
 		t.Fatal("LoadOrNewSession returned nil session")
 	}
@@ -115,15 +103,9 @@ func TestLoadOrNewSession(t *testing.T) {
 	}
 	defer os.Remove(testFile) // Clean up test file
 
-	// Verify session is properly initialized
-	if session.Agent == nil {
-		t.Error("Session agent not set correctly")
-	}
-	if session.BaseURL != "https://api.test.com" {
-		t.Errorf("Session BaseURL not set correctly: got %s", session.BaseURL)
-	}
-	if session.ModelName != "test-model" {
-		t.Errorf("Session ModelName not set correctly: got %s", session.ModelName)
+	// Agent is lazily initialized, so it should be nil at startup
+	if session.Agent != nil {
+		t.Error("Session agent should be nil at startup (lazy initialization)")
 	}
 }
 
@@ -199,8 +181,6 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 				},
 			},
 		},
-		BaseURL:       "https://api.test.com/v1",
-		ModelName:     "test-model",
 		TotalSpent:    fantasy.Usage{TotalTokens: 250, InputTokens: 100, OutputTokens: 150},
 		ContextTokens: 200,
 		Input:         &stream.NopInput{},
@@ -220,12 +200,6 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 	}
 
 	// Verify metadata
-	if loaded.BaseURL != session.BaseURL {
-		t.Errorf("BaseURL mismatch: got %s, want %s", loaded.BaseURL, session.BaseURL)
-	}
-	if loaded.ModelName != session.ModelName {
-		t.Errorf("ModelName mismatch: got %s, want %s", loaded.ModelName, session.ModelName)
-	}
 	if loaded.TotalSpent.TotalTokens != session.TotalSpent.TotalTokens {
 		t.Errorf("TotalTokens mismatch: got %d, want %d", loaded.TotalSpent.TotalTokens, session.TotalSpent.TotalTokens)
 	}
@@ -286,8 +260,6 @@ func TestMarkdownFormat_HumanReadable(t *testing.T) {
 				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "I'm doing well, thanks!"}},
 			},
 		},
-		BaseURL:    "https://api.example.com/v1",
-		ModelName:  "gpt-4",
 		TotalSpent: fantasy.Usage{TotalTokens: 100},
 		Input:      &stream.NopInput{},
 		Output:     &stream.NopOutput{},
@@ -306,11 +278,8 @@ func TestMarkdownFormat_HumanReadable(t *testing.T) {
 	content := string(raw)
 
 	// Verify YAML frontmatter is human-readable
-	if !strings.Contains(content, "base_url:") {
-		t.Error("Missing base_url in frontmatter")
-	}
-	if !strings.Contains(content, "model_name:") {
-		t.Error("Missing model_name in frontmatter")
+	if !strings.Contains(content, "total_tokens:") {
+		t.Error("Missing total_tokens in frontmatter")
 	}
 
 	// Verify message content is preserved (after NUL separators)
@@ -338,8 +307,6 @@ func TestReasoningOnlyMessage(t *testing.T) {
 				Content: []fantasy.MessagePart{fantasy.ReasoningPart{Text: "The user is asking about Lisp. I should explain it."}},
 			},
 		},
-		BaseURL:   "https://api.example.com/v1",
-		ModelName: "gpt-4",
 		Input:     &stream.NopInput{},
 		Output:    &stream.NopOutput{},
 		taskQueue: make([]QueueItem, 0),
@@ -398,8 +365,6 @@ func TestTextAndReasoningInSameMessage(t *testing.T) {
 				},
 			},
 		},
-		BaseURL:   "https://api.example.com/v1",
-		ModelName: "gpt-4",
 		Input:     &stream.NopInput{},
 		Output:    &stream.NopOutput{},
 		taskQueue: make([]QueueItem, 0),
@@ -455,8 +420,6 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 	// Create a session with a model manager
 	session := &Session{
 		Messages:     []fantasy.Message{},
-		BaseURL:      "https://api.test.com/v1",
-		ModelName:    "test-model",
 		Input:        &stream.NopInput{},
 		Output:       output,
 		taskQueue:    make([]QueueItem, 0),
@@ -868,8 +831,6 @@ func TestTLVFormatRecursionProtection(t *testing.T) {
 				Content: []fantasy.MessagePart{fantasy.TextPart{Text: "Here's the file content..."}},
 			},
 		},
-		BaseURL:    "https://api.test.com/v1",
-		ModelName:  "test-model",
 		TotalSpent: fantasy.Usage{TotalTokens: 100},
 		Input:      &stream.NopInput{},
 		Output:     &stream.NopOutput{},

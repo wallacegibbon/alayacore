@@ -48,7 +48,7 @@ Then simply run:
 alayacore
 ```
 
-The program will load models from the config file and use the last model as default.
+The program will load models from the config file. The active model is determined by `runtime.conf` (persisted across sessions). If no active model is set, the first model in the list is used.
 
 Running with skills:
 ```sh

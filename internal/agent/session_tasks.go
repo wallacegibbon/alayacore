@@ -111,6 +111,15 @@ func (s *Session) setInProgress(v bool) {
 
 func (s *Session) runTask(item QueueItem) {
 	s.sendSystemInfo()
+
+	// Lazily initialize the agent if not already done
+	errMsg := s.ensureAgentInitialized()
+	if errMsg != "" {
+		s.writeError(errMsg)
+		s.sendSystemInfo()
+		return
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	s.mu.Lock()
 	s.cancelCurrent = cancel

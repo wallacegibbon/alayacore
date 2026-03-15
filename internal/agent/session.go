@@ -82,8 +82,6 @@ type SystemInfo struct {
 type Session struct {
 	Messages       []fantasy.Message
 	Agent          fantasy.Agent
-	BaseURL        string
-	ModelName      string
 	SessionFile    string
 	TotalSpent     fantasy.Usage
 	ContextTokens  int64
@@ -109,8 +107,6 @@ type Session struct {
 
 // SessionMeta is the YAML frontmatter metadata.
 type SessionMeta struct {
-	BaseURL       string    `yaml:"base_url"`
-	ModelName     string    `yaml:"model_name"`
 	TotalTokens   int64     `yaml:"total_tokens"`
 	ContextTokens int64     `yaml:"context_tokens"`
 	CreatedAt     time.Time `yaml:"created_at"`
@@ -119,8 +115,6 @@ type SessionMeta struct {
 
 // SessionData is the persisted form of a Session.
 type SessionData struct {
-	BaseURL       string
-	ModelName     string
 	Messages      []fantasy.Message
 	TotalSpent    fantasy.Usage
 	ContextTokens int64
@@ -133,21 +127,19 @@ type SessionData struct {
 // ============================================================================
 
 // LoadOrNewSession loads a session from file or creates a new one.
-func LoadOrNewSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt, baseURL, modelName string, input stream.Input, output stream.Output, sessionFile string, contextLimit int64, modelConfigPath, runtimeConfigPath string, debugAPI bool, proxyURL string) (*Session, string) {
+func LoadOrNewSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt string, input stream.Input, output stream.Output, sessionFile string, contextLimit int64, modelConfigPath, runtimeConfigPath string, debugAPI bool, proxyURL string) (*Session, string) {
 	sessionFile = expandPath(sessionFile)
 	if sessionFile != "" {
 		if data, err := LoadSession(sessionFile); err == nil {
-			return RestoreFromSession(model, baseTools, systemPrompt, baseURL, modelName, input, output, data, sessionFile, contextLimit, modelConfigPath, runtimeConfigPath, debugAPI, proxyURL), sessionFile
+			return RestoreFromSession(model, baseTools, systemPrompt, input, output, data, sessionFile, contextLimit, modelConfigPath, runtimeConfigPath, debugAPI, proxyURL), sessionFile
 		}
 	}
-	return NewSession(model, baseTools, systemPrompt, baseURL, modelName, input, output, sessionFile, contextLimit, modelConfigPath, runtimeConfigPath, debugAPI, proxyURL), sessionFile
+	return NewSession(model, baseTools, systemPrompt, input, output, sessionFile, contextLimit, modelConfigPath, runtimeConfigPath, debugAPI, proxyURL), sessionFile
 }
 
 // NewSession creates a fresh session.
-func NewSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt, baseURL, modelName string, input stream.Input, output stream.Output, sessionFile string, contextLimit int64, modelConfigPath, runtimeConfigPath string, debugAPI bool, proxyURL string) *Session {
+func NewSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt string, input stream.Input, output stream.Output, sessionFile string, contextLimit int64, modelConfigPath, runtimeConfigPath string, debugAPI bool, proxyURL string) *Session {
 	s := &Session{
-		BaseURL:        baseURL,
-		ModelName:      modelName,
 		SessionFile:    sessionFile,
 		ContextLimit:   contextLimit,
 		Input:          input,
@@ -162,18 +154,17 @@ func NewSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, syst
 		taskAvailable:  make(chan struct{}, 1),
 		done:           make(chan struct{}),
 	}
-	s.initAgent(model, baseTools, systemPrompt)
+	s.initModelManager()
+	s.sendSystemInfo()
 	go s.readFromInput()
 	go s.taskRunner()
 	return s
 }
 
 // RestoreFromSession creates a session from saved data.
-func RestoreFromSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt, baseURL, modelName string, input stream.Input, output stream.Output, data *SessionData, sessionFile string, contextLimit int64, modelConfigPath, runtimeConfigPath string, debugAPI bool, proxyURL string) *Session {
+func RestoreFromSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt string, input stream.Input, output stream.Output, data *SessionData, sessionFile string, contextLimit int64, modelConfigPath, runtimeConfigPath string, debugAPI bool, proxyURL string) *Session {
 	s := &Session{
 		Messages:       data.Messages,
-		BaseURL:        baseURL,
-		ModelName:      modelName,
 		SessionFile:    sessionFile,
 		TotalSpent:     data.TotalSpent,
 		ContextTokens:  data.ContextTokens,
@@ -190,7 +181,8 @@ func RestoreFromSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTo
 		taskAvailable:  make(chan struct{}, 1),
 		done:           make(chan struct{}),
 	}
-	s.initAgent(model, baseTools, systemPrompt)
+	s.initModelManager()
+	s.sendSystemInfo()
 	go s.readFromInput()
 	go s.taskRunner()
 
@@ -201,37 +193,61 @@ func RestoreFromSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTo
 	return s
 }
 
-func (s *Session) initAgent(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt string) {
-	// If model is nil and no explicit baseURL provided, try to load from model manager
-	if model == nil && s.BaseURL == "" && s.ModelManager != nil {
-		if activeModel := s.ModelManager.GetActive(); activeModel != nil {
-			// Create provider and model
-			provider, err := app.CreateProvider(
-				activeModel.ProtocolType,
-				activeModel.APIKey,
-				activeModel.BaseURL,
-				s.debugAPI,
-				s.proxyURL,
-			)
-			if err == nil {
-				model, err = provider.LanguageModel(context.Background(), activeModel.ModelName)
-				if err == nil {
-					s.BaseURL = activeModel.BaseURL
-					s.ModelName = activeModel.ModelName
-					s.applyModelContextLimit(activeModel)
-				}
-			}
-			// If creation fails, model remains nil and we'll send error via sendSystemInfo
-		}
+// ensureAgentInitialized lazily initializes the agent if not already done.
+// Returns an error message if initialization fails, or empty string on success.
+func (s *Session) ensureAgentInitialized() string {
+	s.mu.Lock()
+	// Already initialized
+	if s.Agent != nil {
+		s.mu.Unlock()
+		return ""
+	}
+	s.mu.Unlock()
+
+	// Get the active model from ModelManager (no lock needed for this)
+	if s.ModelManager == nil {
+		return "Model manager not initialized"
 	}
 
-	s.Agent = fantasy.NewAgent(model,
-		fantasy.WithTools(baseTools...),
-		fantasy.WithSystemPrompt(systemPrompt),
+	activeModel := s.ModelManager.GetActive()
+	if activeModel == nil {
+		return "No model configured. Please add a model to ~/.alayacore/model.conf"
+	}
+
+	// Create provider and model
+	provider, err := app.CreateProvider(
+		activeModel.ProtocolType,
+		activeModel.APIKey,
+		activeModel.BaseURL,
+		s.debugAPI,
+		s.proxyURL,
 	)
-	// Initialize model manager with active model from runtime config
-	s.initModelManager()
-	s.sendSystemInfo()
+	if err != nil {
+		return "Failed to create provider: " + err.Error()
+	}
+
+	model, err := provider.LanguageModel(context.Background(), activeModel.ModelName)
+	if err != nil {
+		return "Failed to create language model: " + err.Error()
+	}
+
+	s.mu.Lock()
+	s.Agent = fantasy.NewAgent(model,
+		fantasy.WithTools(s.baseTools...),
+		fantasy.WithSystemPrompt(s.systemPrompt),
+	)
+	s.mu.Unlock()
+
+	s.applyModelContextLimit(activeModel)
+	return ""
+}
+
+// initAgentFromModel creates an agent from a specific model (used by SwitchModel).
+func (s *Session) initAgentFromModel(model fantasy.LanguageModel) {
+	s.Agent = fantasy.NewAgent(model,
+		fantasy.WithTools(s.baseTools...),
+		fantasy.WithSystemPrompt(s.systemPrompt),
+	)
 }
 
 // applyModelContextLimit updates the session's ContextLimit from a model config
@@ -246,8 +262,8 @@ func (s *Session) applyModelContextLimit(model *ModelConfig) {
 	s.mu.Unlock()
 }
 
-// initModelManager initializes the ModelManager by setting the active model from runtime config
-// This is called during session initialization and after loading models
+// initModelManager initializes the ModelManager by setting the active model from runtime config.
+// Falls back to the first model if runtime.conf has no active model set.
 func (s *Session) initModelManager() {
 	if s.ModelManager == nil || s.RuntimeManager == nil {
 		return
@@ -257,21 +273,20 @@ func (s *Session) initModelManager() {
 	activeModelName := s.RuntimeManager.GetActiveModel()
 	if activeModelName != "" {
 		// Set active model by name in ModelManager
-		_ = s.ModelManager.SetActiveByName(activeModelName)
+		if err := s.ModelManager.SetActiveByName(activeModelName); err == nil {
+			return // Successfully set from runtime.conf
+		}
 	}
+
+	// Fallback to first model in the list
+	s.ModelManager.SetActiveToFirst()
 }
 
 // SwitchModel switches the session to use a new model
-func (s *Session) SwitchModel(model fantasy.LanguageModel, baseURL, modelName string, baseTools []fantasy.AgentTool, systemPrompt string) {
-	s.mu.Lock()
-	s.BaseURL = baseURL
-	s.ModelName = modelName
-	s.mu.Unlock()
-
-	s.initAgent(model, baseTools, systemPrompt)
+func (s *Session) SwitchModel(model fantasy.LanguageModel) {
+	s.initAgentFromModel(model)
+	s.sendSystemInfo()
 }
-
-// SwitchModel switches the session to use a new model
 
 func (s *Session) readFromInput() {
 	defer func() {

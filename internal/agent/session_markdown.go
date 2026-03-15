@@ -31,8 +31,6 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 
 	// Write YAML frontmatter
 	meta := SessionMeta{
-		BaseURL:       data.BaseURL,
-		ModelName:     data.ModelName,
 		TotalTokens:   data.TotalSpent.TotalTokens,
 		ContextTokens: data.ContextTokens,
 		CreatedAt:     data.CreatedAt,
@@ -145,8 +143,6 @@ func parseSessionMarkdown(data []byte) (*SessionData, error) {
 	}
 
 	sd := &SessionData{
-		BaseURL:       meta.BaseURL,
-		ModelName:     meta.ModelName,
 		TotalSpent:    fantasy.Usage{TotalTokens: meta.TotalTokens},
 		ContextTokens: meta.ContextTokens,
 		CreatedAt:     meta.CreatedAt,

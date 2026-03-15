@@ -126,10 +126,6 @@ func (mm *ModelManager) LoadFromFile(path string) error {
 	}
 
 	mm.models = models
-	// Set active to the last model
-	if len(mm.models) > 0 {
-		mm.activeID = mm.models[len(mm.models)-1].ID
-	}
 
 	if mm.filePath == "" {
 		mm.filePath = path
@@ -280,6 +276,19 @@ func (mm *ModelManager) SetActive(id string) error {
 		}
 	}
 	return fmt.Errorf("model not found: %s", id)
+}
+
+// SetActiveToFirst sets the active model to the first one in the list.
+// Returns false if there are no models.
+func (mm *ModelManager) SetActiveToFirst() bool {
+	mm.mu.Lock()
+	defer mm.mu.Unlock()
+
+	if len(mm.models) == 0 {
+		return false
+	}
+	mm.activeID = mm.models[0].ID
+	return true
 }
 
 // GetActive returns the active model (includes API key)

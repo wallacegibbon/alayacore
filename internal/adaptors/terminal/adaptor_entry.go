@@ -61,8 +61,6 @@ func (a *TerminalAdaptor) Start() {
 		a.Config.Model,
 		a.Config.AgentTools,
 		a.Config.SystemPrompt,
-		"", // baseURL - loaded from config file
-		"", // modelName - loaded from config file
 		inputStream,
 		terminalOutput,
 		a.sessionFile,

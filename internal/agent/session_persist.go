@@ -26,8 +26,6 @@ func (s *Session) saveSessionToFile(path string) error {
 	defer s.mu.Unlock()
 
 	data := SessionData{
-		BaseURL:       s.BaseURL,
-		ModelName:     s.ModelName,
 		Messages:      s.Messages,
 		TotalSpent:    s.TotalSpent,
 		ContextTokens: s.ContextTokens,
