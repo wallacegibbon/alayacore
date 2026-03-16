@@ -32,9 +32,10 @@ The project is well-structured (~11,500 lines of Go code) with clear separation 
 
 ### Phase 2: Session Layer Refactoring (Priority: Medium)
 
-- [ ] **Task 2.1**: Extract `session_streaming.go`
-  - Move streaming-related code from `session_prompt.go`
-  - `handleStreamingOutput()`, `handleToolCall()`, streaming error handling
+- [x] **Task 2.1**: Extract streaming and output helpers ✅
+  - Moved `trackUsage` and `cleanIncompleteToolCalls` from `session_prompt.go` (189→107 lines)
+  - `session_output.go` now includes usage tracking and message cleanup (94→178 lines)
+  - `session_prompt.go` is now focused on prompt processing logic
 
 - [ ] **Task 2.2**: Create `session_errors.go`
   - Centralize error handling patterns
@@ -111,7 +112,8 @@ The project is well-structured (~11,500 lines of Go code) with clear separation 
 | 1.1 | Split window.go | ✅ Done |
 | 1.2 | Extract key bindings | ✅ Done |
 | 1.3 | Reduce terminal.go | ✅ Done |
-| 2.1 | Extract session_streaming.go | ⏳ Pending |
+| 2.1 | Extract streaming/output helpers | ✅ Done |
+| 2.2 | Create session_errors.go | ⏳ Pending |
 | 2.1 | Extract session_streaming.go | ⏳ Pending |
 | 2.2 | Create session_errors.go | ⏳ Pending |
 | 2.3 | Create command_registry.go | ⏳ Pending |
