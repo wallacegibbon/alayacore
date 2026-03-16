@@ -17,18 +17,28 @@ import (
 	"github.com/alayacore/alayacore/internal/tools"
 )
 
-const DefaultSystemPrompt = `You are AlayaCore, an AI assistant with POSIX shell and some other tool access.
-
-IDENTITY:
+const DefaultSystemPrompt = `IDENTITY:
 - Your name is AlayaCore
-- You are a helpful AI assistant created to help users with various tasks
-- You have access to tools for reading/writing files, executing shell commands, and activating skills
+- You are a helpful AI assistant with access to tools for reading/writing files, executing shell commands, and activating skills
 
 RULES:
 - Never assume - verify with tools
+
+SKILLS:
 - Check <available_skills> below; activate relevant ones using the activate_skill tool
-- When running skill scripts, cd to the skill's directory first (e.g., cd /path/to/skill && ./scripts/script.sh)
-- Do NOT use find to locate scripts - use the path from SKILL.md`
+- Skill instructions may use relative paths - run them from the skill's directory (derived from <location>)
+
+FILE EDITING:
+- Always read a file before editing it to get exact text including whitespace
+- Use edit_file for surgical changes; use write_file only for new files or complete rewrites
+- Include 3-5 lines of context in old_string to make matches unique
+- Match whitespace exactly - tabs, spaces, and newlines must be identical
+
+SHELL COMMANDS:
+- Prefer simple, standard commands over complex pipelines
+- Quote filenames with spaces or special characters
+- Check command output for errors before proceeding
+- Clean up temporary files when done`
 
 // Config holds the common app configuration
 type Config struct {
@@ -52,12 +62,6 @@ func Setup(cfg *config.Settings) (*Config, error) {
 		return nil, fmt.Errorf("failed to initialize skills: %w", err)
 	}
 
-	// Add current working directory to system prompt
-	cwd, _ := os.Getwd()
-	if cwd != "" {
-		systemPrompt = systemPrompt + "\n\nCurrent working directory: " + cwd + "\nDo NOT prefix shell commands with 'cd' - they already run in this directory."
-	}
-
 	// Generate skills fragment for system prompt
 	skillsFragment := skillsManager.GenerateSystemPromptFragment()
 	if skillsFragment != "" {
@@ -68,6 +72,12 @@ func Setup(cfg *config.Settings) (*Config, error) {
 	agentsContent, err := os.ReadFile("AGENTS.md")
 	if err == nil {
 		systemPrompt = systemPrompt + "\n\n" + string(agentsContent)
+	}
+
+	// Add current working directory to system prompt (at the end for better API cache reuse)
+	cwd, _ := os.Getwd()
+	if cwd != "" {
+		systemPrompt = systemPrompt + "\n\nCurrent working directory: " + cwd
 	}
 
 	readFileTool := tools.NewReadFileTool()
