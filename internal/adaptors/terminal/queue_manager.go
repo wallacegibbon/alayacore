@@ -49,9 +49,12 @@ func NewQueueManager(styles *Styles) *QueueManager {
 
 // --- State Management ---
 
-func (qm *QueueManager) IsOpen() bool               { return qm.state != QueueManagerClosed }
-func (qm *QueueManager) State() QueueManagerState   { return qm.state }
-func (qm *QueueManager) SetItems(items []QueueItem) { qm.items = items }
+func (qm *QueueManager) IsOpen() bool             { return qm.state != QueueManagerClosed }
+func (qm *QueueManager) State() QueueManagerState { return qm.state }
+func (qm *QueueManager) SetItems(items []QueueItem) {
+	qm.items = items
+	qm.clampSelection()
+}
 
 func (qm *QueueManager) Open() {
 	qm.state = QueueManagerList
@@ -76,6 +79,7 @@ func (qm *QueueManager) GetSelectedItem() *QueueItem {
 func (qm *QueueManager) clampSelection() {
 	if len(qm.items) == 0 {
 		qm.selectedIdx = 0
+		qm.scrollIdx = 0
 		return
 	}
 	if qm.selectedIdx >= len(qm.items) {
@@ -83,6 +87,13 @@ func (qm *QueueManager) clampSelection() {
 	}
 	if qm.selectedIdx < 0 {
 		qm.selectedIdx = 0
+	}
+	// Ensure scrollIdx is valid
+	if qm.scrollIdx < 0 {
+		qm.scrollIdx = 0
+	}
+	if qm.scrollIdx > qm.selectedIdx {
+		qm.scrollIdx = qm.selectedIdx
 	}
 }
 

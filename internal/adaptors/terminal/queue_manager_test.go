@@ -140,3 +140,62 @@ func TestQueueManagerOpenClose(t *testing.T) {
 		t.Error("Queue manager should not be open after Close()")
 	}
 }
+
+func TestQueueManagerDeleteLastItem(t *testing.T) {
+	styles := DefaultStyles()
+	qm := NewQueueManager(styles)
+	qm.Open()
+
+	// Set 3 items
+	items := []QueueItem{
+		{QueueID: "Q1", Type: "prompt", Content: "test 1", CreatedAt: time.Now()},
+		{QueueID: "Q2", Type: "command", Content: "test 2", CreatedAt: time.Now()},
+		{QueueID: "Q3", Type: "prompt", Content: "test 3", CreatedAt: time.Now()},
+	}
+	qm.SetItems(items)
+
+	// Move to last item
+	qm.selectedIdx = 2
+	qm.scrollIdx = 0
+
+	// Simulate deleting the last item - set items to 2 items
+	newItems := []QueueItem{
+		{QueueID: "Q1", Type: "prompt", Content: "test 1", CreatedAt: time.Now()},
+		{QueueID: "Q2", Type: "command", Content: "test 2", CreatedAt: time.Now()},
+	}
+	qm.SetItems(newItems)
+
+	// selectedIdx should be clamped to 1 (last valid index)
+	if qm.selectedIdx != 1 {
+		t.Errorf("Expected selectedIdx to be clamped to 1, got %d", qm.selectedIdx)
+	}
+
+	// GetSelectedItem should return Q2
+	item := qm.GetSelectedItem()
+	if item == nil {
+		t.Fatal("Expected non-nil item")
+	}
+	if item.QueueID != "Q2" {
+		t.Errorf("Expected Q2, got %s", item.QueueID)
+	}
+
+	// Test deleting all items
+	emptyItems := []QueueItem{}
+	qm.SetItems(emptyItems)
+
+	// selectedIdx should be 0
+	if qm.selectedIdx != 0 {
+		t.Errorf("Expected selectedIdx to be 0 for empty list, got %d", qm.selectedIdx)
+	}
+
+	// scrollIdx should also be 0
+	if qm.scrollIdx != 0 {
+		t.Errorf("Expected scrollIdx to be 0 for empty list, got %d", qm.scrollIdx)
+	}
+
+	// GetSelectedItem should return nil for empty list
+	item = qm.GetSelectedItem()
+	if item != nil {
+		t.Error("Expected nil for empty queue")
+	}
+}
