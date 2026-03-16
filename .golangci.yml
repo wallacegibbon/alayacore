@@ -1,0 +1,122 @@
+# golangci-lint configuration for AlayaCore
+# See https://golangci-lint.run/usage/configuration/
+
+run:
+  timeout: 5m
+  issues-exit-code: 1
+  tests: true
+  skip-dirs:
+    - vendor
+    - testdata
+
+output:
+  formats:
+    - format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+
+linters:
+  enable:
+    # Default linters
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+
+    # Additional linters
+    - bodyclose      # Check HTTP response body is closed
+    - dogsled        # Check for too many blank identifiers
+    - dupl           # Check for duplicate code
+    - exportloopref  # Check for loop variable references
+    - gochecknoinits # Check for init functions
+    - goconst        # Check for repeated strings that could be constants
+    - gocritic       # Comprehensive Go source checker
+    - gocyclo        # Check cyclomatic complexity
+    - gofmt          # Check formatting
+    - goimports      # Check imports
+    - goprintffuncname # Check printf function names
+    - gosec          # Security checker
+    - misspell       # Check spelling
+    - nakedret       # Check for naked returns
+    - noctx          # Check for HTTP requests without context
+    - prealloc       # Check for preallocation suggestions
+    - revive         # Fast, configurable, extensible linter
+    - rowserrcheck   # Check for sql.Rows.Err close
+    - sqlclosecheck  # Check for sql.Rows close
+    - unconvert      # Check for unnecessary conversions
+    - unparam        # Check for unused function parameters
+    - whitespace     # Check for unnecessary whitespace
+
+  disable:
+    - typecheck  # Can be slow on large codebases
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+
+  govet:
+    enable-all: true
+    disable:
+      - fieldalignment # Can be noisy
+
+  gocyclo:
+    min-complexity: 15
+
+  dupl:
+    threshold: 100
+
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+
+  misspell:
+    locale: US
+
+  revive:
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: exported
+      - name: if-return
+      - name: increment-decrement
+      - name: var-naming
+      - name: var-declaration
+      - name: package-comments
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: indent-error-flow
+      - name: errorf
+      - name: empty-block
+      - name: superfluous-else
+      - name: unused-parameter
+      - name: unreachable-code
+      - name: redefines-builtin-id
+
+issues:
+  exclude-rules:
+    # Exclude some linters from test files
+    - path: _test\.go
+      linters:
+        - dupl
+        - gosec
+        - goconst
+        - gocyclo
+
+    # Exclude known issues in generated code
+    - path: \.pb\.go
+      linters:
+        - all
+
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  new: false

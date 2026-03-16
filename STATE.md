@@ -302,6 +302,11 @@ For this project, simplicity is more important than efficiency.
   - Created `internal/stream/doc.go` with TLV protocol specification
   - Created `internal/errors/doc.go` with domain error documentation
 
+- ✅ **golangci-lint configuration (Phase 8.1 of REFACTOR.md)**
+  - Created `.golangci.yml` with comprehensive linter configuration
+  - Enabled 25+ linters including security, complexity, and style checks
+  - Configured exclusion rules for test files and generated code
+
 - ✅ **Model selector focus management**
   - Input and display windows lose focus when model selector is shown
   - Focus is restored to previously focused window when model selector closes
