@@ -117,21 +117,20 @@ type SessionData struct {
 }
 
 // LoadOrNewSession loads a session from file or creates a new one.
-func LoadOrNewSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt string, input stream.Input, output stream.Output, sessionFile string, contextLimit int64, modelConfigPath, runtimeConfigPath string, debugAPI bool, proxyURL string) (*Session, string) {
+func LoadOrNewSession(model fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt string, input stream.Input, output stream.Output, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, proxyURL string) (*Session, string) {
 	sessionFile = expandPath(sessionFile)
 	if sessionFile != "" {
 		if data, err := LoadSession(sessionFile); err == nil {
-			return RestoreFromSession(model, baseTools, systemPrompt, input, output, data, sessionFile, contextLimit, modelConfigPath, runtimeConfigPath, debugAPI, proxyURL), sessionFile
+			return RestoreFromSession(model, baseTools, systemPrompt, input, output, data, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, proxyURL), sessionFile
 		}
 	}
-	return NewSession(model, baseTools, systemPrompt, input, output, sessionFile, contextLimit, modelConfigPath, runtimeConfigPath, debugAPI, proxyURL), sessionFile
+	return NewSession(model, baseTools, systemPrompt, input, output, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, proxyURL), sessionFile
 }
 
 // NewSession creates a fresh session.
-func NewSession(_ fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt string, input stream.Input, output stream.Output, sessionFile string, contextLimit int64, modelConfigPath, runtimeConfigPath string, debugAPI bool, proxyURL string) *Session {
+func NewSession(_ fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt string, input stream.Input, output stream.Output, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, proxyURL string) *Session {
 	s := &Session{
 		SessionFile:    sessionFile,
-		ContextLimit:   contextLimit,
 		Input:          input,
 		Output:         output,
 		ModelManager:   NewModelManager(modelConfigPath),
@@ -152,11 +151,10 @@ func NewSession(_ fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPr
 }
 
 // RestoreFromSession creates a session from saved data.
-func RestoreFromSession(_ fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt string, input stream.Input, output stream.Output, data *SessionData, sessionFile string, contextLimit int64, modelConfigPath, runtimeConfigPath string, debugAPI bool, proxyURL string) *Session {
+func RestoreFromSession(_ fantasy.LanguageModel, baseTools []fantasy.AgentTool, systemPrompt string, input stream.Input, output stream.Output, data *SessionData, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, proxyURL string) *Session {
 	s := &Session{
 		Messages:       data.Messages,
 		SessionFile:    sessionFile,
-		ContextLimit:   contextLimit,
 		Input:          input,
 		Output:         output,
 		ModelManager:   NewModelManager(modelConfigPath),

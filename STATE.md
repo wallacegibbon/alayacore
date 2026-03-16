@@ -64,9 +64,9 @@ For this project, simplicity is more important than efficiency.
   - Extracted CLI flag parsing to `internal/config` package
   - Refactored terminal adaptor structure
   - Simplified main.go to ~80 lines of minimal glue code
-- ✅ CLI-based provider configuration
-  - All config via CLI flags: --type, --base-url, --api-key, --model
-  - No environment variables or default configs
+- ✅ Config file-based provider configuration
+  - Models configured via ~/.alayacore/model.conf
+  - No CLI flags for model configuration
   - Supports anthropic and openai provider types
 - ✅ Skills system based on agentskills.io specification
   - Skill discovery from directories with SKILL.md files
@@ -166,16 +166,15 @@ For this project, simplicity is more important than efficiency.
   - Incremental window rendering - only re-render the window that changed
   - Cursor-only border swap reuses cached content
 
-- ✅ **Context limit flag and status bar fraction display**
-  - Added `--context-limit` CLI flag to specify provider's context window size in tokens
-  - Supports K/M suffixes: `200K` → 200000, `1M` → 1000000
+- ✅ **Context limit from model config**
+  - `context_limit` field in model config specifies provider's context window size in tokens
   - Status bar shows: `Context: 45231 / 128000 (35.3%) | Total: 67890` when limit is set
 
 - ✅ **Auto-summarize at 80% context usage**
   - Automatically triggers `:summarize` command when context reaches 80% of the limit
   - Shows notification with current usage before summarizing
   - Prevents context overflow errors from API providers
-  - Only triggers when `--context-limit` is configured
+  - Only triggers when model has `context_limit` configured
 
 - ✅ **Model Selector UI for switching/managing model configurations**
   - Press `Ctrl+L` to open model selector overlay
@@ -192,11 +191,9 @@ For this project, simplicity is more important than efficiency.
   - Config file uses YAML-like format with `---` separator between models
   - Supported fields: `name`, `protocol_type`, `base_url`, `api_key`, `model_name`, `context_limit`
   - `context_limit` is optional and specifies maximum context length (0 means unlimited)
-  - Runtime model list created from: (1) model config file, (2) CLI arguments (if provided)
-  - CLI model is appended to the end of the runtime list (if CLI args provided)
-  - When models exist, the last one becomes active
+  - Runtime model list created from model config file
+  - When models exist, the last one becomes active (or the one from runtime.conf)
   - Program exits with helpful error if no models are available
-  - **All CLI arguments are optional** - can run with just `alayacore` if model.conf exists
   - Located in `internal/adaptors/terminal/model_selector.go`
   - **Search/Filter Functionality:**
     - Search input box above model list with "/ " prompt and "Search models..." placeholder
@@ -378,8 +375,8 @@ For this project, simplicity is more important than efficiency.
   - Updated CLI help text and documentation
 
 - ✅ **Fixed nil model panic on startup**
-  - When no CLI model is provided, session is created with nil model
-  - initAgent() now sends ActiveModelConfig via TagSystemData if there's an active model from runtime.conf
+  - Session is created with nil model, then initialized from model config
+  - initAgent() sends ActiveModelConfig via TagSystemData if there's an active model from runtime.conf
   - Terminal adaptor receives the config and calls SwitchModel() to set up the provider
   - Previously, sendSystemInfo() was called without ActiveModelConfig, causing GetActiveModel() to return nil
   - This resulted in SwitchModel() never being called, leaving the Agent with a nil model
@@ -478,8 +475,8 @@ main.go        - alayacore entry point
 - Multi-step conversations with tool calls
 - Token usage tracking
 - Error handling for command execution
-- CLI-based provider configuration (no env vars)
-- CLI flags: --type, --base-url, --api-key, --model, --skill, --session, --context-limit
+- Config file-based provider configuration (no CLI flags for models)
+- CLI flags: --model-config, --runtime-config, --system, --skill, --session, --proxy, --debug-api, --version, --help
 - Provider types: anthropic, openai
 - Color-coded output for better readability
 - Command history for interactive sessions
@@ -491,30 +488,42 @@ main.go        - alayacore entry point
 - Session file persistence for conversation history
 
 ### Usage
+Create a model config file at `~/.alayacore/model.conf`:
+```
+name: "OpenAI GPT-4o"
+protocol_type: "openai"
+base_url: "https://api.openai.com/v1"
+api_key: "your-api-key"
+model_name: "gpt-4o"
+context_limit: 128000
+---
+name: "Ollama Local"
+protocol_type: "openai"
+base_url: "http://localhost:11434/v1"
+api_key: "xxx"
+model_name: "llama3"
+context_limit: 32768
+```
+
+Then run:
 ```sh
-# OpenAI API
-./alayacore --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
+# Basic usage (loads models from ~/.alayacore/model.conf)
+./alayacore
 
-# Anthropic API
-./alayacore --type anthropic --base-url https://api.anthropic.com --api-key $ANTHROPIC_API_KEY --model claude-sonnet-4
+# With custom model config
+./alayacore --model-config ./my-model.conf
 
-# Local AI server (e.g., Ollama)
-./alayacore --type openai --base-url http://localhost:11434/v1 --api-key xxx --model llama3
+# With custom system prompt
+./alayacore --system "You are a code reviewer"
+
+# With skills
+./alayacore --skill ./skills
+
+# With session persistence
+./alayacore --session ~/mysession.md
 
 # Run with API debug
-./alayacore --debug-api --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
-
-# Run with custom system prompt
-./alayacore --system "You are a code reviewer" --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
-
-# Run interactively
-./alayacore --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
-
-# Run with skills
-./alayacore --skill ./skills --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
-
-# Run with session persistence
-./alayacore --session ~/mysession.md --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
+./alayacore --debug-api
 
 # Show help
 ./alayacore --help
@@ -528,11 +537,11 @@ main.go        - alayacore entry point
 
 ### alayacore-web (WebSocket Server)
 ```sh
-# Start WebSocket server
-./alayacore-web --type openai --base-url https://api.openai.com/v1 --api-key $OPENAI_API_KEY --model gpt-4o
+# Start WebSocket server (uses models from config file)
+./alayacore-web
 
 # Custom address
-./alayacore-web --type anthropic --base-url https://api.anthropic.com --api-key $ANTHROPIC_API_KEY --model claude-sonnet-4-20250514 --addr :9090
+./alayacore-web --addr :9090
 
 # Then open http://localhost:8080 in browser
 # WebSocket endpoint: ws://localhost:8080/ws

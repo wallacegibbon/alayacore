@@ -75,7 +75,7 @@ func TestLoadOrNewSession(t *testing.T) {
 	systemPrompt := "test system prompt"
 
 	// Test creating a new session without specifying session file
-	session, sessionFile := LoadOrNewSession(model, baseTools, systemPrompt, &stream.NopInput{}, &stream.NopOutput{}, "", 0, "", "", false, "")
+	session, sessionFile := LoadOrNewSession(model, baseTools, systemPrompt, &stream.NopInput{}, &stream.NopOutput{}, "", "", "", false, "")
 	if session == nil {
 		t.Fatal("LoadOrNewSession returned nil session")
 	}

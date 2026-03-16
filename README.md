@@ -79,7 +79,6 @@ alayacore-web --addr :9090
 - `-skill string` - Skills directory path (can be specified multiple times)
 - `-session string` - Session file path to load/save conversations
 - `-proxy string` - HTTP proxy URL (supports HTTP, HTTPS, and SOCKS5, e.g., `http://127.0.0.1:7890` or `socks5://127.0.0.1:1080`)
-- `-context-limit string` - Provider context window size in tokens. Supports K/M suffixes (e.g., `200K`, `1M`). When set, status bar shows `Context: N / LIMIT (X.X%)` instead of just `Context: N`
 - `-debug-api` - Write raw API requests and responses to log file
 - `-version` - Show version information
 - `-help` - Show help information

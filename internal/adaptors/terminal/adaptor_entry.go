@@ -57,7 +57,6 @@ func (a *TerminalAdaptor) Start() {
 		inputStream,
 		terminalOutput,
 		a.Config.Cfg.Session,
-		a.Config.Cfg.ContextLimit,
 		a.Config.Cfg.ModelConfig,
 		a.Config.Cfg.RuntimeConfig,
 		a.Config.Cfg.DebugAPI,
