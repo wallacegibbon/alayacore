@@ -25,6 +25,22 @@ type Styles struct {
 	InputBorder lipgloss.Style
 }
 
+// RenderBorderedBox renders content with consistent border, padding, and width.
+// This ensures all bordered boxes (input, model selector, queue manager) have the same width.
+// The width calculation is: borderStyle.Padding(0, 1).Render(innerStyle.Width(width-4).Render(content))
+func (s *Styles) RenderBorderedBox(content string, width int, borderColor string, height ...int) string {
+	borderStyle := s.InputBorder.
+		BorderForeground(lipgloss.Color(borderColor)).
+		Padding(0, 1)
+
+	innerStyle := s.Input.Width(max(0, width-4))
+	if len(height) > 0 {
+		innerStyle = innerStyle.Height(height[0])
+	}
+
+	return borderStyle.Render(innerStyle.Render(content))
+}
+
 // DefaultStyles returns the default styling configuration
 func DefaultStyles() *Styles {
 	baseStyle := lipgloss.NewStyle()

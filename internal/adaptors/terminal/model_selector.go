@@ -298,17 +298,12 @@ func (ms *ModelSelector) handleListNavigationKey(key string) tea.Cmd {
 func (ms *ModelSelector) renderList() string {
 	var sb strings.Builder
 
-	// Search input with border (matching main input pattern)
+	// Search input with border
 	borderColor := "#89d4fa"
 	if !ms.searchInputFocused {
 		borderColor = "#45475a"
 	}
-	borderStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color(borderColor)).
-		Padding(0, 1)
-	innerStyle := lipgloss.NewStyle().Width(max(0, ms.width-4))
-	searchBox := borderStyle.Render(innerStyle.Render(ms.searchInput.View()))
+	searchBox := ms.styles.RenderBorderedBox(ms.searchInput.View(), ms.width, borderColor)
 
 	sb.WriteString(searchBox)
 	sb.WriteString("\n\n")
@@ -358,12 +353,7 @@ func (ms *ModelSelector) renderModelList(width int) string {
 		}
 	}
 
-	borderStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#45475a")).
-		Padding(0, 1)
-	innerStyle := lipgloss.NewStyle().Width(max(0, width-4)).Height(listHeight + 2)
-	return borderStyle.Render(innerStyle.Render(content.String()))
+	return ms.styles.RenderBorderedBox(content.String(), width, "#45475a", listHeight+2)
 }
 
 func (ms *ModelSelector) RenderOverlay(baseContent string, screenWidth, screenHeight int) string {

@@ -148,8 +148,6 @@ func (m InputModel) RenderWithBorder(confirmDialog bool, confirmText string) str
 		borderColor = "#45475a"
 	}
 
-	borderStyle := m.styles.InputBorder.BorderForeground(lipgloss.Color(borderColor)).Padding(0, 1)
-
 	// Set input styles based on focus state
 	styles := textinput.DefaultStyles(true)
 	styles.Focused.Prompt = lipgloss.NewStyle().Foreground(lipgloss.Color("#89d4fa")).Bold(true)
@@ -159,11 +157,10 @@ func (m InputModel) RenderWithBorder(confirmDialog bool, confirmText string) str
 	m.input.SetStyles(styles)
 
 	if confirmDialog {
-		confirmStyled := m.styles.Confirm.Width(max(0, m.width-4)).Render(confirmText)
-		return borderStyle.Render(confirmStyled)
+		return m.styles.RenderBorderedBox(confirmText, m.width, borderColor)
 	}
 
-	return borderStyle.Render(m.styles.Input.Width(max(0, m.width-4)).Render(m.input.View()))
+	return m.styles.RenderBorderedBox(m.input.View(), m.width, borderColor)
 }
 
 // SetWidth sets the input width

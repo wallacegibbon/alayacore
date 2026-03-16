@@ -178,22 +178,7 @@ func (qm *QueueManager) View() string {
 
 	// Wrap in border with same style as input box
 	content := strings.Join(lines, "\n")
-
-	// Match input box width calculation:
-	// borderStyle.Padding(0, 1).Render(styles.Input.Width(width-4).Render(...))
-	innerWidth := qm.width - 4
-	if innerWidth < 10 {
-		innerWidth = 10
-	}
-
-	// Create inner content with explicit width (like input box does)
-	innerStyle := lipgloss.NewStyle().Width(innerWidth)
-
-	boxStyle := qm.styles.InputBorder.
-		BorderForeground(lipgloss.Color("#89d4fa")).
-		Padding(0, 1)
-
-	return boxStyle.Render(innerStyle.Render(content))
+	return qm.styles.RenderBorderedBox(content, qm.width, "#89d4fa")
 }
 
 func (qm *QueueManager) renderItem(item QueueItem, selected bool) string {
