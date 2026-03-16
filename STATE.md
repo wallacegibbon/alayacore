@@ -280,6 +280,11 @@ For this project, simplicity is more important than efficiency.
   - Moved all color constants from `styles.go` to `constants.go`
   - `styles.go` now contains only style composition (Styles struct, DefaultStyles, RenderBorderedBox)
 
+- ✅ **OutputWriter interface (Phase 4.2 of REFACTOR.md)**
+  - Created `interfaces.go` with OutputWriter interface for better testability
+  - Terminal struct now uses OutputWriter interface instead of concrete type
+  - Added UpdateChan() and WindowBuffer() methods to outputWriter
+
 - ✅ **Model selector focus management**
   - Input and display windows lose focus when model selector is shown
   - Focus is restored to previously focused window when model selector closes

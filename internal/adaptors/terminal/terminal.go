@@ -22,7 +22,7 @@ import (
 type Terminal struct {
 	// Core components
 	session     *agentpkg.Session
-	out         *outputWriter
+	out         OutputWriter
 	streamInput *stream.ChanInput
 	appConfig   *app.Config
 
@@ -48,7 +48,7 @@ type Terminal struct {
 // NewTerminal creates a new Terminal model with all components initialized.
 func NewTerminal(
 	session *agentpkg.Session,
-	out *outputWriter,
+	out OutputWriter,
 	inputStream *stream.ChanInput,
 	appCfg *app.Config,
 	initialWidth, initialHeight int,
@@ -60,7 +60,7 @@ func NewTerminal(
 		out:           out,
 		streamInput:   inputStream,
 		appConfig:     appCfg,
-		display:       NewDisplayModel(out.windowBuffer, styles),
+		display:       NewDisplayModel(out.WindowBuffer(), styles),
 		input:         NewInputModel(styles),
 		status:        NewStatusModel(styles),
 		modelSelector: NewModelSelector(styles),
@@ -163,8 +163,8 @@ func (m *Terminal) handleTick() (tea.Model, tea.Cmd) {
 
 	// Drain pending display updates (non-blocking)
 	select {
-	case <-m.out.updateChan:
-		if m.out.windowBuffer.GetWindowCount() > 0 {
+	case <-m.out.UpdateChan():
+		if m.out.WindowBuffer().GetWindowCount() > 0 {
 			m.updateStatusWithQueue()
 			m.updateDisplayHeight()
 			if m.display.shouldFollow() {

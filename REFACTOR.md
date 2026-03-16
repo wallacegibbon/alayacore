@@ -65,8 +65,11 @@ The project is well-structured (~11,500 lines of Go code) with clear separation 
 - [ ] **Task 4.1**: Create `SessionInterface` for adaptors
   - Makes testing easier without real session
 
-- [ ] **Task 4.2**: Create `OutputWriter` interface
-  - Abstract output writer for better testability
+- [x] **Task 4.2**: Create `OutputWriter` interface ✅
+  - Created `interfaces.go` with OutputWriter interface
+  - Terminal now uses OutputWriter interface instead of concrete type
+  - Added UpdateChan() and WindowBuffer() methods to outputWriter
+  - Better testability for terminal adaptor tests
 
 ### Phase 5: Error Handling Standardization (Priority: Medium)
 
@@ -123,7 +126,7 @@ The project is well-structured (~11,500 lines of Go code) with clear separation 
 | 3.1 | Consolidate constants.go | ✅ Done |
 | 3.2 | Refactor styles.go | ✅ Done |
 | 4.1 | Create SessionInterface | ⏳ Pending |
-| 4.2 | Create OutputWriter interface | ⏳ Pending |
+| 4.2 | Create OutputWriter interface | ✅ Done |
 | 5.1 | Define domain errors | ⏳ Pending |
 | 5.2 | Use structured errors | ⏳ Pending |
 | 6.1 | Add terminal adaptor tests | ⏳ Pending |
