@@ -100,7 +100,11 @@ The project is well-structured (~11,500 lines of Go code) with clear separation 
 
 ### Phase 7: Documentation Improvements (Priority: Low)
 
-- [ ] **Task 7.1**: Add package documentation (`doc.go` for each package)
+- [x] **Task 7.1**: Add package documentation ✅
+  - Created `internal/adaptors/terminal/doc.go`
+  - Created `internal/agent/doc.go`
+  - Created `internal/stream/doc.go`
+  - Created `internal/errors/doc.go`
 
 - [ ] **Task 7.2**: Create `docs/architecture.md`
   - Data flow diagram
@@ -140,7 +144,7 @@ The project is well-structured (~11,500 lines of Go code) with clear separation 
 | 6.1 | Add terminal adaptor tests | ⏳ Pending |
 | 6.2 | Add tool tests | ⏳ Pending (edit_file_test.go exists) |
 | 6.3 | Add stream tests | ✅ Done |
-| 7.1 | Add package documentation | ⏳ Pending |
+| 7.1 | Add package documentation | ✅ Done |
 | 7.2 | Create architecture docs | ⏳ Pending |
 | 8.1 | Add golangci-lint config | ⏳ Pending |
 | 8.2 | Add pre-commit hooks | ⏳ Pending |

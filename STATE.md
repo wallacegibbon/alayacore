@@ -296,6 +296,12 @@ For this project, simplicity is more important than efficiency.
   - Coverage for unicode, empty values, long messages, multiple messages
   - Created `internal/errors/errors_test.go` with domain error tests
 
+- ✅ **Package documentation (Phase 7.1 of REFACTOR.md)**
+  - Created `internal/adaptors/terminal/doc.go` with architecture overview
+  - Created `internal/agent/doc.go` with session management docs
+  - Created `internal/stream/doc.go` with TLV protocol specification
+  - Created `internal/errors/doc.go` with domain error documentation
+
 - ✅ **Model selector focus management**
   - Input and display windows lose focus when model selector is shown
   - Focus is restored to previously focused window when model selector closes

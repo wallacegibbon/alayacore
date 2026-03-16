@@ -1,81 +1,42 @@
-// Package terminal provides the TUI adaptor for AlayaCore using Bubble Tea.
+// Package terminal provides the terminal user interface for AlayaCore.
 //
-// # Architecture Overview
+// The terminal package implements a Bubble Tea-based TUI that serves as the
+// primary interface for interacting with the AI assistant. It handles:
 //
-// The terminal adaptor is organized into focused modules with clear responsibilities:
+//   - User input (text prompts and commands)
+//   - Display of assistant responses with styling
+//   - Model selection and switching
+//   - Task queue management
+//   - Focus management between input and display windows
 //
-//   - terminal.go: Main Bubble Tea model that coordinates all components
-//   - keys.go: Keyboard input handling and routing
-//   - commands.go: Command processing (:quit, :cancel, :model_set, etc.)
-//   - output.go: TLV parsing from session, styling, and WindowBuffer updates
-//   - window.go: WindowBuffer (windows with borders, wrap, diff rendering)
-//   - display.go: Viewport, scroll state, and window cursor navigation
-//   - input_component.go: Text input with editor integration
-//   - model_selector.go: Model selection UI with search and navigation
-//   - status.go: Token usage and status bar
-//   - styles.go: Lipgloss styles for all UI elements
-//   - adaptor_entry.go: TerminalAdaptor entry point used by main/app
+// Architecture Overview:
 //
-// # Message Flow
+//	The terminal UI follows the Bubble Tea architecture (Elm-style):
+//	  - Terminal: The main model that composes all components
+//	  - DisplayModel: Renders assistant output with virtual scrolling
+//	  - InputModel: Handles user text input with external editor support
+//	  - StatusModel: Shows session status (tokens, queue, model info)
+//	  - ModelSelector: Modal for switching between AI models
+//	  - QueueManager: Modal for managing the task queue
 //
-// User Input Flow:
+// Communication with the session layer uses TLV (Tag-Length-Value) protocol:
+//	  - Input: ChanInput receives TLV messages from user actions
+//	  - Output: OutputWriter parses TLV and renders styled content
 //
-//	User types → Terminal.Update() → keys.go handlers → commands.go or direct actions
+// Key Files:
 //
-// Display Update Flow:
+//	- terminal.go: Main Terminal model and message routing
+//	- keys.go: Keyboard handling and focus management
+//	- commands.go: Command processing (:quit, :model_set, etc.)
+//	- output.go: TLV parsing and styled rendering
+//	- window_*.go: Virtual scrolling and diff display
+//	- constants.go: Layout and timing constants, color palette
+//	- styles.go: Lipgloss style definitions
+//	- keybinds.go: Declarative key binding configuration
 //
-//	Session writes TLV → outputWriter.Write() → parses tags, styles, appends to WindowBuffer
-//	→ throttled updateChan signal → Terminal.handleTick() → DisplayModel.updateContent()
+// Usage:
 //
-// # Key Bindings
-//
-// Global:
-//   - Tab: Toggle focus between display and input
-//   - Ctrl+L: Open model selector
-//   - Ctrl+O: Open external editor
-//   - Ctrl+S: Save session
-//   - Ctrl+G: Cancel current request
-//   - Enter: Submit prompt/command
-//
-// Display-focused:
-//   - j/k: Move window cursor down/up
-//   - J/K: Scroll down/up by one line
-//   - H/L/M: Jump to top/bottom/center
-//   - g/G: Go to top/bottom
-//   - Space: Toggle window wrap mode
-//   - :: Switch to input with command prefix
-//
-// Model Selector:
-//   - Tab: Toggle search/list focus
-//   - j/k or up/down: Navigate list
-//   - e: Edit model config file
-//   - r: Reload models
-//   - Enter: Select model
-//   - Esc/q: Close selector
-//
-// # Components
-//
-// Terminal (terminal.go):
-// The main coordinator that owns all sub-components and routes messages.
-// Delegates keyboard handling to keys.go and command processing to commands.go.
-//
-// DisplayModel (display.go):
-// Manages the viewport over WindowBuffer content. Handles scrolling and
-// window cursor navigation (vim-style j/k, H/L/M, g/G).
-//
-// InputModel (input_component.go):
-// Wraps textinput.Model with editor integration. Supports opening an
-// external editor (Ctrl+O) for multi-line input.
-//
-// ModelSelector (model_selector.go):
-// Provides a searchable list of available models. Supports filtering
-// and keyboard navigation.
-//
-// outputWriter (output.go):
-// Implements io.Writer for the session output stream. Parses TLV tags
-// and routes content to appropriate handlers (text, reasoning, functions).
-//
-// WindowBuffer (window.go):
-// Holds the sequence of display windows. Supports efficient incremental
-// updates and virtual rendering for large outputs.
+//	terminal := NewTerminal(session, output, input, config, width, height)
+//	p := tea.NewProgram(terminal, tea.WithOutput(os.Stderr))
+//	p.Run()
 package terminal
