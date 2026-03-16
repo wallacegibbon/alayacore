@@ -143,7 +143,7 @@ func (qm *QueueManager) View() string {
 	}
 
 	listHeight := 8 // 8 content rows inside border
-	maxItems := 6   // Leave 2 rows for blank line + help footer
+	maxItems := 8   // All rows for items
 
 	// Build content
 	var lines []string
@@ -165,18 +165,18 @@ func (qm *QueueManager) View() string {
 		}
 	}
 
-	// Pad lines to ensure footer is always at the bottom
-	for len(lines) < maxItems {
+	// Pad lines to fill the list height
+	for len(lines) < listHeight {
 		lines = append(lines, "")
 	}
 
-	// Footer with key hints (always at the bottom)
-	lines = append(lines, "")
-	lines = append(lines, qm.styles.System.Render("  j/k: navigate  d: delete  q: close"))
-
 	// Wrap in border with same style as input box
 	content := strings.Join(lines, "\n")
-	return qm.styles.RenderBorderedBox(content, qm.width, ColorAccent, listHeight)
+	borderedBox := qm.styles.RenderBorderedBox(content, qm.width, ColorAccent, listHeight)
+
+	// Help text outside the bordered box
+	helpText := qm.styles.System.Render("j/k: navigate │ d: delete │ q/esc: close")
+	return borderedBox + "\n" + helpText
 }
 
 func (qm *QueueManager) updateScrollForHeight(height int) {

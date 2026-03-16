@@ -383,7 +383,7 @@ func (ms *ModelSelector) renderList() string {
 	if ms.searchInputFocused {
 		sb.WriteString(ms.styles.System.Render("tab: list │ enter: select │ esc: close"))
 	} else {
-		sb.WriteString(ms.styles.System.Render("tab: search │ j/k: nav │ e: edit │ enter: select │ q/esc: close"))
+		sb.WriteString(ms.styles.System.Render("tab: search │ j/k: navigate │ e: edit │ enter: select │ q/esc: close"))
 	}
 
 	return sb.String()
