@@ -160,6 +160,8 @@ For this project, simplicity is more important than efficiency.
 - ✅ **Terminal focus/blur handling**
   - Display and input appear dimmed when user switches away from the program
   - Focus is restored when switching back
+  - Model selector and queue manager overlays also dim when app loses focus
+  - Overlay borders use ColorAccent when focused, ColorDim when unfocused
 
 - ✅ **Terminal display performance optimizations**
   - KeyMsg returns immediately; display updates only on tick (every 250ms during streaming)
