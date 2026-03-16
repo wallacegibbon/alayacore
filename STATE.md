@@ -325,6 +325,12 @@ For this project, simplicity is more important than efficiency.
   - Component descriptions and file organization
   - Key design decisions documented
 
+- ✅ **Makefile with development targets (Phase 8.2 of REFACTOR.md)**
+  - Created `Makefile` with common development tasks
+  - Targets: build, test, lint, fmt, vet, clean, install, check, pre-commit
+  - Cross-platform build support (linux, darwin)
+  - Test coverage target
+
 - ✅ **Model selector focus management**
   - Input and display windows lose focus when model selector is shown
   - Focus is restored to previously focused window when model selector closes

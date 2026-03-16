@@ -127,7 +127,11 @@ The project is well-structured (~11,500 lines of Go code) with clear separation 
   - Enabled 25+ linters including security, complexity, and style checks
   - Configured exclusion rules for test files
 
-- [ ] **Task 8.2**: Add pre-commit hooks or Makefile targets
+- [x] **Task 8.2**: Add pre-commit hooks or Makefile targets ✅
+  - Created `Makefile` with common development tasks
+  - Targets: build, test, lint, fmt, vet, clean, install, check, pre-commit
+  - Cross-platform build support (linux, darwin)
+  - Test coverage target
 
 ### Phase 9: Potential Architectural Changes (Future)
 
@@ -159,7 +163,7 @@ The project is well-structured (~11,500 lines of Go code) with clear separation 
 | 7.1 | Add package documentation | ✅ Done |
 | 7.2 | Create architecture docs | ✅ Done |
 | 8.1 | Add golangci-lint config | ✅ Done |
-| 8.2 | Add pre-commit hooks | ⏳ Pending |
+| 8.2 | Add pre-commit hooks | ✅ Done |
 
 ---
 
