@@ -65,13 +65,13 @@ func NewWindowBuffer(width int) *WindowBuffer {
 	// Dimmed border: rounded border with invisible color (matches background)
 	dimmedBorder := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#1e1e2e")).
+		BorderForeground(lipgloss.Color(ColorBase)).
 		Padding(0, 1)
 
 	// Highlighted border for cursor
 	cursorBorder := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#fab387")).
+		BorderForeground(lipgloss.Color(ColorPeach)).
 		Padding(0, 1)
 
 	return &WindowBuffer{
@@ -339,7 +339,7 @@ func (wb *WindowBuffer) renderWindowContent(w *Window, innerWidth int) string {
 
 			// Create subtle dotted separator across full width
 			wrapIndicator := lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#45475a")).
+				Foreground(lipgloss.Color(ColorDim)).
 				Render(strings.Repeat("·", innerWidth))
 
 			// Show first line, separator, last 3 lines

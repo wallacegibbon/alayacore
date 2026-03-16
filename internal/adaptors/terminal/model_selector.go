@@ -299,9 +299,9 @@ func (ms *ModelSelector) renderList() string {
 	var sb strings.Builder
 
 	// Search input with border
-	searchBorderColor := "#89d4fa"
+	searchBorderColor := ColorAccent
 	if !ms.searchInputFocused {
-		searchBorderColor = "#45475a"
+		searchBorderColor = ColorDim
 	}
 	searchBox := ms.styles.RenderBorderedBox(ms.searchInput.View(), ms.width, searchBorderColor)
 
@@ -316,9 +316,9 @@ func (ms *ModelSelector) renderList() string {
 	}
 
 	// Model list - bright border when list is focused
-	listBorderColor := "#89d4fa"
+	listBorderColor := ColorAccent
 	if ms.searchInputFocused {
-		listBorderColor = "#45475a"
+		listBorderColor = ColorDim
 	}
 	sb.WriteString(ms.renderModelList(lipgloss.Width(searchBox), listBorderColor))
 
@@ -457,12 +457,12 @@ func (ms *ModelSelector) updateSearchInputStyles() {
 	var styles textinput.Styles
 	if ms.searchInputFocused {
 		styles = textinput.DefaultStyles(true)
-		styles.Focused.Prompt = lipgloss.NewStyle().Foreground(lipgloss.Color("#89d4fa")).Bold(true)
-		styles.Focused.Placeholder = lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086"))
+		styles.Focused.Prompt = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorAccent)).Bold(true)
+		styles.Focused.Placeholder = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorMuted))
 	} else {
 		styles = textinput.DefaultStyles(false)
-		styles.Blurred.Prompt = lipgloss.NewStyle().Foreground(lipgloss.Color("#6c7086"))
-		styles.Blurred.Placeholder = lipgloss.NewStyle().Foreground(lipgloss.Color("#45475a"))
+		styles.Blurred.Prompt = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorMuted))
+		styles.Blurred.Placeholder = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorDim))
 	}
 	ms.searchInput.SetStyles(styles)
 }

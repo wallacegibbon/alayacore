@@ -129,6 +129,11 @@ func TestModelSelectorCtrlCClearsSearch(t *testing.T) {
 	ms.SetModels(models)
 	ms.Open()
 
+	// Focus the search input first (simulates user pressing Tab to focus search)
+	ms.searchInputFocused = true
+	ms.searchInput.Focus()
+	ms.updateSearchInputStyles()
+
 	// Type in search input
 	ms.searchInput.SetValue("gpt4")
 	ms.updateFilteredModels()

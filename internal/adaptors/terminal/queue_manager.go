@@ -176,7 +176,7 @@ func (qm *QueueManager) View() string {
 
 	// Wrap in border with same style as input box
 	content := strings.Join(lines, "\n")
-	return qm.styles.RenderBorderedBox(content, qm.width, "#89d4fa", listHeight)
+	return qm.styles.RenderBorderedBox(content, qm.width, ColorAccent, listHeight)
 }
 
 func (qm *QueueManager) updateScrollForHeight(height int) {
