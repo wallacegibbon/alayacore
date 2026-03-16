@@ -285,6 +285,11 @@ For this project, simplicity is more important than efficiency.
   - Terminal struct now uses OutputWriter interface instead of concrete type
   - Added UpdateChan() and WindowBuffer() methods to outputWriter
 
+- ✅ **Domain errors package (Phase 5.1 of REFACTOR.md)**
+  - Created `internal/errors/errors.go` with domain-specific error types
+  - SessionError type with operation context for structured error handling
+  - Model, queue, session, command, and input error types defined
+
 - ✅ **Model selector focus management**
   - Input and display windows lose focus when model selector is shown
   - Focus is restored to previously focused window when model selector closes

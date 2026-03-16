@@ -73,8 +73,13 @@ The project is well-structured (~11,500 lines of Go code) with clear separation 
 
 ### Phase 5: Error Handling Standardization (Priority: Medium)
 
-- [ ] **Task 5.1**: Define domain errors in `internal/errors/errors.go`
-  - `ErrSessionNotFound`, `ErrModelNotLoaded`, etc.
+- [x] **Task 5.1**: Define domain errors in `internal/errors/errors.go` ✅
+  - Created domain errors package with structured error types
+  - Model errors: ErrModelNotFound, ErrModelManagerNotInitialized, ErrNoModelFilePath
+  - Queue errors: ErrQueueItemNotFound
+  - Session errors: ErrNoSessionFile, ErrFailedToSaveSession
+  - Command errors: ErrEmptyCommand, ErrUnknownCommand, ErrNothingToCancel
+  - SessionError type with operation context
 
 - [ ] **Task 5.2**: Use structured errors
   - `SessionError` type with operation context
@@ -127,7 +132,7 @@ The project is well-structured (~11,500 lines of Go code) with clear separation 
 | 3.2 | Refactor styles.go | ✅ Done |
 | 4.1 | Create SessionInterface | ⏳ Pending |
 | 4.2 | Create OutputWriter interface | ✅ Done |
-| 5.1 | Define domain errors | ⏳ Pending |
+| 5.1 | Define domain errors | ✅ Done |
 | 5.2 | Use structured errors | ⏳ Pending |
 | 6.1 | Add terminal adaptor tests | ⏳ Pending |
 | 6.2 | Add tool tests | ⏳ Pending |
