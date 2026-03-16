@@ -145,7 +145,7 @@ func TestEditorFinishedMsgWithError(t *testing.T) {
 		t.Errorf("Input should remain unchanged on error, got '%s'", terminal.input.Value())
 	}
 
-	displayContent := terminal.out.windowBuffer.GetAll(-1)
+	displayContent := terminal.out.WindowBuffer().GetAll(-1)
 	if displayContent == "" {
 		t.Error("Expected error message in display")
 	}
