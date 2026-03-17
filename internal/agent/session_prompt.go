@@ -73,17 +73,9 @@ func (s *Session) processPrompt(ctx context.Context, _ string, history []llm.Mes
 			return nil
 		},
 		OnToolResult: func(toolCallID string, output llm.ToolResultOutput) error {
-			// Add tool result message to session messages
-			s.Messages = append(s.Messages, llm.Message{
-				Role: llm.RoleTool,
-				Content: []llm.ContentPart{llm.ToolResultPart{
-					Type:       "tool_result",
-					ToolCallID: toolCallID,
-					Output:     output,
-				}},
-			})
-
 			// Send tool result status indicator to adaptor
+			// Note: Tool result messages are added to s.Messages by agent.Stream via OnStepFinish,
+			// not here. Adding them here would cause duplicates and out-of-order messages.
 			status := "success"
 			if _, ok := output.(llm.ToolResultOutputError); ok {
 				status = "error"

@@ -100,28 +100,36 @@ func (a *Agent) Stream(
 		totalUsage.OutputTokens += stepUsage.OutputTokens
 		mu.Unlock()
 
-		if callbacks.OnStepFinish != nil {
-			if err := callbacks.OnStepFinish(stepMessages, stepUsage); err != nil {
-				return nil, fmt.Errorf("OnStepFinish callback failed: %w", err)
-			}
-		}
-
 		// If no tool calls, we're done - add the step messages (assistant response)
 		if len(toolCalls) == 0 {
+			if callbacks.OnStepFinish != nil {
+				if err := callbacks.OnStepFinish(stepMessages, stepUsage); err != nil {
+					return nil, fmt.Errorf("OnStepFinish callback failed: %w", err)
+				}
+			}
 			allMessages = append(allMessages, stepMessages...)
 			break
 		}
 
 		// Execute tools and add results to messages
 		toolResults := a.executeTools(ctx, toolCalls, callbacks)
-		allMessages = append(allMessages, Message{
+		assistantMsg := Message{
 			Role:    RoleAssistant,
 			Content: toolCallsToContent(toolCalls),
-		})
-		allMessages = append(allMessages, Message{
+		}
+		toolResultMsg := Message{
 			Role:    RoleTool,
 			Content: toolResults,
-		})
+		}
+		allMessages = append(allMessages, assistantMsg)
+		allMessages = append(allMessages, toolResultMsg)
+
+		// Notify callback with complete step messages (assistant + tool results)
+		if callbacks.OnStepFinish != nil {
+			if err := callbacks.OnStepFinish([]Message{assistantMsg, toolResultMsg}, stepUsage); err != nil {
+				return nil, fmt.Errorf("OnStepFinish callback failed: %w", err)
+			}
+		}
 	}
 
 	return &StreamResult{
