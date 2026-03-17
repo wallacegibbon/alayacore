@@ -124,12 +124,12 @@ type streamState struct {
 	usage        llm.Usage
 
 	// Current block being accumulated
-	currentIndex  int
-	currentType   string
-	currentText   strings.Builder
-	currentInput  strings.Builder
-	currentID     string
-	currentName   string
+	currentIndex int
+	currentType  string
+	currentText  strings.Builder
+	currentInput strings.Builder
+	currentID    string
+	currentName  string
 }
 
 func (s *streamState) startBlock(index int, blockType, id, name string) {
@@ -483,9 +483,9 @@ func (p *AnthropicProvider) handleContentDelta(payload map[string]interface{}, e
 func (p *AnthropicProvider) handleContentBlockStop(payload map[string]interface{}, eventChan chan<- llm.StreamEvent, state *streamState) error {
 	// Get the tool call info before finishBlock() clears it
 	tc := state.lastToolCall()
-	
+
 	state.finishBlock()
-	
+
 	// If we just finished a tool_use block, emit ToolCallEvent
 	if tc != nil {
 		eventChan <- llm.ToolCallEvent{

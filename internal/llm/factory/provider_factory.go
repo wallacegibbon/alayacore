@@ -55,12 +55,3 @@ func NewProvider(config ProviderConfig) (llm.Provider, error) {
 		return nil, fmt.Errorf("unknown provider type: %s", config.Type)
 	}
 }
-
-// ProviderTypeFromURL infers provider type from base URL
-func ProviderTypeFromURL(baseURL string) string {
-	if strings.Contains(baseURL, "api.anthropic.com") {
-		return "anthropic"
-	}
-	// Everything else is treated as OpenAI-compatible (uses OpenAI provider)
-	return "openai"
-}
