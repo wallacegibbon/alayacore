@@ -62,14 +62,14 @@ func (m *StatusModel) SetWidth(width int) {
 
 // RenderString returns the rendered status string
 func (m StatusModel) RenderString() string {
-	// Build status with running indicator
+	// Build status with running indicator (small centered dots)
 	var indicator string
 	if m.inProgress {
-		// Green dot for active
-		indicator = m.styles.Status.Foreground(lipgloss.Color(ColorSuccess)).Render("●")
+		// Small filled dot for active
+		indicator = m.styles.Status.Foreground(lipgloss.Color(ColorSuccess)).Render("•")
 	} else {
-		// Dimmed dot for idle
-		indicator = m.styles.Status.Foreground(lipgloss.Color(ColorDim)).Render("○")
+		// Small hollow dot for idle
+		indicator = m.styles.Status.Foreground(lipgloss.Color(ColorDim)).Render("·")
 	}
 
 	if m.status != "" {
