@@ -143,6 +143,7 @@ Communication between adaptors and session uses a simple Tag-Length-Value (TLV) 
 | `TagFunctionShow` | FS | Output | Function call for display |
 | `TagFunctionCall` | FC | Output | Function call for persistence |
 | `TagFunctionResult` | FR | Output | Function result for persistence |
+| `TagFunctionState` | FO | Output | Function state indicator (pending/success/error) |
 | `TagSystemError` | SE | Output | System error messages |
 | `TagSystemNotify` | SN | Output | System notifications |
 | `TagSystemData` | SD | Output | System data (JSON) |
@@ -213,6 +214,7 @@ base_url: "https://api.openai.com/v1"
 api_key: "sk-..."
 model_name: "gpt-4o"
 context_limit: 128000
+prompt_cache: true  # Optional: enables cache_control for Anthropic APIs
 ---
 name: "Ollama Local"
 protocol_type: "anthropic"
@@ -226,6 +228,10 @@ context_limit: 32768
 ```yaml
 active_model: "OpenAI GPT-4o"
 ```
+
+The active model is determined by:
+1. If `runtime.conf` has a saved `active_model`, that model is used
+2. Otherwise, the **first model** in `model.conf` becomes the active model
 
 ## Key Design Decisions
 

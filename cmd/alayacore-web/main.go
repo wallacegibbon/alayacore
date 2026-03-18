@@ -67,7 +67,7 @@ Usage:
 Flags:
   model-config string  Model config file path (default: ~/.alayacore/model.conf)
   runtime-config string  Runtime config file path (default: ~/.alayacore/runtime.conf)
-  system string     Override system prompt
+  system string     Extra system prompt (can be specified multiple times)
   skill strings     Skills directory path (can be specified multiple times)
   addr string       Server address to listen on (default ":8080")
   session string    Session file path to load/save conversations

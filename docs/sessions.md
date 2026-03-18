@@ -7,7 +7,7 @@ AlayaCore allows you to save and restore conversations manually using session fi
 - **Manual-save**: Sessions are saved only when you use `:save [filename]` or press `Ctrl+S`
 - **Load**: On startup, AlayaCore creates a new empty session unless you specify `--session` to load an existing one
 - **Path expansion**: Paths like `~/mysession.md` are expanded to your home directory
-- **Auto-summarize**: When `--context-limit` is set, AlayaCore automatically triggers `:summarize` when context reaches 80% of the limit to prevent context overflow errors
+- **Auto-summarize**: When `context_limit` is set in the model config, AlayaCore automatically triggers `:summarize` when context reaches 80% of the limit to prevent context overflow errors
 
 ## What's Saved
 
@@ -82,6 +82,7 @@ Each message part is encoded as:
 - `TR` (Text Reasoning) - Reasoning/thinking content
 - `FC` (Function Call) - Tool call (JSON encoded)
 - `FR` (Function Result) - Tool result (JSON encoded)
+- `FO` (Function State) - Function state indicator (pending/success/error)
 
 The TLV (Tag-Length-Value) encoding prevents recursion issues when session files contain tool results that include session-like content. The blank line separators make the file more readable when opened in a text editor.
 

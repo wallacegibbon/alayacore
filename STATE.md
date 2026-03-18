@@ -7,8 +7,6 @@ None
 
 - **SwitchModel deadlock**: Don't hold mutex while calling methods that may need the same mutex. Pattern: lock → update fields → unlock → call methods.
 
-- **Session parsing with NUL**: `splitByMessageSeparators()` only recognizes NUL followed by known message type markers as valid separators. Embedded NUL in content must be preserved.
-
 - **Terminal scroll position**: `userMovedCursorAway` must be set for J/K scrolling, not just j/k, or scroll position is lost on focus switch.
 
 - **Anthropic prompt caching minimum tokens**: System message must be ≥1024 tokens for caching to activate. Shorter prompts won't be cached even with cache_control set.
@@ -26,3 +24,5 @@ None
 - **OpenAI reasoning support**: OpenAI-compatible APIs (DeepSeek, Qwen, etc.) use `reasoning_content` field for thinking tokens. Handled by `openai.go`.
 
 - **Tool result message ordering**: `OnStepFinish` callback receives complete step messages. For tool-using steps, this includes both the assistant message (with tool calls) AND the tool result message. The `OnToolResult` callback should only send UI notifications, not append to session messages - the agent loop handles message assembly.
+
+- **Incomplete tool calls on cancel**: When user cancels mid-tool-call, messages may have `tool_use` without matching `tool_result`. `cleanIncompleteToolCalls()` removes these to prevent API errors on next request.

@@ -53,7 +53,7 @@ type ModelManager struct {
 }
 
 // NewModelManager creates a new model manager
-// If configPath is empty, uses the default path (~/.alayacore/models.json)
+// If configPath is empty, uses the default path (~/.alayacore/model.conf)
 func NewModelManager(configPath string) *ModelManager {
 	var path string
 	var err error

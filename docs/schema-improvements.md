@@ -123,11 +123,11 @@ Supported tags:
 - `/internal/llm/schema_test.go` - Tests for schema generator
 
 ### Updated Tools
-- `internal/tools/write_file.go` - 70 → 30 lines
-- `internal/tools/read_file.go` - 85 → 60 lines
-- `internal/tools/edit_file.go` - 110 → 85 lines
-- `internal/tools/posix_shell.go` - 90 → 65 lines
-- `internal/tools/activate_skill.go` - 45 → 30 lines
+- `internal/tools/write_file.go` - now 39 lines
+- `internal/tools/read_file.go` - now 100 lines
+- `internal/tools/edit_file.go` - now 88 lines
+- `internal/tools/posix_shell.go` - now 84 lines
+- `internal/tools/activate_skill.go` - now 30 lines
 
 ### Removed
 - `/internal/llm/llmcompat/` - Entire package deleted

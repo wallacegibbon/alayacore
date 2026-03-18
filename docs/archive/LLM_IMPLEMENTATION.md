@@ -1,5 +1,7 @@
 # Custom LLM Implementation - Complete ✅
 
+> **Note**: This is a historical document. Some details may be outdated. The `llmcompat` package has been merged into `llm` - use `llm.NewTool` instead of `llmcompat.NewTool`.
+
 ## What We Built
 
 A complete, streaming-only replacement for the `charm.land/fantasy` library with zero external dependencies for HTTP communication.

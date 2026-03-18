@@ -75,7 +75,7 @@ alayacore-web --addr :9090
 
 - `-model-config string` - Model config file path (default: `~/.alayacore/model.conf`)
 - `-runtime-config string` - Runtime config file path (default: same dir as model-config/runtime.conf)
-- `-system string` - Override system prompt
+- `-system string` - Extra system prompt (can be specified multiple times)
 - `-skill string` - Skills directory path (can be specified multiple times)
 - `-session string` - Session file path to load/save conversations
 - `-proxy string` - HTTP proxy URL (supports HTTP, HTTPS, and SOCKS5, e.g., `http://127.0.0.1:7890` or `socks5://127.0.0.1:1080`)
@@ -141,7 +141,7 @@ context_limit: 32768
 ### Model Selection Logic
 
 1. On startup, AlayaCore reads the model config file (from `--model-config` or default location)
-2. The **last model** in the config file becomes the active model
+2. The **first model** in the config file becomes the active model (unless `runtime.conf` has a saved preference)
 3. If no models are available, the program exits with instructions
 
 ### Editing Models
