@@ -325,6 +325,13 @@ func (w *outputWriter) GetStatus() string {
 	return w.status
 }
 
+// IsInProgress returns whether the session has a task in progress
+func (w *outputWriter) IsInProgress() bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.inProgress
+}
+
 // renderMultiline applies a style to each line of text
 func (w *outputWriter) renderMultiline(style lipgloss.Style, value string, trimRight bool) string {
 	lines := strings.Split(value, "\n")

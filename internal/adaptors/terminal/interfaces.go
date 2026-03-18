@@ -24,6 +24,7 @@ type OutputWriter interface {
 	SetWindowWidth(width int)
 	GetStatus() string
 	GetQueueCount() int
+	IsInProgress() bool
 
 	// Model management
 	GetModels() []agentpkg.ModelInfo

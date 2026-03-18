@@ -240,6 +240,7 @@ func (m *Terminal) updateStatusWithQueue() {
 		}
 	}
 	m.status.SetStatus(status)
+	m.status.SetInProgress(m.out.IsInProgress())
 }
 
 // View renders the complete terminal UI.

@@ -2,13 +2,15 @@ package terminal
 
 import (
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 // StatusModel shows the status bar (token usage, etc).
 type StatusModel struct {
-	status string
-	styles *Styles
-	width  int
+	status     string
+	inProgress bool // Whether session has a task in progress
+	styles     *Styles
+	width      int
 }
 
 // NewStatusModel creates a new status model
@@ -43,6 +45,11 @@ func (m *StatusModel) SetStatus(status string) {
 	m.status = status
 }
 
+// SetInProgress updates the in-progress state
+func (m *StatusModel) SetInProgress(inProgress bool) {
+	m.inProgress = inProgress
+}
+
 // GetStatus returns the current status
 func (m StatusModel) GetStatus() string {
 	return m.status
@@ -55,7 +62,20 @@ func (m *StatusModel) SetWidth(width int) {
 
 // RenderString returns the rendered status string
 func (m StatusModel) RenderString() string {
-	return m.styles.Status.Render(m.status)
+	// Build status with running indicator
+	var indicator string
+	if m.inProgress {
+		// Green dot for active
+		indicator = m.styles.Status.Foreground(lipgloss.Color(ColorSuccess)).Render("●")
+	} else {
+		// Dimmed dot for idle
+		indicator = m.styles.Status.Foreground(lipgloss.Color(ColorDim)).Render("○")
+	}
+	
+	if m.status != "" {
+		return indicator + " " + m.styles.Status.Render(m.status)
+	}
+	return indicator
 }
 
 var _ tea.Model = (*StatusModel)(nil)
