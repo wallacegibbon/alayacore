@@ -73,7 +73,8 @@ func (m StatusModel) RenderString() string {
 	}
 
 	if m.status != "" {
-		return indicator + " " + m.styles.Status.Render(m.status)
+		// Don't re-render status - it may already contain ANSI codes
+		return indicator + " " + m.status
 	}
 	return indicator
 }

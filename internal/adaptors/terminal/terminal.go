@@ -6,6 +6,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	agentpkg "github.com/alayacore/alayacore/internal/agent"
 	"github.com/alayacore/alayacore/internal/app"
@@ -233,10 +234,12 @@ func (m *Terminal) updateStatusWithQueue() {
 	status := m.out.GetStatus()
 	queueCount := m.out.GetQueueCount()
 	if queueCount > 0 {
+		// Highlight just the count number
+		countStr := m.styles.Status.Foreground(lipgloss.Color(ColorAccent)).Render(fmt.Sprintf("%d", queueCount))
 		if status != "" {
-			status = fmt.Sprintf("Queued: %d | %s", queueCount, status)
+			status = fmt.Sprintf("Queued(Ctrl-Q): %s | %s", countStr, status)
 		} else {
-			status = fmt.Sprintf("Queued: %d", queueCount)
+			status = fmt.Sprintf("Queued(Ctrl-Q): %s", countStr)
 		}
 	}
 	m.status.SetStatus(status)

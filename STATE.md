@@ -3,6 +3,9 @@
 ## Current Work
 None
 
+## Recent Changes
+- Queue count in status bar shows "Queued(Ctrl-Q): N" with count highlighted; StatusModel.RenderString no longer re-renders to preserve ANSI codes
+
 ## Critical Gotchas
 
 - **SwitchModel deadlock**: Don't hold mutex while calling methods that may need the same mutex. Pattern: lock → update fields → unlock → call methods.
