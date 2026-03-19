@@ -36,6 +36,7 @@ type Settings struct {
 	ModelConfig   string
 	RuntimeConfig string
 	MaxSteps      int
+	Theme         string
 }
 
 // Parse parses CLI flags and returns settings
@@ -53,6 +54,7 @@ func Parse() *Settings {
 	modelConfig := flag.String("model-config", "", "Model config file path (default: ~/.alayacore/model.conf)")
 	runtimeConfig := flag.String("runtime-config", "", "Runtime config file path (default: <model-config-dir>/runtime.conf, or ~/.alayacore/runtime.conf)")
 	maxSteps := flag.Int("max-steps", 50, "Maximum agent loop steps")
+	theme := flag.String("theme", "", "Theme config file path (default: ~/.alayacore/theme.conf)")
 	flag.Parse()
 
 	// Collect skill paths
@@ -77,6 +79,7 @@ func Parse() *Settings {
 		ModelConfig:   *modelConfig,
 		RuntimeConfig: *runtimeConfig,
 		MaxSteps:      *maxSteps,
+		Theme:         *theme,
 	}
 
 	return s

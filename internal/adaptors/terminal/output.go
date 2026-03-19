@@ -42,12 +42,12 @@ type outputWriter struct {
 	lastMaxSteps      int                  // Last max steps from completed task
 }
 
-func NewTerminalOutput() *outputWriter { //nolint:revive // tests need access to internal methods
+func NewTerminalOutput(styles *Styles) *outputWriter { //nolint:revive // tests need access to internal methods
 	to := &outputWriter{
-		windowBuffer: NewWindowBuffer(DefaultWidth),
+		windowBuffer: NewWindowBuffer(DefaultWidth, styles),
 		updateChan:   make(chan struct{}, 1),
 		done:         make(chan struct{}),
-		styles:       DefaultStyles(),
+		styles:       styles,
 		lastUpdate:   time.Now(),
 	}
 	// Start background update flusher

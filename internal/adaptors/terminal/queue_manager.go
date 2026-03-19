@@ -182,9 +182,9 @@ func (qm *QueueManager) View() string {
 
 	// Wrap in border with same style as input box
 	// Dim border when app doesn't have focus
-	borderColor := ColorAccent
+	borderColor := qm.styles.BorderFocused
 	if !qm.hasFocus {
-		borderColor = ColorDim
+		borderColor = qm.styles.BorderBlurred
 	}
 	content := strings.Join(lines, "\n")
 	borderedBox := qm.styles.RenderBorderedBox(content, qm.width, borderColor, listHeight)

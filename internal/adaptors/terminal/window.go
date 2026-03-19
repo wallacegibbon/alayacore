@@ -51,18 +51,18 @@ type WindowBuffer struct {
 	viewportHeight  int // viewport height in lines (0 = disabled, use full render)
 }
 
-// NewWindowBuffer creates a new window buffer with given width.
-func NewWindowBuffer(width int) *WindowBuffer {
+// NewWindowBuffer creates a new window buffer with given width and styles.
+func NewWindowBuffer(width int, styles *Styles) *WindowBuffer {
 	// Dimmed border: rounded border with invisible color (matches background)
 	dimmedBorder := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color(ColorBase)).
+		BorderForeground(styles.ColorBase).
 		Padding(0, 1)
 
 	// Highlighted border for cursor
 	cursorBorder := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color(ColorPeach)).
+		BorderForeground(styles.BorderCursor).
 		Padding(0, 1)
 
 	return &WindowBuffer{
@@ -71,7 +71,7 @@ func NewWindowBuffer(width int) *WindowBuffer {
 		width:       width,
 		borderStyle: dimmedBorder,
 		cursorStyle: cursorBorder,
-		styles:      DefaultStyles(),
+		styles:      styles,
 		lineHeights: []int{},
 	}
 }

@@ -8,7 +8,7 @@ import (
 )
 
 func TestWrapIndicator(t *testing.T) {
-	wb := NewWindowBuffer(80)
+	wb := NewWindowBuffer(80, DefaultStyles())
 
 	// Create a tool window with VERY long content that will definitely wrap to more than 5 lines
 	// At 76 chars inner width, we need more than 380 characters to get 6+ lines
@@ -34,7 +34,7 @@ func TestWrapIndicator(t *testing.T) {
 }
 
 func TestWrapIndicatorColor(t *testing.T) {
-	wb := NewWindowBuffer(80)
+	wb := NewWindowBuffer(80, DefaultStyles())
 
 	// Create a diff window with many lines
 	lines := make([]DiffLinePair, 20)

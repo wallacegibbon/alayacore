@@ -27,19 +27,19 @@ func (wb *WindowBuffer) renderDiffContent(diff *DiffContainer, innerWidth int, s
 	var indicator string
 	if status == "success" {
 		indicator = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(ColorSuccess)).
+			Foreground(wb.styles.ColorSuccess).
 			Render("• ")
 	} else if status == "error" {
 		indicator = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(ColorError)).
+			Foreground(wb.styles.ColorError).
 			Render("• ")
 	} else if status == "pending" {
 		indicator = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(ColorDim)).
+			Foreground(wb.styles.ColorDim).
 			Render("• ")
 	} else {
 		indicator = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(ColorDim)).
+			Foreground(wb.styles.ColorDim).
 			Render("· ")
 	}
 	header := indicator + wb.styles.Tool.Render("edit_file: ") + wb.styles.ToolContent.Render(diff.Path)

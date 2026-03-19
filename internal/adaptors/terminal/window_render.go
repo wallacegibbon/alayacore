@@ -187,7 +187,7 @@ func (wb *WindowBuffer) renderWindowContent(w *Window, innerWidth int) string {
 
 				// Create full-width tricolon separator with border color
 				wrapIndicator := lipgloss.NewStyle().
-					Foreground(lipgloss.Color(ColorBase)).
+					Foreground(wb.styles.ColorBase).
 					Render(strings.Repeat("⁝", innerWidth))
 
 				// Show first line, separator, last 3 lines
@@ -205,22 +205,22 @@ func (wb *WindowBuffer) renderWindowContent(w *Window, innerWidth int) string {
 		if w.Status == "success" {
 			// Green filled dot
 			indicator = lipgloss.NewStyle().
-				Foreground(lipgloss.Color(ColorSuccess)).
+				Foreground(wb.styles.ColorSuccess).
 				Render("• ")
 		} else if w.Status == "error" {
 			// Red filled dot
 			indicator = lipgloss.NewStyle().
-				Foreground(lipgloss.Color(ColorError)).
+				Foreground(wb.styles.ColorError).
 				Render("• ")
 		} else if w.Status == "pending" {
 			// Dimmed filled dot for pending
 			indicator = lipgloss.NewStyle().
-				Foreground(lipgloss.Color(ColorDim)).
+				Foreground(wb.styles.ColorDim).
 				Render("• ")
 		} else {
 			// Default: dimmed hollow dot (for loaded sessions without status)
 			indicator = lipgloss.NewStyle().
-				Foreground(lipgloss.Color(ColorDim)).
+				Foreground(wb.styles.ColorDim).
 				Render("· ")
 		}
 		content = indicator + content
@@ -239,7 +239,7 @@ func (wb *WindowBuffer) renderWindowContent(w *Window, innerWidth int) string {
 
 			// Create full-width tricolon separator with border color
 			wrapIndicator := lipgloss.NewStyle().
-				Foreground(lipgloss.Color(ColorBase)).
+				Foreground(wb.styles.ColorBase).
 				Render(strings.Repeat("⁝", innerWidth))
 
 			// Show first line, separator, last 3 lines

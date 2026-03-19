@@ -15,7 +15,7 @@ func visibleLength(s string) int {
 }
 
 func TestCtrlOOpensEditor(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 
 	msg := tea.KeyPressMsg(tea.Key{
 		Code: 'o',
@@ -34,7 +34,7 @@ func TestCtrlOOpensEditor(t *testing.T) {
 }
 
 func TestCtrlOWithExistingContent(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 	terminal.input.SetValue("existing input text")
 
 	msg := tea.KeyPressMsg(tea.Key{
@@ -58,7 +58,7 @@ func TestCtrlOWithExistingContent(t *testing.T) {
 }
 
 func TestEditorFinishedMsg(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 
 	msg := editorFinishedMsg{
 		content: "test content from editor",
@@ -84,7 +84,7 @@ func TestEditorFinishedMsg(t *testing.T) {
 }
 
 func TestEditorFinishedMsgWithWhitespace(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 
 	msg := editorFinishedMsg{
 		content: "  content with leading and trailing spaces  \n",
@@ -104,7 +104,7 @@ func TestEditorFinishedMsgWithWhitespace(t *testing.T) {
 }
 
 func TestEditorContentSubmittedOnEnter(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 	terminal.input.editorContent = "line1\nline2\nline3"
 
 	// editorContent is cleared before submission when Enter is pressed
@@ -115,7 +115,7 @@ func TestEditorContentSubmittedOnEnter(t *testing.T) {
 }
 
 func TestEditorContentUsedInsteadOfInputValue(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 	terminal.input.editorContent = "editor content"
 	terminal.input.SetValue("input value")
 
@@ -127,7 +127,7 @@ func TestEditorContentUsedInsteadOfInputValue(t *testing.T) {
 }
 
 func TestEditorFinishedMsgWithError(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 	terminal.input.SetValue("original content")
 
 	msg := editorFinishedMsg{
@@ -167,7 +167,7 @@ func TestEditorSelectionOrder(t *testing.T) {
 func TestRenderMultiline(t *testing.T) {
 	// Note: lipgloss.SetColorProfile is no longer needed in v2
 
-	output := NewTerminalOutput()
+	output := NewTerminalOutput(DefaultStyles())
 	// Use existing reasoning style which should produce ANSI codes
 	style := output.styles.Reasoning
 	// First test direct rendering
@@ -201,7 +201,7 @@ func TestRenderMultiline(t *testing.T) {
 func TestColorizeToolMultiline(t *testing.T) {
 	// Note: lipgloss.SetColorProfile is no longer needed in v2
 
-	output := NewTerminalOutput()
+	output := NewTerminalOutput(DefaultStyles())
 	// Test multiline tool output with colon on first line
 	value := "tool_name: first line\nsecond line\nthird line"
 	result := output.colorizeTool(value)
@@ -225,7 +225,7 @@ func TestWordwrapPreservesANSI(t *testing.T) {
 	// Note: lipgloss.SetColorProfile is no longer needed in v2
 
 	// Create a styled line with ANSI escape sequences (dimmed reasoning style)
-	style := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSurface1)).Italic(true)
+	style := lipgloss.NewStyle().Foreground(lipgloss.Color("#585b70")).Italic(true)
 	styledText := style.Render("This is a long line of reasoning text that should wrap when width is limited.")
 
 	// Test wrapping at various widths
@@ -257,7 +257,7 @@ func TestWordwrapPreservesANSI(t *testing.T) {
 }
 
 func TestCtrlCClearsInput(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 	terminal.input.SetValue("test input text")
 
 	// Press Ctrl+C while in input window
@@ -284,7 +284,7 @@ func TestCtrlCClearsInput(t *testing.T) {
 }
 
 func TestCtrlCInDisplayWindow(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 	terminal.input.SetValue("test input text")
 
 	// Press Ctrl+C while in display window
@@ -311,7 +311,7 @@ func TestCtrlCInDisplayWindow(t *testing.T) {
 }
 
 func TestCtrlGTriggersCancel(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 	terminal.input.SetValue("test input text")
 
 	// Press Ctrl+G (should work regardless of focus)
@@ -355,7 +355,7 @@ func TestCtrlGTriggersCancel(t *testing.T) {
 }
 
 func TestCtrlUDoesNothingInInput(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 	terminal.input.SetValue("test input text")
 
 	// Press Ctrl+U while in input window
@@ -382,7 +382,7 @@ func TestCtrlUDoesNothingInInput(t *testing.T) {
 }
 
 func TestWindowBufferDeltaRouting(t *testing.T) {
-	out := NewTerminalOutput()
+	out := NewTerminalOutput(DefaultStyles())
 	// Write assistant text delta with stream ID
 	err := stream.WriteTLV(out, stream.TagTextAssistant, "[:stream1:]Hello")
 	if err != nil {
@@ -433,7 +433,7 @@ func TestWindowBufferDeltaRouting(t *testing.T) {
 }
 
 func TestWindowBufferRendering(t *testing.T) {
-	wb := NewWindowBuffer(30)
+	wb := NewWindowBuffer(30, DefaultStyles())
 	// Add a window with some content
 	wb.AppendOrUpdate("test1", stream.TagTextAssistant, "Hello world")
 	// Get rendered output
@@ -465,7 +465,7 @@ func TestWindowBufferRendering(t *testing.T) {
 }
 
 func TestWindowBufferNonDeltaMessages(t *testing.T) {
-	out := NewTerminalOutput()
+	out := NewTerminalOutput(DefaultStyles())
 	// Write a non-delta message (TagSystemError)
 	err := stream.WriteTLV(out, stream.TagSystemError, "Something went wrong")
 	if err != nil {
@@ -495,7 +495,7 @@ func TestWindowBufferNonDeltaMessages(t *testing.T) {
 }
 
 func TestWindowBufferEdgeCases(t *testing.T) {
-	out := NewTerminalOutput()
+	out := NewTerminalOutput(DefaultStyles())
 	// Delta message with malformed stream ID (missing closing bracket)
 	err := stream.WriteTLV(out, stream.TagTextAssistant, "[:stream1Hello")
 	if err != nil {
@@ -539,7 +539,7 @@ func TestWindowBufferEdgeCases(t *testing.T) {
 func TestWindowBufferWidth(t *testing.T) {
 	// Test that window width matches expected total width
 	const totalWidth = 50
-	wb := NewWindowBuffer(totalWidth)
+	wb := NewWindowBuffer(totalWidth, DefaultStyles())
 	wb.AppendOrUpdate("test", stream.TagTextAssistant, "Hello")
 	rendered := wb.GetAll(-1)
 	// Find first line (top border)
@@ -575,7 +575,7 @@ func TestWindowBufferWidthMatchesInput(t *testing.T) {
 			// Input box total width = terminalWidth (border includes padding and border chars)
 			inputTotalWidth := terminalWidth
 			// Window buffer width should be same as input total width
-			wb := NewWindowBuffer(inputTotalWidth)
+			wb := NewWindowBuffer(inputTotalWidth, DefaultStyles())
 			// Create a window
 			wb.AppendOrUpdate("test", stream.TagTextAssistant, "Content")
 			rendered := wb.GetAll(-1)

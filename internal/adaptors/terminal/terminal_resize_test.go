@@ -12,7 +12,7 @@ import (
 // validated when the terminal is resized.
 func TestTerminalResizeCursorValidation(t *testing.T) {
 	// Create a terminal with initial size
-	output := NewTerminalOutput()
+	output := NewTerminalOutput(DefaultStyles())
 	input := stream.NewChanInput(10)
 	terminal := NewTerminal(nil, output, input, nil, 80, 24)
 
@@ -49,7 +49,7 @@ func TestTerminalResizeCursorValidation(t *testing.T) {
 // TestTerminalResizeClampsCursor tests that cursor is clamped when windows
 // change height during resize.
 func TestTerminalResizeClampsCursor(t *testing.T) {
-	output := NewTerminalOutput()
+	output := NewTerminalOutput(DefaultStyles())
 	input := stream.NewChanInput(10)
 	terminal := NewTerminal(nil, output, input, nil, 80, 24)
 
@@ -88,7 +88,7 @@ func TestTerminalResizeClampsCursor(t *testing.T) {
 // immediately re-rendered when the terminal is resized (fixes blank display bug).
 func TestTerminalResizeUpdatesDisplayContent(t *testing.T) {
 	// Create a terminal with initial size
-	output := NewTerminalOutput()
+	output := NewTerminalOutput(DefaultStyles())
 	input := stream.NewChanInput(10)
 	terminal := NewTerminal(nil, output, input, nil, 80, 24)
 

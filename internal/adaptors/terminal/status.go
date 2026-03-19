@@ -2,7 +2,6 @@ package terminal
 
 import (
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 )
 
 // StatusModel shows the status bar (token usage, etc).
@@ -66,10 +65,10 @@ func (m StatusModel) RenderString() string {
 	var indicator string
 	if m.inProgress {
 		// Small filled dot for active
-		indicator = m.styles.Status.Foreground(lipgloss.Color(ColorSuccess)).Render("•")
+		indicator = m.styles.Status.Foreground(m.styles.ColorSuccess).Render("•")
 	} else {
 		// Small hollow dot for idle
-		indicator = m.styles.Status.Foreground(lipgloss.Color(ColorDim)).Render("·")
+		indicator = m.styles.Status.Foreground(m.styles.ColorDim).Render("·")
 	}
 
 	if m.status != "" {

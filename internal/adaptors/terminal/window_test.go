@@ -9,14 +9,14 @@ import (
 
 func TestWindowBuffer(t *testing.T) {
 	t.Run("new buffer has correct width", func(t *testing.T) {
-		wb := NewWindowBuffer(80)
+		wb := NewWindowBuffer(80, DefaultStyles())
 		if wb.Width() != 80 {
 			t.Errorf("Width() = %d, want 80", wb.Width())
 		}
 	})
 
 	t.Run("set width updates width", func(t *testing.T) {
-		wb := NewWindowBuffer(80)
+		wb := NewWindowBuffer(80, DefaultStyles())
 		wb.SetWidth(120)
 		if wb.Width() != 120 {
 			t.Errorf("Width() = %d, want 120", wb.Width())
@@ -24,7 +24,7 @@ func TestWindowBuffer(t *testing.T) {
 	})
 
 	t.Run("append creates new window", func(t *testing.T) {
-		wb := NewWindowBuffer(80)
+		wb := NewWindowBuffer(80, DefaultStyles())
 		wb.AppendOrUpdate("window-1", stream.TagTextAssistant, "Hello")
 
 		if len(wb.Windows) != 1 {
@@ -36,7 +36,7 @@ func TestWindowBuffer(t *testing.T) {
 	})
 
 	t.Run("update appends to existing window", func(t *testing.T) {
-		wb := NewWindowBuffer(80)
+		wb := NewWindowBuffer(80, DefaultStyles())
 		wb.AppendOrUpdate("window-1", stream.TagTextAssistant, "Hello")
 		wb.AppendOrUpdate("window-1", stream.TagTextAssistant, " World")
 
@@ -52,7 +52,7 @@ func TestWindowBuffer(t *testing.T) {
 	})
 
 	t.Run("multiple windows", func(t *testing.T) {
-		wb := NewWindowBuffer(80)
+		wb := NewWindowBuffer(80, DefaultStyles())
 		wb.AppendOrUpdate("window-1", stream.TagTextAssistant, "First")
 		wb.AppendOrUpdate("window-2", stream.TagTextAssistant, "Second")
 		wb.AppendOrUpdate("window-3", stream.TagTextAssistant, "Third")
@@ -63,7 +63,7 @@ func TestWindowBuffer(t *testing.T) {
 	})
 
 	t.Run("get window count", func(t *testing.T) {
-		wb := NewWindowBuffer(80)
+		wb := NewWindowBuffer(80, DefaultStyles())
 		if wb.GetWindowCount() != 0 {
 			t.Errorf("GetWindowCount() = %d, want 0", wb.GetWindowCount())
 		}
@@ -80,7 +80,7 @@ func TestWindowBuffer(t *testing.T) {
 	})
 
 	t.Run("get all returns empty for empty buffer", func(t *testing.T) {
-		wb := NewWindowBuffer(80)
+		wb := NewWindowBuffer(80, DefaultStyles())
 		content := wb.GetAll(-1)
 		if content != "" {
 			t.Errorf("GetAll() = %q, want empty", content)
@@ -88,7 +88,7 @@ func TestWindowBuffer(t *testing.T) {
 	})
 
 	t.Run("get all returns content", func(t *testing.T) {
-		wb := NewWindowBuffer(80)
+		wb := NewWindowBuffer(80, DefaultStyles())
 		wb.AppendOrUpdate("window-1", stream.TagTextAssistant, "Hello")
 		content := wb.GetAll(-1)
 		if content == "" {
@@ -99,7 +99,7 @@ func TestWindowBuffer(t *testing.T) {
 	t.Run("delete window", func(t *testing.T) {
 		// DeleteWindow is not exposed on WindowBuffer
 		// This test verifies the buffer structure is correct
-		wb := NewWindowBuffer(80)
+		wb := NewWindowBuffer(80, DefaultStyles())
 		wb.AppendOrUpdate("window-1", stream.TagTextAssistant, "First")
 		wb.AppendOrUpdate("window-2", stream.TagTextAssistant, "Second")
 
@@ -111,13 +111,13 @@ func TestWindowBuffer(t *testing.T) {
 
 func TestWindowBufferViewport(t *testing.T) {
 	t.Run("set viewport position", func(_ *testing.T) {
-		wb := NewWindowBuffer(80)
+		wb := NewWindowBuffer(80, DefaultStyles())
 		wb.SetViewportPosition(10, 20)
 		// Should not panic
 	})
 
 	t.Run("get total lines virtual", func(t *testing.T) {
-		wb := NewWindowBuffer(80)
+		wb := NewWindowBuffer(80, DefaultStyles())
 		wb.AppendOrUpdate("window-1", stream.TagTextAssistant, strings.Repeat("line\n", 10))
 		// Should return total lines
 		lines := wb.GetTotalLinesVirtual()
@@ -129,7 +129,7 @@ func TestWindowBufferViewport(t *testing.T) {
 
 func TestWindowBufferDiff(t *testing.T) {
 	t.Run("append diff content", func(t *testing.T) {
-		wb := NewWindowBuffer(80)
+		wb := NewWindowBuffer(80, DefaultStyles())
 		// Diff windows are created differently, this tests the structure
 		wb.AppendOrUpdate("diff-1", stream.TagFunctionNotify, "diff content")
 
@@ -139,7 +139,7 @@ func TestWindowBufferDiff(t *testing.T) {
 	})
 
 	t.Run("diff window folds when wrapped", func(t *testing.T) {
-		wb := NewWindowBuffer(80)
+		wb := NewWindowBuffer(80, DefaultStyles())
 
 		// Create a diff with many lines
 		lines := make([]DiffLinePair, 20)
@@ -175,7 +175,7 @@ func TestWindowBufferDiff(t *testing.T) {
 	})
 
 	t.Run("diff window expands when unwrapped", func(t *testing.T) {
-		wb := NewWindowBuffer(80)
+		wb := NewWindowBuffer(80, DefaultStyles())
 
 		// Create a diff with many lines
 		lines := make([]DiffLinePair, 10)
@@ -203,7 +203,7 @@ func TestWindowBufferDiff(t *testing.T) {
 	})
 
 	t.Run("diff window shows minimal prefixes", func(t *testing.T) {
-		wb := NewWindowBuffer(80)
+		wb := NewWindowBuffer(80, DefaultStyles())
 
 		// Create a diff with unchanged, added, and removed lines
 		lines := []DiffLinePair{
@@ -249,7 +249,7 @@ func TestWindowBufferDiff(t *testing.T) {
 	})
 
 	t.Run("diff window cache invalidates when wrapped changes", func(t *testing.T) {
-		wb := NewWindowBuffer(80)
+		wb := NewWindowBuffer(80, DefaultStyles())
 
 		// Create a diff with many lines
 		lines := make([]DiffLinePair, 20)

@@ -19,13 +19,22 @@ import (
 
 // Adaptor starts the TUI; use from main/app.
 type Adaptor struct {
-	Config *app.Config
+	Config    *app.Config
+	ThemePath string
 }
 
 // NewAdaptor creates a new Terminal adaptor.
 func NewAdaptor(cfg *app.Config) *Adaptor {
 	return &Adaptor{
 		Config: cfg,
+	}
+}
+
+// NewAdaptorWithTheme creates a new Terminal adaptor with a custom theme path.
+func NewAdaptorWithTheme(cfg *app.Config, themePath string) *Adaptor {
+	return &Adaptor{
+		Config:    cfg,
+		ThemePath: themePath,
 	}
 }
 
@@ -42,8 +51,12 @@ func getTerminalSize() (width, height int) {
 
 // Start runs the Terminal program.
 func (a *Adaptor) Start() {
+	// Load theme from config paths
+	theme := LoadThemeFromPaths(a.ThemePath)
+	styles := NewStyles(theme)
+
 	inputStream := stream.NewChanInput(10)
-	terminalOutput := NewTerminalOutput()
+	terminalOutput := NewTerminalOutput(styles)
 
 	// Get terminal size before loading session (so session loads with correct dimensions)
 	initialWidth, initialHeight := getTerminalSize()
@@ -92,8 +105,8 @@ context_limit: 32768`)
 		os.Exit(1)
 	}
 
-	// Create terminal with loaded session and initial window size
-	t := NewTerminal(session, terminalOutput, inputStream, a.Config, initialWidth, initialHeight)
+	// Create terminal with loaded session, initial window size, and theme
+	t := NewTerminalWithTheme(session, terminalOutput, inputStream, a.Config, initialWidth, initialHeight, theme)
 
 	// Create and run the program
 	p := tea.NewProgram(t, tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))

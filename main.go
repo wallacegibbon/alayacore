@@ -28,7 +28,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	adaptor := terminal.NewAdaptor(appCfg)
+	adaptor := terminal.NewAdaptorWithTheme(appCfg, cfg.Theme)
 	adaptor.Start()
 }
 
@@ -45,6 +45,7 @@ Flags:
   --skill strings         Skill path (can be specified multiple times)
   --session string        Session file path to load/save conversations
   --proxy string          HTTP proxy URL (e.g., http://127.0.0.1:7890 or socks5://127.0.0.1:1080)
+  --theme string          Theme config file path (default: ~/.alayacore/theme.conf)
   --max-steps int         Maximum agent loop steps (default: 50)
   --debug-api             Write raw API requests and responses to log file
   --version               Show version information
@@ -59,6 +60,7 @@ Examples:
   alayacore --skill ./skills1 --skill ./skills2
   alayacore --proxy http://127.0.0.1:7890
   alayacore --model-config ./my-model.conf
+  alayacore --theme ./my-theme.conf
   alayacore --max-steps 100
 
 Model config example (~/.alayacore/model.conf):

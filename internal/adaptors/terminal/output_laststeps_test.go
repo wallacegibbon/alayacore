@@ -8,7 +8,7 @@ import (
 )
 
 func TestLastMaxStepsPreservation(t *testing.T) {
-	w := NewTerminalOutput()
+	w := NewTerminalOutput(DefaultStyles())
 
 	// Simulate a task in progress with max steps = 10, current step = 5
 	systemInfoInProgress := agentpkg.SystemInfo{
@@ -75,7 +75,7 @@ func TestLastMaxStepsPreservation(t *testing.T) {
 }
 
 func TestLastMaxStepsZeroOnStart(t *testing.T) {
-	w := NewTerminalOutput()
+	w := NewTerminalOutput(DefaultStyles())
 
 	// Initial state - no last step info
 	lastCurrent, lastMax := w.GetLastStepInfo()
@@ -99,7 +99,7 @@ func TestLastMaxStepsZeroOnStart(t *testing.T) {
 }
 
 func TestLastMaxStepsNotUpdatedWithoutTransition(t *testing.T) {
-	w := NewTerminalOutput()
+	w := NewTerminalOutput(DefaultStyles())
 
 	// Send multiple in-progress updates
 	for i := 1; i <= 3; i++ {

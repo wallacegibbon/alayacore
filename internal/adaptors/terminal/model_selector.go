@@ -2,6 +2,7 @@ package terminal
 
 import (
 	"fmt"
+	"image/color"
 	"os"
 	"os/exec"
 	"strings"
@@ -369,9 +370,9 @@ func (ms *ModelSelector) renderList() string {
 
 	// When app doesn't have focus, dim all borders
 	// Search input with border
-	searchBorderColor := ColorAccent
+	searchBorderColor := ms.styles.BorderFocused
 	if !ms.hasFocus || !ms.searchInputFocused {
-		searchBorderColor = ColorDim
+		searchBorderColor = ms.styles.BorderBlurred
 	}
 	searchBox := ms.styles.RenderBorderedBox(ms.searchInput.View(), ms.width, searchBorderColor)
 
@@ -386,9 +387,9 @@ func (ms *ModelSelector) renderList() string {
 	}
 
 	// Model list - bright border when list is focused
-	listBorderColor := ColorAccent
+	listBorderColor := ms.styles.BorderFocused
 	if !ms.hasFocus || ms.searchInputFocused {
-		listBorderColor = ColorDim
+		listBorderColor = ms.styles.BorderBlurred
 	}
 	sb.WriteString(ms.renderModelList(lipgloss.Width(searchBox), listBorderColor))
 
@@ -403,7 +404,7 @@ func (ms *ModelSelector) renderList() string {
 	return sb.String()
 }
 
-func (ms *ModelSelector) renderModelList(width int, borderColor string) string {
+func (ms *ModelSelector) renderModelList(width int, borderColor color.Color) string {
 	var content strings.Builder
 	listHeight := 8 // 8 content rows inside border
 
@@ -529,13 +530,14 @@ func (ms *ModelSelector) updateSearchInputStyles() {
 	// When app doesn't have focus, always show blurred/dimmed styles
 	if ms.searchInputFocused && ms.hasFocus {
 		styles = textinput.DefaultStyles(true)
-		styles.Focused.Prompt = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorAccent)).Bold(true)
-		styles.Focused.Placeholder = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorMuted))
+		styles.Focused.Prompt = lipgloss.NewStyle().Foreground(ms.styles.ColorAccent).Bold(true)
+		styles.Focused.Placeholder = lipgloss.NewStyle().Foreground(ms.styles.ColorMuted)
 	} else {
 		styles = textinput.DefaultStyles(false)
-		styles.Blurred.Prompt = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorMuted))
-		styles.Blurred.Placeholder = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorDim))
+		styles.Blurred.Prompt = lipgloss.NewStyle().Foreground(ms.styles.ColorMuted)
+		styles.Blurred.Placeholder = lipgloss.NewStyle().Foreground(ms.styles.ColorDim)
 	}
+	styles.Cursor.Color = ms.styles.CursorColor
 	ms.searchInput.SetStyles(styles)
 }
 

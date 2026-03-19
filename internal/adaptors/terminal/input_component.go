@@ -72,10 +72,11 @@ func (m InputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // View renders the input field
 func (m InputModel) View() tea.View {
 	styles := textinput.DefaultStyles(true)
-	styles.Focused.Prompt = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorAccent)).Bold(true)
-	styles.Blurred.Prompt = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorDim)).Bold(true)
+	styles.Focused.Prompt = lipgloss.NewStyle().Foreground(m.styles.ColorAccent).Bold(true)
+	styles.Blurred.Prompt = lipgloss.NewStyle().Foreground(m.styles.ColorDim).Bold(true)
 	styles.Focused.Text = lipgloss.NewStyle()
-	styles.Blurred.Text = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorDim))
+	styles.Blurred.Text = lipgloss.NewStyle().Foreground(m.styles.ColorDim)
+	styles.Cursor.Color = m.styles.CursorColor
 	m.input.SetStyles(styles)
 
 	return tea.NewView(m.input.View())
@@ -143,17 +144,18 @@ func (m InputModel) OpenEditor() tea.Cmd {
 
 // RenderWithBorder renders the input with a border
 func (m InputModel) RenderWithBorder(confirmDialog bool, confirmText string) string {
-	borderColor := ColorAccent
+	borderColor := m.styles.BorderFocused
 	if !m.focused {
-		borderColor = ColorDim
+		borderColor = m.styles.BorderBlurred
 	}
 
 	// Set input styles based on focus state
 	styles := textinput.DefaultStyles(true)
-	styles.Focused.Prompt = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorAccent)).Bold(true)
-	styles.Blurred.Prompt = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorDim)).Bold(true)
+	styles.Focused.Prompt = lipgloss.NewStyle().Foreground(m.styles.ColorAccent).Bold(true)
+	styles.Blurred.Prompt = lipgloss.NewStyle().Foreground(m.styles.ColorDim).Bold(true)
 	styles.Focused.Text = lipgloss.NewStyle()
-	styles.Blurred.Text = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorDim))
+	styles.Blurred.Text = lipgloss.NewStyle().Foreground(m.styles.ColorDim)
+	styles.Cursor.Color = m.styles.CursorColor
 	m.input.SetStyles(styles)
 
 	if confirmDialog {

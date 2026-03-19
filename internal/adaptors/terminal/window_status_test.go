@@ -7,7 +7,7 @@ import (
 )
 
 func TestUpdateToolStatus(t *testing.T) {
-	wb := NewWindowBuffer(80)
+	wb := NewWindowBuffer(80, DefaultStyles())
 
 	// Create a tool window
 	wb.AppendOrUpdate("tool123", stream.TagFunctionNotify, "posix_shell: git status")
@@ -51,7 +51,7 @@ func TestUpdateToolStatus(t *testing.T) {
 }
 
 func TestRenderWindowContentWithStatus(t *testing.T) {
-	wb := NewWindowBuffer(80)
+	wb := NewWindowBuffer(80, DefaultStyles())
 
 	// Create a tool window
 	wb.AppendOrUpdate("tool123", stream.TagFunctionNotify, "posix_shell: git status")

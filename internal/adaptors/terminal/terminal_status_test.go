@@ -9,7 +9,7 @@ import (
 
 func TestStatusBarShowsLastMaxSteps(t *testing.T) {
 	// Create output writer and simulate task completion
-	out := NewTerminalOutput()
+	out := NewTerminalOutput(DefaultStyles())
 
 	// Simulate task in progress with max steps = 50, current step = 2
 	systemInfoInProgress := agentpkg.SystemInfo{
@@ -56,7 +56,7 @@ func TestStatusBarShowsLastMaxSteps(t *testing.T) {
 
 func TestStatusBarShowsCurrentStepsDuringProgress(t *testing.T) {
 	// Create output writer and simulate task in progress
-	out := NewTerminalOutput()
+	out := NewTerminalOutput(DefaultStyles())
 
 	// Simulate task in progress
 	systemInfoInProgress := agentpkg.SystemInfo{

@@ -8,7 +8,7 @@ import (
 
 func TestValidateCursor_ClampsOutOfRangeCursor(t *testing.T) {
 	// Create a display with a window buffer
-	wb := NewWindowBuffer(80)
+	wb := NewWindowBuffer(80, DefaultStyles())
 	display := NewDisplayModel(wb, DefaultStyles())
 
 	// Add some windows
@@ -34,7 +34,7 @@ func TestValidateCursor_ClampsOutOfRangeCursor(t *testing.T) {
 }
 
 func TestValidateCursor_HandlesNegativeCursor(t *testing.T) {
-	wb := NewWindowBuffer(80)
+	wb := NewWindowBuffer(80, DefaultStyles())
 	display := NewDisplayModel(wb, DefaultStyles())
 
 	// Add some windows
@@ -53,7 +53,7 @@ func TestValidateCursor_HandlesNegativeCursor(t *testing.T) {
 }
 
 func TestValidateCursor_HandlesEmptyBuffer(t *testing.T) {
-	wb := NewWindowBuffer(80)
+	wb := NewWindowBuffer(80, DefaultStyles())
 	display := NewDisplayModel(wb, DefaultStyles())
 
 	// No windows added, cursor should stay at -1
@@ -68,7 +68,7 @@ func TestValidateCursor_HandlesEmptyBuffer(t *testing.T) {
 }
 
 func TestValidateCursor_KeepsValidCursor(t *testing.T) {
-	wb := NewWindowBuffer(80)
+	wb := NewWindowBuffer(80, DefaultStyles())
 	display := NewDisplayModel(wb, DefaultStyles())
 
 	// Add windows

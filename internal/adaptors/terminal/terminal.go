@@ -6,7 +6,6 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 
 	agentpkg "github.com/alayacore/alayacore/internal/agent"
 	"github.com/alayacore/alayacore/internal/app"
@@ -54,7 +53,19 @@ func NewTerminal(
 	appCfg *app.Config,
 	initialWidth, initialHeight int,
 ) *Terminal {
-	styles := DefaultStyles()
+	return NewTerminalWithTheme(session, out, inputStream, appCfg, initialWidth, initialHeight, DefaultTheme())
+}
+
+// NewTerminalWithTheme creates a new Terminal model with a custom theme.
+func NewTerminalWithTheme(
+	session *agentpkg.Session,
+	out OutputWriter,
+	inputStream *stream.ChanInput,
+	appCfg *app.Config,
+	initialWidth, initialHeight int,
+	theme *Theme,
+) *Terminal {
+	styles := NewStyles(theme)
 
 	m := &Terminal{
 		session:       session,
@@ -246,7 +257,7 @@ func (m *Terminal) updateStatusWithQueue() {
 	// Queue segment - prefix dimmed, count highlighted
 	if queueCount > 0 {
 		prefix := m.styles.Status.Render("Queued(Ctrl-Q):")
-		count := m.styles.Status.Foreground(lipgloss.Color(ColorAccent)).Render(fmt.Sprintf("%d", queueCount))
+		count := m.styles.Status.Foreground(m.styles.ColorAccent).Render(fmt.Sprintf("%d", queueCount))
 		segments = append(segments, prefix+" "+count)
 	}
 
