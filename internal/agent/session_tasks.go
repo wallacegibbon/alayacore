@@ -100,9 +100,6 @@ func (s *Session) setInProgress(v bool) {
 	s.mu.Lock()
 	changed := s.inProgress != v
 	s.inProgress = v
-	if !v {
-		s.currentStep = 0
-	}
 	s.mu.Unlock()
 	if changed {
 		s.sendSystemInfo()
@@ -119,6 +116,11 @@ func (s *Session) runTask(item QueueItem) {
 		s.sendSystemInfo()
 		return
 	}
+
+	// Reset step counter for new task
+	s.mu.Lock()
+	s.currentStep = 0
+	s.mu.Unlock()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	s.mu.Lock()

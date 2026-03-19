@@ -61,7 +61,7 @@ func TestLastMaxStepsPreservation(t *testing.T) {
 	data = marshalSystemInfo(t, systemInfoNewTask)
 	w.handleSystemTag(string(data))
 
-	// Verify new task state - last step info should still be (5, 10) from previous task
+	// Verify new task state - last step info should be reset when new task starts
 	if !w.IsInProgress() {
 		t.Error("Expected in-progress to be true")
 	}
@@ -69,8 +69,8 @@ func TestLastMaxStepsPreservation(t *testing.T) {
 		t.Errorf("Expected max steps 20, got %d", w.GetMaxSteps())
 	}
 	lastCurrent, lastMax = w.GetLastStepInfo()
-	if lastCurrent != 5 || lastMax != 10 {
-		t.Errorf("Expected last step info (5, 10) (from previous task), got (%d, %d)", lastCurrent, lastMax)
+	if lastCurrent != 0 || lastMax != 0 {
+		t.Errorf("Expected last step info (0, 0) (reset for new task), got (%d, %d)", lastCurrent, lastMax)
 	}
 }
 

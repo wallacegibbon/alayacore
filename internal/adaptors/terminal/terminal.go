@@ -250,17 +250,14 @@ func (m *Terminal) updateStatusWithQueue() {
 		segments = append(segments, prefix+" "+count)
 	}
 
-	// Steps segment (dimmed)
+	// Steps segment (always show)
 	var stepsPart string
-	if inProgress && maxSteps > 0 {
-		stepsPart = fmt.Sprintf("Steps: %d/%d", currentStep, maxSteps)
-	} else if !inProgress && lastMaxSteps > 0 {
-		// Show last step info when task completed (indicates loop termination reason)
+	if lastMaxSteps > 0 {
 		stepsPart = fmt.Sprintf("Steps: %d/%d", lastCurrentStep, lastMaxSteps)
+	} else {
+		stepsPart = fmt.Sprintf("Steps: %d/%d", currentStep, maxSteps)
 	}
-	if stepsPart != "" {
-		segments = append(segments, m.styles.Status.Render(stepsPart))
-	}
+	segments = append(segments, m.styles.Status.Render(stepsPart))
 
 	// Context segment (dimmed)
 	if contextStatus != "" {

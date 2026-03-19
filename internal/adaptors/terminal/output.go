@@ -237,6 +237,11 @@ func (w *outputWriter) handleSystemTag(value string) {
 			w.lastCurrentStep = w.currentStep
 			w.lastMaxSteps = w.maxSteps
 		}
+		// Reset last step info when new task starts (transition from not-in-progress to in-progress)
+		if !w.inProgress && info.InProgress {
+			w.lastCurrentStep = 0
+			w.lastMaxSteps = 0
+		}
 
 		w.inProgress = info.InProgress
 		w.queueCount = len(info.QueueItems)
