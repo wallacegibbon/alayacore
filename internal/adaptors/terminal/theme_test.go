@@ -84,6 +84,10 @@ func TestLoadThemeInvalidPath(t *testing.T) {
 }
 
 func TestLoadThemeFromPaths(t *testing.T) {
+	// Set HOME to a temp directory to isolate from user's config
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+
 	// Test with nonexistent explicit path (should fallback to default)
 	theme := LoadThemeFromPaths("/nonexistent/theme.conf")
 	if theme.Base != "#1e1e2e" {
