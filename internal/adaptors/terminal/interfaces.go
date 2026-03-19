@@ -27,6 +27,7 @@ type OutputWriter interface {
 	IsInProgress() bool
 	GetCurrentStep() int
 	GetMaxSteps() int
+	GetLastStepInfo() (currentStep, maxSteps int)
 
 	// Model management
 	GetModels() []agentpkg.ModelInfo

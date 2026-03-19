@@ -238,10 +238,14 @@ func (m *Terminal) updateStatusWithQueue() {
 	currentStep := m.out.GetCurrentStep()
 	maxSteps := m.out.GetMaxSteps()
 	inProgress := m.out.IsInProgress()
+	lastCurrentStep, lastMaxSteps := m.out.GetLastStepInfo()
 
 	var stepsPart string
 	if inProgress && maxSteps > 0 {
 		stepsPart = fmt.Sprintf("Steps: %d/%d", currentStep, maxSteps)
+	} else if !inProgress && lastMaxSteps > 0 {
+		// Show last step info when task completed (indicates loop termination reason)
+		stepsPart = fmt.Sprintf("Steps: %d/%d", lastCurrentStep, lastMaxSteps)
 	}
 
 	if queueCount > 0 {

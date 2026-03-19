@@ -38,6 +38,8 @@ type outputWriter struct {
 	queueCount        int                  // Number of items in the queue
 	currentStep       int                  // Current step in agent loop (1-indexed)
 	maxSteps          int                  // Maximum steps allowed
+	lastCurrentStep   int                  // Last step reached in completed task
+	lastMaxSteps      int                  // Last max steps from completed task
 }
 
 func NewTerminalOutput() *outputWriter { //nolint:revive // tests need access to internal methods
@@ -230,6 +232,12 @@ func (w *outputWriter) handleSystemTag(value string) {
 	// Try to parse as SystemInfo
 	var info agentpkg.SystemInfo
 	if err := json.Unmarshal([]byte(value), &info); err == nil {
+		// Save step info when task completes (transition from in-progress to done)
+		if w.inProgress && !info.InProgress && w.maxSteps > 0 {
+			w.lastCurrentStep = w.currentStep
+			w.lastMaxSteps = w.maxSteps
+		}
+
 		w.inProgress = info.InProgress
 		w.queueCount = len(info.QueueItems)
 		if info.ContextLimit > 0 {
@@ -350,6 +358,13 @@ func (w *outputWriter) GetMaxSteps() int {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return w.maxSteps
+}
+
+// GetLastStepInfo returns the last step info from a completed task
+func (w *outputWriter) GetLastStepInfo() (currentStep, maxSteps int) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.lastCurrentStep, w.lastMaxSteps
 }
 
 // renderMultiline applies a style to each line of text
