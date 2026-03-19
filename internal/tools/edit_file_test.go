@@ -108,7 +108,7 @@ func TestEditFileTool(t *testing.T) {
 			newString:   "new",
 			expected:    "",
 			expectError: true,
-			errorMsg:    "old_string found 3 times",
+			errorMsg:    "old_string found multiple times",
 		},
 		{
 			name:        "file not found",
