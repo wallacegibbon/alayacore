@@ -52,11 +52,7 @@ type StreamResult struct {
 }
 
 // Stream executes the agent with streaming callbacks
-func (a *Agent) Stream(
-	ctx context.Context,
-	messages []Message,
-	callbacks StreamCallbacks,
-) (*StreamResult, error) {
+func (a *Agent) Stream(ctx context.Context, messages []Message, callbacks StreamCallbacks) (*StreamResult, error) {
 	var (
 		allMessages = make([]Message, len(messages))
 		totalUsage  Usage
@@ -122,20 +118,27 @@ func (a *Agent) Stream(
 
 		// Execute tools and add results to messages
 		toolResults := a.executeTools(ctx, toolCalls, callbacks)
-		assistantMsg := Message{
-			Role:    RoleAssistant,
-			Content: toolCallsToContent(toolCalls),
-		}
 		toolResultMsg := Message{
 			Role:    RoleTool,
 			Content: toolResults,
 		}
-		allMessages = append(allMessages, assistantMsg)
+
+		// Use stepMessages (contains complete assistant response with text, reasoning, AND tool calls)
+		// Fall back to building from toolCalls only if stepMessages is empty (shouldn't happen)
+		if len(stepMessages) == 0 {
+			stepMessages = []Message{{
+				Role:    RoleAssistant,
+				Content: toolCallsToContent(toolCalls),
+			}}
+		}
+
+		allMessages = append(allMessages, stepMessages...)
 		allMessages = append(allMessages, toolResultMsg)
 
 		// Notify callback with complete step messages (assistant + tool results)
 		if callbacks.OnStepFinish != nil {
-			if err := callbacks.OnStepFinish([]Message{assistantMsg, toolResultMsg}, stepUsage); err != nil {
+			stepWithResults := append(stepMessages, toolResultMsg)
+			if err := callbacks.OnStepFinish(stepWithResults, stepUsage); err != nil {
 				return nil, fmt.Errorf("OnStepFinish callback failed: %w", err)
 			}
 		}

@@ -3,7 +3,7 @@
 ## Current Work
 None
 
-## Recent Changes
+## Critical Gotchas
 - Added comprehensive error handling documentation in `docs/error-handling.md`
   - Documents all valid and error finish reasons for OpenAI and Anthropic
   - Includes implementation details and troubleshooting guidance
