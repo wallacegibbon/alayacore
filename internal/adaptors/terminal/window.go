@@ -11,12 +11,6 @@ import (
 
 const fullRebuild = -2 // dirtyIndex value meaning all windows need re-render
 
-// isWriteFileContent checks if the content is from a write_file tool call
-// (starts with "write_file:" prefix)
-func isWriteFileContent(content string) bool {
-	return strings.HasPrefix(content, "write_file:")
-}
-
 // Window represents a single display window with border and content.
 type Window struct {
 	ID      string         // stream ID or generated unique ID
@@ -138,8 +132,8 @@ func (wb *WindowBuffer) AppendOrUpdate(id string, tag string, content string) {
 		Tag:       tag,
 		Content:   content,
 		Style:     wb.borderStyle,
-		Wrapped:   tag == stream.TagTextReasoning || isWriteFileContent(content),
-		LineWidth: 0, // Will be computed on first render
+		Wrapped:   false, // Will be set after content is complete
+		LineWidth: 0,     // Will be computed on first render
 	}
 	wb.Windows = append(wb.Windows, window)
 	wb.idIndex[id] = len(wb.Windows) - 1
@@ -290,14 +284,35 @@ func (wb *WindowBuffer) ToggleWrap(windowIndex int) bool {
 
 // UpdateToolStatus updates the status indicator for a tool window.
 // The toolCallID should match the window ID.
+// Also sets Wrapped=true for write_file windows when status becomes success/error.
 func (wb *WindowBuffer) UpdateToolStatus(toolCallID string, status string) {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 
 	if idx, ok := wb.idIndex[toolCallID]; ok {
-		wb.Windows[idx].Status = status
+		w := wb.Windows[idx]
+		w.Status = status
 		// Invalidate line cache since status affects indicator prefix
-		wb.Windows[idx].LineWidth = 0
+		w.LineWidth = 0
+		// Set Wrapped=true for write_file windows when tool completes
+		// (content starts with "write_file:")
+		if (status == statusSuccess || status == statusError) && len(w.Content) > 0 {
+			// Check if this is a write_file window by looking at content prefix
+			// Content is styled, but we can check the raw content
+			if isWriteFileWindow(w.Content) {
+				w.Wrapped = true
+			}
+		}
 		wb.markDirty(idx)
 	}
+}
+
+// isWriteFileWindow checks if window content is from write_file tool
+func isWriteFileWindow(content string) bool {
+	// Check for write_file prefix (may have ANSI codes at start)
+	// Simple check: look for "write_file" within first 30 chars
+	if len(content) < 10 {
+		return false
+	}
+	return strings.Contains(content[:min(30, len(content))], "write_file")
 }
