@@ -53,7 +53,7 @@ func Parse() *Settings {
 	proxy := flag.String("proxy", "", "HTTP proxy URL (e.g., http://127.0.0.1:7890 or socks5://127.0.0.1:1080)")
 	modelConfig := flag.String("model-config", "", "Model config file path (default: ~/.alayacore/model.conf)")
 	runtimeConfig := flag.String("runtime-config", "", "Runtime config file path (default: <model-config-dir>/runtime.conf, or ~/.alayacore/runtime.conf)")
-	maxSteps := flag.Int("max-steps", 50, "Maximum agent loop steps")
+	maxSteps := flag.Int("max-steps", 100, "Maximum agent loop steps")
 	theme := flag.String("theme", "", "Theme config file path (default: ~/.alayacore/theme.conf)")
 	flag.Parse()
 

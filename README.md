@@ -79,7 +79,7 @@ alayacore-web --addr :9090
 - `-skill string` - Skills directory path (can be specified multiple times)
 - `-session string` - Session file path to load/save conversations
 - `-proxy string` - HTTP proxy URL (supports HTTP, HTTPS, and SOCKS5, e.g., `http://127.0.0.1:7890` or `socks5://127.0.0.1:1080`)
-- `-max-steps int` - Maximum agent loop steps (default: 50)
+- `-max-steps int` - Maximum agent loop steps (default: 100)
 - `-debug-api` - Write raw API requests and responses to log file
 - `-version` - Show version information
 - `-help` - Show help information
