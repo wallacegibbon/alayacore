@@ -25,11 +25,58 @@ func (wb *WindowBuffer) GetTotalLinesVirtual() int {
 }
 
 // ensureLineHeights calculates lineHeights if needed (must be called with lock held).
+// Uses incremental updates when only one window is dirty for better performance.
 func (wb *WindowBuffer) ensureLineHeights() {
+	// If clean and already calculated, nothing to do
 	if wb.dirtyIndex == -1 && len(wb.lineHeights) == len(wb.Windows) {
-		return // Already calculated and clean
+		return
 	}
 
+	// Ensure lineHeights slice has capacity for all windows
+	for len(wb.lineHeights) < len(wb.Windows) {
+		wb.lineHeights = append(wb.lineHeights, 0)
+	}
+
+	if wb.dirtyIndex >= 0 {
+		// Single window dirty - incremental update (O(1))
+		wb.rebuildOneWindowLineHeight(wb.dirtyIndex)
+	} else if wb.dirtyIndex == fullRebuild {
+		// Full rebuild needed (O(n))
+		wb.rebuildAllLineHeights()
+	}
+	wb.dirtyIndex = -1
+}
+
+// rebuildOneWindowLineHeight re-renders only the window at idx and updates its line height.
+// This is O(1) for single-window updates (common case for streaming deltas).
+func (wb *WindowBuffer) rebuildOneWindowLineHeight(idx int) {
+	if idx < 0 || idx >= len(wb.Windows) {
+		return
+	}
+	w := wb.Windows[idx]
+
+	// Re-render just this window
+	innerWidth := max(0, wb.width-4)
+	innerContent := wb.renderWindowContent(w, innerWidth)
+	styled := w.Style.Width(wb.width).Render(innerContent)
+	newLineCount := strings.Count(styled, "\n") + 1
+
+	// Update totalLines: subtract old height, add new height
+	oldLineCount := wb.lineHeights[idx]
+	wb.totalLines += newLineCount - oldLineCount
+
+	// Update lineHeights and cache
+	wb.lineHeights[idx] = newLineCount
+	w.cachedRender = styled
+	w.cachedInnerContent = innerContent
+	w.cachedWidth = wb.width
+	w.lastContentLen = len(w.Content)
+	w.lastWrapped = w.Wrapped
+}
+
+// rebuildAllLineHeights rebuilds all window line heights (O(n)).
+// Used when a full rebuild is needed (e.g., width change, multiple windows dirty).
+func (wb *WindowBuffer) rebuildAllLineHeights() {
 	wb.lineHeights = make([]int, len(wb.Windows))
 	wb.totalLines = 0
 
@@ -49,7 +96,6 @@ func (wb *WindowBuffer) ensureLineHeights() {
 		w.lastContentLen = len(w.Content)
 		w.lastWrapped = w.Wrapped
 	}
-	wb.dirtyIndex = -1
 }
 
 // getVirtualRender returns rendered content using virtual rendering.

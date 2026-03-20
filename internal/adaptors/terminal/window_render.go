@@ -60,6 +60,7 @@ func (wb *WindowBuffer) rebuildCache() {
 }
 
 // rebuildOneWindow re-renders only the window at idx and updates the full cached string.
+// Uses incremental update for totalLines (O(1)) instead of summing all line heights.
 func (wb *WindowBuffer) rebuildOneWindow(idx int) {
 	if idx < 0 || idx >= len(wb.Windows) {
 		return
@@ -71,15 +72,16 @@ func (wb *WindowBuffer) rebuildOneWindow(idx int) {
 		wb.lineHeights = append(wb.lineHeights, 0)
 	}
 
-	// Re-render the dirty window (don't use totalLines from renderAndCacheWindow)
-	styled := wb.renderAndCacheWindow(idx, w)
-	wb.lineHeights[idx] = strings.Count(styled, "\n") + 1
+	// Save old line height for incremental update
+	oldLineHeight := wb.lineHeights[idx]
 
-	// Rebuild totalLines from all lineHeights
-	wb.totalLines = 0
-	for _, h := range wb.lineHeights {
-		wb.totalLines += h
-	}
+	// Re-render the dirty window
+	styled := wb.renderAndCacheWindow(idx, w)
+	newLineHeight := strings.Count(styled, "\n") + 1
+	wb.lineHeights[idx] = newLineHeight
+
+	// Incremental update of totalLines (O(1))
+	wb.totalLines += newLineHeight - oldLineHeight
 
 	// Rebuild cachedRender by concatenating: [before] + [new] + [after]
 	var sb strings.Builder
