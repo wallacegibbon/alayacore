@@ -37,9 +37,9 @@ base_url: "https://api.openai.com/v1"
 api_key: "key1"
 model_name: "gpt-4o"
 ---
-name: "Ollama GPT-OSS:20B"
+name: "Ollama (127.0.0.1) / GPT OSS 20B"
 protocol_type: "anthropic"
-base_url: "https://127.0.0.1:11434"
+base_url: "http://127.0.0.1:11434"
 api_key: "key2"
 model_name: "gpt-oss:20b"`,
 			expected: []ModelConfig{
@@ -51,9 +51,9 @@ model_name: "gpt-oss:20b"`,
 					ModelName:    "gpt-4o",
 				},
 				{
-					Name:         "Ollama GPT-OSS:20B",
+					Name:         "Ollama (127.0.0.1) / GPT OSS 20B",
 					ProtocolType: "anthropic",
-					BaseURL:      "https://127.0.0.1:11434",
+					BaseURL:      "http://127.0.0.1:11434",
 					APIKey:       "key2",
 					ModelName:    "gpt-oss:20b",
 				},

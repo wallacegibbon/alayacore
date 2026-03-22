@@ -2,29 +2,26 @@
 
 ## Usage
 
-AlayaCore loads models from a configuration file. Create `~/.alayacore/model.conf`:
-
-```
-name: "OpenAI GPT-4o"
-protocol_type: "openai"
-base_url: "https://api.openai.com/v1"
-api_key: "your-api-key"
-model_name: "gpt-4o"
-context_limit: 128000
----
-name: "Ollama GPT-OSS:20B"
-protocol_type: "anthropic"
-base_url: "https://127.0.0.1:11434"
-api_key: "your-api-key"
-model_name: "gpt-oss:20b"
-context_limit: 32768
-```
-
-Then simply run:
+Simply run:
 
 ```sh
 alayacore
 ```
+
+On first run, AlayaCore automatically creates a default model config at `~/.alayacore/model.conf` configured for Ollama:
+
+```yaml
+---
+name: "Ollama (127.0.0.1) / GPT OSS 20B"
+protocol_type: "anthropic"
+base_url: "http://127.0.0.1:11434"
+api_key: "no-key-by-default"
+model_name: "gpt-oss:20b"
+context_limit: 128000
+---
+```
+
+To use other providers, edit the config file (press `Ctrl+L` then `e` in the terminal, or edit directly).
 
 Running with skills:
 ```sh
@@ -86,7 +83,7 @@ alayacore --version
 
 ## Model Config File
 
-The model config file uses a simple YAML-like format:
+The model config file uses a simple YAML-like format. If the file doesn't exist or is empty, AlayaCore automatically creates it with a default Ollama configuration.
 
 ```
 name: "Display Name"

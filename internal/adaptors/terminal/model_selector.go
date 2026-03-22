@@ -548,17 +548,8 @@ func OpenModelConfigFile(path string) error {
 	}
 
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		template := `# Model configuration file
-# Use "---" to separate multiple models
-
-name: "OpenAI GPT-4o"
-protocol_type: "openai"
-base_url: "https://api.openai.com/v1"
-api_key: "your-api-key"
-model_name: "gpt-4o"
-context_limit: 128000
-`
-		if err := os.WriteFile(path, []byte(template), 0600); err != nil {
+		// Create with default config - same as auto-initialization
+		if err := os.WriteFile(path, []byte(agentpkg.DefaultModelConfig), 0600); err != nil {
 			return err
 		}
 	}

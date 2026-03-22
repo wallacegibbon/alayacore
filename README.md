@@ -24,7 +24,26 @@ go build ./cmd/alayacore-web/
 
 ## Usage
 
-Create a model config file at `~/.alayacore/model.conf`:
+Simply run:
+
+```sh
+alayacore
+```
+
+On first run, AlayaCore automatically creates a default model config at `~/.alayacore/model.conf` configured for Ollama:
+
+```yaml
+---
+name: "Ollama (127.0.0.1) / GPT OSS 20B"
+protocol_type: "anthropic"
+base_url: "http://127.0.0.1:11434"
+api_key: "no-key-by-default"
+model_name: "gpt-oss:20b"
+context_limit: 128000
+---
+```
+
+To use other providers, edit the config file (press `Ctrl+L` then `e` in the terminal, or edit directly):
 
 ```
 name: "OpenAI GPT-4o"
@@ -34,21 +53,15 @@ api_key: "your-api-key"
 model_name: "gpt-4o"
 context_limit: 128000
 ---
-name: "Ollama GPT-OSS:20B"
+name: "Ollama (127.0.0.1) / GPT OSS 20B"
 protocol_type: "anthropic"
-base_url: "https://127.0.0.1:11434"
-api_key: "your-api-key"
+base_url: "http://127.0.0.1:11434"
+api_key: "no-key-by-default"
 model_name: "gpt-oss:20b"
-context_limit: 32768
+context_limit: 128000
 ```
 
-Then simply run:
-
-```sh
-alayacore
-```
-
-The program will load models from the config file. The active model is determined by `runtime.conf` (persisted across sessions). If no active model is set, the first model in the list is used.
+The active model is determined by `runtime.conf` (persisted across sessions). If no active model is set, the first model in the list is used.
 
 Running with skills:
 ```sh
@@ -110,7 +123,9 @@ AlayaCore uses a model configuration file to store model configurations.
 - **Default location**: `~/.alayacore/model.conf`
 - **Custom location**: Use `--model-config /path/to/model.conf` to specify a different file
 
-**Important: The program NEVER writes to this file automatically.** You must edit it manually with a text editor.
+**Auto-initialization**: If the config file doesn't exist or is empty, AlayaCore automatically creates it with a default Ollama configuration.
+
+**Note**: After auto-initialization, the program NEVER writes to this file automatically. You must edit it manually with a text editor.
 
 ### Model Config File Format
 
@@ -124,12 +139,12 @@ api_key: "your-api-key"
 model_name: "gpt-4o"
 context_limit: 128000
 ---
-name: "Ollama GPT-OSS:20B"
+name: "Ollama (127.0.0.1) / GPT OSS 20B"
 protocol_type: "anthropic"
-base_url: "https://127.0.0.1:11434"
-api_key: "your-api-key"
+base_url: "http://127.0.0.1:11434"
+api_key: "no-key-by-default"
 model_name: "gpt-oss:20b"
-context_limit: 32768
+context_limit: 128000
 ```
 
 **Fields:**
@@ -144,8 +159,8 @@ context_limit: 32768
 ### Model Selection Logic
 
 1. On startup, AlayaCore reads the model config file (from `--model-config` or default location)
-2. The **first model** in the config file becomes the active model (unless `runtime.conf` has a saved preference)
-3. If no models are available, the program exits with instructions
+2. If the config file doesn't exist or is empty, it's auto-initialized with a default Ollama configuration
+3. The **first model** in the config file becomes the active model (unless `runtime.conf` has a saved preference)
 
 ### Editing Models
 

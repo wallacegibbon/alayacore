@@ -52,6 +52,17 @@ type ModelManager struct {
 	filePath string
 }
 
+// DefaultModelConfig is the default model configuration written when config file is empty
+const DefaultModelConfig = `---
+name: "Ollama (127.0.0.1) / GPT OSS 20B"
+protocol_type: "anthropic"
+base_url: "http://127.0.0.1:11434"
+api_key: "no-key-by-default"
+model_name: "gpt-oss:20b"
+context_limit: 128000
+---
+`
+
 // NewModelManager creates a new model manager
 // If configPath is empty, uses the default path (~/.alayacore/model.conf)
 func NewModelManager(configPath string) *ModelManager {
@@ -92,8 +103,7 @@ func defaultModelsConfigFile() (string, error) {
 }
 
 // LoadFromFile loads models from a config file in YAML-like format
-// NOTE: This does NOT create the file if it doesn't exist.
-// The user must create and edit the file manually.
+// If the file doesn't exist or is empty, it creates the file with default config.
 //
 // File format:
 //
@@ -112,10 +122,22 @@ func (mm *ModelManager) LoadFromFile(path string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// File doesn't exist - user needs to create it
-			return nil
+			// File doesn't exist - create it with default config
+			if err := mm.createDefaultConfig(path); err != nil {
+				return err
+			}
+			data = []byte(DefaultModelConfig)
+		} else {
+			return err
 		}
-		return err
+	}
+
+	// If file is empty, write default config
+	if len(strings.TrimSpace(string(data))) == 0 {
+		if err := mm.createDefaultConfig(path); err != nil {
+			return err
+		}
+		data = []byte(DefaultModelConfig)
 	}
 
 	models := parseModelConfig(string(data))
@@ -134,6 +156,17 @@ func (mm *ModelManager) LoadFromFile(path string) error {
 	}
 
 	return nil
+}
+
+// createDefaultConfig creates a default model config file
+func (mm *ModelManager) createDefaultConfig(path string) error {
+	// Ensure parent directory exists
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+
+	return os.WriteFile(path, []byte(DefaultModelConfig), 0600)
 }
 
 // parseModelConfig parses the YAML-like model config format

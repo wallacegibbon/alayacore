@@ -52,7 +52,7 @@ Flags:
   --help                  Show help information
 
 Examples:
-  # Using model config file
+  # Start with default Ollama config (auto-created if needed)
   alayacore
 
   # With optional flags
@@ -64,13 +64,13 @@ Examples:
   alayacore --max-steps 100
 
 Model config example (~/.alayacore/model.conf):
-  name: "Claude 3.5 Sonnet"
+  ---
+  name: "Ollama (127.0.0.1) / GPT OSS 20B"
   protocol_type: "anthropic"
-  base_url: "https://api.anthropic.com"
-  api_key: "your-api-key"
-  model_name: "claude-3-5-sonnet-20241022"
-  context_limit: 200000
-  prompt_cache: true
+  base_url: "http://127.0.0.1:11434"
+  api_key: "no-key-by-default"
+  model_name: "gpt-oss:20b"
+  context_limit: 128000
   ---
   name: "OpenAI GPT-4o"
   protocol_type: "openai"

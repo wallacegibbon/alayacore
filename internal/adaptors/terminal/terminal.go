@@ -479,19 +479,20 @@ func (a *Adaptor) Start() {
 		fmt.Fprintf(os.Stderr, "  %s\n", modelPath)
 		fmt.Fprintln(os.Stderr, "")
 		fmt.Fprintln(os.Stderr, "Example format:")
-		fmt.Fprintln(os.Stderr, `name: "OpenAI GPT-4o"
+		fmt.Fprintln(os.Stderr, `---
+name: "Ollama (127.0.0.1) / GPT OSS 20B"
+protocol_type: "anthropic"
+base_url: "http://127.0.0.1:11434"
+api_key: "no-key-by-default"
+model_name: "gpt-oss:20b"
+context_limit: 128000
+---
+name: "OpenAI GPT-4o"
 protocol_type: "openai"
 base_url: "https://api.openai.com/v1"
 api_key: "your-api-key"
 model_name: "gpt-4o"
-context_limit: 128000
----
-name: "Ollama GPT-OSS:20B"
-protocol_type: "anthropic"
-base_url: "https://127.0.0.1:11434"
-api_key: "your-api-key"
-model_name: "gpt-oss:20b"
-context_limit: 32768`)
+context_limit: 128000`)
 		fmt.Fprintln(os.Stderr, "")
 		os.Exit(1)
 	}
