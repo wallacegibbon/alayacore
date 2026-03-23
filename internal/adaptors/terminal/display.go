@@ -290,13 +290,13 @@ func (m *DisplayModel) SetCursorToLastWindow() {
 	}
 }
 
-// ToggleWindowWrap toggles the wrap state of the currently selected window.
+// ToggleWindowFold toggles the fold state of the currently selected window.
 // Returns true if a window was toggled, false if no window is selected.
-func (m *DisplayModel) ToggleWindowWrap() bool {
+func (m *DisplayModel) ToggleWindowFold() bool {
 	if m.windowCursor < 0 {
 		return false
 	}
-	return m.windowBuffer.ToggleWrap(m.windowCursor)
+	return m.windowBuffer.ToggleFold(m.windowCursor)
 }
 
 // MarkUserScrolled marks that the user has manually scrolled away from the bottom.

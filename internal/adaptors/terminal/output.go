@@ -524,7 +524,18 @@ func (w *outputWriter) parseStreamID(value string) (string, string, bool) {
 
 // updateToolStatus adds a status indicator to a tool window
 func (w *outputWriter) updateToolStatus(toolCallID string, status string) {
-	w.windowBuffer.UpdateToolStatus(toolCallID, status)
+	var ts ToolStatus
+	switch status {
+	case "success":
+		ts = ToolStatusSuccess
+	case "error":
+		ts = ToolStatusError
+	case "pending":
+		ts = ToolStatusPending
+	default:
+		ts = ToolStatusNone
+	}
+	w.windowBuffer.UpdateToolStatus(toolCallID, ts)
 }
 
 // generateWindowID returns a unique window ID for non-delta messages.

@@ -134,7 +134,7 @@ var displayKeyBindings = []KeyBinding{
 	{KeyShiftL, "Move cursor to bottom window", "display"},
 	{KeyShiftM, "Move cursor to middle window", "display"},
 	{KeyColon, "Switch to input with command prefix", "display"},
-	{KeySpace, "Toggle window wrap mode", "display"},
+	{KeySpace, "Toggle window fold (expand/collapse)", "display"},
 }
 
 // Model selector key bindings
@@ -388,7 +388,7 @@ func (m *Terminal) handleDisplayKeys(msg tea.KeyMsg) bool {
 		return true
 
 	case KeySpace:
-		if m.display.ToggleWindowWrap() {
+		if m.display.ToggleWindowFold() {
 			m.display.updateContent()
 		}
 		return true

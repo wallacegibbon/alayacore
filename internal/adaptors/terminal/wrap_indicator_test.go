@@ -7,7 +7,7 @@ import (
 	"github.com/alayacore/alayacore/internal/stream"
 )
 
-func TestWrapIndicator(t *testing.T) {
+func TestFoldIndicator(t *testing.T) {
 	wb := NewWindowBuffer(80, DefaultStyles())
 
 	// Create a tool window with VERY long content that will definitely wrap to more than 5 lines
@@ -15,15 +15,15 @@ func TestWrapIndicator(t *testing.T) {
 	longContent := strings.Repeat("This is a test sentence that will wrap. ", 12)
 	wb.AppendOrUpdate("tool123", stream.TagFunctionNotify, longContent)
 
-	// Set to wrapped mode
-	wb.Windows[0].Wrapped = true
+	// Set to folded mode
+	wb.Windows[0].Folded = true
 
 	// Render the window
 	rendered := wb.GetAll(-1)
 
 	// Should contain the tricolon separator (full row)
 	if !strings.Contains(rendered, "⁝") {
-		t.Errorf("Expected wrap indicator '⁝', got: %s", rendered)
+		t.Errorf("Expected fold indicator '⁝', got: %s", rendered)
 	}
 
 	// Count the tricolons - should have many (full row of ~76)
@@ -33,7 +33,7 @@ func TestWrapIndicator(t *testing.T) {
 	}
 }
 
-func TestWrapIndicatorColor(t *testing.T) {
+func TestFoldIndicatorColor(t *testing.T) {
 	wb := NewWindowBuffer(80, DefaultStyles())
 
 	// Create a diff window with many lines
@@ -46,17 +46,17 @@ func TestWrapIndicatorColor(t *testing.T) {
 	}
 	wb.AppendDiff("diff123", "test.txt", lines)
 
-	// Render the wrapped diff
+	// Render the folded diff
 	rendered := wb.GetAll(-1)
 
 	// Should contain tricolon separator
 	if !strings.Contains(rendered, "⁝") {
-		t.Errorf("Expected tricolon separator in wrapped diff, got: %s", rendered)
+		t.Errorf("Expected tricolon separator in folded diff, got: %s", rendered)
 	}
 
 	// Verify it folds to fewer lines than the full diff
 	renderedLines := strings.Split(rendered, "\n")
 	if len(renderedLines) > 10 {
-		t.Errorf("Wrapped diff should fold to ~7-8 lines, got %d", len(renderedLines))
+		t.Errorf("Folded diff should fold to ~7-8 lines, got %d", len(renderedLines))
 	}
 }

@@ -12,25 +12,46 @@ import (
 	"github.com/alayacore/alayacore/internal/stream"
 )
 
-const fullRebuild = -2 // dirtyIndex value meaning all windows need re-render
-
-// CRITICAL: markDirty sentinel preservation
-// The markDirty function uses sentinel value fullRebuild = -2. Once set, it must NOT be
-// overwritten by a single-window index. The check `if wb.dirtyIndex == fullRebuild { return }`
-// is critical - without it, rapid window creation (e.g., session loading) would set
-// fullRebuild, then overwrite it with the last window index, causing only the last
-// window to render.
-
 // ============================================================================
-// Window Types
+// Rebuild State (replaces sentinel values)
 // ============================================================================
 
-// Status constants for diff display
+// rebuildState represents the cache invalidation state for WindowBuffer.
+type rebuildState int
+
 const (
-	statusSuccess = "success"
-	statusError   = "error"
-	statusPending = "pending"
+	rebuildClean rebuildState = iota // No windows need re-rendering
+	rebuildAll                       // All windows need re-rendering
+	rebuildOne                       // Only one window needs re-rendering
 )
+
+// ============================================================================
+// Tool Status (type-safe status indicator)
+// ============================================================================
+
+// ToolStatus represents the execution status of a tool window.
+type ToolStatus int
+
+const (
+	ToolStatusNone    ToolStatus = iota // No status indicator (dimmed hollow dot)
+	ToolStatusSuccess                   // Tool completed successfully (green dot)
+	ToolStatusError                     // Tool failed (red dot)
+	ToolStatusPending                   // Tool is running (dimmed dot)
+)
+
+// Indicator returns the styled status indicator string.
+func (s ToolStatus) Indicator(styles *Styles) string {
+	switch s {
+	case ToolStatusSuccess:
+		return lipgloss.NewStyle().Foreground(styles.ColorSuccess).Render("• ")
+	case ToolStatusError:
+		return lipgloss.NewStyle().Foreground(styles.ColorError).Render("• ")
+	case ToolStatusPending:
+		return lipgloss.NewStyle().Foreground(styles.ColorDim).Render("• ")
+	default:
+		return lipgloss.NewStyle().Foreground(styles.ColorDim).Render("· ")
+	}
+}
 
 // Window represents a single display window with border and content.
 type Window struct {
@@ -38,7 +59,7 @@ type Window struct {
 	Tag     string         // TLV tag that created this window
 	Content string         // accumulated content (styled)
 	Style   lipgloss.Style // border style (dimmed)
-	Wrapped bool           // true if window is in wrapped (3-row) mode
+	Folded  bool           // true if window is in folded (collapsed) mode showing only first/last lines
 
 	// For diff windows - if non-nil, Content is ignored and Diff is rendered instead
 	Diff *DiffContainer
@@ -47,18 +68,18 @@ type Window struct {
 	WriteFile *WriteFileContainer
 
 	// Status indicator for tool windows
-	Status string // "success", "error", "pending", or "" (default: dimmed hollow dot for loaded sessions)
+	Status ToolStatus // success, error, pending, or none
 
 	// Cached wrapped lines for incremental wrap optimization
 	Lines     []string // wrapped display lines (cached for O(1) delta append)
 	LineWidth int      // width used for wrapping (invalidated on resize)
 
 	// Cached rendering state
-	lastContentLen     int    // length of content when last rendered (for quick change detection)
-	lastWrapped        bool   // wrapped state when last rendered (for diff windows)
-	cachedRender       string // full output with border
-	cachedInnerContent string // inner content before border (for cursor border swap)
-	cachedWidth        int    // width used for cached render
+	lastContentLen  int    // length of content when last rendered (for quick change detection)
+	lastFolded      bool   // folded state when last rendered (for diff windows)
+	cachedRender    string // full output with border
+	cachedInnerCont string // inner content before border (for cursor border swap)
+	cachedWidth     int    // width used for cached render
 }
 
 // DiffContainer holds two panes side by side for diff display
@@ -101,11 +122,12 @@ type WindowBuffer struct {
 	width        int
 	borderStyle  lipgloss.Style
 	cursorStyle  lipgloss.Style
-	styles       *Styles // styles for diff rendering
-	lineHeights  []int   // cached line heights for each window (after rendering)
-	totalLines   int     // total lines across all windows
-	dirtyIndex   int     // -1 = clean, -2 = full rebuild needed, >=0 = only this window dirty
-	cachedRender string  // cached full render of all windows
+	styles       *Styles      // styles for diff rendering
+	lineHeights  []int        // cached line heights for each window (after rendering)
+	totalLines   int          // total lines across all windows
+	rebuild      rebuildState // cache invalidation state
+	rebuildIndex int          // window index when rebuild == rebuildOne
+	cachedRender string       // cached full render of all windows
 
 	// Virtual rendering state
 	viewportYOffset int // current viewport scroll position (0-indexed line number)
@@ -147,7 +169,7 @@ func (wb *WindowBuffer) SetWidth(width int) {
 		for _, w := range wb.Windows {
 			w.LineWidth = 0
 		}
-		wb.dirtyIndex = fullRebuild
+		wb.rebuild = rebuildAll
 	}
 }
 
@@ -181,11 +203,11 @@ func (wb *WindowBuffer) AppendOrUpdate(id string, tag string, content string) {
 		wb.markDirty(idx)
 		return
 	}
-	// User and Assistant messages should NOT be wrapped (show full content)
-	// All other window types default to wrapped (folded/collapsed)
-	wrapped := true
+	// User and Assistant messages should NOT be folded (show full content)
+	// All other window types default to folded (collapsed view)
+	folded := true
 	if tag == stream.TagTextUser || tag == stream.TagTextAssistant {
-		wrapped = false
+		folded = false
 	}
 
 	window := &Window{
@@ -193,7 +215,7 @@ func (wb *WindowBuffer) AppendOrUpdate(id string, tag string, content string) {
 		Tag:       tag,
 		Content:   content,
 		Style:     wb.borderStyle,
-		Wrapped:   wrapped,
+		Folded:    folded,
 		LineWidth: 0, // Will be computed on first render
 	}
 	wb.Windows = append(wb.Windows, window)
@@ -212,11 +234,11 @@ func (wb *WindowBuffer) AppendDiff(id string, path string, lines []DiffLinePair)
 	}
 
 	window := &Window{
-		ID:      id,
-		Tag:     stream.TagFunctionNotify,
-		Style:   wb.borderStyle,
-		Diff:    diff,
-		Wrapped: true, // Enable folding like other windows
+		ID:     id,
+		Tag:    stream.TagFunctionNotify,
+		Style:  wb.borderStyle,
+		Diff:   diff,
+		Folded: true, // Enable folding like other windows
 	}
 	wb.Windows = append(wb.Windows, window)
 	wb.idIndex[id] = len(wb.Windows) - 1
@@ -238,7 +260,7 @@ func (wb *WindowBuffer) AppendWriteFile(id string, path string, content string) 
 		Tag:       stream.TagFunctionNotify,
 		Style:     wb.borderStyle,
 		WriteFile: writeFile,
-		Wrapped:   true, // Enable folding like other windows
+		Folded:    true, // Enable folding like other windows
 	}
 	wb.Windows = append(wb.Windows, window)
 	wb.idIndex[id] = len(wb.Windows) - 1
@@ -247,13 +269,14 @@ func (wb *WindowBuffer) AppendWriteFile(id string, path string, content string) 
 
 // markDirty marks a window as needing re-render.
 func (wb *WindowBuffer) markDirty(idx int) {
-	if wb.dirtyIndex == fullRebuild {
+	if wb.rebuild == rebuildAll {
 		return // Already marked for full rebuild
 	}
-	if wb.dirtyIndex >= 0 && wb.dirtyIndex != idx {
-		wb.dirtyIndex = fullRebuild // Different window dirty - need full rebuild
+	if wb.rebuild == rebuildOne && wb.rebuildIndex != idx {
+		wb.rebuild = rebuildAll // Different window dirty - need full rebuild
 	} else {
-		wb.dirtyIndex = idx
+		wb.rebuild = rebuildOne
+		wb.rebuildIndex = idx
 	}
 }
 
@@ -266,7 +289,7 @@ func (wb *WindowBuffer) Clear() {
 	wb.lineHeights = nil
 	wb.totalLines = 0
 	wb.cachedRender = ""
-	wb.dirtyIndex = fullRebuild
+	wb.rebuild = rebuildAll
 }
 
 // GetWindowCount returns the number of windows.
@@ -313,19 +336,19 @@ func (wb *WindowBuffer) GetTotalLines() int {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 
-	if wb.dirtyIndex != -1 {
-		if wb.dirtyIndex == fullRebuild {
+	if wb.rebuild != rebuildClean {
+		if wb.rebuild == rebuildAll {
 			wb.rebuildCache()
 		} else {
-			wb.rebuildOneWindow(wb.dirtyIndex)
+			wb.rebuildOneWindow(wb.rebuildIndex)
 		}
-		wb.dirtyIndex = -1
+		wb.rebuild = rebuildClean
 	}
 	return wb.totalLines
 }
 
-// ToggleWrap toggles the wrap state of the window at the given index.
-func (wb *WindowBuffer) ToggleWrap(windowIndex int) bool {
+// ToggleFold toggles the fold state of the window at the given index.
+func (wb *WindowBuffer) ToggleFold(windowIndex int) bool {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 
@@ -333,13 +356,13 @@ func (wb *WindowBuffer) ToggleWrap(windowIndex int) bool {
 		return false
 	}
 
-	wb.Windows[windowIndex].Wrapped = !wb.Windows[windowIndex].Wrapped
+	wb.Windows[windowIndex].Folded = !wb.Windows[windowIndex].Folded
 	wb.markDirty(windowIndex)
 	return true
 }
 
 // UpdateToolStatus updates the status indicator for a tool window.
-func (wb *WindowBuffer) UpdateToolStatus(toolCallID string, status string) {
+func (wb *WindowBuffer) UpdateToolStatus(toolCallID string, status ToolStatus) {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 
@@ -347,9 +370,9 @@ func (wb *WindowBuffer) UpdateToolStatus(toolCallID string, status string) {
 		w := wb.Windows[idx]
 		w.Status = status
 		w.LineWidth = 0 // Invalidate line cache
-		if (status == statusSuccess || status == statusError) && len(w.Content) > 0 {
+		if (status == ToolStatusSuccess || status == ToolStatusError) && len(w.Content) > 0 {
 			if isWriteFileWindow(w.Content) || w.IsWriteFileWindow() {
-				w.Wrapped = true
+				w.Folded = true
 			}
 		}
 		wb.markDirty(idx)
@@ -396,7 +419,7 @@ func (wb *WindowBuffer) GetTotalLinesVirtual() int {
 
 // ensureLineHeights calculates lineHeights if needed.
 func (wb *WindowBuffer) ensureLineHeights() {
-	if wb.dirtyIndex == -1 && len(wb.lineHeights) == len(wb.Windows) {
+	if wb.rebuild == rebuildClean && len(wb.lineHeights) == len(wb.Windows) {
 		return
 	}
 
@@ -404,12 +427,12 @@ func (wb *WindowBuffer) ensureLineHeights() {
 		wb.lineHeights = append(wb.lineHeights, 0)
 	}
 
-	if wb.dirtyIndex >= 0 {
-		wb.rebuildOneWindowLineHeight(wb.dirtyIndex)
-	} else if wb.dirtyIndex == fullRebuild {
+	if wb.rebuild == rebuildOne {
+		wb.rebuildOneWindowLineHeight(wb.rebuildIndex)
+	} else if wb.rebuild == rebuildAll {
 		wb.rebuildAllLineHeights()
 	}
-	wb.dirtyIndex = -1
+	wb.rebuild = rebuildClean
 }
 
 // rebuildOneWindowLineHeight re-renders only one window and updates its line height.
@@ -429,10 +452,10 @@ func (wb *WindowBuffer) rebuildOneWindowLineHeight(idx int) {
 
 	wb.lineHeights[idx] = newLineCount
 	w.cachedRender = styled
-	w.cachedInnerContent = innerContent
+	w.cachedInnerCont = innerContent
 	w.cachedWidth = wb.width
 	w.lastContentLen = len(w.Content)
-	w.lastWrapped = w.Wrapped
+	w.lastFolded = w.Folded
 }
 
 // rebuildAllLineHeights rebuilds all window line heights.
@@ -450,10 +473,10 @@ func (wb *WindowBuffer) rebuildAllLineHeights() {
 		wb.totalLines += lineCount
 
 		w.cachedRender = styled
-		w.cachedInnerContent = innerContent
+		w.cachedInnerCont = innerContent
 		w.cachedWidth = wb.width
 		w.lastContentLen = len(w.Content)
-		w.lastWrapped = w.Wrapped
+		w.lastFolded = w.Folded
 	}
 }
 
@@ -524,11 +547,11 @@ func (wb *WindowBuffer) renderWindowCached(i int, isCursor bool) string {
 	w := wb.Windows[i]
 
 	cacheValid := w.cachedRender != "" && w.cachedWidth == wb.width &&
-		(w.IsDiffWindow() && w.Wrapped == w.lastWrapped || !w.IsDiffWindow() && len(w.Content) == w.lastContentLen)
+		(w.IsDiffWindow() && w.Folded == w.lastFolded || !w.IsDiffWindow() && len(w.Content) == w.lastContentLen)
 
 	if cacheValid {
 		if isCursor {
-			return wb.cursorStyle.Width(wb.width).Render(w.cachedInnerContent)
+			return wb.cursorStyle.Width(wb.width).Render(w.cachedInnerCont)
 		}
 		return w.cachedRender
 	}
@@ -539,19 +562,19 @@ func (wb *WindowBuffer) renderWindowCached(i int, isCursor bool) string {
 	if isCursor {
 		styled := wb.cursorStyle.Width(wb.width).Render(innerContent)
 		w.cachedRender = w.Style.Width(wb.width).Render(innerContent)
-		w.cachedInnerContent = innerContent
+		w.cachedInnerCont = innerContent
 		w.cachedWidth = wb.width
 		w.lastContentLen = len(w.Content)
-		w.lastWrapped = w.Wrapped
+		w.lastFolded = w.Folded
 		return styled
 	}
 
 	styled := w.Style.Width(wb.width).Render(innerContent)
 	w.cachedRender = styled
-	w.cachedInnerContent = innerContent
+	w.cachedInnerCont = innerContent
 	w.cachedWidth = wb.width
 	w.lastContentLen = len(w.Content)
-	w.lastWrapped = w.Wrapped
+	w.lastFolded = w.Folded
 	return styled
 }
 
@@ -568,13 +591,13 @@ func (wb *WindowBuffer) GetAll(cursorIndex int) string {
 		return wb.getVirtualRender(cursorIndex)
 	}
 
-	if wb.dirtyIndex != -1 {
-		if wb.dirtyIndex == fullRebuild {
+	if wb.rebuild != rebuildClean {
+		if wb.rebuild == rebuildAll {
 			wb.rebuildCache()
 		} else {
-			wb.rebuildOneWindow(wb.dirtyIndex)
+			wb.rebuildOneWindow(wb.rebuildIndex)
 		}
-		wb.dirtyIndex = -1
+		wb.rebuild = rebuildClean
 	}
 
 	if cursorIndex < 0 || cursorIndex >= len(wb.Windows) {
@@ -648,10 +671,10 @@ func (wb *WindowBuffer) renderAndCacheWindow(i int, w *Window) string {
 		wb.lineHeights[i] = lineCount
 	}
 	w.cachedRender = styled
-	w.cachedInnerContent = innerContent
+	w.cachedInnerCont = innerContent
 	w.cachedWidth = wb.width
 	w.lastContentLen = len(w.Content)
-	w.lastWrapped = w.Wrapped
+	w.lastFolded = w.Folded
 	return styled
 }
 
@@ -661,7 +684,7 @@ func (wb *WindowBuffer) isCacheValid(w *Window) bool {
 		return false
 	}
 	if w.IsDiffWindow() {
-		return w.Wrapped == w.lastWrapped
+		return w.Folded == w.lastFolded
 	}
 	return len(w.Content) == w.lastContentLen
 }
@@ -683,24 +706,24 @@ func (wb *WindowBuffer) renderWithCursor(cursorIndex int) string {
 				innerContent := wb.renderWindowContent(w, innerWidth)
 				styled := w.Style.Width(wb.width).Render(innerContent)
 				w.cachedRender = styled
-				w.cachedInnerContent = innerContent
+				w.cachedInnerCont = innerContent
 				w.cachedWidth = wb.width
 				w.lastContentLen = len(w.Content)
-				w.lastWrapped = w.Wrapped
+				w.lastFolded = w.Folded
 				sb.WriteString(styled)
 			}
 		} else {
-			if w.cachedInnerContent != "" && wb.isCacheValid(w) {
-				sb.WriteString(wb.cursorStyle.Width(wb.width).Render(w.cachedInnerContent))
+			if w.cachedInnerCont != "" && wb.isCacheValid(w) {
+				sb.WriteString(wb.cursorStyle.Width(wb.width).Render(w.cachedInnerCont))
 			} else {
 				innerWidth := max(0, wb.width-4)
 				innerContent := wb.renderWindowContent(w, innerWidth)
 				styled := wb.cursorStyle.Width(wb.width).Render(innerContent)
 				w.cachedRender = w.Style.Width(wb.width).Render(innerContent)
-				w.cachedInnerContent = innerContent
+				w.cachedInnerCont = innerContent
 				w.cachedWidth = wb.width
 				w.lastContentLen = len(w.Content)
-				w.lastWrapped = w.Wrapped
+				w.lastFolded = w.Folded
 				sb.WriteString(styled)
 			}
 		}
@@ -726,7 +749,7 @@ func (wb *WindowBuffer) renderWindowContent(w *Window, innerWidth int) string {
 	}
 
 	// Apply folding if needed
-	if w.Wrapped {
+	if w.Folded {
 		return wb.applyFolding(fullContent, innerWidth)
 	}
 	return fullContent
@@ -753,33 +776,11 @@ func (wb *WindowBuffer) applyFolding(content string, innerWidth int) string {
 func (wb *WindowBuffer) renderGenericContent(w *Window, innerWidth int) string {
 	content := w.Content
 	if w.Tag == stream.TagFunctionNotify {
-		content = wb.renderStatusIndicator(w.Status) + content
+		content = w.Status.Indicator(wb.styles) + content
 	}
 
 	lines := w.getOrBuildLines(content, innerWidth)
 	return strings.Join(lines, "\n")
-}
-
-// renderStatusIndicator returns the status indicator string for a tool window
-func (wb *WindowBuffer) renderStatusIndicator(status string) string {
-	switch status {
-	case statusSuccess:
-		return lipgloss.NewStyle().
-			Foreground(wb.styles.ColorSuccess).
-			Render("• ")
-	case statusError:
-		return lipgloss.NewStyle().
-			Foreground(wb.styles.ColorError).
-			Render("• ")
-	case statusPending:
-		return lipgloss.NewStyle().
-			Foreground(wb.styles.ColorDim).
-			Render("• ")
-	default:
-		return lipgloss.NewStyle().
-			Foreground(wb.styles.ColorDim).
-			Render("· ")
-	}
 }
 
 // ============================================================================
@@ -787,10 +788,10 @@ func (wb *WindowBuffer) renderStatusIndicator(status string) string {
 // ============================================================================
 
 // renderWriteFileContent renders a write_file container
-func (wb *WindowBuffer) renderWriteFileContent(wf *WriteFileContainer, status string) string {
+func (wb *WindowBuffer) renderWriteFileContent(wf *WriteFileContainer, status ToolStatus) string {
 	lines := make([]string, 0, 2)
 
-	header := wb.renderStatusIndicator(status) + wb.styles.Tool.Render("write_file: ") + wb.styles.ToolContent.Render(wf.Path)
+	header := status.Indicator(wb.styles) + wb.styles.Tool.Render("write_file: ") + wb.styles.ToolContent.Render(wf.Path)
 	lines = append(lines, header)
 
 	// Render content lines with Text style
@@ -803,10 +804,10 @@ func (wb *WindowBuffer) renderWriteFileContent(wf *WriteFileContainer, status st
 }
 
 // renderDiffContent renders a diff container in unified diff style
-func (wb *WindowBuffer) renderDiffContent(diff *DiffContainer, status string) string {
+func (wb *WindowBuffer) renderDiffContent(diff *DiffContainer, status ToolStatus) string {
 	lines := make([]string, 0, 1+len(diff.Lines))
 
-	header := wb.renderStatusIndicator(status) + wb.styles.Tool.Render("edit_file: ") + wb.styles.ToolContent.Render(diff.Path)
+	header := status.Indicator(wb.styles) + wb.styles.Tool.Render("edit_file: ") + wb.styles.ToolContent.Render(diff.Path)
 	lines = append(lines, header)
 
 	for _, pair := range diff.Lines {

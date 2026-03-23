@@ -152,9 +152,9 @@ func TestWindowBufferDiff(t *testing.T) {
 
 		wb.AppendDiff("diff-1", "test.txt", lines)
 
-		// Verify window is wrapped by default
-		if !wb.Windows[0].Wrapped {
-			t.Error("Diff window should be wrapped by default")
+		// Verify window is folded by default
+		if !wb.Windows[0].Folded {
+			t.Error("Diff window should be folded by default")
 		}
 
 		// Render and check that it folds
@@ -174,7 +174,7 @@ func TestWindowBufferDiff(t *testing.T) {
 		}
 	})
 
-	t.Run("diff window expands when unwrapped", func(t *testing.T) {
+	t.Run("diff window expands when unfolded", func(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
 
 		// Create a diff with many lines
@@ -188,8 +188,8 @@ func TestWindowBufferDiff(t *testing.T) {
 
 		wb.AppendDiff("diff-1", "test.txt", lines)
 
-		// Unwrap the window
-		wb.ToggleWrap(0)
+		// Unfold the window
+		wb.ToggleFold(0)
 
 		// Render and check that it shows all lines
 		rendered := wb.GetAll(-1)
@@ -198,7 +198,7 @@ func TestWindowBufferDiff(t *testing.T) {
 		// Count the "-" prefixes on left side to count diff lines
 		removeCount := strings.Count(rendered, "- ")
 		if removeCount != 10 {
-			t.Errorf("Unwrapped diff should show 10 changed lines with - prefix, found %d", removeCount)
+			t.Errorf("Unfolded diff should show 10 changed lines with - prefix, found %d", removeCount)
 		}
 	})
 
@@ -216,8 +216,8 @@ func TestWindowBufferDiff(t *testing.T) {
 
 		wb.AppendDiff("diff-1", "test.txt", lines)
 
-		// Unwrap to see all lines
-		wb.ToggleWrap(0)
+		// Unfold to see all lines
+		wb.ToggleFold(0)
 
 		rendered := wb.GetAll(-1)
 
@@ -248,7 +248,7 @@ func TestWindowBufferDiff(t *testing.T) {
 		}
 	})
 
-	t.Run("diff window cache invalidates when wrapped changes", func(t *testing.T) {
+	t.Run("diff window cache invalidates when folded changes", func(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
 
 		// Create a diff with many lines
@@ -262,37 +262,37 @@ func TestWindowBufferDiff(t *testing.T) {
 
 		wb.AppendDiff("diff-1", "test.txt", lines)
 
-		// First render - should be folded (wrapped=true)
+		// First render - should be folded (Folded=true)
 		rendered1 := wb.GetAll(-1)
 		removeCount1 := strings.Count(rendered1, "- ")
 		if removeCount1 >= 10 {
-			t.Errorf("Wrapped diff should fold lines, found %d - prefixes", removeCount1)
+			t.Errorf("Folded diff should fold lines, found %d - prefixes", removeCount1)
 		}
 
-		// Toggle wrap
-		wb.ToggleWrap(0)
+		// Toggle fold
+		wb.ToggleFold(0)
 
-		// Second render - should be expanded (wrapped=false)
+		// Second render - should be expanded (Folded=false)
 		// In unified diff format, each changed line pair shows as "- old" then "+ new"
 		// So 20 line pairs = 20 lines with - prefix + 20 lines with + prefix = 40 total
 		rendered2 := wb.GetAll(-1)
 		removeCount2 := strings.Count(rendered2, "- ")
 		if removeCount2 != 20 {
-			t.Errorf("Unwrapped diff should show all 20 lines with - prefix, found %d", removeCount2)
+			t.Errorf("Unfolded diff should show all 20 lines with - prefix, found %d", removeCount2)
 		}
 
 		// Toggle back
-		wb.ToggleWrap(0)
+		wb.ToggleFold(0)
 
 		// Third render - should be folded again
 		rendered3 := wb.GetAll(-1)
 		removeCount3 := strings.Count(rendered3, "- ")
 		if removeCount3 >= 10 {
-			t.Errorf("Re-wrapped diff should fold lines again, found %d - prefixes", removeCount3)
+			t.Errorf("Re-folded diff should fold lines again, found %d - prefixes", removeCount3)
 		}
 	})
 
-	t.Run("user and assistant messages not wrapped by default", func(t *testing.T) {
+	t.Run("user and assistant messages not folded by default", func(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
 
 		// Create windows for different tag types
@@ -301,20 +301,20 @@ func TestWindowBufferDiff(t *testing.T) {
 		wb.AppendOrUpdate("tool-1", stream.TagFunctionNotify, "Tool output")
 		wb.AppendOrUpdate("reasoning-1", stream.TagTextReasoning, "Reasoning content")
 
-		// User and Assistant should NOT be wrapped (show full content)
-		if wb.Windows[0].Wrapped {
-			t.Error("User window should NOT be wrapped by default")
+		// User and Assistant should NOT be folded (show full content)
+		if wb.Windows[0].Folded {
+			t.Error("User window should NOT be folded by default")
 		}
-		if wb.Windows[1].Wrapped {
-			t.Error("Assistant window should NOT be wrapped by default")
+		if wb.Windows[1].Folded {
+			t.Error("Assistant window should NOT be folded by default")
 		}
 
-		// Other tags should be wrapped (folded/collapsed)
-		if !wb.Windows[2].Wrapped {
-			t.Error("Tool window should be wrapped by default")
+		// Other tags should be folded (collapsed)
+		if !wb.Windows[2].Folded {
+			t.Error("Tool window should be folded by default")
 		}
-		if !wb.Windows[3].Wrapped {
-			t.Error("Reasoning window should be wrapped by default")
+		if !wb.Windows[3].Folded {
+			t.Error("Reasoning window should be folded by default")
 		}
 	})
 }

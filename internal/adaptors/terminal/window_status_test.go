@@ -18,36 +18,36 @@ func TestUpdateToolStatus(t *testing.T) {
 	}
 
 	// Initially no status
-	if wb.Windows[0].Status != "" {
-		t.Errorf("Expected empty status, got %s", wb.Windows[0].Status)
+	if wb.Windows[0].Status != ToolStatusNone {
+		t.Errorf("Expected ToolStatusNone, got %v", wb.Windows[0].Status)
 	}
 
 	// Update with pending status
-	wb.UpdateToolStatus("tool123", "pending")
+	wb.UpdateToolStatus("tool123", ToolStatusPending)
 
 	// Check status was updated
-	if wb.Windows[0].Status != "pending" {
-		t.Errorf("Expected status 'pending', got %s", wb.Windows[0].Status)
+	if wb.Windows[0].Status != ToolStatusPending {
+		t.Errorf("Expected ToolStatusPending, got %v", wb.Windows[0].Status)
 	}
 
 	// Update with success status
-	wb.UpdateToolStatus("tool123", "success")
+	wb.UpdateToolStatus("tool123", ToolStatusSuccess)
 
 	// Check status was updated
-	if wb.Windows[0].Status != "success" {
-		t.Errorf("Expected status 'success', got %s", wb.Windows[0].Status)
+	if wb.Windows[0].Status != ToolStatusSuccess {
+		t.Errorf("Expected ToolStatusSuccess, got %v", wb.Windows[0].Status)
 	}
 
 	// Update with error status
-	wb.UpdateToolStatus("tool123", "error")
+	wb.UpdateToolStatus("tool123", ToolStatusError)
 
 	// Check status was updated
-	if wb.Windows[0].Status != "error" {
-		t.Errorf("Expected status 'error', got %s", wb.Windows[0].Status)
+	if wb.Windows[0].Status != ToolStatusError {
+		t.Errorf("Expected ToolStatusError, got %v", wb.Windows[0].Status)
 	}
 
 	// Try to update non-existent window (should not crash)
-	wb.UpdateToolStatus("nonexistent", "success")
+	wb.UpdateToolStatus("nonexistent", ToolStatusSuccess)
 }
 
 func TestRenderWindowContentWithStatus(t *testing.T) {
@@ -67,7 +67,7 @@ func TestRenderWindowContentWithStatus(t *testing.T) {
 	}
 
 	// Update with pending status
-	wb.UpdateToolStatus("tool123", "pending")
+	wb.UpdateToolStatus("tool123", ToolStatusPending)
 
 	// Test rendering with pending status
 	content = wb.renderWindowContent(wb.Windows[0], 76)
@@ -80,7 +80,7 @@ func TestRenderWindowContentWithStatus(t *testing.T) {
 	}
 
 	// Update with success status
-	wb.UpdateToolStatus("tool123", "success")
+	wb.UpdateToolStatus("tool123", ToolStatusSuccess)
 
 	// Test rendering with success status
 	content = wb.renderWindowContent(wb.Windows[0], 76)
@@ -93,7 +93,7 @@ func TestRenderWindowContentWithStatus(t *testing.T) {
 	}
 
 	// Update with error status
-	wb.UpdateToolStatus("tool123", "error")
+	wb.UpdateToolStatus("tool123", ToolStatusError)
 
 	// Test rendering with error status
 	content = wb.renderWindowContent(wb.Windows[0], 76)

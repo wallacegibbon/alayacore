@@ -74,7 +74,7 @@ type Terminal struct {
 	// UI components
 	display       DisplayModel
 	input         InputModel
-	status        StatusModel
+	statusBar     StatusBar
 	modelSelector *ModelSelector
 	queueManager  *QueueManager
 
@@ -119,7 +119,7 @@ func NewTerminalWithTheme(
 		appConfig:     appCfg,
 		display:       NewDisplayModel(out.WindowBuffer(), styles),
 		input:         NewInputModel(styles),
-		status:        NewStatusModel(styles),
+		statusBar:     NewStatusBar(styles),
 		modelSelector: NewModelSelector(styles),
 		queueManager:  NewQueueManager(styles),
 		windowWidth:   initialWidth,
@@ -132,7 +132,7 @@ func NewTerminalWithTheme(
 	// Initialize component widths
 	m.display.SetWidth(initialWidth)
 	m.input.SetWidth(initialWidth)
-	m.status.SetWidth(initialWidth)
+	m.statusBar.SetWidth(initialWidth)
 	m.modelSelector.SetSize(initialWidth, initialHeight)
 	m.queueManager.SetSize(initialWidth, initialHeight)
 	m.updateDisplayHeight()
@@ -203,7 +203,7 @@ func (m *Terminal) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 	m.out.SetWindowWidth(max(0, msg.Width))
 	m.display.SetWidth(max(0, msg.Width))
 	m.input.SetWidth(max(0, msg.Width))
-	m.status.SetWidth(max(0, msg.Width))
+	m.statusBar.SetWidth(max(0, msg.Width))
 	m.modelSelector.SetSize(msg.Width, msg.Height)
 	m.queueManager.SetSize(msg.Width, msg.Height)
 	m.updateDisplayHeight()
@@ -361,8 +361,8 @@ func (m *Terminal) updateStatusWithQueue() {
 		}
 	}
 
-	m.status.SetStatus(status)
-	m.status.SetInProgress(inProgress)
+	m.statusBar.SetStatus(status)
+	m.statusBar.SetInProgress(inProgress)
 }
 
 // View renders the complete terminal UI.
@@ -384,7 +384,7 @@ func (m *Terminal) View() tea.View {
 
 	// Status bar
 	sb.WriteString("\n")
-	sb.WriteString(m.status.RenderString())
+	sb.WriteString(m.statusBar.RenderString())
 
 	baseContent := sb.String()
 
@@ -626,30 +626,30 @@ func (m *Terminal) handleFocus() (tea.Model, tea.Cmd) {
 // Status Bar
 // ============================================================================
 
-// StatusModel shows the status bar (token usage, etc).
-type StatusModel struct {
+// StatusBar shows the status bar (token usage, queue count, etc).
+type StatusBar struct {
 	status     string
 	inProgress bool
 	styles     *Styles
 	width      int
 }
 
-// NewStatusModel creates a new status model
-func NewStatusModel(styles *Styles) StatusModel {
-	return StatusModel{
+// NewStatusBar creates a new status bar
+func NewStatusBar(styles *Styles) StatusBar {
+	return StatusBar{
 		status: "",
 		styles: styles,
 		width:  DefaultWidth,
 	}
 }
 
-// Init initializes the status model
-func (m StatusModel) Init() tea.Cmd {
+// Init initializes the status bar
+func (m StatusBar) Init() tea.Cmd {
 	return nil
 }
 
-// Update handles messages for the status model
-func (m StatusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+// Update handles messages for the status bar
+func (m StatusBar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if windowMsg, ok := msg.(tea.WindowSizeMsg); ok {
 		m.width = windowMsg.Width
 	}
@@ -657,32 +657,32 @@ func (m StatusModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // View renders the status bar
-func (m StatusModel) View() tea.View {
+func (m StatusBar) View() tea.View {
 	return tea.NewView(m.styles.Status.Render(m.status))
 }
 
 // SetStatus updates the status text
-func (m *StatusModel) SetStatus(status string) {
+func (m *StatusBar) SetStatus(status string) {
 	m.status = status
 }
 
 // SetInProgress updates the in-progress state
-func (m *StatusModel) SetInProgress(inProgress bool) {
+func (m *StatusBar) SetInProgress(inProgress bool) {
 	m.inProgress = inProgress
 }
 
 // GetStatus returns the current status
-func (m StatusModel) GetStatus() string {
+func (m StatusBar) GetStatus() string {
 	return m.status
 }
 
 // SetWidth sets the width for rendering
-func (m *StatusModel) SetWidth(width int) {
+func (m *StatusBar) SetWidth(width int) {
 	m.width = width
 }
 
 // RenderString returns the rendered status string
-func (m StatusModel) RenderString() string {
+func (m StatusBar) RenderString() string {
 	var indicator string
 	if m.inProgress {
 		indicator = m.styles.Status.Foreground(m.styles.ColorSuccess).Render("•")
@@ -830,4 +830,4 @@ func hasEditorPrefix(value string) bool {
 	return len(value) > 0 && value[0] == '['
 }
 
-var _ tea.Model = (*StatusModel)(nil)
+var _ tea.Model = (*StatusBar)(nil)

@@ -35,7 +35,7 @@ func TestStatusBarShowsLastMaxSteps(t *testing.T) {
 		out:           out,
 		display:       NewDisplayModel(out.WindowBuffer(), styles),
 		input:         NewInputModel(styles),
-		status:        NewStatusModel(styles),
+		statusBar:     NewStatusBar(styles),
 		windowWidth:   80,
 		windowHeight:  24,
 		styles:        styles,
@@ -47,7 +47,7 @@ func TestStatusBarShowsLastMaxSteps(t *testing.T) {
 	terminal.updateStatusWithQueue()
 
 	// Check that status shows last step info (2/50, not 50/50)
-	statusText := terminal.status.GetStatus()
+	statusText := terminal.statusBar.GetStatus()
 	expectedSubstring := "Steps: 2/50"
 	if !containsSubstring(statusText, expectedSubstring) {
 		t.Errorf("Expected status to contain %q, got %q", expectedSubstring, statusText)
@@ -73,7 +73,7 @@ func TestStatusBarShowsCurrentStepsDuringProgress(t *testing.T) {
 		out:           out,
 		display:       NewDisplayModel(out.WindowBuffer(), styles),
 		input:         NewInputModel(styles),
-		status:        NewStatusModel(styles),
+		statusBar:     NewStatusBar(styles),
 		windowWidth:   80,
 		windowHeight:  24,
 		styles:        styles,
@@ -85,7 +85,7 @@ func TestStatusBarShowsCurrentStepsDuringProgress(t *testing.T) {
 	terminal.updateStatusWithQueue()
 
 	// Check that status shows current step progress
-	statusText := terminal.status.GetStatus()
+	statusText := terminal.statusBar.GetStatus()
 	expectedSubstring := "Steps: 7/20"
 	if !containsSubstring(statusText, expectedSubstring) {
 		t.Errorf("Expected status to contain %q, got %q", expectedSubstring, statusText)
