@@ -811,6 +811,9 @@ func expandTabs(s string) string {
 			spaces := next - col
 			result.WriteString(strings.Repeat(" ", spaces))
 			col = next
+		} else if r == '\n' {
+			result.WriteRune(r)
+			col = 0
 		} else {
 			result.WriteRune(r)
 			col++

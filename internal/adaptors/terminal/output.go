@@ -381,6 +381,9 @@ func (w *outputWriter) GetLastStepInfo() (currentStep, maxSteps int) {
 
 // renderMultiline applies a style to each line of text
 func (w *outputWriter) renderMultiline(style lipgloss.Style, value string, trimRight bool) string {
+	// Expand tabs BEFORE styling to ensure correct column counting
+	value = expandTabs(value)
+
 	lines := strings.Split(value, "\n")
 	for i, line := range lines {
 		rendered := style.Render(line)
@@ -394,6 +397,9 @@ func (w *outputWriter) renderMultiline(style lipgloss.Style, value string, trimR
 
 // colorizeTool applies tool-specific styling to tool output
 func (w *outputWriter) colorizeTool(value string) string {
+	// Expand tabs BEFORE styling to ensure correct column counting
+	value = expandTabs(value)
+
 	lines := strings.Split(value, "\n")
 	if len(lines) == 1 {
 		return w.colorizeSingleLineTool(value)
