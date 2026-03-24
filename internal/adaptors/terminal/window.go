@@ -42,6 +42,7 @@ type Window struct {
 	Content  string     // accumulated content (raw, unstyled)
 	Folded   bool       // true if window is in folded (collapsed) mode
 	Status   ToolStatus // status indicator for tool windows
+	styles   *Styles    // reference to styles for incremental updates
 
 	// Special content (if non-nil, Content is ignored)
 	Diff      *DiffContainer
@@ -163,7 +164,14 @@ func (w *Window) renderGenericContent(innerWidth int, styles *Styles) string {
 		return content
 	}
 
-	// Use cached wrapped lines if valid
+	// Use cached wrapped lines if valid and width matches
+	// Note: wrappedLines contains styled content, so we can use it directly
+	if w.cache.valid && len(w.cache.wrappedLines) > 0 && w.cache.width-4 == innerWidth {
+		return strings.Join(w.cache.wrappedLines, "\n")
+	}
+
+	// If we have wrappedLines from incremental update (cache.valid=false), use them
+	// This avoids re-wrapping after incremental updates
 	if len(w.cache.wrappedLines) > 0 && w.cache.width-4 == innerWidth {
 		return strings.Join(w.cache.wrappedLines, "\n")
 	}
@@ -199,18 +207,52 @@ func (w *Window) applyFolding(content string, innerWidth int, styles *Styles) st
 // Invalidate marks the cache as invalid (called when content changes)
 func (w *Window) Invalidate() {
 	w.cache.valid = false
+	w.cache.wrappedLines = nil
 }
 
 // AppendContent adds content incrementally, updating wrapped lines if possible
 func (w *Window) AppendContent(delta string, innerWidth int) {
 	w.Content += delta
 
-	// Try incremental wrap
-	if len(w.cache.wrappedLines) > 0 && innerWidth > 0 {
-		w.cache.wrappedLines = appendDeltaToLines(w.cache.wrappedLines, delta, innerWidth)
+	// Try incremental update if we have cached wrapped lines and styles
+	if len(w.cache.wrappedLines) > 0 && innerWidth > 0 && w.styles != nil && !w.IsDiffWindow() && !w.IsWriteFileWindow() {
+		styledDelta := w.styleContent(delta, w.styles)
+		w.cache.wrappedLines = appendDeltaToLines(w.cache.wrappedLines, styledDelta, innerWidth)
+		// Mark cache as needing rebuild for rendered output, but wrappedLines is updated
+		// The rebuild will use cached wrappedLines instead of re-wrapping
+		w.cache.valid = false
+	} else {
+		// Can't do incremental - need full rebuild
+		w.cache.valid = false
+		w.cache.wrappedLines = nil
 	}
-	// Don't mark valid - full rebuild will happen on next Render()
-	w.cache.valid = false
+}
+
+// styleContent applies styling to content based on window tag
+func (w *Window) styleContent(content string, styles *Styles) string {
+	if styles == nil {
+		return content
+	}
+
+	// Apply styling based on tag
+	switch w.Tag {
+	case stream.TagFunctionCall:
+		return w.Status.Indicator(styles) + ColorizeTool(content, styles)
+	case stream.TagFunctionResult:
+		return styleMultiline(content, styles.Text)
+	case stream.TagTextAssistant:
+		return styleMultiline(content, styles.Text)
+	case stream.TagTextReasoning:
+		return styleMultiline(content, styles.Reasoning)
+	case stream.TagTextUser:
+		return styles.Prompt.Render("> ") + styles.UserInput.Render(content)
+	case stream.TagSystemError:
+		return styleMultiline(content, styles.Error)
+	case stream.TagSystemNotify:
+		return styleMultiline(content, styles.System)
+	default:
+		return content
+	}
 }
 
 // LineCount returns the cached line count (valid after Render())
@@ -302,10 +344,11 @@ func (wb *WindowBuffer) AppendOrUpdate(id string, tag string, content string) {
 	// Create new window
 	folded := tag != stream.TagTextUser && tag != stream.TagTextAssistant
 	w := &Window{
-		ID:      id,
-		Tag:     tag,
+		ID:     id,
+		Tag:    tag,
 		Content: content,
-		Folded:  folded,
+		Folded: folded,
+		styles: wb.styles,
 	}
 	wb.Windows = append(wb.Windows, w)
 	wb.idIndex[id] = len(wb.Windows) - 1
@@ -330,6 +373,7 @@ func (wb *WindowBuffer) AppendToolCall(id string, toolName string, content strin
 		ToolName: toolName,
 		Content:  content,
 		Folded:   true,
+		styles:   wb.styles,
 	}
 	wb.Windows = append(wb.Windows, w)
 	wb.idIndex[id] = len(wb.Windows) - 1
@@ -384,6 +428,7 @@ func (wb *WindowBuffer) AppendDiff(id string, path string, lines []DiffLinePair)
 		ToolName: "edit_file",
 		Diff:     &DiffContainer{Path: path, Lines: lines},
 		Folded:   true,
+		styles:   wb.styles,
 	}
 	wb.Windows = append(wb.Windows, w)
 	wb.idIndex[id] = len(wb.Windows) - 1
@@ -401,6 +446,7 @@ func (wb *WindowBuffer) AppendWriteFile(id string, path string, content string) 
 		ToolName:  "write_file",
 		WriteFile: &WriteFileContainer{Path: path, Content: content},
 		Folded:    true,
+		styles:    wb.styles,
 	}
 	wb.Windows = append(wb.Windows, w)
 	wb.idIndex[id] = len(wb.Windows) - 1

@@ -128,12 +128,36 @@ func TestWindowRenderCacheInvalidation(t *testing.T) {
 		t.Error("expected cache to be valid after render")
 	}
 
-	// Invalidate via AppendContent
+	// Check initial wrappedLines contains "Hello"
+	if len(w.cache.wrappedLines) == 0 {
+		t.Fatal("expected wrappedLines to be populated")
+	}
+	if !strings.Contains(w.cache.wrappedLines[0], "Hello") {
+		t.Errorf("expected 'Hello' in wrappedLines[0], got %q", w.cache.wrappedLines[0])
+	}
+
+	// AppendContent with incremental update (window has styles and wrappedLines)
 	w.AppendContent(" world", 76)
 
-	// Cache should be invalid
-	if w.cache.valid {
-		t.Error("expected cache to be invalid after content change")
+	// Content should include both parts
+	if !strings.Contains(w.Content, "Hello world") {
+		t.Errorf("expected 'Hello world' in content, got %q", w.Content)
+	}
+
+	// wrappedLines should be updated incrementally (should now contain "world")
+	if !strings.Contains(w.cache.wrappedLines[0], "world") {
+		t.Errorf("expected 'world' in wrappedLines[0] after incremental update, got %q", w.cache.wrappedLines[0])
+	}
+
+	// Render again - should use cached wrappedLines, not re-wrap
+	rendered := w.Render(80, false, styles, borderStyle, cursorStyle)
+
+	// Render should contain the styled content
+	if !strings.Contains(rendered, "Hello") {
+		t.Error("expected 'Hello' in rendered output")
+	}
+	if !strings.Contains(rendered, "world") {
+		t.Error("expected 'world' in rendered output")
 	}
 }
 
