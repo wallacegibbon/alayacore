@@ -172,6 +172,9 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case editorFinishedMsg:
 		return m.handleEditorFinished(msg)
 
+	case displayEditorFinishedMsg:
+		return m.handleDisplayEditorFinished(msg)
+
 	case FileEditorFinishedMsg:
 		return m.handleFileEditorFinished(msg)
 
@@ -268,6 +271,15 @@ func (m *Terminal) handleEditorFinished(msg editorFinishedMsg) (tea.Model, tea.C
 	return m, nil
 }
 
+// handleDisplayEditorFinished handles completion of the external editor for display viewing.
+// This is a no-op - we just opened the editor to view content, nothing to do when it closes.
+func (m *Terminal) handleDisplayEditorFinished(msg displayEditorFinishedMsg) (tea.Model, tea.Cmd) {
+	if msg.err != nil {
+		m.out.AppendError("Editor error: %v", msg.err)
+	}
+	return m, nil
+}
+
 // handleEditorStart handles the lazy start of the external editor.
 // This is where the temp file is actually created, ensuring cleanup happens properly.
 func (m *Terminal) handleEditorStart(msg editorStartMsg) (tea.Model, tea.Cmd) {
@@ -284,7 +296,15 @@ func (m *Terminal) handleEditorStart(msg editorStartMsg) (tea.Model, tea.Cmd) {
 		defer os.Remove(tmpFileName)
 
 		if err != nil {
+			if msg.forDisplay {
+				return displayEditorFinishedMsg{err: err}
+			}
 			return editorFinishedMsg{content: "", err: err}
+		}
+
+		// For display viewing, we don't need to read the content back
+		if msg.forDisplay {
+			return displayEditorFinishedMsg{err: nil}
 		}
 
 		content, readErr := os.ReadFile(tmpFileName)
@@ -540,16 +560,22 @@ func (m *Terminal) handleFocus() (tea.Model, tea.Cmd) {
 // External Editor
 // ============================================================================
 
-// editorFinishedMsg is sent when external editor closes
+// editorFinishedMsg is sent when external editor closes (for input)
 type editorFinishedMsg struct {
 	content string
 	err     error
+}
+
+// displayEditorFinishedMsg is sent when external editor closes (for display window viewing)
+type displayEditorFinishedMsg struct {
+	err error
 }
 
 // editorStartMsg is sent to trigger actual editor execution (lazy temp file creation)
 type editorStartMsg struct {
 	editorCmd   string
 	tmpFileName string
+	forDisplay  bool // true if opening display window content (don't populate input)
 }
 
 // FileEditorFinishedMsg is sent when external editor closes for a specific file
@@ -590,6 +616,31 @@ func (e *Editor) Open(currentContent string) tea.Cmd {
 		return editorStartMsg{
 			editorCmd:   editorCmd,
 			tmpFileName: "", // Will be created in handleEditorStart
+			forDisplay:  false,
+		}
+	}
+}
+
+// OpenForDisplay opens an external editor to view display window content.
+// Unlike Open, this does not populate the input box when the editor closes.
+func (e *Editor) OpenForDisplay(content string) tea.Cmd {
+	editorCmd := getEditorCommand(os.Getenv("EDITOR"))
+
+	if editorCmd == "" {
+		return func() tea.Msg {
+			return displayEditorFinishedMsg{err: fmt.Errorf("no editor found (tried: vim, vi, nano)")}
+		}
+	}
+
+	// Store content for lazy temp file creation
+	e.content = content
+
+	// Return a command that creates the temp file and runs the editor
+	return func() tea.Msg {
+		return editorStartMsg{
+			editorCmd:   editorCmd,
+			tmpFileName: "", // Will be created in handleEditorStart
+			forDisplay:  true,
 		}
 	}
 }

@@ -596,3 +596,166 @@ func TestWindowBufferWidthMatchesInput(t *testing.T) {
 		})
 	}
 }
+
+func TestEKeyOpensDisplayWindowInEditor(t *testing.T) {
+	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+	terminal.focusedWindow = focusDisplay
+
+	// Add a window with content
+	terminal.out.WindowBuffer().AppendOrUpdate("test1", stream.TagTextAssistant, "Hello from display")
+
+	// Set cursor to first window
+	terminal.display.SetWindowCursor(0)
+
+	// Press 'e' key in display window
+	msg := tea.KeyPressMsg(tea.Key{Code: 'e'})
+
+	model, cmd := terminal.Update(msg)
+
+	if model == nil {
+		t.Fatal("Update returned nil model")
+	}
+
+	// Should return a command (editor open)
+	if cmd == nil {
+		t.Fatal("Update returned nil command - should return editor command when 'e' pressed in display with content")
+	}
+}
+
+func TestEKeyDoesNothingWithNoWindow(t *testing.T) {
+	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+	terminal.focusedWindow = focusDisplay
+
+	// No windows in buffer
+	terminal.display.SetWindowCursor(-1)
+
+	// Press 'e' key in display window
+	msg := tea.KeyPressMsg(tea.Key{Code: 'e'})
+
+	model, cmd := terminal.Update(msg)
+
+	if model == nil {
+		t.Fatal("Update returned nil model")
+	}
+
+	// Should NOT return a command (no content to edit)
+	if cmd != nil {
+		t.Fatal("Update should return nil command when no window is selected")
+	}
+}
+
+func TestEKeyDoesNothingInInputWindow(t *testing.T) {
+	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+	terminal.focusedWindow = focusInput
+
+	// Add a window with content
+	terminal.out.WindowBuffer().AppendOrUpdate("test1", stream.TagTextAssistant, "Hello from display")
+
+	// Press 'e' key while in input window (should be passed to input, not open editor)
+	msg := tea.KeyPressMsg(tea.Key{Code: 'e'})
+
+	model, cmd := terminal.Update(msg)
+
+	if model == nil {
+		t.Fatal("Update returned nil model")
+	}
+
+	// Should NOT return a command (e key goes to input, not display handler)
+	if cmd != nil {
+		t.Fatal("Update should return nil command when 'e' pressed in input window")
+	}
+
+	// The key is passed to input handler - we don't verify input value here
+	// as that tests input component behavior, not the 'e' key routing
+}
+
+func TestDisplayEditorFinishedDoesNotPopulateInput(t *testing.T) {
+	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+	terminal.input.SetValue("original input")
+
+	// Simulate display editor finishing (user viewed content, then quit)
+	msg := displayEditorFinishedMsg{err: nil}
+
+	model, _ := terminal.Update(msg)
+
+	if model == nil {
+		t.Fatal("Update returned nil model")
+	}
+
+	// Input should remain unchanged
+	if terminal.input.Value() != "original input" {
+		t.Errorf("Input should not be modified after display editor closes, got '%s'", terminal.input.Value())
+	}
+
+	// editorContent should remain empty
+	if terminal.input.editorContent != "" {
+		t.Errorf("editorContent should be empty after display editor closes, got '%s'", terminal.input.editorContent)
+	}
+}
+
+func TestDisplayEditorFinishedWithError(t *testing.T) {
+	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+	terminal.input.SetValue("original input")
+
+	// Simulate display editor finishing with error
+	msg := displayEditorFinishedMsg{err: fmt.Errorf("editor failed")}
+
+	model, _ := terminal.Update(msg)
+
+	if model == nil {
+		t.Fatal("Update returned nil model")
+	}
+
+	// Input should remain unchanged
+	if terminal.input.Value() != "original input" {
+		t.Errorf("Input should not be modified after display editor error, got '%s'", terminal.input.Value())
+	}
+
+	// Error should be shown in display (check window buffer has error)
+	// The error is written to window buffer, we just verify input wasn't affected
+}
+
+func TestGetWindowContentWriteFile(t *testing.T) {
+	wb := NewWindowBuffer(80, DefaultStyles())
+	content := "write_file: /path/to/file.txt\nline1\nline2\nline3"
+	wb.AppendToolCall("test-id", "write_file", content)
+
+	result := wb.GetWindowContent(0)
+	if result != content {
+		t.Errorf("Expected write_file content with header, got: %q", result)
+	}
+}
+
+func TestGetWindowContentDiff(t *testing.T) {
+	wb := NewWindowBuffer(80, DefaultStyles())
+	// Simulate formatted diff content (what parseDiffFromFormatted produces)
+	content := "edit_file: /path/to/file.txt\n- old line 1\n+ new line 1\n  same line\n"
+	wb.AppendToolCall("test-id", "edit_file", content)
+
+	result := wb.GetWindowContent(0)
+
+	// Should contain path and diff markers
+	if !strings.Contains(result, "edit_file: /path/to/file.txt") {
+		t.Errorf("Expected path in diff content, got: %q", result)
+	}
+	if !strings.Contains(result, "- old line 1") {
+		t.Errorf("Expected old line with '- ' prefix, got: %q", result)
+	}
+	if !strings.Contains(result, "+ new line 1") {
+		t.Errorf("Expected new line with '+ ' prefix, got: %q", result)
+	}
+	// Unchanged line should have "  " prefix (two spaces)
+	if !strings.Contains(result, "  same line") {
+		t.Errorf("Expected unchanged line with '  ' prefix, got: %q", result)
+	}
+}
+
+func TestGetWindowContentRegular(t *testing.T) {
+	wb := NewWindowBuffer(80, DefaultStyles())
+	wb.AppendOrUpdate("test-id", stream.TagTextAssistant, "Hello world")
+
+	content := wb.GetWindowContent(0)
+	if content != "Hello world" {
+		t.Errorf("Expected regular content, got: %q", content)
+	}
+}

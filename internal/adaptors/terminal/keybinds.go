@@ -128,6 +128,7 @@ var displayKeyBindings = []KeyBinding{
 	{KeyUp, "Move window cursor up", "display"},
 	{KeyShiftJ, "Scroll down one line", "display"},
 	{KeyShiftK, "Scroll up one line", "display"},
+	{KeyE, "Open window content in external editor", "display"},
 	{KeyG, "Go to bottom (last window)", "display"},
 	{Keyg, "Go to top (first window)", "display"},
 	{KeyShiftH, "Move cursor to top window", "display"},
@@ -204,8 +205,8 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// 5. Display-specific keys when display is focused
 	if m.focusedWindow == "display" {
-		if handled := m.handleDisplayKeys(msg); handled {
-			return m, nil
+		if cmd, handled := m.handleDisplayKeys(msg); handled {
+			return m, cmd
 		}
 	}
 
@@ -320,7 +321,7 @@ func (m *Terminal) handleCancelConfirm(msg tea.KeyMsg) (tea.Cmd, bool) {
 // handleDisplayKeys handles key events when display window is focused.
 //
 //nolint:gocyclo // key handling requires many key cases
-func (m *Terminal) handleDisplayKeys(msg tea.KeyMsg) bool {
+func (m *Terminal) handleDisplayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 	keyStr := msg.String()
 
 	// Window cursor navigation
@@ -330,54 +331,54 @@ func (m *Terminal) handleDisplayKeys(msg tea.KeyMsg) bool {
 			m.display.updateContent()
 			m.display.EnsureCursorVisible()
 		}
-		return true
+		return nil, true
 
 	case KeyK, KeyUp:
 		if m.display.MoveWindowCursorUp() {
 			m.display.updateContent()
 			m.display.EnsureCursorVisible()
 		}
-		return true
+		return nil, true
 
 	case KeyShiftJ:
 		m.display.MarkUserScrolled()
 		m.display.ScrollDown(1)
-		return true
+		return nil, true
 
 	case KeyShiftK:
 		m.display.MarkUserScrolled()
 		m.display.ScrollUp(1)
-		return true
+		return nil, true
 
 	case KeyShiftH:
 		if m.display.MoveWindowCursorToTop() {
 			m.display.updateContent()
 		}
-		return true
+		return nil, true
 
 	case KeyShiftL:
 		if m.display.MoveWindowCursorToBottom() {
 			m.display.updateContent()
 		}
-		return true
+		return nil, true
 
 	case KeyShiftM:
 		if m.display.MoveWindowCursorToCenter() {
 			m.display.updateContent()
 		}
-		return true
+		return nil, true
 
 	case KeyG:
 		m.display.GotoBottom()
 		m.display.SetCursorToLastWindow()
 		m.display.updateContent()
-		return true
+		return nil, true
 
 	case Keyg:
 		m.display.GotoTop()
 		m.display.SetWindowCursor(0)
 		m.display.updateContent()
-		return true
+		return nil, true
 
 	case KeyColon:
 		// Switch to input with ":" prefix for command mode
@@ -385,16 +386,24 @@ func (m *Terminal) handleDisplayKeys(msg tea.KeyMsg) bool {
 		m.input.Focus()
 		m.input.SetValue(":")
 		m.input.CursorEnd()
-		return true
+		return nil, true
 
 	case KeySpace:
 		if m.display.ToggleWindowFold() {
 			m.display.updateContent()
 		}
-		return true
+		return nil, true
+
+	case KeyE:
+		// Open current window content in external editor (view only, don't populate input)
+		content := m.display.GetCursorWindowContent()
+		if content != "" {
+			return m.input.editor.OpenForDisplay(content), true
+		}
+		return nil, true
 	}
 
-	return false
+	return nil, false
 }
 
 // handleGlobalKeys handles global keyboard shortcuts.

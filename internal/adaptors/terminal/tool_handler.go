@@ -137,9 +137,24 @@ func (h *EditFileHandler) FormatCall(input json.RawMessage, styles *Styles) stri
 	diffPairs := computeDiff(oldLines, newLines)
 
 	for _, pair := range diffPairs {
-		oldPart := strings.ReplaceAll(pair.old, "\n", "\\n")
-		newPart := strings.ReplaceAll(pair.new, "\n", "\\n")
-		lines = append(lines, fmt.Sprintf("\x00%s\x00%s", oldPart, newPart))
+		old := strings.ReplaceAll(pair.old, "\n", "\\n")
+		new := strings.ReplaceAll(pair.new, "\n", "\\n")
+
+		oldEmpty := pair.old == ""
+		newEmpty := pair.new == ""
+		isSame := pair.old == pair.new
+
+		switch {
+		case isSame:
+			lines = append(lines, "  "+old)
+		case oldEmpty:
+			lines = append(lines, "+ "+new)
+		case newEmpty:
+			lines = append(lines, "- "+old)
+		default:
+			lines = append(lines, "- "+old)
+			lines = append(lines, "+ "+new)
+		}
 	}
 
 	return strings.Join(lines, "\n")

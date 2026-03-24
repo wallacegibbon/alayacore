@@ -130,11 +130,14 @@ func TestWindowBufferViewport(t *testing.T) {
 func TestWindowBufferDiff(t *testing.T) {
 	t.Run("append diff content", func(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
-		// Diff windows are created differently, this tests the structure
-		wb.AppendToolCall("diff-1", "edit_file", "diff content")
+		content := "edit_file: test.txt\n- old line\n+ new line\n"
+		wb.AppendToolCall("diff-1", "edit_file", content)
 
 		if len(wb.Windows) != 1 {
 			t.Fatalf("len(Windows) = %d, want 1", len(wb.Windows))
+		}
+		if wb.Windows[0].ToolName != "edit_file" {
+			t.Errorf("ToolName = %s, want edit_file", wb.Windows[0].ToolName)
 		}
 	})
 
@@ -142,15 +145,17 @@ func TestWindowBufferDiff(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
 
 		// Create a diff with many lines
-		lines := make([]DiffLinePair, 20)
+		var content strings.Builder
+		content.WriteString("edit_file: test.txt\n")
 		for i := 0; i < 20; i++ {
-			lines[i] = DiffLinePair{
-				Old: string(rune('a' + i%26)),
-				New: string(rune('b' + i%26)),
-			}
+			content.WriteString("- ")
+			content.WriteString(string(rune('a' + i%26)))
+			content.WriteString("\n+ ")
+			content.WriteString(string(rune('b' + i%26)))
+			content.WriteString("\n")
 		}
 
-		wb.AppendDiff("diff-1", "test.txt", lines)
+		wb.AppendToolCall("diff-1", "edit_file", content.String())
 
 		// Verify window is folded by default
 		if !wb.Windows[0].Folded {
@@ -178,15 +183,17 @@ func TestWindowBufferDiff(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
 
 		// Create a diff with many lines
-		lines := make([]DiffLinePair, 10)
+		var content strings.Builder
+		content.WriteString("edit_file: test.txt\n")
 		for i := 0; i < 10; i++ {
-			lines[i] = DiffLinePair{
-				Old: string(rune('a' + i%26)),
-				New: string(rune('b' + i%26)),
-			}
+			content.WriteString("- ")
+			content.WriteString(string(rune('a' + i%26)))
+			content.WriteString("\n+ ")
+			content.WriteString(string(rune('b' + i%26)))
+			content.WriteString("\n")
 		}
 
-		wb.AppendDiff("diff-1", "test.txt", lines)
+		wb.AppendToolCall("diff-1", "edit_file", content.String())
 
 		// Unfold the window
 		wb.ToggleFold(0)
@@ -194,8 +201,7 @@ func TestWindowBufferDiff(t *testing.T) {
 		// Render and check that it shows all lines
 		rendered := wb.GetAll(-1)
 
-		// Should show all 10 lines with - prefix on left (changed content)
-		// Count the "-" prefixes on left side to count diff lines
+		// Should show all 10 lines with - prefix
 		removeCount := strings.Count(rendered, "- ")
 		if removeCount != 10 {
 			t.Errorf("Unfolded diff should show 10 changed lines with - prefix, found %d", removeCount)
@@ -206,15 +212,15 @@ func TestWindowBufferDiff(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
 
 		// Create a diff with unchanged, added, and removed lines
-		lines := []DiffLinePair{
-			{Old: "unchanged line 1", New: "unchanged line 1"}, // unchanged
-			{Old: "old content", New: "new content"},           // changed
-			{Old: "unchanged line 2", New: "unchanged line 2"}, // unchanged
-			{Old: "removed line", New: ""},                     // removed
-			{Old: "", New: "added line"},                       // added
-		}
+		content := "edit_file: test.txt\n" +
+			"  unchanged line 1\n" +
+			"- old content\n" +
+			"+ new content\n" +
+			"  unchanged line 2\n" +
+			"- removed line\n" +
+			"+ added line\n"
 
-		wb.AppendDiff("diff-1", "test.txt", lines)
+		wb.AppendToolCall("diff-1", "edit_file", content)
 
 		// Unfold to see all lines
 		wb.ToggleFold(0)
@@ -252,15 +258,17 @@ func TestWindowBufferDiff(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
 
 		// Create a diff with many lines
-		lines := make([]DiffLinePair, 20)
+		var content strings.Builder
+		content.WriteString("edit_file: test.txt\n")
 		for i := 0; i < 20; i++ {
-			lines[i] = DiffLinePair{
-				Old: string(rune('a' + i%26)),
-				New: string(rune('b' + i%26)),
-			}
+			content.WriteString("- ")
+			content.WriteString(string(rune('a' + i%26)))
+			content.WriteString("\n+ ")
+			content.WriteString(string(rune('b' + i%26)))
+			content.WriteString("\n")
 		}
 
-		wb.AppendDiff("diff-1", "test.txt", lines)
+		wb.AppendToolCall("diff-1", "edit_file", content.String())
 
 		// First render - should be folded (Folded=true)
 		rendered1 := wb.GetAll(-1)
@@ -273,8 +281,6 @@ func TestWindowBufferDiff(t *testing.T) {
 		wb.ToggleFold(0)
 
 		// Second render - should be expanded (Folded=false)
-		// In unified diff format, each changed line pair shows as "- old" then "+ new"
-		// So 20 line pairs = 20 lines with - prefix + 20 lines with + prefix = 40 total
 		rendered2 := wb.GetAll(-1)
 		removeCount2 := strings.Count(rendered2, "- ")
 		if removeCount2 != 20 {

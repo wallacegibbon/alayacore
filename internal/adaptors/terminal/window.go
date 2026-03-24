@@ -44,10 +44,6 @@ type Window struct {
 	Status   ToolStatus // status indicator for tool windows
 	styles   *Styles    // reference to styles for incremental updates
 
-	// Special content (if non-nil, Content is ignored)
-	Diff      *DiffContainer
-	WriteFile *WriteFileContainer
-
 	// Internal cache - updated on render, invalidated on content change
 	cache windowCache
 }
@@ -66,12 +62,12 @@ type windowCache struct {
 
 // IsDiffWindow returns true if the window is a diff window
 func (w *Window) IsDiffWindow() bool {
-	return w.Diff != nil
+	return w.ToolName == "edit_file"
 }
 
-// IsWriteFileWindow returns true if the window is a write_file window
-func (w *Window) IsWriteFileWindow() bool {
-	return w.WriteFile != nil
+// IsToolWithTextContent returns true if the window should render content with text style
+func (w *Window) IsToolWithTextContent() bool {
+	return w.ToolName == "write_file" || w.ToolName == "read_file" || w.ToolName == "posix_shell"
 }
 
 // Render returns the window with border, using cache if valid.
@@ -79,7 +75,7 @@ func (w *Window) IsWriteFileWindow() bool {
 func (w *Window) Render(width int, isCursor bool, styles *Styles, borderStyle, cursorStyle lipgloss.Style) string {
 	// Check if cache is valid
 	if w.cache.valid && w.cache.width == width && w.cache.folded == w.Folded {
-		if w.IsDiffWindow() || w.IsWriteFileWindow() {
+		if w.IsDiffWindow() || w.IsToolWithTextContent() {
 			// Special windows: folded state determines validity
 		} else if len(w.Content) == w.cache.contentLen {
 			// Regular windows: content length determines validity
@@ -109,10 +105,10 @@ func (w *Window) rebuildCache(width int, styles *Styles, borderStyle lipgloss.St
 	// Render content based on window type
 	var inner string
 	switch {
-	case w.IsWriteFileWindow():
-		inner = RenderWriteFileContent(w.WriteFile, w.Status, styles)
 	case w.IsDiffWindow():
-		inner = RenderDiffContent(w.Diff, w.Status, styles)
+		inner = RenderDiffContent(w.Content, w.Status, styles)
+	case w.IsToolWithTextContent():
+		inner = RenderToolContent(w.Content, w.Status, styles)
 	default:
 		inner = w.renderGenericContent(innerWidth, styles)
 	}
@@ -215,7 +211,7 @@ func (w *Window) AppendContent(delta string, innerWidth int) {
 	w.Content += delta
 
 	// Try incremental update if we have cached wrapped lines and styles
-	if len(w.cache.wrappedLines) > 0 && innerWidth > 0 && w.styles != nil && !w.IsDiffWindow() && !w.IsWriteFileWindow() {
+	if len(w.cache.wrappedLines) > 0 && innerWidth > 0 && w.styles != nil && !w.IsDiffWindow() && !w.IsToolWithTextContent() {
 		styledDelta := w.styleContent(delta, w.styles)
 		w.cache.wrappedLines = appendDeltaToLines(w.cache.wrappedLines, styledDelta, innerWidth)
 		// Mark cache as needing rebuild for rendered output, but wrappedLines is updated
@@ -344,11 +340,11 @@ func (wb *WindowBuffer) AppendOrUpdate(id string, tag string, content string) {
 	// Create new window
 	folded := tag != stream.TagTextUser && tag != stream.TagTextAssistant
 	w := &Window{
-		ID:     id,
-		Tag:    tag,
+		ID:      id,
+		Tag:     tag,
 		Content: content,
-		Folded: folded,
-		styles: wb.styles,
+		Folded:  folded,
+		styles:  wb.styles,
 	}
 	wb.Windows = append(wb.Windows, w)
 	wb.idIndex[id] = len(wb.Windows) - 1
@@ -417,42 +413,6 @@ func (wb *WindowBuffer) markDirty(idx int) {
 	wb.dirty = true
 }
 
-// AppendDiff adds a diff window.
-func (wb *WindowBuffer) AppendDiff(id string, path string, lines []DiffLinePair) {
-	wb.mu.Lock()
-	defer wb.mu.Unlock()
-
-	w := &Window{
-		ID:       id,
-		Tag:      stream.TagFunctionCall,
-		ToolName: "edit_file",
-		Diff:     &DiffContainer{Path: path, Lines: lines},
-		Folded:   true,
-		styles:   wb.styles,
-	}
-	wb.Windows = append(wb.Windows, w)
-	wb.idIndex[id] = len(wb.Windows) - 1
-	wb.markDirty(len(wb.Windows) - 1)
-}
-
-// AppendWriteFile adds a write_file window.
-func (wb *WindowBuffer) AppendWriteFile(id string, path string, content string) {
-	wb.mu.Lock()
-	defer wb.mu.Unlock()
-
-	w := &Window{
-		ID:        id,
-		Tag:       stream.TagFunctionCall,
-		ToolName:  "write_file",
-		WriteFile: &WriteFileContainer{Path: path, Content: content},
-		Folded:    true,
-		styles:    wb.styles,
-	}
-	wb.Windows = append(wb.Windows, w)
-	wb.idIndex[id] = len(wb.Windows) - 1
-	wb.markDirty(len(wb.Windows) - 1)
-}
-
 // Clear removes all windows.
 func (wb *WindowBuffer) Clear() {
 	wb.mu.Lock()
@@ -495,6 +455,19 @@ func (wb *WindowBuffer) ToggleFold(windowIndex int) bool {
 	return true
 }
 
+// GetWindowContent returns the raw content of a window by index.
+// Returns empty string if index is out of bounds.
+func (wb *WindowBuffer) GetWindowContent(windowIndex int) string {
+	wb.mu.Lock()
+	defer wb.mu.Unlock()
+
+	if windowIndex < 0 || windowIndex >= len(wb.Windows) {
+		return ""
+	}
+
+	return wb.Windows[windowIndex].Content
+}
+
 // UpdateToolStatus updates the status indicator for a tool window.
 func (wb *WindowBuffer) UpdateToolStatus(toolCallID string, status ToolStatus) {
 	wb.mu.Lock()
@@ -505,17 +478,12 @@ func (wb *WindowBuffer) UpdateToolStatus(toolCallID string, status ToolStatus) {
 		w.Status = status
 		w.Invalidate()
 		if status == ToolStatusSuccess || status == ToolStatusError {
-			if w.IsWriteFileWindow() || isWriteFileWindow(w.Content) {
+			if w.ToolName == "write_file" {
 				w.Folded = true
 			}
 		}
 		wb.markDirty(idx)
 	}
-}
-
-// isWriteFileWindow checks if content is from write_file tool
-func isWriteFileWindow(content string) bool {
-	return len(content) >= 10 && strings.Contains(content[:min(30, len(content))], "write_file")
 }
 
 // ============================================================================
@@ -905,6 +873,15 @@ func (m *DisplayModel) shouldFollow() bool {
 // GetWindowCursor returns the current window cursor index
 func (m *DisplayModel) GetWindowCursor() int {
 	return m.windowCursor
+}
+
+// GetCursorWindowContent returns the content of the currently selected window.
+// Returns empty string if no window is selected.
+func (m *DisplayModel) GetCursorWindowContent() string {
+	if m.windowCursor < 0 {
+		return ""
+	}
+	return m.windowBuffer.GetWindowContent(m.windowCursor)
 }
 
 // SetWindowCursor sets the window cursor to a specific index

@@ -160,16 +160,6 @@ func (w *outputWriter) writeColored(tag string, value string) {
 		handler := GetHandler(tc.Name)
 		formatted := handler.FormatCall(json.RawMessage(tc.Input), w.styles)
 
-		// Check if this is a write_file with path and content
-		if wfPath, wfContent, ok := parseWriteFileFromFormatted(formatted); ok {
-			w.windowBuffer.AppendWriteFile(tc.ID, wfPath, wfContent)
-			return
-		}
-		// Check if this is an edit_file with raw diff data
-		if diffPath, diffLines := parseDiffFromFormatted(formatted); diffLines != nil {
-			w.windowBuffer.AppendDiff(tc.ID, diffPath, diffLines)
-			return
-		}
 		// Pass formatted but unstyled content - styling is applied during render
 		w.windowBuffer.AppendToolCall(tc.ID, tc.Name, formatted)
 

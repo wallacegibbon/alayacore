@@ -35,14 +35,16 @@ func TestFoldIndicatorColor(t *testing.T) {
 	wb := NewWindowBuffer(80, DefaultStyles())
 
 	// Create a diff window with many lines
-	lines := make([]DiffLinePair, 20)
+	var content strings.Builder
+	content.WriteString("edit_file: test.txt\n")
 	for i := 0; i < 20; i++ {
-		lines[i] = DiffLinePair{
-			Old: "old line " + string(rune('0'+i%10)),
-			New: "new line " + string(rune('0'+i%10)),
-		}
+		content.WriteString("- old line ")
+		content.WriteString(string(rune('0' + i%10)))
+		content.WriteString("\n+ new line ")
+		content.WriteString(string(rune('0' + i%10)))
+		content.WriteString("\n")
 	}
-	wb.AppendDiff("diff123", "test.txt", lines)
+	wb.AppendToolCall("diff123", "edit_file", content.String())
 
 	// Render the folded diff
 	rendered := wb.GetAll(-1)
