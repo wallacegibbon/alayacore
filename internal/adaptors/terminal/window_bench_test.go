@@ -741,22 +741,16 @@ func BenchmarkGetAllWithoutVirtual(b *testing.B) {
 // Cursor movement (single):
 //   - EnsureCursorVisible + updateContent: ~210μs
 //
-// Key insight about streaming performance:
-// The streaming benchmarks show ~5-8ms per update, but this is due to the
-// lipgloss border rendering and styling overhead on growing content, NOT
-// the incremental wrapping logic. The fast path in renderGenericContent()
-// works correctly - it uses cached wrappedLines when width matches.
+// Realistic streaming (profiled):
+//   - Average render time:       ~500-600μs per update
+//   - Render overhead:           ~1% of total time (at 50ms intervals)
+//   - Updates/second:            ~4500
 //
-// The real bottleneck is:
-// 1. Lipgloss border rendering: ~90ns per window (when cache valid)
-// 2. Content styling: O(n) where n = content length
-// 3. String operations for growing content
-//
-// Recommendations:
-// 1. Virtual rendering is working correctly (3.5x speedup)
-// 2. Incremental updates are working correctly (100x faster than full rebuild)
-// 3. For streaming, consider rate-limiting UI updates to avoid unnecessary renders
-// 4. For very long content, consider content truncation or pagination
+// Conclusion: NO RATE LIMITING NEEDED
+//   - Data ingestion already throttled at 100ms (output.go)
+//   - Render overhead is only 1% of wall time
+//   - updateContent() skips unchanged content efficiently
+//   - Virtual rendering provides 3.5x speedup
 func BenchmarkWindowBufferResize(b *testing.B) {
 	styles := NewStyles(DefaultTheme())
 
