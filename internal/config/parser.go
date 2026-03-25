@@ -27,6 +27,8 @@ func ParseKeyValueBlocks(content string) []string {
 }
 
 // parseKeyValue is the internal implementation
+//
+//nolint:gocyclo // Multiple validation branches required for config parsing
 func parseKeyValue(content string, target interface{}, skipHyphens bool) {
 	v := reflect.ValueOf(target)
 	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Struct {
@@ -84,6 +86,8 @@ func parseKeyValue(content string, target interface{}, skipHyphens bool) {
 }
 
 // setFieldValue sets a struct field value from a string
+//
+//nolint:gocyclo // Complex type switch required for reflection-based field setting
 func setFieldValue(field reflect.Value, value string) {
 	// Handle time.Time specially
 	if field.Type() == reflect.TypeOf(time.Time{}) {
@@ -98,16 +102,7 @@ func setFieldValue(field reflect.Value, value string) {
 		field.SetString(value)
 
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		// Handle time.Duration specially
-		if field.Type() == reflect.TypeOf(time.Duration(0)) {
-			if d, err := time.ParseDuration(value); err == nil {
-				field.SetInt(int64(d))
-			}
-			return
-		}
-		if i, err := strconv.ParseInt(value, 10, 64); err == nil {
-			field.SetInt(i)
-		}
+		setIntField(field, value)
 
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		if u, err := strconv.ParseUint(value, 10, 64); err == nil {
@@ -115,12 +110,7 @@ func setFieldValue(field reflect.Value, value string) {
 		}
 
 	case reflect.Bool:
-		switch strings.ToLower(value) {
-		case "true", "1", "yes", "on":
-			field.SetBool(true)
-		case "false", "0", "no", "off", "":
-			field.SetBool(false)
-		}
+		setBoolField(field, value)
 
 	case reflect.Float32, reflect.Float64:
 		if f, err := strconv.ParseFloat(value, 64); err == nil {
@@ -128,14 +118,40 @@ func setFieldValue(field reflect.Value, value string) {
 		}
 
 	case reflect.Slice:
-		// Handle []string with comma-separated values
-		if field.Type().Elem().Kind() == reflect.String {
-			parts := strings.Split(value, ",")
-			slice := reflect.MakeSlice(field.Type(), len(parts), len(parts))
-			for i, part := range parts {
-				slice.Index(i).SetString(strings.TrimSpace(part))
-			}
-			field.Set(slice)
+		setSliceField(field, value)
+	}
+}
+
+func setIntField(field reflect.Value, value string) {
+	// Handle time.Duration specially
+	if field.Type() == reflect.TypeOf(time.Duration(0)) {
+		if d, err := time.ParseDuration(value); err == nil {
+			field.SetInt(int64(d))
 		}
+		return
+	}
+	if i, err := strconv.ParseInt(value, 10, 64); err == nil {
+		field.SetInt(i)
+	}
+}
+
+func setBoolField(field reflect.Value, value string) {
+	switch strings.ToLower(value) {
+	case "true", "1", "yes", "on":
+		field.SetBool(true)
+	case "false", "0", "no", "off", "":
+		field.SetBool(false)
+	}
+}
+
+func setSliceField(field reflect.Value, value string) {
+	// Handle []string with comma-separated values
+	if field.Type().Elem().Kind() == reflect.String {
+		parts := strings.Split(value, ",")
+		slice := reflect.MakeSlice(field.Type(), len(parts), len(parts))
+		for i, part := range parts {
+			slice.Index(i).SetString(strings.TrimSpace(part))
+		}
+		field.Set(slice)
 	}
 }

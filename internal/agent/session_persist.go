@@ -217,7 +217,9 @@ func parseMessagesTLV(body string) ([]llm.Message, []TLVChunk, error) {
 				return nil, nil, fmt.Errorf("failed to read: %w", err)
 			}
 			if b != '\n' && b != '\r' && b != ' ' && b != '\t' {
-				reader.UnreadByte()
+				if unreadErr := reader.UnreadByte(); unreadErr != nil {
+					return nil, nil, fmt.Errorf("failed to unread: %w", unreadErr)
+				}
 				break
 			}
 		}

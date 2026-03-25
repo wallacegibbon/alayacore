@@ -290,6 +290,7 @@ func (m *Terminal) handleEditorStart(msg editorStartMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	//nolint:gosec // G204: Editor command from user config is intentional
 	cmd := exec.Command(msg.editorCmd, tmpFileName)
 
 	return m, tea.ExecProcess(cmd, func(err error) tea.Msg {
@@ -501,6 +502,7 @@ func (m *Terminal) restoreFocusAfterSelector() {
 
 // openQueueManager opens the queue manager UI.
 func (m *Terminal) openQueueManager() {
+	//nolint:errcheck // Best effort write, errors ignored
 	_ = m.streamInput.EmitTLV(stream.TagTextUser, ":taskqueue_get_all")
 	m.queueManager.Open()
 	m.input.Blur()

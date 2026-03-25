@@ -70,11 +70,12 @@ func TestStreamingProfile(t *testing.T) {
 	t.Logf("Effective content change rate: %.1f/s", float64(contentChanges)/totalTime.Seconds())
 
 	// Recommendations based on results
-	if avgTime > 5*time.Millisecond {
+	switch {
+	case avgTime > 5*time.Millisecond:
 		t.Logf("\n⚠️  SLOW: Average update time > 5ms - rate limiting recommended")
-	} else if avgTime > 1*time.Millisecond {
+	case avgTime > 1*time.Millisecond:
 		t.Logf("\n⚡ MODERATE: Average update time 1-5ms - rate limiting may help")
-	} else {
+	default:
 		t.Logf("\n✅ FAST: Average update time < 1ms - no rate limiting needed")
 	}
 }
@@ -283,11 +284,12 @@ func TestRealisticStreamingWithTiming(t *testing.T) {
 	t.Logf("Average render time: %v", avgRenderTime)
 	t.Logf("Render overhead: %.2f%%", float64(totalRenderTime)/float64(totalWallTime)*100)
 
-	if totalRenderTime < totalWallTime/10 {
+	switch {
+	case totalRenderTime < totalWallTime/10:
 		t.Logf("✅ Render overhead < 10%% - no rate limiting needed")
-	} else if totalRenderTime < totalWallTime/5 {
+	case totalRenderTime < totalWallTime/5:
 		t.Logf("⚡ Render overhead 10-20%% - acceptable")
-	} else {
+	default:
 		t.Logf("⚠️  Render overhead > 20%% - consider rate limiting")
 	}
 }

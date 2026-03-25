@@ -128,6 +128,7 @@ func (s *Session) handleModelSet(args []string) {
 	}
 
 	if s.RuntimeManager != nil {
+		//nolint:errcheck // Best effort save, errors ignored
 		_ = s.RuntimeManager.SetActiveModel(model.Name)
 	}
 

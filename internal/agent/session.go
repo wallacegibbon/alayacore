@@ -222,6 +222,7 @@ func RestoreFromSession(baseTools []llm.Tool, systemPrompt string, extraSystemPr
 
 	// Send TLV chunks directly to output (avoids reconstruction)
 	for _, chunk := range data.TLVChunks {
+		//nolint:errcheck // Best effort write, errors ignored
 		_ = stream.WriteTLV(s.Output, chunk.Tag, chunk.Value)
 	}
 	if len(data.TLVChunks) > 0 {
@@ -628,11 +629,13 @@ func (s *Session) processPrompt(ctx context.Context, _ string, history []llm.Mes
 			return nil
 		},
 		OnTextDelta: func(delta string) error {
+			//nolint:errcheck // Best effort write, errors ignored
 			_ = stream.WriteTLV(s.Output, stream.TagTextAssistant, assembleID("t")+delta)
 			s.Output.Flush()
 			return nil
 		},
 		OnReasoningDelta: func(delta string) error {
+			//nolint:errcheck // Best effort write, errors ignored
 			_ = stream.WriteTLV(s.Output, stream.TagTextReasoning, assembleID("r")+delta)
 			s.Output.Flush()
 			return nil
@@ -681,6 +684,7 @@ func (s *Session) writeGapped(tag string, msg string) {
 	if s.Output == nil {
 		return
 	}
+	//nolint:errcheck // Best effort write, errors ignored
 	_ = stream.WriteTLV(s.Output, tag, msg)
 	s.Output.Flush()
 }
@@ -692,7 +696,8 @@ func (s *Session) writeToolCall(toolName, input, id string) {
 		Name:  toolName,
 		Input: input,
 	}
-	jsonData, _ := json.Marshal(tc)
+	jsonData, _ := json.Marshal(tc) //nolint:errcheck // Best effort marshal, errors ignored
+	//nolint:errcheck // Best effort write, errors ignored
 	_ = stream.WriteTLV(s.Output, stream.TagFunctionCall, string(jsonData))
 	s.Output.Flush()
 	s.writeToolResult(id, "pending")
@@ -704,7 +709,8 @@ func (s *Session) writeToolOutput(toolCallID string, output string) {
 		ID:     toolCallID,
 		Output: output,
 	}
-	jsonData, _ := json.Marshal(tr)
+	jsonData, _ := json.Marshal(tr) //nolint:errcheck // Best effort marshal, errors ignored
+	//nolint:errcheck // Best effort write, errors ignored
 	_ = stream.WriteTLV(s.Output, stream.TagFunctionResult, string(jsonData))
 	s.Output.Flush()
 }
@@ -713,6 +719,7 @@ func (s *Session) writeToolResult(toolCallID string, status string) {
 	if s.Output == nil {
 		return
 	}
+	//nolint:errcheck // Best effort write, errors ignored
 	_ = stream.WriteTLV(s.Output, stream.TagFunctionState, "[:"+toolCallID+":]"+status)
 	s.Output.Flush()
 }
@@ -794,7 +801,8 @@ func (s *Session) sendSystemInfoInternal(activeModelConfig *ModelConfig) {
 		HasModels:         hasModels,
 		ModelConfigPath:   modelConfigPath,
 	}
-	data, _ := json.Marshal(info)
+	data, _ := json.Marshal(info) //nolint:errcheck // Best effort marshal, errors ignored
+	//nolint:errcheck // Best effort write, errors ignored
 	_ = stream.WriteTLV(s.Output, stream.TagSystemData, string(data))
 	s.Output.Flush()
 }

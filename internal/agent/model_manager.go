@@ -122,8 +122,8 @@ func (mm *ModelManager) LoadFromFile(path string) error {
 	if err != nil {
 		if os.IsNotExist(err) {
 			// File doesn't exist - create it with default config
-			if err := mm.createDefaultConfig(path); err != nil {
-				return err
+			if createErr := mm.createDefaultConfig(path); createErr != nil {
+				return createErr
 			}
 			data = []byte(DefaultModelConfig)
 		} else {

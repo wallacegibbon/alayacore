@@ -166,15 +166,16 @@ func expandTabs(s string) string {
 	var result strings.Builder
 	col := 0
 	for _, r := range s {
-		if r == '\t' {
+		switch r {
+		case '\t':
 			next := ((col / 8) + 1) * 8
 			spaces := next - col
 			result.WriteString(strings.Repeat(" ", spaces))
 			col = next
-		} else if r == '\n' {
+		case '\n':
 			result.WriteRune(r)
 			col = 0
-		} else {
+		default:
 			result.WriteRune(r)
 			col++
 		}

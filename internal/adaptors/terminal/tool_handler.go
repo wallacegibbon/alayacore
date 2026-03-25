@@ -42,7 +42,7 @@ type GenericHandler struct {
 	showOutput bool
 }
 
-func (h *GenericHandler) FormatCall(input json.RawMessage, styles *Styles) string {
+func (h *GenericHandler) FormatCall(input json.RawMessage, _ *Styles) string {
 	// Add newline at end so output starts on new line
 	return fmt.Sprintf("%s: %s\n", h.name, string(input))
 }
@@ -54,7 +54,7 @@ func (h *GenericHandler) ShouldShowOutput() bool {
 // PosixShellHandler handles posix_shell commands.
 type PosixShellHandler struct{}
 
-func (h *PosixShellHandler) FormatCall(input json.RawMessage, styles *Styles) string {
+func (h *PosixShellHandler) FormatCall(input json.RawMessage, _ *Styles) string {
 	var args struct {
 		Command string `json:"command"`
 	}
@@ -72,7 +72,7 @@ func (h *PosixShellHandler) ShouldShowOutput() bool {
 // ReadFileHandler handles read_file calls.
 type ReadFileHandler struct{}
 
-func (h *ReadFileHandler) FormatCall(input json.RawMessage, styles *Styles) string {
+func (h *ReadFileHandler) FormatCall(input json.RawMessage, _ *Styles) string {
 	var args struct {
 		Path      string `json:"path"`
 		StartLine string `json:"start_line"`
@@ -100,7 +100,7 @@ func (h *ReadFileHandler) ShouldShowOutput() bool {
 // WriteFileHandler handles write_file calls.
 type WriteFileHandler struct{}
 
-func (h *WriteFileHandler) FormatCall(input json.RawMessage, styles *Styles) string {
+func (h *WriteFileHandler) FormatCall(input json.RawMessage, _ *Styles) string {
 	var args struct {
 		Path    string `json:"path"`
 		Content string `json:"content"`
@@ -118,7 +118,7 @@ func (h *WriteFileHandler) ShouldShowOutput() bool {
 // EditFileHandler handles edit_file calls with diff display.
 type EditFileHandler struct{}
 
-func (h *EditFileHandler) FormatCall(input json.RawMessage, styles *Styles) string {
+func (h *EditFileHandler) FormatCall(input json.RawMessage, _ *Styles) string {
 	var args struct {
 		Path      string `json:"path"`
 		OldString string `json:"old_string"`
@@ -138,7 +138,7 @@ func (h *EditFileHandler) FormatCall(input json.RawMessage, styles *Styles) stri
 
 	for _, pair := range diffPairs {
 		old := strings.ReplaceAll(pair.old, "\n", "\\n")
-		new := strings.ReplaceAll(pair.new, "\n", "\\n")
+		newText := strings.ReplaceAll(pair.new, "\n", "\\n")
 
 		oldEmpty := pair.old == ""
 		newEmpty := pair.new == ""
@@ -148,12 +148,12 @@ func (h *EditFileHandler) FormatCall(input json.RawMessage, styles *Styles) stri
 		case isSame:
 			lines = append(lines, "  "+old)
 		case oldEmpty:
-			lines = append(lines, "+ "+new)
+			lines = append(lines, "+ "+newText)
 		case newEmpty:
 			lines = append(lines, "- "+old)
 		default:
 			lines = append(lines, "- "+old)
-			lines = append(lines, "+ "+new)
+			lines = append(lines, "+ "+newText)
 		}
 	}
 
@@ -167,7 +167,7 @@ func (h *EditFileHandler) ShouldShowOutput() bool {
 // ActivateSkillHandler handles activate_skill calls.
 type ActivateSkillHandler struct{}
 
-func (h *ActivateSkillHandler) FormatCall(input json.RawMessage, styles *Styles) string {
+func (h *ActivateSkillHandler) FormatCall(input json.RawMessage, _ *Styles) string {
 	var args struct {
 		Name string `json:"name"`
 	}

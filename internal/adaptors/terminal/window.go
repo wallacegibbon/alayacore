@@ -69,12 +69,10 @@ func (w *Window) IsDiffWindow() bool {
 // This is the single entry point for rendering a window.
 func (w *Window) Render(width int, isCursor bool, styles *Styles, borderStyle, cursorStyle lipgloss.Style) string {
 	// Check if cache is valid
-	if w.cache.valid && w.cache.width == width && w.cache.folded == w.Folded {
-		if w.IsDiffWindow() {
-			// Diff windows: folded state determines validity
-		} else if len(w.Content) == w.cache.contentLen {
-			// Regular windows: content length determines validity
-		} else {
+	cacheValid := w.cache.valid && w.cache.width == width && w.cache.folded == w.Folded
+	if cacheValid {
+		// Diff windows only need folded state to match; regular windows need content length match
+		if !w.IsDiffWindow() && len(w.Content) != w.cache.contentLen {
 			w.cache.valid = false
 		}
 	} else {
