@@ -123,6 +123,15 @@ func (w *Window) rebuildCache(width int, styles *Styles, borderStyle lipgloss.St
 
 // renderGenericContent renders a generic tool window content
 func (w *Window) renderGenericContent(innerWidth int, styles *Styles) string {
+	innerWidth = max(0, innerWidth)
+
+	// FAST PATH: Use cached wrapped lines if width matches
+	// This avoids re-styling and re-wrapping the entire content
+	if len(w.cache.wrappedLines) > 0 && w.cache.width-4 == innerWidth && innerWidth > 0 {
+		return strings.Join(w.cache.wrappedLines, "\n")
+	}
+
+	// SLOW PATH: Full styling and wrapping
 	content := w.Content
 
 	// Apply styling based on tag
@@ -151,18 +160,6 @@ func (w *Window) renderGenericContent(innerWidth int, styles *Styles) string {
 	content = expandTabs(content)
 	if innerWidth <= 0 {
 		return content
-	}
-
-	// Use cached wrapped lines if valid and width matches
-	// Note: wrappedLines contains styled content, so we can use it directly
-	if w.cache.valid && len(w.cache.wrappedLines) > 0 && w.cache.width-4 == innerWidth {
-		return strings.Join(w.cache.wrappedLines, "\n")
-	}
-
-	// If we have wrappedLines from incremental update (cache.valid=false), use them
-	// This avoids re-wrapping after incremental updates
-	if len(w.cache.wrappedLines) > 0 && w.cache.width-4 == innerWidth {
-		return strings.Join(w.cache.wrappedLines, "\n")
 	}
 
 	wrapped := lipgloss.Wrap(content, innerWidth, " ")
@@ -518,9 +515,14 @@ func (wb *WindowBuffer) ensureLineHeights() {
 }
 
 // GetWindowStartLine returns the starting line number for a window.
+// IMPORTANT: This calls ensureLineHeights() to guarantee accurate positions,
+// since line heights may be stale after content updates.
 func (wb *WindowBuffer) GetWindowStartLine(windowIndex int) int {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
+
+	// Ensure line heights are current before calculating
+	wb.ensureLineHeights()
 
 	if windowIndex < 0 || windowIndex >= len(wb.lineHeights) {
 		return 0
@@ -534,9 +536,14 @@ func (wb *WindowBuffer) GetWindowStartLine(windowIndex int) int {
 }
 
 // GetWindowEndLine returns the ending line number for a window.
+// IMPORTANT: This calls ensureLineHeights() to guarantee accurate positions,
+// since line heights may be stale after content updates.
 func (wb *WindowBuffer) GetWindowEndLine(windowIndex int) int {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
+
+	// Ensure line heights are current before calculating
+	wb.ensureLineHeights()
 
 	if windowIndex < 0 || windowIndex >= len(wb.lineHeights) {
 		return 0

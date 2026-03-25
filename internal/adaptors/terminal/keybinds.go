@@ -320,6 +320,10 @@ func (m *Terminal) handleCancelConfirm(msg tea.KeyMsg) (tea.Cmd, bool) {
 
 // handleDisplayKeys handles key events when display window is focused.
 //
+// IMPORTANT: When moving the cursor, always call EnsureCursorVisible() BEFORE
+// updateContent(). This ensures the viewport position is updated before content
+// is regenerated, preventing blank areas in the virtual rendering.
+//
 //nolint:gocyclo // key handling requires many key cases
 func (m *Terminal) handleDisplayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 	keyStr := msg.String()
@@ -328,15 +332,15 @@ func (m *Terminal) handleDisplayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 	switch keyStr {
 	case KeyJ, KeyDown:
 		if m.display.MoveWindowCursorDown() {
-			m.display.updateContent()
 			m.display.EnsureCursorVisible()
+			m.display.updateContent()
 		}
 		return nil, true
 
 	case KeyK, KeyUp:
 		if m.display.MoveWindowCursorUp() {
-			m.display.updateContent()
 			m.display.EnsureCursorVisible()
+			m.display.updateContent()
 		}
 		return nil, true
 
@@ -352,31 +356,34 @@ func (m *Terminal) handleDisplayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 
 	case KeyShiftH:
 		if m.display.MoveWindowCursorToTop() {
+			m.display.EnsureCursorVisible()
 			m.display.updateContent()
 		}
 		return nil, true
 
 	case KeyShiftL:
 		if m.display.MoveWindowCursorToBottom() {
+			m.display.EnsureCursorVisible()
 			m.display.updateContent()
 		}
 		return nil, true
 
 	case KeyShiftM:
 		if m.display.MoveWindowCursorToCenter() {
+			m.display.EnsureCursorVisible()
 			m.display.updateContent()
 		}
 		return nil, true
 
 	case KeyG:
-		m.display.GotoBottom()
 		m.display.SetCursorToLastWindow()
+		m.display.GotoBottom()
 		m.display.updateContent()
 		return nil, true
 
 	case Keyg:
-		m.display.GotoTop()
 		m.display.SetWindowCursor(0)
+		m.display.GotoTop()
 		m.display.updateContent()
 		return nil, true
 
