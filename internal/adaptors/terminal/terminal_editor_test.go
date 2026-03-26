@@ -71,10 +71,10 @@ func TestEditorFinishedMsg(t *testing.T) {
 		t.Fatal("Update returned nil model")
 	}
 
-	// Input should show summary with line count
+	// For single-line content, input should show the content without any suffix
 	inputValue := terminal.input.Value()
-	if !strings.Contains(inputValue, "[1 lines]") {
-		t.Errorf("Expected summary in input, got '%s'", inputValue)
+	if inputValue != "test content from editor" {
+		t.Errorf("Expected exact content in input for single line, got '%s'", inputValue)
 	}
 
 	// editorContent should preserve original content
@@ -97,9 +97,30 @@ func TestEditorFinishedMsgWithWhitespace(t *testing.T) {
 		t.Fatal("Update returned nil model")
 	}
 
-	// editorContent should preserve all whitespace including leading/trailing spaces
-	if terminal.input.editorContent != "  content with leading and trailing spaces  \n" {
-		t.Errorf("Expected to preserve all whitespace, got '%s'", terminal.input.editorContent)
+	// editorContent should preserve leading/trailing spaces but strip trailing newlines
+	// (text editors add a trailing newline by default, which should be removed)
+	if terminal.input.editorContent != "  content with leading and trailing spaces  " {
+		t.Errorf("Expected to preserve spaces but strip trailing newline, got '%s'", terminal.input.editorContent)
+	}
+}
+
+func TestEditorFinishedMsgWithMultipleTrailingNewlines(t *testing.T) {
+	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+
+	msg := editorFinishedMsg{
+		content: "content with multiple trailing newlines\n\n\n",
+		err:     nil,
+	}
+
+	model, _ := terminal.Update(msg)
+
+	if model == nil {
+		t.Fatal("Update returned nil model")
+	}
+
+	// All trailing newlines should be stripped
+	if terminal.input.editorContent != "content with multiple trailing newlines" {
+		t.Errorf("Expected to strip all trailing newlines, got '%s'", terminal.input.editorContent)
 	}
 }
 
@@ -111,6 +132,75 @@ func TestEditorContentSubmittedOnEnter(t *testing.T) {
 	// This test verifies the logic flow that checks editorContent first
 	if terminal.input.editorContent != "line1\nline2\nline3" {
 		t.Errorf("Expected editorContent to be set before Enter, got '%s'", terminal.input.editorContent)
+	}
+}
+
+func TestEditorFinishedMsgMultiline(t *testing.T) {
+	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+
+	msg := editorFinishedMsg{
+		content: "line1\nline2\nline3",
+		err:     nil,
+	}
+
+	model, _ := terminal.Update(msg)
+
+	if model == nil {
+		t.Fatal("Update returned nil model")
+	}
+
+	// For multi-line content, input should show summary with line count
+	inputValue := terminal.input.Value()
+	if !strings.Contains(inputValue, "[3 lines]") {
+		t.Errorf("Expected line count summary for multi-line content, got '%s'", inputValue)
+	}
+
+	// editorContent should preserve original content
+	if terminal.input.editorContent != "line1\nline2\nline3" {
+		t.Errorf("Expected editorContent to preserve multi-line content, got '%s'", terminal.input.editorContent)
+	}
+}
+
+func TestFormatEditorContent(t *testing.T) {
+	tests := []struct {
+		name     string
+		content  string
+		expected string
+	}{
+		{
+			name:     "single line short",
+			content:  "hello world",
+			expected: "hello world",
+		},
+		{
+			name:     "single line long",
+			content:  "this is a very long single line that exceeds the hundred character limit and should be shown as-is",
+			expected: "this is a very long single line that exceeds the hundred character limit and should be shown as-is",
+		},
+		{
+			name:     "empty content",
+			content:  "",
+			expected: "",
+		},
+		{
+			name:     "two lines",
+			content:  "line1\nline2",
+			expected: "[2 lines] line1 (press Enter to send)",
+		},
+		{
+			name:     "three lines",
+			content:  "line1\nline2\nline3",
+			expected: "[3 lines] line1 (press Enter to send)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := FormatEditorContent(tt.content)
+			if result != tt.expected {
+				t.Errorf("Expected '%s', got '%s'", tt.expected, result)
+			}
+		})
 	}
 }
 

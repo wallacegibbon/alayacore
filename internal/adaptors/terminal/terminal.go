@@ -264,8 +264,10 @@ func (m *Terminal) handleEditorFinished(msg editorFinishedMsg) (tea.Model, tea.C
 	if msg.err != nil {
 		m.out.AppendError("Editor error: %v", msg.err)
 	} else if msg.content != "" {
-		m.input.editorContent = msg.content
-		m.input.SetValue(FormatEditorContent(msg.content))
+		// Strip trailing newlines that text editors add by default
+		content := strings.TrimRight(msg.content, "\n")
+		m.input.editorContent = content
+		m.input.SetValue(FormatEditorContent(content))
 		m.input.CursorEnd()
 		m.focusInput()
 	}
@@ -691,6 +693,13 @@ func (e *Editor) OpenFile(path string) tea.Cmd {
 // FormatEditorContent formats editor content for preview in the input field
 func FormatEditorContent(content string) string {
 	lineCount := strings.Count(content, "\n") + 1
+
+	// For single-line content, show it just like regular user input (no suffix)
+	if lineCount == 1 {
+		return content
+	}
+
+	// For multi-line content, show summary with line count and preview
 	preview := strings.Fields(content)
 	var previewText string
 	switch {
