@@ -1,6 +1,8 @@
 package agent
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -207,5 +209,69 @@ model_name: "mini"`,
 				t.Errorf("expected ContextLimit=%d, got %d", tt.expected.ContextLimit, result.ContextLimit)
 			}
 		})
+	}
+}
+
+func TestModelManagerReloadResetsIDs(t *testing.T) {
+	// Create a temporary config file
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "model.conf")
+
+	config1 := `name: "Model A"
+protocol_type: "openai"
+base_url: "https://api.example.com"
+api_key: "key1"
+model_name: "model-a"
+---
+name: "Model B"
+protocol_type: "anthropic"
+base_url: "https://api.example.com"
+api_key: "key2"
+model_name: "model-b"
+`
+	if err := os.WriteFile(configPath, []byte(config1), 0600); err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	mm := NewModelManager(configPath)
+
+	// Check initial IDs
+	models := mm.GetModels()
+	if len(models) != 2 {
+		t.Fatalf("expected 2 models, got %d", len(models))
+	}
+	if models[0].ID != 0 {
+		t.Errorf("expected first model ID to be 0, got %d", models[0].ID)
+	}
+	if models[1].ID != 1 {
+		t.Errorf("expected second model ID to be 1, got %d", models[1].ID)
+	}
+
+	// Add a model to bump the nextID counter
+	newID := mm.AddModel(ModelConfig{
+		Name:         "Model C",
+		ProtocolType: "openai",
+		BaseURL:      "https://api.example.com",
+		APIKey:       "key3",
+		ModelName:    "model-c",
+	})
+	if newID != 2 {
+		t.Errorf("expected new model ID to be 2, got %d", newID)
+	}
+
+	// Now reload from file - IDs should reset to 0, 1
+	if err := mm.Reload(); err != nil {
+		t.Fatalf("failed to reload: %v", err)
+	}
+
+	models = mm.GetModels()
+	if len(models) != 2 {
+		t.Fatalf("expected 2 models after reload, got %d", len(models))
+	}
+	if models[0].ID != 0 {
+		t.Errorf("expected first model ID to be 0 after reload, got %d", models[0].ID)
+	}
+	if models[1].ID != 1 {
+		t.Errorf("expected second model ID to be 1 after reload, got %d", models[1].ID)
 	}
 }

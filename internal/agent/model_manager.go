@@ -141,7 +141,8 @@ func (mm *ModelManager) LoadFromFile(path string) error {
 
 	models := parseModelConfig(string(data))
 
-	// Generate IDs for models
+	// Reset ID counter and generate IDs for models
+	mm.nextID = 0
 	for i := range models {
 		models[i].ID = mm.nextID
 		mm.nextID++
