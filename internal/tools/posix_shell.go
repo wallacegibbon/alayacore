@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"syscall"
 	"time"
 
@@ -44,7 +45,12 @@ func executePosixShell(ctx context.Context, args PosixShellInput) (llm.ToolResul
 	//nolint:gosec // G204: Command from user input is intentional for shell tool
 	cmd := exec.CommandContext(ctx, "/bin/sh", "-c", args.Command)
 	cmd.Dir = cwd
-	cmd.Env = os.Environ()
+	// Set environment variables to disable terminal features
+	cmd.Env = append(os.Environ(),
+		"TERM=dumb",
+		"NO_COLOR=1",
+		"CI=true",
+	)
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -137,5 +143,29 @@ func combineShellOutput(stdout, stderr *bytes.Buffer) string {
 		}
 		output += stderr.String()
 	}
+	return filterTerminalCodes(output)
+}
+
+// filterTerminalCodes removes ANSI escape sequences and normalizes carriage returns
+func filterTerminalCodes(output string) string {
+	// Remove ANSI escape sequences (colors, cursor movement, etc.)
+	// Matches: ESC [ <params> <command>
+	ansiPattern := regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
+	output = ansiPattern.ReplaceAllString(output, "")
+
+	// Remove other escape sequences
+	// Matches: ESC ] ... BEL (OSC sequences)
+	oscPattern := regexp.MustCompile(`\x1b\].*?\x07`)
+	output = oscPattern.ReplaceAllString(output, "")
+
+	// Replace carriage returns with newlines
+	// This handles progress bars that use \r to overwrite lines
+	carriageReturn := regexp.MustCompile(`\r+`)
+	output = carriageReturn.ReplaceAllString(output, "\n")
+
+	// Remove multiple consecutive newlines (clean up artifacts)
+	multipleNewlines := regexp.MustCompile(`\n{3,}`)
+	output = multipleNewlines.ReplaceAllString(output, "\n\n")
+
 	return output
 }
