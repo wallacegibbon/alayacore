@@ -307,6 +307,7 @@ func (wb *WindowBuffer) SetStyles(styles *Styles) {
 	wb.cursorStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(styles.BorderCursor).Padding(0, 1)
 	// Invalidate all windows to pick up new styles
 	for _, w := range wb.Windows {
+		w.styles = styles // Update window's styles reference
 		w.Invalidate()
 	}
 	wb.dirty = true

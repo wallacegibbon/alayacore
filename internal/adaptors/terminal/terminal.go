@@ -568,6 +568,7 @@ func (m *Terminal) restoreFocusAfterThemeSelector() {
 // applyTheme applies a new theme to all UI components.
 func (m *Terminal) applyTheme(theme *Theme) {
 	m.styles = NewStyles(theme)
+	m.out.SetStyles(m.styles)
 	m.display.SetStyles(m.styles)
 	m.input.SetStyles(m.styles)
 	m.modelSelector.SetStyles(m.styles)
