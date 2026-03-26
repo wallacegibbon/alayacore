@@ -283,11 +283,16 @@ func (m *Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		// For navigation keys, delay theme application to keep cursor responsive
 		key := msg.String()
 		if key == "j" || key == "k" || key == "up" || key == "down" {
+			// Increment the ID to invalidate any pending preview
+			m.themePreviewID++
+			// Capture the current ID to check if this preview is still valid
+			id := m.themePreviewID
+			theme := previewTheme
+
 			// Return a command that will apply the theme after a delay
 			// This allows the cursor to update immediately
-			theme := previewTheme
-			return m, tea.Tick(100*time.Millisecond, func(_ time.Time) tea.Msg {
-				return themePreviewMsg{theme: theme}
+			return m, tea.Tick(150*time.Millisecond, func(_ time.Time) tea.Msg {
+				return themePreviewMsg{theme: theme, id: id}
 			})
 		}
 		// Apply immediately for other keys
@@ -300,10 +305,14 @@ func (m *Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 // themePreviewMsg is sent when a theme preview should be applied
 type themePreviewMsg struct {
 	theme *Theme
+	id    int // ID to check if this preview is still current
 }
 
 func (m *Terminal) handleThemePreview(msg themePreviewMsg) (tea.Model, tea.Cmd) {
-	m.applyTheme(msg.theme)
+	// Only apply if this preview is still the current one (debouncing)
+	if msg.id == m.themePreviewID {
+		m.applyTheme(msg.theme)
+	}
 	return m, nil
 }
 

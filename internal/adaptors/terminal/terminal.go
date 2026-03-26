@@ -94,6 +94,9 @@ type Terminal struct {
 	windowHeight           int
 	styles                 *Styles
 	hasFocus               bool // tracks whether the terminal has application focus
+
+	// Theme preview debouncing
+	themePreviewID int // ID of the current pending theme preview
 }
 
 // NewTerminal creates a new Terminal model with all components initialized.
