@@ -153,6 +153,13 @@ func NewTerminalWithTheme(
 
 // Init starts the periodic tick loop for processing session updates.
 func (m *Terminal) Init() tea.Cmd {
+	// Display any buffered warnings from initialization
+	if warnings := GetWarnings(); len(warnings) > 0 {
+		for _, w := range warnings {
+			m.out.AppendError("%s", w.Message)
+		}
+	}
+
 	return tea.Tick(TickInterval, func(_ time.Time) tea.Msg {
 		return tickMsg{}
 	})

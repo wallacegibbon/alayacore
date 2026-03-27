@@ -5,7 +5,6 @@ package terminal
 // theme switching functionality.
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -59,7 +58,7 @@ func (tm *ThemeManager) initializeThemesFolder() {
 	if _, err := os.Stat(tm.themesFolder); os.IsNotExist(err) {
 		// Create the folder
 		if err := os.MkdirAll(tm.themesFolder, 0755); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to create themes folder: %v\n", err)
+			AddWarning("Warning: failed to create themes folder: %v", err)
 			return
 		}
 
@@ -116,7 +115,7 @@ removed: #f38ba8
 `
 	darkPath := filepath.Join(tm.themesFolder, "theme-dark.conf")
 	if err := os.WriteFile(darkPath, []byte(darkTheme), 0644); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: failed to create default dark theme: %v\n", err)
+		AddWarning("Warning: failed to create default dark theme: %v", err)
 	}
 
 	// theme-light.conf - using Catppuccin Latte colors
@@ -166,7 +165,7 @@ removed: #d20f39
 `
 	lightPath := filepath.Join(tm.themesFolder, "theme-light.conf")
 	if err := os.WriteFile(lightPath, []byte(lightTheme), 0644); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: failed to create default light theme: %v\n", err)
+		AddWarning("Warning: failed to create default light theme: %v", err)
 	}
 }
 
@@ -233,7 +232,7 @@ func (tm *ThemeManager) LoadTheme(name string) *Theme {
 		if theme.Name == name {
 			loaded, err := LoadTheme(theme.Path)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Warning: failed to load theme %s: %v\n", name, err)
+				AddWarning("Warning: failed to load theme %s: %v", name, err)
 				return DefaultTheme()
 			}
 			return loaded
@@ -241,7 +240,7 @@ func (tm *ThemeManager) LoadTheme(name string) *Theme {
 	}
 
 	// Theme not found
-	fmt.Fprintf(os.Stderr, "Warning: theme %s not found, using default\n", name)
+	AddWarning("Warning: theme %s not found, using default", name)
 	return DefaultTheme()
 }
 

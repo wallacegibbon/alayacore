@@ -79,8 +79,8 @@ func LoadThemeFromPaths(explicitPath string) *Theme {
 		if err == nil {
 			return theme
 		}
-		// If explicit path was given but failed, print warning but continue
-		fmt.Fprintf(os.Stderr, "Warning: failed to load theme from %s: %v\n", explicitPath, err)
+		// If explicit path was given but failed, buffer warning but continue
+		AddWarning("Warning: failed to load theme from %s: %v", explicitPath, err)
 	}
 
 	// Try default user theme path
@@ -92,7 +92,7 @@ func LoadThemeFromPaths(explicitPath string) *Theme {
 			if err == nil {
 				return theme
 			}
-			fmt.Fprintf(os.Stderr, "Warning: failed to load theme from %s: %v\n", defaultPath, err)
+			AddWarning("Warning: failed to load theme from %s: %v", defaultPath, err)
 		}
 	}
 
