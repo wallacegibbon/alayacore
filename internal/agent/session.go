@@ -606,33 +606,6 @@ func (s *Session) processPrompt(ctx context.Context, _ string, history []llm.Mes
 	}
 
 	_, err := s.Agent.Stream(ctx, history, llm.StreamCallbacks{
-		OnStepStart: func(step int) error {
-			stepCount = step
-			s.mu.Lock()
-			s.currentStep = step
-			s.mu.Unlock()
-			s.sendSystemInfo()
-			return nil
-		},
-		OnStepFinish: func(messages []llm.Message, usage llm.Usage) error {
-			s.trackUsage(usage)
-			if len(messages) > 0 {
-				s.Messages = append(s.Messages, messages...)
-			}
-			outputTokens += usage.OutputTokens
-			return nil
-		},
-		OnToolResult: func(toolCallID string, output llm.ToolResultOutput) error {
-			status := "success"
-			if textOutput, ok := output.(llm.ToolResultOutputText); ok {
-				s.writeToolOutput(toolCallID, textOutput.Text)
-			} else if errOutput, ok := output.(llm.ToolResultOutputError); ok {
-				status = "error"
-				s.writeToolOutput(toolCallID, errOutput.Error)
-			}
-			s.writeToolResult(toolCallID, status)
-			return nil
-		},
 		OnTextDelta: func(delta string) error {
 			//nolint:errcheck // Best effort write, errors ignored
 			_ = stream.WriteTLV(s.Output, stream.TagTextAssistant, assembleID("t")+delta)
@@ -648,6 +621,33 @@ func (s *Session) processPrompt(ctx context.Context, _ string, history []llm.Mes
 		OnToolCall: func(toolCallID, toolName string, input json.RawMessage) error {
 			s.writeToolCall(toolName, string(input), toolCallID)
 			s.Output.Flush()
+			return nil
+		},
+		OnToolResult: func(toolCallID string, output llm.ToolResultOutput) error {
+			status := "success"
+			if textOutput, ok := output.(llm.ToolResultOutputText); ok {
+				s.writeToolOutput(toolCallID, textOutput.Text)
+			} else if errOutput, ok := output.(llm.ToolResultOutputError); ok {
+				status = "error"
+				s.writeToolOutput(toolCallID, errOutput.Error)
+			}
+			s.writeToolResult(toolCallID, status)
+			return nil
+		},
+		OnStepStart: func(step int) error {
+			stepCount = step
+			s.mu.Lock()
+			s.currentStep = step
+			s.mu.Unlock()
+			s.sendSystemInfo()
+			return nil
+		},
+		OnStepFinish: func(messages []llm.Message, usage llm.Usage) error {
+			s.trackUsage(usage)
+			if len(messages) > 0 {
+				s.Messages = append(s.Messages, messages...)
+			}
+			outputTokens += usage.OutputTokens
 			return nil
 		},
 	})

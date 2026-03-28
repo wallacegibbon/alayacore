@@ -365,33 +365,35 @@ alayacore/
 ├── internal/
 │   ├── adaptors/
 │   │   ├── terminal/          # Terminal UI adaptor
-│   │   │   ├── terminal.go    # Main model
-│   │   │   ├── keys.go        # Keyboard handling
-│   │   │   ├── keybinds.go    # Key binding definitions
-│   │   │   ├── commands.go    # Command processing
-│   │   │   ├── output.go      # TLV parsing
-│   │   │   ├── display.go     # Display rendering
-│   │   │   ├── window*.go     # Virtual scrolling
-│   │   │   ├── input_component.go  # Input handling
-│   │   │   ├── status.go      # Status bar
+│   │   │   ├── adaptor.go     # Adaptor interface and creation
+│   │   │   ├── terminal.go    # Main Bubble Tea model
+│   │   │   ├── keybinds.go    # Key constants, bindings, and handler
+│   │   │   ├── output.go      # TLV parsing and output rendering
+│   │   │   ├── window.go      # Virtual scrolling buffer
+│   │   │   ├── input_component.go  # Input handling with editor support
+│   │   │   ├── interfaces.go  # Interface definitions
 │   │   │   ├── model_selector.go   # Model switching UI
 │   │   │   ├── queue_manager.go    # Task queue UI
-│   │   │   ├── theme.go           # Theme definitions
-│   │   │   ├── theme_manager.go   # Theme loading/management
-│   │   │   ├── theme_selector.go  # Theme switching UI
-│   │   │   ├── styles.go      # Lipgloss styles
-│   │   │   └── constants.go   # Layout/colors
+│   │   │   ├── theme_manager.go    # Theme loading/management
+│   │   │   ├── theme_selector.go   # Theme switching UI
+│   │   │   ├── styles.go      # Theme definitions and lipgloss styles
+│   │   │   ├── tool.go        # Tool display helpers
+│   │   │   ├── tool_handler.go    # Tool execution handling
+│   │   │   ├── warnings.go    # Warning message handling
+│   │   │   └── doc.go         # Package documentation
 │   │   └── websocket/         # WebSocket adaptor
 │   ├── agent/
 │   │   ├── session.go         # Session management
-│   │   ├── session_*.go       # Session components
-│   │   ├── command_registry.go
-│   │   ├── model_manager.go   # Model config loading
-│   │   └── runtime_manager.go # Active model persistence
+│   │   ├── session_io.go      # Session I/O and task handling
+│   │   ├── session_persist.go # Session persistence (TLV format)
+│   │   ├── command_registry.go    # Command registration
+│   │   ├── model_manager.go   # Model config loading (never writes)
+│   │   └── runtime_manager.go # Active model/theme persistence
 │   ├── app/
 │   │   └── app.go             # App initialization, system prompt
 │   ├── config/
-│   │   └── config.go          # CLI flag parsing
+│   │   ├── config.go          # CLI flag parsing
+│   │   └── version.go         # Version constant
 │   ├── debug/
 │   │   └── http.go            # HTTP client with proxy/debug support
 │   ├── stream/                # TLV protocol
@@ -409,9 +411,9 @@ alayacore/
 │   └── llm/
 │       ├── agent.go           # Tool-calling loop
 │       ├── types.go           # Message, ContentPart, StreamEvent
-│       ├── helpers.go         # Message constructors
+│       ├── helpers.go         # Message constructors and tool builder
 │       ├── typed.go           # TypedExecute wrapper
-│       ├── schema.go          # JSON schema generation
+│       ├── schema.go          # JSON schema generation from struct tags
 │       ├── factory/           # Provider factory
 │       │   └── provider_factory.go
 │       └── providers/         # LLM provider implementations
