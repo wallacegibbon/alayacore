@@ -75,9 +75,11 @@ func (s *Session) cancelAllTasks() {
 func (s *Session) summarize(ctx context.Context) {
 	prompt := "Please summarize the conversation above in a concise manner. Return ONLY the summary, no introductions or explanations."
 
+	s.Messages = append(s.Messages, llm.NewUserMessage(prompt))
+
 	beforeCount := len(s.Messages)
 
-	outputTokens, err := s.processPrompt(ctx, prompt, s.Messages)
+	outputTokens, err := s.processPrompt(ctx, s.Messages)
 	if err != nil {
 		s.writeError(err.Error())
 		return

@@ -41,6 +41,7 @@ alayacore --skill ~/playground/alayacore/misc/samples/skills/
 | `--proxy string` | HTTP proxy URL (e.g., `http://127.0.0.1:7890` or `socks5://127.0.0.1:1080`) |
 | `--themes string` | Themes folder path (default: `~/.alayacore/themes`) |
 | `--max-steps int` | Maximum agent loop steps (default: 100) |
+| `--auto-summarize` | Automatically summarize conversation when context exceeds 80% of limit |
 | `--debug-api` | Write raw API requests and responses to log file |
 | `--version` | Show version information |
 | `--help` | Show help information |
@@ -163,7 +164,7 @@ The first model in the file becomes the active model on startup (unless `runtime
 
 - **Manual-save**: Sessions are saved only when you use `:save [filename]` or press `Ctrl+S`
 - **Load**: On startup, AlayaCore creates a new empty session unless you specify `--session` to load an existing one
-- **Auto-summarize**: When `context_limit` is set in the model config, AlayaCore automatically triggers `:summarize` when context reaches 80% of the limit
+- **Auto-summarize**: When `--auto-summarize` is enabled and `context_limit` is set in the model config, AlayaCore automatically triggers `:summarize` when context reaches 80% of the limit. This is disabled by default; use `:summarize` to manually reduce context at any time.
 
 Session files use TLV-encoded binary format with YAML frontmatter for metadata. See [architecture.md](architecture.md) for format details.
 

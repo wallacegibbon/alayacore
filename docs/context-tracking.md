@@ -95,6 +95,6 @@ The apparent "drop" from 2118 to 2073 after model switch is simply the differenc
 
 ## Related
 
-- `shouldAutoSummarize()` — triggers when `ContextTokens >= ContextLimit * 80%`
-- `summarize()` — replaces conversation history with a summary, resets `ContextTokens` to the summary's output token count
+- `shouldAutoSummarize()` — triggers when `ContextTokens >= ContextLimit * 80%` (only when `--auto-summarize` is enabled)
+- `summarize()` — appends the summary prompt to Messages, calls processPrompt, then replaces conversation history with the summary and resets `ContextTokens` to the summary's output token count
 - `applyModelContextLimit()` — sets `ContextLimit` from the active model's config

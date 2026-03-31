@@ -28,6 +28,7 @@ type Settings struct {
 	ShowVersion   bool
 	ShowHelp      bool
 	DebugAPI      bool
+	AutoSummarize bool
 	SystemPrompt  string
 	Skills        []string
 	Addr          string
@@ -44,6 +45,7 @@ func Parse() *Settings {
 	showVersion := flag.Bool("version", false, "Show version information")
 	showHelp := flag.Bool("help", false, "Show help information")
 	debugAPI := flag.Bool("debug-api", false, "Write raw API requests and responses to log file")
+	autoSummarize := flag.Bool("auto-summarize", false, "Automatically summarize conversation when context exceeds 80% of limit")
 	systemPrompt := &stringSlice{}
 	flag.Var(systemPrompt, "system", "Extra system prompt (can be specified multiple times, will be appended to default)")
 	skill := &stringSlice{}
@@ -71,6 +73,7 @@ func Parse() *Settings {
 		ShowVersion:   *showVersion,
 		ShowHelp:      *showHelp,
 		DebugAPI:      *debugAPI,
+		AutoSummarize: *autoSummarize,
 		SystemPrompt:  mergedSystemPrompt,
 		Skills:        skillPaths,
 		Addr:          *addr,

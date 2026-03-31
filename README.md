@@ -22,6 +22,7 @@ go install github.com/alayacore/alayacore@latest
 - `--proxy string` - HTTP proxy URL (e.g., `http://127.0.0.1:7890` or `socks5://127.0.0.1:1080`)
 - `--themes string` - Themes folder path (default: `~/.alayacore/themes`)
 - `--max-steps int` - Maximum agent loop steps (default: 100)
+- `--auto-summarize` - Automatically summarize conversation when context exceeds 80% of limit
 - `--debug-api` - Write raw API requests and responses to log file
 - `--version` - Show version information
 - `--help` - Show help information

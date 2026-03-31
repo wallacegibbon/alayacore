@@ -124,24 +124,25 @@ type TLVChunk struct {
 
 // Session manages conversation state and task execution.
 type Session struct {
-	Messages          []llm.Message
-	Agent             *llm.Agent
-	Provider          llm.Provider
-	SessionFile       string
-	CreatedAt         time.Time
-	TotalSpent        llm.Usage
-	ContextTokens     int64
-	ContextLimit      int64
-	Input             stream.Input
-	Output            stream.Output
-	ModelManager      *ModelManager
-	RuntimeManager    *RuntimeManager
-	baseTools         []llm.Tool
-	systemPrompt      string
-	extraSystemPrompt string
-	debugAPI          bool
-	maxSteps          int
-	proxyURL          string
+	Messages             []llm.Message
+	Agent                *llm.Agent
+	Provider             llm.Provider
+	SessionFile          string
+	CreatedAt            time.Time
+	TotalSpent           llm.Usage
+	ContextTokens        int64
+	ContextLimit         int64
+	Input                stream.Input
+	Output               stream.Output
+	ModelManager         *ModelManager
+	RuntimeManager       *RuntimeManager
+	baseTools            []llm.Tool
+	systemPrompt         string
+	extraSystemPrompt    string
+	debugAPI             bool
+	autoSummarizeEnabled bool
+	maxSteps             int
+	proxyURL             string
 
 	taskQueue     []QueueItem
 	taskAvailable chan struct{}
@@ -159,34 +160,35 @@ type Session struct {
 // ============================================================================
 
 // LoadOrNewSession loads a session from file or creates a new one.
-func LoadOrNewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, proxyURL string) (*Session, string) {
+func LoadOrNewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, proxyURL string) (*Session, string) {
 	sessionFile = expandPath(sessionFile)
 	if sessionFile != "" {
 		if data, err := LoadSession(sessionFile); err == nil {
-			return RestoreFromSession(baseTools, systemPrompt, extraSystemPrompt, maxSteps, input, output, data, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, proxyURL), sessionFile
+			return RestoreFromSession(baseTools, systemPrompt, extraSystemPrompt, maxSteps, input, output, data, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, autoSummarize, proxyURL), sessionFile
 		}
 	}
-	return NewSession(baseTools, systemPrompt, extraSystemPrompt, maxSteps, input, output, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, proxyURL), sessionFile
+	return NewSession(baseTools, systemPrompt, extraSystemPrompt, maxSteps, input, output, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, autoSummarize, proxyURL), sessionFile
 }
 
 // NewSession creates a fresh session.
-func NewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, proxyURL string) *Session {
+func NewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, proxyURL string) *Session {
 	s := &Session{
-		SessionFile:       sessionFile,
-		CreatedAt:         time.Now(),
-		Input:             input,
-		Output:            output,
-		ModelManager:      NewModelManager(modelConfigPath),
-		RuntimeManager:    NewRuntimeManager(runtimeConfigPath, modelConfigPath),
-		baseTools:         baseTools,
-		systemPrompt:      systemPrompt,
-		extraSystemPrompt: extraSystemPrompt,
-		debugAPI:          debugAPI,
-		proxyURL:          proxyURL,
-		maxSteps:          maxSteps,
-		taskQueue:         make([]QueueItem, 0),
-		taskAvailable:     make(chan struct{}, 1),
-		done:              make(chan struct{}),
+		SessionFile:          sessionFile,
+		CreatedAt:            time.Now(),
+		Input:                input,
+		Output:               output,
+		ModelManager:         NewModelManager(modelConfigPath),
+		RuntimeManager:       NewRuntimeManager(runtimeConfigPath, modelConfigPath),
+		baseTools:            baseTools,
+		systemPrompt:         systemPrompt,
+		extraSystemPrompt:    extraSystemPrompt,
+		debugAPI:             debugAPI,
+		autoSummarizeEnabled: autoSummarize,
+		proxyURL:             proxyURL,
+		maxSteps:             maxSteps,
+		taskQueue:            make([]QueueItem, 0),
+		taskAvailable:        make(chan struct{}, 1),
+		done:                 make(chan struct{}),
 	}
 	s.initModelManager()
 	s.sendSystemInfo()
@@ -196,24 +198,25 @@ func NewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt str
 }
 
 // RestoreFromSession creates a session from saved data.
-func RestoreFromSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, data *SessionData, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, proxyURL string) *Session {
+func RestoreFromSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, data *SessionData, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, proxyURL string) *Session {
 	s := &Session{
-		Messages:          data.Messages,
-		SessionFile:       sessionFile,
-		CreatedAt:         data.CreatedAt,
-		Input:             input,
-		Output:            output,
-		ModelManager:      NewModelManager(modelConfigPath),
-		RuntimeManager:    NewRuntimeManager(runtimeConfigPath, modelConfigPath),
-		baseTools:         baseTools,
-		systemPrompt:      systemPrompt,
-		extraSystemPrompt: extraSystemPrompt,
-		debugAPI:          debugAPI,
-		proxyURL:          proxyURL,
-		maxSteps:          maxSteps,
-		taskQueue:         make([]QueueItem, 0),
-		taskAvailable:     make(chan struct{}, 1),
-		done:              make(chan struct{}),
+		Messages:             data.Messages,
+		SessionFile:          sessionFile,
+		CreatedAt:            data.CreatedAt,
+		Input:                input,
+		Output:               output,
+		ModelManager:         NewModelManager(modelConfigPath),
+		RuntimeManager:       NewRuntimeManager(runtimeConfigPath, modelConfigPath),
+		baseTools:            baseTools,
+		systemPrompt:         systemPrompt,
+		extraSystemPrompt:    extraSystemPrompt,
+		debugAPI:             debugAPI,
+		autoSummarizeEnabled: autoSummarize,
+		proxyURL:             proxyURL,
+		maxSteps:             maxSteps,
+		taskQueue:            make([]QueueItem, 0),
+		taskAvailable:        make(chan struct{}, 1),
+		done:                 make(chan struct{}),
 	}
 	s.initModelManager()
 	s.sendSystemInfo()
@@ -568,12 +571,12 @@ func (s *Session) DeleteQueueItem(queueID string) bool {
 
 func (s *Session) handleUserPrompt(ctx context.Context, prompt string) {
 	if s.shouldAutoSummarize() {
-		s.autoSummarize(ctx)
+		s.doAutoSummarize(ctx)
 	}
 
 	s.Messages = append(s.Messages, llm.NewUserMessage(prompt))
 
-	_, err := s.processPrompt(ctx, prompt, s.Messages)
+	_, err := s.processPrompt(ctx, s.Messages)
 
 	s.Messages = cleanIncompleteToolCalls(s.Messages)
 
@@ -584,18 +587,18 @@ func (s *Session) handleUserPrompt(ctx context.Context, prompt string) {
 }
 
 func (s *Session) shouldAutoSummarize() bool {
-	return s.ContextLimit > 0 && s.ContextTokens > 0 &&
+	return s.autoSummarizeEnabled && s.ContextLimit > 0 && s.ContextTokens > 0 &&
 		s.ContextTokens >= s.ContextLimit*80/100
 }
 
-func (s *Session) autoSummarize(ctx context.Context) {
+func (s *Session) doAutoSummarize(ctx context.Context) {
 	usage := float64(s.ContextTokens) * 100 / float64(s.ContextLimit)
 	s.writeNotifyf("Context usage at %d/%d tokens (%.0f%%). Auto-summarizing...",
 		s.ContextTokens, s.ContextLimit, usage)
 	s.summarize(ctx)
 }
 
-func (s *Session) processPrompt(ctx context.Context, _ string, history []llm.Message) (int64, error) {
+func (s *Session) processPrompt(ctx context.Context, history []llm.Message) (int64, error) {
 	promptID := atomic.AddUint64(&s.nextPromptID, 1) - 1
 
 	var stepCount int
