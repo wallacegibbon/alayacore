@@ -2,6 +2,14 @@
 
 This document describes how AlayaCore handles errors from LLM API providers during streaming responses.
 
+> **Note**: This document was originally written for the `llmcompat` package existed and some references are that openai.go`
+> function `handleEvent`. The code has since moved to `providers/openai.go` and `handleEvent`.
+> The Anthropic error handling has moved from `anthropic.go` `handleMessageDelta`.
+
+> The specific error messages below are based on current code behavior.
+
+>
+
 ## Overview
 
 Both OpenAI and Anthropic APIs use finish reasons (or stop reasons) to indicate why a streaming response ended. AlayaCore monitors these reasons to detect errors and prevent silent failures.
@@ -22,7 +30,6 @@ Both OpenAI and Anthropic APIs use finish reasons (or stop reasons) to indicate 
 | Finish Reason | Meaning | Handling |
 |---------------|---------|----------|
 | `content_filter` | Content was blocked or partially omitted by OpenAI's safety filters | **Error** - emit `StreamErrorEvent` with message "content blocked by safety filter" |
-| `network_error` | Network connection issue during streaming | **Error** - emit `StreamErrorEvent` with message "stream finished with error: network_error" |
 | Any other value | Unknown or unexpected finish reason | **Error** - emit `StreamErrorEvent` with unexpected reason |
 
 ### Implementation
@@ -30,7 +37,6 @@ Both OpenAI and Anthropic APIs use finish reasons (or stop reasons) to indicate 
 Error detection is implemented in `internal/llm/providers/openai.go` in the `handleEvent` function:
 
 ```go
-// Check for error finish reasons
 if choice.FinishReason == "content_filter" {
     return fmt.Errorf("content blocked by safety filter")
 }
@@ -44,7 +50,6 @@ if choice.FinishReason != "" && choice.FinishReason != "stop" &&
 
 - **`content_filter`**: The request violated content policy. Review the prompt and modify to comply with safety guidelines. May contain partial content.
 - **`length`**: Not an error, but response is truncated. Increase `max_tokens` if you need the complete response, or handle partial output.
-- **`network_error`**: Network connectivity issue. Retry the request.
 - **Other errors**: Check API documentation or contact support.
 
 ---
@@ -52,7 +57,6 @@ if choice.FinishReason != "" && choice.FinishReason != "stop" &&
 ## Anthropic Provider
 
 ### Valid Stop Reasons
-
 | Stop Reason | Meaning | Handling |
 |-------------|---------|----------|
 | `end_turn` | Model reached a natural stopping point | Normal completion - most common for regular responses |
@@ -62,7 +66,6 @@ if choice.FinishReason != "" && choice.FinishReason != "stop" &&
 | `pause_turn` | Used with server-side tool execution or long-running turns (e.g., agent loops) | Valid - part of extended conversation flow |
 
 ### Error Stop Reasons
-
 | Stop Reason | Meaning | Handling |
 |-------------|---------|----------|
 | `refusal` | Model refused to respond (e.g., due to safety/content policy) | **Error** - emit `StreamErrorEvent` with message "model refused to respond: content policy violation" |
@@ -76,7 +79,6 @@ Error detection is implemented in `internal/llm/providers/anthropic.go` in the `
 if stopReason == "refusal" {
     return fmt.Errorf("model refused to respond: content policy violation")
 }
-// Check for unknown stop reasons
 if stopReason != "" && stopReason != "end_turn" && stopReason != "max_tokens" &&
     stopReason != "stop_sequence" && stopReason != "tool_use" && stopReason != "pause_turn" {
     return fmt.Errorf("stream finished with unexpected stop reason: %s", stopReason)
@@ -84,7 +86,6 @@ if stopReason != "" && stopReason != "end_turn" && stopReason != "max_tokens" &&
 ```
 
 ### What to Do When Errors Occur
-
 - **`refusal`**: The request violated content policy. Review and modify the prompt to comply with safety guidelines.
 
 ---
@@ -109,7 +110,7 @@ This prevents silent failures where:
 Error handling is tested in `internal/llm/providers/providers_test.go`:
 
 ### OpenAI Tests
-- `TestOpenAINetworkError` - Verifies `network_error` finish reason triggers error
+- `TestOpenAINetworkError` - Verifies unexpected finish reasons (e.g. `network_error`) trigger error
 - `TestOpenAIContentFilter` - Verifies `content_filter` finish reason triggers error
 - `TestOpenAILengthFinishReason` - Verifies `length` is treated as valid (not an error)
 
@@ -118,7 +119,3 @@ Error handling is tested in `internal/llm/providers/providers_test.go`:
 - `TestAnthropicUnknownStopReason` - Verifies unknown stop reasons trigger error
 - `TestAnthropicValidStopReasons` - Verifies all valid stop reasons (`end_turn`, `max_tokens`, `stop_sequence`, `tool_use`, `pause_turn`) don't trigger errors
 
-## Related Documentation
-
-- [Architecture](architecture.md) - Overall system architecture
-- [CLI Reference](cli-reference.md) - Command-line interface documentation

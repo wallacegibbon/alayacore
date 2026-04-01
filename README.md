@@ -33,7 +33,7 @@ go install github.com/alayacore/alayacore@latest
 - Multi-step conversations with tool calls
 - Token usage tracking
 - Error handling for command execution
-- Multi-provider support (OpenAI, Anthropic, DeepSeek, ZAI)
+- Multi-provider support (OpenAI, Anthropic, DeepSeek, Qwen, Ollama, LM Studio)
 - Interactive mode
 - Real-time streaming output
 - Color-styled output
@@ -120,7 +120,7 @@ When running the Terminal version:
 | `L` | Move cursor to window at bottom of visible area (when display focused) |
 | `M` | Move cursor to window at center of visible area (when display focused) |
 | `:` | Switch to input with ":" prefix (when display focused) |
-| `Space` | Toggle wrap mode for active window (when display focused) |
+| `Space` | Toggle fold mode for active window (when display focused) |
 | `Ctrl+C` | Clear input (when input focused) |
 | `Ctrl+G` | Cancel current request (with confirmation) |
 | `:cancel` | Cancel current request (with confirmation) |
@@ -132,7 +132,7 @@ The terminal organizes concurrent streams into separate windows with synchronize
 
 ### Window Cursor
 
-A Window Cursor highlights one window with a bright border. Use `j`/`k` to navigate. The cursor stays visible during scrolling and defaults to the newest window. Press `Space` to toggle wrap mode on the active window, which shows only the last 3 lines of content with a `Wrapped - Space to expand` indicator.
+A Window Cursor highlights one window with a bright border. Use `j`/`k` to navigate. The cursor stays visible during scrolling and defaults to the newest window. Press `Space` to toggle fold mode on the active window, which collapses content to first line + indicator + last 3 lines.
 
 ## Task Queue Manager
 
