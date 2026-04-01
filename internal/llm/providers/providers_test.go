@@ -89,10 +89,8 @@ func TestAnthropicProvider(t *testing.T) {
 
 	if usageReceived == nil {
 		t.Error("No usage received")
-	} else {
-		if usageReceived.InputTokens != 10 || usageReceived.OutputTokens != 15 {
-			t.Errorf("Unexpected usage: %+v", usageReceived)
-		}
+	} else if usageReceived.InputTokens != 10 || usageReceived.OutputTokens != 15 {
+		t.Errorf("Unexpected usage: %+v", usageReceived)
 	}
 }
 
@@ -187,7 +185,11 @@ func TestToolCallStreaming(t *testing.T) {
 				},
 			},
 		}
-		data, _ := json.Marshal(toolCall)
+		data, err := json.Marshal(toolCall)
+		if err != nil {
+			t.Errorf("Failed to marshal toolCall: %v", err)
+			return
+		}
 		fmt.Fprintf(w, "data: %s\n\n", string(data))
 		fmt.Fprint(w, "data: [DONE]\n\n")
 
@@ -489,7 +491,7 @@ func TestAnthropicAPIError(t *testing.T) {
 	// Test API error handling
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(`{"error": {"message": "Invalid API key"}}`))
+		_, _ = w.Write([]byte(`{"error": {"message": "Invalid API key"}}`))
 	}))
 	defer server.Close()
 
@@ -769,7 +771,7 @@ func TestOpenAIAPIError(t *testing.T) {
 	// Test OpenAI API error handling
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
-		w.Write([]byte(`{"error": {"message": "Rate limit exceeded"}}`))
+		_, _ = w.Write([]byte(`{"error": {"message": "Rate limit exceeded"}}`))
 	}))
 	defer server.Close()
 

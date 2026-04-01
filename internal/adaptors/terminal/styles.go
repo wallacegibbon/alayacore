@@ -76,7 +76,7 @@ func LoadThemeFromPaths(explicitPath string) *Theme {
 			return theme
 		}
 		// If explicit path was given but failed, buffer warning but continue
-		AddWarning("Warning: failed to load theme from %s: %v", explicitPath, err)
+		AddWarningf("Warning: failed to load theme from %s: %v", explicitPath, err)
 	}
 
 	// Try default user theme path
@@ -88,7 +88,7 @@ func LoadThemeFromPaths(explicitPath string) *Theme {
 			if err == nil {
 				return theme
 			}
-			AddWarning("Warning: failed to load theme from %s: %v", defaultPath, err)
+			AddWarningf("Warning: failed to load theme from %s: %v", defaultPath, err)
 		}
 	}
 

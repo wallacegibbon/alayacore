@@ -245,11 +245,8 @@ func TestCancelAllTasks(t *testing.T) {
 				if !found {
 					t.Errorf("Expected error message, but none found. Messages: %v", output.Messages)
 				}
-			} else {
-				// Should have success message
-				if len(output.Messages) < tt.expectMessages {
-					t.Errorf("Expected at least %d message(s), got %d", tt.expectMessages, len(output.Messages))
-				}
+			} else if len(output.Messages) < tt.expectMessages {
+				t.Errorf("Expected at least %d message(s), got %d", tt.expectMessages, len(output.Messages))
 			}
 		})
 	}

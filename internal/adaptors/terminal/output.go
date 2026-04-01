@@ -68,84 +68,84 @@ func (to *outputWriter) SetStyles(styles *Styles) {
 }
 
 // Close stops the background goroutine and cleans up resources
-func (w *outputWriter) Close() error {
-	close(w.done)
+func (to *outputWriter) Close() error {
+	close(to.done)
 	return nil
 }
 
 // updateFlusher periodically flushes pending updates
-func (w *outputWriter) updateFlusher() {
+func (to *outputWriter) updateFlusher() {
 	ticker := time.NewTicker(FlusherInterval)
 	defer ticker.Stop()
 
 	for {
 		select {
-		case <-w.done:
+		case <-to.done:
 			return
 		case <-ticker.C:
-			w.updateMu.Lock()
-			if w.pendingUpdate && time.Since(w.lastUpdate) >= UpdateThrottleInterval {
-				w.pendingUpdate = false
-				w.lastUpdate = time.Now()
+			to.updateMu.Lock()
+			if to.pendingUpdate && time.Since(to.lastUpdate) >= UpdateThrottleInterval {
+				to.pendingUpdate = false
+				to.lastUpdate = time.Now()
 				select {
-				case w.updateChan <- struct{}{}:
+				case to.updateChan <- struct{}{}:
 				default:
 				}
 			}
-			w.updateMu.Unlock()
+			to.updateMu.Unlock()
 		}
 	}
 }
 
-func (w *outputWriter) Write(p []byte) (n int, err error) {
-	w.mu.Lock()
-	w.buffer = append(w.buffer, p...)
-	w.processBuffer()
-	w.mu.Unlock()
+func (to *outputWriter) Write(p []byte) (n int, err error) {
+	to.mu.Lock()
+	to.buffer = append(to.buffer, p...)
+	to.processBuffer()
+	to.mu.Unlock()
 	return len(p), nil
 }
 
-func (w *outputWriter) WriteString(s string) (int, error) {
-	return w.Write([]byte(s))
+func (to *outputWriter) WriteString(s string) (int, error) {
+	return to.Write([]byte(s))
 }
 
-func (w *outputWriter) Flush() error {
+func (to *outputWriter) Flush() error {
 	return nil
 }
 
 // AppendError adds an error message to the display buffer with error styling
-func (w *outputWriter) AppendError(format string, args ...any) {
+func (to *outputWriter) AppendError(format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
-	id := w.generateWindowID()
-	w.windowBuffer.AppendOrUpdate(id, stream.TagSystemError, w.styles.Error.Render(msg))
+	id := to.generateWindowID()
+	to.windowBuffer.AppendOrUpdate(id, stream.TagSystemError, to.styles.Error.Render(msg))
 }
 
 // WriteNotify writes a notification message to the display
-func (w *outputWriter) WriteNotify(msg string) {
-	id := w.generateWindowID()
-	w.windowBuffer.AppendOrUpdate(id, stream.TagSystemNotify, w.styles.System.Render(msg))
-	w.triggerUpdateForTag(stream.TagSystemNotify)
+func (to *outputWriter) WriteNotify(msg string) {
+	id := to.generateWindowID()
+	to.windowBuffer.AppendOrUpdate(id, stream.TagSystemNotify, to.styles.System.Render(msg))
+	to.triggerUpdateForTag(stream.TagSystemNotify)
 }
 
 // processBuffer parses TLV-encoded data from the buffer
-func (w *outputWriter) processBuffer() {
-	for len(w.buffer) >= 6 {
-		tag := string(w.buffer[0:2])
-		length := int(binary.BigEndian.Uint32(w.buffer[2:6]))
+func (to *outputWriter) processBuffer() {
+	for len(to.buffer) >= 6 {
+		tag := string(to.buffer[0:2])
+		length := int(binary.BigEndian.Uint32(to.buffer[2:6]))
 
-		if len(w.buffer) < 6+length {
+		if len(to.buffer) < 6+length {
 			break
 		}
 
-		value := string(w.buffer[6 : 6+length])
-		w.writeColored(tag, value)
-		w.buffer = w.buffer[6+length:]
+		value := string(to.buffer[6 : 6+length])
+		to.writeColored(tag, value)
+		to.buffer = to.buffer[6+length:]
 	}
 }
 
 // writeColored writes styled content based on the TLV tag
-func (w *outputWriter) writeColored(tag string, value string) {
-	w.triggerUpdateForTag(tag)
+func (to *outputWriter) writeColored(tag string, value string) {
+	to.triggerUpdateForTag(tag)
 
 	switch tag {
 	// Text content tags (delta messages with stream ID prefix)
@@ -153,11 +153,11 @@ func (w *outputWriter) writeColored(tag string, value string) {
 		id, content, ok := ParseStreamID(value)
 		if !ok {
 			// Should not happen, but fallback
-			id = w.generateWindowID()
+			id = to.generateWindowID()
 			content = value
 		}
 		// Pass raw content - styling is applied during render
-		w.windowBuffer.AppendOrUpdate(id, tag, content)
+		to.windowBuffer.AppendOrUpdate(id, tag, content)
 
 	// Function call (JSON: id, name, input)
 	case stream.TagFunctionCall:
@@ -166,10 +166,10 @@ func (w *outputWriter) writeColored(tag string, value string) {
 			return
 		}
 		handler := GetHandler(tc.Name)
-		formatted := handler.FormatCall(json.RawMessage(tc.Input), w.styles)
+		formatted := handler.FormatCall(json.RawMessage(tc.Input), to.styles)
 
 		// Pass formatted but unstyled content - styling is applied during render
-		w.windowBuffer.AppendToolCall(tc.ID, tc.Name, formatted)
+		to.windowBuffer.AppendToolCall(tc.ID, tc.Name, formatted)
 
 	// Function result (JSON: id, output)
 	case stream.TagFunctionResult:
@@ -177,13 +177,13 @@ func (w *outputWriter) writeColored(tag string, value string) {
 		if err := json.Unmarshal([]byte(value), &tr); err != nil {
 			return
 		}
-		handler := w.windowBuffer.GetHandler(tr.ID)
+		handler := to.windowBuffer.GetHandler(tr.ID)
 		if handler != nil && !handler.ShouldShowOutput() {
 			// Skip output for tools that don't show it
 			return
 		}
 		// Pass raw output - styling is applied during render
-		w.windowBuffer.AppendOrUpdate(tr.ID, tag, tr.Output)
+		to.windowBuffer.AppendOrUpdate(tr.ID, tag, tr.Output)
 
 	// Function output status indicator
 	case stream.TagFunctionState:
@@ -192,92 +192,92 @@ func (w *outputWriter) writeColored(tag string, value string) {
 			return
 		}
 		// Update the tool window with status indicator
-		w.windowBuffer.UpdateToolStatus(id, ParseToolStatus(content))
+		to.windowBuffer.UpdateToolStatus(id, ParseToolStatus(content))
 
 	// System tags
 	case stream.TagSystemError:
-		id := w.generateWindowID()
+		id := to.generateWindowID()
 		// Pass raw value - styling is applied during render
-		w.windowBuffer.AppendOrUpdate(id, tag, value)
+		to.windowBuffer.AppendOrUpdate(id, tag, value)
 
 	case stream.TagSystemNotify:
-		id := w.generateWindowID()
+		id := to.generateWindowID()
 		// Pass raw value - styling is applied during render
-		w.windowBuffer.AppendOrUpdate(id, tag, value)
+		to.windowBuffer.AppendOrUpdate(id, tag, value)
 
 	case stream.TagSystemData:
-		w.handleSystemTag(value)
+		to.handleSystemTag(value)
 		return
 
 	// User text tag
 	case stream.TagTextUser:
-		id := w.generateWindowID()
+		id := to.generateWindowID()
 		// Pass raw value - styling is applied during render
-		w.windowBuffer.AppendOrUpdate(id, tag, value)
+		to.windowBuffer.AppendOrUpdate(id, tag, value)
 
 	default:
-		id := w.generateWindowID()
-		w.windowBuffer.AppendOrUpdate(id, tag, value)
+		id := to.generateWindowID()
+		to.windowBuffer.AppendOrUpdate(id, tag, value)
 	}
 }
 
 // triggerUpdateForTag sends an update signal for tags that modify the display
 // Uses throttling to batch rapid updates together
-func (w *outputWriter) triggerUpdateForTag(tag string) {
+func (to *outputWriter) triggerUpdateForTag(tag string) {
 	switch tag {
 	// Text content tags
 	case stream.TagTextAssistant, stream.TagTextReasoning, stream.TagTextUser,
 		stream.TagFunctionCall,
 		// System tags
 		stream.TagSystemError, stream.TagSystemNotify, stream.TagSystemData:
-		w.updateMu.Lock()
-		defer w.updateMu.Unlock()
+		to.updateMu.Lock()
+		defer to.updateMu.Unlock()
 
 		// If enough time has passed since last update, send immediately
-		if time.Since(w.lastUpdate) >= UpdateThrottleInterval {
-			w.lastUpdate = time.Now()
-			w.pendingUpdate = false
+		if time.Since(to.lastUpdate) >= UpdateThrottleInterval {
+			to.lastUpdate = time.Now()
+			to.pendingUpdate = false
 			select {
-			case w.updateChan <- struct{}{}:
+			case to.updateChan <- struct{}{}:
 			default:
 			}
 		} else {
 			// Mark that we have a pending update
-			w.pendingUpdate = true
+			to.pendingUpdate = true
 		}
 	}
 }
 
 // handleSystemTag processes system information tags
-func (w *outputWriter) handleSystemTag(value string) {
+func (to *outputWriter) handleSystemTag(value string) {
 	// Try to parse as SystemInfo
 	var info agentpkg.SystemInfo
 	if err := json.Unmarshal([]byte(value), &info); err == nil {
 		// Save step info when task completes (transition from in-progress to done)
-		if w.inProgress && !info.InProgress && w.maxSteps > 0 {
-			w.lastCurrentStep = w.currentStep
-			w.lastMaxSteps = w.maxSteps
+		if to.inProgress && !info.InProgress && to.maxSteps > 0 {
+			to.lastCurrentStep = to.currentStep
+			to.lastMaxSteps = to.maxSteps
 		}
 		// Reset last step info when new task starts (transition from not-in-progress to in-progress)
-		if !w.inProgress && info.InProgress {
-			w.lastCurrentStep = 0
-			w.lastMaxSteps = 0
+		if !to.inProgress && info.InProgress {
+			to.lastCurrentStep = 0
+			to.lastMaxSteps = 0
 		}
 
-		w.inProgress = info.InProgress
-		w.queueCount = len(info.QueueItems)
+		to.inProgress = info.InProgress
+		to.queueCount = len(info.QueueItems)
 		if info.ContextLimit > 0 {
 			pct := float64(info.ContextTokens) * 100.0 / float64(info.ContextLimit)
-			w.status = fmt.Sprintf("Context: %d/%d (%.1f%%)", info.ContextTokens, info.ContextLimit, pct)
+			to.status = fmt.Sprintf("Context: %d/%d (%.1f%%)", info.ContextTokens, info.ContextLimit, pct)
 		} else {
-			w.status = fmt.Sprintf("Context: %d", info.ContextTokens)
+			to.status = fmt.Sprintf("Context: %d", info.ContextTokens)
 		}
 		// Store model info
-		w.models = info.Models
-		w.activeModelID = info.ActiveModelID
-		w.hasModels = info.HasModels
-		w.modelConfigPath = info.ModelConfigPath
-		w.activeModelName = info.ActiveModelName
+		to.models = info.Models
+		to.activeModelID = info.ActiveModelID
+		to.hasModels = info.HasModels
+		to.modelConfigPath = info.ModelConfigPath
+		to.activeModelName = info.ActiveModelName
 
 		// Store queue items (always update, even if empty)
 		items := make([]QueueItem, len(info.QueueItems))
@@ -293,113 +293,113 @@ func (w *outputWriter) handleSystemTag(value string) {
 				CreatedAt: createdAt,
 			}
 		}
-		w.pendingQueueItems = items
+		to.pendingQueueItems = items
 
 		// Store step info
-		w.currentStep = info.CurrentStep
-		w.maxSteps = info.MaxSteps
+		to.currentStep = info.CurrentStep
+		to.maxSteps = info.MaxSteps
 
 		// Signal update so tick handler picks up changes
 		select {
-		case w.updateChan <- struct{}{}:
+		case to.updateChan <- struct{}{}:
 		default:
 		}
 	}
 }
 
 // GetQueueItems returns and clears the pending queue items
-func (w *outputWriter) GetQueueItems() []QueueItem {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	items := w.pendingQueueItems
-	w.pendingQueueItems = nil
+func (to *outputWriter) GetQueueItems() []QueueItem {
+	to.mu.Lock()
+	defer to.mu.Unlock()
+	items := to.pendingQueueItems
+	to.pendingQueueItems = nil
 	return items
 }
 
 // GetModels returns the current model list
-func (w *outputWriter) GetModels() []agentpkg.ModelInfo {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.models
+func (to *outputWriter) GetModels() []agentpkg.ModelInfo {
+	to.mu.Lock()
+	defer to.mu.Unlock()
+	return to.models
 }
 
 // GetActiveModelID returns the current active model ID
-func (w *outputWriter) GetActiveModelID() int {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.activeModelID
+func (to *outputWriter) GetActiveModelID() int {
+	to.mu.Lock()
+	defer to.mu.Unlock()
+	return to.activeModelID
 }
 
 // HasModels returns whether models are configured
-func (w *outputWriter) HasModels() bool {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.hasModels
+func (to *outputWriter) HasModels() bool {
+	to.mu.Lock()
+	defer to.mu.Unlock()
+	return to.hasModels
 }
 
 // GetModelConfigPath returns the path to the model config file
-func (w *outputWriter) GetModelConfigPath() string {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.modelConfigPath
+func (to *outputWriter) GetModelConfigPath() string {
+	to.mu.Lock()
+	defer to.mu.Unlock()
+	return to.modelConfigPath
 }
 
 // GetActiveModelName returns the name of the active model
-func (w *outputWriter) GetActiveModelName() string {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.activeModelName
+func (to *outputWriter) GetActiveModelName() string {
+	to.mu.Lock()
+	defer to.mu.Unlock()
+	return to.activeModelName
 }
 
 // GetQueueCount returns the current number of queued items
-func (w *outputWriter) GetQueueCount() int {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.queueCount
+func (to *outputWriter) GetQueueCount() int {
+	to.mu.Lock()
+	defer to.mu.Unlock()
+	return to.queueCount
 }
 
 // GetStatus returns the current status string
-func (w *outputWriter) GetStatus() string {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.status
+func (to *outputWriter) GetStatus() string {
+	to.mu.Lock()
+	defer to.mu.Unlock()
+	return to.status
 }
 
 // IsInProgress returns whether the session has a task in progress
-func (w *outputWriter) IsInProgress() bool {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.inProgress
+func (to *outputWriter) IsInProgress() bool {
+	to.mu.Lock()
+	defer to.mu.Unlock()
+	return to.inProgress
 }
 
 // GetCurrentStep returns the current step in the agent loop
-func (w *outputWriter) GetCurrentStep() int {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.currentStep
+func (to *outputWriter) GetCurrentStep() int {
+	to.mu.Lock()
+	defer to.mu.Unlock()
+	return to.currentStep
 }
 
 // GetMaxSteps returns the maximum steps allowed
-func (w *outputWriter) GetMaxSteps() int {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.maxSteps
+func (to *outputWriter) GetMaxSteps() int {
+	to.mu.Lock()
+	defer to.mu.Unlock()
+	return to.maxSteps
 }
 
 // GetLastStepInfo returns the last step info from a completed task
-func (w *outputWriter) GetLastStepInfo() (currentStep, maxSteps int) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.lastCurrentStep, w.lastMaxSteps
+func (to *outputWriter) GetLastStepInfo() (currentStep, maxSteps int) {
+	to.mu.Lock()
+	defer to.mu.Unlock()
+	return to.lastCurrentStep, to.lastMaxSteps
 }
 
 // generateWindowID returns a unique window ID for non-delta messages.
-func (w *outputWriter) generateWindowID() string {
-	w.nextWindowID++
-	return fmt.Sprintf("win%d", w.nextWindowID)
+func (to *outputWriter) generateWindowID() string {
+	to.nextWindowID++
+	return fmt.Sprintf("win%d", to.nextWindowID)
 }
 
 // SetWindowWidth updates the window buffer width.
-func (w *outputWriter) SetWindowWidth(width int) {
-	w.windowBuffer.SetWidth(width)
+func (to *outputWriter) SetWindowWidth(width int) {
+	to.windowBuffer.SetWidth(width)
 }

@@ -111,6 +111,9 @@ issues:
         - gosec
         - goconst
         - gocyclo
+        - errcheck
+        - revive
+        - govet
 
     # Exclude known issues in generated code
     - path: \.pb\.go

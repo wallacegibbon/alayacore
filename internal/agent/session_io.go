@@ -58,13 +58,14 @@ func (s *Session) cancelAllTasks() {
 	}
 
 	// Send notification
-	if currentCanceled && queueLen > 0 {
+	switch {
+	case currentCanceled && queueLen > 0:
 		s.writeNotifyf("Canceled current task and cleared %d queued tasks", queueLen)
-	} else if currentCanceled {
+	case currentCanceled:
 		s.writeNotify("Canceled current task")
-	} else if queueLen > 0 {
+	case queueLen > 0:
 		s.writeNotifyf("Cleared %d queued tasks", queueLen)
-	} else {
+	default:
 		s.writeError(domainerrors.ErrNothingToCancel.Error())
 		return
 	}

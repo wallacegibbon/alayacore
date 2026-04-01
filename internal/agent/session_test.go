@@ -504,7 +504,7 @@ func TestDisplayMessagesWithToolCalls(t *testing.T) {
 	// Create mock output and send TLV chunks
 	mockOutput := &mockOutput{}
 	for _, chunk := range loadedData.TLVChunks {
-		_ = stream.WriteTLV(mockOutput, chunk.Tag, chunk.Value)
+		_ = stream.WriteTLV(mockOutput, chunk.Tag, chunk.Value) //nolint:errcheck // test only
 	}
 
 	// Verify that output was written

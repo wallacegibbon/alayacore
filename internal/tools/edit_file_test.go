@@ -168,7 +168,10 @@ func TestEditFileTool(t *testing.T) {
 
 			// Run tool
 			tool := NewEditFileTool()
-			inputJSON, _ := json.Marshal(input)
+			inputJSON, err := json.Marshal(input)
+			if err != nil {
+				t.Fatal(err)
+			}
 			resp, err := tool.Execute(context.Background(), inputJSON)
 
 			if err != nil {

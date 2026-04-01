@@ -37,6 +37,7 @@ const (
 	// Component sizing
 	InputPaddingH     = 8  // horizontal padding for input fields (border + padding both sides)
 	SelectorMaxHeight = 30 // maximum height for model selector and similar overlays
+	SelectorListRows  = 8  // content rows inside selector borders
 )
 
 // Timing constants
@@ -419,11 +420,12 @@ func (m *Terminal) View() tea.View {
 
 	// Input area with optional confirmation dialog
 	confirmText := ""
-	if m.confirmDialog {
+	switch {
+	case m.confirmDialog:
 		confirmText = "Confirm exit? Press y/n"
-	} else if m.cancelConfirmDialog {
+	case m.cancelConfirmDialog:
 		confirmText = "Confirm cancel? Press y/n"
-	} else if m.cancelAllConfirmDialog {
+	case m.cancelAllConfirmDialog:
 		confirmText = "Confirm cancel all? Press y/n"
 	}
 	sb.WriteString(m.input.RenderWithBorder(m.confirmDialog || m.cancelConfirmDialog || m.cancelAllConfirmDialog, confirmText))

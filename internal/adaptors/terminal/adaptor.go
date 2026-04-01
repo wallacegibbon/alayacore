@@ -15,6 +15,8 @@ import (
 	"github.com/alayacore/alayacore/internal/stream"
 )
 
+const defaultThemeName = "theme-dark"
+
 // Adaptor starts the TUI; use from main/app.
 type Adaptor struct {
 	Config       *app.Config
@@ -64,10 +66,10 @@ func (a *Adaptor) Start() {
 		a.Config.Cfg.Proxy,
 	)
 
-	// Load active theme from runtime.conf (default to "theme-dark" if not set)
+	// Load active theme from runtime.conf (default to default theme if not set)
 	activeThemeName := session.GetRuntimeManager().GetActiveTheme()
 	if activeThemeName == "" {
-		activeThemeName = "theme-dark"
+		activeThemeName = defaultThemeName
 	}
 	theme := themeManager.LoadTheme(activeThemeName)
 	styles := NewStyles(theme)

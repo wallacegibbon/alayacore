@@ -42,27 +42,27 @@ func TestEditFileStreamingMemory(t *testing.T) {
 			// Write first part
 			part1 := patternPos - written
 			if part1 > 0 {
-				if _, err := file.Write(chunk[:part1]); err != nil {
-					t.Fatalf("Failed to write: %v", err)
+				if _, wErr := file.Write(chunk[:part1]); wErr != nil {
+					t.Fatalf("Failed to write: %v", wErr)
 				}
 				written += part1
 			}
 			// Write pattern
-			if _, err := file.Write(pattern); err != nil {
-				t.Fatalf("Failed to write pattern: %v", err)
+			if _, wErr := file.Write(pattern); wErr != nil {
+				t.Fatalf("Failed to write pattern: %v", wErr)
 			}
 			written += len(pattern)
 			// Write remaining part
 			remaining := toWrite - part1
 			if remaining > 0 {
-				if _, err := file.Write(chunk[:remaining]); err != nil {
-					t.Fatalf("Failed to write: %v", err)
+				if _, wErr := file.Write(chunk[:remaining]); wErr != nil {
+					t.Fatalf("Failed to write: %v", wErr)
 				}
 				written += remaining
 			}
 		} else {
-			if _, err := file.Write(chunk[:toWrite]); err != nil {
-				t.Fatalf("Failed to write: %v", err)
+			if _, wErr := file.Write(chunk[:toWrite]); wErr != nil {
+				t.Fatalf("Failed to write: %v", wErr)
 			}
 			written += toWrite
 		}
@@ -213,11 +213,10 @@ func TestEditFileStreamingEdgeCases(t *testing.T) {
 
 			// Check result
 			if tt.shouldError {
-				if _, ok := result.(llm.ToolResultOutputError); !ok {
+				errResult, ok := result.(llm.ToolResultOutputError)
+				if !ok {
 					t.Errorf("Expected error result, got: %v", result)
-				}
-				errResult := result.(llm.ToolResultOutputError)
-				if tt.errorMsg != "" && !contains([]byte(errResult.Error), []byte(tt.errorMsg)) {
+				} else if tt.errorMsg != "" && !contains([]byte(errResult.Error), []byte(tt.errorMsg)) {
 					t.Errorf("Error message should contain %q, got: %q", tt.errorMsg, errResult.Error)
 				}
 			} else {

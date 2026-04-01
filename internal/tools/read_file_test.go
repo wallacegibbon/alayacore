@@ -22,7 +22,10 @@ func TestReadFileFull(t *testing.T) {
 
 	tool := NewReadFileTool()
 	input := ReadFileInput{Path: tmpFile}
-	inputJSON, _ := json.Marshal(input)
+	inputJSON, err := json.Marshal(input)
+	if err != nil {
+		t.Fatal(err)
+	}
 	result, err := tool.Execute(context.Background(), inputJSON)
 	if err != nil {
 		t.Fatal(err)
@@ -111,7 +114,10 @@ func TestReadFileWithLineRange(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			inputJSON, _ := json.Marshal(tt.input)
+			inputJSON, err := json.Marshal(tt.input)
+			if err != nil {
+				t.Fatal(err)
+			}
 			result, err := tool.Execute(context.Background(), inputJSON)
 			if err != nil {
 				t.Fatal(err)
@@ -157,7 +163,10 @@ func TestReadFileTooLarge(t *testing.T) {
 
 	tool := NewReadFileTool()
 	input := ReadFileInput{Path: tmpFile}
-	inputJSON, _ := json.Marshal(input)
+	inputJSON, err := json.Marshal(input)
+	if err != nil {
+		t.Fatal(err)
+	}
 	result, err := tool.Execute(context.Background(), inputJSON)
 	if err != nil {
 		t.Fatal(err)
@@ -182,19 +191,22 @@ func TestReadFileLargeWithLineRange(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.WriteString("first line\n")
+	_, _ = f.WriteString("first line\n")
 	// Write enough data to exceed maxFullReadSize, but with reasonable line lengths
 	for i := 0; i < 100000; i++ {
-		f.WriteString("x")
+		_, _ = f.WriteString("x")
 	}
-	f.WriteString("\nthird line\n")
+	_, _ = f.WriteString("\nthird line\n")
 	f.Close()
 
 	tool := NewReadFileTool()
 
 	// Should be able to read first and last lines without loading entire file
 	input := ReadFileInput{Path: tmpFile, StartLine: "1", EndLine: "1"}
-	inputJSON, _ := json.Marshal(input)
+	inputJSON, err := json.Marshal(input)
+	if err != nil {
+		t.Fatal(err)
+	}
 	result, err := tool.Execute(context.Background(), inputJSON)
 	if err != nil {
 		t.Fatal(err)
@@ -212,7 +224,10 @@ func TestReadFileLargeWithLineRange(t *testing.T) {
 
 	// Also test reading the third line
 	input = ReadFileInput{Path: tmpFile, StartLine: "3", EndLine: "3"}
-	inputJSON, _ = json.Marshal(input)
+	inputJSON, err = json.Marshal(input)
+	if err != nil {
+		t.Fatal(err)
+	}
 	result, err = tool.Execute(context.Background(), inputJSON)
 	if err != nil {
 		t.Fatal(err)
@@ -230,7 +245,10 @@ func TestReadFileLargeWithLineRange(t *testing.T) {
 func TestReadFileNotFound(t *testing.T) {
 	tool := NewReadFileTool()
 	input := ReadFileInput{Path: "/nonexistent/file.txt"}
-	inputJSON, _ := json.Marshal(input)
+	inputJSON, err := json.Marshal(input)
+	if err != nil {
+		t.Fatal(err)
+	}
 	result, err := tool.Execute(context.Background(), inputJSON)
 	if err != nil {
 		t.Fatal(err)
@@ -292,7 +310,10 @@ func TestReadFileBinary(t *testing.T) {
 			}
 
 			input := ReadFileInput{Path: tmpFile}
-			inputJSON, _ := json.Marshal(input)
+			inputJSON, err := json.Marshal(input)
+			if err != nil {
+				t.Fatal(err)
+			}
 			result, err := tool.Execute(context.Background(), inputJSON)
 			if err != nil {
 				t.Fatal(err)

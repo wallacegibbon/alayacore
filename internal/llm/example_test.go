@@ -26,9 +26,9 @@ func Example_usage() {
 
 	tool := llm.NewTool("echo", "Echo back the input").
 		WithSchema(llm.GenerateSchema(EchoInput{})).
-		WithExecute(func(ctx context.Context, input json.RawMessage) (llm.ToolResultOutput, error) {
+		WithExecute(func(_ context.Context, input json.RawMessage) (llm.ToolResultOutput, error) {
 			var params EchoInput
-			if err := json.Unmarshal(input, &params); err != nil {
+			if unmarshalErr := json.Unmarshal(input, &params); unmarshalErr != nil {
 				return llm.NewTextErrorResponse("invalid input"), nil
 			}
 			return llm.NewTextResponse(fmt.Sprintf("Echo: %s", params.Message)), nil
@@ -52,7 +52,7 @@ func Example_usage() {
 			fmt.Print(delta)
 			return nil
 		},
-		OnToolCall: func(toolCallID, toolName string, input json.RawMessage) error {
+		OnToolCall: func(_ string, toolName string, input json.RawMessage) error {
 			fmt.Printf("\n[Tool: %s]\n", toolName)
 			return nil
 		},

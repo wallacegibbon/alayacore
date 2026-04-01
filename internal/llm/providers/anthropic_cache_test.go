@@ -24,8 +24,8 @@ func TestAnthropicPromptCacheFullFlow(t *testing.T) {
 
 		// Return SSE stream with minimal response
 		w.Header().Set("Content-Type", "text/event-stream")
-		w.Write([]byte("event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":10}}}\n\n"))
-		w.Write([]byte("event: message_stop\ndata: {}\n\n"))
+		_, _ = w.Write([]byte("event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":10}}}\n\n"))
+		_, _ = w.Write([]byte("event: message_stop\ndata: {}\n\n"))
 	}))
 	defer server.Close()
 
@@ -106,8 +106,8 @@ func TestAnthropicPromptCacheDisabled(t *testing.T) {
 		lastRequest = body
 
 		w.Header().Set("Content-Type", "text/event-stream")
-		w.Write([]byte("event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":10}}}\n\n"))
-		w.Write([]byte("event: message_stop\ndata: {}\n\n"))
+		_, _ = w.Write([]byte("event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":10}}}\n\n"))
+		_, _ = w.Write([]byte("event: message_stop\ndata: {}\n\n"))
 	}))
 	defer server.Close()
 

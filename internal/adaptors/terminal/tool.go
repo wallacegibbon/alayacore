@@ -201,51 +201,15 @@ func stripANSI(s string) string {
 
 	i := 0
 	for i < len(s) {
-		// Handle carriage return
 		if s[i] == '\r' {
-			// Replace with newline (handles progress bars)
+			// Replace carriage return with newline (handles progress bars)
 			result.WriteByte('\n')
 			i++
 			continue
 		}
 
-		// Handle ANSI escape sequence
 		if s[i] == 0x1b && i+1 < len(s) {
-			next := s[i+1]
-
-			// CSI sequence: ESC [ <params> <command>
-			if next == '[' {
-				i += 2
-				// Skip until we find the command character (0x40-0x7E)
-				for i < len(s) && (s[i] < 0x40 || s[i] > 0x7E) {
-					i++
-				}
-				if i < len(s) {
-					i++ // Skip the command character
-				}
-				continue
-			}
-
-			// OSC sequence: ESC ] ... BEL or ESC ] ... ST
-			if next == ']' {
-				i += 2
-				// Skip until BEL (0x07) or ST (ESC \)
-				for i < len(s) {
-					if s[i] == 0x07 {
-						i++
-						break
-					}
-					if s[i] == 0x1b && i+1 < len(s) && s[i+1] == '\\' {
-						i += 2
-						break
-					}
-					i++
-				}
-				continue
-			}
-
-			// Other escape sequences: skip ESC and next char
-			i += 2
+			i = stripANSISequence(s, i, &result)
 			continue
 		}
 
@@ -255,4 +219,48 @@ func stripANSI(s string) string {
 	}
 
 	return result.String()
+}
+
+// stripANSISequence handles an ANSI escape sequence starting at position i.
+// Returns the new position after the sequence.
+func stripANSISequence(s string, i int, _ *strings.Builder) int {
+	next := s[i+1]
+
+	// CSI sequence: ESC [ <params> <command>
+	if next == '[' {
+		return skipUntilCommand(s, i+2)
+	}
+
+	// OSC sequence: ESC ] ... BEL or ESC ] ... ST
+	if next == ']' {
+		return skipUntilTerminator(s, i+2)
+	}
+
+	// Other escape sequences: skip ESC and next char
+	return i + 2
+}
+
+// skipUntilCommand skips CSI parameters until the command character (0x40-0x7E).
+func skipUntilCommand(s string, i int) int {
+	for i < len(s) && (s[i] < 0x40 || s[i] > 0x7E) {
+		i++
+	}
+	if i < len(s) {
+		i++ // Skip the command character
+	}
+	return i
+}
+
+// skipUntilTerminator skips OSC sequence until BEL (0x07) or ST (ESC \).
+func skipUntilTerminator(s string, i int) int {
+	for i < len(s) {
+		if s[i] == 0x07 {
+			return i + 1
+		}
+		if s[i] == 0x1b && i+1 < len(s) && s[i+1] == '\\' {
+			return i + 2
+		}
+		i++
+	}
+	return i
 }

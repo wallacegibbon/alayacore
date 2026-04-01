@@ -15,7 +15,7 @@ import (
 // TestFullIntegration shows complete end-to-end usage
 func TestFullIntegration(t *testing.T) {
 	// Mock server simulating Anthropic API
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		flusher, _ := w.(http.Flusher)
 
@@ -36,7 +36,7 @@ func TestFullIntegration(t *testing.T) {
 		BaseURL: server.URL,
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	// 2. Define tools
@@ -46,9 +46,9 @@ func TestFullIntegration(t *testing.T) {
 
 	echoTool := llm.NewTool("echo", "Echo back a message").
 		WithSchema(llm.GenerateSchema(EchoInput{})).
-		WithExecute(func(ctx context.Context, input json.RawMessage) (llm.ToolResultOutput, error) {
+		WithExecute(func(_ context.Context, input json.RawMessage) (llm.ToolResultOutput, error) {
 			var params EchoInput
-			if err := json.Unmarshal(input, &params); err != nil {
+			if unmarshalErr := json.Unmarshal(input, &params); unmarshalErr != nil {
 				return llm.NewTextErrorResponse("invalid input"), nil
 			}
 			return llm.NewTextResponse(fmt.Sprintf("Echo: %s", params.Message)), nil
@@ -78,7 +78,7 @@ func TestFullIntegration(t *testing.T) {
 			fmt.Printf("[Thinking] %s", delta)
 			return nil
 		},
-		OnToolCall: func(toolCallID, toolName string, input json.RawMessage) error {
+		OnToolCall: func(_ string, toolName string, _ json.RawMessage) error {
 			fmt.Printf("\n[Calling tool: %s]\n", toolName)
 			return nil
 		},
@@ -86,7 +86,7 @@ func TestFullIntegration(t *testing.T) {
 			fmt.Printf("\n=== Step %d ===\n", step)
 			return nil
 		},
-		OnStepFinish: func(messages []llm.Message, usage llm.Usage) error {
+		OnStepFinish: func(_ []llm.Message, usage llm.Usage) error {
 			fmt.Printf("\n[Step complete: %d in, %d out tokens]\n",
 				usage.InputTokens, usage.OutputTokens)
 			return nil
@@ -186,7 +186,7 @@ func TestAgentMultiTurnWithTools(t *testing.T) {
 			Description: "Echo back a message",
 			Schema:      json.RawMessage(`{"type":"object","properties":{"message":{"type":"string"}},"required":["message"]}`),
 		},
-		Execute: func(ctx context.Context, input json.RawMessage) (llm.ToolResultOutput, error) {
+		Execute: func(_ context.Context, _ json.RawMessage) (llm.ToolResultOutput, error) {
 			return llm.ToolResultOutputText{Type: "text", Text: "Echoed!"}, nil
 		},
 	}
@@ -254,7 +254,7 @@ func TestAgentMultiTurnWithTools(t *testing.T) {
 func TestAgentMultiTurnSequentialTools(t *testing.T) {
 	callCount := 0
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		callCount++
 		w.Header().Set("Content-Type", "text/event-stream")
 		flusher, _ := w.(http.Flusher)
@@ -398,14 +398,14 @@ func TestOpenAIMultiTurnWithTools(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Define echo tool
+	// Define echo tool for TestOpenAIMultiTurnWithTools
 	echoTool := llm.Tool{
 		Definition: llm.ToolDefinition{
 			Name:        "echo",
 			Description: "Echo back a message",
 			Schema:      json.RawMessage(`{"type":"object","properties":{"message":{"type":"string"}},"required":["message"]}`),
 		},
-		Execute: func(ctx context.Context, input json.RawMessage) (llm.ToolResultOutput, error) {
+		Execute: func(_ context.Context, _ json.RawMessage) (llm.ToolResultOutput, error) {
 			return llm.ToolResultOutputText{Type: "text", Text: "Echoed!"}, nil
 		},
 	}
@@ -473,7 +473,7 @@ func TestOpenAIMultiTurnWithTools(t *testing.T) {
 func TestOpenAISequentialQueriesWithTools(t *testing.T) {
 	callCount := 0
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		callCount++
 		w.Header().Set("Content-Type", "text/event-stream")
 		flusher, _ := w.(http.Flusher)
@@ -500,7 +500,7 @@ func TestOpenAISequentialQueriesWithTools(t *testing.T) {
 			Description: "Echo",
 			Schema:      json.RawMessage(`{"type":"object","properties":{}}`),
 		},
-		Execute: func(ctx context.Context, input json.RawMessage) (llm.ToolResultOutput, error) {
+		Execute: func(_ context.Context, _ json.RawMessage) (llm.ToolResultOutput, error) {
 			return llm.ToolResultOutputText{Type: "text", Text: "ok"}, nil
 		},
 	}

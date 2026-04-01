@@ -6,7 +6,6 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 )
 
 // QueueItem represents a queued task for display
@@ -130,14 +129,14 @@ func (qm *QueueManager) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	case KeyJ, KeyDown:
 		if len(qm.items) > 0 && qm.selectedIdx < len(qm.items)-1 {
 			qm.selectedIdx++
-			qm.updateScrollForHeight(8)
+			qm.updateScrollForHeight(SelectorListRows)
 		}
 		return nil
 
 	case KeyK, KeyUp:
 		if qm.selectedIdx > 0 {
 			qm.selectedIdx--
-			qm.updateScrollForHeight(8)
+			qm.updateScrollForHeight(SelectorListRows)
 		}
 		return nil
 
@@ -156,8 +155,8 @@ func (qm *QueueManager) View() string {
 		return ""
 	}
 
-	listHeight := 8 // 8 content rows inside border
-	maxItems := 8   // All rows for items
+	listHeight := SelectorListRows // content rows inside border
+	maxItems := SelectorListRows   // All rows for items
 
 	// Build content
 	var lines []string
@@ -247,21 +246,5 @@ func (qm *QueueManager) RenderOverlay(baseContent string, screenWidth, screenHei
 	if qm.state == QueueManagerClosed {
 		return baseContent
 	}
-
-	box := qm.View()
-	boxWidth := lipgloss.Width(box)
-	boxHeight := lipgloss.Height(box)
-
-	// Center horizontally
-	x := max(0, (screenWidth-boxWidth)/2)
-
-	// Position above the input box (input box is ~3 lines, status bar is 1 line)
-	inputAreaHeight := 4 // input box (3 lines) + status bar (1 line)
-	y := max(0, screenHeight-boxHeight-inputAreaHeight)
-
-	c := lipgloss.NewCompositor(
-		lipgloss.NewLayer(baseContent),
-		lipgloss.NewLayer(box).X(x).Y(y).Z(1),
-	)
-	return c.Render()
+	return renderOverlay(baseContent, qm.View(), screenWidth, screenHeight)
 }

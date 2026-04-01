@@ -12,9 +12,9 @@ type mockProvider struct {
 }
 
 func (m *mockProvider) StreamMessages(
-	ctx context.Context,
-	messages []Message,
-	tools []ToolDefinition,
+	_ context.Context,
+	_ []Message,
+	_ []ToolDefinition,
 	systemPrompt string,
 	extraSystemPrompt string,
 ) (<-chan StreamEvent, error) {
@@ -89,7 +89,7 @@ func TestAgentSystemPromptSeparation(t *testing.T) {
 
 // TestProviderSystemMessageArray documents that providers should send
 // system messages as separate array items, not merged into one string
-func TestProviderSystemMessageArray(t *testing.T) {
+func TestProviderSystemMessageArray(_ *testing.T) {
 	// This test documents the expected behavior for provider implementations:
 	//
 	// Anthropic API format:

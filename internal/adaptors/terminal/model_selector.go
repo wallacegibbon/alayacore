@@ -116,8 +116,7 @@ func (ms *ModelSelector) selectActiveModel() {
 		if m.ID == ms.activeModel.ID {
 			ms.selectedIdx = i
 			// Ensure the active model is visible in the viewport
-			listHeight := 8
-			ms.ensureVisible(listHeight)
+			ms.ensureVisible()
 			return
 		}
 	}
@@ -416,7 +415,7 @@ func (ms *ModelSelector) renderList() string {
 
 func (ms *ModelSelector) renderModelList(width int, borderColor color.Color) string {
 	var content strings.Builder
-	listHeight := 8 // 8 content rows inside border
+	listHeight := SelectorListRows // content rows inside border
 
 	switch {
 	case len(ms.models) == 0:
@@ -426,7 +425,7 @@ func (ms *ModelSelector) renderModelList(width int, borderColor color.Color) str
 	case len(ms.filteredModels) == 0:
 		content.WriteString(ms.styles.System.Render("No models match your search."))
 	default:
-		ms.ensureVisible(listHeight)
+		ms.ensureVisible()
 
 		// Find max ID width across ALL models for stable alignment
 		maxID := 0
@@ -459,23 +458,7 @@ func (ms *ModelSelector) RenderOverlay(baseContent string, screenWidth, screenHe
 	if ms.state == ModelSelectorClosed {
 		return baseContent
 	}
-
-	box := ms.renderList()
-	boxWidth := lipgloss.Width(box)
-	boxHeight := lipgloss.Height(box)
-
-	// Center horizontally
-	x := max(0, (screenWidth-boxWidth)/2)
-
-	// Position above the input box (input box is ~3 lines, status bar is 1 line)
-	inputAreaHeight := LayoutGap // input box (3 lines) + status bar (1 line)
-	y := max(0, screenHeight-boxHeight-inputAreaHeight)
-
-	c := lipgloss.NewCompositor(
-		lipgloss.NewLayer(baseContent),
-		lipgloss.NewLayer(box).X(x).Y(y).Z(1),
-	)
-	return c.Render()
+	return renderOverlay(baseContent, ms.renderList(), screenWidth, screenHeight)
 }
 
 // --- Helpers ---
@@ -539,7 +522,8 @@ func (ms *ModelSelector) clampSelection() {
 	}
 }
 
-func (ms *ModelSelector) ensureVisible(listHeight int) {
+func (ms *ModelSelector) ensureVisible() {
+	listHeight := SelectorListRows
 	if ms.selectedIdx < ms.scrollIdx {
 		ms.scrollIdx = ms.selectedIdx
 	} else if ms.selectedIdx >= ms.scrollIdx+listHeight {

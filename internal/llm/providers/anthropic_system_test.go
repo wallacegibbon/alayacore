@@ -41,7 +41,10 @@ func TestAnthropicSystemMessageArray(t *testing.T) {
 	}
 
 	// Verify first message
-	first := system[0].(map[string]interface{})
+	first, ok := system[0].(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected system[0] to be a map")
+	}
 	if first["type"] != "text" {
 		t.Errorf("Expected type 'text', got %v", first["type"])
 	}
@@ -50,7 +53,10 @@ func TestAnthropicSystemMessageArray(t *testing.T) {
 	}
 
 	// Verify second message
-	second := system[1].(map[string]interface{})
+	second, ok := system[1].(map[string]interface{})
+	if !ok {
+		t.Fatal("Expected system[1] to be a map")
+	}
 	if second["text"] != "Extra system prompt 1\n\nExtra system prompt 2" {
 		t.Errorf("Expected merged extra prompts, got %v", second["text"])
 	}
@@ -78,7 +84,10 @@ func TestAnthropicEmptyExtraPrompt(t *testing.T) {
 		t.Fatalf("Failed to unmarshal: %v", err)
 	}
 
-	system := parsed["system"].([]interface{})
+	system, ok := parsed["system"].([]interface{})
+	if !ok {
+		t.Fatal("Expected system to be an array")
+	}
 	if len(system) != 1 {
 		t.Errorf("Expected 1 system message when extra is empty, got %d", len(system))
 	}
@@ -122,9 +131,15 @@ func TestAnthropicPromptCacheControl(t *testing.T) {
 	}
 
 	// Verify system messages do NOT have cache_control (automatic caching handles it)
-	system := parsed["system"].([]interface{})
+	system, ok := parsed["system"].([]interface{})
+	if !ok {
+		t.Fatal("Expected system to be an array")
+	}
 	for i, msg := range system {
-		m := msg.(map[string]interface{})
+		m, ok := msg.(map[string]interface{})
+		if !ok {
+			t.Fatalf("Expected system[%d] to be a map", i)
+		}
 		if _, hasCache := m["cache_control"]; hasCache {
 			t.Errorf("System message %d should NOT have cache_control in automatic caching mode", i)
 		}

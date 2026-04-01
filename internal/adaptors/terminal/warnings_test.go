@@ -10,8 +10,8 @@ func TestWarningCollector(t *testing.T) {
 	globalWarningCollector = &WarningCollector{}
 
 	// Test adding warnings (no trailing \n)
-	AddWarning("Test warning %d", 1)
-	AddWarning("Another warning")
+	AddWarningf("Test warning %d", 1)
+	AddWarningf("Another warning")
 
 	warnings := GetWarnings()
 	if len(warnings) != 2 {
@@ -47,9 +47,9 @@ func TestWarningCollectorHasWarnings(t *testing.T) {
 		t.Error("Expected no warnings initially")
 	}
 
-	wc.Add("test")
+	wc.Addf("test")
 	if !wc.HasWarnings() {
-		t.Error("Expected warnings after Add")
+		t.Error("Expected warnings after Addf")
 	}
 
 	wc.GetAndClear()

@@ -28,7 +28,7 @@ func TestAgentPreservesTextWithToolCalls(t *testing.T) {
 		Tools: []Tool{
 			{
 				Definition: ToolDefinition{Name: "get_weather", Description: "Get weather", Schema: []byte(`{"type":"object"}`)},
-				Execute: func(ctx context.Context, input json.RawMessage) (ToolResultOutput, error) {
+				Execute: func(_ context.Context, _ json.RawMessage) (ToolResultOutput, error) {
 					return ToolResultOutputText{Type: "text", Text: "Sunny, 72F"}, nil
 				},
 			},
@@ -41,7 +41,7 @@ func TestAgentPreservesTextWithToolCalls(t *testing.T) {
 	_, err := agent.Stream(context.Background(), []Message{
 		{Role: RoleUser, Content: []ContentPart{TextPart{Type: "text", Text: "What's the weather?"}}},
 	}, StreamCallbacks{
-		OnStepFinish: func(messages []Message, usage Usage) error {
+		OnStepFinish: func(messages []Message, _ Usage) error {
 			allStepMessages = append(allStepMessages, messages)
 			return nil
 		},
@@ -109,7 +109,7 @@ type mockResponse struct {
 	toolCalls []ToolCallPart
 }
 
-func (m *mockProviderWithTextAndTools) StreamMessages(ctx context.Context, messages []Message, tools []ToolDefinition, systemPrompt, extraSystemPrompt string) (<-chan StreamEvent, error) {
+func (m *mockProviderWithTextAndTools) StreamMessages(_ context.Context, _ []Message, _ []ToolDefinition, _, _ string) (<-chan StreamEvent, error) {
 	eventChan := make(chan StreamEvent)
 
 	go func() {

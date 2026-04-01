@@ -79,7 +79,7 @@ func (ts *ThemeSelector) Open(themes []ThemeInfo, activeTheme string) {
 	}
 
 	// Ensure selected theme is visible
-	ts.ensureVisible(8)
+	ts.ensureVisible()
 }
 
 func (ts *ThemeSelector) Close() {
@@ -164,13 +164,13 @@ func (ts *ThemeSelector) HandleKeyMsg(msg tea.KeyMsg, themeManager *ThemeManager
 	case KeyUp, KeyK:
 		if ts.selectedIdx > 0 {
 			ts.selectedIdx--
-			ts.ensureVisible(8)
+			ts.ensureVisible()
 			previewTheme = ts.getPreviewTheme(themeManager)
 		}
 	case KeyDown, KeyJ:
 		if ts.selectedIdx < len(ts.themes)-1 {
 			ts.selectedIdx++
-			ts.ensureVisible(8)
+			ts.ensureVisible()
 			previewTheme = ts.getPreviewTheme(themeManager)
 		}
 	case KeyEnter:
@@ -216,7 +216,7 @@ func (ts *ThemeSelector) getPreviewTheme(themeManager *ThemeManager) *Theme {
 func (ts *ThemeSelector) renderList() string {
 	var sb strings.Builder
 
-	listHeight := 8 // 8 content rows inside border
+	listHeight := SelectorListRows
 
 	// Build content
 	var lines []string
@@ -225,7 +225,7 @@ func (ts *ThemeSelector) renderList() string {
 	case len(ts.themes) == 0:
 		lines = append(lines, ts.styles.System.Render("  No Theme"))
 	default:
-		ts.ensureVisible(listHeight)
+		ts.ensureVisible()
 
 		for i := ts.scrollIdx; i < min(ts.scrollIdx+listHeight, len(ts.themes)); i++ {
 			theme := ts.themes[i]
@@ -264,28 +264,13 @@ func (ts *ThemeSelector) RenderOverlay(baseContent string, screenWidth, screenHe
 	if ts.state == ThemeSelectorClosed {
 		return baseContent
 	}
-
-	box := ts.renderList()
-	boxWidth := lipgloss.Width(box)
-	boxHeight := lipgloss.Height(box)
-
-	// Center horizontally
-	x := max(0, (screenWidth-boxWidth)/2)
-
-	// Position above the input box (input box is ~3 lines, status bar is 1 line)
-	inputAreaHeight := LayoutGap // input box (3 lines) + status bar (1 line)
-	y := max(0, screenHeight-boxHeight-inputAreaHeight)
-
-	c := lipgloss.NewCompositor(
-		lipgloss.NewLayer(baseContent),
-		lipgloss.NewLayer(box).X(x).Y(y).Z(1),
-	)
-	return c.Render()
+	return renderOverlay(baseContent, ts.renderList(), screenWidth, screenHeight)
 }
 
 // --- Helpers ---
 
-func (ts *ThemeSelector) ensureVisible(listHeight int) {
+func (ts *ThemeSelector) ensureVisible() {
+	listHeight := SelectorListRows
 	if ts.selectedIdx < ts.scrollIdx {
 		ts.scrollIdx = ts.selectedIdx
 	} else if ts.selectedIdx >= ts.scrollIdx+listHeight {

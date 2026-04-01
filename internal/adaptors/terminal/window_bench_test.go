@@ -373,7 +373,7 @@ func BenchmarkJustEnsureLineHeights(b *testing.B) {
 }
 
 // BenchmarkStreamingDebug shows why streaming is slow
-func BenchmarkStreamingDebug(b *testing.B) {
+func BenchmarkStreamingDebug(_ *testing.B) {
 	styles := NewStyles(DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
@@ -533,7 +533,7 @@ func BenchmarkDirectAppendNoStyles(b *testing.B) {
 }
 
 // BenchmarkDirectAppendDebug shows what's happening
-func BenchmarkDirectAppendDebug(b *testing.B) {
+func BenchmarkDirectAppendDebug(_ *testing.B) {
 	styles := NewStyles(DefaultTheme())
 	w := &Window{
 		ID:      "test",
