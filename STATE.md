@@ -22,12 +22,12 @@ Refactoring `internal/adaptors/terminal/`. Package builds with `go build ./...` 
 - Updated `keybinds.go` to use `SnapshotModels()` for `openModelConfigFile()`
 - Updated tests in `output_laststeps_test.go` to use snapshot methods
 
-## 🔧 TODO (ordered by priority)
+### 2. `emitCommand` helper ✅
+- Added `func (m *Terminal) emitCommand(cmd string)` helper in `terminal.go`
+- Replaced 8 `_ = m.streamInput.EmitTLV(stream.TagTextUser, ...)` + `//nolint` call sites across `terminal.go` and `keybinds.go` with `m.emitCommand(...)`
+- Removed `stream` import from `keybinds.go` (no longer needed)
 
-### 2. `emitCommand` helper
-- **Goal**: Replace 11 `_ = m.streamInput.EmitTLV(...)` + `//nolint` with one helper that logs errors
-- **Files**: `terminal.go`, `keybinds.go`
-- **Steps**: Add `func (m *Terminal) emitCommand(cmd string)` → replace all 11 call sites
+## 🔧 TODO (ordered by priority)
 
 ### 3. Decouple Editor from InputModel
 - **Goal**: Move `Editor` from `InputModel.editor` to `Terminal.editor`

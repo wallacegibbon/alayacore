@@ -9,8 +9,6 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-
-	"github.com/alayacore/alayacore/internal/stream"
 )
 
 // ============================================================================
@@ -354,7 +352,7 @@ func (m *Terminal) handleModelSelectorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 
 	// Check if user wants to reload models
 	if m.modelSelector.ConsumeReloadModels() {
-		_ = m.streamInput.EmitTLV(stream.TagTextUser, ":model_load") //nolint:errcheck // best-effort input
+		m.emitCommand(":model_load")
 	}
 
 	// Restore focus when model selector closes
@@ -372,9 +370,9 @@ func (m *Terminal) handleQueueManagerKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		selectedItem := m.queueManager.GetSelectedItem()
 		if selectedItem != nil {
 			// Send delete command to session
-			_ = m.streamInput.EmitTLV(stream.TagTextUser, ":taskqueue_del "+selectedItem.QueueID) //nolint:errcheck // best-effort input
+			m.emitCommand(":taskqueue_del " + selectedItem.QueueID)
 			// Request updated queue list
-			_ = m.streamInput.EmitTLV(stream.TagTextUser, ":taskqueue_get_all") //nolint:errcheck // best-effort input
+			m.emitCommand(":taskqueue_get_all")
 		}
 		return m, nil
 	}
@@ -619,7 +617,7 @@ func (m *Terminal) handleSubmit() tea.Cmd {
 	}
 
 	// Regular prompt - send to agent
-	_ = m.streamInput.EmitTLV(stream.TagTextUser, prompt) //nolint:errcheck // best-effort input
+	m.emitCommand(prompt)
 	m.input.SetValue("")
 
 	return scheduleTick()
@@ -653,7 +651,7 @@ func (m *Terminal) handleCommand(command string) tea.Cmd {
 
 // submitCommand sends a command to the session and optionally clears input.
 func (m *Terminal) submitCommand(command string, clearInput bool) tea.Cmd {
-	_ = m.streamInput.EmitTLV(stream.TagTextUser, ":"+command) //nolint:errcheck // best-effort input
+	m.emitCommand(":" + command)
 	if clearInput {
 		m.input.SetValue("")
 	}
@@ -676,7 +674,7 @@ func (m *Terminal) switchToSelectedModel() {
 
 	// Send model_set command to session
 	if selectedModel.ID != 0 {
-		_ = m.streamInput.EmitTLV(stream.TagTextUser, fmt.Sprintf(":model_set %d", selectedModel.ID)) //nolint:errcheck // best-effort input
+		m.emitCommand(fmt.Sprintf(":model_set %d", selectedModel.ID))
 	}
 }
 

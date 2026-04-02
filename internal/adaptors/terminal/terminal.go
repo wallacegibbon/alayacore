@@ -21,6 +21,12 @@ import (
 	"github.com/alayacore/alayacore/internal/stream"
 )
 
+// emitCommand sends a user-level command to the session via TLV.
+// Errors are logged but not propagated — commands are best-effort.
+func (m *Terminal) emitCommand(cmd string) {
+	_ = m.streamInput.EmitTLV(stream.TagTextUser, cmd)
+}
+
 // ============================================================================
 // Constants
 // ============================================================================
@@ -363,7 +369,7 @@ func (m *Terminal) handleFileEditorFinished(msg FileEditorFinishedMsg) (tea.Mode
 
 	// Reload models if the model config file was edited
 	if strings.HasSuffix(msg.Path, "model.conf") {
-		_ = m.streamInput.EmitTLV(stream.TagTextUser, ":model_load") //nolint:errcheck // best-effort input
+		m.emitCommand(":model_load")
 	}
 
 	return m, nil
@@ -545,8 +551,7 @@ func (m *Terminal) restoreFocus() {
 
 // openQueueManager opens the queue manager UI.
 func (m *Terminal) openQueueManager() {
-	//nolint:errcheck // Best effort write, errors ignored
-	_ = m.streamInput.EmitTLV(stream.TagTextUser, ":taskqueue_get_all")
+	m.emitCommand(":taskqueue_get_all")
 	m.queueManager.Open()
 	m.input.Blur()
 	m.display.SetDisplayFocused(false)
