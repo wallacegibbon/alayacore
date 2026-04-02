@@ -44,15 +44,14 @@ Refactoring `internal/adaptors/terminal/`. Package builds with `go build ./...` 
 
 ## 🔧 TODO (ordered by priority)
 
-### 5. Remove ModelConfig duplication
-- **Goal**: `ModelConfig` duplicates `agentpkg.ModelInfo` → use `searchableModel` wrapper
-- **File**: `model_selector.go`
+### 5. Remove ModelConfig duplication ✅
+- Replaced `ModelConfig` struct with `searchableModel` that embeds `agentpkg.ModelInfo` + search fields
+- Eliminated field-by-field copying in `LoadModels()` (now embeds `ModelInfo` directly)
+- Deleted orphaned `OpenModelConfigFile()` function (unused package-level function)
+- Removed unused `os`, `os/exec` imports from `model_selector.go`
+- Updated tests to use `searchableModel` with embedded `ModelInfo`
 
 ### 6. Remove global WarningCollector
-- **Goal**: Package-level `var globalWarningCollector` → explicit DI
-- **Files**: `warnings.go`, `theme_manager.go`, `styles.go`, `adaptor.go`
-
-### 7. Consistency fixes
 - Standardize `DisplayModel` receivers (value → pointer)
 - Delete orphaned `OpenModelConfigFile` in `model_selector.go`
 - Fix `View()` return types on internal components

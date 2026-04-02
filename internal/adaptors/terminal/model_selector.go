@@ -3,8 +3,6 @@ package terminal
 import (
 	"fmt"
 	"image/color"
-	"os"
-	"os/exec"
 	"strings"
 
 	"charm.land/bubbles/v2/textinput"
@@ -14,17 +12,9 @@ import (
 	agentpkg "github.com/alayacore/alayacore/internal/agent"
 )
 
-// ModelConfig represents a model configuration for display in the selector.
-type ModelConfig struct {
-	ID           int    `json:"id,omitempty"`
-	Name         string `json:"name"`
-	ProtocolType string `json:"protocol_type"`
-	BaseURL      string `json:"base_url"`
-	APIKey       string `json:"api_key,omitempty"`
-	ModelName    string `json:"model_name"`
-	ContextLimit int    `json:"context_limit"`
-
-	// Pre-computed lowercase fields for fast search
+// searchableModel wraps agentpkg.ModelInfo with pre-computed lowercase fields for fast search.
+type searchableModel struct {
+	agentpkg.ModelInfo
 	nameLower         string
 	protocolTypeLower string
 	modelNameLower    string
@@ -43,8 +33,8 @@ const (
 // It provides a searchable list of models with keyboard navigation.
 type ModelSelector struct {
 	state          ModelSelectorState
-	models         []ModelConfig
-	filteredModels []ModelConfig
+	models         []searchableModel
+	filteredModels []searchableModel
 	selectedIdx    int
 	scrollIdx      int
 	width          int
@@ -57,7 +47,7 @@ type ModelSelector struct {
 	lastSearchValue    string
 
 	// Selection state
-	activeModel       *ModelConfig
+	activeModel       *searchableModel
 	modelJustSelected bool
 
 	// Action flags (consumed by parent)
@@ -78,7 +68,7 @@ func NewModelSelector(styles *Styles) *ModelSelector {
 
 	return &ModelSelector{
 		state:       ModelSelectorClosed,
-		models:      []ModelConfig{},
+		models:      []searchableModel{},
 		styles:      styles,
 		width:       60,
 		height:      20,
@@ -149,11 +139,11 @@ func (ms *ModelSelector) SetHasFocus(hasFocus bool) {
 
 // --- Model Management ---
 
-func (ms *ModelSelector) GetActiveModel() *ModelConfig  { return ms.activeModel }
-func (ms *ModelSelector) SetActiveModel(m *ModelConfig) { ms.activeModel = m }
-func (ms *ModelSelector) GetModels() []ModelConfig      { return ms.models }
+func (ms *ModelSelector) GetActiveModel() *searchableModel  { return ms.activeModel }
+func (ms *ModelSelector) SetActiveModel(m *searchableModel) { ms.activeModel = m }
+func (ms *ModelSelector) GetModels() []searchableModel      { return ms.models }
 
-func (ms *ModelSelector) SetModels(models []ModelConfig) {
+func (ms *ModelSelector) SetModels(models []searchableModel) {
 	ms.models = models
 	for i := range ms.models {
 		ms.models[i].nameLower = strings.ToLower(ms.models[i].Name)
@@ -190,7 +180,7 @@ func (ms *ModelSelector) LoadModels(models []agentpkg.ModelInfo, activeID int) t
 	}
 
 	ms.lastModelCount = len(models)
-	ms.models = make([]ModelConfig, len(models))
+	ms.models = make([]searchableModel, len(models))
 
 	// Preserve user's selection when selector is open
 	savedSelectedIdx := ms.selectedIdx
@@ -198,13 +188,8 @@ func (ms *ModelSelector) LoadModels(models []agentpkg.ModelInfo, activeID int) t
 	shouldPreserveSelection := ms.state != ModelSelectorClosed
 
 	for i, m := range models {
-		ms.models[i] = ModelConfig{
-			ID:                m.ID,
-			Name:              m.Name,
-			ProtocolType:      m.ProtocolType,
-			BaseURL:           m.BaseURL,
-			ModelName:         m.ModelName,
-			ContextLimit:      m.ContextLimit,
+		ms.models[i] = searchableModel{
+			ModelInfo:         m,
 			nameLower:         strings.ToLower(m.Name),
 			protocolTypeLower: strings.ToLower(m.ProtocolType),
 			modelNameLower:    strings.ToLower(m.ModelName),
@@ -496,7 +481,7 @@ func (ms *ModelSelector) updateFilteredModels() {
 	ms.lastSearchValue = search
 
 	if search == "" {
-		ms.filteredModels = make([]ModelConfig, len(ms.models))
+		ms.filteredModels = make([]searchableModel, len(ms.models))
 		copy(ms.filteredModels, ms.models)
 	} else {
 		term := strings.ToLower(search)
@@ -545,31 +530,6 @@ func (ms *ModelSelector) updateSearchInputStyles() {
 	}
 	styles.Cursor.Color = ms.styles.CursorColor
 	ms.searchInput.SetStyles(styles)
-}
-
-// OpenModelConfigFile opens the model config file in the user's editor.
-func OpenModelConfigFile(path string) error {
-	if path == "" {
-		return fmt.Errorf("no model config file path configured")
-	}
-
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		// Create with default config - same as auto-initialization
-		if err := os.WriteFile(path, []byte(agentpkg.DefaultModelConfig), 0600); err != nil {
-			return err
-		}
-	}
-
-	editor := os.Getenv("EDITOR")
-	if editor == "" {
-		editor = "vi"
-	}
-
-	cmd := exec.Command(editor, path)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
 }
 
 var _ tea.Model = (*ModelSelector)(nil)

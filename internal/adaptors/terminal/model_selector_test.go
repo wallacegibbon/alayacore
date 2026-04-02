@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+
+	agentpkg "github.com/alayacore/alayacore/internal/agent"
 )
 
 func TestFuzzyMatch(t *testing.T) {
@@ -122,9 +124,9 @@ func TestModelSelectorCtrlCClearsSearch(t *testing.T) {
 	ms := NewModelSelector(styles)
 
 	// Set up some test models
-	models := []ModelConfig{
-		{Name: "OpenAI GPT-4", ProtocolType: "openai", ModelName: "gpt-4"},
-		{Name: "Zhipu / GLM-5", ProtocolType: "anthropic", ModelName: "glm-5"},
+	models := []searchableModel{
+		{ModelInfo: agentpkg.ModelInfo{Name: "OpenAI GPT-4", ProtocolType: "openai", ModelName: "gpt-4"}},
+		{ModelInfo: agentpkg.ModelInfo{Name: "Zhipu / GLM-5", ProtocolType: "anthropic", ModelName: "glm-5"}},
 	}
 	ms.SetModels(models)
 	ms.Open()
@@ -167,9 +169,9 @@ func TestModelSelectorSetModelsUpdatesFilteredModels(t *testing.T) {
 	ms := NewModelSelector(styles)
 
 	// Set up initial models
-	models := []ModelConfig{
-		{Name: "OpenAI GPT-4", ProtocolType: "openai", ModelName: "gpt-4"},
-		{Name: "Zhipu / GLM-5", ProtocolType: "anthropic", ModelName: "glm-5"},
+	models := []searchableModel{
+		{ModelInfo: agentpkg.ModelInfo{Name: "OpenAI GPT-4", ProtocolType: "openai", ModelName: "gpt-4"}},
+		{ModelInfo: agentpkg.ModelInfo{Name: "Zhipu / GLM-5", ProtocolType: "anthropic", ModelName: "glm-5"}},
 	}
 	ms.SetModels(models)
 	ms.Open()
@@ -193,10 +195,10 @@ func TestModelSelectorSetModelsUpdatesFilteredModels(t *testing.T) {
 
 	// Now set new models (simulating reload after editing config file)
 	// The search value is still "gpt", so without the fix, filteredModels wouldn't update
-	newModels := []ModelConfig{
-		{Name: "OpenAI GPT-4o", ProtocolType: "openai", ModelName: "gpt-4o"},
-		{Name: "OpenAI GPT-4", ProtocolType: "openai", ModelName: "gpt-4"},
-		{Name: "Claude 3.5", ProtocolType: "anthropic", ModelName: "claude-3.5"},
+	newModels := []searchableModel{
+		{ModelInfo: agentpkg.ModelInfo{Name: "OpenAI GPT-4o", ProtocolType: "openai", ModelName: "gpt-4o"}},
+		{ModelInfo: agentpkg.ModelInfo{Name: "OpenAI GPT-4", ProtocolType: "openai", ModelName: "gpt-4"}},
+		{ModelInfo: agentpkg.ModelInfo{Name: "Claude 3.5", ProtocolType: "anthropic", ModelName: "claude-3.5"}},
 	}
 	ms.SetModels(newModels)
 
@@ -219,9 +221,9 @@ func TestModelSelectorLoadModelsPreservesSelection(t *testing.T) {
 	ms := NewModelSelector(styles)
 
 	// Set up initial models
-	models := []ModelConfig{
-		{Name: "Model A", ProtocolType: "openai", ModelName: "model-a"},
-		{Name: "Model B", ProtocolType: "anthropic", ModelName: "model-b"},
+	models := []searchableModel{
+		{ModelInfo: agentpkg.ModelInfo{Name: "Model A", ProtocolType: "openai", ModelName: "model-a"}},
+		{ModelInfo: agentpkg.ModelInfo{Name: "Model B", ProtocolType: "anthropic", ModelName: "model-b"}},
 	}
 	ms.SetModels(models)
 	ms.Open()
@@ -231,10 +233,10 @@ func TestModelSelectorLoadModelsPreservesSelection(t *testing.T) {
 
 	// Set new models (simulating reload)
 	// The selection should be preserved when selector is open
-	newModels := []ModelConfig{
-		{Name: "Model A", ProtocolType: "openai", ModelName: "model-a"},
-		{Name: "Model B", ProtocolType: "anthropic", ModelName: "model-b"},
-		{Name: "Model C", ProtocolType: "anthropic", ModelName: "model-c"},
+	newModels := []searchableModel{
+		{ModelInfo: agentpkg.ModelInfo{Name: "Model A", ProtocolType: "openai", ModelName: "model-a"}},
+		{ModelInfo: agentpkg.ModelInfo{Name: "Model B", ProtocolType: "anthropic", ModelName: "model-b"}},
+		{ModelInfo: agentpkg.ModelInfo{Name: "Model C", ProtocolType: "anthropic", ModelName: "model-c"}},
 	}
 	ms.SetModels(newModels)
 
