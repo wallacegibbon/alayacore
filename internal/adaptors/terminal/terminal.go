@@ -55,6 +55,20 @@ const (
 )
 
 // ============================================================================
+// Confirmation Dialog
+// ============================================================================
+
+// confirmKind represents the type of active confirmation dialog.
+type confirmKind int
+
+const (
+	confirmNone      confirmKind = iota // No dialog active
+	confirmQuit                         // Confirm exit
+	confirmCancel                       // Confirm cancel current request
+	confirmCancelAll                    // Confirm cancel all queued requests
+)
+
+// ============================================================================
 // Terminal Model
 // ============================================================================
 
@@ -85,16 +99,14 @@ type Terminal struct {
 	inProgress bool
 
 	// State
-	quitting               bool
-	confirmDialog          bool
-	cancelConfirmDialog    bool
-	cancelAllConfirmDialog bool
-	cancelFromCommand      bool   // tracks if cancel came from :cancel command (vs Ctrl+G)
-	focusedWindow          string // "input" or "display"
-	windowWidth            int
-	windowHeight           int
-	styles                 *Styles
-	hasFocus               bool // tracks whether the terminal has application focus
+	quitting           bool
+	confirmDialog      confirmKind // active confirmation dialog (confirmNone when inactive)
+	confirmFromCommand bool        // tracks if cancel came from :cancel command (vs Ctrl+G)
+	focusedWindow      string      // "input" or "display"
+	windowWidth        int
+	windowHeight       int
+	styles             *Styles
+	hasFocus           bool // tracks whether the terminal has application focus
 
 	// Theme preview debouncing
 	themePreviewID int // ID of the current pending theme preview
@@ -420,15 +432,15 @@ func (m *Terminal) View() tea.View {
 
 	// Input area with optional confirmation dialog
 	confirmText := ""
-	switch {
-	case m.confirmDialog:
+	switch m.confirmDialog {
+	case confirmQuit:
 		confirmText = "Confirm exit? Press y/n"
-	case m.cancelConfirmDialog:
+	case confirmCancel:
 		confirmText = "Confirm cancel? Press y/n"
-	case m.cancelAllConfirmDialog:
+	case confirmCancelAll:
 		confirmText = "Confirm cancel all? Press y/n"
 	}
-	sb.WriteString(m.input.RenderWithBorder(m.confirmDialog || m.cancelConfirmDialog || m.cancelAllConfirmDialog, confirmText))
+	sb.WriteString(m.input.RenderWithBorder(m.confirmDialog != confirmNone, confirmText))
 
 	// Status bar (simplified - just render directly)
 	sb.WriteString("\n")
@@ -527,8 +539,8 @@ func (m *Terminal) openModelSelector() {
 	m.display.updateContent()
 }
 
-// restoreFocusAfterSelector restores focus after model selector closes.
-func (m *Terminal) restoreFocusAfterSelector() {
+// restoreFocus restores focus to the previously focused window after an overlay closes.
+func (m *Terminal) restoreFocus() {
 	if m.focusedWindow == focusDisplay {
 		m.focusDisplay()
 	} else {
@@ -547,16 +559,6 @@ func (m *Terminal) openQueueManager() {
 	m.display.updateContent()
 }
 
-// restoreFocusAfterQueueManager restores focus after queue manager closes.
-func (m *Terminal) restoreFocusAfterQueueManager() {
-	if m.focusedWindow == focusDisplay {
-		m.focusDisplay()
-	} else {
-		m.focusInput()
-	}
-	m.display.updateContent()
-}
-
 // openThemeSelector opens the theme selector UI.
 func (m *Terminal) openThemeSelector() {
 	if m.themeManager == nil {
@@ -567,16 +569,6 @@ func (m *Terminal) openThemeSelector() {
 	m.themeSelector.Open(m.themeManager.GetThemes(), activeTheme)
 	m.input.Blur()
 	m.display.SetDisplayFocused(false)
-	m.display.updateContent()
-}
-
-// restoreFocusAfterThemeSelector restores focus after theme selector closes.
-func (m *Terminal) restoreFocusAfterThemeSelector() {
-	if m.focusedWindow == focusDisplay {
-		m.focusDisplay()
-	} else {
-		m.focusInput()
-	}
 	m.display.updateContent()
 }
 

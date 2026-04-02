@@ -120,9 +120,9 @@ func TestWindowBufferViewport(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
 		wb.AppendOrUpdate("window-1", stream.TagTextAssistant, strings.Repeat("line\n", 10))
 		// Should return total lines
-		lines := wb.GetTotalLinesVirtual()
+		lines := wb.GetTotalLines()
 		if lines <= 0 {
-			t.Errorf("GetTotalLinesVirtual() = %d, want > 0", lines)
+			t.Errorf("GetTotalLines() = %d, want > 0", lines)
 		}
 	})
 }

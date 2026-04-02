@@ -26,7 +26,7 @@ func BenchmarkWindowBufferDelta(b *testing.B) {
 	}
 
 	// Pre-render to ensure everything is cached
-	_ = wb.GetTotalLinesVirtual()
+	_ = wb.GetTotalLines()
 
 	// Get the last window's ID for delta updates
 	lastID := "msg99"
@@ -37,7 +37,7 @@ func BenchmarkWindowBufferDelta(b *testing.B) {
 		wb.AppendOrUpdate(lastID, "TA", " additional text")
 
 		// Trigger rendering (what happens on each update)
-		_ = wb.GetTotalLinesVirtual()
+		_ = wb.GetTotalLines()
 	}
 }
 
@@ -55,7 +55,7 @@ func BenchmarkWindowBufferDeltaNewWindow(b *testing.B) {
 	}
 
 	// Pre-render to ensure everything is cached
-	_ = wb.GetTotalLinesVirtual()
+	_ = wb.GetTotalLines()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -64,7 +64,7 @@ func BenchmarkWindowBufferDeltaNewWindow(b *testing.B) {
 		wb.AppendOrUpdate(id, "TA", "New message content.\n")
 
 		// Trigger rendering
-		_ = wb.GetTotalLinesVirtual()
+		_ = wb.GetTotalLines()
 	}
 }
 
@@ -78,12 +78,12 @@ func BenchmarkWindowBufferDeltaSingleWindow(b *testing.B) {
 	wb.AppendOrUpdate("msg0", "TA", strings.Repeat("Initial content\n", 10))
 
 	// Pre-render
-	_ = wb.GetTotalLinesVirtual()
+	_ = wb.GetTotalLines()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		wb.AppendOrUpdate("msg0", "TA", " delta")
-		_ = wb.GetTotalLinesVirtual()
+		_ = wb.GetTotalLines()
 	}
 }
 
@@ -101,7 +101,7 @@ func BenchmarkWindowBufferGetWindowStartLine(b *testing.B) {
 	}
 
 	// Ensure line heights are calculated
-	_ = wb.GetTotalLinesVirtual()
+	_ = wb.GetTotalLines()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -124,7 +124,7 @@ func BenchmarkWindowBufferGetAll(b *testing.B) {
 
 	// Set up viewport for virtual rendering
 	wb.SetViewportPosition(0, 30)
-	_ = wb.GetTotalLinesVirtual()
+	_ = wb.GetTotalLines()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -146,7 +146,7 @@ func BenchmarkWindowBufferDeltaWithGetAll(b *testing.B) {
 
 	// Set up viewport for virtual rendering
 	wb.SetViewportPosition(0, 30)
-	_ = wb.GetTotalLinesVirtual()
+	_ = wb.GetTotalLines()
 
 	// Get the last window's ID for delta updates
 	lastID := "msg99"
@@ -157,7 +157,7 @@ func BenchmarkWindowBufferDeltaWithGetAll(b *testing.B) {
 		wb.AppendOrUpdate(lastID, "TA", " additional text")
 
 		// Full render cycle
-		_ = wb.GetTotalLinesVirtual()
+		_ = wb.GetTotalLines()
 		_ = wb.GetAll(-1)
 	}
 }
@@ -177,7 +177,7 @@ func BenchmarkVirtualRenderingCursorMovement(b *testing.B) {
 
 	// Set up viewport
 	wb.SetViewportPosition(0, 30)
-	_ = wb.GetTotalLinesVirtual()
+	_ = wb.GetTotalLines()
 
 	dm := NewDisplayModel(wb, styles)
 	dm.SetHeight(30)
@@ -210,7 +210,7 @@ func BenchmarkVirtualRenderingCursorMovementSingle(b *testing.B) {
 
 	// Set up viewport
 	wb.SetViewportPosition(0, 30)
-	_ = wb.GetTotalLinesVirtual()
+	_ = wb.GetTotalLines()
 
 	dm := NewDisplayModel(wb, styles)
 	dm.SetHeight(30)
@@ -241,21 +241,21 @@ func BenchmarkStreamingUpdateWithIncremental(b *testing.B) {
 
 	// Set up viewport
 	wb.SetViewportPosition(0, 30)
-	_ = wb.GetTotalLinesVirtual()
+	_ = wb.GetTotalLines()
 
 	// Create streaming window with initial content
 	streamID := "stream-current"
 	wb.AppendOrUpdate(streamID, "TA", "Starting...")
 
 	// Pre-render to populate wrappedLines cache
-	_ = wb.GetTotalLinesVirtual()
+	_ = wb.GetTotalLines()
 	_ = wb.GetAll(-1)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Simulate streaming delta - this should use incremental wrapping
 		wb.AppendOrUpdate(streamID, "TA", " more")
-		_ = wb.GetTotalLinesVirtual()
+		_ = wb.GetTotalLines()
 		_ = wb.GetAll(-1)
 	}
 }
@@ -274,12 +274,12 @@ func BenchmarkStreamingUpdateWithoutIncremental(b *testing.B) {
 
 	// Set up viewport
 	wb.SetViewportPosition(0, 30)
-	_ = wb.GetTotalLinesVirtual()
+	_ = wb.GetTotalLines()
 
 	// Create streaming window
 	streamID := "stream-current"
 	wb.AppendOrUpdate(streamID, "TA", "Starting...")
-	_ = wb.GetTotalLinesVirtual()
+	_ = wb.GetTotalLines()
 	_ = wb.GetAll(-1)
 
 	b.ResetTimer()
@@ -292,7 +292,7 @@ func BenchmarkStreamingUpdateWithoutIncremental(b *testing.B) {
 		wb.mu.Unlock()
 
 		wb.AppendOrUpdate(streamID, "TA", " more")
-		_ = wb.GetTotalLinesVirtual()
+		_ = wb.GetTotalLines()
 		_ = wb.GetAll(-1)
 	}
 }
@@ -310,16 +310,16 @@ func BenchmarkStreamingSmallDelta(b *testing.B) {
 	}
 
 	wb.SetViewportPosition(0, 30)
-	_ = wb.GetTotalLinesVirtual()
+	_ = wb.GetTotalLines()
 
 	streamID := "stream"
 	wb.AppendOrUpdate(streamID, "TA", "")
-	_ = wb.GetTotalLinesVirtual()
+	_ = wb.GetTotalLines()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		wb.AppendOrUpdate(streamID, "TA", "word ")
-		_ = wb.GetTotalLinesVirtual()
+		_ = wb.GetTotalLines()
 	}
 }
 
@@ -358,7 +358,7 @@ func BenchmarkJustEnsureLineHeights(b *testing.B) {
 
 	streamID := "stream"
 	wb.AppendOrUpdate(streamID, "TA", "initial")
-	_ = wb.GetTotalLinesVirtual()
+	_ = wb.GetTotalLines()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -368,7 +368,7 @@ func BenchmarkJustEnsureLineHeights(b *testing.B) {
 		wb.dirtyIndex = wb.idIndex[streamID]
 		b.StartTimer()
 
-		_ = wb.GetTotalLinesVirtual()
+		_ = wb.GetTotalLines()
 	}
 }
 
@@ -379,7 +379,7 @@ func BenchmarkStreamingDebug(_ *testing.B) {
 
 	streamID := "stream"
 	wb.AppendOrUpdate(streamID, "TA", strings.Repeat("Line ", 10))
-	_ = wb.GetTotalLinesVirtual()
+	_ = wb.GetTotalLines()
 
 	w := wb.Windows[0]
 	fmt.Printf("Initial: wrappedLines=%d, Content=%d, cache.contentLen=%d\n",
@@ -396,8 +396,8 @@ func BenchmarkStreamingDebug(_ *testing.B) {
 		// Since Content changed, cache.valid becomes false
 		// Then rebuildCache() is called, which calls renderGenericContent()
 
-		_ = wb.GetTotalLinesVirtual()
-		fmt.Printf("After GetTotalLinesVirtual %d:\n", i+1)
+		_ = wb.GetTotalLines()
+		fmt.Printf("After GetTotalLines %d:\n", i+1)
 		fmt.Printf("  cache.valid=%v, cache.contentLen=%d\n", w.cache.valid, w.cache.contentLen)
 	}
 }
@@ -409,12 +409,12 @@ func BenchmarkSingleWindowStreaming(b *testing.B) {
 
 	streamID := "stream"
 	wb.AppendOrUpdate(streamID, "TA", "initial content")
-	_ = wb.GetTotalLinesVirtual()
+	_ = wb.GetTotalLines()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		wb.AppendOrUpdate(streamID, "TA", " word")
-		_ = wb.GetTotalLinesVirtual()
+		_ = wb.GetTotalLines()
 	}
 }
 
@@ -425,7 +425,7 @@ func BenchmarkSingleWindowStreamingDebug(b *testing.B) {
 
 	streamID := "stream"
 	wb.AppendOrUpdate(streamID, "TA", "initial content")
-	_ = wb.GetTotalLinesVirtual()
+	_ = wb.GetTotalLines()
 
 	// Check initial state
 	w := wb.Windows[0]
@@ -442,7 +442,7 @@ func BenchmarkSingleWindowStreamingDebug(b *testing.B) {
 			fmt.Printf("  wrappedLines[0]=%q (len=%d)\n", w.cache.wrappedLines[0], len(w.cache.wrappedLines[0]))
 		}
 
-		_ = wb.GetTotalLinesVirtual()
+		_ = wb.GetTotalLines()
 		fmt.Printf("After ensureLineHeights %d: wrappedLines=%d, cache.valid=%v\n",
 			i+1, len(w.cache.wrappedLines), w.cache.valid)
 		if len(w.cache.wrappedLines) > 0 {
@@ -453,7 +453,7 @@ func BenchmarkSingleWindowStreamingDebug(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		wb.AppendOrUpdate(streamID, "TA", " word")
-		_ = wb.GetTotalLinesVirtual()
+		_ = wb.GetTotalLines()
 	}
 }
 
@@ -465,7 +465,7 @@ func BenchmarkLongContentStreaming(b *testing.B) {
 	streamID := "stream"
 	// Start with content long enough to wrap
 	wb.AppendOrUpdate(streamID, "TA", strings.Repeat("This is a line that will wrap. ", 10))
-	_ = wb.GetTotalLinesVirtual()
+	_ = wb.GetTotalLines()
 
 	w := wb.Windows[0]
 	fmt.Printf("Initial: wrappedLines=%d, contentLen=%d, styles=%v\n",
@@ -474,7 +474,7 @@ func BenchmarkLongContentStreaming(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		wb.AppendOrUpdate(streamID, "TA", " more text")
-		_ = wb.GetTotalLinesVirtual()
+		_ = wb.GetTotalLines()
 	}
 }
 
@@ -643,13 +643,13 @@ func BenchmarkStreamingUpdateWithVirtualRendering(b *testing.B) {
 
 	// Set up viewport in the MIDDLE of content (virtual rendering should help here)
 	wb.SetViewportPosition(150, 30) // Middle of ~300 lines
-	_ = wb.GetTotalLinesVirtual()
+	_ = wb.GetTotalLines()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Simulate delta to last window (which is outside viewport)
 		wb.AppendOrUpdate("msg99", "TA", " more")
-		_ = wb.GetTotalLinesVirtual()
+		_ = wb.GetTotalLines()
 		_ = wb.GetAll(-1)
 	}
 }
@@ -667,13 +667,13 @@ func BenchmarkStreamingUpdateWithoutVirtualRendering(b *testing.B) {
 	}
 
 	// No viewport set - full render every time
-	_ = wb.GetTotalLinesVirtual()
+	_ = wb.GetTotalLines()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Simulate delta to last window
 		wb.AppendOrUpdate("msg99", "TA", " more")
-		_ = wb.GetTotalLinesVirtual()
+		_ = wb.GetTotalLines()
 		_ = wb.GetAll(-1)
 	}
 }
@@ -692,7 +692,7 @@ func BenchmarkGetAllWithVirtual(b *testing.B) {
 
 	// Set up viewport
 	wb.SetViewportPosition(150, 30)
-	_ = wb.GetTotalLinesVirtual()
+	_ = wb.GetTotalLines()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -712,7 +712,7 @@ func BenchmarkGetAllWithoutVirtual(b *testing.B) {
 	}
 
 	// No viewport
-	_ = wb.GetTotalLinesVirtual()
+	_ = wb.GetTotalLines()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -765,13 +765,13 @@ func BenchmarkWindowBufferResize(b *testing.B) {
 			content := strings.Repeat("Content line\n", 5)
 			wb.AppendOrUpdate(id, "TA", content)
 		}
-		_ = wb.GetTotalLinesVirtual()
+		_ = wb.GetTotalLines()
 
 		b.StartTimer()
 
 		// Simulate resize
 		wb.SetWidth(120)
-		_ = wb.GetTotalLinesVirtual()
+		_ = wb.GetTotalLines()
 	}
 }
 
@@ -789,7 +789,7 @@ func BenchmarkVirtualRenderingScroll(b *testing.B) {
 
 	// Set up viewport
 	wb.SetViewportPosition(0, 30)
-	_ = wb.GetTotalLinesVirtual()
+	_ = wb.GetTotalLines()
 
 	dm := NewDisplayModel(wb, styles)
 	dm.SetHeight(30)
@@ -823,7 +823,7 @@ func BenchmarkGetWindowStartLineCached(b *testing.B) {
 	}
 
 	// Pre-calculate line heights
-	_ = wb.GetTotalLinesVirtual()
+	_ = wb.GetTotalLines()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -848,13 +848,13 @@ func BenchmarkEnsureLineHeightsIncremental(b *testing.B) {
 			wb.AppendOrUpdate(id, "TA", content)
 		}
 		// Pre-calculate line heights
-		_ = wb.GetTotalLinesVirtual()
+		_ = wb.GetTotalLines()
 
 		// Now append to one window (incremental path)
 		wb.AppendOrUpdate("msg50", "TA", " new content")
 		b.StartTimer()
 
-		_ = wb.GetTotalLinesVirtual()
+		_ = wb.GetTotalLines()
 	}
 }
 
@@ -874,7 +874,7 @@ func BenchmarkEnsureLineHeightsFullRebuild(b *testing.B) {
 		// Don't pre-calculate - force full rebuild
 		b.StartTimer()
 
-		_ = wb.GetTotalLinesVirtual()
+		_ = wb.GetTotalLines()
 	}
 }
 
@@ -890,13 +890,13 @@ func BenchmarkIncrementalWrappingPath(b *testing.B) {
 		// Create one window with initial content
 		wb.AppendOrUpdate("msg0", "TA", strings.Repeat("Initial content line\n", 10))
 		// Trigger initial render to populate wrappedLines cache
-		_ = wb.GetTotalLinesVirtual()
+		_ = wb.GetTotalLines()
 
 		b.StartTimer()
 
 		// Append small delta - should use incremental wrapping
 		wb.AppendOrUpdate("msg0", "TA", " new text")
-		_ = wb.GetTotalLinesVirtual()
+		_ = wb.GetTotalLines()
 	}
 }
 
@@ -914,6 +914,6 @@ func BenchmarkFullWrappingPath(b *testing.B) {
 		b.StartTimer()
 
 		// First render - full wrapping
-		_ = wb.GetTotalLinesVirtual()
+		_ = wb.GetTotalLines()
 	}
 }

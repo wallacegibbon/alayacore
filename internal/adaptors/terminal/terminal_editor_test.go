@@ -418,8 +418,8 @@ func TestCtrlGTriggersCancel(t *testing.T) {
 	}
 
 	// Cancel confirmation dialog should be shown
-	if !terminal.cancelConfirmDialog {
-		t.Error("Ctrl+G should set cancelConfirmDialog to true")
+	if terminal.confirmDialog != confirmCancel {
+		t.Errorf("Ctrl+G should set confirmDialog to confirmCancel, got %v", terminal.confirmDialog)
 	}
 
 	// Input should remain unchanged
@@ -437,8 +437,8 @@ func TestCtrlGTriggersCancel(t *testing.T) {
 	}
 
 	// Cancel dialog should be closed
-	if terminal.cancelConfirmDialog {
-		t.Error("Cancel dialog should be closed after confirming")
+	if terminal.confirmDialog != confirmNone {
+		t.Errorf("Cancel dialog should be closed after confirming, got %v", terminal.confirmDialog)
 	}
 }
 
@@ -462,8 +462,8 @@ func TestCancelAllCommandRequiresConfirm(t *testing.T) {
 	}
 
 	// Cancel all confirmation dialog should be shown
-	if !terminal.cancelAllConfirmDialog {
-		t.Error(":cancel_all should set cancelAllConfirmDialog to true")
+	if terminal.confirmDialog != confirmCancelAll {
+		t.Errorf(":cancel_all should set confirmDialog to confirmCancelAll, got %v", terminal.confirmDialog)
 	}
 
 	// Test confirming the dialog by pressing 'y'
@@ -476,8 +476,8 @@ func TestCancelAllCommandRequiresConfirm(t *testing.T) {
 	}
 
 	// Cancel dialog should be closed
-	if terminal.cancelAllConfirmDialog {
-		t.Error("Cancel dialog should be closed after confirming")
+	if terminal.confirmDialog != confirmNone {
+		t.Errorf("Cancel dialog should be closed after confirming, got %v", terminal.confirmDialog)
 	}
 }
 

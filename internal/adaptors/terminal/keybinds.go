@@ -287,7 +287,7 @@ func (m *Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 			// Save to runtime.conf
 			_ = m.session.GetRuntimeManager().SetActiveTheme(selectedTheme.Name) //nolint:errcheck // best-effort save
 		}
-		m.restoreFocusAfterThemeSelector()
+		m.restoreFocus()
 		return m, nil
 	}
 
@@ -296,7 +296,7 @@ func (m *Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		originalThemeName := m.themeSelector.GetOriginalThemeName()
 		originalTheme := m.themeManager.LoadTheme(originalThemeName)
 		m.applyTheme(originalTheme)
-		m.restoreFocusAfterThemeSelector()
+		m.restoreFocus()
 		return m, nil
 	}
 
@@ -359,7 +359,7 @@ func (m *Terminal) handleModelSelectorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 
 	// Restore focus when model selector closes
 	if !m.modelSelector.IsOpen() {
-		m.restoreFocusAfterSelector()
+		m.restoreFocus()
 	}
 
 	return m, cmd
@@ -383,7 +383,7 @@ func (m *Terminal) handleQueueManagerKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// Restore focus when queue manager closes
 	if !m.queueManager.IsOpen() {
-		m.restoreFocusAfterQueueManager()
+		m.restoreFocus()
 	}
 
 	return m, cmd
@@ -391,72 +391,46 @@ func (m *Terminal) handleQueueManagerKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // handleConfirmDialog handles quit and cancel confirmation dialogs.
 func (m *Terminal) handleConfirmDialog(msg tea.KeyMsg) (tea.Cmd, bool) {
-	if m.confirmDialog {
-		return m.handleQuitConfirm(msg)
+	if m.confirmDialog == confirmNone {
+		return nil, false
 	}
 
-	if m.cancelConfirmDialog {
-		return m.handleCancelConfirm(msg)
-	}
+	key := msg.String()
 
-	if m.cancelAllConfirmDialog {
-		return m.handleCancelAllConfirm(msg)
-	}
-
-	return nil, false
-}
-
-// handleQuitConfirm handles the quit confirmation dialog.
-func (m *Terminal) handleQuitConfirm(msg tea.KeyMsg) (tea.Cmd, bool) {
-	switch msg.String() {
+	switch key {
 	case KeyY, "Y":
-		m.quitting = true
-		m.streamInput.Close()
-		m.out.Close()
-		return tea.Quit, true
+		kind := m.confirmDialog
+		fromCmd := m.confirmFromCommand
+		m.confirmDialog = confirmNone
+		m.confirmFromCommand = false
+
+		switch kind {
+		case confirmQuit:
+			m.quitting = true
+			m.streamInput.Close()
+			m.out.Close()
+			return tea.Quit, true
+		case confirmCancel:
+			if fromCmd {
+				m.input.SetValue("")
+			}
+			return m.submitCommand("cancel", fromCmd), true
+		case confirmCancelAll:
+			if fromCmd {
+				m.input.SetValue("")
+			}
+			return m.submitCommand("cancel_all", fromCmd), true
+		}
+
 	case KeyN, "N", KeyEsc, KeyCtrlC:
-		m.confirmDialog = false
-		m.input.SetValue("")
+		if m.confirmFromCommand {
+			m.input.SetValue("")
+		}
+		m.confirmDialog = confirmNone
+		m.confirmFromCommand = false
 		return nil, true
 	}
-	return nil, true
-}
 
-// handleCancelConfirm handles the cancel confirmation dialog.
-func (m *Terminal) handleCancelConfirm(msg tea.KeyMsg) (tea.Cmd, bool) {
-	switch msg.String() {
-	case KeyY, "Y":
-		m.cancelConfirmDialog = false
-		if m.cancelFromCommand {
-			m.input.SetValue("")
-		}
-		return m.submitCommand("cancel", m.cancelFromCommand), true
-	case KeyN, "N", KeyEsc, KeyCtrlC:
-		m.cancelConfirmDialog = false
-		if m.cancelFromCommand {
-			m.input.SetValue("")
-		}
-		return nil, true
-	}
-	return nil, true
-}
-
-// handleCancelAllConfirm handles the cancel_all confirmation dialog.
-func (m *Terminal) handleCancelAllConfirm(msg tea.KeyMsg) (tea.Cmd, bool) {
-	switch msg.String() {
-	case KeyY, "Y":
-		m.cancelAllConfirmDialog = false
-		if m.cancelFromCommand {
-			m.input.SetValue("")
-		}
-		return m.submitCommand("cancel_all", m.cancelFromCommand), true
-	case KeyN, "N", KeyEsc, KeyCtrlC:
-		m.cancelAllConfirmDialog = false
-		if m.cancelFromCommand {
-			m.input.SetValue("")
-		}
-		return nil, true
-	}
 	return nil, true
 }
 
@@ -569,8 +543,8 @@ func (m *Terminal) handleDisplayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 func (m *Terminal) handleGlobalKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 	switch msg.String() {
 	case KeyCtrlG:
-		m.cancelConfirmDialog = true
-		m.cancelFromCommand = false
+		m.confirmDialog = confirmCancel
+		m.confirmFromCommand = false
 		return nil, true
 
 	case KeyCtrlC:
@@ -655,21 +629,21 @@ func (m *Terminal) handleSubmit() tea.Cmd {
 func (m *Terminal) handleCommand(command string) tea.Cmd {
 	// Quit command
 	if command == "quit" || command == "q" {
-		m.confirmDialog = true
+		m.confirmDialog = confirmQuit
 		return nil
 	}
 
 	// Cancel command
 	if command == "cancel" {
-		m.cancelConfirmDialog = true
-		m.cancelFromCommand = true
+		m.confirmDialog = confirmCancel
+		m.confirmFromCommand = true
 		return nil
 	}
 
 	// Cancel all command
 	if command == "cancel_all" {
-		m.cancelAllConfirmDialog = true
-		m.cancelFromCommand = true
+		m.confirmDialog = confirmCancelAll
+		m.confirmFromCommand = true
 		return nil
 	}
 

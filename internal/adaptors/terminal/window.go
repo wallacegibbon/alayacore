@@ -624,14 +624,6 @@ func (wb *WindowBuffer) GetTotalLines() int {
 	return wb.totalLines
 }
 
-// GetTotalLinesVirtual returns total lines (ensuring lineHeights are calculated).
-func (wb *WindowBuffer) GetTotalLinesVirtual() int {
-	wb.mu.Lock()
-	defer wb.mu.Unlock()
-	wb.ensureLineHeights()
-	return wb.totalLines
-}
-
 // ============================================================================
 // Virtual Rendering
 // ============================================================================
@@ -891,7 +883,7 @@ func (m *DisplayModel) updateContent() {
 		cursorIndex = m.windowCursor
 	}
 
-	totalLines := m.windowBuffer.GetTotalLinesVirtual()
+	totalLines := m.windowBuffer.GetTotalLines()
 	viewportHeight := m.viewport.Height()
 
 	targetYOffset := m.viewport.YOffset()
