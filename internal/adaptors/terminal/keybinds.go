@@ -529,7 +529,7 @@ func (m *Terminal) handleDisplayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 		// Open current window content in external editor (view only, don't populate input)
 		content := m.display.GetCursorWindowContent()
 		if content != "" {
-			return m.input.editor.OpenForDisplay(content), true
+			return m.editor.OpenForDisplay(content), true
 		}
 		return nil, true
 	}
@@ -556,7 +556,7 @@ func (m *Terminal) handleGlobalKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 		return m.submitCommand("save", false), true
 
 	case KeyCtrlO:
-		return m.input.OpenEditor(), true
+		return m.OpenEditor(), true
 
 	case KeyCtrlL:
 		m.openModelSelector()
@@ -690,5 +690,5 @@ func (m *Terminal) openModelConfigFile() tea.Cmd {
 		}
 	}
 
-	return m.input.editor.OpenFile(path)
+	return m.editor.OpenFile(path)
 }

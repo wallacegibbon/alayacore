@@ -91,6 +91,7 @@ type Terminal struct {
 	out         OutputWriter
 	streamInput *stream.ChanInput
 	appConfig   *app.Config
+	editor      *Editor
 
 	// UI components
 	display       DisplayModel
@@ -141,11 +142,14 @@ func NewTerminalWithTheme(
 ) *Terminal {
 	styles := NewStyles(theme)
 
+	editor := NewEditor()
+
 	m := &Terminal{
 		session:       session,
 		out:           out,
 		streamInput:   inputStream,
 		appConfig:     appCfg,
+		editor:        editor,
 		display:       NewDisplayModel(out.WindowBuffer(), styles),
 		input:         NewInputModel(styles),
 		modelSelector: NewModelSelector(styles),
@@ -328,7 +332,7 @@ func (m *Terminal) handleDisplayEditorFinished(msg displayEditorFinishedMsg) (te
 // This is where the temp file is actually created, ensuring cleanup happens properly.
 func (m *Terminal) handleEditorStart(msg editorStartMsg) (tea.Model, tea.Cmd) {
 	// Create temp file lazily
-	tmpFileName, err := m.input.editor.createTempFile()
+	tmpFileName, err := m.editor.createTempFile()
 	if err != nil {
 		m.out.AppendError("Failed to create temp file: %v", err)
 		return m, nil

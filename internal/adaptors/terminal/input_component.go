@@ -8,12 +8,11 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-// InputModel handles text input and editor integration.
+// InputModel handles text input.
 type InputModel struct {
 	input         textinput.Model
 	focused       bool
 	editorContent string
-	editor        *Editor
 	styles        *Styles
 	width         int
 }
@@ -29,7 +28,6 @@ func NewInputModel(styles *Styles) InputModel {
 	return InputModel{
 		input:   input,
 		focused: true,
-		editor:  NewEditor(),
 		styles:  styles,
 		width:   DefaultWidth,
 	}
@@ -138,9 +136,9 @@ func (m *InputModel) ClearEditorContent() {
 	m.editorContent = ""
 }
 
-// OpenEditor opens the external editor
-func (m InputModel) OpenEditor() tea.Cmd {
-	content := m.editorContent
+// OpenEditor opens the external editor for multi-line input.
+func (m *Terminal) OpenEditor() tea.Cmd {
+	content := m.input.editorContent
 	if content == "" {
 		content = m.input.Value()
 	}

@@ -27,12 +27,16 @@ Refactoring `internal/adaptors/terminal/`. Package builds with `go build ./...` 
 - Replaced 8 `_ = m.streamInput.EmitTLV(stream.TagTextUser, ...)` + `//nolint` call sites across `terminal.go` and `keybinds.go` with `m.emitCommand(...)`
 - Removed `stream` import from `keybinds.go` (no longer needed)
 
-## 🔧 TODO (ordered by priority)
+### 3. Decouple Editor from InputModel ✅
+- Added `editor *Editor` field to `Terminal` struct
+- Moved `OpenEditor()` from `InputModel` to `Terminal` (now accesses `m.editor` directly)
+- Updated `handleEditorStart()` to use `m.editor.createTempFile()` instead of `m.input.editor.createTempFile()`
+- Updated display key 'e' handler to use `m.editor.OpenForDisplay()` instead of `m.input.editor.OpenForDisplay()`
+- Updated `openModelConfigFile()` to use `m.editor.OpenFile()` instead of `m.input.editor.OpenFile()`
+- Kept `editorContent` on `InputModel` (it's input state, not editor state)
+- Kept `OpenEditor()` in `input_component.go` but receiver changed to `*Terminal`
 
-### 3. Decouple Editor from InputModel
-- **Goal**: Move `Editor` from `InputModel.editor` to `Terminal.editor`
-- **Files**: `terminal.go`, `input_component.go`, `keybinds.go`
-- **Steps**: Add `editor *Editor` to `Terminal` → remove from `InputModel` → move `OpenEditor()` to `Terminal` → update all `m.input.editor.X()` → `m.editor.X()`
+## 🔧 TODO (ordered by priority)
 
 ### 4. Map-based display key dispatch
 - **Goal**: Replace `nolint:gocyclo` switch with `map[string]func` table
