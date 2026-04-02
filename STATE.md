@@ -36,12 +36,13 @@ Refactoring `internal/adaptors/terminal/`. Package builds with `go build ./...` 
 - Kept `editorContent` on `InputModel` (it's input state, not editor state)
 - Kept `OpenEditor()` in `input_component.go` but receiver changed to `*Terminal`
 
-## 🔧 TODO (ordered by priority)
+### 4. Map-based display key dispatch ✅
+- Replaced `handleDisplayKeys()` large switch statement with `displayKeyMap` map of `func(*Terminal) tea.Cmd`
+- Each key case extracted into a named closure in the map
+- `handleDisplayKeys()` reduced to a map lookup + call
+- Eliminated `nolint:gocyclo` annotation
 
-### 4. Map-based display key dispatch
-- **Goal**: Replace `nolint:gocyclo` switch with `map[string]func` table
-- **File**: `keybinds.go`
-- **Steps**: Define `displayKeyMap` map → extract each case into named method → replace switch with map lookup
+## 🔧 TODO (ordered by priority)
 
 ### 5. Remove ModelConfig duplication
 - **Goal**: `ModelConfig` duplicates `agentpkg.ModelInfo` → use `searchableModel` wrapper

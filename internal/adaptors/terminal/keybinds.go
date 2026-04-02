@@ -432,109 +432,137 @@ func (m *Terminal) handleConfirmDialog(msg tea.KeyMsg) (tea.Cmd, bool) {
 	return nil, true
 }
 
+// displayKeyMap maps display key strings to their handler functions.
+// Each handler returns a tea.Cmd (may be nil) for follow-up commands.
+var displayKeyMap map[string]func(*Terminal) tea.Cmd
+
+func init() {
+	displayKeyMap = map[string]func(*Terminal) tea.Cmd{
+		KeyJ: func(m *Terminal) tea.Cmd {
+			if m.display.MoveWindowCursorDown() {
+				m.display.EnsureCursorVisible()
+				m.display.updateContent()
+			}
+			return nil
+		},
+		KeyDown: func(m *Terminal) tea.Cmd {
+			if m.display.MoveWindowCursorDown() {
+				m.display.EnsureCursorVisible()
+				m.display.updateContent()
+			}
+			return nil
+		},
+		KeyK: func(m *Terminal) tea.Cmd {
+			if m.display.MoveWindowCursorUp() {
+				m.display.EnsureCursorVisible()
+				m.display.updateContent()
+			}
+			return nil
+		},
+		KeyUp: func(m *Terminal) tea.Cmd {
+			if m.display.MoveWindowCursorUp() {
+				m.display.EnsureCursorVisible()
+				m.display.updateContent()
+			}
+			return nil
+		},
+		KeyCtrlD: func(m *Terminal) tea.Cmd {
+			m.display.MarkUserScrolled()
+			m.display.ScrollDown(max(1, m.display.GetHeight()/2))
+			return nil
+		},
+		KeyCtrlU: func(m *Terminal) tea.Cmd {
+			m.display.MarkUserScrolled()
+			m.display.ScrollUp(max(1, m.display.GetHeight()/2))
+			return nil
+		},
+		KeyShiftJ: func(m *Terminal) tea.Cmd {
+			m.display.MarkUserScrolled()
+			m.display.ScrollDown(1)
+			return nil
+		},
+		KeyShiftDown: func(m *Terminal) tea.Cmd {
+			m.display.MarkUserScrolled()
+			m.display.ScrollDown(1)
+			return nil
+		},
+		KeyShiftK: func(m *Terminal) tea.Cmd {
+			m.display.MarkUserScrolled()
+			m.display.ScrollUp(1)
+			return nil
+		},
+		KeyShiftUp: func(m *Terminal) tea.Cmd {
+			m.display.MarkUserScrolled()
+			m.display.ScrollUp(1)
+			return nil
+		},
+		KeyShiftH: func(m *Terminal) tea.Cmd {
+			if m.display.MoveWindowCursorToTop() {
+				m.display.EnsureCursorVisible()
+				m.display.updateContent()
+			}
+			return nil
+		},
+		KeyShiftL: func(m *Terminal) tea.Cmd {
+			if m.display.MoveWindowCursorToBottom() {
+				m.display.EnsureCursorVisible()
+				m.display.updateContent()
+			}
+			return nil
+		},
+		KeyShiftM: func(m *Terminal) tea.Cmd {
+			if m.display.MoveWindowCursorToCenter() {
+				m.display.EnsureCursorVisible()
+				m.display.updateContent()
+			}
+			return nil
+		},
+		KeyG: func(m *Terminal) tea.Cmd {
+			m.display.SetCursorToLastWindow()
+			m.display.GotoBottom()
+			m.display.updateContent()
+			return nil
+		},
+		Keyg: func(m *Terminal) tea.Cmd {
+			m.display.SetWindowCursor(0)
+			m.display.GotoTop()
+			m.display.updateContent()
+			return nil
+		},
+		KeyColon: func(m *Terminal) tea.Cmd {
+			m.focusInput()
+			m.input.SetValue(":")
+			m.input.CursorEnd()
+			return nil
+		},
+		KeySpace: func(m *Terminal) tea.Cmd {
+			if m.display.ToggleWindowFold() {
+				m.display.EnsureCursorVisible()
+				m.display.updateContent()
+			}
+			return nil
+		},
+		KeyE: func(m *Terminal) tea.Cmd {
+			content := m.display.GetCursorWindowContent()
+			if content != "" {
+				return m.editor.OpenForDisplay(content)
+			}
+			return nil
+		},
+	}
+}
+
 // handleDisplayKeys handles key events when display window is focused.
 //
 // IMPORTANT: When moving the cursor, always call EnsureCursorVisible() BEFORE
 // updateContent(). This ensures the viewport position is updated before content
 // is regenerated, preventing blank areas in the virtual rendering.
-//
-//nolint:gocyclo // key handling requires many key cases
 func (m *Terminal) handleDisplayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
-	keyStr := msg.String()
-
-	// Window cursor navigation
-	switch keyStr {
-	case KeyJ, KeyDown:
-		if m.display.MoveWindowCursorDown() {
-			m.display.EnsureCursorVisible()
-			m.display.updateContent()
-		}
-		return nil, true
-
-	case KeyK, KeyUp:
-		if m.display.MoveWindowCursorUp() {
-			m.display.EnsureCursorVisible()
-			m.display.updateContent()
-		}
-		return nil, true
-
-	case KeyCtrlD:
-		m.display.MarkUserScrolled()
-		m.display.ScrollDown(max(1, m.display.GetHeight()/2))
-		return nil, true
-
-	case KeyCtrlU:
-		m.display.MarkUserScrolled()
-		m.display.ScrollUp(max(1, m.display.GetHeight()/2))
-		return nil, true
-
-	case KeyShiftJ, KeyShiftDown:
-		m.display.MarkUserScrolled()
-		m.display.ScrollDown(1)
-		return nil, true
-
-	case KeyShiftK, KeyShiftUp:
-		m.display.MarkUserScrolled()
-		m.display.ScrollUp(1)
-		return nil, true
-
-	case KeyShiftH:
-		if m.display.MoveWindowCursorToTop() {
-			m.display.EnsureCursorVisible()
-			m.display.updateContent()
-		}
-		return nil, true
-
-	case KeyShiftL:
-		if m.display.MoveWindowCursorToBottom() {
-			m.display.EnsureCursorVisible()
-			m.display.updateContent()
-		}
-		return nil, true
-
-	case KeyShiftM:
-		if m.display.MoveWindowCursorToCenter() {
-			m.display.EnsureCursorVisible()
-			m.display.updateContent()
-		}
-		return nil, true
-
-	case KeyG:
-		m.display.SetCursorToLastWindow()
-		m.display.GotoBottom()
-		m.display.updateContent()
-		return nil, true
-
-	case Keyg:
-		m.display.SetWindowCursor(0)
-		m.display.GotoTop()
-		m.display.updateContent()
-		return nil, true
-
-	case KeyColon:
-		// Switch to input with ":" prefix for command mode
-		m.focusInput()
-		m.input.SetValue(":")
-		m.input.CursorEnd()
-		return nil, true
-
-	case KeySpace:
-		if m.display.ToggleWindowFold() {
-			m.display.EnsureCursorVisible()
-			m.display.updateContent()
-		}
-		return nil, true
-
-	case KeyE:
-		// Open current window content in external editor (view only, don't populate input)
-		content := m.display.GetCursorWindowContent()
-		if content != "" {
-			return m.editor.OpenForDisplay(content), true
-		}
-		return nil, true
+	handler, ok := displayKeyMap[msg.String()]
+	if !ok {
+		return nil, false
 	}
-
-	return nil, false
+	return handler(m), true
 }
 
 // handleGlobalKeys handles global keyboard shortcuts.
