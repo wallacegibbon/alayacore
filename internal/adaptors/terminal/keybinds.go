@@ -548,6 +548,7 @@ func (m *Terminal) handleDisplayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 
 	case KeySpace:
 		if m.display.ToggleWindowFold() {
+			m.display.EnsureCursorVisible()
 			m.display.updateContent()
 		}
 		return nil, true
