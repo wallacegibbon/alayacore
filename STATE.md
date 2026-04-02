@@ -62,6 +62,6 @@ Refactoring `internal/adaptors/terminal/`. Package builds with `go build ./...` 
 
 ## 🔧 TODO
 
-### 7. Consistency fixes
-- Standardize `DisplayModel` receivers (value → pointer)
-- Fix `View()` return types on internal components
+### 7. Consistency fixes ✅
+- Standardized `DisplayModel` receivers: all methods now use pointer receiver `*DisplayModel`
+  (previously mixed value/pointer receivers)

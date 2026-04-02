@@ -828,10 +828,10 @@ func NewDisplayModel(windowBuffer *WindowBuffer, styles *Styles) DisplayModel {
 }
 
 // Init initializes the display
-func (m DisplayModel) Init() tea.Cmd { return nil }
+func (m *DisplayModel) Init() tea.Cmd { return nil }
 
 // Update handles messages for the display
-func (m DisplayModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *DisplayModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if windowMsg, ok := msg.(tea.WindowSizeMsg); ok {
 		m.width = windowMsg.Width
 		m.viewport.SetWidth(max(0, windowMsg.Width))
@@ -840,7 +840,7 @@ func (m DisplayModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // View renders the display
-func (m DisplayModel) View() tea.View {
+func (m *DisplayModel) View() tea.View {
 	return tea.NewView(m.viewport.View())
 }
 
@@ -851,7 +851,7 @@ func (m *DisplayModel) SetHeight(height int) {
 }
 
 // GetHeight returns the current viewport height
-func (m DisplayModel) GetHeight() int {
+func (m *DisplayModel) GetHeight() int {
 	return m.viewport.Height()
 }
 
@@ -872,7 +872,7 @@ func (m *DisplayModel) SetStyles(styles *Styles) {
 }
 
 // YOffset returns the current scroll position
-func (m DisplayModel) YOffset() int {
+func (m *DisplayModel) YOffset() int {
 	return m.viewport.YOffset()
 }
 
@@ -912,7 +912,7 @@ func (m *DisplayModel) ScrollDown(lines int) {
 }
 
 // AtBottom returns whether viewport is at bottom
-func (m DisplayModel) AtBottom() bool {
+func (m *DisplayModel) AtBottom() bool {
 	return m.viewport.AtBottom()
 }
 
