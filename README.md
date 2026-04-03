@@ -45,7 +45,7 @@ go install github.com/alayacore/alayacore@latest
 - Skills system (agentskills.io compatible)
 - Session file persistence
 - HTTP/HTTPS/SOCKS5 proxy support
-- Raw IO mode (stdin/stdout) for scripting and piping (`--plainio`)
+- Plain IO mode (stdin/stdout) for scripting and piping (`--plainio`)
 - Text-only mode for clean output (`--plainio --text-only`)
 
 ## Model Configuration
@@ -130,7 +130,7 @@ When running the Terminal version:
 | `:cancel` | Cancel current request (with confirmation) |
 | `:quit`, `:q` | Exit with confirmation (press y/n) |
 
-## Raw IO Mode
+## Plain IO Mode
 
 Use `--plainio` to run AlayaCore as a plain stdin/stdout process with no terminal UI. This is useful for scripting, piping, or headless environments.
 

@@ -2,7 +2,7 @@
 //
 // It reads user prompts from stdin (one per newline) and prints assistant
 // messages to stdout. No terminal features (ANSI codes, TTY detection, etc.)
-// are used — just raw IO.
+// are used — just plain IO.
 //
 // Activate with the --plainio flag. Use --text-only alongside it to suppress
 // everything except user prompts and assistant text.

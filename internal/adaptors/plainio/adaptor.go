@@ -2,7 +2,7 @@ package plainio
 
 // Package plainio provides a plain stdin/stdout adaptor for AlayaCore.
 // It reads prompts from stdin (one per line) and prints messages to stdout.
-// No terminal features are used — just raw IO.
+// No terminal features are used — just plain IO.
 
 import (
 	"fmt"

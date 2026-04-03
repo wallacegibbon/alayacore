@@ -78,7 +78,7 @@ alayacore --themes ./my-themes
 # Debug API requests
 alayacore --debug-api
 
-# Raw IO mode (stdin/stdout, no terminal UI)
+# Plain IO mode (stdin/stdout, no terminal UI)
 alayacore --plainio
 
 # Piped input
