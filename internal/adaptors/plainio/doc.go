@@ -24,7 +24,7 @@
 //   - A blank line is printed after each task completes.
 //
 // Communication with the session layer uses the same TLV protocol as the
-// terminal and websocket adaptors.
+// terminal and plainio adaptors.
 //
 // Key Files:
 //   - adaptor.go: Adaptor struct, Start() entry point, signal handling

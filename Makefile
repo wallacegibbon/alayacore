@@ -11,7 +11,6 @@ GOFMT=$(GOCMD) fmt
 
 # Binary names
 MAIN_BINARY=alayacore
-WEB_BINARY=alayacore-web
 
 # Build flags
 VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -24,10 +23,6 @@ all: test build
 ## build: Build main binary (static)
 build:
 	CGO_ENABLED=0 $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY) .
-
-## build-web: Build web binary (reference implementation, static)
-build-web:
-	CGO_ENABLED=0 $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(WEB_BINARY) ./cmd/alayacore-web/
 
 ## build-linux: Build for Linux
 build-linux:
@@ -67,18 +62,14 @@ vet:
 ## clean: Clean build artifacts
 clean:
 	$(GOCLEAN)
-	rm -f $(MAIN_BINARY) $(WEB_BINARY)
-	rm -f $(MAIN_BINARY)-linux $(WEB_BINARY)-linux
+	rm -f $(MAIN_BINARY)
+	rm -f $(MAIN_BINARY)-linux
 	rm -f $(MAIN_BINARY)-darwin-*
 	rm -f coverage.out coverage.html
 
 ## install: Install main binary to GOPATH/bin
 install:
 	CGO_ENABLED=0 $(GOCMD) install $(BUILDTAGS) $(LDFLAGS) .
-
-## install-web: Install web binary to GOPATH/bin
-install-web:
-	CGO_ENABLED=0 $(GOCMD) install $(BUILDTAGS) $(LDFLAGS) ./cmd/alayacore-web/
 
 ## mod: Download and tidy modules
 mod:

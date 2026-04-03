@@ -48,7 +48,6 @@ alayacore --skill ~/playground/alayacore/misc/samples/skills/
 | `--version` | Show version information |
 | `--help` | Show help information |
 
-
 ## Examples
 
 ```sh
@@ -189,42 +188,7 @@ The terminal organizes concurrent streams into separate windows with synchronize
 - **Wrap mode**: Press `Space` to toggle wrap mode on the active window, showing only the last 3 lines.
 
 
-## Web Server
-
-`alayacore-web` runs a WebSocket server with a built-in chat UI:
-
-```sh
-# Start server on default port (:8080)
-alayacore-web
-
-# Custom address
-alayacore-web --addr :9090
-
-# With custom model config
-alayacore-web --model-config ./my-model.conf
-
-# With session persistence
-alayacore-web --session ~/my-session.md
-
-# With skills
-alayacore-web --skill ./skills
-
-# With proxy
-alayacore-web --proxy socks5://127.0.0.1:1080
-
-# With max steps
-alayacore-web --max-steps 100
-```
-
-### Endpoints
-
-- **Web UI**: Open `http://localhost:8080` in browser
-- **WebSocket**: `ws://localhost:8080/ws`
-
-Each browser tab gets its own independent agent session.
-
-
-## Raw IO Mode
+## Plain IO Mode
 
 Use `--plainio` to run AlayaCore as a plain stdin/stdout process with no terminal UI. This is useful for scripting, piping, or headless environments.
 

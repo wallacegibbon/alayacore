@@ -1,5 +1,5 @@
 // Package stream provides the minimal IO abstraction and TLV encoding
-// used between adaptors (terminal/websocket) and the core session.
+// used between adaptors (terminal/plainio) and the core session.
 //
 // The stream package defines a simple Input/Output pair plus helpers
 // for reading/writing framed Tag-Length-Value (TLV) messages.
