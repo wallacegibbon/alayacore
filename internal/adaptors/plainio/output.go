@@ -78,54 +78,38 @@ func (o *stdoutOutput) processBuffer() {
 }
 
 func (o *stdoutOutput) printMessage(tag string, value string) {
+	// In text-only mode, only show assistant text and user prompts.
+	// Still track task completion internally.
+	if o.textOnly && tag != stream.TagTextAssistant && tag != stream.TagTextUser {
+		if tag == stream.TagSystemData {
+			o.handleSystemData(value)
+		}
+		return
+	}
+
 	switch tag {
 	case stream.TagTextAssistant:
 		content := stripStreamID(value)
 		fmt.Fprint(o.writer, content)
 
 	case stream.TagTextReasoning:
-		if o.textOnly {
-			return
-		}
 		content := stripStreamID(value)
 		fmt.Fprint(o.writer, content)
 
 	case stream.TagTextUser:
-		if o.textOnly {
-			return
-		}
 		fmt.Fprintf(o.writer, "\n> %s\n", value)
 
 	case stream.TagSystemError:
-		if o.textOnly {
-			return
-		}
 		fmt.Fprintf(o.writer, "\nError: %s\n", value)
 
 	case stream.TagSystemNotify:
-		if o.textOnly {
-			return
-		}
 		fmt.Fprintf(o.writer, "\n[%s]\n", value)
 
 	case stream.TagFunctionCall:
-		if o.textOnly {
-			return
-		}
-		var tc toolCallData
-		if err := json.Unmarshal([]byte(value), &tc); err == nil {
-			formatted := formatToolCall(tc.Name, tc.Input)
-			fmt.Fprintf(o.writer, "\n%s\n", formatted)
-		}
+		o.printFunctionCall(value)
 
 	case stream.TagFunctionResult:
-		if o.textOnly {
-			return
-		}
-		var tr toolResultData
-		if err := json.Unmarshal([]byte(value), &tr); err == nil {
-			fmt.Fprint(o.writer, tr.Output)
-		}
+		o.printFunctionResult(value)
 
 	case stream.TagFunctionState:
 		// Skip state indicators for plainio
@@ -134,11 +118,25 @@ func (o *stdoutOutput) printMessage(tag string, value string) {
 		o.handleSystemData(value)
 
 	default:
-		if o.textOnly {
-			return
-		}
 		fmt.Fprintf(o.writer, "[%s] %s\n", tag, value)
 	}
+}
+
+func (o *stdoutOutput) printFunctionCall(value string) {
+	var tc toolCallData
+	if err := json.Unmarshal([]byte(value), &tc); err != nil {
+		return
+	}
+	formatted := formatToolCall(tc.Name, tc.Input)
+	fmt.Fprintf(o.writer, "\n%s\n", formatted)
+}
+
+func (o *stdoutOutput) printFunctionResult(value string) {
+	var tr toolResultData
+	if err := json.Unmarshal([]byte(value), &tr); err != nil {
+		return
+	}
+	fmt.Fprint(o.writer, tr.Output)
 }
 
 // handleSystemData detects task completion transitions and prints a trailing newline.
