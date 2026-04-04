@@ -148,12 +148,19 @@ type Session struct {
 	taskQueue     []QueueItem
 	taskAvailable chan struct{}
 	done          chan struct{}
+	runnerDone    chan struct{} // closed when taskRunner exits
 	inProgress    bool
 	cancelCurrent func()
 	nextPromptID  uint64
 	nextQueueID   uint64
 	currentStep   int
 	mu            sync.Mutex
+}
+
+// WaitDone blocks until the taskRunner has finished processing all queued tasks
+// and exited. This should be called after closing the input.
+func (s *Session) WaitDone() {
+	<-s.runnerDone
 }
 
 // ============================================================================
@@ -191,6 +198,7 @@ func NewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt str
 		taskQueue:            make([]QueueItem, 0),
 		taskAvailable:        make(chan struct{}, 1),
 		done:                 make(chan struct{}),
+		runnerDone:           make(chan struct{}),
 	}
 	s.initModelManager()
 	s.sendSystemInfo()
@@ -220,6 +228,7 @@ func RestoreFromSession(baseTools []llm.Tool, systemPrompt string, extraSystemPr
 		taskQueue:            make([]QueueItem, 0),
 		taskAvailable:        make(chan struct{}, 1),
 		done:                 make(chan struct{}),
+		runnerDone:           make(chan struct{}),
 	}
 	s.initModelManager()
 	s.sendSystemInfo()
@@ -450,6 +459,7 @@ func (s *Session) signalTaskAvailable() {
 }
 
 func (s *Session) taskRunner() {
+	defer close(s.runnerDone)
 	for {
 		task, ok := s.waitForNextTask()
 		if !ok {

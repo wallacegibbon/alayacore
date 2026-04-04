@@ -33,7 +33,7 @@ func (a *Adaptor) Start() int {
 	output := newStdoutOutput(a.TextOnly)
 
 	// Load session
-	agentpkg.LoadOrNewSession(
+	sess, _ := agentpkg.LoadOrNewSession(
 		a.Config.AgentTools,
 		a.Config.SystemPrompt,
 		a.Config.ExtraSystemPrompt,
@@ -81,6 +81,9 @@ func (a *Adaptor) Start() int {
 	case <-resultCh:
 	default:
 	}
+
+	// Wait for the session to finish processing all queued tasks
+	sess.WaitDone()
 
 	// Give the output a final flush
 	fmt.Fprintln(output.writer)
