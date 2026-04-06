@@ -28,7 +28,8 @@ Rules:
 - Prefer simple, standard commands over complex pipelines
 - Quote filenames with spaces or special characters
 - Check command output for errors before proceeding
-- Clean up temporary files when done`,
+- Clean up temporary files when done
+- Commands run in a detached session with no controlling terminal and stdin closed. Interactive programs (sudo, ssh, etc.) that require a TTY or terminal input will fail immediately.`,
 	).
 		WithSchema(llm.GenerateSchema(PosixShellInput{})).
 		WithExecute(llm.TypedExecute(executePosixShell)).
@@ -44,20 +45,25 @@ func executePosixShell(ctx context.Context, args PosixShellInput) (llm.ToolResul
 	//nolint:gosec // G204: Command from user input is intentional for shell tool
 	cmd := exec.CommandContext(ctx, "/bin/sh", "-c", args.Command)
 	cmd.Dir = cwd
-	// Set environment variables to disable terminal features
-	cmd.Env = append(os.Environ(),
-		"TERM=dumb",
-		"NO_COLOR=1",
-		"CI=true",
-	)
+
+	// Close stdin so commands that read stdin see EOF immediately.
+	devNull, err := os.Open(os.DevNull)
+	if err != nil {
+		return llm.NewTextErrorResponse("failed to open /dev/null: " + err.Error()), nil
+	}
+	defer devNull.Close()
+	cmd.Stdin = devNull
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	// Set process group ID so we can signal the entire process group (shell + children)
+	// Create a new session and detach from the controlling terminal.
+	// This prevents child processes from accessing /dev/tty, so programs
+	// like sudo that open the terminal device directly for password input
+	// cannot scribble on the user's display or hang waiting for input.
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true,
+		Setsid: true,
 	}
 
 	if err := cmd.Start(); err != nil {
@@ -91,32 +97,22 @@ func handleShellCancellation(cmd *exec.Cmd, done chan error, stdout, stderr *byt
 }
 
 func terminateProcessGroup(process *os.Process, done chan error) {
-	// Send SIGINT (Ctrl+C) to the process group so child processes also receive it
-	// Use negative PID to signal the entire process group
-	pgid, pgerr := syscall.Getpgid(process.Pid)
-	if pgerr == nil {
-		// Signal the process group
-		//nolint:errcheck // Best effort signal, errors ignored
-		_ = syscall.Kill(-pgid, syscall.SIGINT)
-	} else {
-		// Fallback: signal just the process
-		//nolint:errcheck // Best effort signal, errors ignored
-		_ = process.Signal(syscall.SIGINT)
-	}
+	// With Setsid: true, the child is a session leader and its PID equals
+	// the session ID. Sending a signal to -PID targets every process in
+	// that session (the shell and all its descendants).
+	pid := process.Pid
 
-	// Give the process 2 seconds to clean up
+	//nolint:errcheck // Best effort signal, errors ignored
+	_ = syscall.Kill(-pid, syscall.SIGINT)
+
+	// Give the process group 2 seconds to clean up
 	select {
 	case <-done:
 		// Process exited cleanly after SIGINT
 	case <-time.After(2 * time.Second):
 		// Force kill if still running
-		if pgerr == nil {
-			//nolint:errcheck // Best effort kill, errors ignored
-			_ = syscall.Kill(-pgid, syscall.SIGKILL)
-		} else {
-			//nolint:errcheck // Best effort kill, errors ignored
-			_ = process.Kill()
-		}
+		//nolint:errcheck // Best effort kill, errors ignored
+		_ = syscall.Kill(-pid, syscall.SIGKILL)
 		<-done
 	}
 }
