@@ -209,6 +209,7 @@ Queue manager shows real-time queue status and allows you to remove pending task
 - `:save [filename]` - Save session to file (uses `--session` path if no filename)
 - `:cancel` - Cancel current request (with confirmation)
 - `:cancel_all` - Cancel current request and clear the task queue
+- `:retry` - Retry the last prompt (re-send history; appends "Please continue." if the latest message is from the assistant)
 - `:summarize` - Summarize conversation to reduce token usage
 - `:quit`, `:q` - Exit with confirmation
 - `:taskqueue_get_all` - Get all queued tasks (internal use)

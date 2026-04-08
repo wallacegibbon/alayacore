@@ -228,3 +228,43 @@ func (s *Session) handleTaskQueueDel(args []string) {
 		s.writeError(domainerrors.NewSessionErrorf("taskqueue_del", "queue item %s not found", queueID).Error())
 	}
 }
+
+// handleRetry retries sending the conversation history to the LLM.
+// This is useful when the API provider returned a transient error (network,
+// rate-limit, server error) and the user wants to try again without retyping.
+//
+// Two cases:
+//  1. Latest message is a user prompt → re-send history as-is (the previous
+//     API call never produced a response).
+//  2. Latest message is an assistant/tool message → the API partially succeeded
+//     or was canceled. A "Please continue." user message is appended so the
+//     model picks up where it left off.
+func (s *Session) handleRetry(ctx context.Context) {
+	s.mu.Lock()
+	msgCount := len(s.Messages)
+	s.mu.Unlock()
+
+	if msgCount == 0 {
+		s.writeError("No messages to retry")
+		return
+	}
+
+	lastMsg := s.Messages[msgCount-1]
+	if lastMsg.Role != llm.RoleUser {
+		// The last message is an assistant or tool response (partial success,
+		// cancel, or error mid-stream). Append a continuation prompt so the
+		// model resumes naturally.
+		s.Messages = append(s.Messages, llm.NewUserMessage("Please continue."))
+	}
+
+	s.writeNotify("Retrying...")
+
+	_, err := s.processPrompt(ctx, s.Messages)
+
+	s.Messages = cleanIncompleteToolCalls(s.Messages)
+
+	if err != nil {
+		s.writeError(err.Error())
+		return
+	}
+}

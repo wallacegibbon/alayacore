@@ -168,6 +168,7 @@ The first model in the file becomes the active model on startup (unless `runtime
 | `:save [filename]` | Save session to file (uses `--session` path if no filename) |
 | `:cancel` | Cancel current request (with confirmation) |
 | `:cancel_all` | Cancel current request and clear the task queue |
+| `:retry` | Retry the last prompt (re-send history; appends "Please continue." if latest message is from the assistant) |
 | `:summarize` | Summarize conversation to reduce token usage |
 | `:quit`, `:q` | Exit with confirmation (press y/n) |
 | `:model_set <id>` | Switch to a saved model configuration |

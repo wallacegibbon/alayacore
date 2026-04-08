@@ -131,6 +131,16 @@ func init() {
 			// Handler is resolved at runtime via Session method
 		},
 	})
+
+	// Retry command
+	commandRegistry.Register(&Command{
+		Name:        "retry",
+		Description: "Retry the last prompt (re-send if the latest message is from user)",
+		Usage:       "",
+		Handler: func(_ context.Context, _ []string) {
+			// Handler is resolved at runtime via Session method
+		},
+	})
 }
 
 // GetCommandRegistry returns the global command registry
@@ -173,6 +183,8 @@ func (s *Session) dispatchCommand(ctx context.Context, cmd string) bool {
 		s.handleTaskQueueGetAll()
 	case "taskqueue_del":
 		s.handleTaskQueueDel(args)
+	case "retry":
+		s.handleRetry(ctx)
 	}
 
 	return true
