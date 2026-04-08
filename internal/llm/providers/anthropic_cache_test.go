@@ -53,7 +53,7 @@ func TestAnthropicPromptCacheFullFlow(t *testing.T) {
 	}
 
 	// Drain the channel
-	for _, _ = range events {
+	for range events {
 	}
 
 	// Parse the captured request
@@ -135,7 +135,7 @@ func TestAnthropicPromptCacheDisabled(t *testing.T) {
 	}
 
 	// Drain the channel
-	for _, _ = range events {
+	for range events {
 	}
 
 	// Parse the captured request

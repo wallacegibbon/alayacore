@@ -55,11 +55,10 @@ func TestTextWithToolCalls(t *testing.T) {
 	var textReceived strings.Builder
 	var stepComplete *llm.StepCompleteEvent
 
-	for event, _ := range events {
-		switch e := event.(type) {
-		case llm.TextDeltaEvent:
+	for event := range events {
+		if e, ok := event.(llm.TextDeltaEvent); ok {
 			textReceived.WriteString(e.Delta)
-		case llm.StepCompleteEvent:
+		} else if e, ok := event.(llm.StepCompleteEvent); ok {
 			stepComplete = &e
 		}
 	}

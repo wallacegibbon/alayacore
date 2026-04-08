@@ -78,22 +78,22 @@ func executePosixShell(ctx context.Context, args PosixShellInput) (llm.ToolResul
 
 	select {
 	case <-ctx.Done():
-		return handleShellCancellation(cmd, done, &stdout, &stderr)
+		return handleShellCancellation(cmd, done, &stdout, &stderr), nil
 	case execErr := <-done:
-		return handleShellCompletion(execErr, &stdout, &stderr)
+		return handleShellCompletion(execErr, &stdout, &stderr), nil
 	}
 }
 
-func handleShellCancellation(cmd *exec.Cmd, done chan error, stdout, stderr *bytes.Buffer) (llm.ToolResultOutput, error) {
+func handleShellCancellation(cmd *exec.Cmd, done chan error, stdout, stderr *bytes.Buffer) llm.ToolResultOutput {
 	process := cmd.Process
 	if process != nil {
 		terminateProcessGroup(process, done)
 	}
 	output := combineShellOutput(stdout, stderr)
 	if output != "" {
-		return llm.NewTextErrorResponse("canceled: " + output), nil
+		return llm.NewTextErrorResponse("canceled: " + output)
 	}
-	return llm.NewTextErrorResponse("canceled"), nil
+	return llm.NewTextErrorResponse("canceled")
 }
 
 func terminateProcessGroup(process *os.Process, done chan error) {
@@ -117,17 +117,17 @@ func terminateProcessGroup(process *os.Process, done chan error) {
 	}
 }
 
-func handleShellCompletion(execErr error, stdout, stderr *bytes.Buffer) (llm.ToolResultOutput, error) {
+func handleShellCompletion(execErr error, stdout, stderr *bytes.Buffer) llm.ToolResultOutput {
 	output := combineShellOutput(stdout, stderr)
 
 	if execErr != nil {
 		if exitErr, ok := execErr.(*exec.ExitError); ok {
-			return llm.NewTextErrorResponse(fmt.Sprintf("[%d] %s", exitErr.ExitCode(), output)), nil
+			return llm.NewTextErrorResponse(fmt.Sprintf("[%d] %s", exitErr.ExitCode(), output))
 		}
-		return llm.NewTextErrorResponse(execErr.Error()), nil
+		return llm.NewTextErrorResponse(execErr.Error())
 	}
 
-	return llm.NewTextResponse(output), nil
+	return llm.NewTextResponse(output)
 }
 
 func combineShellOutput(stdout, stderr *bytes.Buffer) string {

@@ -457,7 +457,12 @@ func (p *OpenAIProvider) convertRegularContent(apiMsg *openAIMessage, content []
 // parseStream returns an iterator that yields SSE events from the OpenAI response.
 func (p *OpenAIProvider) parseStream(reader io.Reader) iter.Seq2[llm.StreamEvent, error] {
 	return func(yield func(llm.StreamEvent, error) bool) {
-		defer func() { _ = reader.(io.Closer).Close() }()
+		defer func() {
+			closer, ok := reader.(io.Closer)
+			if ok {
+				_ = closer.Close()
+			}
+		}()
 
 		state := &openAIStreamState{}
 		scanner := bufio.NewScanner(reader)
@@ -527,46 +532,13 @@ func (p *OpenAIProvider) handleEvent(data string, yield func(llm.StreamEvent, er
 	}
 
 	for _, choice := range streamResp.Choices {
-		// Check for error finish reasons
-		// Valid: "stop" (normal), "length" (truncated), "tool_calls" (function calling)
-		// Error: "content_filter" (blocked by safety), anything else
-		if choice.FinishReason == "content_filter" {
-			yield(nil, fmt.Errorf("content blocked by safety filter"))
-			return false
-		}
-		// Allow empty, "stop", "length", and "tool_calls"
-		if choice.FinishReason != "" && choice.FinishReason != "stop" &&
-			choice.FinishReason != "length" && choice.FinishReason != "tool_calls" {
-			yield(nil, fmt.Errorf("stream finished with unexpected reason: %s", choice.FinishReason))
+		if ok, err := p.checkFinishReason(choice.FinishReason); !ok {
+			yield(nil, err)
 			return false
 		}
 
-		// Handle reasoning content (DeepSeek, Qwen, etc.)
-		if choice.Delta.ReasoningContent != "" {
-			state.addReasoningDelta(choice.Delta.ReasoningContent)
-			if !yield(llm.ReasoningDeltaEvent{Delta: choice.Delta.ReasoningContent}, nil) {
-				return false
-			}
-		}
-
-		// Handle text content
-		if choice.Delta.Content != "" {
-			state.addTextDelta(choice.Delta.Content)
-			if !yield(llm.TextDeltaEvent{Delta: choice.Delta.Content}, nil) {
-				return false
-			}
-		}
-
-		// Handle tool calls - arguments may come in chunks
-		for _, tc := range choice.Delta.ToolCalls {
-			// Accumulate arguments (may come in multiple chunks)
-			if len(tc.Function.Arguments) > 0 {
-				state.appendToolCallArgs(tc.Index, tc.Function.Arguments)
-			}
-			// Set name and ID when available (usually first chunk)
-			if tc.Function.Name != "" {
-				state.setToolCallName(tc.Index, tc.ID, tc.Function.Name)
-			}
+		if ok := p.handleDelta(choice.Delta, yield, state); !ok {
+			return false
 		}
 	}
 
@@ -578,6 +550,59 @@ func (p *OpenAIProvider) handleEvent(data string, yield func(llm.StreamEvent, er
 			InputTokens:         int64(streamResp.Usage.PromptTokens),
 			OutputTokens:        int64(streamResp.Usage.CompletionTokens),
 		})
+	}
+
+	return true
+}
+
+// checkFinishReason validates the finish reason. Returns (ok, nil) for valid reasons,
+// or (false, error) for error conditions.
+func (p *OpenAIProvider) checkFinishReason(reason string) (bool, error) {
+	// Valid: "stop" (normal), "length" (truncated), "tool_calls" (function calling)
+	// Error: "content_filter" (blocked by safety), anything else
+	if reason == "content_filter" {
+		return false, fmt.Errorf("content blocked by safety filter")
+	}
+	// Allow empty, "stop", "length", and "tool_calls"
+	if reason != "" && reason != "stop" && reason != "length" && reason != "tool_calls" {
+		return false, fmt.Errorf("stream finished with unexpected reason: %s", reason)
+	}
+	return true, nil
+}
+
+// handleDelta processes the delta content from a streaming chunk.
+// Returns false if iteration should stop.
+func (p *OpenAIProvider) handleDelta(delta struct {
+	Content          string           `json:"content"`
+	ReasoningContent string           `json:"reasoning_content"`
+	ToolCalls        []openAIToolCall `json:"tool_calls"`
+}, yield func(llm.StreamEvent, error) bool, state *openAIStreamState) bool {
+	// Handle reasoning content (DeepSeek, Qwen, etc.)
+	if delta.ReasoningContent != "" {
+		state.addReasoningDelta(delta.ReasoningContent)
+		if !yield(llm.ReasoningDeltaEvent{Delta: delta.ReasoningContent}, nil) {
+			return false
+		}
+	}
+
+	// Handle text content
+	if delta.Content != "" {
+		state.addTextDelta(delta.Content)
+		if !yield(llm.TextDeltaEvent{Delta: delta.Content}, nil) {
+			return false
+		}
+	}
+
+	// Handle tool calls - arguments may come in chunks
+	for _, tc := range delta.ToolCalls {
+		// Accumulate arguments (may come in multiple chunks)
+		if len(tc.Function.Arguments) > 0 {
+			state.appendToolCallArgs(tc.Index, tc.Function.Arguments)
+		}
+		// Set name and ID when available (usually first chunk)
+		if tc.Function.Name != "" {
+			state.setToolCallName(tc.Index, tc.ID, tc.Function.Name)
+		}
 	}
 
 	return true

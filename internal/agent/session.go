@@ -165,13 +165,6 @@ func (s *Session) WaitDone() {
 	<-s.runnerDone
 }
 
-// isDone returns true if the session has been signaled to stop
-func (s *Session) isDone() bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.inProgress == false && len(s.taskQueue) == 0 && s.cancelCurrent == nil
-}
-
 // ============================================================================
 // Session Lifecycle
 // ============================================================================

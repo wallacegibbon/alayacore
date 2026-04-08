@@ -67,11 +67,10 @@ func TestAnthropicRealAPI(t *testing.T) {
 	var textReceived string
 	var stepComplete *llm.StepCompleteEvent
 
-	for event, _ := range events {
-		switch e := event.(type) {
-		case llm.TextDeltaEvent:
+	for event := range events {
+		if e, ok := event.(llm.TextDeltaEvent); ok {
 			textReceived += e.Delta
-		case llm.StepCompleteEvent:
+		} else if e, ok := event.(llm.StepCompleteEvent); ok {
 			stepComplete = &e
 		}
 	}
@@ -125,9 +124,8 @@ func TestOpenAICompatibleRealAPI(t *testing.T) {
 
 	var textReceived string
 
-	for event, _ := range events {
-		switch e := event.(type) {
-		case llm.TextDeltaEvent:
+	for event := range events {
+		if e, ok := event.(llm.TextDeltaEvent); ok {
 			textReceived += e.Delta
 		}
 	}
@@ -195,11 +193,10 @@ func TestAnthropicRealToolCall(t *testing.T) {
 	var toolCalls []llm.ToolCallEvent
 	var textReceived string
 
-	for event, _ := range events {
-		switch e := event.(type) {
-		case llm.TextDeltaEvent:
+	for event := range events {
+		if e, ok := event.(llm.TextDeltaEvent); ok {
 			textReceived += e.Delta
-		case llm.ToolCallEvent:
+		} else if e, ok := event.(llm.ToolCallEvent); ok {
 			toolCalls = append(toolCalls, e)
 		}
 	}
@@ -258,9 +255,8 @@ func TestOpenAIRealAPI(t *testing.T) {
 
 	var textReceived string
 
-	for event, _ := range events {
-		switch e := event.(type) {
-		case llm.TextDeltaEvent:
+	for event := range events {
+		if e, ok := event.(llm.TextDeltaEvent); ok {
 			textReceived += e.Delta
 		}
 	}

@@ -99,26 +99,26 @@ func (o *stdoutOutput) printMessage(tag string, value string) {
 	// In text-only mode, only show assistant text and user prompts.
 	// Still track task completion internally.
 	if o.textOnly && tag != stream.TagTextAssistant && tag != stream.TagTextUser {
-		if tag == stream.TagSystemData {
-			o.handleSystemData(value)
-		}
-		if tag == stream.TagSystemError {
-			o.hasError = true
-			o.errorOnce.Do(func() { close(o.errorCh) })
-		}
+		o.handleTextOnlyTag(tag, value)
 		return
 	}
 
-	switch tag {
-	case stream.TagTextAssistant:
-		prefix, content := extractStreamPrefix(value)
-		if o.lastStreamPrefix != "" && prefix != o.lastStreamPrefix {
-			fmt.Fprintln(o.writer)
-		}
-		o.lastStreamPrefix = prefix
-		fmt.Fprint(o.writer, content)
+	o.handleTag(tag, value)
+}
 
-	case stream.TagTextReasoning:
+func (o *stdoutOutput) handleTextOnlyTag(tag, value string) {
+	if tag == stream.TagSystemData {
+		o.handleSystemData(value)
+	}
+	if tag == stream.TagSystemError {
+		o.hasError = true
+		o.errorOnce.Do(func() { close(o.errorCh) })
+	}
+}
+
+func (o *stdoutOutput) handleTag(tag, value string) {
+	switch tag {
+	case stream.TagTextAssistant, stream.TagTextReasoning:
 		prefix, content := extractStreamPrefix(value)
 		if o.lastStreamPrefix != "" && prefix != o.lastStreamPrefix {
 			fmt.Fprintln(o.writer)
@@ -201,12 +201,6 @@ func extractStreamPrefix(value string) (prefix string, content string) {
 		return "", value
 	}
 	return value[:endIdx+2], value[endIdx+2:]
-}
-
-// stripStreamID removes the "[:id:]content" prefix from streaming deltas.
-func stripStreamID(value string) string {
-	_, content := extractStreamPrefix(value)
-	return content
 }
 
 // formatToolCall formats a tool call for display.

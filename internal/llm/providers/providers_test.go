@@ -71,11 +71,10 @@ func TestAnthropicProvider(t *testing.T) {
 	var textReceived string
 	var usageReceived *llm.Usage
 
-	for event, _ := range events {
-		switch e := event.(type) {
-		case llm.TextDeltaEvent:
+	for event := range events {
+		if e, ok := event.(llm.TextDeltaEvent); ok {
 			textReceived += e.Delta
-		case llm.StepCompleteEvent:
+		} else if e, ok := event.(llm.StepCompleteEvent); ok {
 			usageReceived = &e.Usage
 		}
 	}
@@ -141,9 +140,8 @@ func TestOpenAIProvider(t *testing.T) {
 	// Collect events
 	var textReceived string
 
-	for event, _ := range events {
-		switch e := event.(type) {
-		case llm.TextDeltaEvent:
+	for event := range events {
+		if e, ok := event.(llm.TextDeltaEvent); ok {
 			textReceived += e.Delta
 		}
 	}
@@ -211,7 +209,7 @@ func TestToolCallStreaming(t *testing.T) {
 	}
 
 	var toolCalls []llm.ToolCallEvent
-	for event, _ := range events {
+	for event := range events {
 		if tc, ok := event.(llm.ToolCallEvent); ok {
 			toolCalls = append(toolCalls, tc)
 		}
@@ -280,7 +278,7 @@ func TestToolCallStreamingChunked(t *testing.T) {
 	}
 
 	var toolCalls []llm.ToolCallEvent
-	for event, _ := range events {
+	for event := range events {
 		if tc, ok := event.(llm.ToolCallEvent); ok {
 			toolCalls = append(toolCalls, tc)
 		}
@@ -348,11 +346,10 @@ func TestAnthropicToolCallStreaming(t *testing.T) {
 
 	var toolCalls []llm.ToolCallEvent
 	var stepComplete *llm.StepCompleteEvent
-	for event, _ := range events {
-		switch e := event.(type) {
-		case llm.ToolCallEvent:
+	for event := range events {
+		if e, ok := event.(llm.ToolCallEvent); ok {
 			toolCalls = append(toolCalls, e)
-		case llm.StepCompleteEvent:
+		} else if e, ok := event.(llm.StepCompleteEvent); ok {
 			stepComplete = &e
 		}
 	}
@@ -431,13 +428,12 @@ func TestAnthropicReasoningStreaming(t *testing.T) {
 	var textReceived string
 	var stepComplete *llm.StepCompleteEvent
 
-	for event, _ := range events {
-		switch e := event.(type) {
-		case llm.TextDeltaEvent:
+	for event := range events {
+		if e, ok := event.(llm.TextDeltaEvent); ok {
 			textReceived += e.Delta
-		case llm.ReasoningDeltaEvent:
+		} else if e, ok := event.(llm.ReasoningDeltaEvent); ok {
 			reasoningText += e.Delta
-		case llm.StepCompleteEvent:
+		} else if e, ok := event.(llm.StepCompleteEvent); ok {
 			stepComplete = &e
 		}
 	}
@@ -881,7 +877,7 @@ func TestOpenAIWithSystemPrompt(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, _ = range events {
+	for range events {
 		// Drain the channel
 	}
 }
@@ -944,7 +940,7 @@ func TestAnthropicWithTools(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, _ = range events {
+	for range events {
 		// Drain the channel
 	}
 }
@@ -989,13 +985,12 @@ func TestOpenAIWithReasoning(t *testing.T) {
 	var textReceived string
 	var stepComplete *llm.StepCompleteEvent
 
-	for event, _ := range events {
-		switch e := event.(type) {
-		case llm.TextDeltaEvent:
+	for event := range events {
+		if e, ok := event.(llm.TextDeltaEvent); ok {
 			textReceived += e.Delta
-		case llm.ReasoningDeltaEvent:
+		} else if e, ok := event.(llm.ReasoningDeltaEvent); ok {
 			reasoningText += e.Delta
-		case llm.StepCompleteEvent:
+		} else if e, ok := event.(llm.StepCompleteEvent); ok {
 			stepComplete = &e
 		}
 	}
@@ -1174,9 +1169,8 @@ func TestAnthropicMultiToolCall(t *testing.T) {
 	}
 
 	var toolCalls []llm.ToolCallEvent
-	for event, _ := range events {
-		switch e := event.(type) {
-		case llm.ToolCallEvent:
+	for event := range events {
+		if e, ok := event.(llm.ToolCallEvent); ok {
 			toolCalls = append(toolCalls, e)
 		}
 	}

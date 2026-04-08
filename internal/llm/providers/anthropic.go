@@ -413,7 +413,12 @@ func (p *AnthropicProvider) StreamMessages(
 // parseStream returns an iterator that yields SSE events from the Anthropic response.
 func (p *AnthropicProvider) parseStream(reader io.Reader) iter.Seq2[llm.StreamEvent, error] {
 	return func(yield func(llm.StreamEvent, error) bool) {
-		defer func() { _ = reader.(io.Closer).Close() }()
+		defer func() {
+			closer, ok := reader.(io.Closer)
+			if ok {
+				_ = closer.Close()
+			}
+		}()
 
 		state := &streamState{
 			contentParts: make([]llm.ContentPart, 0),
