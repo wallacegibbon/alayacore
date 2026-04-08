@@ -49,10 +49,8 @@ const (
 
 // Timing constants
 const (
-	UpdateThrottleInterval = 100 * time.Millisecond // batch rapid display updates
-	TickInterval           = 250 * time.Millisecond // polling during streaming
-	FlusherInterval        = 50 * time.Millisecond  // update flusher tick
-	SubmitTickDelay        = 50 * time.Millisecond  // delay before first tick after submit
+	TickInterval    = 250 * time.Millisecond // polling during streaming
+	SubmitTickDelay = 50 * time.Millisecond  // delay before first tick after submit
 )
 
 // Focus constants
@@ -271,9 +269,8 @@ func (m *Terminal) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 func (m *Terminal) handleTick() (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
-	// Drain pending display updates (non-blocking)
-	select {
-	case <-m.out.UpdateChan():
+	// Check if display needs refresh (dirty flag)
+	if m.out.DrainDirty() {
 		if m.out.WindowBuffer().GetWindowCount() > 0 {
 			m.updateStatus()
 			m.updateDisplayHeight()
@@ -293,8 +290,7 @@ func (m *Terminal) handleTick() (tea.Model, tea.Cmd) {
 			// Update display to show new items
 			m.display.updateContent()
 		}
-
-	default:
+	} else {
 		m.updateStatus()
 	}
 

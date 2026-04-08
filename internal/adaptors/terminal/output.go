@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	agentpkg "github.com/alayacore/alayacore/internal/agent"
@@ -24,39 +25,29 @@ type outputWriter struct {
 	windowBuffer      *WindowBuffer
 	buffer            []byte
 	mu                sync.Mutex
-	updateChan        chan struct{}
-	done              chan struct{}        // Signal goroutine to stop
-	status            string               // Status bar content from TagSystem
-	inProgress        bool                 // Whether session has task in progress
-	styles            *Styles              // UI styles
-	nextWindowID      int                  // Monotonic counter for generating window IDs
-	pendingUpdate     bool                 // Whether there's a pending update to flush
-	lastUpdate        time.Time            // Last time an update was sent
-	updateMu          sync.Mutex           // Mutex for update throttling
-	models            []agentpkg.ModelInfo // Current model list
-	activeModelID     int                  // Current active model ID
-	hasModels         bool                 // Whether models are configured
-	modelConfigPath   string               // Path to model.conf
-	activeModelName   string               // Name of active model
-	pendingQueueItems []QueueItem          // Queue items from taskqueue_get_all
-	queueCount        int                  // Number of items in the queue
-	currentStep       int                  // Current step in agent loop (1-indexed)
-	maxSteps          int                  // Maximum steps allowed
-	lastCurrentStep   int                  // Last step reached in completed task
-	lastMaxSteps      int                  // Last max steps from completed task
+	dirty             atomic.Bool // true when display needs refresh
+	status            string      // Status bar content from TagSystem
+	inProgress        bool        // Whether session has task in progress
+	styles            *Styles     // UI styles
+	nextWindowID      int         // Monotonic counter for generating window IDs
+	models            []agentpkg.ModelInfo
+	activeModelID     int       // Current active model ID
+	hasModels         bool      // Whether models are configured
+	modelConfigPath   string    // Path to model.conf
+	activeModelName   string    // Name of active model
+	pendingQueueItems []QueueItem // Queue items from taskqueue_get_all
+	queueCount        int        // Number of items in the queue
+	currentStep       int        // Current step in agent loop (1-indexed)
+	maxSteps          int        // Maximum steps allowed
+	lastCurrentStep   int        // Last step reached in completed task
+	lastMaxSteps      int        // Last max steps from completed task
 }
 
 func NewTerminalOutput(styles *Styles) *outputWriter { //nolint:revive // tests need access to internal methods
-	to := &outputWriter{
+	return &outputWriter{
 		windowBuffer: NewWindowBuffer(DefaultWidth, styles),
-		updateChan:   make(chan struct{}, 1),
-		done:         make(chan struct{}),
 		styles:       styles,
-		lastUpdate:   time.Now(),
 	}
-	// Start background update flusher
-	go to.updateFlusher()
-	return to
 }
 
 // SetStyles updates the styles for the output writer
@@ -67,34 +58,9 @@ func (to *outputWriter) SetStyles(styles *Styles) {
 	to.windowBuffer.SetStyles(styles)
 }
 
-// Close stops the background goroutine and cleans up resources
+// Close cleans up resources (no background goroutine to stop)
 func (to *outputWriter) Close() error {
-	close(to.done)
 	return nil
-}
-
-// updateFlusher periodically flushes pending updates
-func (to *outputWriter) updateFlusher() {
-	ticker := time.NewTicker(FlusherInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-to.done:
-			return
-		case <-ticker.C:
-			to.updateMu.Lock()
-			if to.pendingUpdate && time.Since(to.lastUpdate) >= UpdateThrottleInterval {
-				to.pendingUpdate = false
-				to.lastUpdate = time.Now()
-				select {
-				case to.updateChan <- struct{}{}:
-				default:
-				}
-			}
-			to.updateMu.Unlock()
-		}
-	}
 }
 
 func (to *outputWriter) Write(p []byte) (n int, err error) {
@@ -221,8 +187,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 	}
 }
 
-// triggerUpdateForTag sends an update signal for tags that modify the display
-// Uses throttling to batch rapid updates together
+// triggerUpdateForTag marks the display as dirty for tags that modify the display
 func (to *outputWriter) triggerUpdateForTag(tag string) {
 	switch tag {
 	// Text content tags
@@ -230,21 +195,7 @@ func (to *outputWriter) triggerUpdateForTag(tag string) {
 		stream.TagFunctionCall,
 		// System tags
 		stream.TagSystemError, stream.TagSystemNotify, stream.TagSystemData:
-		to.updateMu.Lock()
-		defer to.updateMu.Unlock()
-
-		// If enough time has passed since last update, send immediately
-		if time.Since(to.lastUpdate) >= UpdateThrottleInterval {
-			to.lastUpdate = time.Now()
-			to.pendingUpdate = false
-			select {
-			case to.updateChan <- struct{}{}:
-			default:
-			}
-		} else {
-			// Mark that we have a pending update
-			to.pendingUpdate = true
-		}
+		to.dirty.Store(true)
 	}
 }
 
@@ -299,11 +250,8 @@ func (to *outputWriter) handleSystemTag(value string) {
 		to.currentStep = info.CurrentStep
 		to.maxSteps = info.MaxSteps
 
-		// Signal update so tick handler picks up changes
-		select {
-		case to.updateChan <- struct{}{}:
-		default:
-		}
+		// Mark display as dirty so tick handler picks up changes
+		to.dirty.Store(true)
 	}
 }
 

@@ -60,16 +60,17 @@ type OutputWriter interface {
 	WriteNotify(msg string)
 
 	// Update signaling
-	UpdateChan() <-chan struct{}
+	DrainDirty() bool // returns true if display was dirty, clears the flag
 	WindowBuffer() *WindowBuffer
 }
 
 // Ensure outputWriter implements OutputWriter
 var _ OutputWriter = (*outputWriter)(nil)
 
-// UpdateChan returns the update channel for signaling display updates
-func (w *outputWriter) UpdateChan() <-chan struct{} {
-	return w.updateChan
+// DrainDirty returns true if the display was dirty and clears the flag.
+// This replaces the channel-based update signaling with a simple atomic bool.
+func (w *outputWriter) DrainDirty() bool {
+	return w.dirty.CompareAndSwap(true, false)
 }
 
 // WindowBuffer returns the window buffer for direct access
