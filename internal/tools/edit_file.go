@@ -22,7 +22,7 @@ func NewEditFileTool() llm.Tool {
 		"edit_file",
 		`Apply a search/replace edit to a file.
 
-CRITICAL: Read the file first to get the exact text including whitespace.
+If you already have the file's exact text from a prior read or write in this conversation, use it directly without re-reading.
 
 Parameters:
 - path: The file path to edit

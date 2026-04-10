@@ -22,13 +22,7 @@ RULES:
 
 SKILLS:
 - Check <available_skills> below; activate relevant ones using the activate_skill tool
-- Skill instructions may use relative paths - run them from the skill's directory (derived from <location>)
-
-FILE EDITING:
-- Always read a file before editing it to get exact text including whitespace
-- Use edit_file for surgical changes; use write_file only for new files or complete rewrites
-- Include 3-5 lines of context in old_string to make matches unique
-- Match whitespace exactly - tabs, spaces, and newlines must be identical`
+- Skill instructions may use relative paths - run them from the skill's directory (derived from <location>)`
 
 // Config holds the common app configuration
 type Config struct {

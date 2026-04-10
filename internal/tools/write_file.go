@@ -17,7 +17,7 @@ type WriteFileInput struct {
 func NewWriteFileTool() llm.Tool {
 	return llm.NewTool(
 		"write_file",
-		"Create a new file or replace the entire content of an existing file.",
+		"Create a new file or replace the entire content of an existing file. For surgical edits to existing files, prefer edit_file instead.",
 	).
 		WithSchema(llm.GenerateSchema(WriteFileInput{})).
 		WithExecute(llm.TypedExecute(executeWriteFile)).
