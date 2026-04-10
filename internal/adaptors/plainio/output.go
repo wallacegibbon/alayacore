@@ -159,10 +159,6 @@ func (o *stdoutOutput) printFunctionCall(value string) {
 	fmt.Fprintf(o.writer, "%s", formatToolCall(tc.Name, tc.Input))
 }
 
-func (o *stdoutOutput) printFunctionResult(value string) {
-	// Plainio mode: suppress tool result content.
-}
-
 // formatToolCall formats a tool call header for display (name + key args, no content).
 func formatToolCall(name, input string) string {
 	switch name {
