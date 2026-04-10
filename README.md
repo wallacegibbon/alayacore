@@ -25,7 +25,6 @@ go install github.com/alayacore/alayacore@latest
 - `--auto-summarize` - Automatically summarize conversation when context exceeds 80% of limit
 - `--auto-save` - Automatically save session after each response when `--session` is specified (default: enabled)
 - `--plainio` - Use plain stdin/stdout mode instead of terminal UI
-- `--text-only` - Only show user prompts and assistant text (requires `--plainio`)
 - `--debug-api` - Write raw API requests and responses to log file
 - `--version` - Show version information
 - `--help` - Show help information
@@ -48,7 +47,6 @@ go install github.com/alayacore/alayacore@latest
 - Auto-save session (`--auto-save`)
 - HTTP/HTTPS/SOCKS5 proxy support
 - Plain IO mode (stdin/stdout) for scripting and piping (`--plainio`)
-- Text-only mode for clean output (`--plainio --text-only`)
 
 ## Model Configuration
 
@@ -156,8 +154,9 @@ All output is printed to stdout in plain text (no ANSI codes):
 
 - Assistant text and reasoning are printed directly.
 - User prompts are prefixed with `> `.
-- Tool calls are shown as `[tool_name]`.
-- Tool results are printed as-is (unescaped).
+- Tool calls are shown as `[tool_name: args]`.
+- Tool results are suppressed.
+- A blank line separates messages of different types.
 - Errors are prefixed with `Error: `.
 - Notifications are prefixed with `[...]`.
 - A blank line separates completed tasks from the next prompt.
@@ -167,16 +166,6 @@ All output is printed to stdout in plain text (no ANSI codes):
 ```sh
 echo "what is 2+2?" | alayacore --plainio
 ```
-
-### Text-only mode
-
-Add `--text-only` to suppress everything except user prompts and assistant text:
-
-```sh
-echo "what is 2+2?" | alayacore --plainio --text-only
-```
-
-This hides tool calls, tool results, reasoning, errors, and notifications.
 
 ## Window Container
 

@@ -30,7 +30,7 @@ func main() {
 	}
 
 	if cfg.PlainIO {
-		adaptor := plainio.NewAdaptor(appCfg, cfg.TextOnly)
+		adaptor := plainio.NewAdaptor(appCfg)
 		os.Exit(adaptor.Start())
 	}
 
@@ -56,7 +56,6 @@ Flags:
   --auto-summarize        Automatically summarize conversation when context exceeds 80% of limit
   --auto-save             Automatically save session after each response when --session is specified (default: enabled)
   --plainio               Use plain stdin/stdout mode instead of terminal UI
-  --text-only             Only show user/assistant text (requires --plainio)
   --debug-api             Write raw API requests and responses to log file
   --version               Show version information
   --help                  Show help information

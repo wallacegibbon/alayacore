@@ -31,7 +31,6 @@ type Settings struct {
 	AutoSummarize bool
 	AutoSave      bool
 	PlainIO       bool
-	TextOnly      bool
 	SystemPrompt  string
 	Skills        []string
 	Addr          string
@@ -51,7 +50,6 @@ func Parse() *Settings {
 	autoSummarize := flag.Bool("auto-summarize", false, "Automatically summarize conversation when context exceeds 80% of limit")
 	autoSave := flag.Bool("auto-save", true, "Automatically save session after each response (requires --session)")
 	plainIO := flag.Bool("plainio", false, "Use plain stdin/stdout mode instead of terminal UI")
-	textOnly := flag.Bool("text-only", false, "Only show user/assistant text (requires --plainio)")
 	systemPrompt := &stringSlice{}
 	flag.Var(systemPrompt, "system", "Extra system prompt (can be specified multiple times, will be appended to default)")
 	skill := &stringSlice{}
@@ -82,7 +80,6 @@ func Parse() *Settings {
 		AutoSummarize: *autoSummarize,
 		AutoSave:      *autoSave,
 		PlainIO:       *plainIO,
-		TextOnly:      *textOnly,
 		SystemPrompt:  mergedSystemPrompt,
 		Skills:        skillPaths,
 		Addr:          *addr,

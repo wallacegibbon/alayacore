@@ -4,8 +4,7 @@
 // messages to stdout. No terminal features (ANSI codes, TTY detection, etc.)
 // are used — just plain IO.
 //
-// Activate with the --plainio flag. Use --text-only alongside it to suppress
-// everything except user prompts and assistant text.
+// Activate with the --plainio flag.
 //
 // Input rules:
 //   - Each line is treated as a separate prompt.
@@ -20,11 +19,10 @@
 // Output format:
 //   - Assistant text/reasoning: printed directly (stream ID prefix stripped).
 //     A blank line is inserted when consecutive deltas belong to different
-//     stream groups (e.g. assistant text followed by reasoning, or a new
-//     step's text after a tool call).
+//     stream groups or different message types.
 //   - User prompts: prefixed with "> ".
-//   - Tool calls: shown as "[tool_name]".
-//   - Tool results: printed as-is (JSON-unescaped).
+//   - Tool calls: shown as "[tool_name: key-args]" (no content).
+//   - Tool results: suppressed.
 //   - Errors: prefixed with "Error: ".
 //   - Notifications: prefixed with "[...]".
 //   - A blank line is printed after each task completes.

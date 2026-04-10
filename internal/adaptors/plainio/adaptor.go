@@ -16,13 +16,12 @@ import (
 
 // Adaptor reads prompts from stdin and prints assistant output to stdout.
 type Adaptor struct {
-	Config   *app.Config
-	TextOnly bool
+	Config *app.Config
 }
 
 // NewAdaptor creates a new plainio adaptor.
-func NewAdaptor(cfg *app.Config, textOnly bool) *Adaptor {
-	return &Adaptor{Config: cfg, TextOnly: textOnly}
+func NewAdaptor(cfg *app.Config) *Adaptor {
+	return &Adaptor{Config: cfg}
 }
 
 // Start runs the plainio adaptor. It blocks until the session finishes.
@@ -33,7 +32,7 @@ func NewAdaptor(cfg *app.Config, textOnly bool) *Adaptor {
 // with code 1 — queued tasks are NOT executed.
 func (a *Adaptor) Start() int {
 	input := stream.NewChanInput(100)
-	output := newStdoutOutput(a.TextOnly)
+	output := newStdoutOutput()
 
 	// Load session
 	session, _ := agentpkg.LoadOrNewSession(

@@ -44,7 +44,6 @@ alayacore --skill ~/playground/alayacore/misc/samples/skills/
 | `--auto-summarize` | Automatically summarize conversation when context exceeds 80% of limit |
 | `--auto-save` | Automatically save session after each response when `--session` is specified (default: enabled) |
 | `--plainio` | Use plain stdin/stdout mode instead of terminal UI |
-| `--text-only` | Only show user prompts and assistant text (requires `--plainio`) |
 | `--debug-api` | Write raw API requests and responses to log file |
 | `--version` | Show version information |
 | `--help` | Show help information |
@@ -87,9 +86,6 @@ alayacore --plainio
 
 # Piped input
 echo "what is 2+2?" | alayacore --plainio
-
-# Text-only mode (just user prompts and assistant text)
-echo "what is 2+2?" | alayacore --plainio --text-only
 
 # Show version
 alayacore --version
@@ -223,22 +219,12 @@ All output is plain text with no ANSI codes:
 | Assistant text | Printed directly |
 | Reasoning | Printed directly |
 | User prompts | `> prompt` |
-| Tool calls | `[tool_name]` |
-| Tool results | Printed as-is |
+| Tool calls | `[tool_name: args]` |
+| Tool results | Suppressed |
 | Errors | `Error: message` |
 | Notifications | `[message]` |
 
-A blank line separates completed tasks from the next prompt.
-
-### Text-only mode
-
-Add `--text-only` to suppress everything except user prompts and assistant text:
-
-```sh
-echo "what is 2+2?" | alayacore --plainio --text-only
-```
-
-This hides tool calls, tool results, reasoning, errors, and notifications.
+A blank line separates messages of different types.
 
 ### Piped Example
 

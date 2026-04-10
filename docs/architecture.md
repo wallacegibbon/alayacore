@@ -93,7 +93,8 @@ The adaptor layer handles user interaction and translates between user actions a
 
 #### PlainIO Adaptor (`internal/adaptors/plainio/`)
 - Plain stdin/stdout mode, activated with `--plainio`
-- `--text-only` suppresses everything except user prompts and assistant text
+- Shows assistant text, reasoning, tool call headers, user prompts
+- Suppresses tool result content
 - Reads prompts from stdin (one per line, backslash continuation)
 - Prints plain text to stdout (no ANSI codes)
 - Ctrl-D exits gracefully (code 0), Ctrl-C sends `:cancel_all` and exits (code 1)

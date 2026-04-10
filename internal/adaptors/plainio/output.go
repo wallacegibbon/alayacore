@@ -12,19 +12,6 @@ import (
 	"github.com/alayacore/alayacore/internal/stream"
 )
 
-// toolCallData represents a tool call (FC tag payload).
-type toolCallData struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Input string `json:"input"`
-}
-
-// toolResultData represents a tool result (FR tag payload).
-type toolResultData struct {
-	ID     string `json:"id"`
-	Output string `json:"output"`
-}
-
 // systemInfo mirrors the SystemInfo JSON from the agent package.
 type systemInfo struct {
 	InProgress bool `json:"in_progress"`
@@ -33,22 +20,21 @@ type systemInfo struct {
 // stdoutOutput implements stream.Output.
 // It parses TLV messages and prints human-readable text to stdout.
 type stdoutOutput struct {
-	mu               sync.Mutex
-	writer           io.Writer
-	buf              []byte
-	inProgress       bool
-	textOnly         bool
-	hasError         bool
-	errorOnce        sync.Once
-	errorCh          chan struct{} // closed on first SE tag
-	lastStreamPrefix string        // tracks last stream ID prefix for newline separation
+	mu           sync.Mutex
+	writer       io.Writer
+	buf          []byte
+	inProgress   bool
+	hasError     bool
+	errorOnce    sync.Once
+	errorCh      chan struct{} // closed on first SE tag
+	lastTag      string        // last tag that produced visible output
+	lastStreamID string        // tracks last stream ID prefix within TA/TR group
 }
 
-func newStdoutOutput(textOnly bool) *stdoutOutput {
+func newStdoutOutput() *stdoutOutput {
 	return &stdoutOutput{
-		writer:   os.Stdout,
-		textOnly: textOnly,
-		errorCh:  make(chan struct{}),
+		writer:  os.Stdout,
+		errorCh: make(chan struct{}),
 	}
 }
 
@@ -96,55 +82,48 @@ func (o *stdoutOutput) processBuffer() {
 }
 
 func (o *stdoutOutput) printMessage(tag string, value string) {
-	// In text-only mode, only show assistant text and user prompts.
-	// Still track task completion internally.
-	if o.textOnly && tag != stream.TagTextAssistant && tag != stream.TagTextUser {
-		o.handleTextOnlyTag(tag, value)
-		return
-	}
-
 	o.handleTag(tag, value)
-}
-
-func (o *stdoutOutput) handleTextOnlyTag(tag, value string) {
-	if tag == stream.TagSystemData {
-		o.handleSystemData(value)
-	}
-	if tag == stream.TagSystemError {
-		o.hasError = true
-		o.errorOnce.Do(func() { close(o.errorCh) })
-	}
 }
 
 func (o *stdoutOutput) handleTag(tag, value string) {
 	switch tag {
 	case stream.TagTextAssistant, stream.TagTextReasoning:
 		prefix, content := extractStreamPrefix(value)
-		if o.lastStreamPrefix != "" && prefix != o.lastStreamPrefix {
+		if o.lastTag != "" && (o.lastTag != stream.TagTextAssistant && o.lastTag != stream.TagTextReasoning) {
+			// Transitioning from a different tag group → separator
+			fmt.Fprintln(o.writer)
+		} else if o.lastStreamID != "" && prefix != o.lastStreamID {
+			// Same group but different stream → separator
 			fmt.Fprintln(o.writer)
 		}
-		o.lastStreamPrefix = prefix
+		o.lastTag = tag
+		o.lastStreamID = prefix
 		fmt.Fprint(o.writer, content)
 
 	case stream.TagTextUser:
-		fmt.Fprintf(o.writer, "\n> %s\n", value)
-		o.lastStreamPrefix = ""
+		o.emitSeparator(tag)
+		fmt.Fprintf(o.writer, "> %s", value)
 
 	case stream.TagSystemError:
-		fmt.Fprintf(o.writer, "\nError: %s\n", value)
+		o.emitSeparator(tag)
+		fmt.Fprintf(o.writer, "[error: %s]", value)
 		o.hasError = true
 		o.errorOnce.Do(func() { close(o.errorCh) })
-		o.lastStreamPrefix = ""
 
 	case stream.TagSystemNotify:
-		fmt.Fprintf(o.writer, "\n[%s]\n", value)
-		o.lastStreamPrefix = ""
+		o.emitSeparator(tag)
+		fmt.Fprintf(o.writer, "[%s]", value)
 
 	case stream.TagFunctionCall:
+		if o.lastTag != "" {
+			fmt.Fprintln(o.writer)
+		}
+		o.lastTag = tag
+		o.lastStreamID = ""
 		o.printFunctionCall(value)
 
 	case stream.TagFunctionResult:
-		o.printFunctionResult(value)
+		// Suppress tool result content; do not update lastTag.
 
 	case stream.TagFunctionState:
 		// Skip state indicators for plainio
@@ -153,57 +132,38 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 		o.handleSystemData(value)
 
 	default:
-		fmt.Fprintf(o.writer, "\n<%s>%s\n", tag, value)
+		o.emitSeparator(tag)
+		fmt.Fprintf(o.writer, "[unknown-tag:%s %s]", tag, value)
 	}
+}
+
+// emitSeparator prints a newline if the previous visible tag differs from the
+// new tag. It updates lastTag to the new tag.
+func (o *stdoutOutput) emitSeparator(tag string) {
+	if o.lastTag != "" && o.lastTag != tag {
+		fmt.Fprintln(o.writer)
+	}
+	o.lastTag = tag
+	o.lastStreamID = ""
 }
 
 func (o *stdoutOutput) printFunctionCall(value string) {
-	var tc toolCallData
+	var tc struct {
+		ID    string `json:"id"`
+		Name  string `json:"name"`
+		Input string `json:"input"`
+	}
 	if err := json.Unmarshal([]byte(value), &tc); err != nil {
 		return
 	}
-	formatted := formatToolCall(tc.Name, tc.Input)
-	fmt.Fprintf(o.writer, "\n%s\n", formatted)
-	o.lastStreamPrefix = ""
+	fmt.Fprintf(o.writer, "%s", formatToolCall(tc.Name, tc.Input))
 }
 
 func (o *stdoutOutput) printFunctionResult(value string) {
-	var tr toolResultData
-	if err := json.Unmarshal([]byte(value), &tr); err != nil {
-		return
-	}
-	fmt.Fprint(o.writer, tr.Output)
-	o.lastStreamPrefix = ""
+	// Plainio mode: suppress tool result content.
 }
 
-// handleSystemData detects task completion transitions and prints a trailing newline.
-func (o *stdoutOutput) handleSystemData(value string) {
-	var info systemInfo
-	if err := json.Unmarshal([]byte(value), &info); err != nil {
-		return
-	}
-	if o.inProgress && !info.InProgress {
-		fmt.Fprintln(o.writer)
-		o.lastStreamPrefix = ""
-	}
-	o.inProgress = info.InProgress
-}
-
-// extractStreamPrefix splits "[:id:]content" into the prefix key and content.
-// The prefix key is everything between "[:":]" (including the brackets).
-// If there is no stream ID prefix, it returns ("", value).
-func extractStreamPrefix(value string) (prefix string, content string) {
-	if !strings.HasPrefix(value, "[:") {
-		return "", value
-	}
-	endIdx := strings.Index(value, ":]")
-	if endIdx == -1 {
-		return "", value
-	}
-	return value[:endIdx+2], value[endIdx+2:]
-}
-
-// formatToolCall formats a tool call for display.
+// formatToolCall formats a tool call header for display (name + key args, no content).
 func formatToolCall(name, input string) string {
 	switch name {
 	case "posix_shell":
@@ -255,4 +215,32 @@ func formatToolCall(name, input string) string {
 		}
 	}
 	return fmt.Sprintf("[%s]", name)
+}
+
+// handleSystemData detects task completion transitions and prints a trailing newline.
+func (o *stdoutOutput) handleSystemData(value string) {
+	var info systemInfo
+	if err := json.Unmarshal([]byte(value), &info); err != nil {
+		return
+	}
+	if o.inProgress && !info.InProgress {
+		fmt.Fprintln(o.writer)
+		o.lastTag = ""
+		o.lastStreamID = ""
+	}
+	o.inProgress = info.InProgress
+}
+
+// extractStreamPrefix splits "[:id:]content" into the prefix key and content.
+// The prefix key is everything between "[:":]" (including the brackets).
+// If there is no stream ID prefix, it returns ("", value).
+func extractStreamPrefix(value string) (prefix string, content string) {
+	if !strings.HasPrefix(value, "[:") {
+		return "", value
+	}
+	endIdx := strings.Index(value, ":]")
+	if endIdx == -1 {
+		return "", value
+	}
+	return value[:endIdx+2], value[endIdx+2:]
 }
