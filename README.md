@@ -53,18 +53,18 @@ The agent reads files, reasons about them, calls more tools if needed, and strea
 AlayaCore is built in four layers connected by a lightweight TLV (Tag-Length-Value) binary protocol:
 
 ```
-┌─────────────────────────────────────────────────┐
-│  Adaptors   │  Terminal (TUI)  │  PlainIO       │  ← User interaction
-├─────────────┼──────────────────┼────────────────┤
-│             │   TLV Protocol   │                │  ← Inter-layer messages
-├─────────────╨──────────────────╨────────────────┤
-│  Session    │  Task Queue · Model Manager        │  ← Conversation state
-├──────────────────────────────────────────────────┤
-│  Agent      │  Provider Interface · Tool Loop    │  ← LLM interaction
-├──────────────────────────────────────────────────┤
-│  Tools      │  read_file · edit_file · write_file│  ← File & shell operations
-│             │  shell · activate_skill            │
-└──────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────┐
+│  Adaptors   │  Terminal (TUI)  │  PlainIO          │  ← User interaction
+├─────────────┼──────────────────┼───────────────────┤
+│             │   TLV Protocol   │                   │  ← Inter-layer messages
+├─────────────╨──────────────────╨───────────────────┤
+│  Session    │  Task Queue · Model Manager          │  ← Conversation state
+├────────────────────────────────────────────────────┤
+│  Agent      │  Provider Interface · Tool Loop      │  ← LLM interaction
+├────────────────────────────────────────────────────┤
+│  Tools      │  read_file · edit_file · write_file  │  ← File & shell operations
+│             │  shell · activate_skill              │
+└────────────────────────────────────────────────────┘
 ```
 
 The TLV protocol cleanly separates the UI layer from the session/agent layer. Adaptors emit user input as TLV messages; the session processes them, runs the agent loop, and emits output TLV messages back. This means the terminal TUI and the plain-IO mode share all the same session and agent logic.
