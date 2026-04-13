@@ -11,8 +11,8 @@
 Created `/internal/llm/schema.go` with `GenerateSchema()` that reads struct tags:
 ```go
 type ReadFileInput struct {
-    Path      string `json:"path" jsonschema:"required,description=The path of the file to read"`
-    StartLine string `json:"start_line" jsonschema:"description=Optional: The starting line number (1-indexed)"`
+	Path      string `json:"path" jsonschema:"required,description=The path of the file to read"`
+	StartLine string `json:"start_line" jsonschema:"description=Optional: The starting line number (1-indexed)"`
 }
 ```
 
@@ -27,65 +27,65 @@ Created `/internal/llm/typed.go` with generic helper that:
 ### Before (70+ lines)
 ```go
 func NewWriteFileTool() llm.Tool {
-    schema := json.RawMessage(`{
-        "type": "object",
-        "properties": {
-            "path": {
-                "type": "string",
-                "description": "The path of the file to write"
-            },
-            "content": {
-                "type": "string",
-                "description": "The content to write to the file"
-            }
-        },
-        "required": ["path", "content"]
-    }`)
+	schema := json.RawMessage(`{
+		"type": "object",
+		"properties": {
+			"path": {
+				"type": "string",
+				"description": "The path of the file to write"
+			},
+			"content": {
+				"type": "string",
+				"description": "The content to write to the file"
+			}
+		},
+		"required": ["path", "content"]
+	}`)
 
-    return llm.NewTool("write_file", "...").
-        WithSchema(schema).
-        WithExecute(func(_ context.Context, input json.RawMessage) (llm.ToolResultOutput, error) {
-            var args WriteFileInput
-            if err := json.Unmarshal(input, &args); err != nil {
-                return llm.NewTextErrorResponse("failed to parse input: " + err.Error()), nil
-            }
+	return llm.NewTool("write_file", "...").
+		WithSchema(schema).
+		WithExecute(func(_ context.Context, input json.RawMessage) (llm.ToolResultOutput, error) {
+			var args WriteFileInput
+			if err := json.Unmarshal(input, &args); err != nil {
+				return llm.NewTextErrorResponse("failed to parse input: " + err.Error()), nil
+			}
 
-            if args.Path == "" {
-                return llm.NewTextErrorResponse("path is required"), nil
-            }
+			if args.Path == "" {
+				return llm.NewTextErrorResponse("path is required"), nil
+			}
 
-            if err := os.WriteFile(args.Path, []byte(args.Content), 0644); err != nil {
-                return llm.NewTextErrorResponse(err.Error()), nil
-            }
+			if err := os.WriteFile(args.Path, []byte(args.Content), 0644); err != nil {
+				return llm.NewTextErrorResponse(err.Error()), nil
+			}
 
-            return llm.NewTextResponse("File written successfully"), nil
-        }).
-        Build()
+			return llm.NewTextResponse("File written successfully"), nil
+		}).
+		Build()
 }
 ```
 
 ### After (30 lines - 57% reduction!)
 ```go
 type WriteFileInput struct {
-    Path    string `json:"path" jsonschema:"required,description=The path of the file to write"`
-    Content string `json:"content" jsonschema:"required,description=The content to write to the file"`
+	Path    string `json:"path" jsonschema:"required,description=The path of the file to write"`
+	Content string `json:"content" jsonschema:"required,description=The content to write to the file"`
 }
 
 func NewWriteFileTool() llm.Tool {
-    return llm.NewTool("write_file", "...").
-        WithSchema(llm.GenerateSchema(WriteFileInput{})).
-        WithExecute(llm.TypedExecute(executeWriteFile)).
-        Build()
+	return llm.NewTool("write_file", "...").
+		WithSchema(llm.GenerateSchema(WriteFileInput{})).
+		WithExecute(llm.TypedExecute(executeWriteFile)).
+		Build()
 }
 
 func executeWriteFile(_ context.Context, args WriteFileInput) (llm.ToolResultOutput, error) {
-    if args.Path == "" {
-        return llm.NewTextErrorResponse("path is required"), nil
-    }
-    if err := os.WriteFile(args.Path, []byte(args.Content), 0644); err != nil {
-        return llm.NewTextErrorResponse(err.Error()), nil
-    }
-    return llm.NewTextResponse("File written successfully"), nil
+	if args.Path == "" {
+		return llm.NewTextErrorResponse("path is required"), nil
+	}
+	if err := os.WriteFile(args.Path, []byte(args.Content), 0644); err != nil {
+		return llm.NewTextErrorResponse(err.Error()), nil
+	}
+	return llm.NewTextResponse("File written successfully"), nil
 }
 ```
 
@@ -102,9 +102,9 @@ func executeWriteFile(_ context.Context, args WriteFileInput) (llm.ToolResultOut
 
 ```go
 type Example struct {
-    Name     string `json:"name" jsonschema:"required,description=The name"`
-    Type     string `json:"type" jsonschema:"required,description=The type,enum=foo|bar|baz"`
-    Optional string `json:"optional" jsonschema:"description=This is optional"`
+	Name     string `json:"name" jsonschema:"required,description=The name"`
+	Type     string `json:"type" jsonschema:"required,description=The type,enum=foo|bar|baz"`
+	Optional string `json:"optional" jsonschema:"description=This is optional"`
 }
 ```
 
@@ -137,25 +137,25 @@ Supported tags:
 For simple tools:
 ```go
 func NewMyTool() llm.Tool {
-    return llm.NewTool("name", "description").
-        WithSchema(llm.GenerateSchema(MyInput{})).
-        WithExecute(llm.TypedExecute(executeMyTool)).
-        Build()
+	return llm.NewTool("name", "description").
+		WithSchema(llm.GenerateSchema(MyInput{})).
+		WithExecute(llm.TypedExecute(executeMyTool)).
+		Build()
 }
 
 func executeMyTool(_ context.Context, args MyInput) (llm.ToolResultOutput, error) {
-    // Just the business logic
+	// Just the business logic
 }
 ```
 
 For tools needing closure variables:
 ```go
 func NewMyTool(dep *Dependency) llm.Tool {
-    return llm.NewTool("name", "description").
-        WithSchema(llm.GenerateSchema(MyInput{})).
-        WithExecute(llm.TypedExecute(func(_ context.Context, args MyInput) (llm.ToolResultOutput, error) {
-            // Can use dep here
-        })).
-        Build()
+	return llm.NewTool("name", "description").
+		WithSchema(llm.GenerateSchema(MyInput{})).
+		WithExecute(llm.TypedExecute(func(_ context.Context, args MyInput) (llm.ToolResultOutput, error) {
+			// Can use dep here
+		})).
+		Build()
 }
 ```

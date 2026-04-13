@@ -1,10 +1,6 @@
-# AlayaCore Architecture
+# Architecture
 
-This document describes the architecture of AlayaCore, an AI assistant with terminal and plain IO interfaces.
-
-## Overview
-
-AlayaCore follows a layered architecture with clear separation of concerns:
+AlayaCore follows a layered architecture with clear separation of concerns via the TLV protocol.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -59,7 +55,7 @@ AlayaCore follows a layered architecture with clear separation of concerns:
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Component Descriptions
+## Components
 
 ### Entry Point (`main.go`, `internal/config/`, `internal/app/`)
 
@@ -92,7 +88,6 @@ The adaptor layer handles user interaction and translates between user actions a
 - Shows assistant text, reasoning, tool call headers, user prompts
 - Suppresses tool result content
 - Reads prompts from stdin (one per line, backslash continuation)
-- Prints plain text to stdout (no ANSI codes)
 - Ctrl-D exits gracefully (code 0), Ctrl-C sends `:cancel_all` and exits (code 1)
 
 ### Session Layer (`internal/agent/`)
@@ -115,22 +110,21 @@ The agent layer handles language model interaction and tool-calling orchestratio
 - **Types**: Message, ContentPart, StreamEvent definitions
 - **Typed helpers**: Type-safe tool execution via `TypedExecute`
 
-**Key Pattern - Callback Streaming:**
+**Key Pattern — Callback Streaming:**
 ```go
 Agent.Stream(ctx, messages, llm.StreamCallbacks{
-    OnTextDelta:      func(delta string) error { ... },
-    OnReasoningDelta: func(delta string) error { ... },  // For thinking tokens
-    OnToolCall:       func(id, name string, input json.RawMessage) error { ... },
-    OnToolResult:     func(id string, output ToolResultOutput) error { ... },
-    OnStepStart:      func(step int) error { ... },
-    OnStepFinish:     func(msgs []Message, usage Usage) error { ... },
+	OnTextDelta:      func(delta string) error { ... },
+	OnReasoningDelta: func(delta string) error { ... },
+	OnToolCall:       func(id, name string, input json.RawMessage) error { ... },
+	OnToolResult:     func(id string, output ToolResultOutput) error { ... },
+	OnStepStart:      func(step int) error { ... },
+	OnStepFinish:     func(msgs []Message, usage Usage) error { ... },
 })
 ```
-Messages are appended incrementally in `OnStepFinish` so they're preserved even if user cancels.
+
+Messages are appended incrementally in `OnStepFinish` so they're preserved even if the user cancels.
 
 ### Tools Layer (`internal/tools/`)
-
-Tools are functions the AI can call to interact with the system.
 
 | Tool | Description | Safety |
 |------|-------------|--------|
@@ -193,66 +187,7 @@ Default Prompt
 + Extra System Prompt (from --system flag)
 ```
 
-For Anthropic APIs with `prompt_cache: true`, cache_control markers are applied to the default and extra system prompts separately for optimal caching.
-
-## Configuration
-
-### Model Configuration (`~/.alayacore/model.conf`)
-
-```
-name: "OpenAI GPT-4o"
-protocol_type: "openai"
-base_url: "https://api.openai.com/v1"
-api_key: "sk-..."
-model_name: "gpt-4o"
-context_limit: 128000
-prompt_cache: true  # Optional: enables cache_control for Anthropic APIs
----
-name: "Ollama Local"
-protocol_type: "anthropic"
-base_url: "http://127.0.0.1:11434"
-model_name: "llama3"
-context_limit: 32768
-```
-
-**Important**: The program NEVER writes to this file. Users must edit it manually.
-
-### Runtime Configuration (`~/.alayacore/runtime.conf`)
-
-```
-active_model: "OpenAI GPT-4o"
-active_theme: "theme-dark"
-```
-
-The active model is determined by:
-1. If `runtime.conf` has a saved `active_model`, that model is used
-2. Otherwise, the **first model** in `model.conf` becomes the active model
-
-The active theme is saved to `runtime.conf` when you select a theme in the theme selector (`Ctrl+P`).
-
-### Theme Configuration (`~/.alayacore/themes/`)
-
-Themes are stored as `.conf` files in the themes folder. Each file defines a color scheme:
-
-```
-# ~/.alayacore/themes/theme-dark.conf
-primary: #89d4fa
-dim: #313244
-muted: #6c7086
-text: #cdd6f4
-warning: #f9e2af
-error: #f38ba8
-success: #a6e3a1
-selection: #fab387
-cursor: #cdd6f4
-added: #a6e3a1
-removed: #f38ba8
-```
-
-- **Default location**: `~/.alayacore/themes/`
-- **Custom location**: Use `--themes /path/to/themes` to specify a different folder
-- **Auto-initialization**: If the themes folder doesn't exist, AlayaCore creates it with default `theme-dark.conf` and `theme-light.conf`
-- **Switching themes**: Press `Ctrl+P` in the terminal to open the theme selector
+For Anthropic APIs with `prompt_cache: true`, `cache_control` markers are applied to the default and extra system prompts separately for optimal caching.
 
 ## Data Flow
 
@@ -312,117 +247,68 @@ Tool result added to messages
 Agent continues to next step (if under max_steps)
 ```
 
-## Key Design Decisions
+## Design Decisions
 
-1. **TLV Protocol**: Simple binary protocol for clean separation between adaptors and session
-2. **Task Queue**: Async task processing with cancellation support
-3. **Virtual Scrolling**: Handle large outputs efficiently without performance degradation
-4. **Domain Errors**: Structured error types with operation context for consistent error handling
-5. **Command Registry**: Declarative command registration for extensibility
-6. **Interface Abstraction**: OutputWriter interface for testability
-7. **Provider Factory**: Decoupled provider creation from session logic
-8. **Typed Tools**: `TypedExecute[T]` wrapper for type-safe tool implementations
-9. **Lazy Agent Init**: Agent/Provider created on first use, not at startup
-10. **Sequential Tool Execution**: Tool calls execute one at a time even when the LLM returns multiple. See [Sequential Tool Execution](sequential-tool-execution.md) for the rationale.
+1. **TLV Protocol** — Simple binary protocol for clean separation between adaptors and session
+2. **Task Queue** — Async task processing with cancellation support
+3. **Virtual Scrolling** — Handle large outputs efficiently without performance degradation
+4. **Domain Errors** — Structured error types with operation context for consistent error handling
+5. **Command Registry** — Declarative command registration for extensibility
+6. **Interface Abstraction** — OutputWriter interface for testability
+7. **Provider Factory** — Decoupled provider creation from session logic
+8. **Typed Tools** — `TypedExecute[T]` wrapper for type-safe tool implementations
+9. **Lazy Agent Init** — Agent/Provider created on first use, not at startup
+10. **Sequential Tool Execution** — Tools execute one at a time. See [sequential-tool-execution.md](sequential-tool-execution.md)
 
-## Critical Implementation Gotchas
+## Gotchas
 
-These are non-obvious patterns that have caused bugs. When modifying related code, read the corresponding section carefully.
+Non-obvious patterns that have caused bugs. When modifying related code, read carefully.
 
-### Mutex Deadlock in SwitchModel
-Don't hold mutex while calling methods that may need the same mutex.
+### Agent step messages must not be reconstructed
+
+The provider's `StepCompleteEvent.Messages` contains the complete assistant message — text, reasoning, and tool calls all together. The agent must use these messages as-is, not reconstruct a new message from just the tool calls. Reconstruction loses text content that the LLM returned alongside tool calls. See `agent.go` → `processStreamEvents`.
+
+### Sentinel values must never be overwritten
+
+`WindowBuffer.dirtyIndex` uses a sentinel (`fullRebuild = -2`) to signal that all windows need recalculation. State transitions must check whether the sentinel is already set before overwriting — an `else` branch that blindly assigns a new index can downgrade a full-rebuild to a single-window update, silently dropping windows from the display. See `window.go` → `markDirty`.
+
+### Mutex deadlock in SwitchModel
+
+Don't hold a mutex while calling methods that may need the same mutex.
+
 ```
 ❌ lock → update fields → call method (needs lock) → deadlock
 ✅ lock → update fields → unlock → call method
 ```
 
-### OpenAI Tool Call Chunking
+### OpenAI tool call chunking
+
 Tool arguments arrive in chunks across multiple delta events:
 - First chunk: has `id` and `name`
 - Subsequent chunks: `id: ""` but correct `index`
-- **Must use `index` (not `id`) to associate chunks** - see `openAIStreamState.appendToolCallArgs()`
-- When sending back in history, arguments must be JSON-string (not raw JSON) - see `convertToolCalls()`
+- **Must use `index` (not `id`) to associate chunks** — see `openAIStreamState.appendToolCallArgs()`
+- When sending back in history, arguments must be JSON-string (not raw JSON) — see `convertToolCalls()`
 
-### Anthropic Prompt Caching
+### Anthropic prompt caching
+
 - System message must be ≥1024 tokens for caching to activate
 - Uses **automatic caching**: single `cache_control: {"type": "ephemeral"}` applied to system prompts
 - Enabled per-model via `prompt_cache: true` in model.conf (other providers ignore)
 - Best for multi-turn conversations where growing message history should be cached automatically
 
-### Terminal Scroll Position
+### Terminal scroll position
+
 `userMovedCursorAway` must be set for J/K (line scroll) and Ctrl+D/Ctrl+U (half-page scroll), not just j/k (cursor move), or auto-follow is not properly disabled on manual scrolling.
 
-### Incomplete Tool Calls on Cancel
+### Incomplete tool calls on cancel
+
 When user cancels mid-tool-call, messages may have `tool_use` without matching `tool_result`. `cleanIncompleteToolCalls()` removes these to prevent API errors on next request.
 
-### Tool Result Message Ordering
-`OnStepFinish` callback receives complete step messages. For tool-using steps, this includes both the assistant message (with tool calls) AND the tool result message. The `OnToolResult` callback should only send UI notifications, not append to session messages - the agent loop handles message assembly.
+### Tool result message ordering
 
-### ANSI Escape Sequences Are Not Recursive
+`OnStepFinish` callback receives complete step messages. For tool-using steps, this includes both the assistant message (with tool calls) AND the tool result message. The `OnToolResult` callback should only send UI notifications, not append to session messages — the agent loop handles message assembly.
+
+### ANSI escape sequences are not recursive
+
 When styling text with lipgloss, each segment must be rendered individually before concatenation. You cannot render a string that already contains ANSI codes with a new style and expect it to work.
 
-## File Organization
-
-```
-alayacore/
-├── main.go                    # Entry point
-├── internal/
-│   ├── adaptors/
-│   │   ├── terminal/          # Terminal UI adaptor
-│   │   │   ├── adaptor.go     # Adaptor interface and creation
-│   │   │   ├── terminal.go    # Main Bubble Tea model
-│   │   │   ├── keybinds.go    # Key constants, bindings, and handler
-│   │   │   ├── output.go      # TLV parsing and output rendering
-│   │   │   ├── window.go      # Virtual scrolling buffer
-│   │   │   ├── input_component.go  # Input handling with editor support
-│   │   │   ├── interfaces.go  # Interface definitions
-│   │   │   ├── model_selector.go   # Model switching UI
-│   │   │   ├── queue_manager.go    # Task queue UI
-│   │   │   ├── theme_manager.go    # Theme loading/management
-│   │   │   ├── theme_selector.go   # Theme switching UI
-│   │   │   ├── styles.go      # Theme definitions and lipgloss styles
-│   │   │   ├── tool.go        # Tool display helpers
-│   │   │   ├── tool_handler.go    # Tool execution handling
-│   │   │   ├── warnings.go    # Warning message handling
-│   │   │   └── doc.go         # Package documentation
-│   │   └── plainio/             # Plain stdin/stdout adaptor (--plainio)
-│   ├── agent/
-│   │   ├── session.go         # Session management
-│   │   ├── session_io.go      # Session I/O and task handling
-│   │   ├── session_persist.go # Session persistence (TLV format)
-│   │   ├── command_registry.go    # Command registration
-│   │   ├── model_manager.go   # Model config loading (never writes)
-│   │   └── runtime_manager.go # Active model/theme persistence
-│   ├── app/
-│   │   └── app.go             # App initialization, system prompt
-│   ├── config/
-│   │   ├── config.go          # CLI flag parsing
-│   │   └── version.go         # Version constant
-│   ├── debug/
-│   │   └── http.go            # HTTP client with proxy/debug support
-│   ├── stream/                # TLV protocol
-│   ├── errors/                # Domain errors
-│   ├── skills/
-│   │   ├── loader.go          # Skill discovery/loading
-│   │   ├── manifest.go        # Skill metadata parsing
-│   │   └── types.go           # Skill types
-│   ├── tools/                 # Agent tools
-│   │   ├── read_file.go
-│   │   ├── edit_file.go
-│   │   ├── write_file.go
-│   │   ├── shell.go
-│   │   └── activate_skill.go
-│   └── llm/
-│       ├── agent.go           # Tool-calling loop
-│       ├── types.go           # Message, ContentPart, StreamEvent
-│       ├── helpers.go         # Message constructors and tool builder
-│       ├── typed.go           # TypedExecute wrapper
-│       ├── schema.go          # JSON schema generation from struct tags
-│       ├── factory/           # Provider factory
-│       │   └── provider_factory.go
-│       └── providers/         # LLM provider implementations
-│           ├── anthropic.go
-│           └── openai.go
-└── docs/
-    └── architecture.md        # This document
-```

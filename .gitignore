@@ -4,3 +4,4 @@ model.conf
 alayacore-*.log
 *.swp
 *~
+.obsidian/

@@ -38,11 +38,11 @@ Error detection is implemented in `internal/llm/providers/openai.go` in the `han
 
 ```go
 if choice.FinishReason == "content_filter" {
-    return fmt.Errorf("content blocked by safety filter")
+	return fmt.Errorf("content blocked by safety filter")
 }
 if choice.FinishReason != "" && choice.FinishReason != "stop" &&
-    choice.FinishReason != "length" && choice.FinishReason != "tool_calls" {
-    return fmt.Errorf("stream finished with unexpected reason: %s", choice.FinishReason)
+	choice.FinishReason != "length" && choice.FinishReason != "tool_calls" {
+	return fmt.Errorf("stream finished with unexpected reason: %s", choice.FinishReason)
 }
 ```
 
@@ -77,11 +77,11 @@ Error detection is implemented in `internal/llm/providers/anthropic.go` in the `
 
 ```go
 if stopReason == "refusal" {
-    return fmt.Errorf("model refused to respond: content policy violation")
+	return fmt.Errorf("model refused to respond: content policy violation")
 }
 if stopReason != "" && stopReason != "end_turn" && stopReason != "max_tokens" &&
-    stopReason != "stop_sequence" && stopReason != "tool_use" && stopReason != "pause_turn" {
-    return fmt.Errorf("stream finished with unexpected stop reason: %s", stopReason)
+	stopReason != "stop_sequence" && stopReason != "tool_use" && stopReason != "pause_turn" {
+	return fmt.Errorf("stream finished with unexpected stop reason: %s", stopReason)
 }
 ```
 

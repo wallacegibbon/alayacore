@@ -63,9 +63,9 @@ If the tool catalog grows to include slow, read-only operations, the cleanest ap
 
 ```go
 type Tool struct {
-    Definition   ToolDefinition
-    Execute      func(ctx context.Context, input json.RawMessage) (ToolResultOutput, error)
-    SafeToConcur bool // opt-in per tool
+	Definition   ToolDefinition
+	Execute      func(ctx context.Context, input json.RawMessage) (ToolResultOutput, error)
+	SafeToConcur bool // opt-in per tool
 }
 ```
 

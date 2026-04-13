@@ -37,18 +37,18 @@ This queries the current terminal size and **always sends a `WindowSizeMsg`**:
 
 ```go
 func (p *Program) checkResize() {
-    if p.ttyOutput == nil {
-        return
-    }
+	if p.ttyOutput == nil {
+		return
+	}
 
-    w, h, err := term.GetSize(p.ttyOutput.Fd())
-    if err != nil {
-        // ...
-        return
-    }
+	w, h, err := term.GetSize(p.ttyOutput.Fd())
+	if err != nil {
+		// ...
+		return
+	}
 
-    p.width, p.height = w, h
-    p.Send(WindowSizeMsg{Width: w, Height: h})
+	p.width, p.height = w, h
+	p.Send(WindowSizeMsg{Width: w, Height: h})
 }
 ```
 

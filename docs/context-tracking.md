@@ -24,12 +24,12 @@ Provider API response
 
 ```go
 func (s *Session) trackUsage(usage llm.Usage) {
-    s.mu.Lock()
-    s.TotalSpent.InputTokens += usage.InputTokens
-    s.TotalSpent.OutputTokens += usage.OutputTokens
-    s.ContextTokens = usage.InputTokens + usage.CacheReadTokens + usage.CacheCreationTokens
-    s.mu.Unlock()
-    s.sendSystemInfo()
+	s.mu.Lock()
+	s.TotalSpent.InputTokens += usage.InputTokens
+	s.TotalSpent.OutputTokens += usage.OutputTokens
+	s.ContextTokens = usage.InputTokens + usage.CacheReadTokens + usage.CacheCreationTokens
+	s.mu.Unlock()
+	s.sendSystemInfo()
 }
 ```
 
