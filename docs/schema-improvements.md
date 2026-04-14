@@ -149,5 +149,5 @@ All five built-in tools use this pattern:
 | `read_file` | `internal/tools/read_file.go` | ~100 |
 | `edit_file` | `internal/tools/edit_file.go` | ~88 |
 | `write_file` | `internal/tools/write_file.go` | ~39 |
-| `shell` | `internal/tools/shell.go` | ~84 |
+| `execute_command` | `internal/tools/execute_command.go` | ~84 |
 | `activate_skill` | `internal/tools/activate_skill.go` | ~30 |

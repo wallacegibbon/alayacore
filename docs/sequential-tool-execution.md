@@ -32,13 +32,13 @@ Tool execution is a small fraction of total latency. The bottleneck is always LL
 | `activate_skill` | Loads metadata | ✅ Mostly safe |
 | `edit_file` | Mutates files | ⚠️ Risky |
 | `write_file` | Creates/overwrites files | ⚠️ Risky |
-| `shell` | Anything can happen | ❌ Dangerous |
+| `execute_command` | Anything can happen | ❌ Dangerous |
 
-The LLM frequently mixes reads and writes in the same response block. Running those in parallel creates subtle bugs — two `edit_file` calls on the same file, or a `shell` command that depends on a prior `write_file`, would produce unpredictable results.
+The LLM frequently mixes reads and writes in the same response block. Running those in parallel creates subtle bugs — two `edit_file` calls on the same file, or a `execute_command` call that depends on a prior `write_file`, would produce unpredictable results.
 
 ### 3. Sequential Is Simpler to Reason About
 
-- **No race conditions** — Tools that touch the filesystem or run shell commands can't interfere with each other.
+- **No race conditions** — Tools that touch the filesystem or run commands can't interfere with each other.
 - **Deterministic errors** — When tool 3 of 5 fails, the error is unambiguous. No partial results, no goroutine cleanup.
 - **Clean cancellation** — The loop checks `ctx` between iterations naturally. Goroutines require `errgroup` or similar patterns.
 - **Testable** — Sequential behavior is deterministic. Tests don't flake due to scheduling order.

@@ -461,7 +461,7 @@ func TestDisplayMessagesWithToolCalls(t *testing.T) {
 					llm.ToolCallPart{
 						Type:       "tool_use",
 						ToolCallID: "call_123",
-						ToolName:   "shell",
+						ToolName:   "execute_command",
 						Input:      json.RawMessage(`{"command": "ls -la"}`),
 					},
 				},
@@ -531,7 +531,7 @@ func TestDisplayMessagesWithToolCalls(t *testing.T) {
 	}
 
 	// Tool call should be in TLV as FC tag
-	if !strings.Contains(outputStr, "shell") {
+	if !strings.Contains(outputStr, "execute_command") {
 		t.Error("Tool call should be in TLV")
 	}
 }

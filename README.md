@@ -2,9 +2,9 @@
 
 A fast, minimal AI coding agent that runs in your terminal.
 
-AlayaCore connects to any OpenAI-compatible or Anthropic-compatible LLM and gives it the tools to read, write, and edit files, execute shell commands, and activate skills — all from an interactive TUI with streaming output, session persistence, and multi-step agentic tool-calling loops.
+AlayaCore connects to any OpenAI-compatible or Anthropic-compatible LLM and gives it the tools to read, write, and edit files, execute commands, and activate skills — all from an interactive TUI with streaming output, session persistence, and multi-step agentic tool-calling loops.
 
-You give AlayaCore a task in natural language. It calls an LLM, which reasons about the task and invokes tools — reading files to understand context, editing them to make changes, running shell commands to verify results — in an autonomous loop until the task is done. You watch the work happen in real time and can intervene at any point.
+You give AlayaCore a task in natural language. It calls an LLM, which reasons about the task and invokes tools — reading files to understand context, editing them to make changes, running commands to verify results — in an autonomous loop until the task is done. You watch the work happen in real time and can intervene at any point.
 
 Built with [Bubble Tea](https://charm.land/) for a responsive terminal UI with vim-like keybindings, virtual scrolling, and a windowed display for concurrent streams.
 
@@ -20,7 +20,7 @@ On first run, AlayaCore auto-creates a default model config at `~/.alayacore/mod
 ## Features
 
 - **Autonomous tool-calling loop** — The LLM plans, calls tools, and iterates until the task is done. Up to 100 steps per prompt.
-- **Five built-in tools** — `read_file`, `edit_file`, `write_file`, `shell`, `activate_skill`.
+- **Five built-in tools** — `read_file`, `edit_file`, `write_file`, `execute_command`, `activate_skill`.
 - **Any LLM provider** — OpenAI, Anthropic, DeepSeek, Qwen, Ollama, LM Studio. Multiple models in one config, switch at runtime.
 - **Streaming TUI** — Real-time output with virtual scrolling, foldable windows, and vim-like keybindings.
 - **Plain IO mode** — `--plainio` for scripting and piping. No TUI, just stdin/stdout.

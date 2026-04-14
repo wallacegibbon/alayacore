@@ -15,7 +15,7 @@ import (
 
 const DefaultSystemPrompt = `IDENTITY:
 - Your name is AlayaCore
-- You are a helpful AI assistant with access to tools for reading/writing files, executing shell commands, and activating skills
+- You are a helpful AI assistant with access to tools for reading/writing files, executing commands, and activating skills
 
 RULES:
 - Never assume - verify with tools
@@ -60,14 +60,14 @@ func Setup(cfg *config.Settings) (*Config, error) {
 	readFileTool := tools.NewReadFileTool()
 	writeFileTool := tools.NewWriteFileTool()
 	activateSkillTool := tools.NewActivateSkillTool(skillsManager)
-	shellTool := tools.NewShellTool()
+	executeCommandTool := tools.NewExecuteCommandTool()
 	editFileTool := tools.NewEditFileTool()
 
 	return &Config{
 		Cfg:               cfg,
 		Provider:          nil, // Provider will be created when model is set
 		SkillsMgr:         skillsManager,
-		AgentTools:        []llm.Tool{readFileTool, editFileTool, writeFileTool, activateSkillTool, shellTool},
+		AgentTools:        []llm.Tool{readFileTool, editFileTool, writeFileTool, activateSkillTool, executeCommandTool},
 		SystemPrompt:      systemPrompt,
 		ExtraSystemPrompt: cfg.SystemPrompt, // User-provided extra system prompt (supplemental, not replacement)
 		MaxSteps:          cfg.MaxSteps,

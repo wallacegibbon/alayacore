@@ -51,21 +51,21 @@ func (h *GenericHandler) ShouldShowOutput() bool {
 	return h.showOutput
 }
 
-// ShellHandler handles shell commands.
-type ShellHandler struct{}
+// ExecuteCommandHandler handles execute_command calls.
+type ExecuteCommandHandler struct{}
 
-func (h *ShellHandler) FormatCall(input json.RawMessage, _ *Styles) string {
+func (h *ExecuteCommandHandler) FormatCall(input json.RawMessage, _ *Styles) string {
 	var args struct {
 		Command string `json:"command"`
 	}
 	if err := json.Unmarshal(input, &args); err != nil {
-		return "shell: <parse error>"
+		return "execute_command: <parse error>"
 	}
 	// Add newline at end so output starts on new line
-	return fmt.Sprintf("shell: %s\n", escapeNewlines(args.Command))
+	return fmt.Sprintf("execute_command: %s\n", escapeNewlines(args.Command))
 }
 
-func (h *ShellHandler) ShouldShowOutput() bool {
+func (h *ExecuteCommandHandler) ShouldShowOutput() bool {
 	return true
 }
 
@@ -188,11 +188,11 @@ func (h *ActivateSkillHandler) ShouldShowOutput() bool {
 
 // ToolHandlers maps tool names to their display handlers.
 var ToolHandlers = map[string]ToolDisplayHandler{
-	"shell":          &ShellHandler{},
-	"read_file":      &ReadFileHandler{},
-	"write_file":     &WriteFileHandler{},
-	"edit_file":      &EditFileHandler{},
-	"activate_skill": &ActivateSkillHandler{},
+	"execute_command": &ExecuteCommandHandler{},
+	"read_file":       &ReadFileHandler{},
+	"write_file":      &WriteFileHandler{},
+	"edit_file":       &EditFileHandler{},
+	"activate_skill":  &ActivateSkillHandler{},
 }
 
 // GetHandler returns the handler for a tool, or a generic fallback.

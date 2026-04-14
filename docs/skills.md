@@ -16,7 +16,7 @@ AlayaCore supports the [Agent Skills](https://agentskills.io) specification. Ski
    </available_skills>
    ```
 3. **Activation** — When a task matches a skill's description, the LLM calls the `activate_skill` tool to load the full instructions.
-4. **Execution** — The agent follows the loaded instructions, optionally running bundled scripts via the `shell` tool.
+4. **Execution** — The agent follows the loaded instructions, optionally running bundled scripts via the `execute_command` tool.
 
 ## Usage
 
@@ -118,7 +118,7 @@ When the user asks "what's the weather in Tokyo?", the LLM:
 1. Matches the query against the skill description
 2. Calls `activate_skill` with name "weather"
 3. Reads the full instructions from `SKILL.md`
-4. Runs `scripts/weather.sh "Tokyo"` via the `shell` tool
+4. Runs `scripts/weather.sh "Tokyo"` via the `execute_command` tool
 5. Reports the results back to the user
 
 ## Skill Specification

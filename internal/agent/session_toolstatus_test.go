@@ -135,8 +135,7 @@ func TestWriteToolCallWithPending(t *testing.T) {
 		Output: output,
 	}
 
-	// Call writeToolCall with shell (a known tool)
-	session.writeToolCall("shell", `{"command":"ls"}`, "tool123")
+	session.writeToolCall("execute_command", `{"command":"ls"}`, "tool123")
 
 	// Should have written two TLV messages:
 	// 1. TagFunctionCall with tool call JSON (creates window)

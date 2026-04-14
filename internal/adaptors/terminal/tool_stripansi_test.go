@@ -181,7 +181,7 @@ func TestColorizeTool_WithANSI(t *testing.T) {
 	}{
 		{
 			name:     "tool output with ANSI colors",
-			input:    "shell: \x1b[31merror\x1b[0m",
+			input:    "execute_command: \x1b[31merror\x1b[0m",
 			contains: "error",
 		},
 		{

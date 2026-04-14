@@ -13,9 +13,9 @@ import (
 	"github.com/alayacore/alayacore/internal/llm"
 )
 
-// shellInput represents the input for the shell tool
-type shellInput struct {
-	Command string `json:"command" jsonschema:"required,description=The shell command to execute"`
+// executeCommandInput represents the input for the execute_command tool
+type executeCommandInput struct {
+	Command string `json:"command" jsonschema:"required,description=The command to execute"`
 }
 
 // shellPath is the resolved path to the shell binary (bash if available, sh otherwise).
@@ -41,10 +41,10 @@ func resolveShellPath() string {
 	return shellPath
 }
 
-// NewShellTool creates a shell tool for executing commands via bash (or sh as fallback).
-func NewShellTool() llm.Tool {
+// NewExecuteCommandTool creates a tool for executing commands via bash (or sh as fallback).
+func NewExecuteCommandTool() llm.Tool {
 	return llm.NewTool(
-		"shell",
+		"execute_command",
 		`Execute a shell command.
 
 Rules:
@@ -55,18 +55,18 @@ Rules:
 - Clean up temporary files when done
 - Commands run in a detached session with no controlling terminal and stdin closed. Interactive programs (sudo, ssh, etc.) that require a TTY or terminal input will fail immediately.`,
 	).
-		WithSchema(llm.GenerateSchema(shellInput{})).
-		WithExecute(llm.TypedExecute(executeShell)).
+		WithSchema(llm.GenerateSchema(executeCommandInput{})).
+		WithExecute(llm.TypedExecute(executeCommand)).
 		Build()
 }
 
-func executeShell(ctx context.Context, args shellInput) (llm.ToolResultOutput, error) {
+func executeCommand(ctx context.Context, args executeCommandInput) (llm.ToolResultOutput, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		cwd = "." // fallback to current directory
 	}
 
-	//nolint:gosec // G204: Command from user input is intentional for shell tool
+	//nolint:gosec // G204: Command from user input is intentional for execute_command tool
 	cmd := exec.CommandContext(ctx, resolveShellPath(), "-c", args.Command)
 	cmd.Dir = cwd
 
@@ -102,18 +102,18 @@ func executeShell(ctx context.Context, args shellInput) (llm.ToolResultOutput, e
 
 	select {
 	case <-ctx.Done():
-		return handleShellCancellation(cmd, done, &stdout, &stderr), nil
+		return handleCommandCancellation(cmd, done, &stdout, &stderr), nil
 	case execErr := <-done:
-		return handleShellCompletion(execErr, &stdout, &stderr), nil
+		return handleCommandCompletion(execErr, &stdout, &stderr), nil
 	}
 }
 
-func handleShellCancellation(cmd *exec.Cmd, done chan error, stdout, stderr *bytes.Buffer) llm.ToolResultOutput {
+func handleCommandCancellation(cmd *exec.Cmd, done chan error, stdout, stderr *bytes.Buffer) llm.ToolResultOutput {
 	process := cmd.Process
 	if process != nil {
 		terminateProcessGroup(process, done)
 	}
-	output := combineShellOutput(stdout, stderr)
+	output := combineCommandOutput(stdout, stderr)
 	if output != "" {
 		return llm.NewTextErrorResponse("canceled: " + output)
 	}
@@ -141,8 +141,8 @@ func terminateProcessGroup(process *os.Process, done chan error) {
 	}
 }
 
-func handleShellCompletion(execErr error, stdout, stderr *bytes.Buffer) llm.ToolResultOutput {
-	output := combineShellOutput(stdout, stderr)
+func handleCommandCompletion(execErr error, stdout, stderr *bytes.Buffer) llm.ToolResultOutput {
+	output := combineCommandOutput(stdout, stderr)
 
 	if execErr != nil {
 		if exitErr, ok := execErr.(*exec.ExitError); ok {
@@ -154,7 +154,7 @@ func handleShellCompletion(execErr error, stdout, stderr *bytes.Buffer) llm.Tool
 	return llm.NewTextResponse(output)
 }
 
-func combineShellOutput(stdout, stderr *bytes.Buffer) string {
+func combineCommandOutput(stdout, stderr *bytes.Buffer) string {
 	output := stdout.String()
 	if stderr.Len() > 0 {
 		if output != "" {
