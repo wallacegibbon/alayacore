@@ -8,10 +8,10 @@ import (
 )
 
 // TerminateProcessGroup kills the process tree on Windows.
-// On Windows we use process.Kill() since we created the process in a new
-// console (CREATE_NEW_CONSOLE), so it's isolated already.
+// On Windows we use process.Kill() since the process was created with
+// CREATE_NO_WINDOW, so it runs without an attached console.
 func TerminateProcessGroup(process *os.Process, done <-chan error) {
-	// On Windows, the process is in its own console.
+	// On Windows, the process has no visible console.
 	// First try a gentle interrupt, then force kill.
 	//
 	// Note: os.Interrupt on Windows sends CTRL_BREAK_EVENT to the process.

@@ -9,13 +9,13 @@ import (
 )
 
 // SetDetachFlags sets OS-specific process attributes for Windows.
-// On Windows we create the process in a new console to isolate it.
+// On Windows we create the process without a visible console window.
 func SetDetachFlags(cmd *exec.Cmd) {
-	// CREATE_NEW_CONSOLE (0x00000010) — creates a new console window
-	// instead of inheriting the parent's.  This prevents child processes
-	// from scribbling on the user's terminal.
+	// CREATE_NO_WINDOW (0x08000000) — the process runs without creating
+	// a visible console window.  This prevents a command prompt window
+	// from flashing on screen each time a command is executed.
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		CreationFlags: 0x00000010, // CREATE_NEW_CONSOLE
+		CreationFlags: 0x08000000, // CREATE_NO_WINDOW
 	}
 }
 
