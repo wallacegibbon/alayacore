@@ -79,7 +79,7 @@ func handleCommandCancellation(cmd *exec.Cmd, done chan error, stdout, stderr *b
 	if process != nil {
 		shell.TerminateProcessGroup(process, done)
 	}
-	output := combineCommandOutput(stdout, stderr)
+	output := formatCommandOutput(stdout, stderr, -1) // canceled, always show labels
 	if output != "" {
 		return llm.NewTextErrorResponse("canceled: " + output)
 	}
@@ -87,11 +87,22 @@ func handleCommandCancellation(cmd *exec.Cmd, done chan error, stdout, stderr *b
 }
 
 func handleCommandCompletion(execErr error, stdout, stderr *bytes.Buffer) llm.ToolResultOutput {
-	output := combineCommandOutput(stdout, stderr)
+	exitCode := 0
+	if execErr != nil {
+		if exitErr, ok := execErr.(*exec.ExitError); ok {
+			exitCode = exitErr.ExitCode()
+		}
+	}
+
+	output := formatCommandOutput(stdout, stderr, exitCode)
 
 	if execErr != nil {
 		if exitErr, ok := execErr.(*exec.ExitError); ok {
-			return llm.NewTextErrorResponse(fmt.Sprintf("[%d] %s", exitErr.ExitCode(), output))
+			code := exitErr.ExitCode()
+			if code != 0 {
+				return llm.NewTextErrorResponse(fmt.Sprintf("Exit Code: %d\n%s", code, output))
+			}
+			return llm.NewTextErrorResponse(output)
 		}
 		return llm.NewTextErrorResponse(execErr.Error())
 	}
@@ -99,13 +110,17 @@ func handleCommandCompletion(execErr error, stdout, stderr *bytes.Buffer) llm.To
 	return llm.NewTextResponse(output)
 }
 
-func combineCommandOutput(stdout, stderr *bytes.Buffer) string {
-	output := stdout.String()
+func formatCommandOutput(stdout, stderr *bytes.Buffer, exitCode int) string {
+	if exitCode == 0 && stderr.Len() == 0 {
+		return stdout.String()
+	}
+
+	var output string
+	if stdout.Len() > 0 {
+		output = "STDOUT:\n" + stdout.String() + "\n"
+	}
 	if stderr.Len() > 0 {
-		if output != "" {
-			output += "\n"
-		}
-		output += stderr.String()
+		output += "STDERR:\n" + stderr.String()
 	}
 	return output
 }
