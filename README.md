@@ -30,26 +30,13 @@ On first run, AlayaCore auto-creates a default model config at `~/.alayacore/mod
 
 ## Documentation
 
-### User Docs
-
 | Document | Description |
 |----------|-------------|
 | [Getting Started](docs/getting-started.md) | Installation, CLI flags, and usage examples |
 | [Configuration](docs/configuration.md) | Model config, runtime config, and themes |
 | [Terminal UI](docs/terminal-ui.md) | Keybindings, commands, windows, task queue, plain IO mode |
 | [Skills System](docs/skills.md) | Agent Skills specification, directory structure, SKILL.md format |
-
-### Architecture Docs
-
-| Document | Description |
-|----------|-------------|
 | [Architecture](docs/architecture.md) | Layered architecture, TLV protocol, data flow, design decisions |
-| [Virtual Rendering Performance](docs/virtual-rendering-performance.md) | Performance analysis of the virtual scrolling system |
-| [External Editor & Window Size](docs/external-editor-windowsize.md) | How Bubble Tea handles resize after external editor |
-| [Context Token Tracking](docs/context-tracking.md) | How context size is tracked across providers |
-| [Error Handling](docs/error-handling.md) | How LLM API errors are detected and propagated |
-| [Sequential Tool Execution](docs/sequential-tool-execution.md) | Why tools execute one at a time |
-| [Schema Improvements](docs/schema-improvements.md) | Type-safe tools with auto-generated JSON schemas |
 
 ## License
 

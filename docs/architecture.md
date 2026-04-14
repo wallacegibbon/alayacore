@@ -79,8 +79,8 @@ The adaptor layer handles user interaction and translates between user actions a
 | Component | Description |
 |-----------|-------------|
 | `Terminal` | Main Bubble Tea model composing all UI components |
-| `DisplayModel` | Renders assistant output with virtual scrolling |
-| `InputModel` | Handles user text input with external editor support |
+| `DisplayModel` | Renders assistant output with virtual scrolling. See [virtual-rendering-performance.md](virtual-rendering-performance.md). |
+| `InputModel` | Handles user text input with external editor support. See [external-editor-windowsize.md](external-editor-windowsize.md). |
 | `ModelSelector` | Modal for switching between AI models |
 | `QueueManager` | Modal for managing the task queue |
 | `ThemeSelector` | Modal for switching between color themes |
@@ -118,6 +118,7 @@ The session layer manages conversation state, task execution, and model interact
 | `ModelManager` | Loads and manages AI model configurations from `model.conf`. Never writes to the file. |
 | `RuntimeManager` | Persists runtime settings (active model, active theme) to `runtime.conf` |
 | `CommandRegistry` | Declarative registration of session commands (`:save`, `:cancel`, etc.) |
+| `ContextTokens` | Tracks conversation context size across API calls. See [context-tracking.md](context-tracking.md). |
 
 ### Agent Layer (`internal/llm/`)
 
@@ -265,7 +266,7 @@ Agent.Stream() receives tool_call event
 1. **TLV Protocol** — Simple binary protocol for clean separation between adaptors and session. Both the TUI and plain-IO mode share all session/agent logic.
 2. **Task Queue** — Async task processing with cancellation support. Queued tasks execute sequentially.
 3. **Virtual Scrolling** — Only visible windows are rendered. 3.5x faster than naive rendering. See [virtual-rendering-performance.md](virtual-rendering-performance.md).
-4. **Domain Errors** — Structured error types with operation context for consistent error handling.
+4. **Domain Errors** — Structured error types with operation context for consistent error handling. See [error-handling.md](error-handling.md).
 5. **Command Registry** — Declarative command registration for extensibility.
 6. **Interface Abstraction** — OutputWriter interface for testability.
 7. **Provider Factory** — Decoupled provider creation from session logic.
