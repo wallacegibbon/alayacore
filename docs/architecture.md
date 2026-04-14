@@ -100,10 +100,39 @@ Messages are appended incrementally in `OnStepFinish` so they're preserved even 
 | `read_file` | Read file contents with optional line ranges | Safe |
 | `edit_file` | Search/replace edits on existing files | Medium |
 | `write_file` | Create or overwrite files | Dangerous |
-| `execute_command` | Execute commands | Most Dangerous |
+| `execute_command` | Execute commands in the detected shell (cross-platform) | Most Dangerous |
 | `activate_skill` | Load and execute Agent Skills | Medium |
 
 Each tool is implemented with type-safe input structs and auto-generated JSON schemas. See [schema-improvements.md](schema-improvements.md) for the pattern.
+
+#### Shell Detection (`internal/tools/shell/`)
+
+The `execute_command` tool uses a cross-platform shell detection system. On startup, it probes the OS environment for an available shell and selects the best candidate.
+
+**Detection order:**
+
+1. `ALAYACORE_SHELL` environment variable (exact override)
+2. OS-specific preferred shell (bash on Unix, pwsh on Windows)
+3. All known shells tried in preference order (see table below)
+4. Fallback to `sh` (Unix) or `cmd` (Windows)
+
+**Supported shells:**
+
+| Shell | Binary | OS | Invocation | Notes |
+|-------|--------|----|------------|-------|
+| Bash | `bash` | Unix | `bash -c <cmd>` | Preferred on Unix; LLMs naturally write bash syntax |
+| Zsh | `zsh` | Unix | `zsh -c <cmd>` | Second choice on Unix |
+| POSIX sh | `sh` | Unix | `sh -c <cmd>` | Universal Unix fallback |
+| PowerShell Core | `pwsh` | Windows, Unix | `pwsh -NoLogo -NonInteractive -Command <cmd>` | Preferred on Windows |
+| Windows PowerShell | `powershell` | Windows | `powershell -NoLogo -NonInteractive -Command <cmd>` | Ships with Windows |
+| cmd | `cmd` | Windows | `cmd /C <cmd>` | Guaranteed to exist on every Windows machine |
+
+The tool description (shown to the LLM) is dynamically generated based on the detected shell so the LLM uses the correct syntax. Platform-specific process isolation is handled per-OS:
+
+- **Unix**: `setsid` creates a new session; `SIGINT` → `SIGKILL` for cancellation
+- **Windows**: `CREATE_NEW_CONSOLE` isolates the child; `process.Kill()` for cancellation
+
+The package uses Go build tags (`//go:build !windows` / `//go:build windows`) for all OS-specific code.
 
 ## TLV Protocol
 
@@ -140,6 +169,22 @@ Communication between adaptors and session uses a simple Tag-Length-Value (TLV) 
 6. Agent generates response → Session emits: TLV(TA, "Here's what main.go does...")
 7. Terminal adaptor parses TLV, renders styled content in windows
 ```
+
+## Cross-Platform Architecture
+
+AlayaCore uses Go build tags for all OS-specific code. The only platform-dependent subsystem is shell execution, isolated in the `internal/tools/shell/` package:
+
+| File | Build tag | Provides |
+|------|-----------|----------|
+| `shell.go` | *(all)* | `Shell` type, `Detect()`, `knownShells` registry |
+| `shell_unix.go` | `!windows` | `osDefault()` → bash |
+| `shell_windows.go` | `windows` | `osDefault()` → pwsh |
+| `exec_unix.go` | `!windows` | `SetDetachFlags` (setsid), `OpenDevNull` (/dev/null) |
+| `exec_windows.go` | `windows` | `SetDetachFlags` (CREATE_NEW_CONSOLE), `OpenDevNull` (NUL) |
+| `terminate_unix.go` | `!windows` | `TerminateProcessGroup` (SIGINT → SIGKILL) |
+| `terminate_windows.go` | `windows` | `TerminateProcessGroup` (timeout → Kill) |
+
+All other packages (LLM providers, session management, TLV protocol, skills, schema generation) are pure Go with no OS-specific code.
 
 ## System Prompt Architecture
 

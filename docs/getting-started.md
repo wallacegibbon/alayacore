@@ -40,6 +40,25 @@ To use other providers, edit the config file — press `Ctrl+L` then `e` in the 
 3. **Switch models** — Press `Ctrl+L` to open the model selector. Press `e` to edit your config, `r` to reload, `Enter` to select.
 4. **Save your session** — Type `:save my-session.md` or press `Ctrl+S`.
 
+## Cross-Platform Support
+
+AlayaCore runs on Linux, macOS, and Windows. The `execute_command` tool automatically detects the best available shell on startup:
+
+| OS | Detection order |
+|----|----------------|
+| **Linux / macOS** | bash → zsh → sh → pwsh → powershell |
+| **Windows** | pwsh → powershell → cmd → bash → zsh → sh |
+
+The tool description is dynamically adapted so the LLM knows which shell syntax to use. You can override the detection with the `ALAYACORE_SHELL` environment variable:
+
+```sh
+# Force PowerShell Core on any OS
+export ALAYACORE_SHELL=pwsh
+
+# Use a specific shell binary
+export ALAYACORE_SHELL=/bin/zsh
+```
+
 ## CLI Flags
 
 | Flag | Default | Description |

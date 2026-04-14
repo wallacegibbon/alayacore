@@ -1,5 +1,7 @@
-alayacore-web
 alayacore
+alayacore-linux-*
+alayacore-darwin-*
+alayacore-windows-*
 model.conf
 alayacore-*.log
 *.swp

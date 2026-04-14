@@ -1,4 +1,5 @@
-.PHONY: all build test lint fmt clean install run release
+.PHONY: all build test lint fmt clean install run release release-all \
+       build-linux build-darwin build-windows
 
 # Go parameters
 GOCMD=go
@@ -20,22 +21,41 @@ BUILDTAGS=-tags netgo
 
 all: test build
 
-## build: Build main binary (static)
+## build: Build main binary for the current OS (static)
 build:
 	CGO_ENABLED=0 $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY) .
 
-## build-linux: Build for Linux
+## build-linux: Build for Linux (amd64, arm64, arm, riscv64)
 build-linux:
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY)-linux .
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY)-linux-amd64 .
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY)-linux-arm64 .
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY)-linux-arm .
+	CGO_ENABLED=0 GOOS=linux GOARCH=riscv64 $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY)-linux-riscv64 .
 
-## build-darwin: Build for macOS
+## build-darwin: Build for macOS (amd64 + arm64)
 build-darwin:
 	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY)-darwin-amd64 .
 	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY)-darwin-arm64 .
 
-## release: Build optimized release binary (stripped)
+## build-windows: Build for Windows (amd64 + arm64)
+build-windows:
+	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY)-windows-amd64.exe .
+	CGO_ENABLED=0 GOOS=windows GOARCH=arm64 $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY)-windows-arm64.exe .
+
+## release: Build optimized release binary for the current OS (stripped)
 release:
 	CGO_ENABLED=0 $(GOBUILD) $(BUILDTAGS) $(RELEASE_LDFLAGS) -o $(MAIN_BINARY) .
+
+## release-all: Build optimized release binaries for all platforms
+release-all:
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) $(BUILDTAGS) $(RELEASE_LDFLAGS) -o $(MAIN_BINARY)-linux-amd64 .
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 $(GOBUILD) $(BUILDTAGS) $(RELEASE_LDFLAGS) -o $(MAIN_BINARY)-linux-arm64 .
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 $(GOBUILD) $(BUILDTAGS) $(RELEASE_LDFLAGS) -o $(MAIN_BINARY)-linux-arm .
+	CGO_ENABLED=0 GOOS=linux GOARCH=riscv64 $(GOBUILD) $(BUILDTAGS) $(RELEASE_LDFLAGS) -o $(MAIN_BINARY)-linux-riscv64 .
+	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 $(GOBUILD) $(BUILDTAGS) $(RELEASE_LDFLAGS) -o $(MAIN_BINARY)-darwin-amd64 .
+	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(GOBUILD) $(BUILDTAGS) $(RELEASE_LDFLAGS) -o $(MAIN_BINARY)-darwin-arm64 .
+	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 $(GOBUILD) $(BUILDTAGS) $(RELEASE_LDFLAGS) -o $(MAIN_BINARY)-windows-amd64.exe .
+	CGO_ENABLED=0 GOOS=windows GOARCH=arm64 $(GOBUILD) $(BUILDTAGS) $(RELEASE_LDFLAGS) -o $(MAIN_BINARY)-windows-arm64.exe .
 
 ## test: Run all tests
 test:
@@ -62,9 +82,10 @@ vet:
 ## clean: Clean build artifacts
 clean:
 	$(GOCLEAN)
-	rm -f $(MAIN_BINARY)
-	rm -f $(MAIN_BINARY)-linux
-	rm -f $(MAIN_BINARY)-darwin-*
+	rm -f $(MAIN_BINARY) $(MAIN_BINARY).exe
+	rm -f $(MAIN_BINARY)-linux-amd64 $(MAIN_BINARY)-linux-arm64 $(MAIN_BINARY)-linux-arm $(MAIN_BINARY)-linux-riscv64
+	rm -f $(MAIN_BINARY)-darwin-amd64 $(MAIN_BINARY)-darwin-arm64
+	rm -f $(MAIN_BINARY)-windows-amd64.exe $(MAIN_BINARY)-windows-arm64.exe
 	rm -f coverage.out coverage.html
 
 ## install: Install main binary to GOPATH/bin

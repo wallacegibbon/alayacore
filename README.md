@@ -21,6 +21,7 @@ On first run, AlayaCore auto-creates a default model config at `~/.alayacore/mod
 
 - **Autonomous tool-calling loop** — The LLM plans, calls tools, and iterates until the task is done. Up to 100 steps per prompt.
 - **Five built-in tools** — `read_file`, `edit_file`, `write_file`, `execute_command`, `activate_skill`.
+- **Cross-platform** — Runs on Linux, macOS, and Windows. The `execute_command` tool auto-detects the shell (bash/zsh/sh on Unix, PowerShell/cmd on Windows).
 - **Any LLM provider** — OpenAI, Anthropic, DeepSeek, Qwen, Ollama, LM Studio. Multiple models in one config, switch at runtime.
 - **Streaming TUI** — Real-time output with virtual scrolling, foldable windows, and vim-like keybindings.
 - **Plain IO mode** — `--plainio` for scripting and piping. No TUI, just stdin/stdout.

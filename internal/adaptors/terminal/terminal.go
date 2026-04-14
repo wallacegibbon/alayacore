@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"time"
 
@@ -659,6 +660,18 @@ type FileEditorFinishedMsg struct {
 	Err  error
 }
 
+// defaultEditors is the list of editor binaries to try when $EDITOR is not set.
+// Ordered by preference per OS.
+var defaultEditors []string
+
+func init() { //nolint:gochecknoinits // platform-specific list requires init-time setup
+	if runtime.GOOS == "windows" {
+		defaultEditors = []string{"notepad"}
+	} else {
+		defaultEditors = []string{"vim", "vi", "nano"}
+	}
+}
+
 // Editor handles external editor operations
 type Editor struct {
 	tempFilePrefix string
@@ -679,7 +692,7 @@ func (e *Editor) Open(currentContent string) tea.Cmd {
 
 	if editorCmd == "" {
 		return func() tea.Msg {
-			return editorFinishedMsg{content: "", err: fmt.Errorf("no editor found (tried: vim, vi, nano)")}
+			return editorFinishedMsg{content: "", err: fmt.Errorf("no editor found (tried: %s; set $EDITOR to override)", strings.Join(defaultEditors, ", "))}
 		}
 	}
 
@@ -703,7 +716,7 @@ func (e *Editor) OpenForDisplay(content string) tea.Cmd {
 
 	if editorCmd == "" {
 		return func() tea.Msg {
-			return displayEditorFinishedMsg{err: fmt.Errorf("no editor found (tried: vim, vi, nano)")}
+			return displayEditorFinishedMsg{err: fmt.Errorf("no editor found (tried: %s; set $EDITOR to override)", strings.Join(defaultEditors, ", "))}
 		}
 	}
 
@@ -747,7 +760,7 @@ func (e *Editor) OpenFile(path string) tea.Cmd {
 
 	if editorCmd == "" {
 		return func() tea.Msg {
-			return FileEditorFinishedMsg{Path: path, Err: fmt.Errorf("no editor found (tried: vim, vi, nano)")}
+			return FileEditorFinishedMsg{Path: path, Err: fmt.Errorf("no editor found (tried: %s; set $EDITOR to override)", strings.Join(defaultEditors, ", "))}
 		}
 	}
 
@@ -787,7 +800,7 @@ func getEditorCommand(editorCmd string) string {
 		return editorCmd
 	}
 
-	for _, editor := range []string{"vim", "vi", "nano"} {
+	for _, editor := range defaultEditors {
 		path, err := exec.LookPath(editor)
 		if err == nil {
 			return path
