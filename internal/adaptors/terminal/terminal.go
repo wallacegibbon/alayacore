@@ -666,9 +666,9 @@ var defaultEditors []string
 
 func init() { //nolint:gochecknoinits // platform-specific list requires init-time setup
 	if runtime.GOOS == "windows" {
-		defaultEditors = []string{"notepad"}
+		defaultEditors = []string{"vim", "notepad"}
 	} else {
-		defaultEditors = []string{"vim", "vi", "nano"}
+		defaultEditors = []string{"vim", "vi"}
 	}
 }
 

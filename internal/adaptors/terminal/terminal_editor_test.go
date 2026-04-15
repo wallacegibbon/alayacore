@@ -247,9 +247,9 @@ func TestEditorSelectionOrder(t *testing.T) {
 		t.Fatal("Expected editor to be found")
 	}
 
-	// Should return one of the three editors in order: vim, vi, nano
+	// Should return one of the editors in order: vim, vi
 	// Or use EDITOR environment variable if set
-	if editor != "vim" && editor != "vi" && editor != "nano" {
+	if editor != "vim" && editor != "vi" {
 		t.Logf("Editor is: %s (may be set by EDITOR env var)", editor)
 	}
 }
