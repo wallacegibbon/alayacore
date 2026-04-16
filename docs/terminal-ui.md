@@ -39,7 +39,7 @@ AlayaCore's terminal UI is built with [Bubble Tea](https://charm.land/) and uses
 
 Commands are split into two categories:
 
-**Sync commands** — run immediately, no task running required:
+**Immediate commands** — run immediately, no task running required:
 | Command | Action |
 |---------|--------|
 | `:cancel` | Cancel current request (with confirmation) |
@@ -48,7 +48,7 @@ Commands are split into two categories:
 | `:model_set <id>` | Switch to a model by numeric ID |
 | `:model_load` | Reload model configs from the config file |
 
-**Async commands** — enqueued at the front of the task queue; require no task currently running:
+**Deferred commands** — enqueued at the front of the task queue; require no task currently running:
 | Command | Action |
 |---------|--------|
 | `:retry` | Retry the last prompt. Appends "Please continue." if latest message is from the assistant. Also clears the pause-on-error state. |

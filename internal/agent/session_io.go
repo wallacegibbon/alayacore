@@ -15,7 +15,7 @@ import (
 // Command Handling
 // ============================================================================
 
-func (s *Session) handleCommandSync(ctx context.Context, cmd string) {
+func (s *Session) handleCommand(ctx context.Context, cmd string) {
 	parts := strings.Fields(cmd)
 	if len(parts) == 0 {
 		s.writeError(domainerrors.ErrEmptyCommand.Error())

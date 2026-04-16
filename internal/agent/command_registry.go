@@ -158,7 +158,7 @@ func GetCommandRegistry() *CommandRegistry {
 }
 
 // DispatchCommand dispatches a command to the appropriate handler
-// This is called by Session.handleCommandSync
+// This is called by Session.handleCommand
 func (s *Session) dispatchCommand(ctx context.Context, cmd string) bool {
 	parts := strings.Fields(cmd)
 	if len(parts) == 0 {

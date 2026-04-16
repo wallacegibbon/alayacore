@@ -252,7 +252,7 @@ Agent.Stream() receives tool_call event
 ## Design Decisions
 
 1. **TLV Protocol** — Simple binary protocol for clean separation between adaptors and session. Both the TUI and plain-IO mode share all session/agent logic.
-2. **Task Queue** — Async task processing with cancellation support. Queued tasks execute sequentially.
+2. **Task Queue** — Deferred task processing with cancellation support. Queued tasks execute sequentially.
 3. **Virtual Scrolling** — Only visible windows are rendered. 3.5x faster than naive rendering. See [virtual-rendering-performance.md](virtual-rendering-performance.md).
 4. **Domain Errors** — Structured error types with operation context for consistent error handling. See [error-handling.md](error-handling.md).
 5. **Command Registry** — Declarative command registration for extensibility.

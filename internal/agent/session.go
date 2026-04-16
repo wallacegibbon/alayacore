@@ -406,9 +406,9 @@ func (s *Session) readFromInput() {
 		if len(value) > 0 && value[0] == ':' {
 			cmd := value[1:]
 			if cmd == "cancel" || cmd == "cancel_all" || cmd == "continue" || cmd == "model_load" || cmd == "taskqueue_get_all" || strings.HasPrefix(cmd, "taskqueue_del ") || strings.HasPrefix(cmd, "model_set ") {
-				s.handleCommandSync(context.Background(), cmd)
+				s.handleCommand(context.Background(), cmd)
 			} else {
-				s.submitAsyncCommand(cmd)
+				s.submitDeferredCommand(cmd)
 			}
 		} else {
 			s.submitTask(UserPrompt{Text: value})
@@ -424,11 +424,11 @@ func (s *Session) submitTask(task Task) {
 	s.enqueueTask(task, false)
 }
 
-// submitAsyncCommand enqueues an async command at the front of the task queue.
-// Async commands (e.g. :retry, :summarize) can only run when no task is
+// submitDeferredCommand enqueues a deferred command at the front of the task queue.
+// Deferred commands (e.g. :retry, :summarize) can only run when no task is
 // currently in progress. They are placed at the front so they run ahead of
 // any accumulated user prompts.
-func (s *Session) submitAsyncCommand(cmd string) {
+func (s *Session) submitDeferredCommand(cmd string) {
 	s.mu.Lock()
 	if s.inProgress && !s.pausedOnError {
 		s.mu.Unlock()
@@ -557,7 +557,7 @@ func (s *Session) runTask(item QueueItem) {
 	case UserPrompt:
 		s.handleUserPrompt(ctx, t.Text)
 	case CommandPrompt:
-		s.handleCommandSync(ctx, t.Command)
+		s.handleCommand(ctx, t.Command)
 	}
 
 	if ctx.Err() == context.Canceled {

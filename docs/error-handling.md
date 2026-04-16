@@ -107,20 +107,20 @@ Without pausing, a network outage would cause every queued prompt to fail in seq
 
 Commands are split into two paths:
 
-**Sync commands** — run immediately on the input goroutine, regardless of queue state:
+**Immediate commands** — run immediately on the input goroutine, regardless of queue state:
 `:cancel`, `:cancel_all`, `:continue`, `:model_set`, `:model_load`, `:taskqueue_get_all`, `:taskqueue_del`
 
-**Async commands** — enqueued at the front of the task queue via `submitAsyncCommand`, which rejects if a task is already running (unless paused on error):
+**Deferred commands** — enqueued at the front of the task queue via `submitDeferredCommand`, which rejects if a task is already running (unless paused on error):
 `:retry`, `:summarize`, `:save`, `:quit`, and all others
 
-Async commands run on the `taskRunner` goroutine with a cancellable context, so `:cancel` can interrupt them at any time. They are placed at the front of the queue so they run ahead of any accumulated user prompts.
+Deferred commands run on the `taskRunner` goroutine with a cancellable context, so `:cancel` can interrupt them at any time. They are placed at the front of the queue so they run ahead of any accumulated user prompts.
 
 ### Implementation
 
 `internal/agent/session.go`:
 - `pausedOnError` field on `Session`
 - `waitForNextTask` checks `s.pausedOnError` in its loop condition
-- `submitAsyncCommand` guards: rejects if `inProgress && !pausedOnError`, then calls `submitTaskFront`
+- `submitDeferredCommand` guards: rejects if `inProgress && !pausedOnError`, then calls `enqueueTask`
 - `submitTask` / `submitTaskFront` clear `s.pausedOnError` and signal the condition variable
 
 `internal/agent/session_io.go`:
@@ -128,7 +128,7 @@ Async commands run on the `taskRunner` goroutine with a cancellable context, so 
 - `cancelAllTasks` clears `pausedOnError` and signals the condition variable
 
 `internal/agent/command_registry.go`:
-- `retry` is dispatched via `dispatchCommand` → `executeRetry`, same as other async commands
+- `retry` is dispatched via `dispatchCommand` → `executeRetry`, same as other deferred commands
 
 ## Testing
 

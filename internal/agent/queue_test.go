@@ -311,7 +311,7 @@ func TestSubmitTaskFront(t *testing.T) {
 	session.submitTask(UserPrompt{Text: "first"})
 	session.submitTask(UserPrompt{Text: "second"})
 
-	// Submit at front (simulates an async command like :retry)
+	// Submit at front (simulates a deferred command like :retry)
 	session.enqueueTask(CommandPrompt{Command: "retry"}, true)
 
 	items := session.GetQueueItems()
