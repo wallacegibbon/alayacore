@@ -54,7 +54,8 @@ Commands are split into two categories:
 | `:retry` | Retry the last prompt. Appends "Please continue." if latest message is from the assistant. Also clears the pause-on-error state. |
 | `:summarize` | Summarize conversation to reduce token usage |
 | `:save [filename]` | Save session. Uses `--session` path if no filename given. |
-| `:quit`, `:q` | Exit with confirmation (y/n) |
+
+Note: `:quit` / `:q` is handled directly by each adaptor (terminal shows a confirmation dialog, plainio exits immediately) and never reaches the session command dispatch.
 
 ## Window Container
 

@@ -75,7 +75,9 @@ var displayKeyBindings = []KeyBinding{
 // Model selector key bindings
 var modelSelectorKeyBindings = []KeyBinding{
 	{"up", "Move selection up", "model-selector"},
+	{"k", "Move selection up", "model-selector"},
 	{"down", "Move selection down", "model-selector"},
+	{"j", "Move selection down", "model-selector"},
 	{"enter", "Select model", "model-selector"},
 	{"esc", "Close model selector", "model-selector"},
 	{"tab", "Toggle focus between search and list", "model-selector"},
@@ -86,8 +88,11 @@ var modelSelectorKeyBindings = []KeyBinding{
 // Queue manager key bindings
 var queueManagerKeyBindings = []KeyBinding{
 	{"up", "Move selection up", "queue-manager"},
+	{"k", "Move selection up", "queue-manager"},
 	{"down", "Move selection down", "queue-manager"},
+	{"j", "Move selection down", "queue-manager"},
 	{"esc", "Close queue manager", "queue-manager"},
+	{"q", "Close queue manager", "queue-manager"},
 	{"d", "Delete selected queue item", "queue-manager"},
 }
 

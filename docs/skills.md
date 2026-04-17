@@ -111,7 +111,7 @@ Get weather information using the weather script.
 ./scripts/weather.sh "City name"
 ```
 
-- **Note**: Use English city names (e.g., "New York" not "纽约")
+- **Note**: Use English or Pinyin for city names (e.g. Use "Wuhan" instead of "武汉")
 ```
 
 When the user asks "what's the weather in Tokyo?", the LLM:

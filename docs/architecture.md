@@ -186,17 +186,19 @@ All other packages (LLM providers, session management, TLV protocol, skills, sch
 
 ## System Prompt Architecture
 
-The system prompt is built in layers:
+The system prompt is sent as **separate messages** (not a single concatenated string):
 
 ```
-Default Prompt (identity + rules)
-    ↓
-+ Skills Fragment (if skills configured — XML format with name, description, location)
-    ↓
-+ Current working directory
-    ↓
-+ Extra System Prompt (from --system flag, repeatable)
+System Message 1: Default Prompt (identity + rules)
+                  + Skills Fragment (if skills configured — XML format)
+                  + Current working directory
+
+System Message 2: Extra System Prompt (from --system flag, repeatable)
 ```
+
+Both providers (`openai`, `anthropic`) send these as two independent system
+messages. The default prompt and extra prompt are kept separate so the LLM API
+can cache them independently.
 
 For Anthropic APIs with `prompt_cache: true`, a top-level `cache_control: {"type": "ephemeral"}` is added to the request body for automatic prompt caching.
 

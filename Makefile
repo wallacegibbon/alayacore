@@ -15,8 +15,8 @@ MAIN_BINARY=alayacore
 
 # Build flags
 VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
-LDFLAGS=-ldflags "-X main.Version=$(VERSION)"
-RELEASE_LDFLAGS=-ldflags "-s -w -X main.Version=$(VERSION)"
+LDFLAGS=-ldflags "-X github.com/alayacore/alayacore/internal/config.Version=$(VERSION)"
+RELEASE_LDFLAGS=-ldflags "-s -w -X github.com/alayacore/alayacore/internal/config.Version=$(VERSION)"
 BUILDTAGS=-tags netgo
 
 all: test build

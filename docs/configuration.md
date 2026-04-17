@@ -137,14 +137,14 @@ removed: #f38ba8
 
 | Color | Used for |
 |-------|----------|
-| `primary` | Tool call headers, skill names, emphasis |
-| `dim` | Window borders, separators |
-| `muted` | Status bar, secondary text |
+| `primary` | User input text, prompt display, emphasis, focused borders |
+| `dim` | Window borders, separators, status bar |
+| `muted` | Secondary text, system messages, reasoning, tool content |
 | `text` | Body text |
-| `warning` | Warnings, pending states |
+| `warning` | Tool call headers, pending states |
 | `error` | Errors |
 | `success` | Success messages, completed states |
-| `selection` | Selected items in lists |
+| `selection` | Selected items in lists, cursor border highlight |
 | `cursor` | Cursor indicator |
 | `added` | Diff additions |
 | `removed` | Diff removals |

@@ -111,7 +111,9 @@ Commands are split into two paths:
 `:cancel`, `:cancel_all`, `:continue`, `:model_set`, `:model_load`, `:taskqueue_get_all`, `:taskqueue_del`
 
 **Deferred commands** — enqueued at the front of the task queue via `submitDeferredCommand`, which rejects if a task is already running (unless paused on error):
-`:retry`, `:summarize`, `:save`, `:quit`, and all others
+`:retry`, `:summarize`, `:save`, and all others
+
+Note: `:quit` / `:q` is handled directly by each adaptor and never reaches the session.
 
 Deferred commands run on the `taskRunner` goroutine with a cancellable context, so `:cancel` can interrupt them at any time. They are placed at the front of the queue so they run ahead of any accumulated user prompts.
 

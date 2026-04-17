@@ -29,11 +29,14 @@
 //   - keybinds.go: Declarative key binding configuration
 //   - output.go: TLV parsing and styled rendering
 //   - window.go: Virtual scrolling, DisplayModel, and diff display
-//   - styles.go: Lipgloss style definitions
+//   - styles.go: Theme definition and lipgloss style derivation
 //   - input_component.go: Input handling and external editor support
-//   - model_selector.go: Model switching UI
+//   - model_selector.go: Model switching UI with fuzzy search
 //   - queue_manager.go: Task queue UI
-//   - theme_test.go: Theme configuration
+//   - theme_manager.go: Theme loading, default theme creation, and folder management
+//   - theme_selector.go: Theme selection UI with live preview
+//   - warnings.go: Warning collection for non-fatal initialization errors
+//   - overlay.go: Overlay rendering for selectors and queue manager
 //   - tool.go, tool_handler.go: Tool execution display
 //
 // Usage:

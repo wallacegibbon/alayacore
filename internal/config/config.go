@@ -33,7 +33,6 @@ type Settings struct {
 	PlainIO       bool
 	SystemPrompt  string
 	Skills        []string
-	Addr          string
 	Session       string
 	Proxy         string
 	ModelConfig   string
@@ -54,7 +53,6 @@ func Parse() *Settings {
 	flag.Var(systemPrompt, "system", "Extra system prompt (can be specified multiple times, will be appended to default)")
 	skill := &stringSlice{}
 	flag.Var(skill, "skill", "Skill path (can be specified multiple times)")
-	addr := flag.String("addr", ":8080", "Server address to listen on (for web server)")
 	session := flag.String("session", "", "Session file path to load/save conversations")
 	proxy := flag.String("proxy", "", "HTTP proxy URL (e.g., http://127.0.0.1:7890 or socks5://127.0.0.1:1080)")
 	modelConfig := flag.String("model-config", "", "Model config file path (default: ~/.alayacore/model.conf)")
@@ -82,7 +80,6 @@ func Parse() *Settings {
 		PlainIO:       *plainIO,
 		SystemPrompt:  mergedSystemPrompt,
 		Skills:        skillPaths,
-		Addr:          *addr,
 		Session:       *session,
 		Proxy:         *proxy,
 		ModelConfig:   *modelConfig,
