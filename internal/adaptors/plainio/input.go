@@ -23,7 +23,7 @@ func readPrompts(input *stream.ChanInput, reader io.Reader) error {
 			if err == io.EOF {
 				if prompt.Len() > 0 || len(line) > 0 {
 					prompt.WriteString(line)
-					text := strings.TrimRight(prompt.String(), "\n")
+					text := strings.TrimRight(prompt.String(), "\r\n")
 					if text != "" {
 						_ = input.EmitTLV(stream.TagTextUser, text) //nolint:errcheck // best effort on EOF
 					}
@@ -34,7 +34,7 @@ func readPrompts(input *stream.ChanInput, reader io.Reader) error {
 		}
 
 		// Check if line ends with backslash (escaped newline)
-		trimmed := strings.TrimRight(line, "\n")
+		trimmed := strings.TrimRight(line, "\r\n")
 		if strings.HasSuffix(trimmed, "\\") {
 			// Remove the trailing backslash and append, continue to next line
 			prompt.WriteString(trimmed[:len(trimmed)-1])
