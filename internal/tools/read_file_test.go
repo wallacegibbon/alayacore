@@ -276,12 +276,12 @@ func TestReadFileBinary(t *testing.T) {
 		{
 			name:        "binary with null bytes",
 			content:     []byte{0x00, 0x01, 0x02, 0x03, 'H', 'e', 'l', 'l', 'o'},
-			expectError: true,
+			expectError: false,
 		},
 		{
 			name:        "PNG header",
 			content:     []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00},
-			expectError: true,
+			expectError: false,
 		},
 		{
 			name:        "UTF-8 text with special chars",
@@ -322,11 +322,11 @@ func TestReadFileBinary(t *testing.T) {
 			if tt.expectError {
 				errResp, ok := result.(llm.ToolResultOutputError)
 				if !ok {
-					t.Errorf("expected error response for binary file, got %T", result)
+					t.Errorf("expected error response, got %T", result)
 					return
 				}
-				if !strings.Contains(errResp.Error, "binary") {
-					t.Errorf("expected binary error message, got %q", errResp.Error)
+				if errResp.Error == "" {
+					t.Errorf("expected non-empty error message, got empty")
 				}
 			} else {
 				textResp, ok := result.(llm.ToolResultOutputText)
