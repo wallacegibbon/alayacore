@@ -31,7 +31,7 @@ func NewReadFileTool() llm.Tool {
 		Build()
 }
 
-func executeReadFile(_ context.Context, args ReadFileInput) (llm.ToolResultOutput, error) {
+func executeReadFile(ctx context.Context, args ReadFileInput) (llm.ToolResultOutput, error) {
 	info, err := os.Stat(args.Path)
 	if err != nil {
 		return llm.NewTextErrorResponse(err.Error()), nil
@@ -66,7 +66,7 @@ func executeReadFile(_ context.Context, args ReadFileInput) (llm.ToolResultOutpu
 	}
 	defer file.Close()
 
-	lines, err := readLinesRange(file, startLine, endLine)
+	lines, err := readLinesRange(ctx, file, startLine, endLine)
 	if err != nil {
 		return llm.NewTextErrorResponse(err.Error()), nil
 	}
@@ -106,7 +106,7 @@ func parseLineRange(startLineStr, endLineStr string) (startLine, endLine int, er
 	return startLine, endLine, nil
 }
 
-func readLinesRange(file *os.File, startLine, endLine int) ([]string, error) {
+func readLinesRange(ctx context.Context, file *os.File, startLine, endLine int) ([]string, error) {
 	scanner := bufio.NewScanner(file)
 	// Increase buffer size to handle long lines (default is 64KB)
 	// We use 1MB which should be reasonable for most cases while still
@@ -117,6 +117,12 @@ func readLinesRange(file *os.File, startLine, endLine int) ([]string, error) {
 	currentLine := 1
 
 	for scanner.Scan() {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
 		if startLine > 0 && currentLine < startLine {
 			currentLine++
 			continue

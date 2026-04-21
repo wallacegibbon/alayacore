@@ -149,14 +149,15 @@ func NewMyTool(dep *Dependency) llm.Tool {
 | `internal/llm/typed.go` | `TypedExecute[T]()` — generic unmarshaling + execution wrapper |
 | `internal/llm/schema_test.go` | Tests for schema generator |
 
-All five built-in tools use this pattern:
+All six built-in tools use this pattern:
 
 | Tool | File | Lines |
 |------|------|-------|
-| `read_file` | `internal/tools/read_file.go` | ~206 |
-| `edit_file` | `internal/tools/edit_file.go` | ~208 |
+| `read_file` | `internal/tools/read_file.go` | ~144 |
+| `edit_file` | `internal/tools/edit_file.go` | ~215 |
 | `write_file` | `internal/tools/write_file.go` | ~39 |
-| `execute_command` | `internal/tools/execute_command.go` | ~126 |
+| `execute_command` | `internal/tools/execute_command.go` | ~167 |
 | `activate_skill` | `internal/tools/activate_skill.go` | ~30 |
+| `ripgrep` | `internal/tools/ripgrep.go` | ~154 |
 
 The `execute_command` tool delegates platform-specific logic to the `internal/tools/shell/` package, which handles shell detection and command execution across Unix and Windows. See [architecture.md](architecture.md) for details.

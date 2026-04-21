@@ -24,11 +24,12 @@ Tool execution is a small fraction of total latency. The bottleneck is always LL
 
 ### 2. Most Tools Mutate State
 
-3 out of 5 tools have side effects:
+4 out of 6 tools have side effects:
 
 | Tool | Side Effects | Parallelizable? |
 |------|-------------|-----------------|
 | `read_file` | None | ✅ Safe |
+| `ripgrep` | None | ✅ Safe |
 | `activate_skill` | Loads metadata | ✅ Mostly safe |
 | `edit_file` | Mutates files | ⚠️ Risky |
 | `write_file` | Creates/overwrites files | ⚠️ Risky |

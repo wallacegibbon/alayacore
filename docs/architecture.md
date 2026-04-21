@@ -104,7 +104,7 @@ Messages are appended incrementally in `OnStepFinish` so they're preserved even 
 | `activate_skill` | Load and execute Agent Skills | Medium | — |
 | `ripgrep` | Search file contents using ripgrep (`rg`) | Safe | Requires `rg` binary |
 
-Each tool is implemented with type-safe input structs and auto-generated JSON schemas. See [schema-improvements.md](schema-improvements.md) for the pattern.
+Each tool is implemented with type-safe input structs and auto-generated JSON schemas. All tools accept a `context.Context` parameter and respect cancellation — `:cancel` will interrupt long-running tool execution. See [schema-improvements.md](schema-improvements.md) for the pattern.
 
 The `ripgrep` tool is conditionally registered — it is only available when the `rg` binary is found on the system `PATH` at startup. When available, the system prompt includes a `SEARCH:` section instructing the LLM to prefer `ripgrep` over reading files chunk by chunk to locate code, definitions, usages, and patterns.
 

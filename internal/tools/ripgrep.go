@@ -48,27 +48,7 @@ Examples:
 		Build()
 }
 
-func executeRipgrep(_ context.Context, args RipgrepInput) (llm.ToolResultOutput, error) {
-	if args.Pattern == "" {
-		return llm.NewTextErrorResponse("pattern is required"), nil
-	}
-
-	rgPath, err := exec.LookPath("rg")
-	if err != nil {
-		return llm.NewTextErrorResponse("ripgrep (rg) is not available on this system"), nil
-	}
-
-	maxLines := args.MaxLines
-	if maxLines == "" {
-		maxLines = defaultRipgrepMaxLines
-	}
-
-	// Build arguments:
-	// -n: show line numbers
-	// --no-heading: don't group by file (more compact output)
-	// --color=never: no ANSI codes
-	// -m <N>: max matches per file
-	// --max-count <N>: effectively limits total output when combined with paging
+func buildRipgrepArgs(args RipgrepInput, maxLines string) []string {
 	rgArgs := []string{
 		"-n",
 		"--no-heading",
@@ -89,6 +69,50 @@ func executeRipgrep(_ context.Context, args RipgrepInput) (llm.ToolResultOutput,
 		rgArgs = append(rgArgs, "--glob", args.Glob)
 	}
 
+	return rgArgs
+}
+
+func handleRipgrepResult(execErr error, stdout, stderr *bytes.Buffer) llm.ToolResultOutput {
+	if execErr != nil {
+		// rg exits with code 1 when no matches found — that's not an error for us
+		if exitErr, ok := execErr.(*exec.ExitError); ok {
+			if exitErr.ExitCode() == 1 && stderr.Len() == 0 {
+				return llm.NewTextResponse("No matches found")
+			}
+		}
+		// Real error (bad regex, permission denied, etc.)
+		errMsg := execErr.Error()
+		if stderr.Len() > 0 {
+			errMsg = stderr.String()
+		}
+		return llm.NewTextErrorResponse(errMsg)
+	}
+
+	output := stdout.String()
+	if output == "" {
+		return llm.NewTextResponse("No matches found")
+	}
+
+	return llm.NewTextResponse(output)
+}
+
+func executeRipgrep(ctx context.Context, args RipgrepInput) (llm.ToolResultOutput, error) {
+	if args.Pattern == "" {
+		return llm.NewTextErrorResponse("pattern is required"), nil
+	}
+
+	rgPath, err := exec.LookPath("rg")
+	if err != nil {
+		return llm.NewTextErrorResponse("ripgrep (rg) is not available on this system"), nil
+	}
+
+	maxLines := args.MaxLines
+	if maxLines == "" {
+		maxLines = defaultRipgrepMaxLines
+	}
+
+	rgArgs := buildRipgrepArgs(args, maxLines)
+
 	cwd, err := os.Getwd()
 	if err != nil {
 		cwd = "."
@@ -102,25 +126,29 @@ func executeRipgrep(_ context.Context, args RipgrepInput) (llm.ToolResultOutput,
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	if err := cmd.Run(); err != nil {
-		// rg exits with code 1 when no matches found — that's not an error for us
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			if exitErr.ExitCode() == 1 && stderr.Len() == 0 {
-				return llm.NewTextResponse("No matches found"), nil
-			}
-		}
-		// Real error (bad regex, permission denied, etc.)
-		errMsg := err.Error()
-		if stderr.Len() > 0 {
-			errMsg = stderr.String()
-		}
-		return llm.NewTextErrorResponse(errMsg), nil
+	if err := cmd.Start(); err != nil {
+		return llm.NewTextErrorResponse(err.Error()), nil
 	}
 
-	output := stdout.String()
-	if output == "" {
-		return llm.NewTextResponse("No matches found"), nil
-	}
+	// Wait for command to complete, handling cancellation
+	done := make(chan error, 1)
+	go func() {
+		done <- cmd.Wait()
+	}()
 
-	return llm.NewTextResponse(output), nil
+	select {
+	case <-ctx.Done():
+		// Parent context was canceled — kill the rg process
+		killRipgrepProcess(cmd, done)
+		return llm.NewTextErrorResponse("Canceled"), nil
+	case execErr := <-done:
+		return handleRipgrepResult(execErr, &stdout, &stderr), nil
+	}
+}
+
+func killRipgrepProcess(cmd *exec.Cmd, done chan error) {
+	if cmd.Process != nil {
+		_ = cmd.Process.Kill() //nolint:errcheck // best-effort kill on cancel path
+		<-done                 // wait for Process to release resources
+	}
 }

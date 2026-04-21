@@ -144,7 +144,7 @@ func openFileForEdit(path string) (*os.File, error) {
 	return file, nil
 }
 
-func executeEditFile(_ context.Context, args EditFileInput) (llm.ToolResultOutput, error) {
+func executeEditFile(ctx context.Context, args EditFileInput) (llm.ToolResultOutput, error) {
 	path, err := validateEditFileInput(args)
 	if err != nil {
 		return llm.NewTextErrorResponse(err.Error()), nil
@@ -166,6 +166,13 @@ func executeEditFile(_ context.Context, args EditFileInput) (llm.ToolResultOutpu
 	editor := newStreamEditor(args.OldString, args.NewString)
 
 	for {
+		select {
+		case <-ctx.Done():
+			tempFile.Close()
+			return llm.NewTextErrorResponse("Canceled"), nil
+		default:
+		}
+
 		var done bool
 		done, err = editor.processChunk(file, tempFile)
 		if err != nil {
