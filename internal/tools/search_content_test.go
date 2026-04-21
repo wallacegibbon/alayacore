@@ -139,3 +139,53 @@ func TestSearchContentFileTypeFilter(t *testing.T) {
 		t.Error("expected non-empty output")
 	}
 }
+
+func TestSearchContentIgnoreCase(t *testing.T) {
+	if !RGAvailable() {
+		t.Skip("rg not available on system")
+	}
+
+	tmpDir, err := os.MkdirTemp("", "alayacore-rg-test-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	testFile := filepath.Join(tmpDir, "test.txt")
+	if err := os.WriteFile(testFile, []byte("Hello World\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Without ignore_case, lowercase "hello" should not match "Hello"
+	result, err := executeSearchContent(context.Background(), SearchContentInput{
+		Pattern: "hello",
+		Path:    tmpDir,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	text, ok := result.(llm.ToolResultOutputText)
+	if !ok {
+		t.Fatalf("expected text output, got %T", result)
+	}
+	if text.Text != "No matches found" {
+		t.Errorf("expected 'No matches found' for case-sensitive search, got %q", text.Text)
+	}
+
+	// With ignore_case, lowercase "hello" should match "Hello"
+	result, err = executeSearchContent(context.Background(), SearchContentInput{
+		Pattern:    "hello",
+		Path:       tmpDir,
+		IgnoreCase: "true",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	text, ok = result.(llm.ToolResultOutputText)
+	if !ok {
+		t.Fatalf("expected text output, got %T", result)
+	}
+	if text.Text == "" || text.Text == "No matches found" {
+		t.Errorf("expected match with ignore_case=true, got %q", text.Text)
+	}
+}

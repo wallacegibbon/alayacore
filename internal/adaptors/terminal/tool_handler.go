@@ -187,11 +187,12 @@ type SearchContentHandler struct{}
 
 func (h *SearchContentHandler) FormatCall(input json.RawMessage, _ *Styles) string {
 	var args struct {
-		Pattern  string `json:"pattern"`
-		Path     string `json:"path"`
-		FileType string `json:"file_type"`
-		Glob     string `json:"glob"`
-		MaxLines string `json:"max_lines"`
+		Pattern    string `json:"pattern"`
+		Path       string `json:"path"`
+		FileType   string `json:"file_type"`
+		Glob       string `json:"glob"`
+		IgnoreCase string `json:"ignore_case"`
+		MaxLines   string `json:"max_lines"`
 	}
 	if err := json.Unmarshal(input, &args); err != nil {
 		return "search_content: <parse error>"
@@ -206,6 +207,9 @@ func (h *SearchContentHandler) FormatCall(input json.RawMessage, _ *Styles) stri
 	}
 	if args.Glob != "" {
 		label += " [" + args.Glob + "]"
+	}
+	if args.IgnoreCase == "true" {
+		label += " -i"
 	}
 	// Add newline at end so output starts on new line
 	return fmt.Sprintf("search_content: %s\n", label)
