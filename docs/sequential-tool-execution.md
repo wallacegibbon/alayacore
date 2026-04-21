@@ -29,7 +29,7 @@ Tool execution is a small fraction of total latency. The bottleneck is always LL
 | Tool | Side Effects | Parallelizable? |
 |------|-------------|-----------------|
 | `read_file` | None | ✅ Safe |
-| `ripgrep` | None | ✅ Safe |
+| `search_content` | None | ✅ Safe |
 | `activate_skill` | Loads metadata | ✅ Mostly safe |
 | `edit_file` | Mutates files | ⚠️ Risky |
 | `write_file` | Creates/overwrites files | ⚠️ Risky |

@@ -14,7 +14,7 @@ func TestRGAvailable(t *testing.T) {
 	_ = RGAvailable()
 }
 
-func TestRipgrepBasicSearch(t *testing.T) {
+func TestSearchContentBasicSearch(t *testing.T) {
 	if !RGAvailable() {
 		t.Skip("rg not available on system")
 	}
@@ -34,7 +34,7 @@ func TestRipgrepBasicSearch(t *testing.T) {
 	}
 
 	// Search for "hello"
-	result, err := executeRipgrep(context.Background(), RipgrepInput{
+	result, err := executeSearchContent(context.Background(), SearchContentInput{
 		Pattern: "hello",
 		Path:    tmpDir,
 	})
@@ -50,7 +50,7 @@ func TestRipgrepBasicSearch(t *testing.T) {
 	}
 }
 
-func TestRipgrepNoMatches(t *testing.T) {
+func TestSearchContentNoMatches(t *testing.T) {
 	if !RGAvailable() {
 		t.Skip("rg not available on system")
 	}
@@ -66,7 +66,7 @@ func TestRipgrepNoMatches(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err := executeRipgrep(context.Background(), RipgrepInput{
+	result, err := executeSearchContent(context.Background(), SearchContentInput{
 		Pattern: "nonexistent_pattern_xyz",
 		Path:    tmpDir,
 	})
@@ -82,8 +82,8 @@ func TestRipgrepNoMatches(t *testing.T) {
 	}
 }
 
-func TestRipgrepEmptyPattern(t *testing.T) {
-	result, err := executeRipgrep(context.Background(), RipgrepInput{
+func TestSearchContentEmptyPattern(t *testing.T) {
+	result, err := executeSearchContent(context.Background(), SearchContentInput{
 		Pattern: "",
 	})
 	if err != nil {
@@ -98,7 +98,7 @@ func TestRipgrepEmptyPattern(t *testing.T) {
 	}
 }
 
-func TestRipgrepFileTypeFilter(t *testing.T) {
+func TestSearchContentFileTypeFilter(t *testing.T) {
 	if !RGAvailable() {
 		t.Skip("rg not available on system")
 	}
@@ -121,7 +121,7 @@ func TestRipgrepFileTypeFilter(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err := executeRipgrep(context.Background(), RipgrepInput{
+	result, err := executeSearchContent(context.Background(), SearchContentInput{
 		Pattern:  "func",
 		Path:     tmpDir,
 		FileType: "go",

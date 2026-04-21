@@ -182,10 +182,10 @@ func (h *ActivateSkillHandler) ShouldShowOutput() bool {
 	return true
 }
 
-// RipgrepHandler handles ripgrep calls.
-type RipgrepHandler struct{}
+// SearchContentHandler handles search_content calls.
+type SearchContentHandler struct{}
 
-func (h *RipgrepHandler) FormatCall(input json.RawMessage, _ *Styles) string {
+func (h *SearchContentHandler) FormatCall(input json.RawMessage, _ *Styles) string {
 	var args struct {
 		Pattern  string `json:"pattern"`
 		Path     string `json:"path"`
@@ -194,7 +194,7 @@ func (h *RipgrepHandler) FormatCall(input json.RawMessage, _ *Styles) string {
 		MaxLines string `json:"max_lines"`
 	}
 	if err := json.Unmarshal(input, &args); err != nil {
-		return "ripgrep: <parse error>"
+		return "search_content: <parse error>"
 	}
 
 	label := args.Pattern
@@ -208,10 +208,10 @@ func (h *RipgrepHandler) FormatCall(input json.RawMessage, _ *Styles) string {
 		label += " [" + args.Glob + "]"
 	}
 	// Add newline at end so output starts on new line
-	return fmt.Sprintf("ripgrep: %s\n", label)
+	return fmt.Sprintf("search_content: %s\n", label)
 }
 
-func (h *RipgrepHandler) ShouldShowOutput() bool {
+func (h *SearchContentHandler) ShouldShowOutput() bool {
 	return true
 }
 
@@ -226,7 +226,7 @@ var ToolHandlers = map[string]ToolDisplayHandler{
 	"write_file":      &WriteFileHandler{},
 	"edit_file":       &EditFileHandler{},
 	"activate_skill":  &ActivateSkillHandler{},
-	"ripgrep":         &RipgrepHandler{},
+	"search_content":  &SearchContentHandler{},
 }
 
 // GetHandler returns the handler for a tool, or a generic fallback.

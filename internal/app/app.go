@@ -21,7 +21,7 @@ const systemPromptRules = `RULES:
 - Never assume - verify with tools`
 
 const systemPromptSearch = `SEARCH:
-- Prefer the ripgrep tool over reading file chunks by chunks to find content. Use ripgrep to locate code, definitions, usages, and patterns first, then read_file for detailed inspection`
+- Prefer the search_content tool over reading file chunks by chunks to find content. Use search_content to locate code, definitions, usages, and patterns first, then read_file for detailed inspection`
 
 const systemPromptSkills = `SKILLS:
 - Check <available_skills> below; activate relevant ones using the activate_skill tool
@@ -53,10 +53,10 @@ func Setup(cfg *config.Settings) (*Config, error) {
 
 	agentTools := []llm.Tool{readFileTool, editFileTool, writeFileTool, activateSkillTool, executeCommandTool}
 
-	// Conditionally register ripgrep tool if rg binary is available
+	// Conditionally register search_content tool if rg binary is available
 	rgAvailable := tools.RGAvailable()
 	if rgAvailable {
-		agentTools = append(agentTools, tools.NewRipgrepTool())
+		agentTools = append(agentTools, tools.NewSearchContentTool())
 	}
 
 	// Build the default system prompt

@@ -11,7 +11,7 @@ The entry point wires together all components:
 1. **`config.Parse()`** — Parses CLI flags into `config.Settings`
 2. **`app.Setup()`** — Initializes shared components:
    - Skills manager (loads skill metadata from `--skill` directories)
-   - Tools (`read_file`, `edit_file`, `write_file`, `execute_command`, `activate_skill`, and conditionally `ripgrep`)
+   - Tools (`read_file`, `edit_file`, `write_file`, `execute_command`, `activate_skill`, and conditionally `search_content`)
    - System prompt (default + skills fragment + current working directory)
 3. **Adaptor creation** — Starts either the terminal or PlainIO adaptor
 
@@ -102,11 +102,11 @@ Messages are appended incrementally in `OnStepFinish` so they're preserved even 
 | `write_file` | Create or overwrite files | Dangerous | — |
 | `execute_command` | Execute commands in the detected shell (cross-platform) | Most Dangerous | — |
 | `activate_skill` | Load and execute Agent Skills | Medium | — |
-| `ripgrep` | Search file contents using ripgrep (`rg`) | Safe | Requires `rg` binary |
+| `search_content` | Search file contents using ripgrep (`rg`) | Safe | Requires `rg` binary |
 
 Each tool is implemented with type-safe input structs and auto-generated JSON schemas. All tools accept a `context.Context` parameter and respect cancellation — `:cancel` will interrupt long-running tool execution. See [schema-improvements.md](schema-improvements.md) for the pattern.
 
-The `ripgrep` tool is conditionally registered — it is only available when the `rg` binary is found on the system `PATH` at startup. When available, the system prompt includes a `SEARCH:` section instructing the LLM to prefer `ripgrep` over reading files chunk by chunk to locate code, definitions, usages, and patterns.
+The `search_content` tool is conditionally registered — it is only available when the `rg` binary is found on the system `PATH` at startup. When available, the system prompt includes a `SEARCH:` section instructing the LLM to prefer `search_content` over reading files chunk by chunk to locate code, definitions, usages, and patterns.
 
 #### Shell Detection (`internal/tools/shell/`)
 
@@ -199,7 +199,7 @@ System Message 1: Default Prompt (identity + rules + search preferences)
 System Message 2: Extra System Prompt (from --system flag, repeatable)
 ```
 
-When `rg` is available, the default prompt includes a `SEARCH:` section that instructs the LLM to prefer the `ripgrep` tool for locating content over reading files chunk by chunk. This section is omitted when `rg` is not installed.
+When `rg` is available, the default prompt includes a `SEARCH:` section that instructs the LLM to prefer the `search_content` tool for locating content over reading files chunk by chunk. This section is omitted when `rg` is not installed.
 
 Both providers (`openai`, `anthropic`) send these as two independent system
 messages. The default prompt and extra prompt are kept separate so the LLM API
@@ -218,7 +218,7 @@ main.go → config.Parse() → Settings
                 ↓
         ├── skills.NewManager(skillPaths)
         ├── tools.NewReadFileTool(), etc.
-        ├── tools.RGAvailable() → conditionally register ripgrep tool
+        ├── tools.RGAvailable() → conditionally register search_content tool
         └── Build system prompt (with SEARCH section if rg available)
                 ↓
         terminal.NewAdaptor(appConfig)  or  plainio.NewAdaptor(appConfig)
