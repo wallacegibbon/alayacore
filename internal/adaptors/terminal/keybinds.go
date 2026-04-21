@@ -443,6 +443,7 @@ var displayKeyMap = map[string]func(*Terminal) tea.Cmd{
 		m.focusInput()
 		m.input.SetValue(":")
 		m.input.CursorEnd()
+		m.display.updateContent()
 		return nil
 	},
 	"space": func(m *Terminal) tea.Cmd {
