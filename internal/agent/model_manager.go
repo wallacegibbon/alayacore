@@ -16,6 +16,11 @@ import (
 	"github.com/alayacore/alayacore/internal/config"
 )
 
+// resolveConfigPath returns the provided path, or the default ~/.alayacore/<filename>
+func resolveConfigPath(providedPath, defaultFilename string) string {
+	return config.ResolveConfigPath(providedPath, defaultFilename)
+}
+
 // ModelConfig represents a model configuration
 type ModelConfig struct {
 	ID           int    `json:"id"`                                   // Runtime ID (generated, not persisted)

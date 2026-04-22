@@ -2,8 +2,22 @@ package config
 
 import (
 	"flag"
+	"os"
+	"path/filepath"
 	"strings"
 )
+
+// ResolveConfigPath returns the provided path, or the default ~/.alayacore/<filename>
+func ResolveConfigPath(providedPath, defaultFilename string) string {
+	if providedPath != "" {
+		return providedPath
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".alayacore", defaultFilename)
+}
 
 // stringSlice implements flag.Value for multiple string flags
 type stringSlice struct {
