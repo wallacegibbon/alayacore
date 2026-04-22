@@ -16,11 +16,6 @@ import (
 	"github.com/alayacore/alayacore/internal/config"
 )
 
-// resolveConfigPath returns the provided path, or the default ~/.alayacore/<filename>
-func resolveConfigPath(providedPath, defaultFilename string) string {
-	return config.ResolveConfigPath(providedPath, defaultFilename)
-}
-
 // ModelConfig represents a model configuration
 type ModelConfig struct {
 	ID           int    `json:"id"`                                   // Runtime ID (generated, not persisted)
@@ -72,7 +67,7 @@ context_limit: 128000
 // NewModelManager creates a new model manager
 // If configPath is empty, uses the default path (~/.alayacore/model.conf)
 func NewModelManager(configPath string) *ModelManager {
-	path := resolveConfigPath(configPath, "model.conf")
+	path := config.ResolveConfigPath(configPath, "model.conf")
 	mm := &ModelManager{
 		filePath: path,
 		nextID:   1, // IDs start from 1; 0 is reserved as "no model"

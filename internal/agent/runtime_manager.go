@@ -32,7 +32,7 @@ type RuntimeManager struct {
 // If runtimePath is empty, it defaults to ~/.alayacore/runtime.conf
 func NewRuntimeManager(runtimePath, _ string) *RuntimeManager {
 	rm := &RuntimeManager{}
-	rm.path = resolveConfigPath(runtimePath, "runtime.conf")
+	rm.path = config.ResolveConfigPath(runtimePath, "runtime.conf")
 
 	// Load if path is set
 	if rm.path != "" {
