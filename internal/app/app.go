@@ -62,15 +62,15 @@ func Setup(cfg *config.Settings) (*Config, error) {
 	// Build the default system prompt
 	var systemPrompt string
 	if rgAvailable {
-		systemPrompt = systemPromptIdentity + "\n\n" + systemPromptRules + "\n\n" + systemPromptSearch + "\n\n" + systemPromptSkills
+		systemPrompt = systemPromptIdentity + "\n\n" + systemPromptRules + "\n\n" + systemPromptSearch
 	} else {
-		systemPrompt = systemPromptIdentity + "\n\n" + systemPromptRules + "\n\n" + systemPromptSkills
+		systemPrompt = systemPromptIdentity + "\n\n" + systemPromptRules
 	}
 
-	// Generate skills fragment for system prompt (appended right after SKILLS section)
+	// Only include SKILLS section when skills are actually available
 	skillsFragment := skillsManager.GenerateSystemPromptFragment()
 	if skillsFragment != "" {
-		systemPrompt = systemPrompt + "\n\n" + skillsFragment
+		systemPrompt = systemPrompt + "\n\n" + systemPromptSkills + "\n\n" + skillsFragment
 	}
 
 	// Add current working directory to system prompt (at the end for better API cache reuse)

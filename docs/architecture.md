@@ -12,7 +12,7 @@ The entry point wires together all components:
 2. **`app.Setup()`** — Initializes shared components:
    - Skills manager (loads skill metadata from `--skill` directories)
    - Tools (`read_file`, `edit_file`, `write_file`, `execute_command`, `activate_skill`, and conditionally `search_content`)
-   - System prompt (default + skills fragment + current working directory)
+   - System prompt (default + skills section/fragment when configured + current working directory)
 3. **Adaptor creation** — Starts either the terminal or PlainIO adaptor
 
 ### Adaptors Layer (`internal/adaptors/`)
@@ -193,13 +193,15 @@ The system prompt is sent as **separate messages** (not a single concatenated st
 
 ```
 System Message 1: Default Prompt (identity + rules + search preferences)
-                  + Skills Fragment (if skills configured — XML format)
+                  + Skills section + Skills Fragment (only when skills configured)
                   + Current working directory
 
 System Message 2: Extra System Prompt (from --system flag, repeatable)
 ```
 
 When `rg` is available, the default prompt includes a `SEARCH:` section that instructs the LLM to prefer the `search_content` tool for locating content over reading files chunk by chunk. This section is omitted when `rg` is not installed.
+
+When skill paths are provided via `--skill` and skills are discovered, the prompt includes a `SKILLS:` section (with instructions for using `activate_skill`) followed by an `<available_skills>` XML fragment. Both are omitted entirely when no skills are configured.
 
 Both providers (`openai`, `anthropic`) send these as two independent system
 messages. The default prompt and extra prompt are kept separate so the LLM API
