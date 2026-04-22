@@ -64,7 +64,7 @@ The session layer manages conversation state, task execution, and model interact
 | `RuntimeManager` | Persists runtime settings (active model, active theme) to `runtime.conf` |
 | `CommandRegistry` | Declarative registration of session commands (`:save`, `:cancel`, etc.) |
 | `ContextTokens` | Tracks conversation context size across API calls. See [context-tracking.md](context-tracking.md). |
-| `compactHistory()` | Truncates old tool results to save context. Enabled by default; disable with `--no-compact`. |
+| `compactHistory()` | Truncates old tool results to save context. Configurable via `--compact-keep-steps` and `--compact-truncate-len`. |
 
 ### Agent Layer (`internal/llm/`)
 

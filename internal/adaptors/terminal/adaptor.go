@@ -65,6 +65,8 @@ func (a *Adaptor) Start() {
 		a.Config.Cfg.AutoSummarize,
 		a.Config.Cfg.AutoSave,
 		a.Config.Cfg.NoCompact,
+		a.Config.Cfg.CompactKeepSteps,
+		a.Config.Cfg.CompactTruncateLen,
 		a.Config.Cfg.Proxy,
 		a.Config.SkillsMgr,
 	)

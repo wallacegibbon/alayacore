@@ -145,6 +145,8 @@ type Session struct {
 	autoSummarizeEnabled bool
 	compactEnabled       bool
 	autoSaveEnabled      bool
+	compactKeepSteps     int
+	compactTruncateLen   int
 	maxSteps             int
 	proxyURL             string
 
@@ -174,18 +176,18 @@ func (s *Session) WaitDone() {
 // ============================================================================
 
 // LoadOrNewSession loads a session from file or creates a new one.
-func LoadOrNewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, autoSave bool, noCompact bool, proxyURL string, skillsMgr *skills.Manager) (*Session, string) {
+func LoadOrNewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, autoSave bool, noCompact bool, compactKeepSteps int, compactTruncateLen int, proxyURL string, skillsMgr *skills.Manager) (*Session, string) {
 	sessionFile = expandPath(sessionFile)
 	if sessionFile != "" {
 		if data, err := LoadSession(sessionFile); err == nil {
-			return RestoreFromSession(baseTools, systemPrompt, extraSystemPrompt, maxSteps, input, output, data, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, autoSummarize, autoSave, noCompact, proxyURL, skillsMgr), sessionFile
+			return RestoreFromSession(baseTools, systemPrompt, extraSystemPrompt, maxSteps, input, output, data, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, autoSummarize, autoSave, noCompact, compactKeepSteps, compactTruncateLen, proxyURL, skillsMgr), sessionFile
 		}
 	}
-	return NewSession(baseTools, systemPrompt, extraSystemPrompt, maxSteps, input, output, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, autoSummarize, autoSave, noCompact, proxyURL, skillsMgr), sessionFile
+	return NewSession(baseTools, systemPrompt, extraSystemPrompt, maxSteps, input, output, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, autoSummarize, autoSave, noCompact, compactKeepSteps, compactTruncateLen, proxyURL, skillsMgr), sessionFile
 }
 
 // NewSession creates a fresh session.
-func NewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, autoSave bool, noCompact bool, proxyURL string, skillsMgr *skills.Manager) *Session {
+func NewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, autoSave bool, noCompact bool, compactKeepSteps int, compactTruncateLen int, proxyURL string, skillsMgr *skills.Manager) *Session {
 	sessionCtx, sessionCancel := context.WithCancel(context.Background())
 	s := &Session{
 		SessionFile:          sessionFile,
@@ -202,6 +204,8 @@ func NewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt str
 		autoSummarizeEnabled: autoSummarize,
 		compactEnabled:       !noCompact,
 		autoSaveEnabled:      autoSave,
+		compactKeepSteps:     compactKeepSteps,
+		compactTruncateLen:   compactTruncateLen,
 		proxyURL:             proxyURL,
 		maxSteps:             maxSteps,
 		taskQueue:            make([]QueueItem, 0),
@@ -218,7 +222,7 @@ func NewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt str
 }
 
 // RestoreFromSession creates a session from saved data.
-func RestoreFromSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, data *SessionData, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, autoSave bool, noCompact bool, proxyURL string, skillsMgr *skills.Manager) *Session {
+func RestoreFromSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, data *SessionData, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, autoSave bool, noCompact bool, compactKeepSteps int, compactTruncateLen int, proxyURL string, skillsMgr *skills.Manager) *Session {
 	sessionCtx, sessionCancel := context.WithCancel(context.Background())
 	s := &Session{
 		Messages:             data.Messages,
@@ -236,6 +240,8 @@ func RestoreFromSession(baseTools []llm.Tool, systemPrompt string, extraSystemPr
 		autoSummarizeEnabled: autoSummarize,
 		compactEnabled:       !noCompact,
 		autoSaveEnabled:      autoSave,
+		compactKeepSteps:     compactKeepSteps,
+		compactTruncateLen:   compactTruncateLen,
 		proxyURL:             proxyURL,
 		maxSteps:             maxSteps,
 		taskQueue:            make([]QueueItem, 0),
@@ -980,12 +986,10 @@ func (s *Session) compactHistory() {
 	if !s.compactEnabled {
 		return
 	}
-	const (
-		recentSteps = 6   // Keep last N messages (3 steps: prompt/tool-call/tool-result) intact
-		maxOldLen   = 500 // Truncate old tool results to this many characters
-	)
+	// Each agent step is typically 2 messages (tool call + tool result)
+	recentMessages := s.compactKeepSteps * 2
 	msgs := s.Messages
-	truncateBoundary := len(msgs) - recentSteps
+	truncateBoundary := len(msgs) - recentMessages
 	if truncateBoundary <= 0 {
 		return
 	}
@@ -993,7 +997,7 @@ func (s *Session) compactHistory() {
 	for i := 0; i < truncateBoundary; i++ {
 		msg := msgs[i]
 		if msg.Role == llm.RoleTool {
-			s.truncateToolResultsInMessage(msg, i, maxOldLen)
+			s.truncateToolResultsInMessage(msg, i, s.compactTruncateLen)
 		}
 	}
 }

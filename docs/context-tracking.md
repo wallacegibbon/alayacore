@@ -128,7 +128,7 @@ The apparent "drop" from 2118 to 2073 after model switch is the difference in to
 - `shouldAutoSummarize()` — triggers when `ContextTokens >= ContextLimit * 65%` (only when `--auto-summarize` is enabled)
 - `summarize()` — appends the summary prompt to Messages, calls `processPrompt`, then replaces conversation history with the summary and resets `ContextTokens` to the summary's output token count
 - `applyModelContextLimit()` — sets `ContextLimit` from the active model's config
-- `compactHistory()` — truncates old tool results (> 6 messages back) to 500 characters to save context tokens. Enabled by default; disabled with `--no-compact`.
+- `compactHistory()` — truncates old tool results to save context tokens. Kept steps and truncate length are configurable via `--compact-keep-steps` and `--compact-truncate-len`. Enabled by default; disabled with `--no-compact`.
 
 ## History Compaction
 
@@ -136,7 +136,7 @@ In long agent sessions, tool result outputs accumulate and consume increasing am
 
 ### How It Works
 
-`compactHistory()` is called after each user prompt completes. It truncates tool result outputs that are older than the last 6 messages (roughly 3 agent steps) to 500 characters. The most recent results are kept intact.
+`compactHistory()` is called after each user prompt completes. It truncates tool result outputs that are older than the last N steps (default 3, configurable via `--compact-keep-steps`) to a configurable length (default 500 characters, via `--compact-truncate-len`). The most recent results are kept intact.
 
 ```
 Before compaction (9 messages):
@@ -149,11 +149,13 @@ After compaction:
 
 ### Truncation Strategy
 
-Old tool results are cut at 500 characters, then snapped back to the last newline boundary to avoid partial lines. A `[truncated for context efficiency]` marker is appended so the LLM knows content was omitted. The LLM can re-read any truncated files if needed.
+Old tool results are cut at the configured truncate length (default 500 characters), then snapped back to the last newline boundary to avoid partial lines. A `[truncated for context efficiency]` marker is appended so the LLM knows content was omitted. The LLM can re-read any truncated files if needed.
 
 ### Controlling Compaction
 
-- **Default**: Compaction is **enabled** — no flag needed
+- **Default**: Compaction is **enabled** — keeps last 3 steps intact, truncates older results to 500 characters
+- **Keep more steps**: `--compact-keep-steps=5` preserves 5 agent steps (10 messages)
+- **Shorter truncation**: `--compact-truncate-len=250` truncates to 250 characters for more aggressive savings
 - **Disable**: `alayacore --no-compact` keeps all tool results in full (useful for debugging or when context budget is not a concern)
 
 ### Other Context-Saving Measures

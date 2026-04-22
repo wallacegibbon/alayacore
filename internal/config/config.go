@@ -25,21 +25,23 @@ func (s *stringSlice) Get() []string {
 
 // Settings holds all CLI configuration
 type Settings struct {
-	ShowVersion   bool
-	ShowHelp      bool
-	DebugAPI      bool
-	AutoSummarize bool
-	AutoSave      bool
-	PlainIO       bool
-	NoCompact     bool
-	SystemPrompt  string
-	Skills        []string
-	Session       string
-	Proxy         string
-	ModelConfig   string
-	RuntimeConfig string
-	MaxSteps      int
-	ThemesFolder  string
+	ShowVersion        bool
+	ShowHelp           bool
+	DebugAPI           bool
+	AutoSummarize      bool
+	AutoSave           bool
+	PlainIO            bool
+	NoCompact          bool
+	SystemPrompt       string
+	Skills             []string
+	Session            string
+	Proxy              string
+	ModelConfig        string
+	RuntimeConfig      string
+	ThemesFolder       string
+	CompactKeepSteps   int
+	CompactTruncateLen int
+	MaxSteps           int
 }
 
 // Parse parses CLI flags and returns settings
@@ -51,6 +53,8 @@ func Parse() *Settings {
 	autoSave := flag.Bool("auto-save", true, "Automatically save session after each response (requires --session)")
 	plainIO := flag.Bool("plainio", false, "Use plain stdin/stdout mode instead of terminal UI")
 	noCompact := flag.Bool("no-compact", false, "Disable automatic history compaction (old tool results are kept in full)")
+	compactKeepSteps := flag.Int("compact-keep-steps", 3, "Number of recent agent steps to preserve during compaction (default: 3)")
+	compactTruncateLen := flag.Int("compact-truncate-len", 500, "Characters to keep when truncating old tool results (default: 500)")
 	systemPrompt := &stringSlice{}
 	flag.Var(systemPrompt, "system", "Extra system prompt (can be specified multiple times, will be appended to default)")
 	skill := &stringSlice{}
@@ -74,21 +78,23 @@ func Parse() *Settings {
 	}
 
 	s := &Settings{
-		ShowVersion:   *showVersion,
-		ShowHelp:      *showHelp,
-		DebugAPI:      *debugAPI,
-		AutoSummarize: *autoSummarize,
-		AutoSave:      *autoSave,
-		PlainIO:       *plainIO,
-		NoCompact:     *noCompact,
-		SystemPrompt:  mergedSystemPrompt,
-		Skills:        skillPaths,
-		Session:       *session,
-		Proxy:         *proxy,
-		ModelConfig:   *modelConfig,
-		RuntimeConfig: *runtimeConfig,
-		MaxSteps:      *maxSteps,
-		ThemesFolder:  *themesFolder,
+		ShowVersion:        *showVersion,
+		ShowHelp:           *showHelp,
+		DebugAPI:           *debugAPI,
+		AutoSummarize:      *autoSummarize,
+		AutoSave:           *autoSave,
+		PlainIO:            *plainIO,
+		NoCompact:          *noCompact,
+		SystemPrompt:       mergedSystemPrompt,
+		Skills:             skillPaths,
+		Session:            *session,
+		Proxy:              *proxy,
+		ModelConfig:        *modelConfig,
+		RuntimeConfig:      *runtimeConfig,
+		CompactKeepSteps:   *compactKeepSteps,
+		CompactTruncateLen: *compactTruncateLen,
+		MaxSteps:           *maxSteps,
+		ThemesFolder:       *themesFolder,
 	}
 
 	return s

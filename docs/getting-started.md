@@ -74,6 +74,8 @@ export ALAYACORE_SHELL=zsh
 | `--auto-summarize` | `false` | Automatically summarize when context exceeds 65% of `context_limit` |
 | `--auto-save` | `true` | Auto-save session after each response (requires `--session`) |
 | `--no-compact` | `false` | Disable automatic history compaction (old tool results are kept in full) |
+| `--compact-keep-steps` | `3` | Number of recent agent steps to preserve during compaction |
+| `--compact-truncate-len` | `500` | Characters to keep when truncating old tool results |
 | `--plainio` | `false` | Plain stdin/stdout mode — no TUI, for scripting and piping |
 | `--debug-api` | `false` | Write raw API requests and responses to a log file |
 | `--version` | — | Print version and exit |
