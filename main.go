@@ -56,6 +56,8 @@ Flags:
   --auto-summarize        Automatically summarize conversation when context exceeds 65% of limit
   --auto-save             Automatically save session after each response when --session is specified (default: enabled)
   --no-compact            Disable automatic history compaction (old tool results are kept in full)
+  --compact-keep-steps    Number of recent agent steps to preserve during compaction (default: 3)
+  --compact-truncate-len  Characters to keep when truncating old tool results (default: 500)
   --plainio               Use plain stdin/stdout mode instead of terminal UI
   --debug-api             Write raw API requests and responses to log file
   --version               Show version information
