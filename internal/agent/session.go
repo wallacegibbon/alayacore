@@ -33,8 +33,8 @@ import (
 	debugpkg "github.com/alayacore/alayacore/internal/debug"
 	domainerrors "github.com/alayacore/alayacore/internal/errors"
 	"github.com/alayacore/alayacore/internal/llm"
-	"github.com/alayacore/alayacore/internal/skills"
 	"github.com/alayacore/alayacore/internal/llm/factory"
+	"github.com/alayacore/alayacore/internal/skills"
 	"github.com/alayacore/alayacore/internal/stream"
 )
 
@@ -145,6 +145,7 @@ type Session struct {
 	autoSummarizeEnabled bool
 	compactEnabled       bool
 	autoSaveEnabled      bool
+	skillPaths           map[string]bool // Normalized skill file paths for compaction exemption
 	maxSteps             int
 	proxyURL             string
 
@@ -202,6 +203,7 @@ func NewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt str
 		autoSummarizeEnabled: autoSummarize,
 		compactEnabled:       !noCompact,
 		autoSaveEnabled:      autoSave,
+		skillPaths:           buildSkillPathSet(skillsMgr),
 		proxyURL:             proxyURL,
 		maxSteps:             maxSteps,
 		taskQueue:            make([]QueueItem, 0),
@@ -236,6 +238,7 @@ func RestoreFromSession(baseTools []llm.Tool, systemPrompt string, extraSystemPr
 		autoSummarizeEnabled: autoSummarize,
 		compactEnabled:       !noCompact,
 		autoSaveEnabled:      autoSave,
+		skillPaths:           buildSkillPathSet(skillsMgr),
 		proxyURL:             proxyURL,
 		maxSteps:             maxSteps,
 		taskQueue:            make([]QueueItem, 0),
@@ -1033,21 +1036,8 @@ func (s *Session) compactHistory() {
 func (s *Session) collectSkillReadCallIDs(msgs []llm.Message) map[string]bool {
 	ids := make(map[string]bool)
 
-	// Get known skill file paths
-	skillPaths := s.SkillsManager.GetSkillPaths()
-	if len(skillPaths) == 0 {
+	if len(s.skillPaths) == 0 {
 		return ids
-	}
-
-	// Build normalized path set for matching
-	skillPathSet := make(map[string]bool)
-	for _, p := range skillPaths {
-		// Normalize path for comparison
-		absPath := filepath.Clean(p)
-		if abs, err := filepath.Abs(p); err == nil {
-			absPath = abs
-		}
-		skillPathSet[absPath] = true
 	}
 
 	for _, msg := range msgs {
@@ -1072,12 +1062,33 @@ func (s *Session) collectSkillReadCallIDs(msgs []llm.Message) map[string]bool {
 				readPath = abs
 			}
 			// Check if it matches a skill file
-			if skillPathSet[readPath] {
+			if s.skillPaths[readPath] {
 				ids[tc.ToolCallID] = true
 			}
 		}
 	}
 	return ids
+}
+
+// buildSkillPathSet creates a normalized path set from skill locations.
+// Called once at session creation since skills are fixed during process lifetime.
+func buildSkillPathSet(skillsMgr *skills.Manager) map[string]bool {
+	if skillsMgr == nil {
+		return nil
+	}
+	skillPaths := skillsMgr.GetSkillPaths()
+	if len(skillPaths) == 0 {
+		return nil
+	}
+	pathSet := make(map[string]bool)
+	for _, p := range skillPaths {
+		absPath := filepath.Clean(p)
+		if abs, err := filepath.Abs(p); err == nil {
+			absPath = abs
+		}
+		pathSet[absPath] = true
+	}
+	return pathSet
 }
 
 // ============================================================================
