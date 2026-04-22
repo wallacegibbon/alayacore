@@ -44,6 +44,7 @@ type AnthropicProvider struct {
 	client      *http.Client
 	model       string
 	promptCache bool
+	maxTokens   int
 }
 
 // AnthropicOption configures the provider
@@ -52,9 +53,10 @@ type AnthropicOption func(*AnthropicProvider)
 // NewAnthropic creates a new Anthropic provider
 func NewAnthropic(opts ...AnthropicOption) (*AnthropicProvider, error) {
 	p := &AnthropicProvider{
-		baseURL: "https://api.anthropic.com",
-		client:  &http.Client{Timeout: 10 * time.Minute},
-		model:   "claude-3-5-sonnet-20241022",
+		baseURL:   "https://api.anthropic.com",
+		client:    &http.Client{Timeout: 10 * time.Minute},
+		model:     "claude-3-5-sonnet-20241022",
+		maxTokens: 4096,
 	}
 	for _, opt := range opts {
 		opt(p)
@@ -97,6 +99,13 @@ func WithAnthropicModel(model string) AnthropicOption {
 func WithPromptCache(enabled bool) AnthropicOption {
 	return func(p *AnthropicProvider) {
 		p.promptCache = enabled
+	}
+}
+
+// WithMaxTokens sets the maximum output tokens
+func WithMaxTokens(tokens int) AnthropicOption {
+	return func(p *AnthropicProvider) {
+		p.maxTokens = tokens
 	}
 }
 
@@ -367,7 +376,7 @@ func (p *AnthropicProvider) StreamMessages(
 	reqBody := anthropicRequest{
 		Model:     p.model,
 		Messages:  apiMessages,
-		MaxTokens: 4096,
+		MaxTokens: p.maxTokens,
 		System:    systemMessages,
 		Tools:     apiTools,
 		Stream:    true,
