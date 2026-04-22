@@ -97,11 +97,7 @@ func defaultModelsConfigFile() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	dir := filepath.Join(home, ".alayacore")
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return "", err
-	}
-	return filepath.Join(dir, "model.conf"), nil
+	return filepath.Join(home, ".alayacore", "model.conf"), nil
 }
 
 // LoadFromFile loads models from a config file in key-value format
