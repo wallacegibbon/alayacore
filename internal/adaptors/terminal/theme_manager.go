@@ -11,6 +11,18 @@ import (
 	"strings"
 )
 
+// resolveConfigPath returns the provided path, or the default ~/.alayacore/<filename>
+func resolveConfigPath(providedPath, defaultFilename string) string {
+	if providedPath != "" {
+		return providedPath
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".alayacore", defaultFilename)
+}
+
 // ThemeInfo represents a theme's metadata for display in the selector.
 type ThemeInfo struct {
 	Name string // Theme name (filename without .conf extension)
@@ -30,17 +42,10 @@ type ThemeManager struct {
 func NewThemeManager(themesFolder string) *ThemeManager {
 	wc := &WarningCollector{}
 	tm := &ThemeManager{
-		themesFolder: themesFolder,
-		wc:           wc,
+		wc: wc,
 	}
 
-	// Set default folder if not provided
-	if tm.themesFolder == "" {
-		home, err := os.UserHomeDir()
-		if err == nil {
-			tm.themesFolder = filepath.Join(home, ".alayacore", "themes")
-		}
-	}
+	tm.themesFolder = resolveConfigPath(themesFolder, "themes")
 
 	// Initialize themes folder with default themes if needed
 	tm.initializeThemesFolder()
