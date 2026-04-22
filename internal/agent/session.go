@@ -667,6 +667,7 @@ func (s *Session) handleUserPrompt(ctx context.Context, prompt string) {
 	_, err := s.processPrompt(ctx, s.Messages)
 
 	s.Messages = cleanIncompleteToolCalls(s.Messages)
+	s.compactHistory()
 
 	if err != nil {
 		s.writeError(err.Error())
@@ -961,6 +962,47 @@ func cleanIncompleteToolCalls(messages []llm.Message) []llm.Message {
 	}
 
 	return messages
+}
+
+// compactHistory truncates old tool result outputs to save context tokens.
+// Only tool results from the most recent steps are kept in full; older ones
+// are truncated to a summary. This prevents unbounded context growth in
+// long agent sessions where each step's tool I/O accumulates.
+func (s *Session) compactHistory() {
+	const (
+		recentSteps = 6        // Keep last N messages (3 steps: prompt/tool-call/tool-result) intact
+		maxOldLen   = 500      // Truncate old tool results to this many characters
+	)
+	msgs := s.Messages
+	if len(msgs) <= recentSteps {
+		return
+	}
+	for i := 0; i < len(msgs)-recentSteps; i++ {
+		if msgs[i].Role != llm.RoleTool {
+			continue
+		}
+		for j, part := range msgs[i].Content {
+			tr, ok := part.(llm.ToolResultPart)
+			if !ok {
+				continue
+			}
+			textOut, ok := tr.Output.(llm.ToolResultOutputText)
+			if !ok || len(textOut.Text) <= maxOldLen {
+				continue
+			}
+			truncated := textOut.Text[:maxOldLen]
+			// Cut at last newline to avoid partial lines
+			if idx := strings.LastIndex(truncated, "\n"); idx > 0 {
+				truncated = truncated[:idx]
+			}
+			truncated += "\n... [truncated for context efficiency]"
+			msgs[i].Content[j] = llm.ToolResultPart{
+				Type:       "tool_result",
+				ToolCallID: tr.ToolCallID,
+				Output:     llm.ToolResultOutputText{Type: "text", Text: truncated},
+			}
+		}
+	}
 }
 
 // ============================================================================
