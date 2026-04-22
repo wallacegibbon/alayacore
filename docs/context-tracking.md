@@ -151,6 +151,8 @@ After compaction:
 
 Old tool results are cut at the configured truncate length (default 500 characters), then snapped back to the last newline boundary to avoid partial lines. A `[truncated for context efficiency]` marker is appended so the LLM knows content was omitted. The LLM can re-read any truncated files if needed.
 
+**Skill directories are exempt from truncation.** Any `read_file` result for a file under a skill directory (SKILL.md, scripts, references, assets) is preserved in full. Skill instructions and their supporting files must remain intact for the LLM to follow correctly.
+
 ### Controlling Compaction
 
 - **Default**: Compaction is **enabled** — keeps last 3 steps intact, truncates older results to 500 characters

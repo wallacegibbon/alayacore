@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"os/user"
 	"path/filepath"
 	"strconv"
@@ -147,6 +148,7 @@ type Session struct {
 	autoSaveEnabled      bool
 	compactKeepSteps     int
 	compactTruncateLen   int
+	skillDirs            []string // Skill directories for compaction exemption
 	maxSteps             int
 	proxyURL             string
 
@@ -206,6 +208,7 @@ func NewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt str
 		autoSaveEnabled:      autoSave,
 		compactKeepSteps:     compactKeepSteps,
 		compactTruncateLen:   compactTruncateLen,
+		skillDirs:            buildSkillDirSet(skillsMgr),
 		proxyURL:             proxyURL,
 		maxSteps:             maxSteps,
 		taskQueue:            make([]QueueItem, 0),
@@ -242,6 +245,7 @@ func RestoreFromSession(baseTools []llm.Tool, systemPrompt string, extraSystemPr
 		autoSaveEnabled:      autoSave,
 		compactKeepSteps:     compactKeepSteps,
 		compactTruncateLen:   compactTruncateLen,
+		skillDirs:            buildSkillDirSet(skillsMgr),
 		proxyURL:             proxyURL,
 		maxSteps:             maxSteps,
 		taskQueue:            make([]QueueItem, 0),
@@ -982,6 +986,9 @@ func cleanIncompleteToolCalls(messages []llm.Message) []llm.Message {
 // Only tool results from the most recent steps are kept in full; older ones
 // are truncated to a summary. This prevents unbounded context growth in
 // long agent sessions where each step's tool I/O accumulates.
+//
+// Files under skill directories are never truncated — skill instructions
+// and their supporting files must remain intact for the LLM to follow.
 func (s *Session) compactHistory() {
 	if !s.compactEnabled {
 		return
@@ -994,21 +1001,64 @@ func (s *Session) compactHistory() {
 		return
 	}
 
+	// Build set of tool call IDs that read files under skill directories
+	skillReadIDs := make(map[string]bool)
+	for i := 0; i < truncateBoundary; i++ {
+		msg := msgs[i]
+		if msg.Role == llm.RoleAssistant {
+			s.collectSkillDirReads(msg, skillReadIDs)
+		}
+	}
+
 	for i := 0; i < truncateBoundary; i++ {
 		msg := msgs[i]
 		if msg.Role == llm.RoleTool {
-			s.truncateToolResultsInMessage(msg, i, s.compactTruncateLen)
+			s.truncateToolResultsInMessage(msg, i, skillReadIDs, s.compactTruncateLen)
 		}
 	}
 }
 
-// truncateToolResultsInMessage truncates tool results in a message.
-func (s *Session) truncateToolResultsInMessage(msg llm.Message, msgIndex int, maxLen int) {
+// collectSkillDirReads extracts tool call IDs for read_file calls targeting
+// files under any skill directory.
+func (s *Session) collectSkillDirReads(msg llm.Message, skillReadIDs map[string]bool) {
+	if len(s.skillDirs) == 0 {
+		return
+	}
+	for _, part := range msg.Content {
+		tc, ok := part.(llm.ToolCallPart)
+		if !ok || tc.ToolName != "read_file" {
+			continue
+		}
+		var input struct {
+			Path string `json:"path"`
+		}
+		if err := json.Unmarshal(tc.Input, &input); err != nil || input.Path == "" {
+			continue
+		}
+		absPath := input.Path
+		if abs, err := filepath.Abs(input.Path); err == nil {
+			absPath = abs
+		}
+		for _, dir := range s.skillDirs {
+			if strings.HasPrefix(absPath+string(os.PathSeparator), dir+string(os.PathSeparator)) {
+				skillReadIDs[tc.ToolCallID] = true
+				break
+			}
+		}
+	}
+}
+
+// truncateToolResultsInMessage truncates tool results in a message,
+// preserving reads from skill directories.
+func (s *Session) truncateToolResultsInMessage(msg llm.Message, msgIndex int, skillReadIDs map[string]bool, maxLen int) {
 	const truncationMarker = "\n... [truncated for context efficiency]"
 	for j, part := range msg.Content {
 		tr, ok := part.(llm.ToolResultPart)
 		if !ok {
 			continue
+		}
+		if skillReadIDs[tr.ToolCallID] {
+			continue // preserve skill directory reads
 		}
 		textOut, ok := tr.Output.(llm.ToolResultOutputText)
 		if !ok {
@@ -1037,6 +1087,15 @@ func (s *Session) truncateToolResultsInMessage(msg llm.Message, msgIndex int, ma
 // ============================================================================
 // Path Helpers
 // ============================================================================
+
+// buildSkillDirSet creates a slice of absolute skill directory paths.
+// Called once at session creation since skills are fixed during process lifetime.
+func buildSkillDirSet(skillsMgr *skills.Manager) []string {
+	if skillsMgr == nil {
+		return nil
+	}
+	return skillsMgr.GetSkillDirs()
+}
 
 func expandPath(path string) string {
 	if !strings.HasPrefix(path, "~") {
