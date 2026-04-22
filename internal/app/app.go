@@ -13,19 +13,13 @@ import (
 // This package provides shared initialization for all adaptors.
 // It builds the system prompt, initializes tools, and creates the app config.
 
-const systemPromptIdentity = `IDENTITY:
-- Your name is AlayaCore
-- You are a helpful AI assistant with access to tools for reading/writing files, executing commands, and activating skills`
+const systemPromptIdentity = `Your name is AlayaCore. You are a helpful AI assistant with access to tools for reading/writing files, executing commands, and activating skills.`
 
-const systemPromptRules = `RULES:
-- Never assume - verify with tools`
+const systemPromptRules = `Never assume - verify with tools.`
 
-const systemPromptSearch = `SEARCH:
-- Prefer the search_content tool over reading file chunks by chunks to find content. Use search_content to locate code, definitions, usages, and patterns first, then read_file for detailed inspection`
+const systemPromptSearch = `Use search_content to locate code and patterns before using read_file for detailed inspection.`
 
-const systemPromptSkills = `SKILLS:
-- Check <available_skills> below; activate relevant ones using the activate_skill tool
-- Skill instructions may use relative paths - run them from the skill's directory (derived from <location>)`
+const systemPromptSkills = `Check <available_skills> below; activate relevant ones using the activate_skill tool. Skill instructions may use relative paths - run them from the skill's directory (derived from <location>).`
 
 // Config holds the common app configuration
 type Config struct {
