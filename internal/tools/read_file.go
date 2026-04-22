@@ -11,7 +11,7 @@ import (
 	"github.com/alayacore/alayacore/internal/llm"
 )
 
-const maxFullReadSize = 100 * 1024 // 100KB limit for full file reads (~25K tokens, ~2500 lines)
+const maxFullReadSize = 32 * 1024 // 32KB limit for full file reads (~8K tokens)
 
 // ReadFileInput represents the input for the read_file tool
 type ReadFileInput struct {
