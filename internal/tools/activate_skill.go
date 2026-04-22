@@ -9,7 +9,7 @@ import (
 
 // ActivateSkillInput represents the input for the activate_skill tool
 type ActivateSkillInput struct {
-	Name string `json:"name" jsonschema:"required,description=The name of the skill to activate"`
+	Name string `json:"name" jsonschema:"required,description=Skill name to activate"`
 }
 
 // NewActivateSkillTool creates a tool for activating skills

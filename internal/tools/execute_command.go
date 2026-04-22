@@ -26,7 +26,7 @@ const maxCommandOutput = 32 * 1024 // 32KB
 
 // executeCommandInput represents the input for the execute_command tool
 type executeCommandInput struct {
-	Command string `json:"command" jsonschema:"required,description=The command to execute"`
+	Command string `json:"command" jsonschema:"required,description=Command to execute"`
 }
 
 // NewExecuteCommandTool creates a tool for executing commands in the

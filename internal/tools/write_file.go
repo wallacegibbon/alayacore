@@ -9,8 +9,8 @@ import (
 
 // WriteFileInput represents the input for the write_file tool
 type WriteFileInput struct {
-	Path    string `json:"path" jsonschema:"required,description=The path of the file to write"`
-	Content string `json:"content" jsonschema:"required,description=The content to write to the file"`
+	Path    string `json:"path" jsonschema:"required,description=File path to write"`
+	Content string `json:"content" jsonschema:"required,description=Content to write to the file"`
 }
 
 // NewWriteFileTool creates a tool for writing files

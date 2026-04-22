@@ -11,12 +11,12 @@ import (
 
 // SearchContentInput represents the input for the search_content tool
 type SearchContentInput struct {
-	Pattern    string `json:"pattern" jsonschema:"required,description=The regex pattern to search for"`
-	Path       string `json:"path" jsonschema:"description=The file or directory to search in (defaults to current working directory)"`
-	FileType   string `json:"file_type" jsonschema:"description=Filter files by type. Common values: go, python, rust, java, js, ts, ruby, c, cpp, html, css, json, yaml, md, sh"`
-	Glob       string `json:"glob" jsonschema:"description=Glob pattern to filter files (e.g., \"*.go\", \"*.{ts,tsx}\")"`
-	IgnoreCase string `json:"ignore_case" jsonschema:"description=Search case-insensitively. Set to \"true\" to enable"`
-	MaxLines   string `json:"max_lines" jsonschema:"description=Maximum number of matching lines to return (defaults to 200)"`
+	Pattern    string `json:"pattern" jsonschema:"required,description=Regex pattern to search for"`
+	Path       string `json:"path" jsonschema:"description=File or directory to search (default: cwd)"`
+	FileType   string `json:"file_type" jsonschema:"description=File type filter (e.g. go, python, rust)"`
+	Glob       string `json:"glob" jsonschema:"description=Glob pattern (e.g. *.go, *.{ts,tsx})"`
+	IgnoreCase string `json:"ignore_case" jsonschema:"description=Set \"true\" for case-insensitive"`
+	MaxLines   string `json:"max_lines" jsonschema:"description=Max matching lines (default 50)"`
 }
 
 const defaultSearchContentMaxLines = "50"

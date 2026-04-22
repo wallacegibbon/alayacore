@@ -15,9 +15,9 @@ const maxFullReadSize = 32 * 1024 // 32KB limit for full file reads (~8K tokens)
 
 // ReadFileInput represents the input for the read_file tool
 type ReadFileInput struct {
-	Path      string `json:"path" jsonschema:"required,description=The path of the file to read"`
-	StartLine string `json:"start_line" jsonschema:"description=Optional: The starting line number (1-indexed)"`
-	EndLine   string `json:"end_line" jsonschema:"description=Optional: The ending line number (1-indexed)"`
+	Path      string `json:"path" jsonschema:"required,description=File path to read"`
+	StartLine string `json:"start_line" jsonschema:"description=Starting line number (1-indexed)"`
+	EndLine   string `json:"end_line" jsonschema:"description=Ending line number (1-indexed)"`
 }
 
 // NewReadFileTool creates a tool for reading files
