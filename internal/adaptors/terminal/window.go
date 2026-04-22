@@ -1192,4 +1192,58 @@ func (m *DisplayModel) MoveWindowCursorToCenter() bool {
 	return false
 }
 
+// MoveWindowCursorToNextUserPrompt moves the window cursor forward (down) to
+// the next window whose tag is TagTextUser ("TU"). Returns false if no such
+// window exists below the current cursor.
+func (m *DisplayModel) MoveWindowCursorToNextUserPrompt() bool {
+	windowCount := m.windowBuffer.GetWindowCount()
+	if windowCount == 0 {
+		return false
+	}
+
+	// Start searching from the window after the current cursor.
+	// If cursor is -1 (none), start from 0.
+	start := m.windowCursor + 1
+	if start < 0 {
+		start = 0
+	}
+
+	for i := start; i < windowCount; i++ {
+		w := m.windowBuffer.GetWindow(i)
+		if w != nil && w.Tag == stream.TagTextUser {
+			m.windowCursor = i
+			m.userMovedCursorAway = i < windowCount-1
+			return true
+		}
+	}
+	return false
+}
+
+// MoveWindowCursorToPrevUserPrompt moves the window cursor backward (up) to
+// the previous window whose tag is TagTextUser ("TU"). Returns false if no
+// such window exists above the current cursor.
+func (m *DisplayModel) MoveWindowCursorToPrevUserPrompt() bool {
+	windowCount := m.windowBuffer.GetWindowCount()
+	if windowCount == 0 {
+		return false
+	}
+
+	// Start searching from the window before the current cursor.
+	// Clamp cursor so we don't go out of bounds.
+	start := m.windowCursor - 1
+	if start >= windowCount {
+		start = windowCount - 1
+	}
+
+	for i := start; i >= 0; i-- {
+		w := m.windowBuffer.GetWindow(i)
+		if w != nil && w.Tag == stream.TagTextUser {
+			m.windowCursor = i
+			m.userMovedCursorAway = i < windowCount-1
+			return true
+		}
+	}
+	return false
+}
+
 var _ tea.Model = (*DisplayModel)(nil)

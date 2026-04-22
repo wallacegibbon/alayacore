@@ -66,6 +66,10 @@ var displayKeyBindings = []KeyBinding{
 	{"M", "Move cursor to middle window", "display"},
 	// Open window content in external editor
 	{"e", "Open window content in external editor", "display"},
+	// Jump to next user prompt (TU)
+	{"f", "Jump to next user prompt", "display"},
+	// Jump to previous user prompt (TU)
+	{"b", "Jump to previous user prompt", "display"},
 	// Switch to input with command prefix
 	{":", "Switch to input with command prefix", "display"},
 	// Toggle window fold (expand/collapse)
@@ -457,6 +461,20 @@ var displayKeyMap = map[string]func(*Terminal) tea.Cmd{
 		content := m.display.GetCursorWindowContent()
 		if content != "" {
 			return m.editor.OpenForDisplay(content)
+		}
+		return nil
+	},
+	"f": func(m *Terminal) tea.Cmd {
+		if m.display.MoveWindowCursorToNextUserPrompt() {
+			m.display.EnsureCursorVisible()
+			m.display.updateContent()
+		}
+		return nil
+	},
+	"b": func(m *Terminal) tea.Cmd {
+		if m.display.MoveWindowCursorToPrevUserPrompt() {
+			m.display.EnsureCursorVisible()
+			m.display.updateContent()
 		}
 		return nil
 	},

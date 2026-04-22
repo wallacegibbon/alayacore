@@ -18,6 +18,8 @@ AlayaCore's terminal UI is built with [Bubble Tea](https://charm.land/) and uses
 | `H` | Move cursor to top window in visible area |
 | `M` | Move cursor to middle window in visible area |
 | `L` | Move cursor to bottom window in visible area |
+| `f` | Jump to next user prompt |
+| `b` | Jump to previous user prompt |
 | `e` | Open window content in external editor |
 
 ## Input & Actions
@@ -62,7 +64,7 @@ The display area organizes content into separate windows — one per message or 
 
 ### Auto-Follow
 
-When new windows appear, the cursor automatically moves to the newest one. Pressing `j`, `k`, `g`, `H`, `L`, `M`, `J`, `K`, `Ctrl+D`, or `Ctrl+U` disables auto-follow. Returning to the last window re-enables it.
+When new windows appear, the cursor automatically moves to the newest one. Pressing `j`, `k`, `g`, `H`, `L`, `M`, `J`, `K`, `Ctrl+D`, `Ctrl+U`, `f`, or `b` disables auto-follow. Returning to the last window re-enables it.
 
 ### Fold Mode
 
