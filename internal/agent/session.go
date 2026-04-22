@@ -141,6 +141,7 @@ type Session struct {
 	extraSystemPrompt    string
 	debugAPI             bool
 	autoSummarizeEnabled bool
+	compactEnabled       bool
 	autoSaveEnabled      bool
 	maxSteps             int
 	proxyURL             string
@@ -171,18 +172,18 @@ func (s *Session) WaitDone() {
 // ============================================================================
 
 // LoadOrNewSession loads a session from file or creates a new one.
-func LoadOrNewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, autoSave bool, proxyURL string) (*Session, string) {
+func LoadOrNewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, autoSave bool, noCompact bool, proxyURL string) (*Session, string) {
 	sessionFile = expandPath(sessionFile)
 	if sessionFile != "" {
 		if data, err := LoadSession(sessionFile); err == nil {
-			return RestoreFromSession(baseTools, systemPrompt, extraSystemPrompt, maxSteps, input, output, data, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, autoSummarize, autoSave, proxyURL), sessionFile
+			return RestoreFromSession(baseTools, systemPrompt, extraSystemPrompt, maxSteps, input, output, data, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, autoSummarize, autoSave, noCompact, proxyURL), sessionFile
 		}
 	}
-	return NewSession(baseTools, systemPrompt, extraSystemPrompt, maxSteps, input, output, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, autoSummarize, autoSave, proxyURL), sessionFile
+	return NewSession(baseTools, systemPrompt, extraSystemPrompt, maxSteps, input, output, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, autoSummarize, autoSave, noCompact, proxyURL), sessionFile
 }
 
 // NewSession creates a fresh session.
-func NewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, autoSave bool, proxyURL string) *Session {
+func NewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, autoSave bool, noCompact bool, proxyURL string) *Session {
 	sessionCtx, sessionCancel := context.WithCancel(context.Background())
 	s := &Session{
 		SessionFile:          sessionFile,
@@ -196,6 +197,7 @@ func NewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt str
 		extraSystemPrompt:    extraSystemPrompt,
 		debugAPI:             debugAPI,
 		autoSummarizeEnabled: autoSummarize,
+		compactEnabled:       !noCompact,
 		autoSaveEnabled:      autoSave,
 		proxyURL:             proxyURL,
 		maxSteps:             maxSteps,
@@ -213,7 +215,7 @@ func NewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt str
 }
 
 // RestoreFromSession creates a session from saved data.
-func RestoreFromSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, data *SessionData, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, autoSave bool, proxyURL string) *Session {
+func RestoreFromSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, data *SessionData, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, autoSave bool, noCompact bool, proxyURL string) *Session {
 	sessionCtx, sessionCancel := context.WithCancel(context.Background())
 	s := &Session{
 		Messages:             data.Messages,
@@ -228,6 +230,7 @@ func RestoreFromSession(baseTools []llm.Tool, systemPrompt string, extraSystemPr
 		extraSystemPrompt:    extraSystemPrompt,
 		debugAPI:             debugAPI,
 		autoSummarizeEnabled: autoSummarize,
+		compactEnabled:       !noCompact,
 		autoSaveEnabled:      autoSave,
 		proxyURL:             proxyURL,
 		maxSteps:             maxSteps,
@@ -970,6 +973,9 @@ func cleanIncompleteToolCalls(messages []llm.Message) []llm.Message {
 // are truncated to a summary. This prevents unbounded context growth in
 // long agent sessions where each step's tool I/O accumulates.
 func (s *Session) compactHistory() {
+	if !s.compactEnabled {
+		return
+	}
 	const (
 		recentSteps = 6   // Keep last N messages (3 steps: prompt/tool-call/tool-result) intact
 		maxOldLen   = 500 // Truncate old tool results to this many characters

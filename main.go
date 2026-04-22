@@ -53,8 +53,9 @@ Flags:
   --proxy string          HTTP proxy URL (e.g., http://127.0.0.1:7890 or socks5://127.0.0.1:1080)
   --themes string         Themes folder path (default: ~/.alayacore/themes)
   --max-steps int         Maximum agent loop steps (default: 100)
-  --auto-summarize        Automatically summarize conversation when context exceeds 80% of limit
+  --auto-summarize        Automatically summarize conversation when context exceeds 65% of limit
   --auto-save             Automatically save session after each response when --session is specified (default: enabled)
+  --no-compact            Disable automatic history compaction (old tool results are kept in full)
   --plainio               Use plain stdin/stdout mode instead of terminal UI
   --debug-api             Write raw API requests and responses to log file
   --version               Show version information
