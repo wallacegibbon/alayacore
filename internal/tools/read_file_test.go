@@ -63,52 +63,46 @@ func TestReadFileWithLineRange(t *testing.T) {
 	}{
 		{
 			name:      "read lines 5-10",
-			input:     ReadFileInput{Path: tmpFile, StartLine: "5", EndLine: "10"},
+			input:     ReadFileInput{Path: tmpFile, StartLine: 5, EndLine: 10},
 			wantLines: []string{"line5", "line6", "line7", "line8", "line9", "line10"},
 		},
 		{
 			name:      "read first line",
-			input:     ReadFileInput{Path: tmpFile, StartLine: "1", EndLine: "1"},
+			input:     ReadFileInput{Path: tmpFile, StartLine: 1, EndLine: 1},
 			wantLines: []string{"line1"},
 		},
 		{
 			name:      "read last line",
-			input:     ReadFileInput{Path: tmpFile, StartLine: "100", EndLine: "100"},
+			input:     ReadFileInput{Path: tmpFile, StartLine: 100, EndLine: 100},
 			wantLines: []string{"line100"},
 		},
 		{
 			name:      "read from line to end",
-			input:     ReadFileInput{Path: tmpFile, StartLine: "98"},
+			input:     ReadFileInput{Path: tmpFile, StartLine: 98},
 			wantLines: []string{"line98", "line99", "line100"},
 		},
 		{
 			name:      "read from start to line",
-			input:     ReadFileInput{Path: tmpFile, EndLine: "3"},
+			input:     ReadFileInput{Path: tmpFile, EndLine: 3},
 			wantLines: []string{"line1", "line2", "line3"},
 		},
 		{
-			name:      "invalid start_line",
-			input:     ReadFileInput{Path: tmpFile, StartLine: "0"},
+			name:      "invalid negative start_line",
+			input:     ReadFileInput{Path: tmpFile, StartLine: -1},
 			wantError: true,
-			errorMsg:  "start_line must be >= 1",
+			errorMsg:  "start_line must be >= 0",
 		},
 		{
-			name:      "invalid end_line",
-			input:     ReadFileInput{Path: tmpFile, EndLine: "-1"},
+			name:      "invalid negative end_line",
+			input:     ReadFileInput{Path: tmpFile, EndLine: -1},
 			wantError: true,
-			errorMsg:  "end_line must be >= 1",
+			errorMsg:  "end_line must be >= 0",
 		},
 		{
 			name:      "start > end",
-			input:     ReadFileInput{Path: tmpFile, StartLine: "10", EndLine: "5"},
+			input:     ReadFileInput{Path: tmpFile, StartLine: 10, EndLine: 5},
 			wantError: true,
 			errorMsg:  "start_line must be <= end_line",
-		},
-		{
-			name:      "non-numeric start_line",
-			input:     ReadFileInput{Path: tmpFile, StartLine: "abc"},
-			wantError: true,
-			errorMsg:  "invalid start_line",
 		},
 	}
 
@@ -202,7 +196,7 @@ func TestReadFileLargeWithLineRange(t *testing.T) {
 	tool := NewReadFileTool()
 
 	// Should be able to read first and last lines without loading entire file
-	input := ReadFileInput{Path: tmpFile, StartLine: "1", EndLine: "1"}
+	input := ReadFileInput{Path: tmpFile, StartLine: 1, EndLine: 1}
 	inputJSON, err := json.Marshal(input)
 	if err != nil {
 		t.Fatal(err)
@@ -223,7 +217,7 @@ func TestReadFileLargeWithLineRange(t *testing.T) {
 	}
 
 	// Also test reading the third line
-	input = ReadFileInput{Path: tmpFile, StartLine: "3", EndLine: "3"}
+	input = ReadFileInput{Path: tmpFile, StartLine: 3, EndLine: 3}
 	inputJSON, err = json.Marshal(input)
 	if err != nil {
 		t.Fatal(err)

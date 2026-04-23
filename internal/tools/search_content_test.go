@@ -239,7 +239,7 @@ func TestSearchContentMaxLinesGlobal(t *testing.T) {
 	result, err := executeSearchContent(context.Background(), SearchContentInput{
 		Pattern:  "match",
 		Path:     tmpDir,
-		MaxLines: "5",
+		MaxLines: 5,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

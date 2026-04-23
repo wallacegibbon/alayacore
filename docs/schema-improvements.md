@@ -89,6 +89,9 @@ See the Pattern Overview above.
 ```go
 type Example struct {
 	Name     string `json:"name" jsonschema:"required,description=The name"`
+	Count    int    `json:"count" jsonschema:"description=The count"`
+	Rate     float64 `json:"rate" jsonschema:"description=Rate per second"`
+	Enabled  bool   `json:"enabled" jsonschema:"description=Whether enabled"`
 	Type     string `json:"type" jsonschema:"required,description=The type,enum=foo|bar|baz"`
 	Optional string `json:"optional" jsonschema:"description=This is optional"`
 }
@@ -98,8 +101,22 @@ type Example struct {
 |-----|-------------|
 | `required` | Field is required in the JSON schema |
 | `description=...` | Field description for the LLM |
-| `type=...` | Override the JSON type (defaults to `string`) |
+| `type=...` | Override the inferred type (rarely needed) |
 | `enum=...` | Pipe-separated allowed values |
+
+### Type Inference
+
+JSON schema types are **automatically inferred** from Go field types:
+
+| Go type | JSON schema type |
+|---------|------------------|
+| `string` | `"string"` |
+| `int`, `int8`, `int16`, `int32`, `int64` | `"integer"` |
+| `uint`, `uint8`, `uint16`, `uint32`, `uint64` | `"integer"` |
+| `float32`, `float64` | `"number"` |
+| `bool` | `"boolean"` |
+
+No `type=` tag is needed — just use the appropriate Go type and the schema generator handles it.
 
 ## Benefits
 

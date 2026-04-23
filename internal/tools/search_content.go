@@ -5,7 +5,6 @@ import (
 	"context"
 	"os"
 	"os/exec"
-	"strconv"
 
 	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/truncation"
@@ -18,10 +17,10 @@ type SearchContentInput struct {
 	FileType   string `json:"file_type" jsonschema:"description=File type filter (e.g. go, python, rust)"`
 	Glob       string `json:"glob" jsonschema:"description=Glob pattern (e.g. *.go, *.{ts,tsx})"`
 	IgnoreCase string `json:"ignore_case" jsonschema:"description=Set \"true\" for case-insensitive"`
-	MaxLines   string `json:"max_lines" jsonschema:"description=Max matching lines (default 50)"`
+	MaxLines   int    `json:"max_lines" jsonschema:"description=Max matching lines (default 100)"`
 }
 
-const defaultSearchContentMaxLines = "50"
+const defaultSearchContentMaxLines = 100
 
 // RGAvailable checks if the rg binary is available on the system
 func RGAvailable() bool {
@@ -40,12 +39,11 @@ func NewSearchContentTool() llm.Tool {
 		Build()
 }
 
-func buildSearchContentArgs(args SearchContentInput, maxLines string) []string {
+func buildSearchContentArgs(args SearchContentInput) []string {
 	rgArgs := []string{
 		"-n",
 		"--no-heading",
 		"--color=never",
-		"--max-count", maxLines,
 		args.Pattern,
 	}
 
@@ -68,7 +66,7 @@ func buildSearchContentArgs(args SearchContentInput, maxLines string) []string {
 	return rgArgs
 }
 
-func handleSearchContentResult(execErr error, stdout, stderr *bytes.Buffer, maxLines string) llm.ToolResultOutput {
+func handleSearchContentResult(execErr error, stdout, stderr *bytes.Buffer, maxLines int) llm.ToolResultOutput {
 	if execErr != nil {
 		// rg exits with code 1 when no matches found — that's not an error for us
 		if exitErr, ok := execErr.(*exec.ExitError); ok {
@@ -84,16 +82,17 @@ func handleSearchContentResult(execErr error, stdout, stderr *bytes.Buffer, maxL
 		return llm.NewTextErrorResponse(errMsg)
 	}
 
-	// Truncate output to maxLines total matching lines.
-	// rg's --max-count limits per-file, not globally, so we enforce a global cap here.
-	maxLinesInt := parseMaxLines(maxLines)
+	// Use default if maxLines not specified
+	if maxLines <= 0 {
+		maxLines = defaultSearchContentMaxLines
+	}
 
 	output := stdout.String()
 	if output == "" {
 		return llm.NewTextResponse("No matches found")
 	}
 
-	wasTruncated, truncatedOutput := truncation.Lines(output, maxLinesInt)
+	wasTruncated, truncatedOutput := truncation.Lines(output, maxLines)
 	if wasTruncated {
 		truncatedOutput += truncation.Marker
 	}
@@ -111,12 +110,7 @@ func executeSearchContent(ctx context.Context, args SearchContentInput) (llm.Too
 		return llm.NewTextErrorResponse("ripgrep (rg) is not available on this system"), nil
 	}
 
-	maxLines := args.MaxLines
-	if maxLines == "" {
-		maxLines = defaultSearchContentMaxLines
-	}
-
-	rgArgs := buildSearchContentArgs(args, maxLines)
+	rgArgs := buildSearchContentArgs(args)
 
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -147,7 +141,7 @@ func executeSearchContent(ctx context.Context, args SearchContentInput) (llm.Too
 		killSearchContentProcess(cmd, done)
 		return llm.NewTextErrorResponse("Canceled"), nil
 	case execErr := <-done:
-		return handleSearchContentResult(execErr, &stdout, &stderr, maxLines), nil
+		return handleSearchContentResult(execErr, &stdout, &stderr, args.MaxLines), nil
 	}
 }
 
@@ -156,13 +150,4 @@ func killSearchContentProcess(cmd *exec.Cmd, done chan error) {
 		_ = cmd.Process.Kill() //nolint:errcheck // best-effort kill on cancel path
 		<-done                 // wait for Process to release resources
 	}
-}
-
-// parseMaxLines converts the maxLines string to an int, falling back to the default on failure.
-func parseMaxLines(maxLines string) int {
-	n, err := strconv.Atoi(maxLines)
-	if err != nil || n <= 0 {
-		n = 50 // fallback to hardcoded default
-	}
-	return n
 }

@@ -7,9 +7,12 @@ import (
 
 func TestGenerateSchema(t *testing.T) {
 	type TestInput struct {
-		Name        string `json:"name" jsonschema:"required,description=The name of the item"`
-		Description string `json:"description" jsonschema:"description=Optional description"`
-		Type        string `json:"type" jsonschema:"required,description=The type,enum=foo|bar|baz"`
+		Name        string  `json:"name" jsonschema:"required,description=The name of the item"`
+		Description string  `json:"description" jsonschema:"description=Optional description"`
+		Type        string  `json:"type" jsonschema:"required,description=The type,enum=foo|bar|baz"`
+		Count       int     `json:"count" jsonschema:"description=Number of items"`
+		Rate        float64 `json:"rate" jsonschema:"description=Rate per second"`
+		Enabled     bool    `json:"enabled" jsonschema:"description=Whether enabled"`
 	}
 
 	schema := GenerateSchema(TestInput{})
@@ -40,7 +43,7 @@ func TestGenerateSchema(t *testing.T) {
 		t.Fatal("properties is not an object")
 	}
 
-	// Check name field
+	// Check name field (string)
 	nameField, ok := props["name"].(map[string]interface{})
 	if !ok {
 		t.Fatal("name property is not an object")
@@ -50,6 +53,33 @@ func TestGenerateSchema(t *testing.T) {
 	}
 	if nameField["description"] != "The name of the item" {
 		t.Errorf("Unexpected name description: %v", nameField["description"])
+	}
+
+	// Check count field (int → integer)
+	countField, ok := props["count"].(map[string]interface{})
+	if !ok {
+		t.Fatal("count property is not an object")
+	}
+	if countField["type"] != "integer" {
+		t.Errorf("Expected count type 'integer', got %v", countField["type"])
+	}
+
+	// Check rate field (float64 → number)
+	rateField, ok := props["rate"].(map[string]interface{})
+	if !ok {
+		t.Fatal("rate property is not an object")
+	}
+	if rateField["type"] != "number" {
+		t.Errorf("Expected rate type 'number', got %v", rateField["type"])
+	}
+
+	// Check enabled field (bool → boolean)
+	enabledField, ok := props["enabled"].(map[string]interface{})
+	if !ok {
+		t.Fatal("enabled property is not an object")
+	}
+	if enabledField["type"] != "boolean" {
+		t.Errorf("Expected enabled type 'boolean', got %v", enabledField["type"])
 	}
 
 	// Check enum field

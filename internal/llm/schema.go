@@ -12,12 +12,49 @@ import (
 // Supported tags:
 //   - required: marks the field as required
 //   - description=...: sets the field description
-//   - type=...: overrides the type (defaults to string)
+//   - type=...: overrides the inferred type
 //   - enum=...: pipe-separated list of allowed values
+//
+// Type inference (automatic, no tag needed):
+//   - string → "string"
+//   - int, int8, int16, int32, int64 → "integer"
+//   - uint, uint8, uint16, uint32, uint64 → "integer"
+//   - float32, float64 → "number"
+//   - bool → "boolean"
 type SchemaField struct {
 	Type        string   `json:"type,omitempty"`
 	Description string   `json:"description,omitempty"`
 	Enum        []string `json:"enum,omitempty"`
+}
+
+const (
+	schemaTypeString  = "string"
+	schemaTypeInteger = "integer"
+	schemaTypeNumber  = "number"
+	schemaTypeBoolean = "boolean"
+)
+
+// inferSchemaType maps Go types to JSON schema types
+func inferSchemaType(t reflect.Type) string {
+	// Handle pointer types
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
+	switch t.Kind() {
+	case reflect.String:
+		return schemaTypeString
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return schemaTypeInteger
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return schemaTypeInteger
+	case reflect.Float32, reflect.Float64:
+		return schemaTypeNumber
+	case reflect.Bool:
+		return schemaTypeBoolean
+	default:
+		return schemaTypeString // fallback
+	}
 }
 
 // GenerateSchema generates a JSON schema from a struct using reflection
@@ -55,7 +92,7 @@ func GenerateSchema(v interface{}) json.RawMessage {
 		}
 
 		schemaField := SchemaField{
-			Type: "string", // default
+			Type: inferSchemaType(field.Type),
 		}
 
 		// Parse jsonschema tag
