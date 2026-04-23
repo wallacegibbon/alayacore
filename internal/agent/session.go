@@ -1001,18 +1001,13 @@ func (s *Session) compactHistory() {
 		return
 	}
 
-	// Build set of tool call IDs that read files under skill directories
 	skillReadIDs := make(map[string]bool)
 	for i := 0; i < truncateBoundary; i++ {
 		msg := msgs[i]
-		if msg.Role == llm.RoleAssistant {
+		switch msg.Role {
+		case llm.RoleAssistant:
 			s.collectSkillDirReads(msg, skillReadIDs)
-		}
-	}
-
-	for i := 0; i < truncateBoundary; i++ {
-		msg := msgs[i]
-		if msg.Role == llm.RoleTool {
+		case llm.RoleTool:
 			s.truncateToolResultsInMessage(msg, i, skillReadIDs, s.compactTruncateLen)
 		}
 	}
