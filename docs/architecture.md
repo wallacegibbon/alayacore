@@ -72,7 +72,7 @@ Shared text truncation utilities used by the tools and session layers. All funct
 
 | Function | Strategy | Used by |
 |----------|----------|---------|
-| `Lines` | Keeps first N non-empty lines | `search_content` (50 lines default) |
+| `Lines` | Keeps first N non-empty lines | `search_content` (100 lines default) |
 | `Front` | Keeps front of text within byte budget | `execute_command` (32KB limit), `compactHistory` (configurable length) |
 
 All strategies use a unified `[truncated]` marker so the LLM can recognize truncated output regardless of source. `Front` uses a byte budget and counts each rune's actual byte cost, so any mix of ASCII and multi-byte characters (CJK, emoji) is handled fairly without approximation.
@@ -113,7 +113,7 @@ Messages are appended incrementally in `OnStepFinish` so they're preserved even 
 | `edit_file` | Search/replace edits on existing files | Medium | — |
 | `write_file` | Create or overwrite files | Dangerous | — |
 | `execute_command` | Execute commands in the detected shell (cross-platform). Output truncated at 32KB. | Most Dangerous | — |
-| `search_content` | Search file contents using ripgrep (`rg`). 50 matching lines by default. | Safe | Requires `rg` binary |
+| `search_content` | Search file contents using ripgrep (`rg`). 100 matching lines by default. | Safe | Requires `rg` binary |
 
 Each tool is implemented with type-safe input structs and auto-generated JSON schemas. All tools accept a `context.Context` parameter and respect cancellation — `:cancel` will interrupt long-running tool execution. See [schema-improvements.md](schema-improvements.md) for the pattern.
 
@@ -282,7 +282,7 @@ Agent.Stream() receives tool_call event
 8. **Typed Tools** — `TypedExecute[T]` wrapper for type-safe tool implementations with auto-generated schemas.
 9. **Lazy Agent Init** — Agent and provider are created on first use, not at startup.
 10. **Sequential Tool Execution** — Tools execute one at a time. See [sequential-tool-execution.md](sequential-tool-execution.md).
-11. **Context Efficiency** — Tool descriptions are minimal, outputs are size-capped (32KB), search results limited (50 lines), and old tool results are compacted to save tokens. See [context-tracking.md](context-tracking.md).
+11. **Context Efficiency** — Tool descriptions are minimal, outputs are size-capped (32KB), search results limited (100 lines), and old tool results are compacted to save tokens. See [context-tracking.md](context-tracking.md).
 
 ## Gotchas
 

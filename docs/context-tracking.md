@@ -167,7 +167,7 @@ The truncation uses a byte budget: each rune counts its actual byte cost (`utf8.
 | Mechanism | Default | Description |
 |-----------|---------|-------------|
 | `read_file` size limit | 32KB | Full file reads capped at 32KB (~8K tokens); use `start_line`/`end_line` for larger files |
-| `search_content` max lines | 50 | Default result count capped at 50 lines; increase with `max_lines` parameter |
+| `search_content` max lines | 100 | Default result count capped at 100 lines; increase with `max_lines` parameter |
 | `execute_command` output truncation | 32KB | Command output truncated when exceeding 32KB (front preserved) |
 | Tool descriptions | Compressed | Minimal descriptions and schemas to reduce per-request overhead |
 | Auto-summarize threshold | 65% | Triggers summarization at 65% of context limit (lowered from 80% to prevent mid-step overflow) |
