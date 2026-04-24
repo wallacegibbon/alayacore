@@ -100,15 +100,15 @@ type SystemInfo struct {
 	ActiveModelName   string          `json:"active_model_name,omitempty"`
 	HasModels         bool            `json:"has_models"`
 	ModelConfigPath   string          `json:"model_config_path,omitempty"`
-	ReasoningEnabled   bool            `json:"thinking_enabled"`
+	ReasoningEnabled  bool            `json:"thinking_enabled"`
 }
 
 // SessionMeta is the frontmatter metadata.
 type SessionMeta struct {
-	CreatedAt       time.Time `config:"created_at"`
-	UpdatedAt       time.Time `config:"updated_at"`
+	CreatedAt        time.Time `config:"created_at"`
+	UpdatedAt        time.Time `config:"updated_at"`
 	ReasoningEnabled bool      `config:"thinking_enabled"`
-	ActiveModel     string    `config:"active_model"`
+	ActiveModel      string    `config:"active_model"`
 }
 
 // SessionData is the persisted form of a Session.
@@ -155,7 +155,7 @@ type Session struct {
 	skillDirs            []string // Skill directories for compaction exemption
 	maxSteps             int
 	proxyURL             string
-	reasoningEnabled    bool
+	reasoningEnabled     bool
 
 	taskQueue     []QueueItem
 	cond          *sync.Cond         // signals when taskQueue becomes non-empty or pausedOnError clears
@@ -187,7 +187,7 @@ func LoadOrNewSession(baseTools []llm.Tool, systemPrompt string, extraSystemProm
 	sessionFile = expandPath(sessionFile)
 	if sessionFile != "" {
 		if data, err := LoadSession(sessionFile); err == nil {
-			return RestoreFromSession(baseTools, systemPrompt, extraSystemPrompt, maxSteps, input, output, data, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, autoSummarize, autoSave, noCompact, compactKeepSteps, compactTruncateLen, proxyURL, skillsMgr, thinking), sessionFile
+			return RestoreFromSession(baseTools, systemPrompt, extraSystemPrompt, maxSteps, input, output, data, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, autoSummarize, autoSave, noCompact, compactKeepSteps, compactTruncateLen, proxyURL, skillsMgr), sessionFile
 		}
 	}
 	return NewSession(baseTools, systemPrompt, extraSystemPrompt, maxSteps, input, output, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, autoSummarize, autoSave, noCompact, compactKeepSteps, compactTruncateLen, proxyURL, skillsMgr, thinking), sessionFile
@@ -216,7 +216,7 @@ func NewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt str
 		skillDirs:            buildSkillDirSet(skillsMgr),
 		proxyURL:             proxyURL,
 		maxSteps:             maxSteps,
-		reasoningEnabled:    thinking,
+		reasoningEnabled:     thinking,
 		taskQueue:            make([]QueueItem, 0),
 		sessionCtx:           sessionCtx,
 		sessionCancel:        sessionCancel,
@@ -231,7 +231,7 @@ func NewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt str
 }
 
 // RestoreFromSession creates a session from saved data.
-func RestoreFromSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, data *SessionData, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, autoSave bool, noCompact bool, compactKeepSteps int, compactTruncateLen int, proxyURL string, skillsMgr *skills.Manager, thinking bool) *Session {
+func RestoreFromSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, data *SessionData, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, autoSave bool, noCompact bool, compactKeepSteps int, compactTruncateLen int, proxyURL string, skillsMgr *skills.Manager) *Session {
 	sessionCtx, sessionCancel := context.WithCancel(context.Background())
 	s := &Session{
 		Messages:             data.Messages,
@@ -254,7 +254,7 @@ func RestoreFromSession(baseTools []llm.Tool, systemPrompt string, extraSystemPr
 		skillDirs:            buildSkillDirSet(skillsMgr),
 		proxyURL:             proxyURL,
 		maxSteps:             maxSteps,
-		reasoningEnabled:    data.ReasoningEnabled,
+		reasoningEnabled:     data.ReasoningEnabled,
 		taskQueue:            make([]QueueItem, 0),
 		sessionCtx:           sessionCtx,
 		sessionCancel:        sessionCancel,
@@ -262,12 +262,11 @@ func RestoreFromSession(baseTools []llm.Tool, systemPrompt string, extraSystemPr
 	}
 	s.initModelManager()
 
-	// Override runtime config default with the model saved in the session file
+	// Override runtime config default with the model saved in the session file.
+	// If the model was removed from config since the session was saved,
+	// fall back to whatever initModelManager already set.
 	if data.ActiveModel != "" {
-		if err := s.ModelManager.SetActiveByName(data.ActiveModel); err != nil {
-			// Model may have been removed from config since the session was saved;
-			// fall back to whatever initModelManager already set.
-		}
+		_ = s.ModelManager.SetActiveByName(data.ActiveModel) //nolint:errcheck // best-effort restore, fall back to initModelManager default
 	}
 
 	s.cond = sync.NewCond(&s.mu)
@@ -984,7 +983,7 @@ func (s *Session) sendSystemInfoInternal(activeModelConfig *ModelConfig) {
 		ActiveModelName:   activeModelName,
 		HasModels:         hasModels,
 		ModelConfigPath:   modelConfigPath,
-		ReasoningEnabled:   s.reasoningEnabled,
+		ReasoningEnabled:  s.reasoningEnabled,
 	}
 	data, _ := json.Marshal(info) //nolint:errcheck // Best effort marshal, errors ignored
 	//nolint:errcheck // Best effort write, errors ignored

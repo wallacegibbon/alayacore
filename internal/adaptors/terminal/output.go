@@ -41,7 +41,7 @@ type outputWriter struct {
 	maxSteps          int         // Maximum steps allowed
 	lastCurrentStep   int         // Last step reached in completed task
 	lastMaxSteps      int         // Last max steps from completed task
-	reasoningEnabled   bool        // Whether reasoning mode is active
+	reasoningEnabled  bool        // Whether reasoning mode is active
 }
 
 func NewTerminalOutput(styles *Styles) *outputWriter { //nolint:revive // tests need access to internal methods

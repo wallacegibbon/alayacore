@@ -155,10 +155,10 @@ func (s *openAIStreamState) getUsage() llm.Usage {
 
 // OpenAIProvider implements the OpenAI API
 type OpenAIProvider struct {
-	apiKey          string
-	baseURL         string
-	client          *http.Client
-	model           string
+	apiKey           string
+	baseURL          string
+	client           *http.Client
+	model            string
 	reasoningEnabled bool
 }
 

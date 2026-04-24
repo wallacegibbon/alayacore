@@ -35,10 +35,10 @@ func (s *Session) saveSessionToFile(path string) error {
 
 	data := SessionData{
 		SessionMeta: SessionMeta{
-			CreatedAt:       s.CreatedAt,
-			UpdatedAt:       time.Now(),
+			CreatedAt:        s.CreatedAt,
+			UpdatedAt:        time.Now(),
 			ReasoningEnabled: s.reasoningEnabled,
-			ActiveModel:     s.activeModelName(),
+			ActiveModel:      s.activeModelName(),
 		},
 		Messages: s.Messages,
 	}

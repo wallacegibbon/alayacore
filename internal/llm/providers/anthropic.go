@@ -34,25 +34,25 @@ import (
 )
 
 const (
-	blockTypeToolUse              = "tool_use"
-	anthropicBlockTypeText        = "text"
-	anthropicBlockTypeThinking    = "thinking"
-	anthropicBlockTypeToolResult  = "tool_result"
+	blockTypeToolUse             = "tool_use"
+	anthropicBlockTypeText       = "text"
+	anthropicBlockTypeThinking   = "thinking"
+	anthropicBlockTypeToolResult = "tool_result"
 
 	// Anthropic SSE delta types
-	anthropicDeltaTypeText       = "text_delta"
-	anthropicDeltaTypeThinking   = "thinking_delta"
-	anthropicDeltaTypeInputJSON  = "input_json_delta"
+	anthropicDeltaTypeText      = "text_delta"
+	anthropicDeltaTypeThinking  = "thinking_delta"
+	anthropicDeltaTypeInputJSON = "input_json_delta"
 )
 
 // AnthropicProvider implements the Anthropic API
 type AnthropicProvider struct {
-	apiKey          string
-	baseURL         string
-	client          *http.Client
-	model           string
-	promptCache     bool
-	maxTokens       int
+	apiKey           string
+	baseURL          string
+	client           *http.Client
+	model            string
+	promptCache      bool
+	maxTokens        int
 	reasoningEnabled bool
 }
 
