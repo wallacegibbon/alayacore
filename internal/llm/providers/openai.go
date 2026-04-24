@@ -434,7 +434,9 @@ func (p *OpenAIProvider) convertToolCalls(apiMsg *openAIMessage, content []llm.C
 		}
 	}
 	// Preserve reasoning_content for providers that require it (DeepSeek, etc.)
-	if reasoningText != "" {
+	// Only when thinking is enabled — otherwise reasoning from a previous
+	// provider would be sent without reasoning_effort, causing a 400 error.
+	if p.thinkingEnabled && reasoningText != "" {
 		apiMsg.ReasoningContent = reasoningText
 	}
 	// Content can be nil for tool calls
@@ -458,8 +460,10 @@ func (p *OpenAIProvider) convertRegularContent(apiMsg *openAIMessage, content []
 		}
 	}
 
-	// Set reasoning_content if present
-	if reasoningText != "" {
+	// Set reasoning_content if present and thinking is enabled.
+	// When thinking is off, reasoning from a previous provider must not
+	// be sent — it would reach the API without reasoning_effort, causing 400.
+	if p.thinkingEnabled && reasoningText != "" {
 		apiMsg.ReasoningContent = reasoningText
 	}
 
