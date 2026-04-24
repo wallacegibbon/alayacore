@@ -80,7 +80,7 @@ func (s *openAIStreamState) setToolCallName(index int, id, name string) {
 	// Ensure tool calls slice is big enough
 	for len(s.toolCalls) <= index {
 		s.toolCalls = append(s.toolCalls, llm.ToolCallPart{
-			Type: "tool_use",
+			Type: llm.ContentPartToolUse,
 		})
 	}
 	s.toolCalls[index].ToolCallID = id
@@ -123,7 +123,7 @@ func (s *openAIStreamState) getMessage() llm.Message {
 	// Add reasoning first (thinking before response)
 	if s.reasoningBuilder.Len() > 0 {
 		content = append(content, llm.ReasoningPart{
-			Type: "reasoning",
+			Type: llm.ContentPartReasoning,
 			Text: s.reasoningBuilder.String(),
 		})
 	}
@@ -131,7 +131,7 @@ func (s *openAIStreamState) getMessage() llm.Message {
 	// Add text content
 	if s.textBuilder.Len() > 0 {
 		content = append(content, llm.TextPart{
-			Type: "text",
+			Type: llm.ContentPartText,
 			Text: s.textBuilder.String(),
 		})
 	}

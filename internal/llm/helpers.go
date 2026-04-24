@@ -10,7 +10,7 @@ func NewSystemMessage(text string) Message {
 	return Message{
 		Role: RoleSystem,
 		Content: []ContentPart{
-			TextPart{Type: "text", Text: text},
+			TextPart{Type: ContentPartText, Text: text},
 		},
 	}
 }
@@ -20,7 +20,7 @@ func NewUserMessage(text string) Message {
 	return Message{
 		Role: RoleUser,
 		Content: []ContentPart{
-			TextPart{Type: "text", Text: text},
+			TextPart{Type: ContentPartText, Text: text},
 		},
 	}
 }
@@ -39,7 +39,7 @@ func NewToolResultMessage(toolCallID string, output ToolResultOutput) Message {
 		Role: RoleTool,
 		Content: []ContentPart{
 			ToolResultPart{
-				Type:       "tool_result",
+				Type:       ContentPartToolResult,
 				ToolCallID: toolCallID,
 				Output:     output,
 			},
@@ -50,7 +50,7 @@ func NewToolResultMessage(toolCallID string, output ToolResultOutput) Message {
 // NewTextResponse creates a text tool response
 func NewTextResponse(text string) ToolResultOutput {
 	return ToolResultOutputText{
-		Type: "text",
+		Type: ContentPartText,
 		Text: text,
 	}
 }

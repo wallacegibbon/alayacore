@@ -22,6 +22,16 @@ type ContentPart interface {
 	isContentPart()
 }
 
+// Content part type constants. These are the canonical domain-level type
+// strings used in ContentPart implementations. Each provider maps these to
+// its own wire-format type (e.g., Anthropic maps ContentPartReasoning to "thinking").
+const (
+	ContentPartText       = "text"
+	ContentPartReasoning  = "reasoning"
+	ContentPartToolUse    = "tool_use"
+	ContentPartToolResult = "tool_result"
+)
+
 // TextPart represents text content
 type TextPart struct {
 	Type string `json:"type"`

@@ -194,7 +194,7 @@ func (a *Agent) processStreamEvents(events iter.Seq2[StreamEvent, error], callba
 
 		case ToolCallEvent:
 			toolCalls = append(toolCalls, ToolCallPart{
-				Type:       "tool_use",
+				Type:       ContentPartToolUse,
 				ToolCallID: e.ToolCallID,
 				ToolName:   e.ToolName,
 				Input:      e.Input,
@@ -230,7 +230,7 @@ func (a *Agent) executeTools(ctx context.Context, toolCalls []ToolCallPart, call
 
 		if tool == nil {
 			toolResults[i] = ToolResultPart{
-				Type:       "tool_result",
+				Type:       ContentPartToolResult,
 				ToolCallID: tc.ToolCallID,
 				Output: ToolResultOutputError{
 					Type:  "error",
@@ -250,7 +250,7 @@ func (a *Agent) executeTools(ctx context.Context, toolCalls []ToolCallPart, call
 		}
 
 		toolResults[i] = ToolResultPart{
-			Type:       "tool_result",
+			Type:       ContentPartToolResult,
 			ToolCallID: tc.ToolCallID,
 			Output:     output,
 		}

@@ -284,7 +284,7 @@ func parseMessagesTLV(body string) ([]llm.Message, []TLVChunk, error) {
 
 		case stream.TagTextReasoning:
 			msgRole = llm.RoleAssistant
-			msgPart = llm.ReasoningPart{Type: "thinking", Text: string(content)}
+			msgPart = llm.ReasoningPart{Type: llm.ContentPartReasoning, Text: string(content)}
 
 		case stream.TagFunctionCall:
 			msgRole = llm.RoleAssistant

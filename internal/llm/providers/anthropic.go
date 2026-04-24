@@ -34,7 +34,10 @@ import (
 )
 
 const (
-	blockTypeToolUse = "tool_use"
+	blockTypeToolUse            = "tool_use"
+	anthropicBlockTypeText      = "text"
+	anthropicBlockTypeThinking  = "thinking"
+	anthropicBlockTypeToolResult = "tool_result"
 )
 
 // AnthropicProvider implements the Anthropic API
@@ -224,12 +227,12 @@ func (s *streamState) finishBlock() {
 	switch s.currentType {
 	case "text":
 		s.contentParts = append(s.contentParts, llm.TextPart{
-			Type: "text",
+			Type: llm.ContentPartText,
 			Text: s.currentText.String(),
 		})
 	case "thinking":
 		s.contentParts = append(s.contentParts, llm.ReasoningPart{
-			Type: "reasoning",
+			Type: llm.ContentPartReasoning,
 			Text: s.currentText.String(),
 		})
 	case blockTypeToolUse:
@@ -318,7 +321,7 @@ func (p *AnthropicProvider) StreamMessages(
 			switch v := part.(type) {
 			case llm.TextPart:
 				apiMsg.Content = append(apiMsg.Content, anthropicContentBlock{
-					Type: "text",
+					Type: llm.ContentPartText,
 					Text: v.Text,
 				})
 			case llm.ReasoningPart:
@@ -327,7 +330,7 @@ func (p *AnthropicProvider) StreamMessages(
 				// thinking will ignore this, and Anthropic requires it in
 				// thinking mode.
 				apiMsg.Content = append(apiMsg.Content, anthropicContentBlock{
-					Type:     "thinking",
+					Type:     anthropicBlockTypeThinking,
 					Thinking: v.Text,
 				})
 			case llm.ToolCallPart:
@@ -345,7 +348,7 @@ func (p *AnthropicProvider) StreamMessages(
 				case llm.ToolResultOutputError:
 					content = out.Error
 					apiMsg.Content = append(apiMsg.Content, anthropicContentBlock{
-						Type:      "tool_result",
+						Type:      anthropicBlockTypeToolResult,
 						ToolUseID: v.ToolCallID,
 						Content:   content,
 						IsError:   true,
@@ -353,7 +356,7 @@ func (p *AnthropicProvider) StreamMessages(
 					continue
 				}
 				apiMsg.Content = append(apiMsg.Content, anthropicContentBlock{
-					Type:      "tool_result",
+					Type:      anthropicBlockTypeToolResult,
 					ToolUseID: v.ToolCallID,
 					Content:   content,
 				})
@@ -378,7 +381,7 @@ func (p *AnthropicProvider) StreamMessages(
 	// Add default system prompt
 	if systemPrompt != "" {
 		systemMessages = append(systemMessages, anthropicSystemMessage{
-			Type: "text",
+			Type: anthropicBlockTypeText,
 			Text: systemPrompt,
 		})
 	}
@@ -386,7 +389,7 @@ func (p *AnthropicProvider) StreamMessages(
 	// Add extra system prompt separately
 	if extraSystemPrompt != "" {
 		systemMessages = append(systemMessages, anthropicSystemMessage{
-			Type: "text",
+			Type: anthropicBlockTypeText,
 			Text: extraSystemPrompt,
 		})
 	}
