@@ -164,24 +164,35 @@ func (h *SearchContentHandler) FormatCall(input json.RawMessage, _ *Styles) stri
 		return "search_content: <parse error>"
 	}
 
-	label := args.Pattern
+	var parts []string
+
+	// Pattern and path
+	part := args.Pattern
 	if args.Path != "" {
-		label += " in " + args.Path
+		part += " in " + args.Path
 	}
-	if args.FileType != "" {
-		label += " (" + args.FileType + ")"
+	parts = append(parts, part)
+
+	// FileType and/or Glob
+	switch {
+	case args.FileType != "" && args.Glob != "":
+		parts = append(parts, fmt.Sprintf("for %s files (%s)", args.FileType, args.Glob))
+	case args.FileType != "":
+		parts = append(parts, fmt.Sprintf("for %s files", args.FileType))
+	case args.Glob != "":
+		parts = append(parts, fmt.Sprintf("matching %s", args.Glob))
 	}
-	if args.Glob != "" {
-		label += " [" + args.Glob + "]"
-	}
+
+	// Modifiers
 	if args.IgnoreCase == "true" {
-		label += " -i"
+		parts = append(parts, "ignoring case")
 	}
 	if args.MaxLines > 0 {
-		label += fmt.Sprintf(" (max: %d)", args.MaxLines)
+		parts = append(parts, fmt.Sprintf("limit %d", args.MaxLines))
 	}
+
 	// Add newline at end so output starts on new line
-	return fmt.Sprintf("search_content: %s\n", label)
+	return fmt.Sprintf("search_content: %s\n", strings.Join(parts, ", "))
 }
 
 func (h *SearchContentHandler) ShouldShowOutput() bool {

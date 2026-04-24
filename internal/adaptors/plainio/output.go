@@ -225,23 +225,35 @@ func formatSearchContent(input string) string {
 	if err := json.Unmarshal([]byte(input), &args); err != nil {
 		return "[search_content]"
 	}
-	label := args.Pattern
+
+	var parts []string
+
+	// Pattern and path
+	part := args.Pattern
 	if args.Path != "" {
-		label += " in " + args.Path
+		part += " in " + args.Path
 	}
-	if args.FileType != "" {
-		label += " (" + args.FileType + ")"
+	parts = append(parts, part)
+
+	// FileType and/or Glob
+	switch {
+	case args.FileType != "" && args.Glob != "":
+		parts = append(parts, fmt.Sprintf("for %s files (%s)", args.FileType, args.Glob))
+	case args.FileType != "":
+		parts = append(parts, fmt.Sprintf("for %s files", args.FileType))
+	case args.Glob != "":
+		parts = append(parts, fmt.Sprintf("matching %s", args.Glob))
 	}
-	if args.Glob != "" {
-		label += " [" + args.Glob + "]"
-	}
+
+	// Modifiers
 	if args.IgnoreCase == "true" {
-		label += " -i"
+		parts = append(parts, "ignoring case")
 	}
 	if args.MaxLines > 0 {
-		label += fmt.Sprintf(" (max: %d)", args.MaxLines)
+		parts = append(parts, fmt.Sprintf("limit %d", args.MaxLines))
 	}
-	return fmt.Sprintf("[search_content: %s]", label)
+
+	return fmt.Sprintf("[search_content: %s]", strings.Join(parts, ", "))
 }
 
 // handleSystemData detects task completion transitions and prints a trailing newline.
