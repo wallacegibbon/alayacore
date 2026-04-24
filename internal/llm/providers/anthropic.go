@@ -45,7 +45,7 @@ type AnthropicProvider struct {
 	model           string
 	promptCache     bool
 	maxTokens       int
-	thinkingEnabled bool
+	reasoningEnabled bool
 }
 
 // AnthropicOption configures the provider
@@ -110,9 +110,9 @@ func WithMaxTokens(tokens int) AnthropicOption {
 	}
 }
 
-// SetThinkingEnabled enables or disables thinking mode for Anthropic.
-func (p *AnthropicProvider) SetThinkingEnabled(enabled bool) {
-	p.thinkingEnabled = enabled
+// SetReasoningEnabled enables or disables reasoning mode for Anthropic.
+func (p *AnthropicProvider) SetReasoningEnabled(enabled bool) {
+	p.reasoningEnabled = enabled
 }
 
 // anthropicRequest represents the Anthropic API request
@@ -407,7 +407,7 @@ func (p *AnthropicProvider) StreamMessages(
 	}
 
 	// Add thinking fields when enabled
-	if p.thinkingEnabled {
+	if p.reasoningEnabled {
 		reqBody.Thinking = &anthropicThinking{Type: "adaptive"}
 		reqBody.OutputConfig = &anthropicOutputConfig{Effort: "high"}
 	}

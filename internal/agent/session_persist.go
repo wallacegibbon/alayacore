@@ -37,7 +37,7 @@ func (s *Session) saveSessionToFile(path string) error {
 		SessionMeta: SessionMeta{
 			CreatedAt:       s.CreatedAt,
 			UpdatedAt:       time.Now(),
-			ThinkingEnabled: s.thinkingEnabled,
+			ReasoningEnabled: s.reasoningEnabled,
 			ActiveModel:     s.activeModelName(),
 		},
 		Messages: s.Messages,
@@ -71,7 +71,7 @@ func formatFrontmatter(meta *SessionMeta) string {
 	buf.WriteString(meta.UpdatedAt.Format(time.RFC3339))
 	buf.WriteString("\n")
 
-	if meta.ThinkingEnabled {
+	if meta.ReasoningEnabled {
 		buf.WriteString("thinking_enabled: true\n")
 	} else {
 		buf.WriteString("thinking_enabled: false\n")

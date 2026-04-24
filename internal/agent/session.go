@@ -100,14 +100,14 @@ type SystemInfo struct {
 	ActiveModelName   string          `json:"active_model_name,omitempty"`
 	HasModels         bool            `json:"has_models"`
 	ModelConfigPath   string          `json:"model_config_path,omitempty"`
-	ThinkingEnabled   bool            `json:"thinking_enabled"`
+	ReasoningEnabled   bool            `json:"thinking_enabled"`
 }
 
 // SessionMeta is the frontmatter metadata.
 type SessionMeta struct {
 	CreatedAt       time.Time `config:"created_at"`
 	UpdatedAt       time.Time `config:"updated_at"`
-	ThinkingEnabled bool      `config:"thinking_enabled"`
+	ReasoningEnabled bool      `config:"thinking_enabled"`
 	ActiveModel     string    `config:"active_model"`
 }
 
@@ -155,7 +155,7 @@ type Session struct {
 	skillDirs            []string // Skill directories for compaction exemption
 	maxSteps             int
 	proxyURL             string
-	thinkingEnabled      bool
+	reasoningEnabled    bool
 
 	taskQueue     []QueueItem
 	cond          *sync.Cond         // signals when taskQueue becomes non-empty or pausedOnError clears
@@ -216,7 +216,7 @@ func NewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt str
 		skillDirs:            buildSkillDirSet(skillsMgr),
 		proxyURL:             proxyURL,
 		maxSteps:             maxSteps,
-		thinkingEnabled:      thinking,
+		reasoningEnabled:    thinking,
 		taskQueue:            make([]QueueItem, 0),
 		sessionCtx:           sessionCtx,
 		sessionCancel:        sessionCancel,
@@ -254,7 +254,7 @@ func RestoreFromSession(baseTools []llm.Tool, systemPrompt string, extraSystemPr
 		skillDirs:            buildSkillDirSet(skillsMgr),
 		proxyURL:             proxyURL,
 		maxSteps:             maxSteps,
-		thinkingEnabled:      data.ThinkingEnabled,
+		reasoningEnabled:    data.ReasoningEnabled,
 		taskQueue:            make([]QueueItem, 0),
 		sessionCtx:           sessionCtx,
 		sessionCancel:        sessionCancel,
@@ -409,7 +409,7 @@ func (s *Session) applyModelContextLimit(model *ModelConfig) {
 // current provider. Must be called after Provider is set.
 func (s *Session) syncThinkingToProvider() {
 	if s.Provider != nil {
-		s.Provider.SetThinkingEnabled(s.thinkingEnabled)
+		s.Provider.SetReasoningEnabled(s.reasoningEnabled)
 	}
 }
 
@@ -418,13 +418,13 @@ func (s *Session) ToggleThinking(mode int) {
 	s.mu.Lock()
 	switch mode {
 	case 0:
-		s.thinkingEnabled = false
+		s.reasoningEnabled = false
 	case 1:
-		s.thinkingEnabled = true
+		s.reasoningEnabled = true
 	case -1:
-		s.thinkingEnabled = !s.thinkingEnabled
+		s.reasoningEnabled = !s.reasoningEnabled
 	}
-	enabled := s.thinkingEnabled
+	enabled := s.reasoningEnabled
 	s.mu.Unlock()
 
 	s.syncThinkingToProvider()
@@ -984,7 +984,7 @@ func (s *Session) sendSystemInfoInternal(activeModelConfig *ModelConfig) {
 		ActiveModelName:   activeModelName,
 		HasModels:         hasModels,
 		ModelConfigPath:   modelConfigPath,
-		ThinkingEnabled:   s.thinkingEnabled,
+		ReasoningEnabled:   s.reasoningEnabled,
 	}
 	data, _ := json.Marshal(info) //nolint:errcheck // Best effort marshal, errors ignored
 	//nolint:errcheck // Best effort write, errors ignored

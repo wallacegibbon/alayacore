@@ -159,7 +159,7 @@ type OpenAIProvider struct {
 	baseURL         string
 	client          *http.Client
 	model           string
-	thinkingEnabled bool
+	reasoningEnabled bool
 }
 
 // OpenAIOption configures the provider
@@ -209,9 +209,9 @@ func WithOpenAIModel(model string) OpenAIOption {
 	}
 }
 
-// SetThinkingEnabled enables or disables thinking mode for OpenAI.
-func (p *OpenAIProvider) SetThinkingEnabled(enabled bool) {
-	p.thinkingEnabled = enabled
+// SetReasoningEnabled enables or disables reasoning mode for OpenAI.
+func (p *OpenAIProvider) SetReasoningEnabled(enabled bool) {
+	p.reasoningEnabled = enabled
 }
 
 // openAIRequest represents the OpenAI API request
@@ -319,7 +319,7 @@ func (p *OpenAIProvider) StreamMessages(
 
 	// Add reasoning effort when thinking mode is enabled.
 	// Providers that don't support it will ignore this parameter.
-	if p.thinkingEnabled {
+	if p.reasoningEnabled {
 		reqBody.ReasoningEffort = "high"
 	}
 
