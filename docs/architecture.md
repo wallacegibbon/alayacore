@@ -339,21 +339,28 @@ When styling text with lipgloss, each segment must be rendered individually befo
 
 ### Thinking mode and reasoning_content
 
-When thinking mode is enabled, provider-specific fields are added to API requests:
-- **Anthropic**: `"thinking": {"type": "enabled"}` and `"output_config": {"effort": "high"}` (or `"type": "disabled"` when thinking is off)
-- **OpenAI-compatible**: `"reasoning_effort": "high"` and `"thinking": {"type": "enabled"}` (or `"type": "disabled"` when thinking is off)
+When thinking mode is toggled by the user (`Ctrl+T` or `:thinking`), each provider sends explicit thinking configuration in API requests:
 
-> **Note:** The OpenAI-compatible thinking/reasoning parameters (`thinking`, `reasoning_effort`, `reasoning_content`) are not part of the official OpenAI API standard. They originate from [DeepSeek's thinking mode documentation](https://api-docs.deepseek.com/guides/thinking_mode) and are supported by several providers including **DeepSeek**, **GLM**, and **MiniMax**. Other OpenAI-compatible providers simply ignore these unknown fields.
+| Provider | Enabled | Disabled |
+|----------|---------|----------|
+| **Anthropic** | `"thinking": {"type": "enabled"}`, `"output_config": {"effort": "high"}` | `"thinking": {"type": "disabled"}` |
+| **OpenAI-compatible** | `"thinking": {"type": "enabled"}`, `"reasoning_effort": "high"` | `"thinking": {"type": "disabled"}` |
 
-Some OpenAI-compatible providers (e.g. DeepSeek) return `reasoning_content` in assistant responses. This **must** be passed back in subsequent requests' assistant message history, even when the message also contains tool calls. Dropping it causes a 400 error from providers that require it.
+> **Note:** The OpenAI-compatible thinking/reasoning parameters (`thinking`, `reasoning_effort`, `reasoning_content`) are not part of the official OpenAI API standard. They originate from [DeepSeek's thinking mode documentation](https://api-docs.deepseek.com/guides/thinking_mode) and are supported by **DeepSeek**, **GLM**, and **MiniMax**. Other providers silently ignore unknown fields.
 
-### Empty thinking block workaround (DeepSeek V4)
+Some OpenAI-compatible providers (e.g. DeepSeek) return `reasoning_content` in assistant responses. Per [DeepSeek's documentation](https://api-docs.deepseek.com/guides/thinking_mode):
 
-DeepSeek V4 (2026/04/24) has a server-side bug: when thinking mode is **enabled**, the API rejects assistant messages in the conversation history that do not contain a `thinking` block (or `reasoning_content` for OpenAI-protocol). To work around this, both providers pad assistant messages with empty reasoning data — but **only when reasoning/thinking mode is enabled** — to avoid wasting input tokens when the workaround isn't needed.
+> Between two user messages, if the model performed a tool call, the intermediate assistant's `reasoning_content` must participate in the context concatenation and must be passed back to the API in all subsequent user interaction turns.
+
+This means **all** intermediate assistant messages in a multi-turn tool call chain must include their `reasoning_content`. Dropping it causes a 400 error from providers that require it.
+
+### Empty thinking block padding
+
+When reasoning mode is enabled and an assistant message has no `reasoning_content` (e.g. it only contains tool calls and never produced reasoning text), both providers still emit an empty value — but **only when reasoning mode is enabled** — to avoid wasting input tokens when it isn't needed.
 
 - **Anthropic provider** (`anthropicConvertMessages`): pads every assistant message with an empty `{"type": "thinking", "thinking": ""}` block when none is present.
 - **OpenAI provider** (`openaiConvertMessages`): extracts reasoning text via `openaiExtractReasoning()` and sets `reasoning_content` on every assistant message — even as empty string when no reasoning text exists.
 
-Both are conditional on reasoning mode being enabled. When thinking is off, no padding is added — no provider needs it.
+Both are conditional on reasoning mode being enabled. When thinking is off, no padding is added.
 
 

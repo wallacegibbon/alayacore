@@ -17,12 +17,13 @@ package providers
 // 4. PROMPT CACHE PER-MODEL: prompt_cache: true in model.conf enables cache_control
 //    markers for Anthropic. Other providers auto-cache and ignore this setting.
 //
-// 5. EMPTY THINKING BLOCK PADDING: When reasoning mode is enabled, every
-//    assistant message is padded with an empty "thinking" block if none is
-//    present. This works around a DeepSeek V4 (2026/04/24) bug. The padding
-//    is conditional on reasoning mode to avoid wasting tokens when thinking
-//    is disabled. Anthropic and other providers ignore the extra block.
-//    See docs/architecture.md → "Empty thinking block workaround".
+// 5. EMPTY THINKING BLOCK PADDING: Per DeepSeek's documentation, between two
+//    user messages all intermediate assistant reasoning_content must be passed
+//    back. When reasoning mode is enabled, every assistant message is padded
+//    with an empty "thinking" block if none is present, so that assistant
+//    messages containing only tool calls still satisfy this requirement.
+//    Conditional on reasoning mode to avoid wasting tokens when thinking is off.
+//    See docs/architecture.md → "Empty thinking block padding".
 
 import (
 	"bufio"
@@ -181,7 +182,7 @@ type anthropicContentBlock struct {
 	IsError   bool        `json:"is_error,omitempty"`
 
 	// For thinking (extended thinking)
-	// Pointer so we can emit `"thinking": ""` (DeepSeek workaround)
+	// Pointer so we can emit `"thinking": ""` (DeepSeek requires empty thinking block)
 	// vs. omitting the field on non-thinking blocks.
 	Thinking *string `json:"thinking,omitempty"`
 
@@ -372,10 +373,12 @@ func anthropicConvertMessages(messages []llm.Message, reasoningEnabled bool) []a
 			}
 		}
 
-		// Pad assistant messages with an empty "thinking" block when reasoning
-		// mode is enabled and none is present. Needed for DeepSeek V4
-		// (2026/04/24) which requires it; other providers ignore the extra
-		// block. Only done when reasoning is enabled to avoid wasting tokens.
+		// Per DeepSeek's documentation, intermediate assistant reasoning_content
+		// must be passed back. Pad assistant messages with an empty "thinking"
+		// block when reasoning mode is enabled and none is present, so that
+		// tool-call-only messages still satisfy this requirement. Other providers
+		// ignore the extra block. Only done when reasoning is enabled to avoid
+		// wasting tokens.
 		if reasoningEnabled && msg.Role == llm.RoleAssistant {
 			hasThinking := false
 			for _, block := range apiMsg.Content {

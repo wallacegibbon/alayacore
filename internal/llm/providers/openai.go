@@ -14,12 +14,14 @@ package providers
 // 3. REASONING SUPPORT: OpenAI-compatible APIs (DeepSeek, Qwen, etc.) use
 //    `reasoning_content` field for thinking tokens. Handled in `handleEvent()`.
 //
-// 4. EMPTY REASONING_CONTENT PADDING: When reasoning mode is enabled,
-//    reasoning_content is always set (even as empty string) on assistant
-//    messages. DeepSeek V4 (2026/04/24) requires it when thinking is enabled.
+// 4. REASONING_CONTENT IN TOOL CALL CHAINS: Per DeepSeek's documentation,
+//    between two user messages all intermediate assistant reasoning_content
+//    must be passed back. When reasoning mode is enabled, reasoning_content
+//    is always set (even as empty string) on assistant messages so that
+//    messages containing only tool calls still satisfy this requirement.
 //    Conditional on reasoning mode to avoid wasting tokens. The logic lives
 //    in openaiConvertMessages, not in the sub-converters.
-//    See docs/architecture.md → "Empty thinking block workaround".
+//    See docs/architecture.md → "Empty thinking block padding".
 
 import (
 	"bufio"
@@ -245,7 +247,7 @@ type openAIStreamOptions struct {
 type openAIMessage struct {
 	Role    string      `json:"role"`
 	Content interface{} `json:"content,omitempty"`
-	// Pointer so we can emit `"reasoning_content": ""` (DeepSeek workaround)
+	// Pointer so we can emit `"reasoning_content": ""` (DeepSeek requires it)
 	// vs. omitting the field entirely when reasoning is disabled.
 	ReasoningContent *string          `json:"reasoning_content,omitempty"`
 	ToolCalls        []openAIToolCall `json:"tool_calls,omitempty"`
@@ -392,9 +394,11 @@ func openaiConvertMessages(messages []llm.Message, reasoningEnabled bool) []open
 			openaiConvertRegularContent(&apiMsg, msg.Content)
 		}
 
-		// DeepSeek V4 (2026/04/24) requires reasoning_content on every
-		// assistant message when thinking is enabled — even as empty string.
-		// Only set it for assistant messages to avoid wasting tokens.
+		// Per DeepSeek's documentation, between two user messages all
+		// intermediate assistant reasoning_content must be passed back.
+		// Set reasoning_content on every assistant message when thinking is
+		// enabled — even as empty string for tool-call-only messages.
+		// Only for assistant messages to avoid wasting tokens.
 		if msg.Role == llm.RoleAssistant {
 			reasoningText := openaiExtractReasoning(msg.Content)
 			if reasoningText != "" || reasoningEnabled {
