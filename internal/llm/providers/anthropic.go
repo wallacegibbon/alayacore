@@ -365,10 +365,19 @@ func anthropicConvertMessages(messages []llm.Message) []anthropicMessage {
 		// Anthropic requires a "thinking" block on every assistant message.
 		// If none was present in the content, add an empty one.
 		if msg.Role == llm.RoleAssistant {
-			apiMsg.Content = append(apiMsg.Content, anthropicContentBlock{
-				Type:     anthropicBlockTypeThinking,
-				Thinking: "",
-			})
+			hasThinking := false
+			for _, block := range apiMsg.Content {
+				if block.Type == anthropicBlockTypeThinking {
+					hasThinking = true
+					break
+				}
+			}
+			if !hasThinking {
+				apiMsg.Content = append(apiMsg.Content, anthropicContentBlock{
+					Type:     anthropicBlockTypeThinking,
+					Thinking: "",
+				})
+			}
 		}
 
 		apiMessages = append(apiMessages, apiMsg)
