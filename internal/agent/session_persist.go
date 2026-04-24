@@ -261,7 +261,10 @@ func parseMessagesTLV(body string) ([]llm.Message, []TLVChunk, error) {
 			msgPart = llm.TextPart{Type: "text", Text: string(content)}
 
 		case stream.TagTextAssistant:
-			newMessage = true
+			// Do NOT force newMessage: an assistant message may start with
+			// TagTextReasoning or TagFunctionCall; the text part belongs in
+			// the same message.  A new message is still created when
+			// currentMsg is nil or the role doesn't match.
 			msgRole = llm.RoleAssistant
 			msgPart = llm.TextPart{Type: "text", Text: string(content)}
 

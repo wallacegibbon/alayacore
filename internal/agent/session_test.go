@@ -129,7 +129,8 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 	tmpDir := t.TempDir()
 	sessionPath := filepath.Join(tmpDir, "test-messages.md")
 
-	// Create session with messages
+	// Create session with messages simulating a realistic agent conversation:
+	// user → assistant(reasoning+text+toolcall) → tool(result) → assistant(reasoning+text)
 	session := &Session{
 		Messages: []llm.Message{
 			{
@@ -137,14 +138,33 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 				Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Hello, world!"}},
 			},
 			{
-				Role:    llm.RoleAssistant,
-				Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Hi there!"}},
+				Role: llm.RoleAssistant,
+				Content: []llm.ContentPart{
+					llm.ReasoningPart{Type: "reasoning", Text: "User needs help..."},
+					llm.TextPart{Type: "text", Text: "Let me help you."},
+					llm.ToolCallPart{
+						Type:       "tool_use",
+						ToolCallID: "call_1",
+						ToolName:   "read_file",
+						Input:      json.RawMessage(`{"path":"/tmp/test.txt"}`),
+					},
+				},
+			},
+			{
+				Role: llm.RoleTool,
+				Content: []llm.ContentPart{
+					llm.ToolResultPart{
+						Type:       "tool_result",
+						ToolCallID: "call_1",
+						Output:     llm.ToolResultOutputText{Type: "text", Text: "file contents"},
+					},
+				},
 			},
 			{
 				Role: llm.RoleAssistant,
 				Content: []llm.ContentPart{
-					llm.TextPart{Type: "text", Text: "Let me help you."},
-					llm.ReasoningPart{Type: "reasoning", Text: "User needs help..."},
+					llm.ReasoningPart{Type: "reasoning", Text: "Now I have the file..."},
+					llm.TextPart{Type: "text", Text: "Here is the file."},
 				},
 			},
 		},
@@ -165,10 +185,9 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 	}
 
 	// Verify messages - TLV format preserves message structure
-	// Original: 3 messages (user, assistant, assistant with text+reasoning)
-	// Stored and loaded: 3 messages (same structure)
-	if len(loaded.Messages) != 3 {
-		t.Fatalf("Message count mismatch: got %d, want 3", len(loaded.Messages))
+	// 4 messages: user, assistant(reasoning+text+toolcall), tool(result), assistant(reasoning+text)
+	if len(loaded.Messages) != 4 {
+		t.Fatalf("Message count mismatch: got %d, want 4", len(loaded.Messages))
 	}
 
 	// Check first user message
@@ -182,23 +201,40 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 		t.Errorf("First message content mismatch: got %v", loaded.Messages[0].Content[0])
 	}
 
-	// Check second message (assistant text "Hi there!")
+	// Check second message (assistant with reasoning + text + tool call)
 	if loaded.Messages[1].Role != llm.RoleAssistant {
 		t.Errorf("Second message role mismatch: got %s", loaded.Messages[1].Role)
 	}
+	if len(loaded.Messages[1].Content) != 3 {
+		t.Fatalf("Second message should have 3 parts (reasoning + text + toolcall), got %d", len(loaded.Messages[1].Content))
+	}
+	if _, ok := loaded.Messages[1].Content[0].(llm.ReasoningPart); !ok {
+		t.Errorf("Second message first part should be ReasoningPart, got %T", loaded.Messages[1].Content[0])
+	}
+	if tp, ok := loaded.Messages[1].Content[1].(llm.TextPart); !ok || tp.Text != "Let me help you." {
+		t.Errorf("Second message text part mismatch: got %v", loaded.Messages[1].Content[1])
+	}
+	if _, ok := loaded.Messages[1].Content[2].(llm.ToolCallPart); !ok {
+		t.Errorf("Second message third part should be ToolCallPart, got %T", loaded.Messages[1].Content[2])
+	}
 
-	// Check third message (assistant with text + reasoning)
-	if loaded.Messages[2].Role != llm.RoleAssistant {
+	// Check third message (tool result)
+	if loaded.Messages[2].Role != llm.RoleTool {
 		t.Errorf("Third message role mismatch: got %s", loaded.Messages[2].Role)
 	}
-	if len(loaded.Messages[2].Content) != 2 {
-		t.Fatalf("Third message should have 2 parts (text + reasoning), got %d", len(loaded.Messages[2].Content))
+
+	// Check fourth message (assistant with reasoning + text)
+	if loaded.Messages[3].Role != llm.RoleAssistant {
+		t.Errorf("Fourth message role mismatch: got %s", loaded.Messages[3].Role)
 	}
-	if tp, ok := loaded.Messages[2].Content[0].(llm.TextPart); !ok || tp.Text != "Let me help you." {
-		t.Errorf("Third message text part mismatch: got %v", loaded.Messages[2].Content[0])
+	if len(loaded.Messages[3].Content) != 2 {
+		t.Fatalf("Fourth message should have 2 parts (reasoning + text), got %d", len(loaded.Messages[3].Content))
 	}
-	if _, ok := loaded.Messages[2].Content[1].(llm.ReasoningPart); !ok {
-		t.Errorf("Third message second part should be ReasoningPart")
+	if _, ok := loaded.Messages[3].Content[0].(llm.ReasoningPart); !ok {
+		t.Errorf("Fourth message first part should be ReasoningPart, got %T", loaded.Messages[3].Content[0])
+	}
+	if tp, ok := loaded.Messages[3].Content[1].(llm.TextPart); !ok || tp.Text != "Here is the file." {
+		t.Errorf("Fourth message text part mismatch: got %v", loaded.Messages[3].Content[1])
 	}
 }
 
@@ -305,8 +341,9 @@ func TestTextAndReasoningInSameMessage(t *testing.T) {
 	tmpDir := t.TempDir()
 	sessionPath := filepath.Join(tmpDir, "text-and-reasoning.md")
 
-	// Session with assistant message that has both reasoning and text
-	// Note: In the file format, these become separate messages
+	// Session with assistant message that has both reasoning and text.
+	// After save/load, they must remain in the SAME assistant message so that
+	// providers that require reasoning_content/thinking to be passed back receive it.
 	session := &Session{
 		Messages: []llm.Message{
 			{
@@ -336,9 +373,9 @@ func TestTextAndReasoningInSameMessage(t *testing.T) {
 		t.Fatalf("LoadSession failed: %v", err)
 	}
 
-	// Reasoning and text are stored as separate messages in the file format
-	if len(loaded.Messages) != 3 {
-		t.Fatalf("Expected 3 messages (user, reasoning, assistant text), got %d", len(loaded.Messages))
+	// Reasoning and text must stay in the same assistant message
+	if len(loaded.Messages) != 2 {
+		t.Fatalf("Expected 2 messages (user, assistant with reasoning+text), got %d", len(loaded.Messages))
 	}
 
 	// Check first message is user
@@ -346,26 +383,22 @@ func TestTextAndReasoningInSameMessage(t *testing.T) {
 		t.Errorf("First message should be user, got %s", loaded.Messages[0].Role)
 	}
 
-	// Check second message is reasoning (stored as assistant with ReasoningPart)
+	// Check second message is assistant with reasoning + text in one message
 	if loaded.Messages[1].Role != llm.RoleAssistant {
 		t.Errorf("Second message should be assistant, got %s", loaded.Messages[1].Role)
 	}
-	if len(loaded.Messages[1].Content) != 1 {
-		t.Fatalf("Second message should have 1 part, got %d", len(loaded.Messages[1].Content))
+	if len(loaded.Messages[1].Content) != 2 {
+		t.Fatalf("Second message should have 2 parts (reasoning + text), got %d", len(loaded.Messages[1].Content))
 	}
-	if _, ok := loaded.Messages[1].Content[0].(llm.ReasoningPart); !ok {
-		t.Errorf("Second message part should be ReasoningPart, got %T", loaded.Messages[1].Content[0])
+	if rp, ok := loaded.Messages[1].Content[0].(llm.ReasoningPart); !ok {
+		t.Errorf("Second message first part should be ReasoningPart, got %T", loaded.Messages[1].Content[0])
+	} else if rp.Text != "Let me explain Lisp." {
+		t.Errorf("Reasoning text mismatch: %s", rp.Text)
 	}
-
-	// Check third message is assistant text
-	if loaded.Messages[2].Role != llm.RoleAssistant {
-		t.Errorf("Third message should be assistant, got %s", loaded.Messages[2].Role)
-	}
-	if len(loaded.Messages[2].Content) != 1 {
-		t.Fatalf("Third message should have 1 part, got %d", len(loaded.Messages[2].Content))
-	}
-	if _, ok := loaded.Messages[2].Content[0].(llm.TextPart); !ok {
-		t.Errorf("Third message part should be TextPart, got %T", loaded.Messages[2].Content[0])
+	if tp, ok := loaded.Messages[1].Content[1].(llm.TextPart); !ok {
+		t.Errorf("Second message second part should be TextPart, got %T", loaded.Messages[1].Content[1])
+	} else if tp.Text != "Lisp is a family of programming languages." {
+		t.Errorf("Text mismatch: %s", tp.Text)
 	}
 }
 
