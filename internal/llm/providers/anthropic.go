@@ -299,17 +299,14 @@ func (s *streamState) lastToolCall() *llm.ToolCallPart {
 	return nil
 }
 
-// StreamMessages streams messages from Anthropic
+// anthropicConvertMessages converts domain messages to Anthropic wire format.
 //
-//nolint:gocyclo // message conversion requires multiple type switches
-func (p *AnthropicProvider) StreamMessages(
-	ctx context.Context,
-	messages []llm.Message,
-	tools []llm.ToolDefinition,
-	systemPrompt string,
-	extraSystemPrompt string,
-) (iter.Seq2[llm.StreamEvent, error], error) {
-	// Convert messages to Anthropic format
+// Wire-format mappings:
+//   - llm.TextPart       → anthropicContentBlock{Type: "text"}
+//   - llm.ReasoningPart  → anthropicContentBlock{Type: "thinking"}  (domain "reasoning" → wire "thinking")
+//   - llm.ToolCallPart   → anthropicContentBlock{Type: "tool_use"}
+//   - llm.ToolResultPart → anthropicContentBlock{Type: "tool_result"} (role remapped to "user")
+func anthropicConvertMessages(messages []llm.Message) []anthropicMessage {
 	apiMessages := make([]anthropicMessage, 0, len(messages))
 	for _, msg := range messages {
 		apiMsg := anthropicMessage{
@@ -330,10 +327,7 @@ func (p *AnthropicProvider) StreamMessages(
 					Text: v.Text,
 				})
 			case llm.ReasoningPart:
-				// Anthropic uses "thinking" type for extended thinking.
-				// Always include if present - providers that don't support
-				// thinking will ignore this, and Anthropic requires it in
-				// thinking mode.
+				// Domain "reasoning" maps to Anthropic wire format "thinking"
 				apiMsg.Content = append(apiMsg.Content, anthropicContentBlock{
 					Type:     anthropicBlockTypeThinking,
 					Thinking: v.Text,
@@ -369,6 +363,21 @@ func (p *AnthropicProvider) StreamMessages(
 		}
 		apiMessages = append(apiMessages, apiMsg)
 	}
+	return apiMessages
+}
+
+// StreamMessages streams messages from Anthropic
+//
+//nolint:gocyclo // message conversion requires multiple type switches
+func (p *AnthropicProvider) StreamMessages(
+	ctx context.Context,
+	messages []llm.Message,
+	tools []llm.ToolDefinition,
+	systemPrompt string,
+	extraSystemPrompt string,
+) (iter.Seq2[llm.StreamEvent, error], error) {
+	// Convert messages to Anthropic format
+	apiMessages := anthropicConvertMessages(messages)
 
 	// Convert tools to Anthropic format
 	apiTools := make([]anthropicTool, 0, len(tools))

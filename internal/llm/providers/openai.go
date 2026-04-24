@@ -353,8 +353,14 @@ func (p *OpenAIProvider) StreamMessages(
 	return p.parseStream(resp.Body), nil
 }
 
-// convertMessages converts our message to OpenAI format.
+// convertMessages converts domain messages to OpenAI wire format.
 // For tool messages, returns multiple messages (one per tool result).
+//
+// Wire-format mappings:
+//   - llm.TextPart       → content (string or parts array)
+//   - llm.ReasoningPart  → reasoning_content field  (domain "reasoning" → wire "reasoning_content")
+//   - llm.ToolCallPart   → tool_calls array
+//   - llm.ToolResultPart → role="tool" message with tool_call_id
 func (p *OpenAIProvider) convertMessages(msg llm.Message) []openAIMessage {
 	// Handle tool results specially - return multiple messages, one per result
 	if msg.Role == llm.RoleTool {
@@ -409,7 +415,8 @@ func (p *OpenAIProvider) hasToolCalls(content []llm.ContentPart) bool {
 	return false
 }
 
-// convertToolCalls handles conversion of assistant messages with tool calls
+// convertToolCalls handles conversion of assistant messages with tool calls.
+// Accumulates ReasoningPart text into reasoning_content field.
 func (p *OpenAIProvider) convertToolCalls(apiMsg *openAIMessage, content []llm.ContentPart) {
 	apiMsg.ToolCalls = make([]openAIToolCall, 0)
 	var reasoningText string
@@ -443,7 +450,8 @@ func (p *OpenAIProvider) convertToolCalls(apiMsg *openAIMessage, content []llm.C
 	apiMsg.Content = nil
 }
 
-// convertRegularContent handles conversion of regular text/reasoning content
+// convertRegularContent handles conversion of regular text/reasoning content.
+// Accumulates ReasoningPart text into reasoning_content field.
 func (p *OpenAIProvider) convertRegularContent(apiMsg *openAIMessage, content []llm.ContentPart) {
 	var contentParts []map[string]interface{}
 	var reasoningText string
