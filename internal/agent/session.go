@@ -100,6 +100,7 @@ type SystemInfo struct {
 	ActiveModelName   string          `json:"active_model_name,omitempty"`
 	HasModels         bool            `json:"has_models"`
 	ModelConfigPath   string          `json:"model_config_path,omitempty"`
+	ThinkingEnabled   bool            `json:"thinking_enabled"`
 }
 
 // SessionMeta is the frontmatter metadata.
@@ -152,6 +153,7 @@ type Session struct {
 	skillDirs            []string // Skill directories for compaction exemption
 	maxSteps             int
 	proxyURL             string
+	thinkingEnabled      bool
 
 	taskQueue     []QueueItem
 	cond          *sync.Cond         // signals when taskQueue becomes non-empty or pausedOnError clears
@@ -179,18 +181,18 @@ func (s *Session) WaitDone() {
 // ============================================================================
 
 // LoadOrNewSession loads a session from file or creates a new one.
-func LoadOrNewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, autoSave bool, noCompact bool, compactKeepSteps int, compactTruncateLen int, proxyURL string, skillsMgr *skills.Manager) (*Session, string) {
+func LoadOrNewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, autoSave bool, noCompact bool, compactKeepSteps int, compactTruncateLen int, proxyURL string, skillsMgr *skills.Manager, thinking bool) (*Session, string) {
 	sessionFile = expandPath(sessionFile)
 	if sessionFile != "" {
 		if data, err := LoadSession(sessionFile); err == nil {
-			return RestoreFromSession(baseTools, systemPrompt, extraSystemPrompt, maxSteps, input, output, data, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, autoSummarize, autoSave, noCompact, compactKeepSteps, compactTruncateLen, proxyURL, skillsMgr), sessionFile
+			return RestoreFromSession(baseTools, systemPrompt, extraSystemPrompt, maxSteps, input, output, data, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, autoSummarize, autoSave, noCompact, compactKeepSteps, compactTruncateLen, proxyURL, skillsMgr, thinking), sessionFile
 		}
 	}
-	return NewSession(baseTools, systemPrompt, extraSystemPrompt, maxSteps, input, output, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, autoSummarize, autoSave, noCompact, compactKeepSteps, compactTruncateLen, proxyURL, skillsMgr), sessionFile
+	return NewSession(baseTools, systemPrompt, extraSystemPrompt, maxSteps, input, output, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, autoSummarize, autoSave, noCompact, compactKeepSteps, compactTruncateLen, proxyURL, skillsMgr, thinking), sessionFile
 }
 
 // NewSession creates a fresh session.
-func NewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, autoSave bool, noCompact bool, compactKeepSteps int, compactTruncateLen int, proxyURL string, skillsMgr *skills.Manager) *Session {
+func NewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, autoSave bool, noCompact bool, compactKeepSteps int, compactTruncateLen int, proxyURL string, skillsMgr *skills.Manager, thinking bool) *Session {
 	sessionCtx, sessionCancel := context.WithCancel(context.Background())
 	s := &Session{
 		SessionFile:          sessionFile,
@@ -212,6 +214,7 @@ func NewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt str
 		skillDirs:            buildSkillDirSet(skillsMgr),
 		proxyURL:             proxyURL,
 		maxSteps:             maxSteps,
+		thinkingEnabled:      thinking,
 		taskQueue:            make([]QueueItem, 0),
 		sessionCtx:           sessionCtx,
 		sessionCancel:        sessionCancel,
@@ -226,7 +229,7 @@ func NewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt str
 }
 
 // RestoreFromSession creates a session from saved data.
-func RestoreFromSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, data *SessionData, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, autoSave bool, noCompact bool, compactKeepSteps int, compactTruncateLen int, proxyURL string, skillsMgr *skills.Manager) *Session {
+func RestoreFromSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, data *SessionData, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, autoSave bool, noCompact bool, compactKeepSteps int, compactTruncateLen int, proxyURL string, skillsMgr *skills.Manager, thinking bool) *Session {
 	sessionCtx, sessionCancel := context.WithCancel(context.Background())
 	s := &Session{
 		Messages:             data.Messages,
@@ -249,6 +252,7 @@ func RestoreFromSession(baseTools []llm.Tool, systemPrompt string, extraSystemPr
 		skillDirs:            buildSkillDirSet(skillsMgr),
 		proxyURL:             proxyURL,
 		maxSteps:             maxSteps,
+		thinkingEnabled:      thinking,
 		taskQueue:            make([]QueueItem, 0),
 		sessionCtx:           sessionCtx,
 		sessionCancel:        sessionCancel,
@@ -343,6 +347,7 @@ func (s *Session) ensureAgentInitialized() string {
 	s.mu.Unlock()
 
 	s.applyModelContextLimit(activeModel)
+	s.syncThinkingToProvider()
 	return ""
 }
 
@@ -365,6 +370,7 @@ func (s *Session) initAgentFromConfig(modelConfig *ModelConfig) error {
 	s.Provider = provider
 	s.mu.Unlock()
 
+	s.syncThinkingToProvider()
 	return nil
 }
 
@@ -375,6 +381,38 @@ func (s *Session) applyModelContextLimit(model *ModelConfig) {
 	s.mu.Lock()
 	s.ContextLimit = int64(model.ContextLimit)
 	s.mu.Unlock()
+}
+
+// syncThinkingToProvider propagates the session's thinking state to the
+// current provider. Must be called after Provider is set.
+func (s *Session) syncThinkingToProvider() {
+	if s.Provider != nil {
+		s.Provider.SetThinkingEnabled(s.thinkingEnabled)
+	}
+}
+
+// ToggleThinking controls thinking mode. mode: 0=off, 1=on, -1=toggle.
+func (s *Session) ToggleThinking(mode int) {
+	s.mu.Lock()
+	switch mode {
+	case 0:
+		s.thinkingEnabled = false
+	case 1:
+		s.thinkingEnabled = true
+	case -1:
+		s.thinkingEnabled = !s.thinkingEnabled
+	}
+	enabled := s.thinkingEnabled
+	s.mu.Unlock()
+
+	s.syncThinkingToProvider()
+
+	if enabled {
+		s.writeNotify("Thinking mode enabled")
+	} else {
+		s.writeNotify("Thinking mode disabled")
+	}
+	s.sendSystemInfo()
 }
 
 func createProviderFromConfig(config *ModelConfig, debugAPI bool, proxyURL string) (llm.Provider, error) {
@@ -418,7 +456,7 @@ func isCommandImmediate(cmd string) bool {
 		name = cmd[:idx]
 	}
 	switch name {
-	case commandNameCancel, commandNameCancelAll, commandNameModelLoad, commandNameTaskQueueGetAll:
+	case commandNameCancel, commandNameCancelAll, commandNameModelLoad, commandNameTaskQueueGetAll, commandNameThinking:
 		return true
 	}
 	return strings.HasPrefix(cmd, commandNameTaskQueueDel+" ") || strings.HasPrefix(cmd, commandNameModelSet+" ")
@@ -924,6 +962,7 @@ func (s *Session) sendSystemInfoInternal(activeModelConfig *ModelConfig) {
 		ActiveModelName:   activeModelName,
 		HasModels:         hasModels,
 		ModelConfigPath:   modelConfigPath,
+		ThinkingEnabled:   s.thinkingEnabled,
 	}
 	data, _ := json.Marshal(info) //nolint:errcheck // Best effort marshal, errors ignored
 	//nolint:errcheck // Best effort write, errors ignored

@@ -155,10 +155,11 @@ func (s *openAIStreamState) getUsage() llm.Usage {
 
 // OpenAIProvider implements the OpenAI API
 type OpenAIProvider struct {
-	apiKey  string
-	baseURL string
-	client  *http.Client
-	model   string
+	apiKey          string
+	baseURL         string
+	client          *http.Client
+	model           string
+	thinkingEnabled bool
 }
 
 // OpenAIOption configures the provider
@@ -208,15 +209,21 @@ func WithOpenAIModel(model string) OpenAIOption {
 	}
 }
 
+// SetThinkingEnabled enables or disables thinking mode for OpenAI.
+func (p *OpenAIProvider) SetThinkingEnabled(enabled bool) {
+	p.thinkingEnabled = enabled
+}
+
 // openAIRequest represents the OpenAI API request
 type openAIRequest struct {
-	Model         string               `json:"model"`
-	Messages      []openAIMessage      `json:"messages"`
-	Tools         []openAITool         `json:"tools,omitempty"`
-	Stream        bool                 `json:"stream"`
-	StreamOptions *openAIStreamOptions `json:"stream_options,omitempty"`
-	MaxTokens     int                  `json:"max_tokens,omitempty"`
-	Temperature   float64              `json:"temperature,omitempty"`
+	Model           string               `json:"model"`
+	Messages        []openAIMessage      `json:"messages"`
+	Tools           []openAITool         `json:"tools,omitempty"`
+	Stream          bool                 `json:"stream"`
+	StreamOptions   *openAIStreamOptions `json:"stream_options,omitempty"`
+	MaxTokens       int                  `json:"max_tokens,omitempty"`
+	Temperature     float64              `json:"temperature,omitempty"`
+	ReasoningEffort string               `json:"reasoning_effort,omitempty"`
 }
 
 type openAIStreamOptions struct {
@@ -310,6 +317,11 @@ func (p *OpenAIProvider) StreamMessages(
 		},
 	}
 
+	// Add reasoning effort when thinking mode is enabled
+	if p.thinkingEnabled {
+		reqBody.ReasoningEffort = "high"
+	}
+
 	bodyBytes, err := json.Marshal(reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
@@ -399,23 +411,31 @@ func (p *OpenAIProvider) hasToolCalls(content []llm.ContentPart) bool {
 // convertToolCalls handles conversion of assistant messages with tool calls
 func (p *OpenAIProvider) convertToolCalls(apiMsg *openAIMessage, content []llm.ContentPart) {
 	apiMsg.ToolCalls = make([]openAIToolCall, 0)
+	var reasoningText string
 	for _, part := range content {
-		if tc, ok := part.(llm.ToolCallPart); ok {
+		switch v := part.(type) {
+		case llm.ToolCallPart:
 			// OpenAI expects arguments to be a JSON-encoded string
 			// We need to marshal the raw JSON to a string
-			argsStr, err := json.Marshal(string(tc.Input))
+			argsStr, err := json.Marshal(string(v.Input))
 			if err != nil {
 				argsStr = []byte("{}")
 			}
 			apiMsg.ToolCalls = append(apiMsg.ToolCalls, openAIToolCall{
-				ID:   tc.ToolCallID,
+				ID:   v.ToolCallID,
 				Type: "function",
 				Function: openAIFunction{
-					Name:      tc.ToolName,
+					Name:      v.ToolName,
 					Arguments: argsStr,
 				},
 			})
+		case llm.ReasoningPart:
+			reasoningText += v.Text
 		}
+	}
+	// Preserve reasoning_content for providers that require it (DeepSeek, etc.)
+	if reasoningText != "" {
+		apiMsg.ReasoningContent = reasoningText
 	}
 	// Content can be nil for tool calls
 	apiMsg.Content = nil

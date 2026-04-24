@@ -148,4 +148,9 @@ type Provider interface {
 		systemPrompt string,
 		extraSystemPrompt string,
 	) (iter.Seq2[StreamEvent, error], error)
+
+	// SetThinkingEnabled enables or disables thinking/reasoning mode.
+	// When enabled, provider-specific fields are added to API requests
+	// to activate extended thinking (Anthropic) or reasoning effort (OpenAI).
+	SetThinkingEnabled(enabled bool)
 }

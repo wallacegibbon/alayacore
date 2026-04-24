@@ -41,6 +41,7 @@ type outputWriter struct {
 	maxSteps          int         // Maximum steps allowed
 	lastCurrentStep   int         // Last step reached in completed task
 	lastMaxSteps      int         // Last max steps from completed task
+	thinkingEnabled   bool        // Whether thinking mode is active
 }
 
 func NewTerminalOutput(styles *Styles) *outputWriter { //nolint:revive // tests need access to internal methods
@@ -250,6 +251,9 @@ func (to *outputWriter) handleSystemTag(value string) {
 		to.currentStep = info.CurrentStep
 		to.maxSteps = info.MaxSteps
 
+		// Store thinking state
+		to.thinkingEnabled = info.ThinkingEnabled
+
 		// Mark display as dirty so tick handler picks up changes
 		to.dirty.Store(true)
 	}
@@ -268,6 +272,7 @@ func (to *outputWriter) SnapshotStatus() StatusSnapshot {
 		MaxSteps:        to.maxSteps,
 		LastCurrentStep: to.lastCurrentStep,
 		LastMaxSteps:    to.lastMaxSteps,
+		ThinkingEnabled: to.thinkingEnabled,
 	}
 }
 

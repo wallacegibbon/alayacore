@@ -153,3 +153,5 @@ func (m *mockProviderWithTextAndTools) StreamMessages(_ context.Context, _ []Mes
 		}, nil)
 	}, nil
 }
+
+func (m *mockProviderWithTextAndTools) SetThinkingEnabled(_ bool) {}

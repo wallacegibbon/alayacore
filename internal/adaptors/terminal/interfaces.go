@@ -19,6 +19,7 @@ type StatusSnapshot struct {
 	MaxSteps        int
 	LastCurrentStep int
 	LastMaxSteps    int
+	ThinkingEnabled bool
 }
 
 // ModelSnapshot holds a consistent point-in-time view of model state.

@@ -283,6 +283,7 @@ Agent.Stream() receives tool_call event
 9. **Lazy Agent Init** — Agent and provider are created on first use, not at startup.
 10. **Sequential Tool Execution** — Tools execute one at a time. See [sequential-tool-execution.md](sequential-tool-execution.md).
 11. **Context Efficiency** — Tool descriptions are minimal, outputs are size-capped (32KB), search results limited (100 lines), and old tool results are compacted to save tokens. See [context-tracking.md](context-tracking.md).
+12. **Thinking Mode** — Provider-specific reasoning fields are added to API requests when enabled. Toggled at runtime via `Ctrl+T`, `:thinking`, or `--thinking` flag.
 
 ## Gotchas
 
@@ -335,5 +336,13 @@ When user cancels mid-tool-call, messages may have `tool_use` without matching `
 ### ANSI escape sequences are not recursive
 
 When styling text with lipgloss, each segment must be rendered individually before concatenation. You cannot render a string that already contains ANSI codes with a new style and expect it to work.
+
+### Thinking mode and reasoning_content
+
+When thinking mode is enabled, provider-specific fields are added to API requests:
+- **Anthropic**: `"thinking": {"type": "adaptive"}` and `"output_config": {"effort": "high"}`
+- **OpenAI-compatible**: `"reasoning_effort": "high"`
+
+Some OpenAI-compatible providers (e.g. DeepSeek) return `reasoning_content` in assistant responses. This **must** be passed back in subsequent requests' assistant message history, even when the message also contains tool calls. The `convertToolCalls()` method preserves `ReasoningPart` alongside `ToolCallPart` — dropping it causes a 400 error from providers that require it.
 
 

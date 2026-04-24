@@ -39,12 +39,13 @@ const (
 
 // AnthropicProvider implements the Anthropic API
 type AnthropicProvider struct {
-	apiKey      string
-	baseURL     string
-	client      *http.Client
-	model       string
-	promptCache bool
-	maxTokens   int
+	apiKey          string
+	baseURL         string
+	client          *http.Client
+	model           string
+	promptCache     bool
+	maxTokens       int
+	thinkingEnabled bool
 }
 
 // AnthropicOption configures the provider
@@ -109,6 +110,11 @@ func WithMaxTokens(tokens int) AnthropicOption {
 	}
 }
 
+// SetThinkingEnabled enables or disables thinking mode for Anthropic.
+func (p *AnthropicProvider) SetThinkingEnabled(enabled bool) {
+	p.thinkingEnabled = enabled
+}
+
 // anthropicRequest represents the Anthropic API request
 type anthropicRequest struct {
 	Model        string                   `json:"model"`
@@ -118,6 +124,16 @@ type anthropicRequest struct {
 	Tools        []anthropicTool          `json:"tools,omitempty"`
 	Stream       bool                     `json:"stream"`
 	CacheControl *anthropicCacheControl   `json:"cache_control,omitempty"`
+	Thinking     *anthropicThinking       `json:"thinking,omitempty"`
+	OutputConfig *anthropicOutputConfig   `json:"output_config,omitempty"`
+}
+
+type anthropicThinking struct {
+	Type string `json:"type"`
+}
+
+type anthropicOutputConfig struct {
+	Effort string `json:"effort"`
 }
 
 type anthropicCacheControl struct {
@@ -385,6 +401,12 @@ func (p *AnthropicProvider) StreamMessages(
 	// Add top-level cache_control for automatic caching (Anthropic's automatic caching)
 	if p.promptCache {
 		reqBody.CacheControl = &anthropicCacheControl{Type: "ephemeral"}
+	}
+
+	// Add thinking fields when enabled
+	if p.thinkingEnabled {
+		reqBody.Thinking = &anthropicThinking{Type: "adaptive"}
+		reqBody.OutputConfig = &anthropicOutputConfig{Effort: "high"}
 	}
 
 	bodyBytes, err := json.Marshal(reqBody)
