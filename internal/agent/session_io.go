@@ -323,7 +323,6 @@ func (s *Session) resendPrompt(ctx context.Context) {
 	_, err := s.processPrompt(ctx, s.Messages)
 
 	s.Messages = cleanIncompleteToolCalls(s.Messages)
-	s.compactHistory()
 
 	if err != nil {
 		s.writeError(err.Error())
@@ -334,5 +333,6 @@ func (s *Session) resendPrompt(ctx context.Context) {
 		return
 	}
 
+	s.compactHistory()
 	s.sendSystemInfo()
 }

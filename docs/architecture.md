@@ -414,8 +414,8 @@ When thinking is **enabled**, every assistant message is padded with `"reasoning
 
 	"model": "deepseek-v4-flash",
 
-	"reasoning_effort": "xhigh",
 	"thinking": { "type": "enabled" },
+	"reasoning_effort": "xhigh",
 
 	...
 }

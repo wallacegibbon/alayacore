@@ -745,7 +745,6 @@ func (s *Session) handleUserPrompt(ctx context.Context, prompt string) {
 	_, err := s.processPrompt(ctx, s.Messages)
 
 	s.Messages = cleanIncompleteToolCalls(s.Messages)
-	s.compactHistory()
 
 	if err != nil {
 		s.writeError(err.Error())
@@ -755,6 +754,8 @@ func (s *Session) handleUserPrompt(ctx context.Context, prompt string) {
 		s.sendSystemInfo()
 		return
 	}
+
+	s.compactHistory()
 }
 
 func (s *Session) shouldAutoSummarize() bool {
