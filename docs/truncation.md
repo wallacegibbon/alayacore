@@ -97,8 +97,8 @@ The byte budget approach ensures fair handling of all scripts:
 | `"🎉🎊🎈"` | 3 | 12 | Each emoji = 4 bytes |
 
 With a 10-byte budget:
-- `"Hello world"` → `"Hello worl[truncated]"` (would exceed, but let's use realistic budgets)
-- `"你好世界"` → `"你好世[truncated]"` (9 bytes content + 12 bytes marker = 21 total, budget exceeded → just marker)
+- `"Hello world"` → `"[truncated]"` (11 bytes exceeds 10-byte budget, marker only)
+- `"你好世界"` → `"[truncated]"` (12 bytes exceeds 10-byte budget, marker only)
 
 This approach avoids the approximation of "1 token ≈ 4 characters" which is wildly inaccurate for non-ASCII scripts.
 

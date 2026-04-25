@@ -9,8 +9,8 @@ AlayaCore's terminal UI is built with [Bubble Tea](https://charm.land/) and uses
 | `Tab` | Switch focus between display and input window |
 | `j` | Move window cursor down |
 | `k` | Move window cursor up |
-| `J` | Scroll down one line |
-| `K` | Scroll up one line |
+| `J` / `Shift+Down` | Scroll down one line |
+| `K` / `Shift+Up` | Scroll up one line |
 | `Ctrl+D` | Scroll down half screen |
 | `Ctrl+U` | Scroll up half screen |
 | `g` | Go to first window, scroll to top |
@@ -66,7 +66,7 @@ The display area organizes content into separate windows — one per message or 
 
 ### Auto-Follow
 
-When new windows appear, the cursor automatically moves to the newest one. Pressing `j`, `k`, `g`, `H`, `L`, `M`, `J`, `K`, `Ctrl+D`, `Ctrl+U`, `f`, or `b` disables auto-follow. Returning to the last window re-enables it.
+When new windows appear, the cursor automatically moves to the newest one. Pressing `j`, `k`, `g`, `G`, `H`, `L`, `M`, `J`, `K`, `Ctrl+D`, `Ctrl+U`, `f`, or `b` disables auto-follow. Returning to the last window re-enables it.
 
 ### Fold Mode
 

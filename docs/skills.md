@@ -66,7 +66,7 @@ Instructions for the agent...
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `name` | Yes | Skill identifier. 1-64 characters, lowercase letters, numbers, and hyphens only. |
+| `name` | Yes | Skill identifier. 1-64 characters, lowercase letters, numbers, and hyphens only. Must match the directory name. |
 | `description` | Yes | Describes what the skill does **and when to use it**. 1-1024 characters. This is what the LLM uses to decide whether to activate the skill. |
 | `license` | No | License name or reference |
 | `compatibility` | No | Environment requirements |

@@ -35,13 +35,13 @@ The adaptor layer handles user interaction and translates between user actions a
 
 #### PlainIO Adaptor (`internal/adaptors/plainio/`)
 
-Plain stdin/stdout mode, activated with `--plainio`. Shows assistant text, reasoning, and tool call headers. Suppresses tool result content. Reads prompts from stdin (one per line, backslash continuation).
+Plain stdin/stdout mode, activated with `--plainio`. Shows assistant text, reasoning, and tool call headers. Suppresses tool result content. Reads prompts from stdin (one per line, backslash continuation for multi-line prompts).
 
 #### File Naming Convention
 
 Files in the adaptor packages are named from the **session's perspective**:
 
-- **`input.go`** — builds the **input to the session**. Reads user data (keystrokes, stdin lines) and feeds it into the session's input channel.
+- **`input.go`** — builds the **input to the session**. Reads user data (keystrokes, stdin lines) and feeds it into the session's input channel via TLV-encoded messages.
 - **`output.go`** — handles the **output from the session**. Receives TLV messages from the session and renders them to the user (TUI windows, stdout).
 
 ```
@@ -137,7 +137,7 @@ The `execute_command` tool uses a cross-platform shell detection system. On star
 | POSIX sh | `sh` | Unix | `sh -c <cmd>` | Guaranteed on all POSIX systems |
 | PowerShell Core | `pwsh` | Windows | `pwsh -NoLogo -NonInteractive -Command <cmd>` | Preferred on Windows |
 | Windows PowerShell | `powershell` | Windows | `powershell -NoLogo -NonInteractive -Command <cmd>` | Ships with Windows |
-| cmd | `cmd` | Windows | `cmd /C <cmd>` | Guaranteed on all Windows machines |
+| cmd | `cmd` | Windows | `cmd /c <cmd>` | Guaranteed on all Windows machines |
 
 The tool description (shown to the LLM) is dynamically generated based on the detected shell so the LLM uses the correct syntax. Platform-specific process isolation is handled per-OS:
 
@@ -204,7 +204,7 @@ The system prompt is sent as **separate messages** (not a single concatenated st
 
 ```
 System Message 1: Default Prompt (identity + rules + search preferences)
-                  + Skills section + Skills Fragment (only when skills configured)
+                  + Skills section (only when skills configured)
                   + Current working directory
 
 System Message 2: Extra System Prompt (from --system flag, repeatable)
@@ -212,7 +212,7 @@ System Message 2: Extra System Prompt (from --system flag, repeatable)
 
 When `rg` is available, the default prompt includes a `SEARCH:` section that instructs the LLM to prefer the `search_content` tool for locating content over reading files chunk by chunk. This section is omitted when `rg` is not installed.
 
-When skill paths are provided via `--skill` and skills are discovered, the prompt includes a `SKILLS:` section (with instructions for reading `<location>` files) followed by an `<available_skills>` XML fragment. Both are omitted entirely when no skills are configured.
+When skill paths are provided via `--skill` and skills are discovered, the prompt includes instructions for reading skill `SKILL.md` files from their `<location>`, followed by an `<available_skills>` XML fragment listing each skill's name, description, and location. Both are omitted entirely when no skills are configured.
 
 Both providers (`openai`, `anthropic`) send these as two independent system
 messages. The default prompt and extra prompt are kept separate so the LLM API
