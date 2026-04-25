@@ -259,12 +259,21 @@ func TestAgentMultiTurnSequentialTools(t *testing.T) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		flusher, _ := w.(http.Flusher)
 
-		// Every call returns a tool call
-		fmt.Fprintf(w, "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"tool-%d\",\"name\":\"echo\"}}\n\n", callCount)
-		fmt.Fprint(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{}\"}}\n\n")
-		fmt.Fprint(w, "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n")
-		fmt.Fprint(w, "event: message_delta\ndata: {\"type\":\"message_delta\",\"usage\":{\"input_tokens\":10,\"output_tokens\":20}}\n\n")
-		fmt.Fprint(w, "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
+		if callCount%2 == 1 {
+			// Odd calls: return tool call
+			fmt.Fprintf(w, "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"tool-%d\",\"name\":\"echo\"}}\n\n", callCount)
+			fmt.Fprint(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{}\"}}\n\n")
+			fmt.Fprint(w, "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n")
+			fmt.Fprint(w, "event: message_delta\ndata: {\"type\":\"message_delta\",\"usage\":{\"input_tokens\":10,\"output_tokens\":20}}\n\n")
+			fmt.Fprint(w, "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
+		} else {
+			// Even calls: return text response
+			fmt.Fprint(w, "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n")
+			fmt.Fprint(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Done!\"}}\n\n")
+			fmt.Fprint(w, "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n")
+			fmt.Fprint(w, "event: message_delta\ndata: {\"type\":\"message_delta\",\"usage\":{\"input_tokens\":10,\"output_tokens\":5}}\n\n")
+			fmt.Fprint(w, "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
+		}
 		flusher.Flush()
 	}))
 	defer server.Close()
@@ -329,14 +338,13 @@ func TestAgentMultiTurnSequentialTools(t *testing.T) {
 		t.Fatalf("Query 3 failed: %v", err)
 	}
 
-	// Each query makes 2 API calls: tool call, then tool response
+	// Each query makes 2 API calls: tool call, then text response
 	// Query 1: 2 calls
 	// Query 2: 2 calls (adds to accumulated messages)
 	// Query 3: 2 calls (adds to accumulated messages)
-	// Total: 6 calls... but actually agent keeps looping because tool keeps getting called
-	// Let's just verify we got at least 3 queries worth
-	if callCount < 6 {
-		t.Errorf("Expected at least 6 API calls (3 queries * 2 calls each), got %d", callCount)
+	// Total: 6 calls
+	if callCount != 6 {
+		t.Errorf("Expected 6 API calls (3 queries * 2 calls each), got %d", callCount)
 	}
 }
 
@@ -478,8 +486,13 @@ func TestOpenAISequentialQueriesWithTools(t *testing.T) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		flusher, _ := w.(http.Flusher)
 
-		// Every call returns a tool call
-		fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call-%d\",\"type\":\"function\",\"function\":{\"name\":\"echo\",\"arguments\":\"{}\"}}]},\"finish_reason\":\"tool_calls\"}]}\n\n", callCount)
+		if callCount%2 == 1 {
+			// Odd calls: return tool call
+			fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call-%d\",\"type\":\"function\",\"function\":{\"name\":\"echo\",\"arguments\":\"{}\"}}]},\"finish_reason\":\"tool_calls\"}]}\n\n", callCount)
+		} else {
+			// Even calls: return text response
+			fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"Done!\"},\"finish_reason\":\"stop\"}]}\n\n")
+		}
 		fmt.Fprint(w, "data: [DONE]\n\n")
 		flusher.Flush()
 	}))
@@ -545,13 +558,12 @@ func TestOpenAISequentialQueriesWithTools(t *testing.T) {
 		t.Fatalf("Query 3 failed: %v", err)
 	}
 
-	// Each query makes 2 API calls: tool call, then tool response
+	// Each query makes 2 API calls: tool call, then text response
 	// Query 1: 2 calls
-	// Query 2: 2 calls (adds to accumulated messages)
-	// Query 3: 2 calls (adds to accumulated messages)
-	// Total: 6 calls... but actually agent keeps looping because tool keeps getting called
-	// Let's just verify we got at least 3 queries worth
-	if callCount < 6 {
-		t.Errorf("Expected at least 6 API calls (3 queries * 2 calls each), got %d", callCount)
+	// Query 2: 2 calls
+	// Query 3: 2 calls
+	// Total: 6 calls
+	if callCount != 6 {
+		t.Errorf("Expected 6 API calls (3 queries * 2 calls each), got %d", callCount)
 	}
 }

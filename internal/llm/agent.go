@@ -14,10 +14,15 @@ package llm
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"iter"
 	"sync"
 )
+
+// ErrMaxStepsExceeded is returned when the agent loop reaches the configured maximum number of steps
+// without the model producing a final text-only response.
+var ErrMaxStepsExceeded = errors.New("agent loop exceeded maximum steps")
 
 // Tool represents an executable tool
 type Tool struct {
@@ -156,6 +161,14 @@ func (a *Agent) Stream(ctx context.Context, messages []Message, callbacks Stream
 				return nil, fmt.Errorf("OnStepFinish callback failed: %w", err)
 			}
 		}
+	}
+
+	// If the loop completed without a break (no final text-only response), we exceeded max steps.
+	if step > a.config.MaxSteps {
+		return &StreamResult{
+			Messages: allMessages,
+			Usage:    totalUsage,
+		}, ErrMaxStepsExceeded
 	}
 
 	return &StreamResult{
