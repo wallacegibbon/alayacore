@@ -50,6 +50,8 @@ Commands are split into two categories:
 | `:model_set <id>` | Switch to a model by numeric ID |
 | `:model_load` | Reload model configs from the config file |
 | `:thinking [0\|1\|-1]` | Control thinking mode (0=off, 1=on, -1=toggle). Default: toggle |
+| `:taskqueue_get_all` | List all queued tasks (used by queue manager UI) |
+| `:taskqueue_del <id>` | Delete a queued task by ID (used by queue manager UI) |
 
 **Deferred commands** — enqueued at the front of the task queue; require no task currently running:
 | Command | Action |
