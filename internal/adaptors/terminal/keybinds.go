@@ -435,6 +435,7 @@ var displayKeyMap = map[string]func(*Terminal) tea.Cmd{
 	"G": func(m *Terminal) tea.Cmd {
 		m.display.SetCursorToLastWindow()
 		m.display.GotoBottom()
+		m.display.MarkNewContent()
 		m.display.updateContent()
 		return nil
 	},
