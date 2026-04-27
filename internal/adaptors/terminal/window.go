@@ -810,6 +810,7 @@ type DisplayModel struct {
 	userMovedCursorAway bool
 	displayFocused      bool
 	lastContent         string
+	hasNewContent       bool // true when new streaming content arrived, cleared by updateContent
 }
 
 // NewDisplayModel creates a new display model
@@ -886,8 +887,14 @@ func (m *DisplayModel) updateContent() {
 	totalLines := m.windowBuffer.GetTotalLines()
 	viewportHeight := m.viewport.Height()
 
+	// Only auto-follow when new streaming content arrived, not when the
+	// user navigates (j/k/H/L/M etc.). This prevents the viewport from
+	// jumping to the bottom on manual navigation to the last window.
+	follow := m.shouldFollow() && m.hasNewContent
+	m.hasNewContent = false
+
 	targetYOffset := m.viewport.YOffset()
-	if m.shouldFollow() && totalLines > viewportHeight {
+	if follow && totalLines > viewportHeight {
 		targetYOffset = max(0, totalLines-viewportHeight)
 	}
 
@@ -901,7 +908,7 @@ func (m *DisplayModel) updateContent() {
 
 	m.viewport.SetContent(newContent)
 
-	if m.shouldFollow() {
+	if follow {
 		m.viewport.GotoBottom()
 	}
 }
@@ -1000,6 +1007,12 @@ func (m *DisplayModel) MoveWindowCursorUp() bool {
 	}
 	m.userMovedCursorAway = true
 	return true
+}
+
+// MarkNewContent signals that new streaming content has arrived.
+// This enables auto-follow in the next updateContent() call.
+func (m *DisplayModel) MarkNewContent() {
+	m.hasNewContent = true
 }
 
 // EnsureCursorVisible scrolls the viewport only if the cursor window is
