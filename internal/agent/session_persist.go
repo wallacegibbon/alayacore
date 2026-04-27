@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -35,10 +36,11 @@ func (s *Session) saveSessionToFile(path string) error {
 
 	data := SessionData{
 		SessionMeta: SessionMeta{
-			CreatedAt:    s.CreatedAt,
-			UpdatedAt:    time.Now(),
-			ThinkEnabled: s.thinkEnabled,
-			ActiveModel:  s.activeModelName(),
+			CreatedAt:     s.CreatedAt,
+			UpdatedAt:     time.Now(),
+			ThinkEnabled:  s.thinkEnabled,
+			ActiveModel:   s.activeModelName(),
+			ContextTokens: s.ContextTokens,
 		},
 		Messages: s.Messages,
 	}
@@ -81,6 +83,12 @@ func formatFrontmatter(meta *SessionMeta) string {
 		buf.WriteString("active_model: \"")
 		buf.WriteString(meta.ActiveModel)
 		buf.WriteString("\"\n")
+	}
+
+	if meta.ContextTokens > 0 {
+		buf.WriteString("context_tokens: ")
+		buf.WriteString(strconv.FormatInt(meta.ContextTokens, 10))
+		buf.WriteString("\n")
 	}
 
 	buf.WriteString("---\n")

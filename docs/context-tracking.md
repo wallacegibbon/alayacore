@@ -129,6 +129,7 @@ The apparent "drop" from 2118 to 2073 after model switch is the difference in to
 - `summarize()` — appends the summary prompt to Messages, calls `processPrompt`, then replaces conversation history with the summary and resets `ContextTokens` to the summary's output token count
 - `applyModelContextLimit()` — sets `ContextLimit` from the active model's config
 - `compactHistory()` — truncates old tool results to save context tokens. Kept steps and truncate length are configurable via `--compact-keep-steps` and `--compact-truncate-len`. Enabled by default; disabled with `--no-compact`.
+- `SessionMeta.ContextTokens` — persisted to session file frontmatter so the status bar shows the correct context usage immediately after loading a session
 
 ## History Compaction
 

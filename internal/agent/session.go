@@ -104,10 +104,11 @@ type SystemInfo struct {
 
 // SessionMeta is the frontmatter metadata.
 type SessionMeta struct {
-	CreatedAt    time.Time `config:"created_at"`
-	UpdatedAt    time.Time `config:"updated_at"`
-	ThinkEnabled bool      `config:"think_enabled"`
-	ActiveModel  string    `config:"active_model"`
+	CreatedAt     time.Time `config:"created_at"`
+	UpdatedAt     time.Time `config:"updated_at"`
+	ThinkEnabled  bool      `config:"think_enabled"`
+	ActiveModel   string    `config:"active_model"`
+	ContextTokens int64     `config:"context_tokens"`
 }
 
 // SessionData is the persisted form of a Session.
@@ -254,6 +255,7 @@ func RestoreFromSession(baseTools []llm.Tool, systemPrompt string, extraSystemPr
 		proxyURL:             proxyURL,
 		maxSteps:             maxSteps,
 		thinkEnabled:         data.ThinkEnabled,
+		ContextTokens:        data.ContextTokens,
 		taskQueue:            make([]QueueItem, 0),
 		sessionCtx:           sessionCtx,
 		sessionCancel:        sessionCancel,
@@ -266,6 +268,12 @@ func RestoreFromSession(baseTools []llm.Tool, systemPrompt string, extraSystemPr
 	// fall back to whatever initModelManager already set.
 	if data.ActiveModel != "" {
 		_ = s.ModelManager.SetActiveByName(data.ActiveModel) //nolint:errcheck // best-effort restore, fall back to initModelManager default
+	}
+
+	// Apply context limit from the resolved model so the status bar
+	// can show "tokens/limit (pct%)" immediately, before any API call.
+	if model := s.ModelManager.GetActive(); model != nil {
+		s.applyModelContextLimit(model)
 	}
 
 	s.cond = sync.NewCond(&s.mu)
