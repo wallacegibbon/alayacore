@@ -74,7 +74,7 @@ func TestEnsureCursorVisible_OversizedWindowScrollsWhenOffScreen(t *testing.T) {
 
 	display.SetWindowCursor(0)
 
-	// Scroll to the very bottom so window-1 is entirely above the viewport
+	// Scroll to the very bottom so window-0 is entirely above the viewport
 	display.viewport.GotoBottom()
 	display.updateContent()
 
@@ -102,13 +102,13 @@ func TestEnsureCursorVisible_OversizedWindowScrollsWhenOffScreen(t *testing.T) {
 	}
 }
 
-// TestEnsureCursorVisible_NormalWindowStillScrolls verifies that the fix
-// doesn't break the normal case where a regular-sized window needs scrolling.
-func TestEnsureCursorVisible_NormalWindowStillScrolls(t *testing.T) {
+// TestEnsureCursorVisible_PartiallyVisibleWindowNotMoved verifies that a
+// normal-sized window that is already partially visible is NOT scrolled.
+func TestEnsureCursorVisible_PartiallyVisibleWindowNotMoved(t *testing.T) {
 	wb := NewWindowBuffer(80, DefaultStyles())
 	display := NewDisplayModel(wb, DefaultStyles())
 
-	// 20 windows, each 5 lines → 100 total lines
+	// 20 windows, each ~8 rendered lines → ~160 total lines
 	for i := range 20 {
 		wb.AppendOrUpdate("window-"+strings.Repeat("x", i+1), stream.TagTextAssistant,
 			strings.Repeat("line\n", 5))
@@ -117,25 +117,102 @@ func TestEnsureCursorVisible_NormalWindowStillScrolls(t *testing.T) {
 	display.SetHeight(20) // viewport shows 20 lines
 	display.updateContent()
 
-	// Cursor on last window (lines 95-100)
-	display.SetWindowCursor(19)
+	// Use window index 10 — NOT the last window, so shouldFollow() won't
+	// force the viewport to the bottom.
+	display.SetWindowCursor(10) // sets userMovedCursorAway = true
 
-	// Start at top of content
-	display.viewport.SetYOffset(0)
+	startLine := wb.GetWindowStartLine(10)
+	endLine := wb.GetWindowEndLine(10)
+	t.Logf("Window 10: lines %d-%d", startLine, endLine)
+
+	// Position viewport so the window is partially visible:
+	// e.g., if window is lines 80-88, set YOffset=82 so viewport shows 82-102
+	// Lines 82-88 are visible, lines 80-81 are above — partially visible.
+	partialOffset := startLine + 2
+	display.viewport.SetYOffset(partialOffset)
+
+	yOffsetBefore := display.viewport.YOffset()
+	t.Logf("YOffset before: %d (viewport %d-%d)", yOffsetBefore, yOffsetBefore, yOffsetBefore+20)
 
 	display.EnsureCursorVisible()
 
-	// Should have scrolled down to show the window
-	yOffset := display.viewport.YOffset()
-	endLine := wb.GetWindowEndLine(19)
-	startLine := wb.GetWindowStartLine(19)
-	vpTop := yOffset
+	yOffsetAfter := display.viewport.YOffset()
+	t.Logf("YOffset after: %d", yOffsetAfter)
+
+	if yOffsetAfter != yOffsetBefore {
+		t.Errorf("YOffset changed from %d to %d for a partially visible window (should stay)",
+			yOffsetBefore, yOffsetAfter)
+	}
+}
+
+// TestEnsureCursorVisible_OffScreenWindowScrolls verifies that a window
+// completely off-screen (below viewport) does get scrolled into view.
+func TestEnsureCursorVisible_OffScreenWindowScrolls(t *testing.T) {
+	wb := NewWindowBuffer(80, DefaultStyles())
+	display := NewDisplayModel(wb, DefaultStyles())
+
+	for i := range 20 {
+		wb.AppendOrUpdate("window-"+strings.Repeat("x", i+1), stream.TagTextAssistant,
+			strings.Repeat("line\n", 5))
+	}
+
+	display.SetHeight(20)
+	display.updateContent()
+
+	// Use window index 10 — NOT the last window to avoid shouldFollow()
+	display.SetWindowCursor(10)
+
+	// Start at top — window 10 is entirely below viewport (0-20 vs ~80-88)
+	display.viewport.SetYOffset(0)
+
+	yOffsetBefore := display.viewport.YOffset()
+	t.Logf("YOffset before: %d", yOffsetBefore)
+
+	display.EnsureCursorVisible()
+
+	yOffsetAfter := display.viewport.YOffset()
+	t.Logf("YOffset after: %d", yOffsetAfter)
+
+	if yOffsetAfter == yOffsetBefore {
+		t.Errorf("YOffset unchanged at %d for off-screen window (should scroll)", yOffsetBefore)
+	}
+
+	startLine := wb.GetWindowStartLine(10)
+	vpTop := yOffsetAfter
 	vpBottom := vpTop + 20
 
-	if startLine < vpTop {
-		t.Errorf("window start above viewport: startLine=%d, viewportTop=%d", startLine, vpTop)
+	if startLine >= vpBottom {
+		t.Errorf("window still entirely below viewport: startLine=%d, viewportBottom=%d", startLine, vpBottom)
 	}
-	if endLine > vpBottom {
-		t.Errorf("window end below viewport: endLine=%d, viewportBottom=%d", endLine, vpBottom)
+}
+
+// TestEnsureCursorVisible_EntirelyAboveScrolls verifies that a window
+// completely above the viewport gets scrolled into view.
+func TestEnsureCursorVisible_EntirelyAboveScrolls(t *testing.T) {
+	wb := NewWindowBuffer(80, DefaultStyles())
+	display := NewDisplayModel(wb, DefaultStyles())
+
+	for i := range 20 {
+		wb.AppendOrUpdate("window-"+strings.Repeat("x", i+1), stream.TagTextAssistant,
+			strings.Repeat("line\n", 5))
+	}
+
+	display.SetHeight(20)
+	display.updateContent()
+
+	// Use window index 3 — NOT the last window
+	display.SetWindowCursor(3)
+
+	// Scroll to bottom so the window is entirely above the viewport
+	display.viewport.GotoBottom()
+	display.updateContent()
+
+	display.EnsureCursorVisible()
+
+	endLine := wb.GetWindowEndLine(3)
+	vpTop := display.viewport.YOffset()
+
+	if endLine <= vpTop {
+		t.Errorf("window still entirely above viewport: endLine=%d, viewportTop=%d", endLine, vpTop)
 	}
 }

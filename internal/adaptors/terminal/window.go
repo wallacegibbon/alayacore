@@ -1002,13 +1002,13 @@ func (m *DisplayModel) MoveWindowCursorUp() bool {
 	return true
 }
 
-// EnsureCursorVisible scrolls the viewport to make the cursor window fully visible.
-// Use this for active navigation (j/k/H/L/M/space) where the user explicitly
-// wants to see the selected window.
+// EnsureCursorVisible scrolls the viewport only if the cursor window is
+// completely off-screen. If any part of the window is already visible, the
+// viewport position is left unchanged. The cursor highlight tells the user
+// where they are; explicit scroll keys (Ctrl-D, J, etc.) can reveal more.
 //
-// When the window is taller than the viewport, it cannot be fully shown, so
-// we only scroll if it is completely off-screen. This prevents oscillation
-// between showing the top and bottom of an oversized window on repeated calls.
+// This avoids viewport jumping on repeated navigation and prevents
+// oscillation when a window is taller than the viewport.
 func (m *DisplayModel) EnsureCursorVisible() {
 	if m.windowCursor < 0 {
 		return
@@ -1018,25 +1018,13 @@ func (m *DisplayModel) EnsureCursorVisible() {
 	endLine := m.windowBuffer.GetWindowEndLine(m.windowCursor)
 	viewportTop := m.viewport.YOffset()
 	viewportBottom := viewportTop + m.viewport.Height()
-	windowHeight := endLine - startLine
 
-	// Window is taller than the viewport — it can never be fully visible.
-	// Only scroll if it is completely off-screen to avoid oscillation.
-	if windowHeight > m.viewport.Height() {
-		if endLine <= viewportTop {
-			// Entirely above — show the bottom edge
-			m.viewport.SetYOffset(max(0, endLine-m.viewport.Height()))
-		} else if startLine >= viewportBottom {
-			// Entirely below — show the top edge
-			m.viewport.SetYOffset(startLine)
-		}
-		return
-	}
-
-	if startLine < viewportTop {
+	if endLine <= viewportTop {
+		// Entirely above — show the bottom edge
+		m.viewport.SetYOffset(max(0, endLine-m.viewport.Height()))
+	} else if startLine >= viewportBottom {
+		// Entirely below — show the top edge
 		m.viewport.SetYOffset(startLine)
-	} else if endLine > viewportBottom {
-		m.viewport.SetYOffset(endLine - m.viewport.Height())
 	}
 }
 
