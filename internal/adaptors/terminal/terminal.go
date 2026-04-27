@@ -434,15 +434,17 @@ func (m *Terminal) updateStatus() {
 	}
 
 	// Context segment
-	if snap.ContextStatus != "" {
-		parts := strings.SplitN(snap.ContextStatus, ":", 2)
-		if len(parts) == 2 {
-			segments = append(segments,
-				keyStyle.Render(parts[0]+":")+valStyle.Render(parts[1]),
-			)
+	if snap.ContextTokens > 0 {
+		var ctxVal string
+		if snap.ContextLimit > 0 {
+			pct := float64(snap.ContextTokens) * 100.0 / float64(snap.ContextLimit)
+			ctxVal = fmt.Sprintf(" %d/%d (%.1f%%)", snap.ContextTokens, snap.ContextLimit, pct)
 		} else {
-			segments = append(segments, valStyle.Render(snap.ContextStatus))
+			ctxVal = fmt.Sprintf(" %d", snap.ContextTokens)
 		}
+		segments = append(segments,
+			keyStyle.Render("Context:")+valStyle.Render(ctxVal),
+		)
 	}
 
 	// Join segments with dimmed separator

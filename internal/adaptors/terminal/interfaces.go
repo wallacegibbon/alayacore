@@ -12,7 +12,8 @@ import (
 
 // StatusSnapshot holds a consistent point-in-time view of session status.
 type StatusSnapshot struct {
-	ContextStatus   string
+	ContextTokens   int64
+	ContextLimit    int64
 	QueueCount      int
 	InProgress      bool
 	CurrentStep     int

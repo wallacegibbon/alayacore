@@ -26,7 +26,6 @@ type outputWriter struct {
 	buffer            []byte
 	mu                sync.Mutex
 	dirty             atomic.Bool // true when display needs refresh
-	status            string      // Status bar content from TagSystem
 	inProgress        bool        // Whether session has task in progress
 	styles            *Styles     // UI styles
 	nextWindowID      int         // Monotonic counter for generating window IDs
@@ -42,6 +41,8 @@ type outputWriter struct {
 	lastCurrentStep   int         // Last step reached in completed task
 	lastMaxSteps      int         // Last max steps from completed task
 	thinkEnabled      bool        // Whether think mode is active
+	contextTokens     int64       // Current context token count
+	contextLimit      int64       // Context token limit (0 = unlimited)
 }
 
 func NewTerminalOutput(styles *Styles) *outputWriter { //nolint:revive // tests need access to internal methods
@@ -220,12 +221,8 @@ func (to *outputWriter) handleSystemTag(value string) {
 
 		to.inProgress = info.InProgress
 		to.queueCount = len(info.QueueItems)
-		if info.ContextLimit > 0 {
-			pct := float64(info.ContextTokens) * 100.0 / float64(info.ContextLimit)
-			to.status = fmt.Sprintf("Context: %d/%d (%.1f%%)", info.ContextTokens, info.ContextLimit, pct)
-		} else {
-			to.status = fmt.Sprintf("Context: %d", info.ContextTokens)
-		}
+		to.contextTokens = info.ContextTokens
+		to.contextLimit = info.ContextLimit
 		// Store model info
 		to.models = info.Models
 		to.activeModelID = info.ActiveModelID
@@ -267,7 +264,8 @@ func (to *outputWriter) SnapshotStatus() StatusSnapshot {
 	to.mu.Lock()
 	defer to.mu.Unlock()
 	return StatusSnapshot{
-		ContextStatus:   to.status,
+		ContextTokens:   to.contextTokens,
+		ContextLimit:    to.contextLimit,
 		QueueCount:      to.queueCount,
 		InProgress:      to.inProgress,
 		CurrentStep:     to.currentStep,
