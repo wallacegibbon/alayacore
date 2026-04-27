@@ -419,11 +419,11 @@ func (m *Terminal) updateStatus() {
 	var showSteps bool
 	var stepsKey string
 	var stepsVal string
-	if snap.LastMaxSteps > 0 {
+	if snap.LastMaxSteps > 0 && snap.TaskError {
 		showSteps = true
 		stepsKey = "Steps: "
 		stepsVal = fmt.Sprintf("%d/%d", snap.LastCurrentStep, snap.LastMaxSteps)
-	} else if snap.CurrentStep > 0 {
+	} else if snap.InProgress && snap.CurrentStep > 0 {
 		showSteps = true
 		stepsKey = "Steps: "
 		stepsVal = fmt.Sprintf("%d/%d", snap.CurrentStep, snap.MaxSteps)

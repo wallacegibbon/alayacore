@@ -93,6 +93,7 @@ type SystemInfo struct {
 	InProgress        bool            `json:"in_progress"`
 	CurrentStep       int             `json:"current_step,omitempty"`
 	MaxSteps          int             `json:"max_steps,omitempty"`
+	TaskError         bool            `json:"task_error,omitempty"`
 	Models            []ModelInfo     `json:"models,omitempty"`
 	ActiveModelID     int             `json:"active_model_id,omitempty"`
 	ActiveModelConfig *ModelConfig    `json:"active_model_config,omitempty"`
@@ -985,6 +986,7 @@ func (s *Session) sendSystemInfoInternal(activeModelConfig *ModelConfig) {
 		InProgress:        inProgress,
 		CurrentStep:       currentStep,
 		MaxSteps:          s.maxSteps,
+		TaskError:         s.pausedOnError,
 		Models:            models,
 		ActiveModelID:     activeID,
 		ActiveModelConfig: activeModelConfig,

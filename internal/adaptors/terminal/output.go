@@ -40,6 +40,7 @@ type outputWriter struct {
 	maxSteps          int         // Maximum steps allowed
 	lastCurrentStep   int         // Last step reached in completed task
 	lastMaxSteps      int         // Last max steps from completed task
+	lastTaskError     bool        // Whether last completed task ended with error
 	thinkEnabled      bool        // Whether think mode is active
 	contextTokens     int64       // Current context token count
 	contextLimit      int64       // Context token limit (0 = unlimited)
@@ -212,11 +213,13 @@ func (to *outputWriter) handleSystemTag(value string) {
 		if to.inProgress && !info.InProgress && to.maxSteps > 0 {
 			to.lastCurrentStep = to.currentStep
 			to.lastMaxSteps = to.maxSteps
+			to.lastTaskError = info.TaskError
 		}
 		// Reset last step info when new task starts (transition from not-in-progress to in-progress)
 		if !to.inProgress && info.InProgress {
 			to.lastCurrentStep = 0
 			to.lastMaxSteps = 0
+			to.lastTaskError = false
 		}
 
 		to.inProgress = info.InProgress
@@ -272,6 +275,7 @@ func (to *outputWriter) SnapshotStatus() StatusSnapshot {
 		MaxSteps:        to.maxSteps,
 		LastCurrentStep: to.lastCurrentStep,
 		LastMaxSteps:    to.lastMaxSteps,
+		TaskError:       to.lastTaskError,
 		ThinkEnabled:    to.thinkEnabled,
 	}
 }

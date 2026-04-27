@@ -8,8 +8,8 @@ import (
 	agentpkg "github.com/alayacore/alayacore/internal/agent"
 )
 
-func TestStatusBarShowsLastMaxSteps(t *testing.T) {
-	// Create output writer and simulate task completion
+func TestStatusBarShowsLastMaxStepsOnError(t *testing.T) {
+	// Create output writer and simulate task ending with error
 	out := NewTerminalOutput(DefaultStyles())
 
 	// Simulate task in progress with max steps = 50, current step = 2
@@ -21,11 +21,11 @@ func TestStatusBarShowsLastMaxSteps(t *testing.T) {
 	data := marshalSystemInfoForTerminalTest(t, systemInfoInProgress)
 	out.handleSystemTag(string(data))
 
-	// Simulate task completion
+	// Simulate task ending with error
 	systemInfoCompleted := agentpkg.SystemInfo{
-		InProgress:  false,
-		MaxSteps:    50,
-		CurrentStep: 0,
+		InProgress: false,
+		MaxSteps:   50,
+		TaskError:  true,
 	}
 	data = marshalSystemInfoForTerminalTest(t, systemInfoCompleted)
 	out.handleSystemTag(string(data))
@@ -47,7 +47,7 @@ func TestStatusBarShowsLastMaxSteps(t *testing.T) {
 	// Update status
 	terminal.updateStatus()
 
-	// Check that status shows last step info (2/50, not 50/50)
+	// Check that status shows last step info (2/50) after completion
 	expectedSubstring := "Steps: 2/50"
 	plain := stripANSI(terminal.statusText)
 	if !containsSubstring(plain, expectedSubstring) {

@@ -20,6 +20,7 @@ type StatusSnapshot struct {
 	MaxSteps        int
 	LastCurrentStep int
 	LastMaxSteps    int
+	TaskError       bool
 	ThinkEnabled    bool
 }
 
