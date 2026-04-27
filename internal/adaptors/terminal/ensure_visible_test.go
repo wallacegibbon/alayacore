@@ -255,11 +255,9 @@ func TestAutoFollow_OnlyGEnables(t *testing.T) {
 	wb.AppendOrUpdate("w3", stream.TagTextAssistant, strings.Repeat("line\n", 20))
 	display.updateContent()
 
-	yOffsetAfterNewContent := display.viewport.YOffset()
-	t.Logf("After new content (no follow): YOffset=%d", yOffsetAfterNewContent)
-
-	if yOffsetAfterNewContent != display.viewport.YOffset() {
-		// just log, the key point is it didn't jump to bottom
+	if display.viewport.YOffset() != yOffsetAtBottom {
+		t.Errorf("viewport moved after new content while autoFollow=false (YOffset changed from %d to %d)",
+			yOffsetAtBottom, display.viewport.YOffset())
 	}
 
 	// Now press G again — re-enables auto-follow

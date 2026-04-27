@@ -377,8 +377,10 @@ func moveWindowCursorUp(m *Terminal) tea.Cmd {
 
 // nolint:unparam
 func scrollDownLine(m *Terminal) tea.Cmd {
-	m.display.MarkUserScrolled()
-	m.display.ScrollDown(1)
+	if !m.display.AtBottom() {
+		m.display.MarkUserScrolled()
+		m.display.ScrollDown(1)
+	}
 	return nil
 }
 

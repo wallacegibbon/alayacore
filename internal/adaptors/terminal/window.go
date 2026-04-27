@@ -816,14 +816,14 @@ type DisplayModel struct {
 func NewDisplayModel(windowBuffer *WindowBuffer, styles *Styles) DisplayModel {
 	vp := viewport.New(viewport.WithWidth(DefaultWidth), viewport.WithHeight(DefaultHeight))
 	return DisplayModel{
-		viewport:            vp,
-		windowBuffer:        windowBuffer,
-		styles:              styles,
-		width:               DefaultWidth,
-		height:              DefaultHeight,
-		windowCursor:        -1,
+		viewport:       vp,
+		windowBuffer:   windowBuffer,
+		styles:         styles,
+		width:          DefaultWidth,
+		height:         DefaultHeight,
+		windowCursor:   -1,
 		autoFollow:     true,
-		displayFocused:      false,
+		displayFocused: false,
 	}
 }
 
