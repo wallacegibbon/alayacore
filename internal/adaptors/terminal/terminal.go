@@ -275,7 +275,6 @@ func (m *Terminal) handleTick() (tea.Model, tea.Cmd) {
 		if m.out.WindowBuffer().GetWindowCount() > 0 {
 			m.updateStatus()
 			m.updateDisplayHeight()
-			m.display.MarkNewContent()
 			if m.display.shouldFollow() {
 				m.display.SetCursorToLastWindow()
 			}
@@ -289,8 +288,6 @@ func (m *Terminal) handleTick() (tea.Model, tea.Cmd) {
 		// Check for queue items update
 		if queueItems := m.out.GetQueueItems(); queueItems != nil {
 			m.queueManager.SetItems(queueItems)
-			// Update display to show new items
-			m.display.MarkNewContent()
 			m.display.updateContent()
 		}
 	} else {

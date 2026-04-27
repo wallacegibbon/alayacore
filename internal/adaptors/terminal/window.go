@@ -801,16 +801,15 @@ func appendDeltaWithNewlines(lines []string, delta string, width int) []string {
 
 // DisplayModel holds the viewport over WindowBuffer content.
 type DisplayModel struct {
-	viewport            viewport.Model
-	windowBuffer        *WindowBuffer
-	styles              *Styles
-	width               int
-	height              int
-	windowCursor        int
-	userMovedCursorAway bool
-	displayFocused      bool
-	lastContent         string
-	hasNewContent       bool // true when new streaming content arrived, cleared by updateContent
+	viewport       viewport.Model
+	windowBuffer   *WindowBuffer
+	styles         *Styles
+	width          int
+	height         int
+	windowCursor   int
+	autoFollow     bool // true when G was pressed; cleared by any other navigation
+	displayFocused bool
+	lastContent    string
 }
 
 // NewDisplayModel creates a new display model
@@ -823,7 +822,7 @@ func NewDisplayModel(windowBuffer *WindowBuffer, styles *Styles) DisplayModel {
 		width:               DefaultWidth,
 		height:              DefaultHeight,
 		windowCursor:        -1,
-		userMovedCursorAway: false,
+		autoFollow:     true,
 		displayFocused:      false,
 	}
 }
@@ -887,14 +886,8 @@ func (m *DisplayModel) updateContent() {
 	totalLines := m.windowBuffer.GetTotalLines()
 	viewportHeight := m.viewport.Height()
 
-	// Only auto-follow when new streaming content arrived, not when the
-	// user navigates (j/k/H/L/M etc.). This prevents the viewport from
-	// jumping to the bottom on manual navigation to the last window.
-	follow := m.shouldFollow() && m.hasNewContent
-	m.hasNewContent = false
-
 	targetYOffset := m.viewport.YOffset()
-	if follow && totalLines > viewportHeight {
+	if m.autoFollow && totalLines > viewportHeight {
 		targetYOffset = max(0, totalLines-viewportHeight)
 	}
 
@@ -908,7 +901,7 @@ func (m *DisplayModel) updateContent() {
 
 	m.viewport.SetContent(newContent)
 
-	if follow {
+	if m.autoFollow {
 		m.viewport.GotoBottom()
 	}
 }
@@ -946,7 +939,7 @@ func (m *DisplayModel) UpdateHeight(totalHeight int) {
 
 // shouldFollow returns true when viewport should auto-follow new content
 func (m *DisplayModel) shouldFollow() bool {
-	return !m.userMovedCursorAway
+	return m.autoFollow
 }
 
 // GetWindowCursor returns the current window cursor index
@@ -963,7 +956,8 @@ func (m *DisplayModel) GetCursorWindowContent() string {
 	return m.windowBuffer.GetWindowContent(m.windowCursor)
 }
 
-// SetWindowCursor sets the window cursor to a specific index
+// SetWindowCursor sets the window cursor to a specific index.
+// This disables auto-follow; only G re-enables it.
 func (m *DisplayModel) SetWindowCursor(index int) {
 	windowCount := m.windowBuffer.GetWindowCount()
 	if index < -1 {
@@ -972,11 +966,7 @@ func (m *DisplayModel) SetWindowCursor(index int) {
 		index = windowCount - 1
 	}
 	m.windowCursor = index
-	if windowCount > 0 && index == windowCount-1 {
-		m.userMovedCursorAway = false
-	} else if index >= 0 {
-		m.userMovedCursorAway = true
-	}
+	m.autoFollow = false
 }
 
 // MoveWindowCursorDown moves the window cursor down
@@ -990,7 +980,7 @@ func (m *DisplayModel) MoveWindowCursorDown() bool {
 	} else {
 		m.windowCursor++
 	}
-	m.userMovedCursorAway = m.windowCursor != windowCount-1
+	m.autoFollow = false
 	return true
 }
 
@@ -1005,14 +995,13 @@ func (m *DisplayModel) MoveWindowCursorUp() bool {
 	} else {
 		m.windowCursor--
 	}
-	m.userMovedCursorAway = true
+	m.autoFollow = false
 	return true
 }
 
-// MarkNewContent signals that new streaming content has arrived.
-// This enables auto-follow in the next updateContent() call.
-func (m *DisplayModel) MarkNewContent() {
-	m.hasNewContent = true
+// MarkUserScrolled disables auto-follow. Called by scroll keys (J/K/Ctrl-D/Ctrl-U).
+func (m *DisplayModel) MarkUserScrolled() {
+	m.autoFollow = false
 }
 
 // EnsureCursorVisible scrolls the viewport only if the cursor window is
@@ -1088,7 +1077,7 @@ func (m *DisplayModel) SetCursorToLastWindow() {
 		m.windowCursor = -1
 	} else {
 		m.windowCursor = windowCount - 1
-		m.userMovedCursorAway = false
+		m.autoFollow = true
 	}
 }
 
@@ -1098,11 +1087,6 @@ func (m *DisplayModel) ToggleWindowFold() bool {
 		return false
 	}
 	return m.windowBuffer.ToggleFold(m.windowCursor)
-}
-
-// MarkUserScrolled marks that the user scrolled manually
-func (m *DisplayModel) MarkUserScrolled() {
-	m.userMovedCursorAway = true
 }
 
 // MoveWindowCursorToTop moves cursor to top visible window
@@ -1118,7 +1102,7 @@ func (m *DisplayModel) MoveWindowCursorToTop() bool {
 		endLine := m.windowBuffer.GetWindowEndLine(i)
 		if (startLine <= viewportTop && endLine > viewportTop) || startLine >= viewportTop {
 			m.windowCursor = i
-			m.userMovedCursorAway = true
+			m.autoFollow = false
 			return true
 		}
 	}
@@ -1138,7 +1122,7 @@ func (m *DisplayModel) MoveWindowCursorToBottom() bool {
 		endLine := m.windowBuffer.GetWindowEndLine(i)
 		if (startLine < viewportBottom && endLine >= viewportBottom) || endLine <= viewportBottom {
 			m.windowCursor = i
-			m.userMovedCursorAway = i < windowCount-1
+			m.autoFollow = false
 			return true
 		}
 	}
@@ -1168,7 +1152,7 @@ func (m *DisplayModel) MoveWindowCursorToCenter() bool {
 		// Check if viewport center line falls within this window
 		if viewportCenter >= startLine && viewportCenter < endLine {
 			m.windowCursor = i
-			m.userMovedCursorAway = m.windowCursor < windowCount-1
+			m.autoFollow = false
 			return true
 		}
 	}
@@ -1204,7 +1188,7 @@ func (m *DisplayModel) MoveWindowCursorToCenter() bool {
 
 	if bestDistance >= 0 {
 		m.windowCursor = bestWindow
-		m.userMovedCursorAway = m.windowCursor < windowCount-1
+		m.autoFollow = false
 		return true
 	}
 
@@ -1231,7 +1215,7 @@ func (m *DisplayModel) MoveWindowCursorToNextUserPrompt() bool {
 		w := m.windowBuffer.GetWindow(i)
 		if w != nil && w.Tag == stream.TagTextUser {
 			m.windowCursor = i
-			m.userMovedCursorAway = i < windowCount-1
+			m.autoFollow = false
 			return true
 		}
 	}
@@ -1258,7 +1242,7 @@ func (m *DisplayModel) MoveWindowCursorToPrevUserPrompt() bool {
 		w := m.windowBuffer.GetWindow(i)
 		if w != nil && w.Tag == stream.TagTextUser {
 			m.windowCursor = i
-			m.userMovedCursorAway = i < windowCount-1
+			m.autoFollow = false
 			return true
 		}
 	}

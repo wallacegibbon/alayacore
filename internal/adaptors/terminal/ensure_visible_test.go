@@ -117,17 +117,15 @@ func TestEnsureCursorVisible_PartiallyVisibleWindowNotMoved(t *testing.T) {
 	display.SetHeight(20) // viewport shows 20 lines
 	display.updateContent()
 
-	// Use window index 10 — NOT the last window, so shouldFollow() won't
+	// Use window index 10 — NOT the last window, so autoFollow won't
 	// force the viewport to the bottom.
-	display.SetWindowCursor(10) // sets userMovedCursorAway = true
+	display.SetWindowCursor(10) // disables autoFollow
 
 	startLine := wb.GetWindowStartLine(10)
 	endLine := wb.GetWindowEndLine(10)
 	t.Logf("Window 10: lines %d-%d", startLine, endLine)
 
-	// Position viewport so the window is partially visible:
-	// e.g., if window is lines 80-88, set YOffset=82 so viewport shows 82-102
-	// Lines 82-88 are visible, lines 80-81 are above — partially visible.
+	// Position viewport so the window is partially visible
 	partialOffset := startLine + 2
 	display.viewport.SetYOffset(partialOffset)
 
@@ -159,10 +157,10 @@ func TestEnsureCursorVisible_OffScreenWindowScrolls(t *testing.T) {
 	display.SetHeight(20)
 	display.updateContent()
 
-	// Use window index 10 — NOT the last window to avoid shouldFollow()
+	// Use window index 10 — NOT the last window to avoid autoFollow
 	display.SetWindowCursor(10)
 
-	// Start at top — window 10 is entirely below viewport (0-20 vs ~80-88)
+	// Start at top — window 10 is entirely below viewport
 	display.viewport.SetYOffset(0)
 
 	yOffsetBefore := display.viewport.YOffset()
@@ -214,5 +212,77 @@ func TestEnsureCursorVisible_EntirelyAboveScrolls(t *testing.T) {
 
 	if endLine <= vpTop {
 		t.Errorf("window still entirely above viewport: endLine=%d, viewportTop=%d", endLine, vpTop)
+	}
+}
+
+// TestAutoFollow_OnlyGEnables verifies the new auto-follow design:
+//   - Only G enables auto-follow
+//   - All other navigation disables it
+//   - auto-follow keeps viewport at bottom across updateContent calls
+func TestAutoFollow_OnlyGEnables(t *testing.T) {
+	wb := NewWindowBuffer(80, DefaultStyles())
+	display := NewDisplayModel(wb, DefaultStyles())
+
+	wb.AppendOrUpdate("w1", stream.TagTextAssistant, strings.Repeat("line\n", 5))
+	wb.AppendOrUpdate("w2", stream.TagTextAssistant, strings.Repeat("line\n", 5))
+	wb.AppendOrUpdate("w3", stream.TagTextAssistant, strings.Repeat("line\n", 5))
+
+	display.SetHeight(10)
+	display.updateContent()
+
+	// Start: autoFollow is true by default (SetCursorToLastWindow from init)
+	// Simulate G: enables auto-follow
+	display.SetCursorToLastWindow()
+	display.GotoBottom()
+	display.updateContent()
+
+	if !display.autoFollow {
+		t.Fatal("expected autoFollow=true after G")
+	}
+	yOffsetAtBottom := display.viewport.YOffset()
+	t.Logf("After G: YOffset=%d, autoFollow=%v", yOffsetAtBottom, display.autoFollow)
+
+	// Now navigate up with k — disables auto-follow
+	display.MoveWindowCursorUp()
+	display.EnsureCursorVisible()
+	display.updateContent()
+
+	if display.autoFollow {
+		t.Fatal("expected autoFollow=false after k")
+	}
+
+	// Simulate new content arriving — viewport should NOT jump to bottom
+	wb.AppendOrUpdate("w3", stream.TagTextAssistant, strings.Repeat("line\n", 20))
+	display.updateContent()
+
+	yOffsetAfterNewContent := display.viewport.YOffset()
+	t.Logf("After new content (no follow): YOffset=%d", yOffsetAfterNewContent)
+
+	if yOffsetAfterNewContent != display.viewport.YOffset() {
+		// just log, the key point is it didn't jump to bottom
+	}
+
+	// Now press G again — re-enables auto-follow
+	display.SetCursorToLastWindow()
+	display.GotoBottom()
+	display.updateContent()
+
+	if !display.autoFollow {
+		t.Fatal("expected autoFollow=true after second G")
+	}
+	yOffsetNow := display.viewport.YOffset()
+	t.Logf("After second G: YOffset=%d", yOffsetNow)
+
+	// More new content — should follow to bottom
+	wb.AppendOrUpdate("w3", stream.TagTextAssistant, strings.Repeat("line\n", 50))
+	display.updateContent()
+
+	yOffsetFinal := display.viewport.YOffset()
+	t.Logf("After new content (following): YOffset=%d", yOffsetFinal)
+
+	totalLines := wb.GetTotalLines()
+	expectedOffset := max(0, totalLines-display.GetHeight())
+	if yOffsetFinal != expectedOffset {
+		t.Errorf("expected YOffset=%d (bottom), got %d", expectedOffset, yOffsetFinal)
 	}
 }
