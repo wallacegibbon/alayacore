@@ -115,11 +115,13 @@ func (to *outputWriter) writeColored(tag string, value string) {
 	to.triggerUpdateForTag(tag)
 
 	switch tag {
-	// Text content tags (delta messages with stream ID prefix)
+	// Text content tags — may carry NUL-delimited stream ID for live deltas,
+	// or plain text when replayed from a saved session file.
 	case stream.TagTextAssistant, stream.TagTextReasoning:
-		id, content, ok := ParseStreamID(value)
+		id, content, ok := stream.UnwrapDelta(value)
 		if !ok {
-			// Should not happen, but fallback
+			// No stream ID (e.g. replayed from session file) — each message
+			// gets its own window.
 			id = to.generateWindowID()
 			content = value
 		}
@@ -154,7 +156,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 
 	// Function output status indicator
 	case stream.TagFunctionState:
-		id, content, ok := ParseStreamID(value)
+		id, content, ok := stream.UnwrapDelta(value)
 		if !ok {
 			return
 		}

@@ -19,43 +19,17 @@ func encodeTLV(tag, value string) []byte {
 	return msg
 }
 
-func TestExtractStreamPrefix(t *testing.T) {
-	tests := []struct {
-		name        string
-		value       string
-		wantPrefix  string
-		wantContent string
-	}{
-		{"no prefix", "hello", "", "hello"},
-		{"with prefix", "[:0-1-t:]hello", "[:0-1-t:]", "hello"},
-		{"empty content", "[:0-1-t:]", "[:0-1-t:]", ""},
-		{"malformed", "[:no close", "", "[:no close"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			prefix, content := extractStreamPrefix(tt.value)
-			if prefix != tt.wantPrefix {
-				t.Errorf("prefix = %q, want %q", prefix, tt.wantPrefix)
-			}
-			if content != tt.wantContent {
-				t.Errorf("content = %q, want %q", content, tt.wantContent)
-			}
-		})
-	}
-}
-
 func TestNewlineBetweenDifferentStreamGroups(t *testing.T) {
 	var buf bytes.Buffer
 	o := &stdoutOutput{
 		writer: &buf,
 	}
 
-	// Simulate: assistant text delta (stream prefix "[:0-1-t:]")
-	msg1 := encodeTLV(stream.TagTextAssistant, "[:0-1-t:]hello ")
-	msg2 := encodeTLV(stream.TagTextAssistant, "[:0-1-t:]world")
-	// New step: different stream prefix "[:0-2-t:]"
-	msg3 := encodeTLV(stream.TagTextAssistant, "[:0-2-t:]new step")
+	// Simulate: assistant text delta with NUL-delimited stream IDs
+	msg1 := encodeTLV(stream.TagTextAssistant, stream.WrapDelta("0-1-t", "hello "))
+	msg2 := encodeTLV(stream.TagTextAssistant, stream.WrapDelta("0-1-t", "world"))
+	// New step: different stream ID
+	msg3 := encodeTLV(stream.TagTextAssistant, stream.WrapDelta("0-2-t", "new step"))
 
 	o.Write(msg1)
 	o.Write(msg2)
@@ -74,8 +48,8 @@ func TestNoNewlineWithinSameStreamGroup(t *testing.T) {
 		writer: &buf,
 	}
 
-	msg1 := encodeTLV(stream.TagTextAssistant, "[:0-1-t:]hello ")
-	msg2 := encodeTLV(stream.TagTextAssistant, "[:0-1-t:]world")
+	msg1 := encodeTLV(stream.TagTextAssistant, stream.WrapDelta("0-1-t", "hello "))
+	msg2 := encodeTLV(stream.TagTextAssistant, stream.WrapDelta("0-1-t", "world"))
 
 	o.Write(msg1)
 	o.Write(msg2)
@@ -93,8 +67,8 @@ func TestNewlineBetweenTextAndReasoning(t *testing.T) {
 		writer: &buf,
 	}
 
-	msg1 := encodeTLV(stream.TagTextAssistant, "[:0-1-t:]some text")
-	msg2 := encodeTLV(stream.TagTextReasoning, "[:0-1-r:]some reasoning")
+	msg1 := encodeTLV(stream.TagTextAssistant, stream.WrapDelta("0-1-t", "some text"))
+	msg2 := encodeTLV(stream.TagTextReasoning, stream.WrapDelta("0-1-r", "some reasoning"))
 
 	o.Write(msg1)
 	o.Write(msg2)
@@ -112,8 +86,8 @@ func TestNewlineBetweenReasoningAndText(t *testing.T) {
 		writer: &buf,
 	}
 
-	msg1 := encodeTLV(stream.TagTextReasoning, "[:0-1-r:]thinking...")
-	msg2 := encodeTLV(stream.TagTextAssistant, "[:0-2-t:]answer")
+	msg1 := encodeTLV(stream.TagTextReasoning, stream.WrapDelta("0-1-r", "thinking..."))
+	msg2 := encodeTLV(stream.TagTextAssistant, stream.WrapDelta("0-2-t", "answer"))
 
 	o.Write(msg1)
 	o.Write(msg2)
@@ -152,18 +126,18 @@ func TestToolCallResetsStreamPrefix(t *testing.T) {
 	}
 
 	// Stream some text
-	msg1 := encodeTLV(stream.TagTextAssistant, "[:0-1-t:]hello")
+	msg1 := encodeTLV(stream.TagTextAssistant, stream.WrapDelta("0-1-t", "hello"))
 	// Then a tool call (resets prefix)
 	msg2 := encodeTLV(stream.TagFunctionCall, `{"id":"1","name":"read_file","input":"{}"}`)
 	// Then more text with different prefix — should NOT get extra newline since tool call reset it
-	msg3 := encodeTLV(stream.TagTextAssistant, "[:0-3-t:]result")
+	msg3 := encodeTLV(stream.TagTextAssistant, stream.WrapDelta("0-3-t", "result"))
 
 	o.Write(msg1)
 	o.Write(msg2)
 	o.Write(msg3)
 
 	got := buf.String()
-	// After tool call, lastStreamPrefix is "" so the new prefix "[:0-3-t:]" doesn't trigger separator
+	// After tool call, lastStreamID is "" so the new ID doesn't trigger separator
 	if !contains(got, "hello") || !contains(got, "result") {
 		t.Errorf("output = %q", got)
 	}
@@ -175,9 +149,9 @@ func TestUserPromptResetsStreamPrefix(t *testing.T) {
 		writer: &buf,
 	}
 
-	msg1 := encodeTLV(stream.TagTextAssistant, "[:0-1-t:]response")
+	msg1 := encodeTLV(stream.TagTextAssistant, stream.WrapDelta("0-1-t", "response"))
 	msg2 := encodeTLV(stream.TagTextUser, "next prompt")
-	msg3 := encodeTLV(stream.TagTextAssistant, "[:1-1-t:]new response")
+	msg3 := encodeTLV(stream.TagTextAssistant, stream.WrapDelta("1-1-t", "new response"))
 
 	o.Write(msg1)
 	o.Write(msg2)

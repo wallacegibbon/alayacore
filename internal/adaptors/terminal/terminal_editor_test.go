@@ -510,17 +510,17 @@ func TestCtrlUDoesNothingInInput(t *testing.T) {
 func TestWindowBufferDeltaRouting(t *testing.T) {
 	out := NewTerminalOutput(DefaultStyles())
 	// Write assistant text delta with stream ID
-	err := stream.WriteTLV(out, stream.TagTextAssistant, "[:stream1:]Hello")
+	err := stream.WriteTLV(out, stream.TagTextAssistant, stream.WrapDelta("stream1", "Hello"))
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
 	// Write another delta with same stream ID
-	err = stream.WriteTLV(out, stream.TagTextAssistant, "[:stream1:] world")
+	err = stream.WriteTLV(out, stream.TagTextAssistant, stream.WrapDelta("stream1", " world"))
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
 	// Write different stream ID
-	err = stream.WriteTLV(out, stream.TagTextAssistant, "[:stream2:]Another")
+	err = stream.WriteTLV(out, stream.TagTextAssistant, stream.WrapDelta("stream2", "Another"))
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
@@ -623,8 +623,8 @@ func TestWindowBufferNonDeltaMessages(t *testing.T) {
 
 func TestWindowBufferEdgeCases(t *testing.T) {
 	out := NewTerminalOutput(DefaultStyles())
-	// Delta message with malformed stream ID (missing closing bracket)
-	err := stream.WriteTLV(out, stream.TagTextAssistant, "[:stream1Hello")
+	// Delta message without valid NUL-delimited stream ID (plain text)
+	err := stream.WriteTLV(out, stream.TagTextAssistant, "plain text without stream ID")
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
@@ -638,7 +638,7 @@ func TestWindowBufferEdgeCases(t *testing.T) {
 		t.Errorf("Expected generated window ID, got %s", windows[0].ID)
 	}
 	// Mixed delta and non-delta messages
-	err = stream.WriteTLV(out, stream.TagTextAssistant, "[:stream2:]Delta")
+	err = stream.WriteTLV(out, stream.TagTextAssistant, stream.WrapDelta("stream2", "Delta"))
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}

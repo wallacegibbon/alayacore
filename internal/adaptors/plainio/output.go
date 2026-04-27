@@ -89,16 +89,18 @@ func (o *stdoutOutput) printMessage(tag string, value string) {
 func (o *stdoutOutput) handleTag(tag, value string) {
 	switch tag {
 	case stream.TagTextAssistant, stream.TagTextReasoning:
-		prefix, content := extractStreamPrefix(value)
+		id, content, _ := stream.UnwrapDelta(value)
+		// When id is "" (replayed from session file, no NUL prefix),
+		// we just track it as-is — no stream transition to detect.
 		if o.lastTag != "" && (o.lastTag != stream.TagTextAssistant && o.lastTag != stream.TagTextReasoning) {
 			// Transitioning from a different tag group → separator
 			fmt.Fprintln(o.writer)
-		} else if o.lastStreamID != "" && prefix != o.lastStreamID {
+		} else if o.lastStreamID != "" && id != o.lastStreamID {
 			// Same group but different stream → separator
 			fmt.Fprintln(o.writer)
 		}
 		o.lastTag = tag
-		o.lastStreamID = prefix
+		o.lastStreamID = id
 		fmt.Fprint(o.writer, content)
 
 	case stream.TagTextUser:
@@ -268,18 +270,4 @@ func (o *stdoutOutput) handleSystemData(value string) {
 		o.lastStreamID = ""
 	}
 	o.inProgress = info.InProgress
-}
-
-// extractStreamPrefix splits "[:id:]content" into the prefix key and content.
-// The prefix key is everything between "[:":]" (including the brackets).
-// If there is no stream ID prefix, it returns ("", value).
-func extractStreamPrefix(value string) (prefix string, content string) {
-	if !strings.HasPrefix(value, "[:") {
-		return "", value
-	}
-	endIdx := strings.Index(value, ":]")
-	if endIdx == -1 {
-		return "", value
-	}
-	return value[:endIdx+2], value[endIdx+2:]
 }

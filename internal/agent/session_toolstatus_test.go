@@ -24,9 +24,9 @@ func TestWriteToolResult(t *testing.T) {
 		t.Errorf("Expected tag %s, got %s", stream.TagFunctionState, tag)
 	}
 
-	expectedValue := "[:tool123:]success"
+	expectedValue := stream.WrapDelta("tool123", "success")
 	if value != expectedValue {
-		t.Errorf("Expected value %s, got %s", expectedValue, value)
+		t.Errorf("Expected value %q, got %q", expectedValue, value)
 	}
 
 	// Test error case
@@ -38,9 +38,9 @@ func TestWriteToolResult(t *testing.T) {
 		t.Errorf("Expected tag %s, got %s", stream.TagFunctionState, tag)
 	}
 
-	expectedValue = "[:tool456:]error"
+	expectedValue = stream.WrapDelta("tool456", "error")
 	if value != expectedValue {
-		t.Errorf("Expected value %s, got %s", expectedValue, value)
+		t.Errorf("Expected value %q, got %q", expectedValue, value)
 	}
 
 	// Test pending case
@@ -52,9 +52,9 @@ func TestWriteToolResult(t *testing.T) {
 		t.Errorf("Expected tag %s, got %s", stream.TagFunctionState, tag)
 	}
 
-	expectedValue = "[:tool789:]pending"
+	expectedValue = stream.WrapDelta("tool789", "pending")
 	if value != expectedValue {
-		t.Errorf("Expected value %s, got %s", expectedValue, value)
+		t.Errorf("Expected value %q, got %q", expectedValue, value)
 	}
 }
 
@@ -105,9 +105,9 @@ func TestOnToolResultCallback(t *testing.T) {
 		t.Errorf("Expected tag %s, got %s", stream.TagFunctionState, tag)
 	}
 
-	expectedValue := "[:call1:]success"
+	expectedValue := stream.WrapDelta("call1", "success")
 	if value != expectedValue {
-		t.Errorf("Expected value %s, got %s", expectedValue, value)
+		t.Errorf("Expected value %q, got %q", expectedValue, value)
 	}
 
 	// Test error result
@@ -122,9 +122,9 @@ func TestOnToolResultCallback(t *testing.T) {
 		t.Errorf("Expected tag %s, got %s", stream.TagFunctionState, tag)
 	}
 
-	expectedValue = "[:call2:]error"
+	expectedValue = stream.WrapDelta("call2", "error")
 	if value != expectedValue {
-		t.Errorf("Expected value %s, got %s", expectedValue, value)
+		t.Errorf("Expected value %q, got %q", expectedValue, value)
 	}
 }
 
@@ -171,9 +171,9 @@ func TestWriteToolCallWithPending(t *testing.T) {
 			length2 := int(binary.BigEndian.Uint32(data[offset+2 : offset+6]))
 			if len(data) >= offset+6+length2 {
 				value2 := string(data[offset+6 : offset+6+length2])
-				expectedValue2 := "[:tool123:]pending"
+				expectedValue2 := stream.WrapDelta("tool123", "pending")
 				if value2 != expectedValue2 {
-					t.Errorf("Expected pending value %s, got %s", expectedValue2, value2)
+					t.Errorf("Expected pending value %q, got %q", expectedValue2, value2)
 				}
 			}
 		}

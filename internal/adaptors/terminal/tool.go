@@ -52,27 +52,6 @@ func ParseToolStatus(status string) ToolStatus {
 }
 
 // ============================================================================
-// Stream ID Parsing (for text deltas and status updates)
-// ============================================================================
-
-// ParseStreamID extracts stream ID prefix from value.
-// Format: "[:id:]content". Returns id, content, true if prefix found.
-func ParseStreamID(value string) (id string, content string, ok bool) {
-	const prefixStart = "[:"
-	const prefixEnd = ":]"
-	if !strings.HasPrefix(value, prefixStart) {
-		return "", value, false
-	}
-	endIdx := strings.Index(value, prefixEnd)
-	if endIdx == -1 {
-		return "", value, false
-	}
-	id = value[len(prefixStart):endIdx]
-	content = value[endIdx+len(prefixEnd):]
-	return id, content, true
-}
-
-// ============================================================================
 // Rendering
 // ============================================================================
 

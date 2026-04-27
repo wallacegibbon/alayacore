@@ -28,6 +28,21 @@
 //   - "error": Tool execution failed (• red filled dot)
 //   - default: Tool from loaded session with no status (· dimmed hollow dot)
 //
+// Delta Messages:
+//
+// TA, TR, and FS are delta messages that arrive piece-by-piece during
+// streaming. Their TLV values use NUL-delimited stream IDs:
+//
+//	\x00<stream-id>\x00<content>
+//
+// NUL bytes (\x00) are used as delimiters because they can never appear in
+// normal UTF-8 text, making the split unambiguous. See WrapDelta and
+// UnwrapDelta in stream_id.go.
+//
+// Stream ID formats differ by tag:
+//   - TA, TR: "<promptID>-<step>-<suffix>" where suffix is "t" or "r"
+//   - FS: free-form tool call ID assigned by the LLM provider
+//
 // Key Types:
 //
 //   - ChanInput: Input implementation using a channel of TLV messages

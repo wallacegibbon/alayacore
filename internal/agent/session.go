@@ -25,7 +25,6 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -777,19 +776,19 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) (int
 	var outputTokens int64
 
 	assembleID := func(id string) string {
-		return "[:" + strconv.FormatUint(promptID, 10) + "-" + strconv.FormatInt(int64(stepCount), 10) + "-" + id + ":]"
+		return stream.NewStreamID(promptID, stepCount, id)
 	}
 
 	_, err := s.Agent.Stream(ctx, history, llm.StreamCallbacks{
 		OnTextDelta: func(delta string) error {
 			//nolint:errcheck // Best effort write, errors ignored
-			_ = stream.WriteTLV(s.Output, stream.TagTextAssistant, assembleID("t")+delta)
+			_ = stream.WriteTLV(s.Output, stream.TagTextAssistant, stream.WrapDelta(assembleID(stream.SuffixText), delta))
 			s.Output.Flush()
 			return nil
 		},
 		OnReasoningDelta: func(delta string) error {
 			//nolint:errcheck // Best effort write, errors ignored
-			_ = stream.WriteTLV(s.Output, stream.TagTextReasoning, assembleID("r")+delta)
+			_ = stream.WriteTLV(s.Output, stream.TagTextReasoning, stream.WrapDelta(assembleID(stream.SuffixReasoning), delta))
 			s.Output.Flush()
 			return nil
 		},
@@ -896,7 +895,7 @@ func (s *Session) writeToolResult(toolCallID string, status string) {
 		return
 	}
 	//nolint:errcheck // Best effort write, errors ignored
-	_ = stream.WriteTLV(s.Output, stream.TagFunctionState, "[:"+toolCallID+":]"+status)
+	_ = stream.WriteTLV(s.Output, stream.TagFunctionState, stream.WrapDelta(toolCallID, status))
 	s.Output.Flush()
 }
 
