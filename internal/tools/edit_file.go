@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/alayacore/alayacore/internal/llm"
 )
@@ -136,7 +137,10 @@ func executeEditFile(ctx context.Context, args EditFileInput) (llm.ToolResultOut
 	}
 	defer file.Close()
 
-	tempFile, err := os.CreateTemp("", "edit_file_*.tmp")
+	// Create temp file in the same directory as the target file to avoid
+	// cross-device rename errors on Windows (e.g. temp dir on C: vs target on D:).
+	dir := filepath.Dir(path)
+	tempFile, err := os.CreateTemp(dir, "edit_file_*.tmp")
 	if err != nil {
 		return llm.NewTextErrorResponse(fmt.Sprintf("failed to create temp file: %v", err)), nil
 	}
