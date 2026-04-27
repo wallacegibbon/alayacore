@@ -1005,6 +1005,10 @@ func (m *DisplayModel) MoveWindowCursorUp() bool {
 // EnsureCursorVisible scrolls the viewport to make the cursor window fully visible.
 // Use this for active navigation (j/k/H/L/M/space) where the user explicitly
 // wants to see the selected window.
+//
+// When the window is taller than the viewport, it cannot be fully shown, so
+// we only scroll if it is completely off-screen. This prevents oscillation
+// between showing the top and bottom of an oversized window on repeated calls.
 func (m *DisplayModel) EnsureCursorVisible() {
 	if m.windowCursor < 0 {
 		return
@@ -1014,6 +1018,20 @@ func (m *DisplayModel) EnsureCursorVisible() {
 	endLine := m.windowBuffer.GetWindowEndLine(m.windowCursor)
 	viewportTop := m.viewport.YOffset()
 	viewportBottom := viewportTop + m.viewport.Height()
+	windowHeight := endLine - startLine
+
+	// Window is taller than the viewport — it can never be fully visible.
+	// Only scroll if it is completely off-screen to avoid oscillation.
+	if windowHeight > m.viewport.Height() {
+		if endLine <= viewportTop {
+			// Entirely above — show the bottom edge
+			m.viewport.SetYOffset(max(0, endLine-m.viewport.Height()))
+		} else if startLine >= viewportBottom {
+			// Entirely below — show the top edge
+			m.viewport.SetYOffset(startLine)
+		}
+		return
+	}
 
 	if startLine < viewportTop {
 		m.viewport.SetYOffset(startLine)
