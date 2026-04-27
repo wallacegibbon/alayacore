@@ -99,15 +99,15 @@ type SystemInfo struct {
 	ActiveModelName   string          `json:"active_model_name,omitempty"`
 	HasModels         bool            `json:"has_models"`
 	ModelConfigPath   string          `json:"model_config_path,omitempty"`
-	ReasoningEnabled  bool            `json:"thinking_enabled"`
+	ThinkEnabled      bool            `json:"think_enabled"`
 }
 
 // SessionMeta is the frontmatter metadata.
 type SessionMeta struct {
-	CreatedAt        time.Time `config:"created_at"`
-	UpdatedAt        time.Time `config:"updated_at"`
-	ReasoningEnabled bool      `config:"thinking_enabled"`
-	ActiveModel      string    `config:"active_model"`
+	CreatedAt    time.Time `config:"created_at"`
+	UpdatedAt    time.Time `config:"updated_at"`
+	ThinkEnabled bool      `config:"think_enabled"`
+	ActiveModel  string    `config:"active_model"`
 }
 
 // SessionData is the persisted form of a Session.
@@ -154,7 +154,7 @@ type Session struct {
 	skillDirs            []string // Skill directories for compaction exemption
 	maxSteps             int
 	proxyURL             string
-	reasoningEnabled     bool
+	thinkEnabled         bool
 
 	taskQueue     []QueueItem
 	cond          *sync.Cond         // signals when taskQueue becomes non-empty or pausedOnError clears
@@ -182,18 +182,18 @@ func (s *Session) WaitDone() {
 // ============================================================================
 
 // LoadOrNewSession loads a session from file or creates a new one.
-func LoadOrNewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, autoSave bool, noCompact bool, compactKeepSteps int, compactTruncateLen int, proxyURL string, skillsMgr *skills.Manager, thinking bool) (*Session, string) {
+func LoadOrNewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, autoSave bool, noCompact bool, compactKeepSteps int, compactTruncateLen int, proxyURL string, skillsMgr *skills.Manager, think bool) (*Session, string) {
 	sessionFile = expandPath(sessionFile)
 	if sessionFile != "" {
 		if data, err := LoadSession(sessionFile); err == nil {
 			return RestoreFromSession(baseTools, systemPrompt, extraSystemPrompt, maxSteps, input, output, data, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, autoSummarize, autoSave, noCompact, compactKeepSteps, compactTruncateLen, proxyURL, skillsMgr), sessionFile
 		}
 	}
-	return NewSession(baseTools, systemPrompt, extraSystemPrompt, maxSteps, input, output, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, autoSummarize, autoSave, noCompact, compactKeepSteps, compactTruncateLen, proxyURL, skillsMgr, thinking), sessionFile
+	return NewSession(baseTools, systemPrompt, extraSystemPrompt, maxSteps, input, output, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, autoSummarize, autoSave, noCompact, compactKeepSteps, compactTruncateLen, proxyURL, skillsMgr, think), sessionFile
 }
 
 // NewSession creates a fresh session.
-func NewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, autoSave bool, noCompact bool, compactKeepSteps int, compactTruncateLen int, proxyURL string, skillsMgr *skills.Manager, thinking bool) *Session {
+func NewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, autoSave bool, noCompact bool, compactKeepSteps int, compactTruncateLen int, proxyURL string, skillsMgr *skills.Manager, think bool) *Session {
 	sessionCtx, sessionCancel := context.WithCancel(context.Background())
 	s := &Session{
 		SessionFile:          sessionFile,
@@ -215,7 +215,7 @@ func NewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt str
 		skillDirs:            buildSkillDirSet(skillsMgr),
 		proxyURL:             proxyURL,
 		maxSteps:             maxSteps,
-		reasoningEnabled:     thinking,
+		thinkEnabled:         think,
 		taskQueue:            make([]QueueItem, 0),
 		sessionCtx:           sessionCtx,
 		sessionCancel:        sessionCancel,
@@ -253,7 +253,7 @@ func RestoreFromSession(baseTools []llm.Tool, systemPrompt string, extraSystemPr
 		skillDirs:            buildSkillDirSet(skillsMgr),
 		proxyURL:             proxyURL,
 		maxSteps:             maxSteps,
-		reasoningEnabled:     data.ReasoningEnabled,
+		thinkEnabled:         data.ThinkEnabled,
 		taskQueue:            make([]QueueItem, 0),
 		sessionCtx:           sessionCtx,
 		sessionCancel:        sessionCancel,
@@ -367,7 +367,7 @@ func (s *Session) ensureAgentInitialized() string {
 	s.mu.Unlock()
 
 	s.applyModelContextLimit(activeModel)
-	s.syncThinkingToProvider()
+	s.syncThinkToProvider()
 	return ""
 }
 
@@ -390,7 +390,7 @@ func (s *Session) initAgentFromConfig(modelConfig *ModelConfig) error {
 	s.Provider = provider
 	s.mu.Unlock()
 
-	s.syncThinkingToProvider()
+	s.syncThinkToProvider()
 	return nil
 }
 
@@ -403,34 +403,34 @@ func (s *Session) applyModelContextLimit(model *ModelConfig) {
 	s.mu.Unlock()
 }
 
-// syncThinkingToProvider propagates the session's thinking state to the
+// syncThinkToProvider propagates the session's thinking state to the
 // current provider. Must be called after Provider is set.
-func (s *Session) syncThinkingToProvider() {
+func (s *Session) syncThinkToProvider() {
 	if s.Provider != nil {
-		s.Provider.SetReasoningEnabled(s.reasoningEnabled)
+		s.Provider.SetReasoningEnabled(s.thinkEnabled)
 	}
 }
 
-// ToggleThinking controls thinking mode. mode: 0=off, 1=on, -1=toggle.
-func (s *Session) ToggleThinking(mode int) {
+// ToggleThink controls think mode. mode: 0=off, 1=on, -1=toggle.
+func (s *Session) ToggleThink(mode int) {
 	s.mu.Lock()
 	switch mode {
 	case 0:
-		s.reasoningEnabled = false
+		s.thinkEnabled = false
 	case 1:
-		s.reasoningEnabled = true
+		s.thinkEnabled = true
 	case -1:
-		s.reasoningEnabled = !s.reasoningEnabled
+		s.thinkEnabled = !s.thinkEnabled
 	}
-	enabled := s.reasoningEnabled
+	enabled := s.thinkEnabled
 	s.mu.Unlock()
 
-	s.syncThinkingToProvider()
+	s.syncThinkToProvider()
 
 	if enabled {
-		s.writeNotify("Thinking mode enabled")
+		s.writeNotify("Think mode enabled")
 	} else {
-		s.writeNotify("Thinking mode disabled")
+		s.writeNotify("Think mode disabled")
 	}
 	s.sendSystemInfo()
 }
@@ -476,7 +476,7 @@ func isCommandImmediate(cmd string) bool {
 		name = cmd[:idx]
 	}
 	switch name {
-	case commandNameCancel, commandNameCancelAll, commandNameModelLoad, commandNameTaskQueueGetAll, commandNameThinking:
+	case commandNameCancel, commandNameCancelAll, commandNameModelLoad, commandNameTaskQueueGetAll, commandNameThink:
 		return true
 	}
 	return strings.HasPrefix(cmd, commandNameTaskQueueDel+" ") || strings.HasPrefix(cmd, commandNameModelSet+" ")
@@ -983,7 +983,7 @@ func (s *Session) sendSystemInfoInternal(activeModelConfig *ModelConfig) {
 		ActiveModelName:   activeModelName,
 		HasModels:         hasModels,
 		ModelConfigPath:   modelConfigPath,
-		ReasoningEnabled:  s.reasoningEnabled,
+		ThinkEnabled:      s.thinkEnabled,
 	}
 	data, _ := json.Marshal(info) //nolint:errcheck // Best effort marshal, errors ignored
 	//nolint:errcheck // Best effort write, errors ignored

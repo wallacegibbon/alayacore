@@ -18,7 +18,7 @@ const (
 	commandNameModelLoad       = "model_load"
 	commandNameTaskQueueGetAll = "taskqueue_get_all"
 	commandNameTaskQueueDel    = "taskqueue_del"
-	commandNameThinking        = "thinking"
+	commandNameThink           = "think"
 )
 
 // CommandHandler is the function signature for command handlers
@@ -156,8 +156,8 @@ func init() {
 	})
 
 	commandRegistry.Register(&Command{
-		Name:        commandNameThinking,
-		Description: "Control thinking mode (0=off, 1=on, -1=toggle)",
+		Name:        commandNameThink,
+		Description: "Control think mode (0=off, 1=on, -1=toggle)",
 		Usage:       "[0|1|-1]",
 		Handler: func(_ context.Context, _ []string) {
 			// Handler is resolved at runtime via Session method
@@ -207,8 +207,8 @@ func (s *Session) dispatchCommand(ctx context.Context, cmd string) bool {
 		s.handleTaskQueueGetAll()
 	case commandNameTaskQueueDel:
 		s.handleTaskQueueDel(args)
-	case commandNameThinking:
-		s.handleThinking(args)
+	case commandNameThink:
+		s.handleThink(args)
 	}
 
 	return true

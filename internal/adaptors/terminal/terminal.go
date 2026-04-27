@@ -390,9 +390,12 @@ func (m *Terminal) updateStatus() {
 	// Build status segments - each rendered separately with appropriate colors
 	var segments []string
 
-	// Thinking segment (show when enabled)
-	if snap.ThinkingEnabled {
-		segments = append(segments, m.styles.Status.Foreground(m.styles.ColorAccent).Render("Thinking"))
+	// Reasoning mode segment (show when enabled)
+	if snap.ThinkEnabled {
+		segments = append(segments,
+			m.styles.Status.Render("Think: ")+
+				m.styles.Status.Foreground(m.styles.ColorAccent).Render("ON"),
+		)
 	}
 
 	// Queue segment - prefix dimmed, count highlighted

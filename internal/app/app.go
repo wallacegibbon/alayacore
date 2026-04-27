@@ -30,7 +30,7 @@ type Config struct {
 	SystemPrompt      string // Default system prompt (always present)
 	ExtraSystemPrompt string // User-provided extra system prompt via --system flag
 	MaxSteps          int    // Maximum agent loop steps
-	Thinking          bool   // Enable thinking/reasoning mode
+	Think             bool   // Enable thinking/reasoning mode
 }
 
 // Setup initializes the common app components
@@ -81,6 +81,6 @@ func Setup(cfg *config.Settings) (*Config, error) {
 		SystemPrompt:      systemPrompt,
 		ExtraSystemPrompt: cfg.SystemPrompt, // User-provided extra system prompt (supplemental, not replacement)
 		MaxSteps:          cfg.MaxSteps,
-		Thinking:          cfg.Thinking,
+		Think:             cfg.Think,
 	}, nil
 }

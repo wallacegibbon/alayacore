@@ -69,7 +69,7 @@ func (a *Adaptor) Start() {
 		a.Config.Cfg.CompactTruncateLen,
 		a.Config.Cfg.Proxy,
 		a.Config.SkillsMgr,
-		a.Config.Thinking,
+		a.Config.Think,
 	)
 
 	// Load active theme from runtime.conf (default to default theme if not set)

@@ -64,8 +64,8 @@ type Settings struct {
 	CompactKeepSteps   int
 	CompactTruncateLen int
 
-	// Thinking
-	Thinking bool
+	// Think
+	Think bool
 }
 
 // Parse parses CLI flags and returns settings
@@ -107,7 +107,7 @@ Flags:
 	noCompact := flag.Bool("no-compact", false, "Disable automatic history compaction (old tool results are kept in full)")
 	compactKeepSteps := flag.Int("compact-keep-steps", 3, "Number of recent agent steps to preserve during compaction")
 	compactTruncateLen := flag.Int("compact-truncate-len", 500, "Byte-equivalent length to keep when truncating old tool results")
-	thinking := flag.Bool("thinking", false, "Enable thinking/reasoning mode for supported models")
+	think := flag.Bool("think", false, "Enable thinking/reasoning mode for supported models")
 
 	flag.Parse()
 
@@ -138,7 +138,7 @@ Flags:
 		NoCompact:          *noCompact,
 		CompactKeepSteps:   *compactKeepSteps,
 		CompactTruncateLen: *compactTruncateLen,
-		Thinking:           *thinking,
+		Think:              *think,
 	}
 
 	return s

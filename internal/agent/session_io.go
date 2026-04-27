@@ -273,17 +273,17 @@ func (s *Session) handleTaskQueueDel(args []string) {
 	}
 }
 
-func (s *Session) handleThinking(args []string) {
+func (s *Session) handleThink(args []string) {
 	mode := -1 // default: toggle
 	if len(args) > 0 {
 		var err error
 		mode, err = strconv.Atoi(args[0])
 		if err != nil {
-			s.writeError("usage: :thinking [0|1|-1]  (0=off, 1=on, -1=toggle)")
+			s.writeError("usage: :think [0|1|-1]  (0=off, 1=on, -1=toggle)")
 			return
 		}
 	}
-	s.ToggleThinking(mode)
+	s.ToggleThink(mode)
 }
 
 // resendPrompt resends the conversation history to the LLM.

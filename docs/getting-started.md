@@ -77,7 +77,7 @@ export ALAYACORE_SHELL=zsh
 | `--compact-keep-steps` | `3` | Number of recent agent steps to preserve during compaction |
 | `--compact-truncate-len` | `500` | Byte-equivalent length to keep when truncating old tool results |
 | `--plainio` | `false` | Plain stdin/stdout mode — no TUI, for scripting and piping |
-| `--thinking` | `false` | Enable thinking/reasoning mode for supported models |
+| `--think` | `false` | Enable thinking/reasoning mode for supported models |
 | `--debug-api` | `false` | Write raw API requests and responses to a log file |
 | `--version` | — | Print version and exit |
 | `--help` | — | Print help and exit |

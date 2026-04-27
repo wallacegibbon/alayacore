@@ -32,7 +32,7 @@ AlayaCore's terminal UI is built with [Bubble Tea](https://charm.land/) and uses
 | `Ctrl+L` | Open model selector |
 | `Ctrl+P` | Open theme selector |
 | `Ctrl+Q` | Open task queue manager |
-| `Ctrl+T` | Toggle thinking mode |
+| `Ctrl+T` | Toggle think mode |
 | `Ctrl+G` | Cancel current request (with confirmation) |
 | `Ctrl+C` | Clear input field (only when input is focused) |
 | `:` | Switch to input with `:` prefix (command mode) |
@@ -49,7 +49,7 @@ Commands are split into two categories:
 | `:cancel_all` | Cancel current request and clear the task queue |
 | `:model_set <id>` | Switch to a model by numeric ID |
 | `:model_load` | Reload model configs from the config file |
-| `:thinking [0\|1\|-1]` | Control thinking mode (0=off, 1=on, -1=toggle). Default: toggle |
+| `:think [0\|1\|-1]` | Control think mode (0=off, 1=on, -1=toggle). Default: toggle |
 | `:taskqueue_get_all` | List all queued tasks (used by queue manager UI) |
 | `:taskqueue_del <id>` | Delete a queued task by ID (used by queue manager UI) |
 

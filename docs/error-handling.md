@@ -111,7 +111,7 @@ Without pausing, a network outage would cause every queued prompt to fail in seq
 Commands are split into two paths:
 
 **Immediate commands** — run immediately on the input goroutine, regardless of queue state:
-`:cancel`, `:cancel_all`, `:model_set`, `:model_load`, `:taskqueue_get_all`, `:taskqueue_del`, `:thinking`
+`:cancel`, `:cancel_all`, `:model_set`, `:model_load`, `:taskqueue_get_all`, `:taskqueue_del`, `:think`
 
 **Deferred commands** — enqueued at the front of the task queue via `submitDeferredCommand`, which rejects if a task is already running (unless paused on error):
 `:continue`, `:summarize`, `:save`, and all others

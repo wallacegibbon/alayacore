@@ -33,7 +33,7 @@ var globalKeyBindings = []KeyBinding{
 	{"ctrl+l", "Open model selector", "global"},
 	{"ctrl+p", "Open theme selector", "global"},
 	{"ctrl+q", "Open queue manager", "global"},
-	{"ctrl+t", "Toggle thinking mode", "global"},
+	{"ctrl+t", "Toggle think mode", "global"},
 	{"enter", "Submit prompt/command", "global"},
 }
 
@@ -530,7 +530,7 @@ func (m *Terminal) handleGlobalKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 		return nil, true
 
 	case "ctrl+t":
-		return m.submitCommand("thinking -1", false), true
+		return m.submitCommand("think -1", false), true
 
 	case "enter":
 		return m.handleSubmit(), true

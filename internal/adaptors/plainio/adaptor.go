@@ -53,7 +53,7 @@ func (a *Adaptor) Start() int {
 		a.Config.Cfg.CompactTruncateLen,
 		a.Config.Cfg.Proxy,
 		a.Config.SkillsMgr,
-		a.Config.Thinking,
+		a.Config.Think,
 	)
 
 	sigCh := make(chan os.Signal, 1)

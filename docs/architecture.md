@@ -304,7 +304,7 @@ Agent.Stream() receives tool_call event
 9. **Lazy Agent Init** — Agent and provider are created on first use, not at startup.
 10. **Sequential Tool Execution** — Tools execute one at a time. See [sequential-tool-execution.md](sequential-tool-execution.md).
 11. **Context Efficiency** — Tool descriptions are minimal, outputs are size-capped (32KB), search results limited (100 lines), and old tool results are compacted to save tokens. See [context-tracking.md](context-tracking.md).
-12. **Thinking Mode** — Provider-specific reasoning fields are added to API requests when enabled. Toggled at runtime via `Ctrl+T`, `:thinking`, or `--thinking` flag.
+12. **Think Mode** — Provider-specific reasoning fields are added to API requests when enabled. Toggled at runtime via `Ctrl+T`, `:think`, or `--think` flag.
 
 ## Gotchas
 
@@ -382,12 +382,12 @@ When user cancels mid-tool-call, messages may have `tool_use` without matching `
 
 When styling text with lipgloss, each segment must be rendered individually before concatenation. You cannot render a string that already contains ANSI codes with a new style and expect it to work.
 
-### Thinking mode and reasoning_content
+### Think mode and reasoning_content
 
-When thinking mode is toggled by the user (`Ctrl+T` or `:thinking`), each provider sends explicit thinking configuration in API requests. The key differences are:
+When think mode is toggled by the user (`Ctrl+T` or `:think`), each provider sends explicit thinking configuration in API requests. The key differences are:
 
 1. A top-level **`thinking`** field (`{"type": "enabled"}` or `{"type": "disabled"}`) controls whether reasoning is active.
-2. When thinking is on, assistant messages that only contain tool calls must still include an **empty reasoning block** (required by DeepSeek and similar providers).
+2. When think mode is on, assistant messages that only contain tool calls must still include an **empty reasoning block** (required by DeepSeek and similar providers).
 
 | Provider | Enabled | Disabled |
 |----------|---------|----------|
@@ -398,7 +398,7 @@ When thinking mode is toggled by the user (`Ctrl+T` or `:thinking`), each provid
 
 #### OpenAI-compatible — request examples
 
-When thinking is **disabled**, assistant messages contain only the tool calls — no `reasoning_content` field:
+When think mode is **disabled**, assistant messages contain only the tool calls — no `reasoning_content` field:
 
 ```json
 {
@@ -431,7 +431,7 @@ When thinking is **disabled**, assistant messages contain only the tool calls �
 }
 ```
 
-When thinking is **enabled**, every assistant message is padded with `"reasoning_content": ""` even when there is no actual reasoning text, and the request includes `reasoning_effort`:
+When think mode is **enabled**, every assistant message is padded with `"reasoning_content": ""` even when there is no actual reasoning text, and the request includes `reasoning_effort`:
 
 ```json
 {
@@ -468,7 +468,7 @@ When thinking is **enabled**, every assistant message is padded with `"reasoning
 
 #### Anthropic-compatible — request examples
 
-When thinking is **disabled**, assistant messages contain only the tool-use content block — no `thinking` block:
+When think mode is **disabled**, assistant messages contain only the tool-use content block — no `thinking` block:
 
 ```json
 {
@@ -503,7 +503,7 @@ When thinking is **disabled**, assistant messages contain only the tool-use cont
 }
 ```
 
-When thinking is **enabled**, every assistant message is padded with an empty `{"type": "thinking", "thinking": ""}` block when none is present, and the request includes `output_config`:
+When think mode is **enabled**, every assistant message is padded with an empty `{"type": "thinking", "thinking": ""}` block when none is present, and the request includes `output_config`:
 
 ```json
 {
@@ -556,6 +556,6 @@ Both providers pad assistant messages with an empty reasoning value — but **on
 - **Anthropic provider** (`anthropicConvertMessages`): pads every assistant message with an empty `{"type": "thinking", "thinking": ""}` block when none is present.
 - **OpenAI provider** (`openaiConvertMessages`): extracts reasoning text via `openaiExtractReasoning()` and sets `reasoning_content` on every assistant message — even as empty string when no reasoning text exists.
 
-Both are conditional on reasoning mode being enabled. When thinking is off, no padding is added.
+Both are conditional on reasoning mode being enabled. When think mode is off, no padding is added.
 
 
