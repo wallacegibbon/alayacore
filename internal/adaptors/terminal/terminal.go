@@ -9,6 +9,7 @@ package terminal
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"runtime"
@@ -438,9 +439,9 @@ func (m *Terminal) updateStatus() {
 		var ctxVal string
 		if snap.ContextLimit > 0 {
 			pct := float64(snap.ContextTokens) * 100.0 / float64(snap.ContextLimit)
-			ctxVal = fmt.Sprintf(" %d/%d (%.1f%%)", snap.ContextTokens, snap.ContextLimit, pct)
+			ctxVal = fmt.Sprintf(" %s/%s (%.1f%%)", formatTokenCount(snap.ContextTokens), formatTokenCount(snap.ContextLimit), pct)
 		} else {
-			ctxVal = fmt.Sprintf(" %d", snap.ContextTokens)
+			ctxVal = fmt.Sprintf(" %s", formatTokenCount(snap.ContextTokens))
 		}
 		segments = append(segments,
 			keyStyle.Render("Context:")+valStyle.Render(ctxVal),
@@ -518,6 +519,26 @@ func (m *Terminal) View() tea.View {
 	v.AltScreen = true
 	v.ReportFocus = true
 	return v
+}
+
+// formatTokenCount returns a compact human-readable representation of a
+// token count (e.g. 1500 → "1.5K", 1000000 → "1M").
+func formatTokenCount(n int64) string {
+	if n < 1_000 {
+		return fmt.Sprintf("%d", n)
+	}
+	if n < 1_000_000 {
+		v := float64(n) / 1_000
+		if v == math.Floor(v) {
+			return fmt.Sprintf("%.0fK", v)
+		}
+		return fmt.Sprintf("%.1fK", v)
+	}
+	v := float64(n) / 1_000_000
+	if v == math.Floor(v) {
+		return fmt.Sprintf("%.0fM", v)
+	}
+	return fmt.Sprintf("%.1fM", v)
 }
 
 // renderStatusBar renders the status bar line.

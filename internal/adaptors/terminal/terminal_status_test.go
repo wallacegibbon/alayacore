@@ -2,6 +2,7 @@ package terminal
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	agentpkg "github.com/alayacore/alayacore/internal/agent"
@@ -110,4 +111,35 @@ func containsSubstring(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+func TestFormatTokenCount(t *testing.T) {
+	tests := []struct {
+		input    int64
+		expected string
+	}{
+		{0, "0"},
+		{42, "42"},
+		{999, "999"},
+		{1000, "1K"},
+		{1500, "1.5K"},
+		{9999, "10.0K"},
+		{10000, "10K"},
+		{15500, "15.5K"},
+		{100000, "100K"},
+		{999499, "999.5K"},
+		{1000000, "1M"},
+		{1500000, "1.5M"},
+		{10000000, "10M"},
+		{128000, "128K"},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%d", tt.input), func(t *testing.T) {
+			got := formatTokenCount(tt.input)
+			if got != tt.expected {
+				t.Errorf("formatTokenCount(%d) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
 }
