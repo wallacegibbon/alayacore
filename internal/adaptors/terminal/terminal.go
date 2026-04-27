@@ -387,36 +387,62 @@ func (m *Terminal) updateDisplayHeight() {
 func (m *Terminal) updateStatus() {
 	snap := m.out.SnapshotStatus()
 
+	keyStyle := m.styles.Status
+	valStyle := m.styles.Status.Foreground(m.styles.ColorMuted)
+
 	// Build status segments - each rendered separately with appropriate colors
 	var segments []string
+
+	// Auto-follow indicator (leftmost — viewport state)
+	if m.display.shouldFollow() {
+		segments = append(segments,
+			keyStyle.Render("Follow: ")+valStyle.Render("ON"),
+		)
+	}
 
 	// Reasoning mode segment (show when enabled)
 	if snap.ThinkEnabled {
 		segments = append(segments,
-			m.styles.Status.Render("Think: ")+
-				m.styles.Status.Foreground(m.styles.ColorAccent).Render("ON"),
+			keyStyle.Render("Think: ")+valStyle.Render("ON"),
 		)
 	}
 
-	// Queue segment - prefix dimmed, count highlighted
+	// Queue segment
 	if snap.QueueCount > 0 {
-		prefix := m.styles.Status.Render("Queued(Ctrl-Q):")
-		count := m.styles.Status.Foreground(m.styles.ColorAccent).Render(fmt.Sprintf("%d", snap.QueueCount))
-		segments = append(segments, prefix+" "+count)
+		segments = append(segments,
+			keyStyle.Render("Queued(Ctrl-Q): ")+valStyle.Render(fmt.Sprintf("%d", snap.QueueCount)),
+		)
 	}
 
-	// Steps segment (always show)
-	var stepsPart string
+	// Steps segment (show only when there's step activity)
+	var showSteps bool
+	var stepsKey string
+	var stepsVal string
 	if snap.LastMaxSteps > 0 {
-		stepsPart = fmt.Sprintf("Steps: %d/%d", snap.LastCurrentStep, snap.LastMaxSteps)
-	} else {
-		stepsPart = fmt.Sprintf("Steps: %d/%d", snap.CurrentStep, snap.MaxSteps)
+		showSteps = true
+		stepsKey = "Steps: "
+		stepsVal = fmt.Sprintf("%d/%d", snap.LastCurrentStep, snap.LastMaxSteps)
+	} else if snap.CurrentStep > 0 {
+		showSteps = true
+		stepsKey = "Steps: "
+		stepsVal = fmt.Sprintf("%d/%d", snap.CurrentStep, snap.MaxSteps)
 	}
-	segments = append(segments, m.styles.Status.Render(stepsPart))
+	if showSteps {
+		segments = append(segments,
+			keyStyle.Render(stepsKey)+valStyle.Render(stepsVal),
+		)
+	}
 
-	// Context segment (dimmed)
+	// Context segment
 	if snap.ContextStatus != "" {
-		segments = append(segments, m.styles.Status.Render(snap.ContextStatus))
+		parts := strings.SplitN(snap.ContextStatus, ":", 2)
+		if len(parts) == 2 {
+			segments = append(segments,
+				keyStyle.Render(parts[0]+":")+valStyle.Render(parts[1]),
+			)
+		} else {
+			segments = append(segments, valStyle.Render(snap.ContextStatus))
+		}
 	}
 
 	// Join segments with dimmed separator

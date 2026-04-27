@@ -48,8 +48,9 @@ func TestStatusBarShowsLastMaxSteps(t *testing.T) {
 
 	// Check that status shows last step info (2/50, not 50/50)
 	expectedSubstring := "Steps: 2/50"
-	if !containsSubstring(terminal.statusText, expectedSubstring) {
-		t.Errorf("Expected status to contain %q, got %q", expectedSubstring, terminal.statusText)
+	plain := stripANSI(terminal.statusText)
+	if !containsSubstring(plain, expectedSubstring) {
+		t.Errorf("Expected status to contain %q, got %q", expectedSubstring, plain)
 	}
 }
 
@@ -85,8 +86,9 @@ func TestStatusBarShowsCurrentStepsDuringProgress(t *testing.T) {
 
 	// Check that status shows current step progress
 	expectedSubstring := "Steps: 7/20"
-	if !containsSubstring(terminal.statusText, expectedSubstring) {
-		t.Errorf("Expected status to contain %q, got %q", expectedSubstring, terminal.statusText)
+	plain := stripANSI(terminal.statusText)
+	if !containsSubstring(plain, expectedSubstring) {
+		t.Errorf("Expected status to contain %q, got %q", expectedSubstring, plain)
 	}
 }
 
