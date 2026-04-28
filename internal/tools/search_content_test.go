@@ -260,3 +260,39 @@ func TestSearchContentMaxLinesGlobal(t *testing.T) {
 		t.Errorf("expected truncation indicator in output:\n%s", text.Text)
 	}
 }
+
+func TestSearchContentPatternLooksLikeFlag(t *testing.T) {
+	if !RGAvailable() {
+		t.Skip("rg not available on system")
+	}
+
+	tmpDir, err := os.MkdirTemp("", "alayacore-rg-test-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	testFile := filepath.Join(tmpDir, "test.txt")
+	if err := os.WriteFile(testFile, []byte("--skill\n--help\nnormal text\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Patterns that look like flags should be treated as literal regex patterns
+	result, err := executeSearchContent(context.Background(), SearchContentInput{
+		Pattern: "--skill",
+		Path:    tmpDir,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	text, ok := result.(llm.ToolResultOutputText)
+	if !ok {
+		t.Fatalf("expected text output, got %T", result)
+	}
+	if text.Text == "" || text.Text == "No matches found" {
+		t.Errorf("expected match for '--skill' pattern, got %q", text.Text)
+	}
+	if !strings.Contains(text.Text, "--skill") {
+		t.Errorf("expected output to contain '--skill', got %q", text.Text)
+	}
+}

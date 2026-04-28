@@ -44,7 +44,7 @@ func buildSearchContentArgs(args SearchContentInput) []string {
 		"-n",
 		"--no-heading",
 		"--color=never",
-		args.Pattern,
+		"-e", args.Pattern,
 	}
 
 	if args.Path != "" {
