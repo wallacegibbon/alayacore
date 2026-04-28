@@ -20,6 +20,20 @@ func ResolveConfigPath(providedPath, defaultFilename string) string {
 	return filepath.Join(home, ".alayacore", defaultFilename)
 }
 
+// printDefaults prints all command-line flags with -- prefix instead of the default -
+func printDefaults() {
+	flag.CommandLine.VisitAll(func(f *flag.Flag) {
+		var placeholder string
+		usage := f.Usage
+		if s, _ := flag.UnquoteUsage(f); s != "" {
+			placeholder = " " + s
+		}
+		usage = strings.ReplaceAll(usage, "`", "")
+		fmt.Fprintf(flag.CommandLine.Output(), "\t--%s%s\n", f.Name, placeholder)
+		fmt.Fprintf(flag.CommandLine.Output(), "\t\t%s\n", usage)
+	})
+}
+
 // stringSlice implements flag.Value for multiple string flags
 type stringSlice struct {
 	slice []string
@@ -72,33 +86,27 @@ type Settings struct {
 func Parse() *Settings {
 	// Set custom usage function before any flag definitions
 	flag.Usage = func() {
-		fmt.Fprint(flag.CommandLine.Output(), `AlayaCore - A minimal AI Agent
-
-Usage:
-  alayacore [flags]
-
-Flags:
-`)
-		flag.PrintDefaults()
+		fmt.Fprint(flag.CommandLine.Output(), "AlayaCore - A minimal AI Agent\n\nUsage:\n\talayacore [flags]\n\nFlags:\n")
+		printDefaults()
 	}
 
 	// Core
 	showVersion := flag.Bool("version", false, "Show version information")
 	plainIO := flag.Bool("plainio", false, "Use plain stdin/stdout mode instead of terminal UI")
 	debugAPI := flag.Bool("debug-api", false, "Write raw API requests and responses to log file")
-	modelConfig := flag.String("model-config", "", "Model config file path (default: ~/.alayacore/model.conf)")
-	runtimeConfig := flag.String("runtime-config", "", "Runtime config file path (default: ~/.alayacore/runtime.conf)")
-	themesFolder := flag.String("themes", "", "Themes folder path (default: ~/.alayacore/themes)")
+	modelConfig := flag.String("model-config", "", "Model config file `path` (default: ~/.alayacore/model.conf)")
+	runtimeConfig := flag.String("runtime-config", "", "Runtime config file `path` (default: ~/.alayacore/runtime.conf)")
+	themesFolder := flag.String("themes", "", "Themes folder `path` (default: ~/.alayacore/themes)")
 	skill := &stringSlice{}
-	flag.Var(skill, "skill", "Skill path (can be specified multiple times)")
-	session := flag.String("session", "", "Session file path to load/save conversations")
+	flag.Var(skill, "skill", "Skill `path` (can be specified multiple times)")
+	session := flag.String("session", "", "Session file `path` to load/save conversations")
 
 	// I/O
 	proxy := flag.String("proxy", "", "HTTP proxy URL (e.g., http://127.0.0.1:7890 or socks5://127.0.0.1:1080)")
 
 	// Agent behavior
 	systemPrompt := &stringSlice{}
-	flag.Var(systemPrompt, "system", "Extra system prompt (can be specified multiple times, will be appended to default)")
+	flag.Var(systemPrompt, "system", "Extra `system-prompt` (can be specified multiple times, will be appended to default)")
 	maxSteps := flag.Int("max-steps", 100, "Maximum agent loop steps")
 	autoSummarize := flag.Bool("auto-summarize", false, "Automatically summarize conversation when context exceeds 65% of limit")
 	autoSave := flag.Bool("auto-save", true, "Automatically save session after each response (requires --session)")
