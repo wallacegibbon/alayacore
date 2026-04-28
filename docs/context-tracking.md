@@ -6,7 +6,7 @@ How AlayaCore tracks conversation context size across LLM API calls and provider
 
 `ContextTokens` in `Session` tracks the current conversation's context size (input tokens) as reported by the LLM provider. It is used for:
 
-- Displaying context usage in the status bar (e.g. `context: 2118 / 128000`)
+- Displaying context usage in the status bar (e.g. `2.1K/128K 1.7%`)
 - Triggering auto-summarization when context exceeds 65% of `context_limit`
 
 ## Data Flow

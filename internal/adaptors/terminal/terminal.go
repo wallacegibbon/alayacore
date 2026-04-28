@@ -397,40 +397,14 @@ func (m *Terminal) updateStatus() {
 	// Auto-follow indicator (leftmost — viewport state)
 	if m.display.shouldFollow() {
 		segments = append(segments,
-			keyStyle.Render("Follow: ")+valStyle.Render("ON"),
+			valStyle.Render("F↓"),
 		)
 	}
 
 	// Reasoning mode segment (show when enabled)
 	if snap.ThinkEnabled {
 		segments = append(segments,
-			keyStyle.Render("Think: ")+valStyle.Render("ON"),
-		)
-	}
-
-	// Queue segment
-	if snap.QueueCount > 0 {
-		segments = append(segments,
-			keyStyle.Render("Queued(Ctrl-Q): ")+valStyle.Render(fmt.Sprintf("%d", snap.QueueCount)),
-		)
-	}
-
-	// Steps segment (show only when there's step activity)
-	var showSteps bool
-	var stepsKey string
-	var stepsVal string
-	if snap.LastMaxSteps > 0 && snap.TaskError {
-		showSteps = true
-		stepsKey = "Steps: "
-		stepsVal = fmt.Sprintf("%d/%d", snap.LastCurrentStep, snap.LastMaxSteps)
-	} else if snap.InProgress && snap.CurrentStep > 0 {
-		showSteps = true
-		stepsKey = "Steps: "
-		stepsVal = fmt.Sprintf("%d/%d", snap.CurrentStep, snap.MaxSteps)
-	}
-	if showSteps {
-		segments = append(segments,
-			keyStyle.Render(stepsKey)+valStyle.Render(stepsVal),
+			valStyle.Render("T✦"),
 		)
 	}
 
@@ -439,12 +413,35 @@ func (m *Terminal) updateStatus() {
 		var ctxVal string
 		if snap.ContextLimit > 0 {
 			pct := float64(snap.ContextTokens) * 100.0 / float64(snap.ContextLimit)
-			ctxVal = fmt.Sprintf(" %s/%s (%.1f%%)", formatTokenCount(snap.ContextTokens), formatTokenCount(snap.ContextLimit), pct)
+			ctxVal = fmt.Sprintf("%s/%s %.1f%%", formatTokenCount(snap.ContextTokens), formatTokenCount(snap.ContextLimit), pct)
 		} else {
-			ctxVal = fmt.Sprintf(" %s", formatTokenCount(snap.ContextTokens))
+			ctxVal = formatTokenCount(snap.ContextTokens)
 		}
 		segments = append(segments,
-			keyStyle.Render("Context:")+valStyle.Render(ctxVal),
+			valStyle.Render(ctxVal),
+		)
+	}
+
+	// Queue segment (2nd rightmost)
+	if snap.QueueCount > 0 {
+		segments = append(segments,
+			keyStyle.Render("Q:")+valStyle.Render(fmt.Sprintf("%d", snap.QueueCount)),
+		)
+	}
+
+	// Steps segment (rightmost — show only when there's step activity)
+	var showSteps bool
+	var stepsVal string
+	if snap.LastMaxSteps > 0 && snap.TaskError {
+		showSteps = true
+		stepsVal = fmt.Sprintf("%d/%d", snap.LastCurrentStep, snap.LastMaxSteps)
+	} else if snap.InProgress && snap.CurrentStep > 0 {
+		showSteps = true
+		stepsVal = fmt.Sprintf("%d/%d", snap.CurrentStep, snap.MaxSteps)
+	}
+	if showSteps {
+		segments = append(segments,
+			valStyle.Render(stepsVal),
 		)
 	}
 
