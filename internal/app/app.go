@@ -67,7 +67,10 @@ func Setup(cfg *config.Settings) (*Config, error) {
 		systemPrompt = systemPrompt + "\n\n" + systemPromptSkills + "\n\n" + skillsFragment
 	}
 
-	// Add current working directory to system prompt (at the end for better API cache reuse)
+	// Append CWD at the end so the LLM constructs correct absolute paths
+	// from the first tool call. Placed last for API cache reuse — stable
+	// portion stays cached, only the suffix changes per project.
+	// See docs/architecture.md for rationale.
 	cwd, err := os.Getwd()
 	if err == nil && cwd != "" {
 		systemPrompt = systemPrompt + "\n\nCurrent working directory: " + cwd

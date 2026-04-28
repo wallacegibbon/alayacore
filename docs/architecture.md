@@ -239,6 +239,25 @@ Both providers (`openai`, `anthropic`) send these as two independent system
 messages. The default prompt and extra prompt are kept separate so the LLM API
 can cache them independently.
 
+### Current Working Directory
+
+The current working directory is appended to the end of System Message 1. This
+placement has two benefits:
+
+1. **Absolute path anchoring** — LLMs use the CWD to construct correct absolute
+   paths from the first tool call onward, rather than guessing or assembling
+   paths incorrectly. Empirical testing shows that without the CWD, LLMs still
+   use absolute paths but occasionally construct them with the wrong base
+   directory, wasting steps.
+
+2. **Cache reuse** — The stable portion of the system prompt (identity, rules,
+   skills) remains identical across sessions and can be served from the API
+   cache. Only the CWD suffix changes between projects, minimizing cache misses.
+
+The CWD is **not** persisted in the session file. On session load, it is
+rebuilt from the current runtime environment, ensuring the LLM always sees the
+correct base directory for the current session.
+
 For Anthropic APIs with `prompt_cache: true`, a top-level `cache_control: {"type": "ephemeral"}` is added to the request body for automatic prompt caching.
 
 ## Data Flow
