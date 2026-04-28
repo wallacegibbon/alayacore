@@ -1,6 +1,6 @@
 # Terminal UI
 
-AlayaCore's terminal UI is built with [Bubble Tea](https://charm.land/) and uses vim-like keybindings throughout.
+AlayaCore's terminal UI is built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Bubbles](https://github.com/charmbracelet/bubbles), and [Lip Gloss](https://github.com/charmbracelet/lipgloss) and uses vim-like keybindings throughout.
 
 ## Navigation
 

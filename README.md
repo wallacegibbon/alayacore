@@ -6,7 +6,7 @@ AlayaCore connects to any OpenAI-compatible or Anthropic-compatible LLM and give
 
 You give AlayaCore a task in natural language. It calls an LLM, which reasons about the task and invokes tools — reading files to understand context, editing them to make changes, running commands to verify results — in an autonomous loop until the task is done. You watch the work happen in real time and can intervene at any point.
 
-Built with [Bubble Tea](https://charm.land/) for a responsive terminal UI with vim-like keybindings, virtual scrolling, and a windowed display for concurrent streams.
+Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Bubbles](https://github.com/charmbracelet/bubbles), and [Lip Gloss](https://github.com/charmbracelet/lipgloss) for a responsive terminal UI with vim-like keybindings, virtual scrolling, and a windowed display for concurrent streams.
 
 ## Quick Start
 
