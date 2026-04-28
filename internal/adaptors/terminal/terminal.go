@@ -394,17 +394,18 @@ func (m *Terminal) updateStatus() {
 	// Build status segments - each rendered separately with appropriate colors
 	var segments []string
 
-	// Auto-follow indicator (leftmost — viewport state)
-	if m.display.shouldFollow() {
+	// Reasoning mode segment (leftmost — think mode status)
+	if snap.ThinkEnabled {
+		thinkStyle := m.styles.Status.Foreground(m.styles.ColorAccent).Bold(true)
 		segments = append(segments,
-			valStyle.Render("F↓"),
+			thinkStyle.Render("T✦"),
 		)
 	}
 
-	// Reasoning mode segment (show when enabled)
-	if snap.ThinkEnabled {
+	// Auto-follow indicator
+	if m.display.shouldFollow() {
 		segments = append(segments,
-			valStyle.Render("T✦"),
+			valStyle.Render("F↓"),
 		)
 	}
 

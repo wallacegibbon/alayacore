@@ -431,16 +431,10 @@ func (s *Session) ToggleThink(mode int) {
 	case -1:
 		s.thinkEnabled = !s.thinkEnabled
 	}
-	enabled := s.thinkEnabled
 	s.mu.Unlock()
 
 	s.syncThinkToProvider()
 
-	if enabled {
-		s.writeNotify("Think mode enabled")
-	} else {
-		s.writeNotify("Think mode disabled")
-	}
 	s.sendSystemInfo()
 }
 
