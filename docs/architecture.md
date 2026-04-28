@@ -387,7 +387,7 @@ After `json.Unmarshal` into `json.RawMessage`, `args` becomes the 4 bytes `null`
 
 ### Terminal scroll position
 
-`DisplayModel.autoFollow` must be set to `false` for J/K (line scroll) and Ctrl+D/Ctrl+U (half-page scroll) via `MarkUserScrolled()`, not just j/k (cursor move via `MoveWindowCursorDown`/`MoveWindowCursorUp`), or auto-follow is not properly disabled on manual scrolling. Only `G` (`SetCursorToLastWindow`) re-enables it. See `window.go` → `MarkUserScrolled`.
+`DisplayModel.autoFollow` must be set to `false` for K (line scroll up) and Ctrl+D/Ctrl+U (half-page scroll) via `MarkUserScrolled()`, not just k/g/H/M (cursor move via `MoveWindowCursorUp`/`SetWindowCursor`/`MoveWindowCursorToTop`/`MoveWindowCursorToCenter`), or auto-follow is not properly disabled on manual scrolling. When auto-follow is active, j, J, and L are no-ops (cursor already at last window, viewport already at bottom) and do not disable auto-follow. Only `G` (`SetCursorToLastWindow`) re-enables it. See `window.go` → `MarkUserScrolled`.
 
 ### Incomplete tool calls on cancel
 

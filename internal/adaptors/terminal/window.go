@@ -1121,6 +1121,9 @@ func (m *DisplayModel) MoveWindowCursorToBottom() bool {
 		startLine := m.windowBuffer.GetWindowStartLine(i)
 		endLine := m.windowBuffer.GetWindowEndLine(i)
 		if (startLine < viewportBottom && endLine >= viewportBottom) || endLine <= viewportBottom {
+			if i == m.windowCursor {
+				return false
+			}
 			m.windowCursor = i
 			m.autoFollow = false
 			return true

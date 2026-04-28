@@ -68,7 +68,7 @@ The display area organizes content into separate windows — one per message or 
 
 ### Auto-Follow
 
-When new windows appear, the cursor automatically moves to the newest one. Pressing `k`, `g`, `H`, `L`, `M`, `K`, `Ctrl+D`, `Ctrl+U`, `f`, or `b` disables auto-follow. Pressing `G` (go to last window) re-enables it.
+When new windows appear, the cursor automatically moves to the newest one. Pressing `k`, `g`, `H`, `M`, `K`, `Ctrl+D`, `Ctrl+U`, `f`, or `b` disables auto-follow. Pressing `G` (go to last window) re-enables it.
 
 ### Fold Mode
 
