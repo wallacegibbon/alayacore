@@ -147,11 +147,10 @@ func handleCommandCompletion(execErr error, stdout, stderr *bytes.Buffer) llm.To
 	output = truncation.Front(output, maxCommandOutput, truncation.Marker)
 
 	if execErr != nil {
-		if exitErr, ok := execErr.(*exec.ExitError); ok {
-			code := exitErr.ExitCode()
-			if code != 0 {
-				return llm.NewTextErrorResponse(fmt.Sprintf("Exit Code: %d\n%s", code, output))
-			}
+		if exitCode != 0 {
+			return llm.NewTextErrorResponse(fmt.Sprintf("Exit Code: %d\n%s", exitCode, output))
+		}
+		if _, ok := execErr.(*exec.ExitError); ok {
 			return llm.NewTextErrorResponse(output)
 		}
 		return llm.NewTextErrorResponse(execErr.Error())
