@@ -337,6 +337,7 @@ func (m *Terminal) handleHelpWindowKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if pending := m.helpWindow.ConsumePendingCommand(); pending != "" {
 		m.restoreFocus()
 		m.input.SetValue(pending + " ")
+		m.input.CursorEnd()
 		m.input.Focus()
 		m.focusedWindow = "input"
 		return m, nil
