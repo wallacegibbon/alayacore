@@ -184,18 +184,18 @@ func (s *Session) WaitDone() {
 // ============================================================================
 
 // LoadOrNewSession loads a session from file or creates a new one.
-func LoadOrNewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, autoSave bool, noCompact bool, compactKeepSteps int, compactTruncateLen int, proxyURL string, skillsMgr *skills.Manager, think bool) (*Session, string) {
+func LoadOrNewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, autoSave bool, noCompact bool, compactKeepSteps int, compactTruncateLen int, proxyURL string, skillsMgr *skills.Manager) (*Session, string) {
 	sessionFile = expandPath(sessionFile)
 	if sessionFile != "" {
 		if data, err := LoadSession(sessionFile); err == nil {
 			return RestoreFromSession(baseTools, systemPrompt, extraSystemPrompt, maxSteps, input, output, data, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, autoSummarize, autoSave, noCompact, compactKeepSteps, compactTruncateLen, proxyURL, skillsMgr), sessionFile
 		}
 	}
-	return NewSession(baseTools, systemPrompt, extraSystemPrompt, maxSteps, input, output, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, autoSummarize, autoSave, noCompact, compactKeepSteps, compactTruncateLen, proxyURL, skillsMgr, think), sessionFile
+	return NewSession(baseTools, systemPrompt, extraSystemPrompt, maxSteps, input, output, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, autoSummarize, autoSave, noCompact, compactKeepSteps, compactTruncateLen, proxyURL, skillsMgr), sessionFile
 }
 
 // NewSession creates a fresh session.
-func NewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, autoSave bool, noCompact bool, compactKeepSteps int, compactTruncateLen int, proxyURL string, skillsMgr *skills.Manager, think bool) *Session {
+func NewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, autoSave bool, noCompact bool, compactKeepSteps int, compactTruncateLen int, proxyURL string, skillsMgr *skills.Manager) *Session {
 	sessionCtx, sessionCancel := context.WithCancel(context.Background())
 	s := &Session{
 		SessionFile:          sessionFile,
@@ -217,7 +217,7 @@ func NewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt str
 		skillDirs:            buildSkillDirSet(skillsMgr),
 		proxyURL:             proxyURL,
 		maxSteps:             maxSteps,
-		thinkEnabled:         think,
+		thinkEnabled:         true,
 		taskQueue:            make([]QueueItem, 0),
 		sessionCtx:           sessionCtx,
 		sessionCancel:        sessionCancel,
