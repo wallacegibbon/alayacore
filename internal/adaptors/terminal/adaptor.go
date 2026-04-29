@@ -115,8 +115,25 @@ context_limit: 128000`)
 	// Create terminal with loaded session, initial window size, theme, and theme manager
 	t := NewTerminalWithTheme(session, terminalOutput, inputStream, a.Config, initialWidth, initialHeight, theme, themeManager)
 
+	// Determine I/O sources for Bubble Tea.
+	// When stdin/stdout are piped (not a TTY), open the terminal directly so
+	// that piped data never leaks into the keyboard input and TUI output
+	// always reaches the user's terminal.  This is the same pattern used by
+	// vim, less, htop, etc.  tea.OpenTTY is cross-platform:
+	//   Unix:   /dev/tty
+	//   Windows: CONIN$ + CONOUT$
+	ttyIn, ttyOut, err := tea.OpenTTY()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Error: could not open TTY:", err)
+		os.Exit(1)
+	}
+	defer ttyIn.Close()
+	if ttyOut != ttyIn {
+		defer ttyOut.Close()
+	}
+
 	// Create and run the program
-	p := tea.NewProgram(t, tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
+	p := tea.NewProgram(t, tea.WithInput(ttyIn), tea.WithOutput(ttyOut))
 	_, _ = p.Run() //nolint:errcheck // terminal program run, error not critical
 }
 
