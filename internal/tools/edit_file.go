@@ -3,7 +3,9 @@ package tools
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -52,8 +54,8 @@ func newStreamEditor(oldString, newString string) *streamEditor {
 // Returns (done, error)
 func (se *streamEditor) processChunk(file *os.File, tempFile *os.File) (bool, error) {
 	n, err := file.Read(se.chunk)
-	if err != nil && err.Error() != "EOF" {
-		return false, fmt.Errorf("failed to read file: %v", err)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return false, fmt.Errorf("failed to read file: %w", err)
 	}
 
 	se.buffer = append(se.buffer, se.chunk[:n]...)
@@ -88,7 +90,7 @@ func (se *streamEditor) processChunk(file *os.File, tempFile *os.File) (bool, er
 		se.buffer = se.buffer[writeLen:]
 	}
 
-	return err != nil && err.Error() == "EOF", nil
+	return errors.Is(err, io.EOF), nil
 }
 
 // flushRemaining writes any remaining buffer content
@@ -114,15 +116,10 @@ func validateEditFileInput(args EditFileInput) (string, error) {
 	return args.Path, nil
 }
 
-func openFileForEdit(path string) (*os.File, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("file not found: %s", path)
-		}
-		return nil, err
-	}
-	return file, nil
+type editResult struct {
+	tempPath    string
+	fileInfo    os.FileInfo
+	occurrences int
 }
 
 func executeEditFile(ctx context.Context, args EditFileInput) (llm.ToolResultOutput, error) {
@@ -131,37 +128,72 @@ func executeEditFile(ctx context.Context, args EditFileInput) (llm.ToolResultOut
 		return llm.NewTextErrorResponse(err.Error()), nil
 	}
 
-	file, err := openFileForEdit(path)
-	if err != nil {
-		return llm.NewTextErrorResponse(err.Error()), nil
+	result, resp := editToTemp(ctx, args, path)
+	defer func() {
+		if result != nil && result.tempPath != "" {
+			os.Remove(result.tempPath)
+		}
+	}()
+	if resp != nil {
+		return resp, nil
 	}
-	defer file.Close()
+
+	return replaceFile(result.tempPath, path, result.fileInfo), nil
+}
+
+// editToTemp applies the edit to a temp file and returns the result.
+// On error, the caller should clean up tempPath if it is non-empty.
+func editToTemp(ctx context.Context, args EditFileInput, path string) (result *editResult, resp llm.ToolResultOutput) {
+	file, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, llm.NewTextErrorResponse(fmt.Sprintf("file not found: %s", path))
+		}
+		return nil, llm.NewTextErrorResponse(err.Error())
+	}
+
+	var tempFile *os.File
+	cleanup := func() {
+		file.Close()
+		if tempFile != nil {
+			tempFile.Close()
+		}
+	}
+
+	result = &editResult{}
 
 	// Create temp file in the same directory as the target file to avoid
 	// cross-device rename errors on Windows (e.g. temp dir on C: vs target on D:).
 	dir := filepath.Dir(path)
-	tempFile, err := os.CreateTemp(dir, "edit_file_*.tmp")
+	tempFile, err = os.CreateTemp(dir, "edit_file_*.tmp")
 	if err != nil {
-		return llm.NewTextErrorResponse(fmt.Sprintf("failed to create temp file: %v", err)), nil
+		cleanup()
+		return result, llm.NewTextErrorResponse(fmt.Sprintf("failed to create temp file: %v", err))
 	}
-	tempPath := tempFile.Name()
-	defer os.Remove(tempPath)
+	result.tempPath = tempFile.Name()
+
+	// Use file.Stat() instead of os.Stat(path) to avoid a redundant syscall
+	// and TOCTOU race between open and stat.
+	fileInfo, err := file.Stat()
+	if err != nil {
+		cleanup()
+		return result, llm.NewTextErrorResponse(fmt.Sprintf("failed to get file info: %v", err))
+	}
 
 	editor := newStreamEditor(args.OldString, args.NewString)
 
 	for {
 		select {
 		case <-ctx.Done():
-			tempFile.Close()
-			return llm.NewTextErrorResponse("Canceled"), nil
+			cleanup()
+			return result, llm.NewTextErrorResponse("Canceled")
 		default:
 		}
 
-		var done bool
-		done, err = editor.processChunk(file, tempFile)
-		if err != nil {
-			tempFile.Close()
-			return llm.NewTextErrorResponse(err.Error()), nil
+		done, pErr := editor.processChunk(file, tempFile)
+		if pErr != nil {
+			cleanup()
+			return result, llm.NewTextErrorResponse(pErr.Error())
 		}
 		if done {
 			break
@@ -169,31 +201,33 @@ func executeEditFile(ctx context.Context, args EditFileInput) (llm.ToolResultOut
 	}
 
 	if err = editor.flushRemaining(tempFile); err != nil {
-		tempFile.Close()
-		return llm.NewTextErrorResponse(err.Error()), nil
-	}
-
-	if err = tempFile.Close(); err != nil {
-		return llm.NewTextErrorResponse(fmt.Sprintf("failed to close temp file: %v", err)), nil
+		cleanup()
+		return result, llm.NewTextErrorResponse(err.Error())
 	}
 
 	if editor.occurrences == 0 {
-		return llm.NewTextErrorResponse(
-			fmt.Sprintf("old_string not found in file. Make sure to copy the exact text including all whitespace and indentation.\n\nSearched for:\n%q", args.OldString)), nil
+		cleanup()
+		return result, llm.NewTextErrorResponse(
+			fmt.Sprintf("old_string not found in file. Make sure to copy the exact text including all whitespace and indentation.\n\nSearched for:\n%q", args.OldString))
 	}
 
-	fileInfo, err := os.Stat(args.Path)
-	if err != nil {
-		return llm.NewTextErrorResponse(fmt.Sprintf("failed to get file info: %v", err)), nil
+	result.fileInfo = fileInfo
+	result.occurrences = editor.occurrences
+	cleanup()
+	return result, nil
+}
+
+func replaceFile(tempPath string, path string, fileInfo os.FileInfo) llm.ToolResultOutput {
+	// On Windows, os.Rename fails with "Access is denied" if the target
+	// file still has an open handle. All source file handles are closed
+	// by the time we get here (editToTemp's cleanup closes them).
+	if err := os.Rename(tempPath, path); err != nil {
+		return llm.NewTextErrorResponse(fmt.Sprintf("failed to replace file: %v", err))
 	}
 
-	if err = os.Rename(tempPath, args.Path); err != nil {
-		return llm.NewTextErrorResponse(fmt.Sprintf("failed to replace file: %v", err)), nil
+	if err := os.Chmod(path, fileInfo.Mode()); err != nil {
+		return llm.NewTextErrorResponse(fmt.Sprintf("failed to restore file permissions: %v", err))
 	}
 
-	if err = os.Chmod(args.Path, fileInfo.Mode()); err != nil {
-		return llm.NewTextErrorResponse(fmt.Sprintf("failed to restore file permissions: %v", err)), nil
-	}
-
-	return llm.NewTextResponse("File edited successfully"), nil
+	return llm.NewTextResponse("File edited successfully")
 }
