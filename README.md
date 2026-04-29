@@ -2,7 +2,7 @@
 
 A fast, minimal AI coding agent that runs in your terminal.
 
-AlayaCore connects to any OpenAI-compatible or Anthropic-compatible LLM and gives it the tools to read, write, and edit files, execute commands, and activate skills — all from an interactive TUI with streaming output, session persistence, and multi-step agentic tool-calling loops.
+AlayaCore connects to any OpenAI-compatible or Anthropic-compatible LLM and gives it the tools to read, write, and edit files, and execute commands — all from an interactive TUI with streaming output, session persistence, and multi-step agentic tool-calling loops.
 
 You give AlayaCore a task in natural language. It calls an LLM, which reasons about the task and invokes tools — reading files to understand context, editing them to make changes, running commands to verify results — in an autonomous loop until the task is done. You watch the work happen in real time and can intervene at any point.
 
