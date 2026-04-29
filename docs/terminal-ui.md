@@ -14,7 +14,7 @@ AlayaCore's terminal UI is built with [Bubble Tea](https://github.com/charmbrace
 | `Ctrl+D` | Scroll down half screen |
 | `Ctrl+U` | Scroll up half screen |
 | `g` | Go to first window, scroll to top |
-| `G` | Go to last window, scroll to bottom |
+| `G` | Go to last window, enable follow |
 | `H` | Move cursor to top window in visible area |
 | `M` | Move cursor to middle window in visible area |
 | `L` | Move cursor to bottom window in visible area |
@@ -32,6 +32,7 @@ AlayaCore's terminal UI is built with [Bubble Tea](https://github.com/charmbrace
 | `Ctrl+L` | Open model selector |
 | `Ctrl+P` | Open theme selector |
 | `Ctrl+Q` | Open task queue manager |
+| `Ctrl+H` | Open help window |
 | `Ctrl+T` | Toggle think mode |
 | `Ctrl+G` | Cancel current request (with confirmation) |
 | `Ctrl+C` | Clear input field (only when input is focused) |
@@ -60,7 +61,7 @@ Commands are split into two categories:
 | `:summarize` | Summarize conversation to reduce token usage |
 | `:save [filename]` | Save session. Uses `--session` path if no filename given. |
 
-Note: `:quit` / `:q` is handled directly by each adaptor (terminal shows a confirmation dialog, plainio exits immediately) and never reaches the session command dispatch.
+Note: `:quit` / `:q` and `:help` are handled directly by each adaptor (terminal shows a confirmation dialog for quit, opens help window for help; plainio exits immediately for quit) and never reaches the session command dispatch.
 
 ## Window Container
 
@@ -90,6 +91,25 @@ When you submit prompts or commands while a previous task is running, they are q
 | `d` | Delete selected task |
 
 Each queued task shows its queue ID (Q1, Q2, …), type (`P` for prompt, `C` for command), and a truncated content preview.
+
+## Help Window
+
+Press `Ctrl+H` or type `:help` to open a help window listing all keybindings and commands:
+
+| Key | Action |
+|-----|--------|
+| `q`, `Esc` | Close help window |
+| `j`, `↓` | Move selection down |
+| `k`, `↑` | Move selection up |
+| `Enter` | Copy selected command to input (commands only) |
+
+The help window is organized into three sections:
+
+- **Commands** — colon commands available in the input field
+- **Global Shortcuts** — keybindings that work from any context
+- **Display Mode** — navigation and editing keys for the display area
+
+The help window uses the same size, position, and overlay pattern as the task queue manager and theme selector.
 
 ## Session Persistence
 

@@ -34,6 +34,7 @@ var globalKeyBindings = []KeyBinding{
 	{"ctrl+p", "Open theme selector", "global"},
 	{"ctrl+q", "Open queue manager", "global"},
 	{"ctrl+t", "Toggle think mode", "global"},
+	{"ctrl+h", "Open help window", "global"},
 	{"enter", "Submit prompt/command", "global"},
 }
 
@@ -113,6 +114,17 @@ var themeSelectorKeyBindings = []KeyBinding{
 	{"q", "Close theme selector", "theme-selector"},
 }
 
+// Help window key bindings
+var helpWindowKeyBindings = []KeyBinding{
+	{"up", "Move selection up", "help-window"},
+	{"k", "Move selection up", "help-window"},
+	{"down", "Move selection down", "help-window"},
+	{"j", "Move selection down", "help-window"},
+	{"enter", "Copy command to input (commands only)", "help-window"},
+	{"esc", "Close help window", "help-window"},
+	{"q", "Close help window", "help-window"},
+}
+
 // Confirmation dialog key bindings
 var confirmDialogKeyBindings = []KeyBinding{
 	{"y", "Confirm action", "confirm-dialog"},
@@ -129,6 +141,7 @@ func GetAllKeyBindings() []KeyBinding {
 	all = append(all, modelSelectorKeyBindings...)
 	all = append(all, queueManagerKeyBindings...)
 	all = append(all, themeSelectorKeyBindings...)
+	all = append(all, helpWindowKeyBindings...)
 	all = append(all, confirmDialogKeyBindings...)
 	return all
 }
@@ -152,6 +165,11 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// 3. Queue manager takes precedence when open
 	if m.queueManager.IsOpen() {
 		return m.handleQueueManagerKeys(msg)
+	}
+
+	// 3.5 Help window takes precedence when open
+	if m.helpWindow.IsOpen() {
+		return m.handleHelpWindowKeys(msg)
 	}
 
 	// 4. Confirmation dialogs block normal input
@@ -308,6 +326,27 @@ func (m *Terminal) handleQueueManagerKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, cmd
+}
+
+// handleHelpWindowKeys handles input when help window is open.
+func (m *Terminal) handleHelpWindowKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	m.helpWindow.HandleKeyMsg(msg)
+
+	// Check if a command was selected via Enter before window closed
+	if pending := m.helpWindow.ConsumePendingCommand(); pending != "" {
+		m.restoreFocus()
+		m.input.SetValue(pending + " ")
+		m.input.Focus()
+		m.focusedWindow = "input"
+		return m, nil
+	}
+
+	// Restore focus when help window closes
+	if !m.helpWindow.IsOpen() {
+		m.restoreFocus()
+	}
+
+	return m, nil
 }
 
 // handleConfirmDialog handles quit and cancel confirmation dialogs.
@@ -529,6 +568,10 @@ func (m *Terminal) handleGlobalKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 		m.openQueueManager()
 		return nil, true
 
+	case "ctrl+h":
+		m.openHelpWindow()
+		return nil, true
+
 	case "ctrl+t":
 		return m.submitCommand("think -1", false), true
 
@@ -566,7 +609,7 @@ func (m *Terminal) handleInputKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // handleSubmit processes the input when Enter is pressed.
 func (m *Terminal) handleSubmit() tea.Cmd {
-	prompt := m.input.GetPrompt()
+	prompt := strings.TrimSpace(m.input.GetPrompt())
 	m.input.editorContent = ""
 
 	if prompt == "" {
@@ -575,7 +618,7 @@ func (m *Terminal) handleSubmit() tea.Cmd {
 
 	// Check if it's a command (starts with ":")
 	if command, found := strings.CutPrefix(prompt, ":"); found {
-		return m.handleCommand(command)
+		return m.handleCommand(strings.TrimSpace(command))
 	}
 
 	// Regular prompt - send to agent
@@ -605,6 +648,13 @@ func (m *Terminal) handleCommand(command string) tea.Cmd {
 	if command == "cancel_all" {
 		m.confirmDialog = confirmCancelAll
 		m.confirmFromCommand = true
+		return nil
+	}
+
+	// Help command - opens help window locally, not sent to session
+	if command == "help" {
+		m.input.SetValue("")
+		m.openHelpWindow()
 		return nil
 	}
 

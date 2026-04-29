@@ -101,6 +101,7 @@ type Terminal struct {
 	queueManager  *QueueManager
 	themeSelector *ThemeSelector
 	themeManager  *ThemeManager
+	helpWindow    *HelpWindow
 
 	// Status bar state (simplified - no separate struct)
 	statusText string
@@ -157,6 +158,7 @@ func NewTerminalWithTheme(
 		queueManager:  NewQueueManager(styles),
 		themeSelector: NewThemeSelector(styles),
 		themeManager:  themeManager,
+		helpWindow:    NewHelpWindow(styles),
 		windowWidth:   initialWidth,
 		windowHeight:  initialHeight,
 		styles:        styles,
@@ -170,6 +172,7 @@ func NewTerminalWithTheme(
 	m.modelSelector.SetSize(initialWidth, initialHeight)
 	m.queueManager.SetSize(initialWidth, initialHeight)
 	m.themeSelector.SetSize(initialWidth, initialHeight)
+	m.helpWindow.SetSize(initialWidth, initialHeight)
 	m.updateDisplayHeight()
 
 	return m
@@ -256,6 +259,7 @@ func (m *Terminal) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 	m.modelSelector.SetSize(msg.Width, msg.Height)
 	m.queueManager.SetSize(msg.Width, msg.Height)
 	m.themeSelector.SetSize(msg.Width, msg.Height)
+	m.helpWindow.SetSize(msg.Width, msg.Height)
 	m.updateDisplayHeight()
 
 	// Validate cursor position after resize (window heights may have changed)
@@ -513,6 +517,15 @@ func (m *Terminal) View() tea.View {
 		return v
 	}
 
+	// Render help window overlay if open
+	if m.helpWindow.IsOpen() {
+		fullContent := m.helpWindow.RenderOverlay(baseContent, m.windowWidth, m.windowHeight)
+		v := tea.NewView(fullContent)
+		v.AltScreen = true
+		v.ReportFocus = true
+		return v
+	}
+
 	v := tea.NewView(baseContent)
 	v.AltScreen = true
 	v.ReportFocus = true
@@ -629,6 +642,14 @@ func (m *Terminal) openThemeSelector() {
 	m.display.updateContent()
 }
 
+// openHelpWindow opens the help window UI.
+func (m *Terminal) openHelpWindow() {
+	m.helpWindow.Open()
+	m.input.Blur()
+	m.display.SetDisplayFocused(false)
+	m.display.updateContent()
+}
+
 // applyTheme applies a new theme to all UI components.
 func (m *Terminal) applyTheme(theme *Theme) {
 	m.styles = NewStyles(theme)
@@ -638,6 +659,7 @@ func (m *Terminal) applyTheme(theme *Theme) {
 	m.modelSelector.SetStyles(m.styles)
 	m.queueManager.SetStyles(m.styles)
 	m.themeSelector.SetStyles(m.styles)
+	m.helpWindow.SetStyles(m.styles)
 	m.display.updateContent()
 }
 
@@ -649,6 +671,7 @@ func (m *Terminal) handleBlur() (tea.Model, tea.Cmd) {
 	m.modelSelector.SetHasFocus(false)
 	m.queueManager.SetHasFocus(false)
 	m.themeSelector.SetHasFocus(false)
+	m.helpWindow.SetHasFocus(false)
 	m.display.updateContent()
 	return m, nil
 }
@@ -660,6 +683,7 @@ func (m *Terminal) handleFocus() (tea.Model, tea.Cmd) {
 	m.modelSelector.SetHasFocus(true)
 	m.queueManager.SetHasFocus(true)
 	m.themeSelector.SetHasFocus(true)
+	m.helpWindow.SetHasFocus(true)
 
 	if m.modelSelector.IsOpen() {
 		m.display.updateContent()
@@ -672,6 +696,11 @@ func (m *Terminal) handleFocus() (tea.Model, tea.Cmd) {
 	}
 
 	if m.themeSelector.IsOpen() {
+		m.display.updateContent()
+		return m, nil
+	}
+
+	if m.helpWindow.IsOpen() {
 		m.display.updateContent()
 		return m, nil
 	}
