@@ -398,19 +398,17 @@ func (m *Terminal) updateStatus() {
 	// Build status segments - each rendered separately with appropriate colors
 	var segments []string
 
-	// Reasoning mode segment (leftmost — think mode status)
+	// Switch indicators segment (compact: "T✦ F↓" in one segment)
+	var switches []string
 	if snap.ThinkEnabled {
 		thinkStyle := m.styles.Status.Foreground(m.styles.ColorAccent).Bold(true)
-		segments = append(segments,
-			thinkStyle.Render("T✦"),
-		)
+		switches = append(switches, thinkStyle.Render("T✦"))
 	}
-
-	// Auto-follow indicator
 	if m.display.shouldFollow() {
-		segments = append(segments,
-			valStyle.Render("F↓"),
-		)
+		switches = append(switches, valStyle.Render("F↓"))
+	}
+	if len(switches) > 0 {
+		segments = append(segments, strings.Join(switches, " "))
 	}
 
 	// Context segment
