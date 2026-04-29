@@ -383,13 +383,16 @@ func (hw *HelpWindow) clampSelection() {
 	hw.ensureVisible()
 }
 
-// ensureVisible adjusts scrollIdx so the selected item is visible.
+// ensureVisible adjusts scrollIdx so the selected item is visible,
+// maintaining a small scroll offset from the edges (like vim's scrolloff).
 func (hw *HelpWindow) ensureVisible() {
 	listHeight := SelectorListRows
-	if hw.selectedIdx < hw.scrollIdx {
-		hw.scrollIdx = hw.selectedIdx
-	} else if hw.selectedIdx >= hw.scrollIdx+listHeight {
-		hw.scrollIdx = hw.selectedIdx - listHeight + 1
+	scrollOff := min(1, listHeight/4)
+
+	if hw.selectedIdx < hw.scrollIdx+scrollOff {
+		hw.scrollIdx = max(0, hw.selectedIdx-scrollOff)
+	} else if hw.selectedIdx >= hw.scrollIdx+listHeight-scrollOff {
+		hw.scrollIdx = hw.selectedIdx - listHeight + 1 + scrollOff
 	}
 }
 
@@ -460,7 +463,7 @@ func (hw *HelpWindow) View() string {
 // renderItem renders a single help item.
 func (hw *HelpWindow) renderItem(item HelpItem, selected bool) string {
 	if item.IsSection {
-		return hw.styles.Prompt.Bold(true).Render("── " + item.Description)
+		return hw.styles.System.Bold(true).Render("── " + item.Description)
 	}
 
 	// Fixed 32-column key column for consistent alignment

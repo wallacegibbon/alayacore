@@ -424,6 +424,61 @@ func TestHelpWindowFilterEmptyResult(t *testing.T) {
 	}
 }
 
+func TestHelpWindowHeaderReappearsOnScrollBack(t *testing.T) {
+	styles := DefaultStyles()
+	hw := NewHelpWindow(styles)
+
+	// Use a small set of items to control the scenario precisely:
+	// 1 header + 9 items = 10 entries, with SelectorListRows = 8
+	hw.items = []HelpItem{
+		{IsSection: true, Description: "Commands"},
+		{Key: ":a", Description: "A"},
+		{Key: ":b", Description: "B"},
+		{Key: ":c", Description: "C"},
+		{Key: ":d", Description: "D"},
+		{Key: ":e", Description: "E"},
+		{Key: ":f", Description: "F"},
+		{Key: ":g", Description: "G"},
+		{Key: ":h", Description: "H"},
+		{Key: ":i", Description: "I"},
+	}
+	hw.Open()
+
+	// Verify header is visible at start (scrollIdx = 0)
+	if hw.scrollIdx != 0 {
+		t.Fatalf("Expected scrollIdx=0 at start, got %d", hw.scrollIdx)
+	}
+	if !containsStr(hw.View(), "Commands") {
+		t.Fatal("Header should be visible at start")
+	}
+
+	// Move down past the visible area to push header out of view
+	for i := 0; i < SelectorListRows; i++ {
+		hw.moveDown()
+	}
+
+	// Header should be out of view now
+	if hw.scrollIdx == 0 {
+		t.Fatal("Expected scrollIdx > 0 after scrolling down")
+	}
+	if containsStr(hw.View(), "── Commands") {
+		t.Fatal("Header should be out of view after scrolling down")
+	}
+
+	// Now move all the way back up
+	for i := 0; i < SelectorListRows; i++ {
+		hw.moveUp()
+	}
+
+	// Header should reappear
+	if hw.scrollIdx != 0 {
+		t.Errorf("Expected scrollIdx=0 after scrolling back up, got %d", hw.scrollIdx)
+	}
+	if !containsStr(hw.View(), "── Commands") {
+		t.Error("Header should be visible again after scrolling back up")
+	}
+}
+
 func containsStr(s, substr string) bool {
 	for i := 0; i <= len(s)-len(substr); i++ {
 		if s[i:i+len(substr)] == substr {
