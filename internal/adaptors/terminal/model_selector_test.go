@@ -111,9 +111,9 @@ func TestFuzzyMatch(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Convert to lowercase for both (as the function expects)
-			result := fuzzyMatch(strings.ToLower(tt.search), strings.ToLower(tt.target))
+			result := FuzzyMatch(strings.ToLower(tt.search), strings.ToLower(tt.target))
 			if result != tt.expected {
-				t.Errorf("fuzzyMatch(%q, %q) = %v, expected %v", tt.search, tt.target, result, tt.expected)
+				t.Errorf("FuzzyMatch(%q, %q) = %v, expected %v", tt.search, tt.target, result, tt.expected)
 			}
 		})
 	}

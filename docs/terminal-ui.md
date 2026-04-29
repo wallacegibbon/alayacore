@@ -94,10 +94,11 @@ Each queued task shows its queue ID (Q1, Q2, …), type (`P` for prompt, `C` for
 
 ## Help Window
 
-Press `Ctrl+H` or type `:help` to open a help window listing all keybindings and commands:
+Press `Ctrl+H` or type `:help` to open a help window listing all keybindings and commands. The filter input at the top lets you fuzzy-search for specific keys or commands (e.g. typing `gt` matches `:get_tasks`):
 
 | Key | Action |
 |-----|--------|
+| `Tab` | Toggle focus between filter input and list |
 | `q`, `Esc` | Close help window |
 | `j`, `↓` | Move selection down |
 | `k`, `↑` | Move selection up |

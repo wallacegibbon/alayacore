@@ -120,6 +120,7 @@ var helpWindowKeyBindings = []KeyBinding{
 	{"k", "Move selection up", "help-window"},
 	{"down", "Move selection down", "help-window"},
 	{"j", "Move selection down", "help-window"},
+	{"tab", "Toggle filter/list focus", "help-window"},
 	{"enter", "Copy command to input (commands only)", "help-window"},
 	{"esc", "Close help window", "help-window"},
 	{"q", "Close help window", "help-window"},

@@ -4,8 +4,19 @@ import (
 	"fmt"
 	"strings"
 
+	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 )
+
+// FuzzyMatchHelpItem checks if the search term fuzzy-matches either the Key
+// or Description field of a HelpItem (case-insensitive).
+func FuzzyMatchHelpItem(search string, item HelpItem) bool {
+	if search == "" {
+		return true
+	}
+	return FuzzyMatch(search, strings.ToLower(item.Key)) ||
+		FuzzyMatch(search, strings.ToLower(item.Description))
+}
 
 // HelpItem represents a single help entry with a key and description.
 type HelpItem struct {
@@ -23,15 +34,22 @@ const (
 )
 
 // HelpWindow manages a help overlay that displays keybindings and commands.
-// It follows the same pattern as QueueManager and ThemeSelector.
+// It provides a filter input to search items, following the same pattern
+// as ModelSelector.
 type HelpWindow struct {
-	state       HelpWindowState
-	items       []HelpItem
-	selectedIdx int
-	scrollIdx   int
-	width       int
-	height      int
-	styles      *Styles
+	state         HelpWindowState
+	items         []HelpItem
+	filteredItems []HelpItem
+	selectedIdx   int
+	scrollIdx     int
+	width         int
+	height        int
+	styles        *Styles
+
+	// Filter state
+	filterInput        textinput.Model
+	filterInputFocused bool
+	lastFilterValue    string
 
 	// App focus state
 	hasFocus bool
@@ -44,14 +62,23 @@ type HelpWindow struct {
 
 // NewHelpWindow creates a new help window.
 func NewHelpWindow(styles *Styles) *HelpWindow {
-	return &HelpWindow{
-		state:    HelpWindowClosed,
-		items:    buildHelpItems(),
-		styles:   styles,
-		width:    72,
-		height:   20,
-		hasFocus: true,
+	filterInput := textinput.New()
+	filterInput.Placeholder = "Filter..."
+	filterInput.Prompt = "/ "
+	filterInput.SetWidth(50)
+
+	hw := &HelpWindow{
+		state:           HelpWindowClosed,
+		items:           buildHelpItems(),
+		styles:          styles,
+		width:           72,
+		height:          20,
+		hasFocus:        true,
+		filterInput:     filterInput,
+		lastFilterValue: "\x00",
 	}
+	hw.updateFilteredItems()
+	return hw
 }
 
 // buildHelpItems constructs the static list of help entries.
@@ -105,9 +132,14 @@ func (hw *HelpWindow) State() HelpWindowState { return hw.state }
 
 func (hw *HelpWindow) Open() {
 	hw.state = HelpWindowOpen
-	hw.selectedIdx = hw.firstSelectableIdx()
+	hw.filterInput.SetValue("")
+	hw.lastFilterValue = "\x00" // Force update
+	hw.filterInputFocused = false
+	hw.filterInput.Blur()
+	hw.updateFilterInputStyles()
 	hw.scrollIdx = 0
-	hw.clampScroll()
+	hw.updateFilteredItems()
+	hw.selectedIdx = hw.firstSelectableIdx()
 }
 
 func (hw *HelpWindow) Close() {
@@ -119,30 +151,148 @@ func (hw *HelpWindow) Close() {
 func (hw *HelpWindow) SetSize(width, height int) {
 	hw.width = width
 	hw.height = height
+	if width > 0 {
+		hw.filterInput.SetWidth(max(0, width-InputPaddingH))
+	}
 }
 
 func (hw *HelpWindow) SetStyles(styles *Styles) {
 	hw.styles = styles
+	hw.updateFilterInputStyles()
 }
 
 func (hw *HelpWindow) SetHasFocus(hasFocus bool) {
 	hw.hasFocus = hasFocus
+	hw.updateFilterInputStyles()
+}
+
+// updateFilterInputStyles applies current styles to the filter input.
+func (hw *HelpWindow) updateFilterInputStyles() {
+	hw.styles.ApplyTextInputStyles(&hw.filterInput, hw.filterInputFocused && hw.hasFocus)
+}
+
+// --- Filtering ---
+
+// updateFilteredItems rebuilds filteredItems from items based on the current filter.
+// Only non-header items are matched; section headers are included only if they
+// have at least one matching item below them.
+func (hw *HelpWindow) updateFilteredItems() {
+	filter := strings.ToLower(hw.filterInput.Value())
+	if filter == hw.lastFilterValue {
+		return
+	}
+	hw.lastFilterValue = filter
+
+	if filter == "" {
+		hw.filteredItems = hw.items
+		return
+	}
+
+	var result []HelpItem
+	var currentSection []HelpItem
+	var sectionHeader *HelpItem
+
+	flushSection := func() {
+		if sectionHeader != nil && len(currentSection) > 0 {
+			result = append(result, *sectionHeader)
+			result = append(result, currentSection...)
+		}
+		sectionHeader = nil
+		currentSection = nil
+	}
+
+	for _, item := range hw.items {
+		if item.IsSection {
+			flushSection()
+			h := item
+			sectionHeader = &h
+			continue
+		}
+		if FuzzyMatchHelpItem(filter, item) {
+			currentSection = append(currentSection, item)
+		}
+	}
+	flushSection()
+
+	hw.filteredItems = result
+}
+
+// filteredLen returns the length of filteredItems.
+func (hw *HelpWindow) filteredLen() int {
+	return len(hw.filteredItems)
 }
 
 // --- Input Handling ---
 
 // HandleKeyMsg processes keyboard input and returns a tea.Cmd.
 func (hw *HelpWindow) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
-	switch msg.String() {
+	key := msg.String()
+
+	// TAB: Toggle focus between filter input and list
+	if key == "tab" {
+		hw.filterInputFocused = !hw.filterInputFocused
+		if hw.filterInputFocused {
+			hw.filterInput.Focus()
+		} else {
+			hw.filterInput.Blur()
+		}
+		hw.updateFilterInputStyles()
+		return nil
+	}
+
+	// Route to filter input or list based on focus
+	if hw.filterInputFocused {
+		return hw.handleFilterInputKey(msg, key)
+	}
+
+	return hw.handleListKey(key)
+}
+
+// handleFilterInputKey handles keys when the filter input is focused.
+func (hw *HelpWindow) handleFilterInputKey(msg tea.KeyMsg, key string) tea.Cmd {
+	if key == "esc" {
+		hw.Close()
+		return nil
+	}
+
+	if key == "ctrl+c" {
+		hw.filterInput.SetValue("")
+		hw.updateFilteredItems()
+		hw.clampSelection()
+		return nil
+	}
+
+	// Ignore ctrl+u/ctrl+d to prevent textinput clear/delete behavior
+	if key == "ctrl+u" || key == "ctrl+d" {
+		return nil
+	}
+
+	oldValue := hw.filterInput.Value()
+	var cmd tea.Cmd
+	hw.filterInput, cmd = hw.filterInput.Update(msg)
+
+	if oldValue != hw.filterInput.Value() {
+		hw.updateFilteredItems()
+		hw.clampSelection()
+	}
+
+	return cmd
+}
+
+// handleListKey handles keys when the list is focused.
+func (hw *HelpWindow) handleListKey(key string) tea.Cmd {
+	switch key {
 	case "q", "esc", "ctrl+c":
 		hw.Close()
 		return nil
 
 	case "enter":
-		item := hw.items[hw.selectedIdx]
-		if !item.IsSection && strings.HasPrefix(item.Key, ":") {
-			hw.pendingCommand = item.Key
-			hw.Close()
+		if hw.selectedIdx >= 0 && hw.selectedIdx < hw.filteredLen() {
+			item := hw.filteredItems[hw.selectedIdx]
+			if !item.IsSection && strings.HasPrefix(item.Key, ":") {
+				hw.pendingCommand = item.Key
+				hw.Close()
+			}
 		}
 		return nil
 
@@ -169,8 +319,8 @@ func (hw *HelpWindow) ConsumePendingCommand() string {
 
 // moveDown moves the selection down, skipping section headers.
 func (hw *HelpWindow) moveDown() {
-	for i := hw.selectedIdx + 1; i < len(hw.items); i++ {
-		if !hw.items[i].IsSection {
+	for i := hw.selectedIdx + 1; i < hw.filteredLen(); i++ {
+		if !hw.filteredItems[i].IsSection {
 			hw.selectedIdx = i
 			hw.ensureVisible()
 			return
@@ -181,7 +331,7 @@ func (hw *HelpWindow) moveDown() {
 // moveUp moves the selection up, skipping section headers.
 func (hw *HelpWindow) moveUp() {
 	for i := hw.selectedIdx - 1; i >= 0; i-- {
-		if !hw.items[i].IsSection {
+		if !hw.filteredItems[i].IsSection {
 			hw.selectedIdx = i
 			hw.ensureVisible()
 			return
@@ -191,12 +341,46 @@ func (hw *HelpWindow) moveUp() {
 
 // firstSelectableIdx returns the index of the first non-section item.
 func (hw *HelpWindow) firstSelectableIdx() int {
-	for i, item := range hw.items {
+	for i, item := range hw.filteredItems {
 		if !item.IsSection {
 			return i
 		}
 	}
 	return 0
+}
+
+// clampSelection ensures selectedIdx is within valid bounds.
+func (hw *HelpWindow) clampSelection() {
+	if hw.filteredLen() == 0 {
+		hw.selectedIdx = 0
+		hw.scrollIdx = 0
+		return
+	}
+	if hw.selectedIdx >= hw.filteredLen() {
+		hw.selectedIdx = hw.filteredLen() - 1
+	}
+	// Skip section headers
+	if hw.selectedIdx >= 0 && hw.selectedIdx < hw.filteredLen() && hw.filteredItems[hw.selectedIdx].IsSection {
+		// Try to find next non-section item
+		found := false
+		for i := hw.selectedIdx; i < hw.filteredLen(); i++ {
+			if !hw.filteredItems[i].IsSection {
+				hw.selectedIdx = i
+				found = true
+				break
+			}
+		}
+		if !found {
+			// Try backwards
+			for i := hw.selectedIdx - 1; i >= 0; i-- {
+				if !hw.filteredItems[i].IsSection {
+					hw.selectedIdx = i
+					break
+				}
+			}
+		}
+	}
+	hw.ensureVisible()
 }
 
 // ensureVisible adjusts scrollIdx so the selected item is visible.
@@ -211,7 +395,7 @@ func (hw *HelpWindow) ensureVisible() {
 
 // clampScroll ensures scrollIdx is valid.
 func (hw *HelpWindow) clampScroll() {
-	maxScroll := max(0, len(hw.items)-SelectorListRows)
+	maxScroll := max(0, hw.filteredLen()-SelectorListRows)
 	if hw.scrollIdx > maxScroll {
 		hw.scrollIdx = maxScroll
 	}
@@ -231,11 +415,22 @@ func (hw *HelpWindow) View() string {
 	listHeight := SelectorListRows
 	hw.clampScroll()
 
-	// Build visible lines
+	// Filter input with border
+	filterBorderColor := hw.styles.BorderFocused
+	if !hw.hasFocus || !hw.filterInputFocused {
+		filterBorderColor = hw.styles.BorderBlurred
+	}
+	filterBox := hw.styles.RenderBorderedBox(hw.filterInput.View(), hw.width, filterBorderColor)
+
+	// Build list lines
 	var lines []string
-	endIdx := min(hw.scrollIdx+listHeight, len(hw.items))
-	for i := hw.scrollIdx; i < endIdx; i++ {
-		lines = append(lines, hw.renderItem(hw.items[i], i == hw.selectedIdx))
+	if hw.filteredLen() == 0 {
+		lines = append(lines, hw.styles.System.Render("No matching commands or keys."))
+	} else {
+		endIdx := min(hw.scrollIdx+listHeight, hw.filteredLen())
+		for i := hw.scrollIdx; i < endIdx; i++ {
+			lines = append(lines, hw.renderItem(hw.filteredItems[i], i == hw.selectedIdx))
+		}
 	}
 
 	// Pad to fill the list height
@@ -243,17 +438,23 @@ func (hw *HelpWindow) View() string {
 		lines = append(lines, "")
 	}
 
-	// Wrap in border
-	borderColor := hw.styles.BorderFocused
-	if !hw.hasFocus {
-		borderColor = hw.styles.BorderBlurred
+	// List with border
+	listBorderColor := hw.styles.BorderFocused
+	if !hw.hasFocus || hw.filterInputFocused {
+		listBorderColor = hw.styles.BorderBlurred
 	}
 	content := strings.Join(lines, "\n")
-	borderedBox := hw.styles.RenderBorderedBox(content, hw.width, borderColor, listHeight)
+	listBox := hw.styles.RenderBorderedBox(content, hw.width, listBorderColor, listHeight)
 
-	// Help text outside the bordered box
-	helpText := hw.styles.System.Render("j/k: navigate │ enter: copy command │ q/esc: close")
-	return borderedBox + "\n" + helpText
+	// Help text based on focus
+	var helpText string
+	if hw.filterInputFocused {
+		helpText = hw.styles.System.Render("tab: list │ esc: close")
+	} else {
+		helpText = hw.styles.System.Render("tab: filter │ j/k: navigate │ enter: copy command │ q/esc: close")
+	}
+
+	return filterBox + "\n" + listBox + "\n" + helpText
 }
 
 // renderItem renders a single help item.

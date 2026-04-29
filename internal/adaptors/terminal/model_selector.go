@@ -461,31 +461,6 @@ func (ms *ModelSelector) RenderOverlay(baseContent string, screenWidth, screenHe
 
 // --- Helpers ---
 
-// fuzzyMatch checks if all characters in the search term appear in order
-// (but not necessarily consecutively) in the target string.
-// Both strings should be lowercase for case-insensitive matching.
-//
-// Examples:
-//   - fuzzyMatch("zhipuglm5", "zhipu / glm-5") → true (all chars appear in order)
-//   - fuzzyMatch("glm5", "zhipu / glm-5") → true (partial match)
-//   - fuzzyMatch("glmzhipu", "zhipu / glm-5") → false (wrong order)
-func fuzzyMatch(search, target string) bool {
-	if search == "" {
-		return true
-	}
-	if len(search) > len(target) {
-		return false
-	}
-
-	searchIdx := 0
-	for i := 0; i < len(target) && searchIdx < len(search); i++ {
-		if search[searchIdx] == target[i] {
-			searchIdx++
-		}
-	}
-	return searchIdx == len(search)
-}
-
 func (ms *ModelSelector) updateFilteredModels() {
 	search := ms.searchInput.Value()
 	if search == ms.lastSearchValue {
@@ -500,10 +475,10 @@ func (ms *ModelSelector) updateFilteredModels() {
 		term := strings.ToLower(search)
 		ms.filteredModels = ms.filteredModels[:0]
 		for _, m := range ms.models {
-			if fuzzyMatch(term, m.nameLower) ||
-				fuzzyMatch(term, m.protocolTypeLower) ||
-				fuzzyMatch(term, m.modelNameLower) ||
-				fuzzyMatch(term, m.baseURLLower) {
+			if FuzzyMatch(term, m.nameLower) ||
+				FuzzyMatch(term, m.protocolTypeLower) ||
+				FuzzyMatch(term, m.modelNameLower) ||
+				FuzzyMatch(term, m.baseURLLower) {
 				ms.filteredModels = append(ms.filteredModels, m)
 			}
 		}
@@ -530,19 +505,7 @@ func (ms *ModelSelector) ensureVisible() {
 }
 
 func (ms *ModelSelector) updateSearchInputStyles() {
-	var styles textinput.Styles
-	// When app doesn't have focus, always show blurred/dimmed styles
-	if ms.searchInputFocused && ms.hasFocus {
-		styles = textinput.DefaultStyles(true)
-		styles.Focused.Prompt = lipgloss.NewStyle().Foreground(ms.styles.ColorAccent).Bold(true)
-		styles.Focused.Placeholder = lipgloss.NewStyle().Foreground(ms.styles.ColorMuted)
-	} else {
-		styles = textinput.DefaultStyles(false)
-		styles.Blurred.Prompt = lipgloss.NewStyle().Foreground(ms.styles.ColorMuted)
-		styles.Blurred.Placeholder = lipgloss.NewStyle().Foreground(ms.styles.ColorDim)
-	}
-	styles.Cursor.Color = ms.styles.CursorColor
-	ms.searchInput.SetStyles(styles)
+	ms.styles.ApplyTextInputStyles(&ms.searchInput, ms.searchInputFocused && ms.hasFocus)
 }
 
 var _ tea.Model = (*ModelSelector)(nil)

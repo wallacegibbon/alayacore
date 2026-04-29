@@ -286,6 +286,7 @@ func TestHelpWindowEnterOnKeyBinding(t *testing.T) {
 		{IsSection: true, Description: "Global Shortcuts"},
 		{Key: "Ctrl+H", Description: "Open help window"},
 	}
+	hw.updateFilteredItems()
 	hw.Open()
 
 	// Press Enter on Ctrl+H (not a :command)
@@ -300,6 +301,126 @@ func TestHelpWindowEnterOnKeyBinding(t *testing.T) {
 	pending := hw.ConsumePendingCommand()
 	if pending != "" {
 		t.Errorf("Expected no pending command, got %q", pending)
+	}
+}
+
+func TestHelpWindowFilter(t *testing.T) {
+	styles := DefaultStyles()
+	hw := NewHelpWindow(styles)
+	hw.Open()
+
+	// Initially all items should be shown
+	totalItems := len(hw.items)
+	if hw.filteredLen() != totalItems {
+		t.Errorf("Expected %d filtered items initially, got %d", totalItems, hw.filteredLen())
+	}
+
+	// Type "quit" into filter
+	hw.filterInputFocused = true
+	hw.filterInput.Focus()
+	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'q'}))
+	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'u'}))
+	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'i'}))
+	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 't'}))
+
+	// Should have filtered items (section header + :quit)
+	if hw.filteredLen() == 0 {
+		t.Error("Expected filtered items after typing 'quit'")
+	}
+
+	// Should contain :quit
+	found := false
+	for _, item := range hw.filteredItems {
+		if item.Key == ":quit" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("Expected ':quit' in filtered items after typing 'quit'")
+	}
+
+	// Clear filter with ctrl+c
+	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'c', Mod: tea.ModCtrl}))
+	if hw.filteredLen() != totalItems {
+		t.Errorf("Expected all items after clear, got %d", hw.filteredLen())
+	}
+}
+
+func TestHelpWindowFilterSectionHeaders(t *testing.T) {
+	styles := DefaultStyles()
+	hw := NewHelpWindow(styles)
+	hw.Open()
+
+	// Filter for "Ctrl" - should only show Global Shortcuts section (has Ctrl+ entries)
+	hw.filterInputFocused = true
+	hw.filterInput.Focus()
+	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'C'}))
+	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 't'}))
+	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'r'}))
+	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'l'}))
+
+	// Should include Global Shortcuts section header
+	hasGlobalShortcuts := false
+	hasDisplayMode := false
+	for _, item := range hw.filteredItems {
+		if item.IsSection && item.Description == "Global Shortcuts" {
+			hasGlobalShortcuts = true
+		}
+		if item.IsSection && item.Description == "Display Mode" {
+			hasDisplayMode = true
+		}
+	}
+	if !hasGlobalShortcuts {
+		t.Error("Expected Global Shortcuts section header in filtered items")
+	}
+	// Display Mode has "Ctrl+D/U" so it should also be present
+	if !hasDisplayMode {
+		t.Error("Expected Display Mode section header in filtered items (has Ctrl+D/U)")
+	}
+}
+
+func TestHelpWindowTabToggle(t *testing.T) {
+	styles := DefaultStyles()
+	hw := NewHelpWindow(styles)
+	hw.Open()
+
+	// Initially list is focused
+	if hw.filterInputFocused {
+		t.Error("Expected list focused initially")
+	}
+
+	// Tab to filter
+	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
+	if !hw.filterInputFocused {
+		t.Error("Expected filter focused after Tab")
+	}
+
+	// Tab back to list
+	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
+	if hw.filterInputFocused {
+		t.Error("Expected list focused after second Tab")
+	}
+}
+
+func TestHelpWindowFilterEmptyResult(t *testing.T) {
+	styles := DefaultStyles()
+	hw := NewHelpWindow(styles)
+	hw.Open()
+
+	// Directly set filter value to test filtering logic
+	hw.filterInput.SetValue("zzz")
+	hw.lastFilterValue = "" // Force update
+	hw.updateFilteredItems()
+
+	if hw.filteredLen() != 0 {
+		t.Errorf("Expected 0 filtered items for 'zzz', got %d", hw.filteredLen())
+	}
+
+	// View should still render without error
+	view := hw.View()
+	if view == "" {
+		t.Error("Expected non-empty view even with no matches")
 	}
 }
 
