@@ -30,6 +30,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/alayacore/alayacore/internal/config"
 	debugpkg "github.com/alayacore/alayacore/internal/debug"
 	domainerrors "github.com/alayacore/alayacore/internal/errors"
 	"github.com/alayacore/alayacore/internal/llm"
@@ -217,7 +218,7 @@ func NewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt str
 		skillDirs:            buildSkillDirSet(skillsMgr),
 		proxyURL:             proxyURL,
 		maxSteps:             maxSteps,
-		thinkLevel:           1,
+		thinkLevel:           config.DefaultThinkLevel,
 		taskQueue:            make([]QueueItem, 0),
 		sessionCtx:           sessionCtx,
 		sessionCancel:        sessionCancel,

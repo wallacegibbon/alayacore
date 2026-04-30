@@ -8,6 +8,10 @@ import (
 	"strings"
 )
 
+// DefaultThinkLevel is the reasoning level used when a session file does not
+// specify one.  0 = off, 1 = normal, 2 = max.
+const DefaultThinkLevel = 1
+
 // ResolveConfigPath returns the provided path, or the default ~/.alayacore/<filename>
 func ResolveConfigPath(providedPath, defaultFilename string) string {
 	if providedPath != "" {

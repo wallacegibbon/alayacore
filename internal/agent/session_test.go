@@ -749,3 +749,32 @@ func TestTLVFormatRecursionProtection(t *testing.T) {
 		t.Errorf("tool result should contain 'Fake user message', got: %q", output.Text)
 	}
 }
+
+// TestLoadSessionMissingThinkLevel verifies that when a session file's
+// frontmatter does not contain a think_level key, the think_level defaults
+// to 1 (normal) rather than 0 (off).
+func TestLoadSessionMissingThinkLevel(t *testing.T) {
+	// Frontmatter without think_level, mimicking an older session file.
+	raw := []byte("---\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\n---\n")
+
+	data, err := parseSessionMarkdown(raw)
+	if err != nil {
+		t.Fatalf("parseSessionMarkdown failed: %v", err)
+	}
+
+	if data.ThinkLevel != 1 {
+		t.Errorf("expected ThinkLevel=1 when think_level is absent from frontmatter, got %d", data.ThinkLevel)
+	}
+
+	// Also verify that an explicit think_level: 0 is preserved.
+	raw2 := []byte("---\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\nthink_level: 0\n---\n")
+
+	data2, err := parseSessionMarkdown(raw2)
+	if err != nil {
+		t.Fatalf("parseSessionMarkdown failed: %v", err)
+	}
+
+	if data2.ThinkLevel != 0 {
+		t.Errorf("expected ThinkLevel=0 when think_level is explicitly 0, got %d", data2.ThinkLevel)
+	}
+}

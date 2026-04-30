@@ -191,6 +191,14 @@ func parseFrontmatter(content string) (frontmatter, body string, err error) {
 func parseSessionMeta(frontmatter string) SessionMeta {
 	var meta SessionMeta
 	config.ParseKeyValue(frontmatter, &meta)
+
+	// Default think_level to 1 (normal) when the key is absent from the
+	// frontmatter.  config.ParseKeyValue leaves the field at its zero value
+	// (0) when the key is missing, which would incorrectly disable thinking.
+	if !strings.Contains(frontmatter, "think_level:") {
+		meta.ThinkLevel = config.DefaultThinkLevel
+	}
+
 	return meta
 }
 
