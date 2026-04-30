@@ -38,6 +38,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/llm"
 )
 
@@ -380,7 +381,7 @@ func anthropicConvertMessages(messages []llm.Message, reasoningLevel int) []anth
 		// tool-call-only messages still satisfy this requirement. Other providers
 		// ignore the extra block. Only done when reasoning is enabled to avoid
 		// wasting tokens.
-		if reasoningLevel > 0 && msg.Role == llm.RoleAssistant {
+		if reasoningLevel > config.ThinkLevelOff && msg.Role == llm.RoleAssistant {
 			hasThinking := false
 			for _, block := range apiMsg.Content {
 				if block.Type == anthropicBlockTypeThinking {
@@ -459,10 +460,10 @@ func (p *AnthropicProvider) StreamMessages(
 	}
 
 	// Always include thinking config based on reasoning level.
-	if p.reasoningLevel > 0 {
+	if p.reasoningLevel > config.ThinkLevelOff {
 		reqBody.Thinking = &anthropicThinking{Type: "enabled"}
 		effort := "high"
-		if p.reasoningLevel >= 2 {
+		if p.reasoningLevel >= config.ThinkLevelMax {
 			effort = "max"
 		}
 		reqBody.OutputConfig = &anthropicOutputConfig{Effort: effort}

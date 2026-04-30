@@ -778,3 +778,37 @@ func TestLoadSessionMissingThinkLevel(t *testing.T) {
 		t.Errorf("expected ThinkLevel=0 when think_level is explicitly 0, got %d", data2.ThinkLevel)
 	}
 }
+
+// TestLoadSessionInvalidThinkLevel verifies that out-of-range think_level
+// values in the session file are reset to the default (1) rather than being
+// passed through to the provider.
+func TestLoadSessionInvalidThinkLevel(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		want  int
+	}{
+		{"negative", "think_level: -1", 1},
+		{"too high", "think_level: 3", 1},
+		{"large positive", "think_level: 999", 1},
+		{"large negative", "think_level: -100", 1},
+		{"valid zero", "think_level: 0", 0},
+		{"valid one", "think_level: 1", 1},
+		{"valid two", "think_level: 2", 2},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			raw := []byte("---\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\n" + tt.value + "\n---\n")
+
+			data, err := parseSessionMarkdown(raw)
+			if err != nil {
+				t.Fatalf("parseSessionMarkdown failed: %v", err)
+			}
+
+			if data.ThinkLevel != tt.want {
+				t.Errorf("think_level=%s: expected %d, got %d", tt.value, tt.want, data.ThinkLevel)
+			}
+		})
+	}
+}

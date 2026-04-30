@@ -42,6 +42,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/llm"
 )
 
@@ -342,10 +343,10 @@ func (p *OpenAIProvider) StreamMessages(
 	}
 
 	// Always include thinking config based on reasoning level.
-	if p.reasoningLevel > 0 {
+	if p.reasoningLevel > config.ThinkLevelOff {
 		reqBody.Thinking = &openAIThinking{Type: "enabled"}
 		effort := "high"
-		if p.reasoningLevel >= 2 {
+		if p.reasoningLevel >= config.ThinkLevelMax {
 			effort = "xhigh"
 		}
 		reqBody.ReasoningEffort = effort
@@ -415,7 +416,7 @@ func openaiConvertMessages(messages []llm.Message, reasoningLevel int) []openAIM
 		// Only for assistant messages to avoid wasting tokens.
 		if msg.Role == llm.RoleAssistant {
 			reasoningText := openaiExtractReasoning(msg.Content)
-			if reasoningText != "" || reasoningLevel > 0 {
+			if reasoningText != "" || reasoningLevel > config.ThinkLevelOff {
 				apiMsg.ReasoningContent = &reasoningText
 			}
 		}

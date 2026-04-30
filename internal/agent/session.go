@@ -421,7 +421,8 @@ func (s *Session) syncThinkToProvider() {
 	}
 }
 
-// SetThinkLevel sets the think level. level: 0=off, 1=normal, 2=max.
+// SetThinkLevel sets the think level.
+// See config.ThinkLevelOff, config.ThinkLevelNormal, config.ThinkLevelMax.
 func (s *Session) SetThinkLevel(level int) {
 	s.mu.Lock()
 	s.thinkLevel = level

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/alayacore/alayacore/internal/config"
 	domainerrors "github.com/alayacore/alayacore/internal/errors"
 	"github.com/alayacore/alayacore/internal/llm"
 )
@@ -279,7 +280,7 @@ func (s *Session) handleThink(args []string) {
 		return
 	}
 	level, err := strconv.Atoi(args[0])
-	if err != nil || level < 0 || level > 2 {
+	if err != nil || level < config.ThinkLevelOff || level > config.ThinkLevelMax {
 		s.writeError("usage: :think [0|1|2]  (0=off, 1=normal, 2=max)")
 		return
 	}

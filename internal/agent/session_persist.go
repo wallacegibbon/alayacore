@@ -199,6 +199,13 @@ func parseSessionMeta(frontmatter string) SessionMeta {
 		meta.ThinkLevel = config.DefaultThinkLevel
 	}
 
+	// Validate think_level range: 0=off, 1=normal, 2=max.
+	// Clamp to default if the stored value is out of range (e.g. corrupted
+	// or hand-edited session file).
+	if meta.ThinkLevel < config.ThinkLevelOff || meta.ThinkLevel > config.ThinkLevelMax {
+		meta.ThinkLevel = config.DefaultThinkLevel
+	}
+
 	return meta
 }
 

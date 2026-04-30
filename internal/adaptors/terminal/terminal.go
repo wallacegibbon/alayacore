@@ -20,6 +20,7 @@ import (
 
 	agentpkg "github.com/alayacore/alayacore/internal/agent"
 	"github.com/alayacore/alayacore/internal/app"
+	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/stream"
 )
 
@@ -400,7 +401,7 @@ func (m *Terminal) updateStatus() {
 
 	// Switch indicators segment (compact: "T1✦ F↓" in one segment)
 	var switches []string
-	if snap.ThinkLevel > 0 {
+	if snap.ThinkLevel > config.ThinkLevelOff {
 		thinkStyle := m.styles.Status.Foreground(m.styles.ColorAccent).Bold(true)
 		switches = append(switches, thinkStyle.Render(fmt.Sprintf("T%d✦", snap.ThinkLevel)))
 	}
