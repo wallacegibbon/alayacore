@@ -7,6 +7,11 @@ import (
 	"iter"
 )
 
+// DefaultMaxTokens is the default maximum output tokens when the user
+// doesn't specify one. Safe for all current models (Claude 3.5 maxes
+// at 8K; newer models support more).
+const DefaultMaxTokens = 8192
+
 // MessageRole represents the role of a message
 type MessageRole string
 

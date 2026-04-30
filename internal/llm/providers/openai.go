@@ -202,9 +202,10 @@ type OpenAIOption func(*OpenAIProvider)
 // NewOpenAI creates a new OpenAI provider
 func NewOpenAI(opts ...OpenAIOption) (*OpenAIProvider, error) {
 	p := &OpenAIProvider{
-		baseURL: "https://api.openai.com/v1",
-		client:  &http.Client{Timeout: 10 * time.Minute},
-		model:   "gpt-4o",
+		baseURL:   "https://api.openai.com/v1",
+		client:    &http.Client{Timeout: 10 * time.Minute},
+		model:     "gpt-4o",
+		maxTokens: llm.DefaultMaxTokens,
 	}
 	for _, opt := range opts {
 		opt(p)

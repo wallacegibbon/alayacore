@@ -74,7 +74,7 @@ func NewAnthropic(opts ...AnthropicOption) (*AnthropicProvider, error) {
 		baseURL:   "https://api.anthropic.com",
 		client:    &http.Client{Timeout: 10 * time.Minute},
 		model:     "claude-3-5-sonnet-20241022",
-		maxTokens: 4096,
+		maxTokens: llm.DefaultMaxTokens,
 	}
 	for _, opt := range opts {
 		opt(p)
