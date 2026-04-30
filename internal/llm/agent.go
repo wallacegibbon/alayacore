@@ -46,9 +46,6 @@ type Agent struct {
 
 // NewAgent creates a new agent
 func NewAgent(config AgentConfig) *Agent {
-	if config.MaxSteps == 0 {
-		config.MaxSteps = 100
-	}
 	return &Agent{config: config}
 }
 
