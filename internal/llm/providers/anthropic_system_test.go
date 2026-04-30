@@ -3,6 +3,8 @@ package providers
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/alayacore/alayacore/internal/llm"
 )
 
 func TestAnthropicSystemMessageArray(t *testing.T) {
@@ -14,7 +16,7 @@ func TestAnthropicSystemMessageArray(t *testing.T) {
 			{Type: "text", Text: "Default system prompt"},
 			{Type: "text", Text: "Extra system prompt 1\n\nExtra system prompt 2"},
 		},
-		MaxTokens: 4096,
+		MaxTokens: llm.DefaultMaxTokens,
 		Stream:    true,
 	}
 
@@ -70,7 +72,7 @@ func TestAnthropicEmptyExtraPrompt(t *testing.T) {
 		System: []anthropicSystemMessage{
 			{Type: "text", Text: "Default system prompt"},
 		},
-		MaxTokens: 4096,
+		MaxTokens: llm.DefaultMaxTokens,
 		Stream:    true,
 	}
 

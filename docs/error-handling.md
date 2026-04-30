@@ -85,12 +85,16 @@ if stopReason != "" && stopReason != "end_turn" && stopReason != "max_tokens" &&
 
 Truncation (`max_tokens` / `length`) is **not** an error at the provider level — the response is valid, just incomplete. The provider includes the stop reason in `StepCompleteEvent.StopReason`.
 
-The agent detects truncation and returns `ErrResponseTruncated`. Partial messages are still included in the `StreamResult` so the caller can inspect what was generated before the cutoff.
+The agent detects truncation in `processStreamEvents` and returns `ErrResponseTruncated`. Partial messages are still included in the `StreamResult` so the caller can inspect what was generated before the cutoff.
 
 ```go
-if stopReason == "max_tokens" || stopReason == "length" {
-    return &StreamResult{Messages: allMessages, Usage: totalUsage}, ErrResponseTruncated
-}
+// In processStreamEvents:
+case StepCompleteEvent:
+    stepMessages = e.Messages
+    stepUsage = e.Usage
+    if e.StopReason == "max_tokens" || e.StopReason == "length" {
+        return stepMessages, stepUsage, nil, ErrResponseTruncated
+    }
 ```
 
 ## Queue Pause on Error
