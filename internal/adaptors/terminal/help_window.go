@@ -382,16 +382,20 @@ func (hw *HelpWindow) clampSelection() {
 	hw.ensureVisible()
 }
 
-// ensureVisible adjusts scrollIdx so the selected item is visible,
-// maintaining a small scroll offset from the edges (like vim's scrolloff).
+// ensureVisible adjusts scrollIdx so the selected item is visible.
+// The bottom-edge logic matches ThemeSelector/ModelSelector/QueueManager
+// exactly (scroll when cursor moves past the last visible row).
+// The top-edge keeps a 1-line margin so section headers stay visible
+// when scrolling near the top of the list.
 func (hw *HelpWindow) ensureVisible() {
 	listHeight := SelectorListRows
-	scrollOff := min(1, listHeight/4)
 
-	if hw.selectedIdx < hw.scrollIdx+scrollOff {
-		hw.scrollIdx = max(0, hw.selectedIdx-scrollOff)
-	} else if hw.selectedIdx >= hw.scrollIdx+listHeight-scrollOff {
-		hw.scrollIdx = hw.selectedIdx - listHeight + 1 + scrollOff
+	// Top edge: keep 1-line margin so section headers remain visible
+	if hw.selectedIdx <= hw.scrollIdx && hw.selectedIdx > 0 {
+		hw.scrollIdx = max(0, hw.selectedIdx-1)
+	} else if hw.selectedIdx >= hw.scrollIdx+listHeight {
+		// Bottom edge: standard logic, same as other selector windows
+		hw.scrollIdx = hw.selectedIdx - listHeight + 1
 	}
 }
 
