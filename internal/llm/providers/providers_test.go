@@ -702,12 +702,14 @@ func TestAnthropicValidStopReasons(t *testing.T) {
 			// Collect events - should NOT get an error
 			var gotError bool
 			var gotStepComplete bool
+			var gotStopReason string
 			for event, iterErr := range events {
 				if iterErr != nil {
 					gotError = true
 				}
-				if _, ok := event.(llm.StepCompleteEvent); ok {
+				if e, ok := event.(llm.StepCompleteEvent); ok {
 					gotStepComplete = true
+					gotStopReason = e.StopReason
 				}
 			}
 
@@ -716,6 +718,9 @@ func TestAnthropicValidStopReasons(t *testing.T) {
 			}
 			if !gotStepComplete {
 				t.Errorf("Expected StepCompleteEvent for valid stop reason '%s'", reason)
+			}
+			if gotStopReason != reason {
+				t.Errorf("Expected StopReason=%q, got %q", reason, gotStopReason)
 			}
 		})
 	}
@@ -796,23 +801,28 @@ func TestOpenAILengthFinishReason(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Collect events - should NOT get an error
+	// Collect events - should NOT get an error at provider level
 	var gotError bool
 	var gotStepComplete bool
+	var gotStopReason string
 	for event, iterErr := range events {
 		if iterErr != nil {
 			gotError = true
 		}
-		if _, ok := event.(llm.StepCompleteEvent); ok {
+		if e, ok := event.(llm.StepCompleteEvent); ok {
 			gotStepComplete = true
+			gotStopReason = e.StopReason
 		}
 	}
 
 	if gotError {
-		t.Error("Should not get error for 'length' finish reason (it's valid, just truncated)")
+		t.Error("Should not get error for 'length' finish reason at provider level")
 	}
 	if !gotStepComplete {
 		t.Error("Expected StepCompleteEvent for 'length' finish reason")
+	}
+	if gotStopReason != "length" {
+		t.Errorf("Expected StopReason=%q, got %q", "length", gotStopReason)
 	}
 }
 

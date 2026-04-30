@@ -54,6 +54,7 @@ type openAIStreamState struct {
 	toolCallArgs     map[int]*strings.Builder // tool call index -> arguments builder
 	toolCalls        []llm.ToolCallPart
 	usage            llm.Usage
+	stopReason       string
 }
 
 func (s *openAIStreamState) addTextDelta(delta string) {
@@ -171,6 +172,18 @@ func (s *openAIStreamState) getUsage() llm.Usage {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.usage
+}
+
+func (s *openAIStreamState) setStopReason(reason string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.stopReason = reason
+}
+
+func (s *openAIStreamState) getStopReason() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.stopReason
 }
 
 // OpenAIProvider implements the OpenAI API
@@ -568,8 +581,9 @@ func (p *OpenAIProvider) parseStream(reader io.Reader) iter.Seq2[llm.StreamEvent
 
 		// Send final StepCompleteEvent with accumulated message
 		yield(llm.StepCompleteEvent{
-			Messages: []llm.Message{state.getMessage()},
-			Usage:    state.getUsage(),
+			Messages:   []llm.Message{state.getMessage()},
+			Usage:      state.getUsage(),
+			StopReason: state.getStopReason(),
 		}, nil)
 	}
 }
@@ -596,6 +610,10 @@ func (p *OpenAIProvider) handleEvent(data string, yield func(llm.StreamEvent, er
 		if ok, err := p.checkFinishReason(choice.FinishReason); !ok {
 			yield(nil, err)
 			return false
+		}
+
+		if choice.FinishReason != "" {
+			state.setStopReason(choice.FinishReason)
 		}
 
 		if ok := p.handleDelta(choice.Delta, yield, state); !ok {

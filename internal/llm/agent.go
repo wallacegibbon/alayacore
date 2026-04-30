@@ -17,12 +17,15 @@ import (
 	"errors"
 	"fmt"
 	"iter"
-	"sync"
 )
 
 // ErrMaxStepsExceeded is returned when the agent loop reaches the configured maximum number of steps
 // without the model producing a final text-only response.
 var ErrMaxStepsExceeded = errors.New("agent loop exceeded maximum steps")
+
+// ErrResponseTruncated is returned when the model's response was cut short
+// due to hitting the output token limit (max_tokens / length).
+var ErrResponseTruncated = errors.New("response truncated: hit output token limit")
 
 // Tool represents an executable tool
 type Tool struct {
@@ -71,10 +74,11 @@ func (a *Agent) Stream(ctx context.Context, messages []Message, callbacks Stream
 		allMessages = make([]Message, len(messages))
 		totalUsage  Usage
 		step        int
-		mu          sync.Mutex
 	)
 
 	copy(allMessages, messages)
+
+	var truncErr error // non-nil when response hit output token limit
 
 	for step = 1; step <= a.config.MaxSteps; step++ {
 		// Check for context cancellation between steps
@@ -84,10 +88,8 @@ func (a *Agent) Stream(ctx context.Context, messages []Message, callbacks Stream
 		default:
 		}
 
-		if callbacks.OnStepStart != nil {
-			if err := callbacks.OnStepStart(step); err != nil {
-				return nil, fmt.Errorf("OnStepStart callback failed: %w", err)
-			}
+		if err := a.invokeStepStart(callbacks, step); err != nil {
+			return nil, err
 		}
 
 		// Convert tools to definitions
@@ -111,67 +113,80 @@ func (a *Agent) Stream(ctx context.Context, messages []Message, callbacks Stream
 		// Process events
 		stepMessages, stepUsage, toolCalls, err := a.processStreamEvents(events, callbacks)
 		if err != nil {
-			return nil, err
+			if !errors.Is(err, ErrResponseTruncated) {
+				return nil, err
+			}
+			truncErr = err
 		}
 
-		mu.Lock()
 		totalUsage.InputTokens += stepUsage.InputTokens
 		totalUsage.OutputTokens += stepUsage.OutputTokens
-		mu.Unlock()
 
-		// If no tool calls, we're done - add the step messages (assistant response)
-		if len(toolCalls) == 0 {
+		// Truncation or no tool calls: finalize the step and stop
+		if truncErr != nil || len(toolCalls) == 0 {
 			if callbacks.OnStepFinish != nil {
-				if err := callbacks.OnStepFinish(stepMessages, stepUsage); err != nil {
-					return nil, fmt.Errorf("OnStepFinish callback failed: %w", err)
+				if cbErr := callbacks.OnStepFinish(stepMessages, stepUsage); cbErr != nil {
+					return nil, fmt.Errorf("OnStepFinish callback failed: %w", cbErr)
 				}
 			}
 			allMessages = append(allMessages, stepMessages...)
 			break
 		}
 
-		// Execute tools and add results to messages
-		toolResults := a.executeTools(ctx, toolCalls, callbacks)
-		toolResultMsg := Message{
-			Role:    RoleTool,
-			Content: toolResults,
+		// Execute tools and continue the loop
+		allMessages, err = a.executeToolStep(ctx, stepMessages, toolCalls, stepUsage, callbacks, allMessages)
+		if err != nil {
+			return nil, err
 		}
+	}
 
-		// Use stepMessages (contains complete assistant response with text, reasoning, AND tool calls)
-		// Fall back to building from toolCalls only if stepMessages is empty (shouldn't happen)
-		if len(stepMessages) == 0 {
-			stepMessages = []Message{{
-				Role:    RoleAssistant,
-				Content: toolCallsToContent(toolCalls),
-			}}
-		}
+	result := &StreamResult{Messages: allMessages, Usage: totalUsage}
 
-		allMessages = append(allMessages, stepMessages...)
-		allMessages = append(allMessages, toolResultMsg)
-
-		// Notify callback with complete step messages (assistant + tool results)
-		if callbacks.OnStepFinish != nil {
-			stepWithResults := make([]Message, len(stepMessages), len(stepMessages)+1)
-			copy(stepWithResults, stepMessages)
-			stepWithResults = append(stepWithResults, toolResultMsg)
-			if err := callbacks.OnStepFinish(stepWithResults, stepUsage); err != nil {
-				return nil, fmt.Errorf("OnStepFinish callback failed: %w", err)
-			}
-		}
+	if truncErr != nil {
+		return result, truncErr
 	}
 
 	// If the loop completed without a break (no final text-only response), we exceeded max steps.
 	if step > a.config.MaxSteps {
-		return &StreamResult{
-			Messages: allMessages,
-			Usage:    totalUsage,
-		}, ErrMaxStepsExceeded
+		return result, ErrMaxStepsExceeded
 	}
 
-	return &StreamResult{
-		Messages: allMessages,
-		Usage:    totalUsage,
-	}, nil
+	return result, nil
+}
+
+// invokeStepStart fires the OnStepStart callback if set.
+func (a *Agent) invokeStepStart(callbacks StreamCallbacks, step int) error {
+	if callbacks.OnStepStart != nil {
+		if err := callbacks.OnStepStart(step); err != nil {
+			return fmt.Errorf("OnStepStart callback failed: %w", err)
+		}
+	}
+	return nil
+}
+
+// executeToolStep runs tool calls, appends assistant + tool result messages,
+// and fires the OnStepFinish callback.
+func (a *Agent) executeToolStep(ctx context.Context, stepMessages []Message, toolCalls []ToolCallPart, stepUsage Usage, callbacks StreamCallbacks, allMessages []Message) ([]Message, error) {
+	toolResults := a.executeTools(ctx, toolCalls, callbacks)
+	toolResultMsg := Message{Role: RoleTool, Content: toolResults}
+
+	if len(stepMessages) == 0 {
+		stepMessages = []Message{{Role: RoleAssistant, Content: toolCallsToContent(toolCalls)}}
+	}
+
+	allMessages = append(allMessages, stepMessages...)
+	allMessages = append(allMessages, toolResultMsg)
+
+	if callbacks.OnStepFinish != nil {
+		stepWithResults := make([]Message, len(stepMessages), len(stepMessages)+1)
+		copy(stepWithResults, stepMessages)
+		stepWithResults = append(stepWithResults, toolResultMsg)
+		if err := callbacks.OnStepFinish(stepWithResults, stepUsage); err != nil {
+			return nil, fmt.Errorf("OnStepFinish callback failed: %w", err)
+		}
+	}
+
+	return allMessages, nil
 }
 
 // processStreamEvents handles streaming events from the provider
@@ -219,6 +234,9 @@ func (a *Agent) processStreamEvents(events iter.Seq2[StreamEvent, error], callba
 		case StepCompleteEvent:
 			stepMessages = e.Messages
 			stepUsage = e.Usage
+			if e.StopReason == "max_tokens" || e.StopReason == "length" {
+				return stepMessages, stepUsage, nil, ErrResponseTruncated
+			}
 		}
 	}
 

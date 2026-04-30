@@ -13,7 +13,7 @@ Both OpenAI and Anthropic APIs use finish reasons (or stop reasons) to indicate 
 | Finish Reason | Meaning | Handling |
 |---------------|---------|----------|
 | `stop` | Normal completion | Process the full message |
-| `length` | Hit `max_tokens` limit, response is truncated | Valid — partial but not an error |
+| `length` | Hit `max_tokens` limit, response is truncated | **Error** — `ErrResponseTruncated` |
 | `tool_calls` | Model wants to call tools | Execute tools and continue |
 | `""` (empty) | Still streaming | Continue processing |
 
@@ -45,7 +45,7 @@ if choice.FinishReason != "" && choice.FinishReason != "stop" &&
 | Stop Reason | Meaning | Handling |
 |-------------|---------|----------|
 | `end_turn` | Natural stopping point | Normal completion |
-| `max_tokens` | Hit token limit | Valid — truncated but not an error |
+| `max_tokens` | Hit token limit | **Error** — `ErrResponseTruncated` |
 | `stop_sequence` | Hit custom stop sequence | Valid |
 | `tool_use` | Tool call complete | Execute tool and continue |
 | `pause_turn` | Server-side extended turn | Valid — part of extended flow |
@@ -73,13 +73,25 @@ if stopReason != "" && stopReason != "end_turn" && stopReason != "max_tokens" &&
 
 ## Error Propagation
 
-When an error finish reason is detected:
+### Provider-level errors (content filter, refusal, unknown reasons)
 
 1. The provider returns an error from the event handler via the streaming iterator's error parameter (`yield(nil, err)`)
 2. The agent's `processStreamEvents` function receives the error from the `iter.Seq2[StreamEvent, error]` iterator (`for event, err := range events`)
 3. The agent loop terminates and returns the error to the caller
 4. The session sets `pausedOnError = true` and notifies the user via a system error message
 5. The UI displays the error message to the user
+
+### Agent-level errors (truncation, max steps)
+
+Truncation (`max_tokens` / `length`) is **not** an error at the provider level — the response is valid, just incomplete. The provider includes the stop reason in `StepCompleteEvent.StopReason`.
+
+The agent detects truncation and returns `ErrResponseTruncated`. Partial messages are still included in the `StreamResult` so the caller can inspect what was generated before the cutoff.
+
+```go
+if stopReason == "max_tokens" || stopReason == "length" {
+    return &StreamResult{Messages: allMessages, Usage: totalUsage}, ErrResponseTruncated
+}
+```
 
 ## Queue Pause on Error
 
@@ -88,6 +100,7 @@ When an error occurs during prompt processing, the task queue **pauses** instead
 Errors that trigger pause include:
 - **Provider errors** — network failure, API error, content filter, refusal
 - **Max steps exceeded** — agent loop hit `--max-steps` limit without final response (error: `"agent loop exceeded maximum steps"`)
+- **Response truncated** — model hit output token limit (error: `"response truncated: hit output token limit"`)
 
 ### Why pause instead of continue
 
@@ -145,14 +158,17 @@ Error handling is tested in `internal/llm/providers/providers_test.go`:
 |------|----------|
 | `TestOpenAINetworkError` | Unexpected finish reasons trigger error |
 | `TestOpenAIContentFilter` | `content_filter` triggers error |
-| `TestOpenAILengthFinishReason` | `length` is valid, not an error |
+| `TestOpenAILengthFinishReason` | `length` doesn't trigger provider error, `StopReason` is populated |
 | `TestAnthropicRefusalStopReason` | `refusal` triggers error |
 | `TestAnthropicUnknownStopReason` | Unknown stop reasons trigger error |
-| `TestAnthropicValidStopReasons` | All valid reasons (`end_turn`, `max_tokens`, `stop_sequence`, `tool_use`, `pause_turn`) don't trigger errors |
+| `TestAnthropicValidStopReasons` | All valid reasons don't trigger errors, `StopReason` is populated |
 
-Max steps behavior is tested in `internal/llm/agent_maxsteps_test.go`:
+Max steps and truncation behavior is tested in `internal/llm/agent_maxsteps_test.go`:
 
 | Test | Verifies |
 |------|----------|
 | `TestAgentMaxStepsExceeded` | Agent returns `ErrMaxStepsExceeded` after reaching limit, with accumulated messages |
 | `TestAgentCompletesWithinMaxSteps` | Agent completes normally when final response arrives before limit |
+| `TestAgentTruncatedMaxTokens` | Agent returns `ErrResponseTruncated` for `max_tokens`, partial messages preserved |
+| `TestAgentTruncatedLength` | Agent returns `ErrResponseTruncated` for `length`, partial messages preserved |
+| `TestAgentNoTruncationOnEndTurn` | Agent does not return `ErrResponseTruncated` for `end_turn` |

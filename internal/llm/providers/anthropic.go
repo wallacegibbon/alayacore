@@ -753,10 +753,11 @@ func (p *AnthropicProvider) handleMessageStop(payload map[string]interface{}, yi
 		p.extractAndSetUsage(usage, state)
 	}
 
-	// Send the accumulated message with usage
+	// Send the accumulated message with usage and stop reason
 	yield(llm.StepCompleteEvent{
-		Messages: []llm.Message{state.getMessage()},
-		Usage:    state.getUsage(),
+		Messages:   []llm.Message{state.getMessage()},
+		Usage:      state.getUsage(),
+		StopReason: state.stopReason,
 	}, nil)
 	return true
 }

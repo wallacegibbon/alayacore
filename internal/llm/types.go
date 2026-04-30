@@ -139,8 +139,9 @@ func (ToolCallEvent) isStreamEvent() {}
 
 // StepCompleteEvent represents completion of an agentic step
 type StepCompleteEvent struct {
-	Messages []Message
-	Usage    Usage
+	Messages   []Message
+	Usage      Usage
+	StopReason string // "end_turn", "stop", "max_tokens", "length", etc.
 }
 
 func (StepCompleteEvent) isStreamEvent() {}
