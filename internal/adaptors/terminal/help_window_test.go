@@ -247,8 +247,8 @@ func TestHelpWindowEnterOnCommand(t *testing.T) {
 	// Set up items with a :command at index 1
 	hw.items = []HelpItem{
 		{IsSection: true, Description: "Commands"},
-		{Key: ":quit", Description: "Exit application"},
-		{Key: ":save", Description: "Save session"},
+		{Key: ":quit", Description: "Exit application", Type: HelpItemCommand},
+		{Key: ":save", Description: "Save session", Type: HelpItemCommand},
 	}
 	hw.Open()
 	// Should start at index 1 (first non-header)

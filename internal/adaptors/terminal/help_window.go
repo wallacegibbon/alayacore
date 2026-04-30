@@ -18,11 +18,20 @@ func FuzzyMatchHelpItem(search string, item HelpItem) bool {
 		FuzzyMatch(search, strings.ToLower(item.Description))
 }
 
+// HelpItemType classifies a HelpItem as either a command or a key binding.
+type HelpItemType int
+
+const (
+	HelpItemKey     HelpItemType = iota // key binding (e.g. "j", "Ctrl+H")
+	HelpItemCommand                     // command (e.g. ":quit", ":save")
+)
+
 // HelpItem represents a single help entry with a key and description.
 type HelpItem struct {
 	Key         string
 	Description string
-	IsSection   bool // true for section headers
+	IsSection   bool         // true for section headers
+	Type        HelpItemType // HelpItemCommand for :commands, HelpItemKey for key bindings
 }
 
 // HelpWindowState represents the current state of the help window.
@@ -86,41 +95,41 @@ func buildHelpItems() []HelpItem {
 	return []HelpItem{
 		// Commands
 		{IsSection: true, Description: "Commands"},
-		{Key: ":continue", Description: "Resume after error"},
-		{Key: ":cancel", Description: "Cancel current task"},
-		{Key: ":cancel_all", Description: "Cancel all & clear queue"},
-		{Key: ":think", Description: "Set think level (0/1/2)"},
-		{Key: ":save", Description: "Save session"},
-		{Key: ":quit", Description: "Exit application"},
-		{Key: ":model_set", Description: "Switch model by ID"},
-		{Key: ":model_load", Description: "Reload model config"},
-		{Key: ":help", Description: "Open help window"},
+		{Key: ":continue", Description: "Resume after error", Type: HelpItemCommand},
+		{Key: ":cancel", Description: "Cancel current task", Type: HelpItemCommand},
+		{Key: ":cancel_all", Description: "Cancel all & clear queue", Type: HelpItemCommand},
+		{Key: ":think", Description: "Set think level (0/1/2)", Type: HelpItemCommand},
+		{Key: ":save", Description: "Save session", Type: HelpItemCommand},
+		{Key: ":quit", Description: "Exit application", Type: HelpItemCommand},
+		{Key: ":model_set", Description: "Switch model by ID", Type: HelpItemCommand},
+		{Key: ":model_load", Description: "Reload model config", Type: HelpItemCommand},
+		{Key: ":help", Description: "Open help window", Type: HelpItemCommand},
 
 		// Global Shortcuts
 		{IsSection: true, Description: "Global Shortcuts"},
-		{Key: "Tab", Description: "Toggle focus display/input"},
-		{Key: "Enter", Description: "Submit prompt or command"},
-		{Key: "Ctrl+H", Description: "Open help window"},
-		{Key: "Ctrl+G", Description: "Cancel current request"},
-		{Key: "Ctrl+C", Description: "Clear input field"},
-		{Key: "Ctrl+S", Description: "Save session"},
-		{Key: "Ctrl+O", Description: "Open external editor"},
-		{Key: "Ctrl+L", Description: "Open model selector"},
-		{Key: "Ctrl+P", Description: "Open theme selector"},
-		{Key: "Ctrl+Q", Description: "Open queue manager"},
+		{Key: "Tab", Description: "Toggle focus display/input", Type: HelpItemKey},
+		{Key: "Enter", Description: "Submit prompt or command", Type: HelpItemKey},
+		{Key: "Ctrl+H", Description: "Open help window", Type: HelpItemKey},
+		{Key: "Ctrl+G", Description: "Cancel current request", Type: HelpItemKey},
+		{Key: "Ctrl+C", Description: "Clear input field", Type: HelpItemKey},
+		{Key: "Ctrl+S", Description: "Save session", Type: HelpItemKey},
+		{Key: "Ctrl+O", Description: "Open external editor", Type: HelpItemKey},
+		{Key: "Ctrl+L", Description: "Open model selector", Type: HelpItemKey},
+		{Key: "Ctrl+P", Description: "Open theme selector", Type: HelpItemKey},
+		{Key: "Ctrl+Q", Description: "Open queue manager", Type: HelpItemKey},
 
 		// Display Mode
 		{IsSection: true, Description: "Display Mode"},
-		{Key: "j/k", Description: "Move window cursor"},
-		{Key: "J/K", Description: "Scroll one line"},
-		{Key: "Ctrl+D/U", Description: "Scroll half screen"},
-		{Key: "g", Description: "Go to first window"},
-		{Key: "G", Description: "Go to last window, enable follow"},
-		{Key: "H/L/M", Description: "Cursor top/btm/mid"},
-		{Key: "e", Description: "Open in editor"},
-		{Key: "f/b", Description: "Next/prev prompt"},
-		{Key: ":", Description: "Enter command mode"},
-		{Key: "Space", Description: "Toggle window fold"},
+		{Key: "j/k", Description: "Move window cursor", Type: HelpItemKey},
+		{Key: "J/K", Description: "Scroll one line", Type: HelpItemKey},
+		{Key: "Ctrl+D/U", Description: "Scroll half screen", Type: HelpItemKey},
+		{Key: "g", Description: "Go to first window", Type: HelpItemKey},
+		{Key: "G", Description: "Go to last window, enable follow", Type: HelpItemKey},
+		{Key: "H/L/M", Description: "Cursor top/btm/mid", Type: HelpItemKey},
+		{Key: "e", Description: "Open in editor", Type: HelpItemKey},
+		{Key: "f/b", Description: "Next/prev prompt", Type: HelpItemKey},
+		{Key: ":", Description: "Enter command mode", Type: HelpItemKey},
+		{Key: "Space", Description: "Toggle window fold", Type: HelpItemKey},
 	}
 }
 
@@ -288,7 +297,7 @@ func (hw *HelpWindow) handleListKey(key string) tea.Cmd {
 	case "enter":
 		if hw.selectedIdx >= 0 && hw.selectedIdx < hw.filteredLen() {
 			item := hw.filteredItems[hw.selectedIdx]
-			if !item.IsSection && strings.HasPrefix(item.Key, ":") {
+			if !item.IsSection && item.Type == HelpItemCommand {
 				hw.pendingCommand = item.Key
 				hw.Close()
 			}
