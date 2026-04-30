@@ -323,7 +323,7 @@ Agent.Stream() receives tool_call event
 9. **Lazy Agent Init** — Agent and provider are created on first use, not at startup.
 10. **Sequential Tool Execution** — Tools execute one at a time. See [sequential-tool-execution.md](sequential-tool-execution.md).
 11. **Context Efficiency** — Tool descriptions are minimal, outputs are size-capped (32KB), search results limited (100 lines), and old tool results are compacted to save tokens. See [context-tracking.md](context-tracking.md).
-12. **Think Mode** — Provider-specific reasoning fields are added to API requests when enabled. Toggled at runtime via `Ctrl+T` or `:think`.
+12. **Think Mode** — Provider-specific reasoning fields are added to API requests when enabled.
 
 ## Gotchas
 
@@ -403,7 +403,7 @@ When styling text with lipgloss, each segment must be rendered individually befo
 
 ### Think mode and reasoning_content
 
-When think mode is toggled by the user (`Ctrl+T` or `:think`), each provider sends explicit thinking configuration in API requests. The key differences are:
+When think mode is toggled by the user (`:think`), each provider sends explicit thinking configuration in API requests. The key differences are:
 
 1. A top-level **`thinking`** field (`{"type": "enabled"}` or `{"type": "disabled"}`) controls whether reasoning is active.
 2. When think mode is on, assistant messages that only contain tool calls must still include an **empty reasoning block** (required by DeepSeek and similar providers).

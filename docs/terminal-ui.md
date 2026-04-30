@@ -33,7 +33,6 @@ AlayaCore's terminal UI is built with [Bubble Tea](https://github.com/charmbrace
 | `Ctrl+P` | Open theme selector |
 | `Ctrl+Q` | Open task queue manager |
 | `Ctrl+H` | Open help window |
-| `Ctrl+T` | Toggle think mode |
 | `Ctrl+G` | Cancel current request (with confirmation) |
 | `Ctrl+C` | Clear input field (only when input is focused) |
 | `:` | Switch to input with `:` prefix (command mode) |

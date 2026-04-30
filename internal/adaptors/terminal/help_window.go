@@ -108,7 +108,6 @@ func buildHelpItems() []HelpItem {
 		{Key: "Ctrl+L", Description: "Open model selector"},
 		{Key: "Ctrl+P", Description: "Open theme selector"},
 		{Key: "Ctrl+Q", Description: "Open queue manager"},
-		{Key: "Ctrl+T", Description: "Toggle think mode"},
 
 		// Display Mode
 		{IsSection: true, Description: "Display Mode"},
