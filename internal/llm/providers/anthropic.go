@@ -55,13 +55,13 @@ const (
 
 // AnthropicProvider implements the Anthropic API
 type AnthropicProvider struct {
-	apiKey           string
-	baseURL          string
-	client           *http.Client
-	model            string
-	promptCache      bool
-	maxTokens        int
-	reasoningEnabled bool
+	apiKey         string
+	baseURL        string
+	client         *http.Client
+	model          string
+	promptCache    bool
+	maxTokens      int
+	reasoningLevel int // 0=off, 1=high, 2=max
 }
 
 // AnthropicOption configures the provider
@@ -126,9 +126,10 @@ func WithMaxTokens(tokens int) AnthropicOption {
 	}
 }
 
-// SetReasoningEnabled enables or disables reasoning mode for Anthropic.
-func (p *AnthropicProvider) SetReasoningEnabled(enabled bool) {
-	p.reasoningEnabled = enabled
+// SetReasoningLevel sets the reasoning level for Anthropic.
+// 0=off, 1=high, 2=max.
+func (p *AnthropicProvider) SetReasoningLevel(level int) {
+	p.reasoningLevel = level
 }
 
 // anthropicRequest represents the Anthropic API request
@@ -316,7 +317,7 @@ func (s *streamState) lastToolCall() *llm.ToolCallPart {
 //   - llm.ReasoningPart  → anthropicContentBlock{Type: "thinking"}  (domain "reasoning" → wire "thinking")
 //   - llm.ToolCallPart   → anthropicContentBlock{Type: "tool_use"}
 //   - llm.ToolResultPart → anthropicContentBlock{Type: "tool_result"} (role remapped to "user")
-func anthropicConvertMessages(messages []llm.Message, reasoningEnabled bool) []anthropicMessage {
+func anthropicConvertMessages(messages []llm.Message, reasoningLevel int) []anthropicMessage {
 	apiMessages := make([]anthropicMessage, 0, len(messages))
 	for _, msg := range messages {
 		apiMsg := anthropicMessage{
@@ -379,7 +380,7 @@ func anthropicConvertMessages(messages []llm.Message, reasoningEnabled bool) []a
 		// tool-call-only messages still satisfy this requirement. Other providers
 		// ignore the extra block. Only done when reasoning is enabled to avoid
 		// wasting tokens.
-		if reasoningEnabled && msg.Role == llm.RoleAssistant {
+		if reasoningLevel > 0 && msg.Role == llm.RoleAssistant {
 			hasThinking := false
 			for _, block := range apiMsg.Content {
 				if block.Type == anthropicBlockTypeThinking {
@@ -411,7 +412,7 @@ func (p *AnthropicProvider) StreamMessages(
 	extraSystemPrompt string,
 ) (iter.Seq2[llm.StreamEvent, error], error) {
 	// Convert messages to Anthropic format
-	apiMessages := anthropicConvertMessages(messages, p.reasoningEnabled)
+	apiMessages := anthropicConvertMessages(messages, p.reasoningLevel)
 
 	// Convert tools to Anthropic format
 	apiTools := make([]anthropicTool, 0, len(tools))
@@ -457,11 +458,14 @@ func (p *AnthropicProvider) StreamMessages(
 		reqBody.CacheControl = &anthropicCacheControl{Type: "ephemeral"}
 	}
 
-	// Always include thinking config. Use "enabled"/"disabled" explicitly
-	// rather than relying on provider defaults.
-	if p.reasoningEnabled {
+	// Always include thinking config based on reasoning level.
+	if p.reasoningLevel > 0 {
 		reqBody.Thinking = &anthropicThinking{Type: "enabled"}
-		reqBody.OutputConfig = &anthropicOutputConfig{Effort: "max"}
+		effort := "high"
+		if p.reasoningLevel >= 2 {
+			effort = "max"
+		}
+		reqBody.OutputConfig = &anthropicOutputConfig{Effort: effort}
 	} else {
 		reqBody.Thinking = &anthropicThinking{Type: "disabled"}
 	}

@@ -26,7 +26,7 @@ func (m *mockProvider) StreamMessages(
 	return func(func(StreamEvent, error) bool) {}, nil
 }
 
-func (m *mockProvider) SetReasoningEnabled(_ bool) {}
+func (m *mockProvider) SetReasoningLevel(_ int) {}
 
 func TestAgentSystemPromptSeparation(t *testing.T) {
 	tests := []struct {

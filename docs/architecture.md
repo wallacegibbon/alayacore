@@ -323,7 +323,7 @@ Agent.Stream() receives tool_call event
 9. **Lazy Agent Init** — Agent and provider are created on first use, not at startup.
 10. **Sequential Tool Execution** — Tools execute one at a time. See [sequential-tool-execution.md](sequential-tool-execution.md).
 11. **Context Efficiency** — Tool descriptions are minimal, outputs are size-capped (32KB), search results limited (100 lines), and old tool results are compacted to save tokens. See [context-tracking.md](context-tracking.md).
-12. **Think Mode** — Provider-specific reasoning fields are added to API requests when enabled.
+12. **Think Mode** — Provider-specific reasoning fields are added to API requests. Three levels: 0=off, 1=normal, 2=max. Toggled via `:think [0|1|2]`.
 
 ## Gotchas
 
@@ -403,15 +403,15 @@ When styling text with lipgloss, each segment must be rendered individually befo
 
 ### Think mode and reasoning_content
 
-When think mode is toggled by the user (`:think`), each provider sends explicit thinking configuration in API requests. The key differences are:
+When think mode is set via `:think [0|1|2]`, each provider sends explicit thinking configuration in API requests. The key differences are:
 
 1. A top-level **`thinking`** field (`{"type": "enabled"}` or `{"type": "disabled"}`) controls whether reasoning is active.
-2. When think mode is on, assistant messages that only contain tool calls must still include an **empty reasoning block** (required by DeepSeek and similar providers).
+2. When think mode is on (level 1 or 2), assistant messages that only contain tool calls must still include an **empty reasoning block** (required by DeepSeek and similar providers).
 
-| Provider | Enabled | Disabled |
-|----------|---------|----------|
-| **Anthropic** | `"thinking": {"type": "enabled"}`, `"output_config": {"effort": "max"}` | `"thinking": {"type": "disabled"}` |
-| **OpenAI-compatible** | `"thinking": {"type": "enabled"}`, `"reasoning_effort": "xhigh"` | `"thinking": {"type": "disabled"}` |
+| Provider | Level 1 (normal) | Level 2 (max) | Disabled |
+|----------|------------------|---------------|----------|
+| **Anthropic** | `"thinking": {"type": "enabled"}`, `"output_config": {"effort": "high"}` | `"thinking": {"type": "enabled"}`, `"output_config": {"effort": "max"}` | `"thinking": {"type": "disabled"}` |
+| **OpenAI-compatible** | `"thinking": {"type": "enabled"}`, `"reasoning_effort": "high"` | `"thinking": {"type": "enabled"}`, `"reasoning_effort": "xhigh"` | `"thinking": {"type": "disabled"}` |
 
 > **Note:** The OpenAI-compatible thinking/reasoning parameters (`thinking`, `reasoning_effort`, `reasoning_content`) are not part of the official OpenAI API standard. They originate from [DeepSeek's thinking mode documentation](https://api-docs.deepseek.com/guides/thinking_mode) and are supported by **DeepSeek**, **GLM**, and **MiniMax**. Other providers silently ignore unknown fields.
 

@@ -38,7 +38,7 @@ func (s *Session) saveSessionToFile(path string) error {
 		SessionMeta: SessionMeta{
 			CreatedAt:     s.CreatedAt,
 			UpdatedAt:     time.Now(),
-			ThinkEnabled:  s.thinkEnabled,
+			ThinkLevel:    s.thinkLevel,
 			ActiveModel:   s.activeModelName(),
 			ContextTokens: s.ContextTokens,
 		},
@@ -73,11 +73,9 @@ func formatFrontmatter(meta *SessionMeta) string {
 	buf.WriteString(meta.UpdatedAt.Format(time.RFC3339))
 	buf.WriteString("\n")
 
-	if meta.ThinkEnabled {
-		buf.WriteString("think_enabled: true\n")
-	} else {
-		buf.WriteString("think_enabled: false\n")
-	}
+	buf.WriteString("think_level: ")
+	buf.WriteString(strconv.Itoa(meta.ThinkLevel))
+	buf.WriteString("\n")
 
 	if meta.ActiveModel != "" {
 		buf.WriteString("active_model: \"")

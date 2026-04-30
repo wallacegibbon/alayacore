@@ -89,7 +89,7 @@ func buildHelpItems() []HelpItem {
 		{Key: ":continue", Description: "Resume after error"},
 		{Key: ":cancel", Description: "Cancel current task"},
 		{Key: ":cancel_all", Description: "Cancel all & clear queue"},
-		{Key: ":think", Description: "Toggle think mode"},
+		{Key: ":think", Description: "Set think level (0/1/2)"},
 		{Key: ":save", Description: "Save session"},
 		{Key: ":quit", Description: "Exit application"},
 		{Key: ":model_set", Description: "Switch model by ID"},

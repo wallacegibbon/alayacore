@@ -49,7 +49,7 @@ Commands are split into two categories:
 | `:cancel_all` | Cancel current request and clear the task queue |
 | `:model_set <id>` | Switch to a model by numeric ID |
 | `:model_load` | Reload model configs from the config file |
-| `:think [0\|1\|-1]` | Control think mode (0=off, 1=on, -1=toggle). Default: toggle |
+| `:think [0\|1\|2]` | Set think level (0=off, 1=normal, 2=max). Default: 1 |
 | `:taskqueue_get_all` | List all queued tasks (used by queue manager UI) |
 | `:taskqueue_del <id>` | Delete a queued task by ID (used by queue manager UI) |
 

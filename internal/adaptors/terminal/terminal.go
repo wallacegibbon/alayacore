@@ -398,11 +398,11 @@ func (m *Terminal) updateStatus() {
 	// Build status segments - each rendered separately with appropriate colors
 	var segments []string
 
-	// Switch indicators segment (compact: "T✦ F↓" in one segment)
+	// Switch indicators segment (compact: "T1✦ F↓" in one segment)
 	var switches []string
-	if snap.ThinkEnabled {
+	if snap.ThinkLevel > 0 {
 		thinkStyle := m.styles.Status.Foreground(m.styles.ColorAccent).Bold(true)
-		switches = append(switches, thinkStyle.Render("T✦"))
+		switches = append(switches, thinkStyle.Render(fmt.Sprintf("T%d✦", snap.ThinkLevel)))
 	}
 	if m.display.shouldFollow() {
 		switches = append(switches, valStyle.Render("F↓"))

@@ -100,14 +100,14 @@ type SystemInfo struct {
 	ActiveModelName   string          `json:"active_model_name,omitempty"`
 	HasModels         bool            `json:"has_models"`
 	ModelConfigPath   string          `json:"model_config_path,omitempty"`
-	ThinkEnabled      bool            `json:"think_enabled"`
+	ThinkLevel        int             `json:"think_level"`
 }
 
 // SessionMeta is the frontmatter metadata.
 type SessionMeta struct {
 	CreatedAt     time.Time `config:"created_at"`
 	UpdatedAt     time.Time `config:"updated_at"`
-	ThinkEnabled  bool      `config:"think_enabled"`
+	ThinkLevel    int       `config:"think_level"`
 	ActiveModel   string    `config:"active_model"`
 	ContextTokens int64     `config:"context_tokens"`
 }
@@ -156,7 +156,7 @@ type Session struct {
 	skillDirs            []string // Skill directories for compaction exemption
 	maxSteps             int
 	proxyURL             string
-	thinkEnabled         bool
+	thinkLevel           int
 
 	taskQueue     []QueueItem
 	cond          *sync.Cond         // signals when taskQueue becomes non-empty or pausedOnError clears
@@ -217,7 +217,7 @@ func NewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt str
 		skillDirs:            buildSkillDirSet(skillsMgr),
 		proxyURL:             proxyURL,
 		maxSteps:             maxSteps,
-		thinkEnabled:         true,
+		thinkLevel:           1,
 		taskQueue:            make([]QueueItem, 0),
 		sessionCtx:           sessionCtx,
 		sessionCancel:        sessionCancel,
@@ -255,7 +255,7 @@ func RestoreFromSession(baseTools []llm.Tool, systemPrompt string, extraSystemPr
 		skillDirs:            buildSkillDirSet(skillsMgr),
 		proxyURL:             proxyURL,
 		maxSteps:             maxSteps,
-		thinkEnabled:         data.ThinkEnabled,
+		thinkLevel:           data.ThinkLevel,
 		ContextTokens:        data.ContextTokens,
 		taskQueue:            make([]QueueItem, 0),
 		sessionCtx:           sessionCtx,
@@ -412,25 +412,18 @@ func (s *Session) applyModelContextLimit(model *ModelConfig) {
 	s.mu.Unlock()
 }
 
-// syncThinkToProvider propagates the session's thinking state to the
+// syncThinkToProvider propagates the session's thinking level to the
 // current provider. Must be called after Provider is set.
 func (s *Session) syncThinkToProvider() {
 	if s.Provider != nil {
-		s.Provider.SetReasoningEnabled(s.thinkEnabled)
+		s.Provider.SetReasoningLevel(s.thinkLevel)
 	}
 }
 
-// ToggleThink controls think mode. mode: 0=off, 1=on, -1=toggle.
-func (s *Session) ToggleThink(mode int) {
+// SetThinkLevel sets the think level. level: 0=off, 1=normal, 2=max.
+func (s *Session) SetThinkLevel(level int) {
 	s.mu.Lock()
-	switch mode {
-	case 0:
-		s.thinkEnabled = false
-	case 1:
-		s.thinkEnabled = true
-	case -1:
-		s.thinkEnabled = !s.thinkEnabled
-	}
+	s.thinkLevel = level
 	s.mu.Unlock()
 
 	s.syncThinkToProvider()
@@ -987,7 +980,7 @@ func (s *Session) sendSystemInfoInternal(activeModelConfig *ModelConfig) {
 		ActiveModelName:   activeModelName,
 		HasModels:         hasModels,
 		ModelConfigPath:   modelConfigPath,
-		ThinkEnabled:      s.thinkEnabled,
+		ThinkLevel:        s.thinkLevel,
 	}
 	data, _ := json.Marshal(info) //nolint:errcheck // Best effort marshal, errors ignored
 	//nolint:errcheck // Best effort write, errors ignored

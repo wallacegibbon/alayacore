@@ -42,7 +42,7 @@ func (m *mockProviderAlwaysToolCalls) StreamMessages(_ context.Context, _ []Mess
 	}, nil
 }
 
-func (m *mockProviderAlwaysToolCalls) SetReasoningEnabled(_ bool) {}
+func (m *mockProviderAlwaysToolCalls) SetReasoningLevel(_ int) {}
 
 func TestAgentMaxStepsExceeded(t *testing.T) {
 	provider := &mockProviderAlwaysToolCalls{}

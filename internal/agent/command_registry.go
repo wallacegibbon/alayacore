@@ -157,8 +157,8 @@ func init() {
 
 	commandRegistry.Register(&Command{
 		Name:        commandNameThink,
-		Description: "Control think mode (0=off, 1=on, -1=toggle)",
-		Usage:       "[0|1|-1]",
+		Description: "Set think level (0=off, 1=normal, 2=max)",
+		Usage:       "[0|1|2]",
 		Handler: func(_ context.Context, _ []string) {
 			// Handler is resolved at runtime via Session method
 		},

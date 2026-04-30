@@ -274,16 +274,16 @@ func (s *Session) handleTaskQueueDel(args []string) {
 }
 
 func (s *Session) handleThink(args []string) {
-	mode := -1 // default: toggle
-	if len(args) > 0 {
-		var err error
-		mode, err = strconv.Atoi(args[0])
-		if err != nil {
-			s.writeError("usage: :think [0|1|-1]  (0=off, 1=on, -1=toggle)")
-			return
-		}
+	if len(args) == 0 {
+		s.writeError("usage: :think [0|1|2]  (0=off, 1=normal, 2=max)")
+		return
 	}
-	s.ToggleThink(mode)
+	level, err := strconv.Atoi(args[0])
+	if err != nil || level < 0 || level > 2 {
+		s.writeError("usage: :think [0|1|2]  (0=off, 1=normal, 2=max)")
+		return
+	}
+	s.SetThinkLevel(level)
 }
 
 // resendPrompt resends the conversation history to the LLM.

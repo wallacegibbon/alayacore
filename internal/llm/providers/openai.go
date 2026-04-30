@@ -174,11 +174,11 @@ func (s *openAIStreamState) getUsage() llm.Usage {
 
 // OpenAIProvider implements the OpenAI API
 type OpenAIProvider struct {
-	apiKey           string
-	baseURL          string
-	client           *http.Client
-	model            string
-	reasoningEnabled bool
+	apiKey         string
+	baseURL        string
+	client         *http.Client
+	model          string
+	reasoningLevel int // 0=off, 1=high, 2=xhigh
 }
 
 // OpenAIOption configures the provider
@@ -228,9 +228,10 @@ func WithOpenAIModel(model string) OpenAIOption {
 	}
 }
 
-// SetReasoningEnabled enables or disables reasoning mode for OpenAI.
-func (p *OpenAIProvider) SetReasoningEnabled(enabled bool) {
-	p.reasoningEnabled = enabled
+// SetReasoningLevel sets the reasoning level for OpenAI.
+// 0=off, 1=high, 2=xhigh.
+func (p *OpenAIProvider) SetReasoningLevel(level int) {
+	p.reasoningLevel = level
 }
 
 // openAIRequest represents the OpenAI API request
@@ -314,7 +315,7 @@ func (p *OpenAIProvider) StreamMessages(
 	}
 
 	// Convert conversation messages
-	apiMessages = append(apiMessages, openaiConvertMessages(messages, p.reasoningEnabled)...)
+	apiMessages = append(apiMessages, openaiConvertMessages(messages, p.reasoningLevel)...)
 
 	// Convert tools to OpenAI format
 	apiTools := make([]openAITool, 0, len(tools))
@@ -340,11 +341,14 @@ func (p *OpenAIProvider) StreamMessages(
 		},
 	}
 
-	// Always include thinking config. Use "enabled"/"disabled" explicitly
-	// rather than relying on provider defaults.
-	if p.reasoningEnabled {
+	// Always include thinking config based on reasoning level.
+	if p.reasoningLevel > 0 {
 		reqBody.Thinking = &openAIThinking{Type: "enabled"}
-		reqBody.ReasoningEffort = "xhigh"
+		effort := "high"
+		if p.reasoningLevel >= 2 {
+			effort = "xhigh"
+		}
+		reqBody.ReasoningEffort = effort
 	} else {
 		reqBody.Thinking = &openAIThinking{Type: "disabled"}
 	}
@@ -386,7 +390,7 @@ func (p *OpenAIProvider) StreamMessages(
 //   - llm.ReasoningPart  → reasoning_content field  (domain "reasoning" → wire "reasoning_content")
 //   - llm.ToolCallPart   → tool_calls array
 //   - llm.ToolResultPart → role="tool" message with tool_call_id (1:N expansion)
-func openaiConvertMessages(messages []llm.Message, reasoningEnabled bool) []openAIMessage {
+func openaiConvertMessages(messages []llm.Message, reasoningLevel int) []openAIMessage {
 	apiMessages := make([]openAIMessage, 0, len(messages))
 	for _, msg := range messages {
 		if msg.Role == llm.RoleTool {
@@ -411,7 +415,7 @@ func openaiConvertMessages(messages []llm.Message, reasoningEnabled bool) []open
 		// Only for assistant messages to avoid wasting tokens.
 		if msg.Role == llm.RoleAssistant {
 			reasoningText := openaiExtractReasoning(msg.Content)
-			if reasoningText != "" || reasoningEnabled {
+			if reasoningText != "" || reasoningLevel > 0 {
 				apiMsg.ReasoningContent = &reasoningText
 			}
 		}

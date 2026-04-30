@@ -41,7 +41,7 @@ type outputWriter struct {
 	lastCurrentStep   int         // Last step reached in completed task
 	lastMaxSteps      int         // Last max steps from completed task
 	lastTaskError     bool        // Whether last completed task ended with error
-	thinkEnabled      bool        // Whether think mode is active
+	thinkLevel        int         // Think level: 0=off, 1=normal, 2=max
 	contextTokens     int64       // Current context token count
 	contextLimit      int64       // Context token limit (0 = unlimited)
 }
@@ -254,7 +254,7 @@ func (to *outputWriter) handleSystemTag(value string) {
 		to.maxSteps = info.MaxSteps
 
 		// Store think state
-		to.thinkEnabled = info.ThinkEnabled
+		to.thinkLevel = info.ThinkLevel
 
 		// Mark display as dirty so tick handler picks up changes
 		to.dirty.Store(true)
@@ -276,7 +276,7 @@ func (to *outputWriter) SnapshotStatus() StatusSnapshot {
 		LastCurrentStep: to.lastCurrentStep,
 		LastMaxSteps:    to.lastMaxSteps,
 		TaskError:       to.lastTaskError,
-		ThinkEnabled:    to.thinkEnabled,
+		ThinkLevel:      to.thinkLevel,
 	}
 }
 
