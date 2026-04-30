@@ -127,10 +127,14 @@ context_limit: 128000`)
 		fmt.Fprintln(os.Stderr, "Error: could not open TTY:", err)
 		os.Exit(1)
 	}
-	defer ttyIn.Close()
-	if ttyOut != ttyIn {
-		defer ttyOut.Close()
-	}
+	// NOTE: We intentionally do NOT close ttyIn/ttyOut.
+	// Bubbletea restores the console state (raw mode, alt screen, etc.)
+	// inside p.Run()'s shutdown sequence.  Closing the CONIN$/CONOUT$
+	// handles (Windows) or /dev/tty fd (Unix) immediately after that can
+	// race with the OS console subsystem still processing the final
+	// escape sequences, which on Windows causes the parent shell's
+	// prompt to not appear until the user presses a key.  The OS
+	// reclaims these handles on process exit anyway.
 
 	// Create and run the program
 	p := tea.NewProgram(t, tea.WithInput(ttyIn), tea.WithOutput(ttyOut))
