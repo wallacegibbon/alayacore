@@ -192,6 +192,7 @@ type OpenAIProvider struct {
 	baseURL        string
 	client         *http.Client
 	model          string
+	maxTokens      int // Maximum output tokens (0 = provider default)
 	reasoningLevel int // 0=off, 1=high, 2=xhigh
 }
 
@@ -242,6 +243,13 @@ func WithOpenAIModel(model string) OpenAIOption {
 	}
 }
 
+// WithOpenAIMaxTokens sets the maximum output tokens
+func WithOpenAIMaxTokens(tokens int) OpenAIOption {
+	return func(p *OpenAIProvider) {
+		p.maxTokens = tokens
+	}
+}
+
 // SetReasoningLevel sets the reasoning level for OpenAI.
 // 0=off, 1=high, 2=xhigh.
 func (p *OpenAIProvider) SetReasoningLevel(level int) {
@@ -250,14 +258,15 @@ func (p *OpenAIProvider) SetReasoningLevel(level int) {
 
 // openAIRequest represents the OpenAI API request
 type openAIRequest struct {
-	Model           string               `json:"model"`
-	Messages        []openAIMessage      `json:"messages"`
-	Tools           []openAITool         `json:"tools,omitempty"`
-	Stream          bool                 `json:"stream"`
-	StreamOptions   *openAIStreamOptions `json:"stream_options,omitempty"`
-	Temperature     float64              `json:"temperature,omitempty"`
-	ReasoningEffort string               `json:"reasoning_effort,omitempty"`
-	Thinking        *openAIThinking      `json:"thinking"`
+	Model               string               `json:"model"`
+	Messages            []openAIMessage      `json:"messages"`
+	Tools               []openAITool         `json:"tools,omitempty"`
+	Stream              bool                 `json:"stream"`
+	StreamOptions       *openAIStreamOptions `json:"stream_options,omitempty"`
+	MaxCompletionTokens int                  `json:"max_completion_tokens,omitempty"`
+	Temperature         float64              `json:"temperature,omitempty"`
+	ReasoningEffort     string               `json:"reasoning_effort,omitempty"`
+	Thinking            *openAIThinking      `json:"thinking"`
 }
 
 type openAIThinking struct {
@@ -352,6 +361,9 @@ func (p *OpenAIProvider) StreamMessages(
 		StreamOptions: &openAIStreamOptions{
 			IncludeUsage: true,
 		},
+	}
+	if p.maxTokens > 0 {
+		reqBody.MaxCompletionTokens = p.maxTokens
 	}
 
 	// Always include thinking config based on reasoning level.

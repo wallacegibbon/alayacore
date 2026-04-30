@@ -55,6 +55,9 @@ func NewProvider(config ProviderConfig) (llm.Provider, error) {
 		if config.Model != "" {
 			opts = append(opts, providers.WithOpenAIModel(config.Model))
 		}
+		if config.MaxTokens > 0 {
+			opts = append(opts, providers.WithOpenAIMaxTokens(config.MaxTokens))
+		}
 		return providers.NewOpenAI(opts...)
 
 	default:
