@@ -242,7 +242,6 @@ type openAIRequest struct {
 	Tools           []openAITool         `json:"tools,omitempty"`
 	Stream          bool                 `json:"stream"`
 	StreamOptions   *openAIStreamOptions `json:"stream_options,omitempty"`
-	MaxTokens       int                  `json:"max_tokens,omitempty"`
 	Temperature     float64              `json:"temperature,omitempty"`
 	ReasoningEffort string               `json:"reasoning_effort,omitempty"`
 	Thinking        *openAIThinking      `json:"thinking"`
