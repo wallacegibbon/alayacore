@@ -42,6 +42,6 @@
 // Usage:
 //
 //	terminal := NewTerminal(session, output, input, config, width, height)
-//	p := tea.NewProgram(terminal, tea.WithOutput(os.Stderr))
+//	p := tea.NewProgram(terminal)
 //	p.Run()
 package terminal
