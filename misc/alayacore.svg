@@ -1,0 +1,8 @@
+<svg width="500" height="500" viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
+<rect width="100%" height="100%" fill="black"/>
+<g transform="translate(250, 250)">
+<path d="M 100 -45 A 110 110 0 1 0 100 45" stroke="white" stroke-width="30" stroke-linecap="butt" fill="none" transform="translate(0, 10)"/>
+<!-- Letter A extracted from DejaVu Sans Bold -->
+<path d="M 26.50 41.70 L -26.41 41.70 L -34.76 65.61 L -68.77 65.61 L -20.17 -65.61 L 20.17 -65.61 L 68.77 65.61 L 34.76 65.61 Z M -17.97 17.36 L 17.97 17.36 L 0.04 -34.85 Z" fill-rule="evenodd" fill="white" stroke="none"/>
+</g>
+</svg>
