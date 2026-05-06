@@ -126,6 +126,36 @@ type TLVChunk struct {
 	Value string
 }
 
+// SessionConfig bundles all configuration for creating or restoring a session.
+// This avoids passing 16+ positional parameters to NewSession / RestoreFromSession.
+type SessionConfig struct {
+	// IO — required, provided by the adaptor.
+	Input  stream.Input
+	Output stream.Output
+
+	// Files — paths to configuration and session files. Empty means default / none.
+	SessionFile      string
+	ModelConfigPath  string
+	RuntimeConfigPath string
+
+	// Agent behavior
+	BaseTools         []llm.Tool
+	SystemPrompt      string
+	ExtraSystemPrompt string
+	MaxSteps          int
+
+	// Feature flags
+	DebugAPI          bool
+	AutoSummarize     bool
+	NoCompact         bool
+	CompactKeepSteps  int
+	CompactTruncateLen int
+	ProxyURL          string
+
+	// External dependencies
+	SkillsMgr *skills.Manager
+}
+
 // ============================================================================
 // Session Struct
 // ============================================================================
@@ -186,38 +216,38 @@ func (s *Session) WaitDone() {
 // ============================================================================
 
 // LoadOrNewSession loads a session from file or creates a new one.
-func LoadOrNewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, noCompact bool, compactKeepSteps int, compactTruncateLen int, proxyURL string, skillsMgr *skills.Manager) (*Session, string) {
-	sessionFile = expandPath(sessionFile)
-	if sessionFile != "" {
-		if data, err := LoadSession(sessionFile); err == nil {
-			return RestoreFromSession(baseTools, systemPrompt, extraSystemPrompt, maxSteps, input, output, data, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, autoSummarize, noCompact, compactKeepSteps, compactTruncateLen, proxyURL, skillsMgr), sessionFile
+func LoadOrNewSession(cfg SessionConfig) (*Session, string) {
+	cfg.SessionFile = expandPath(cfg.SessionFile)
+	if cfg.SessionFile != "" {
+		if data, err := LoadSession(cfg.SessionFile); err == nil {
+			return RestoreFromSession(cfg, data), cfg.SessionFile
 		}
 	}
-	return NewSession(baseTools, systemPrompt, extraSystemPrompt, maxSteps, input, output, sessionFile, modelConfigPath, runtimeConfigPath, debugAPI, autoSummarize, noCompact, compactKeepSteps, compactTruncateLen, proxyURL, skillsMgr), sessionFile
+	return NewSession(cfg), cfg.SessionFile
 }
 
 // NewSession creates a fresh session.
-func NewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, noCompact bool, compactKeepSteps int, compactTruncateLen int, proxyURL string, skillsMgr *skills.Manager) *Session {
+func NewSession(cfg SessionConfig) *Session {
 	sessionCtx, sessionCancel := context.WithCancel(context.Background())
 	s := &Session{
-		SessionFile:          sessionFile,
+		SessionFile:          cfg.SessionFile,
 		CreatedAt:            time.Now(),
-		Input:                input,
-		Output:               output,
-		ModelManager:         NewModelManager(modelConfigPath),
-		RuntimeManager:       NewRuntimeManager(runtimeConfigPath, modelConfigPath),
-		SkillsManager:        skillsMgr,
-		baseTools:            baseTools,
-		systemPrompt:         systemPrompt,
-		extraSystemPrompt:    extraSystemPrompt,
-		debugAPI:             debugAPI,
-		autoSummarizeEnabled: autoSummarize,
-		compactEnabled:       !noCompact,
-		compactKeepSteps:     compactKeepSteps,
-		compactTruncateLen:   compactTruncateLen,
-		skillDirs:            buildSkillDirSet(skillsMgr),
-		proxyURL:             proxyURL,
-		maxSteps:             maxSteps,
+		Input:                cfg.Input,
+		Output:               cfg.Output,
+		ModelManager:         NewModelManager(cfg.ModelConfigPath),
+		RuntimeManager:       NewRuntimeManager(cfg.RuntimeConfigPath, cfg.ModelConfigPath),
+		SkillsManager:        cfg.SkillsMgr,
+		baseTools:            cfg.BaseTools,
+		systemPrompt:         cfg.SystemPrompt,
+		extraSystemPrompt:    cfg.ExtraSystemPrompt,
+		debugAPI:             cfg.DebugAPI,
+		autoSummarizeEnabled: cfg.AutoSummarize,
+		compactEnabled:       !cfg.NoCompact,
+		compactKeepSteps:     cfg.CompactKeepSteps,
+		compactTruncateLen:   cfg.CompactTruncateLen,
+		skillDirs:            buildSkillDirSet(cfg.SkillsMgr),
+		proxyURL:             cfg.ProxyURL,
+		maxSteps:             cfg.MaxSteps,
 		thinkLevel:           config.DefaultThinkLevel,
 		lastSaveMessages:     -1,
 		taskQueue:            make([]QueueItem, 0),
@@ -234,28 +264,28 @@ func NewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt str
 }
 
 // RestoreFromSession creates a session from saved data.
-func RestoreFromSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt string, maxSteps int, input stream.Input, output stream.Output, data *SessionData, sessionFile string, modelConfigPath, runtimeConfigPath string, debugAPI bool, autoSummarize bool, noCompact bool, compactKeepSteps int, compactTruncateLen int, proxyURL string, skillsMgr *skills.Manager) *Session {
+func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 	sessionCtx, sessionCancel := context.WithCancel(context.Background())
 	s := &Session{
 		Messages:             data.Messages,
-		SessionFile:          sessionFile,
+		SessionFile:          cfg.SessionFile,
 		CreatedAt:            data.CreatedAt,
-		Input:                input,
-		Output:               output,
-		ModelManager:         NewModelManager(modelConfigPath),
-		RuntimeManager:       NewRuntimeManager(runtimeConfigPath, modelConfigPath),
-		SkillsManager:        skillsMgr,
-		baseTools:            baseTools,
-		systemPrompt:         systemPrompt,
-		extraSystemPrompt:    extraSystemPrompt,
-		debugAPI:             debugAPI,
-		autoSummarizeEnabled: autoSummarize,
-		compactEnabled:       !noCompact,
-		compactKeepSteps:     compactKeepSteps,
-		compactTruncateLen:   compactTruncateLen,
-		skillDirs:            buildSkillDirSet(skillsMgr),
-		proxyURL:             proxyURL,
-		maxSteps:             maxSteps,
+		Input:                cfg.Input,
+		Output:               cfg.Output,
+		ModelManager:         NewModelManager(cfg.ModelConfigPath),
+		RuntimeManager:       NewRuntimeManager(cfg.RuntimeConfigPath, cfg.ModelConfigPath),
+		SkillsManager:        cfg.SkillsMgr,
+		baseTools:            cfg.BaseTools,
+		systemPrompt:         cfg.SystemPrompt,
+		extraSystemPrompt:    cfg.ExtraSystemPrompt,
+		debugAPI:             cfg.DebugAPI,
+		autoSummarizeEnabled: cfg.AutoSummarize,
+		compactEnabled:       !cfg.NoCompact,
+		compactKeepSteps:     cfg.CompactKeepSteps,
+		compactTruncateLen:   cfg.CompactTruncateLen,
+		skillDirs:            buildSkillDirSet(cfg.SkillsMgr),
+		proxyURL:             cfg.ProxyURL,
+		maxSteps:             cfg.MaxSteps,
 		thinkLevel:           data.ThinkLevel,
 		ContextTokens:        data.ContextTokens,
 		lastSaveMessages:     len(data.Messages),

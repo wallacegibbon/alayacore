@@ -75,10 +75,14 @@ func TestLoadOrNewSession(t *testing.T) {
 	// Use nil for provider since we're just testing session creation
 	baseTools := []llm.Tool{}
 	systemPrompt := "test system prompt"
-	extraSystemPrompt := ""
 
 	// Test creating a new session without specifying session file
-	session, sessionFile := LoadOrNewSession(baseTools, systemPrompt, extraSystemPrompt, 0, &stream.NopInput{}, &stream.NopOutput{}, "", "", "", false, false, false, 3, 500, "", nil)
+	session, sessionFile := LoadOrNewSession(SessionConfig{
+		BaseTools:    baseTools,
+		SystemPrompt: systemPrompt,
+		Input:        &stream.NopInput{},
+		Output:       &stream.NopOutput{},
+	})
 	if session == nil {
 		t.Fatal("LoadOrNewSession returned nil session")
 		return
