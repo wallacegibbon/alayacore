@@ -113,8 +113,8 @@ model_name: 'claude'`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, warnings := parseModelConfig(tt.input)
-			_ = warnings
+			result, msgs := parseModelConfig(tt.input)
+			_ = msgs
 
 			if len(result) != len(tt.expected) {
 				t.Fatalf("expected %d models, got %d", len(tt.expected), len(result))
@@ -189,8 +189,8 @@ model_name: "mini"`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			models, warnings := parseModelConfig(tt.input)
-			_ = warnings
+			models, msgs := parseModelConfig(tt.input)
+			_ = msgs
 			var result ModelConfig
 			if len(models) > 0 {
 				result = models[0]

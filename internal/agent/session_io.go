@@ -252,10 +252,10 @@ func (s *Session) handleModelLoad() {
 		return
 	}
 
-	// Report validation warnings (unknown protocol_type, missing fields, etc.)
-	if warnings := s.ModelManager.GetWarnings(); len(warnings) > 0 {
-		for _, w := range warnings {
-			s.writeNotify("warning: " + w)
+	// Report validation messages (unknown protocol_type, missing fields, etc.)
+	if msgs := s.ModelManager.GetLoadErrors(); len(msgs) > 0 {
+		for _, m := range msgs {
+			s.writeNotify("error: " + m)
 		}
 	}
 

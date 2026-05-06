@@ -14,18 +14,18 @@ base_url: "https://api.example.com"
 api_key: "key"
 model_name: "model"`
 
-	models, warnings := parseModelConfig(input)
+	models, msgs := parseModelConfig(input)
 	if len(models) != 0 {
 		t.Fatalf("expected 0 models (broken model should be skipped), got %d", len(models))
 	}
 	found := false
-	for _, w := range warnings {
-		if strings.Contains(w, "unknown protocol_type") && strings.Contains(w, "foobar") {
+	for _, m := range msgs {
+		if strings.Contains(m, "unknown protocol_type") && strings.Contains(m, "foobar") {
 			found = true
 		}
 	}
 	if !found {
-		t.Errorf("expected error about unknown protocol_type, got: %v", warnings)
+		t.Errorf("expected error about unknown protocol_type, got: %v", msgs)
 	}
 }
 
@@ -73,26 +73,26 @@ model_name: "model"`,
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			models, warnings := parseModelConfig(tt.input)
+			models, msgs := parseModelConfig(tt.input)
 			if len(models) != tt.wantModels {
 				t.Errorf("expected %d models, got %d", tt.wantModels, len(models))
 			}
 			if tt.wantError != "" {
 				found := false
-				for _, w := range warnings {
-					if strings.Contains(w, tt.wantError) {
+				for _, m := range msgs {
+					if strings.Contains(m, tt.wantError) {
 						found = true
 						break
 					}
 				}
 				if !found {
-					t.Errorf("expected error containing %q, got: %v", tt.wantError, warnings)
+					t.Errorf("expected error containing %q, got: %v", tt.wantError, msgs)
 				}
 			}
 			if tt.dontWantErr != "" {
-				for _, w := range warnings {
-					if strings.Contains(w, tt.dontWantErr) {
-						t.Errorf("unexpected error: %s", w)
+				for _, m := range msgs {
+					if strings.Contains(m, tt.dontWantErr) {
+						t.Errorf("unexpected error: %s", m)
 						break
 					}
 				}
@@ -108,18 +108,18 @@ base_url: ":://bad"
 api_key: "key"
 model_name: "model"`
 
-	models, warnings := parseModelConfig(input)
+	models, msgs := parseModelConfig(input)
 	if len(models) != 0 {
 		t.Fatalf("expected 0 models (broken model should be skipped), got %d", len(models))
 	}
 	found := false
-	for _, w := range warnings {
-		if strings.Contains(w, "invalid base_url") {
+	for _, m := range msgs {
+		if strings.Contains(m, "invalid base_url") {
 			found = true
 		}
 	}
 	if !found {
-		t.Errorf("expected error about invalid base_url, got: %v", warnings)
+		t.Errorf("expected error about invalid base_url, got: %v", msgs)
 	}
 }
 
@@ -130,15 +130,15 @@ base_url: "https://api.example.com"
 model_name: "model"
 context_limit: abc`
 
-	_, warnings := parseModelConfig(input)
+	_, msgs := parseModelConfig(input)
 	found := false
-	for _, w := range warnings {
-		if strings.Contains(w, "context_limit") && strings.Contains(w, "invalid integer") {
+	for _, m := range msgs {
+		if strings.Contains(m, "context_limit") && strings.Contains(m, "invalid integer") {
 			found = true
 		}
 	}
 	if !found {
-		t.Errorf("expected warning about invalid integer for context_limit, got: %v", warnings)
+		t.Errorf("expected parse warning about invalid integer for context_limit, got: %v", msgs)
 	}
 }
 
@@ -153,22 +153,22 @@ protocol_type: "openai"
 base_url: "https://api.example.com"
 model_name: "gpt-4"
 `
-	models, warnings := parseModelConfig(input)
+	models, msgs := parseModelConfig(input)
 	if len(models) != 1 {
 		t.Fatalf("expected 1 model (bad one skipped), got %d", len(models))
 	}
 	if models[0].Name != "Good" {
 		t.Errorf("expected model name %q, got %q", "Good", models[0].Name)
 	}
-	if len(warnings) != 1 {
-		t.Fatalf("expected 1 warning, got %d: %v", len(warnings), warnings)
+	if len(msgs) != 1 {
+		t.Fatalf("expected 1 message, got %d: %v", len(msgs), msgs)
 	}
-	if !strings.Contains(warnings[0], "unknown protocol_type") {
-		t.Errorf("expected protocol_type error, got: %s", warnings[0])
+	if !strings.Contains(msgs[0], "unknown protocol_type") {
+		t.Errorf("expected protocol_type error, got: %s", msgs[0])
 	}
 }
 
-func TestModelManagerGetWarnings(t *testing.T) {
+func TestModelManagerGetLoadErrors(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "model.conf")
 
@@ -183,33 +183,33 @@ model_name: ""
 	}
 
 	mm := NewModelManager(configPath)
-	warnings := mm.GetWarnings()
+	msgs := mm.GetLoadErrors()
 
-	if len(warnings) == 0 {
+	if len(msgs) == 0 {
 		t.Fatal("expected errors from invalid config, got none")
 	}
 
 	// Check specific errors are present
 	var foundProto, foundURL, foundModelName bool
-	for _, w := range warnings {
-		if strings.Contains(w, "unknown protocol_type") {
+	for _, m := range msgs {
+		if strings.Contains(m, "unknown protocol_type") {
 			foundProto = true
 		}
-		if strings.Contains(w, "invalid base_url") {
+		if strings.Contains(m, "invalid base_url") {
 			foundURL = true
 		}
-		if strings.Contains(w, "missing required field model_name") {
+		if strings.Contains(m, "missing required field model_name") {
 			foundModelName = true
 		}
 	}
 	if !foundProto {
-		t.Errorf("missing protocol_type error in: %v", warnings)
+		t.Errorf("missing protocol_type error in: %v", msgs)
 	}
 	if !foundURL {
-		t.Errorf("missing base_url error in: %v", warnings)
+		t.Errorf("missing base_url error in: %v", msgs)
 	}
 	if !foundModelName {
-		t.Errorf("missing model_name error in: %v", warnings)
+		t.Errorf("missing model_name error in: %v", msgs)
 	}
 
 	// Broken model should not be in the list
@@ -233,10 +233,10 @@ model_name: "gpt-4"
 	}
 
 	mm := NewModelManager(configPath)
-	warnings := mm.GetWarnings()
+	msgs := mm.GetLoadErrors()
 
-	if len(warnings) != 0 {
-		t.Errorf("expected no warnings from valid config, got: %v", warnings)
+	if len(msgs) != 0 {
+		t.Errorf("expected no errors from valid config, got: %v", msgs)
 	}
 	if mm.ModelCount() != 1 {
 		t.Errorf("expected 1 model, got %d", mm.ModelCount())

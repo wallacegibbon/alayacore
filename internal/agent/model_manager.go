@@ -52,7 +52,7 @@ type ModelManager struct {
 	nextID   int
 	mu       sync.RWMutex
 	filePath string
-	warnings []string // config validation warnings from last load
+	warnings []string // config validation messages from last load (parse warnings + model errors)
 }
 
 // DefaultModelConfig is the default model configuration written when config file is empty
@@ -95,8 +95,10 @@ func NewModelManager(configPath string) *ModelManager {
 	return mm
 }
 
-// GetWarnings returns validation warnings from the last LoadFromFile call.
-func (mm *ModelManager) GetWarnings() []string {
+// GetLoadErrors returns validation messages from the last LoadFromFile call.
+// These include both parse warnings (e.g. non-numeric value for an int field)
+// and model errors (e.g. unknown protocol_type, missing required fields).
+func (mm *ModelManager) GetLoadErrors() []string {
 	mm.mu.RLock()
 	defer mm.mu.RUnlock()
 	return mm.warnings
@@ -140,7 +142,7 @@ func (mm *ModelManager) LoadFromFile(path string) error {
 		data = []byte(DefaultModelConfig)
 	}
 
-	models, warnings := parseModelConfig(string(data))
+	models, msgs := parseModelConfig(string(data))
 
 	// Reset ID counter and generate IDs for models (start from 1; 0 is reserved as "no model")
 	mm.nextID = 1
@@ -150,7 +152,7 @@ func (mm *ModelManager) LoadFromFile(path string) error {
 	}
 
 	mm.models = models
-	mm.warnings = warnings
+	mm.warnings = msgs
 
 	if mm.filePath == "" {
 		mm.filePath = path
@@ -171,9 +173,9 @@ func (mm *ModelManager) createDefaultConfig(path string) error {
 }
 
 // parseModelConfig parses the key-value model config format.
-// Returns valid models and a list of validation warnings.
+// Returns valid models and a list of validation messages (parse warnings and model errors).
 func parseModelConfig(content string) ([]ModelConfig, []string) {
-	var warnings []string
+	var msgs []string
 
 	blocks := config.ParseKeyValueBlocks(content)
 	models := make([]ModelConfig, 0, len(blocks))
@@ -186,7 +188,7 @@ func parseModelConfig(content string) ([]ModelConfig, []string) {
 
 		var model ModelConfig
 		for _, w := range config.ParseKeyValueWithWarnings(block, &model) {
-			warnings = append(warnings, fmt.Sprintf("model block %d: %s", blockIdx+1, w.String()))
+			msgs = append(msgs, fmt.Sprintf("model block %d: %s", blockIdx+1, w.String()))
 		}
 
 		if model.Name == "" && model.ModelName == "" {
@@ -194,14 +196,14 @@ func parseModelConfig(content string) ([]ModelConfig, []string) {
 		}
 
 		if errs := validateModel(model); len(errs) > 0 {
-			warnings = append(warnings, errs...)
+			msgs = append(msgs, errs...)
 			continue // skip broken model
 		}
 
 		models = append(models, model)
 	}
 
-	return models, warnings
+	return models, msgs
 }
 
 // validateModel checks required fields and returns errors for any issues found.
