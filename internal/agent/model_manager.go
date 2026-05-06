@@ -47,12 +47,13 @@ type ModelInfo struct {
 // NOTE: ModelManager NEVER writes to the model config file.
 // Users must edit the file with a text editor (press 'e' in model selector).
 type ModelManager struct {
-	models   []ModelConfig
-	activeID int
-	nextID   int
-	mu       sync.RWMutex
-	filePath string
-	warnings []string // config validation messages from last load (parse warnings + model errors)
+	models      []ModelConfig
+	activeID    int
+	nextID      int
+	mu          sync.RWMutex
+	filePath    string
+	warnings    []string // config validation messages from last load (parse warnings + model errors)
+	hasRejected bool     // true if any model blocks were rejected during last load
 }
 
 // DefaultModelConfig is the default model configuration written when config file is empty
@@ -72,10 +73,15 @@ var KnownProtocolTypes = map[string]bool{
 	"anthropic": true,
 }
 
-// NoModelsErrorMessage returns a formatted error message for when no models are configured.
-func NoModelsErrorMessage(configPath string) string {
+// NoModelsErrorMessage returns a formatted error message for when no usable models
+// are available. If models were found but all rejected, the message reflects that.
+func NoModelsErrorMessage(configPath string, hasRejected bool) string {
 	var b strings.Builder
-	b.WriteString("Error: No models configured.\n")
+	if hasRejected {
+		b.WriteString("Error: All models were rejected due to configuration errors.\n")
+	} else {
+		b.WriteString("Error: No models configured.\n")
+	}
 	fmt.Fprintf(&b, "Please edit the model config file: %s\n", configPath)
 	b.WriteString("\nExample:\n")
 	b.WriteString(DefaultModelConfig)
@@ -150,6 +156,10 @@ func (mm *ModelManager) LoadFromFile(path string) error {
 		models[i].ID = mm.nextID
 		mm.nextID++
 	}
+
+	// Track whether any model blocks were present but rejected
+	totalBlocks := len(config.ParseKeyValueBlocks(string(data)))
+	mm.hasRejected = totalBlocks > 0 && len(models) == 0 && len(msgs) > 0
 
 	mm.models = models
 	mm.warnings = msgs
@@ -243,6 +253,13 @@ func (mm *ModelManager) HasModels() bool {
 	mm.mu.RLock()
 	defer mm.mu.RUnlock()
 	return len(mm.models) > 0
+}
+
+// HasRejected returns true if any model blocks were rejected during the last load.
+func (mm *ModelManager) HasRejected() bool {
+	mm.mu.RLock()
+	defer mm.mu.RUnlock()
+	return mm.hasRejected
 }
 
 // AddModel adds a new model to the runtime list (does NOT persist to file)

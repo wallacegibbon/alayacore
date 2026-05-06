@@ -66,7 +66,7 @@ func (a *Adaptor) Start() int {
 
 	// Check if we have any models available.
 	if !session.HasModels() {
-		fmt.Fprint(os.Stderr, agentpkg.NoModelsErrorMessage(session.ModelConfigPath()))
+		fmt.Fprint(os.Stderr, agentpkg.NoModelsErrorMessage(session.ModelConfigPath(), session.ModelManager.HasRejected()))
 		return 1
 	}
 
