@@ -16,7 +16,7 @@
 ## Low Priority
 
 - [x] 8. `expandPath` in wrong package — move to `config` or shared utility
-- [ ] 9. `GenerateSchema` uses `panic` — return error instead
+- [x] 9. `GenerateSchema` uses `panic` — return error instead
 - [ ] 10. Config parser fragility — add unknown-key validation
 - [ ] 11. Oversized `debug/http.go` — audit for dead code
 - [ ] 12. Binary artifact + debug logs in repo — add to `.gitignore`

@@ -16,8 +16,16 @@ import (
 //
 // Lines starting with # are comments. Empty lines are ignored.
 // Multiple configs can be separated by "---" on its own line.
+//
+// Unknown keys are silently ignored.  Use ParseKeyValueStrict to detect them.
 func ParseKeyValue(content string, target interface{}) {
 	parseKeyValue(content, target, false)
+}
+
+// ParseKeyValueStrict is like ParseKeyValue but returns any keys in content
+// that did not match a struct field tag.  Callers can log or error on these.
+func ParseKeyValueStrict(content string, target interface{}) []string {
+	return parseKeyValueStrict(content, target, false)
 }
 
 // ParseKeyValueBlocks parses multiple config blocks separated by "---"
@@ -30,9 +38,16 @@ func ParseKeyValueBlocks(content string) []string {
 //
 //nolint:gocyclo // Multiple validation branches required for config parsing
 func parseKeyValue(content string, target interface{}, skipHyphens bool) {
+	parseKeyValueStrict(content, target, skipHyphens)
+}
+
+// parseKeyValueStrict is like parseKeyValue but returns unknown keys.
+//
+//nolint:gocyclo // Multiple validation branches required for config parsing
+func parseKeyValueStrict(content string, target interface{}, skipHyphens bool) []string {
 	v := reflect.ValueOf(target)
 	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Struct {
-		return
+		return nil
 	}
 	v = v.Elem()
 	t := v.Type()
@@ -45,6 +60,8 @@ func parseKeyValue(content string, target interface{}, skipHyphens bool) {
 			tagToField[tag] = i
 		}
 	}
+
+	var unknownKeys []string
 
 	// Parse lines
 	for line := range strings.SplitSeq(content, "\n") {
@@ -77,12 +94,15 @@ func parseKeyValue(content string, target interface{}, skipHyphens bool) {
 		// Look up field by tag
 		fieldIdx, ok := tagToField[key]
 		if !ok {
+			unknownKeys = append(unknownKeys, key)
 			continue
 		}
 
 		field := v.Field(fieldIdx)
 		setFieldValue(field, value)
 	}
+
+	return unknownKeys
 }
 
 // setFieldValue sets a struct field value from a string
