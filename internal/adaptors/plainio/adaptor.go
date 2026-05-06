@@ -36,22 +36,22 @@ func (a *Adaptor) Start() int {
 
 	// Load session
 	session, _ := agentpkg.LoadOrNewSession(agentpkg.SessionConfig{
-		Input:             input,
-		Output:            output,
-		SessionFile:       a.Config.Cfg.Session,
-		ModelConfigPath:   a.Config.Cfg.ModelConfig,
-		RuntimeConfigPath: a.Config.Cfg.RuntimeConfig,
-		BaseTools:         a.Config.AgentTools,
-		SystemPrompt:      a.Config.SystemPrompt,
-		ExtraSystemPrompt: a.Config.ExtraSystemPrompt,
-		MaxSteps:          a.Config.MaxSteps,
-		DebugAPI:          a.Config.Cfg.DebugAPI,
-		AutoSummarize:     a.Config.Cfg.AutoSummarize,
-		NoCompact:         a.Config.Cfg.NoCompact,
-		CompactKeepSteps:  a.Config.Cfg.CompactKeepSteps,
+		Input:              input,
+		Output:             output,
+		SessionFile:        a.Config.Cfg.Session,
+		ModelConfigPath:    a.Config.Cfg.ModelConfig,
+		RuntimeConfigPath:  a.Config.Cfg.RuntimeConfig,
+		BaseTools:          a.Config.AgentTools,
+		SystemPrompt:       a.Config.SystemPrompt,
+		ExtraSystemPrompt:  a.Config.ExtraSystemPrompt,
+		MaxSteps:           a.Config.MaxSteps,
+		DebugAPI:           a.Config.Cfg.DebugAPI,
+		AutoSummarize:      a.Config.Cfg.AutoSummarize,
+		NoCompact:          a.Config.Cfg.NoCompact,
+		CompactKeepSteps:   a.Config.Cfg.CompactKeepSteps,
 		CompactTruncateLen: a.Config.Cfg.CompactTruncateLen,
-		ProxyURL:          a.Config.Cfg.Proxy,
-		SkillsMgr:         a.Config.SkillsMgr,
+		ProxyURL:           a.Config.Cfg.Proxy,
+		SkillsMgr:          a.Config.SkillsMgr,
 	})
 
 	sigCh := make(chan os.Signal, 1)

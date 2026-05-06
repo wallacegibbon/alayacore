@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strings"
 )
@@ -34,6 +35,21 @@ func ResolveConfigPath(providedPath, defaultFilename string) string {
 		return ""
 	}
 	return filepath.Join(home, ".alayacore", defaultFilename)
+}
+
+// ExpandPath expands ~ to the user's home directory.
+func ExpandPath(path string) string {
+	if !strings.HasPrefix(path, "~") {
+		return path
+	}
+	usr, err := user.Current()
+	if err != nil {
+		return path
+	}
+	if path == "~" {
+		return usr.HomeDir
+	}
+	return filepath.Join(usr.HomeDir, path[1:])
 }
 
 // printDefaults prints all command-line flags with -- prefix instead of the default -

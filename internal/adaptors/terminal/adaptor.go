@@ -52,22 +52,22 @@ func (a *Adaptor) Start() {
 
 	// Load session synchronously before starting the UI
 	session, _ := agentpkg.LoadOrNewSession(agentpkg.SessionConfig{
-		Input:             inputStream,
-		Output:            terminalOutput,
-		SessionFile:       a.Config.Cfg.Session,
-		ModelConfigPath:   a.Config.Cfg.ModelConfig,
-		RuntimeConfigPath: a.Config.Cfg.RuntimeConfig,
-		BaseTools:         a.Config.AgentTools,
-		SystemPrompt:      a.Config.SystemPrompt,
-		ExtraSystemPrompt: a.Config.ExtraSystemPrompt,
-		MaxSteps:          a.Config.MaxSteps,
-		DebugAPI:          a.Config.Cfg.DebugAPI,
-		AutoSummarize:     a.Config.Cfg.AutoSummarize,
-		NoCompact:         a.Config.Cfg.NoCompact,
-		CompactKeepSteps:  a.Config.Cfg.CompactKeepSteps,
+		Input:              inputStream,
+		Output:             terminalOutput,
+		SessionFile:        a.Config.Cfg.Session,
+		ModelConfigPath:    a.Config.Cfg.ModelConfig,
+		RuntimeConfigPath:  a.Config.Cfg.RuntimeConfig,
+		BaseTools:          a.Config.AgentTools,
+		SystemPrompt:       a.Config.SystemPrompt,
+		ExtraSystemPrompt:  a.Config.ExtraSystemPrompt,
+		MaxSteps:           a.Config.MaxSteps,
+		DebugAPI:           a.Config.Cfg.DebugAPI,
+		AutoSummarize:      a.Config.Cfg.AutoSummarize,
+		NoCompact:          a.Config.Cfg.NoCompact,
+		CompactKeepSteps:   a.Config.Cfg.CompactKeepSteps,
 		CompactTruncateLen: a.Config.Cfg.CompactTruncateLen,
-		ProxyURL:          a.Config.Cfg.Proxy,
-		SkillsMgr:         a.Config.SkillsMgr,
+		ProxyURL:           a.Config.Cfg.Proxy,
+		SkillsMgr:          a.Config.SkillsMgr,
 	})
 
 	// Load active theme from runtime.conf (default to default theme if not set)
