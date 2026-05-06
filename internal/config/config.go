@@ -80,7 +80,6 @@ type Settings struct {
 	SystemPrompt  string
 	MaxSteps      int
 	AutoSummarize bool
-	AutoSave      bool
 
 	// Compaction
 	NoCompact          bool
@@ -115,7 +114,6 @@ func Parse() *Settings {
 	flag.Var(systemPrompt, "system", "Extra `system-prompt` (can be specified multiple times, will be appended to default)")
 	maxSteps := flag.Int("max-steps", 100, "Maximum agent loop steps")
 	autoSummarize := flag.Bool("auto-summarize", false, "Automatically summarize conversation when context exceeds 65% of limit")
-	autoSave := flag.Bool("auto-save", true, "Automatically save session after each response (requires --session)")
 
 	// Compaction
 	noCompact := flag.Bool("no-compact", false, "Disable automatic history compaction (old tool results are kept in full)")
@@ -147,7 +145,6 @@ func Parse() *Settings {
 		SystemPrompt:       mergedSystemPrompt,
 		MaxSteps:           *maxSteps,
 		AutoSummarize:      *autoSummarize,
-		AutoSave:           *autoSave,
 		NoCompact:          *noCompact,
 		CompactKeepSteps:   *compactKeepSteps,
 		CompactTruncateLen: *compactTruncateLen,

@@ -38,7 +38,7 @@ On first run, AlayaCore auto-creates a default model config at `~/.alayacore/mod
 - **Any LLM provider** — OpenAI, Anthropic, DeepSeek, Qwen, Ollama, LM Studio. Multiple models in one config, switch at runtime.
 - **Streaming TUI** — Real-time output with virtual scrolling, foldable windows, and vim-like keybindings.
 - **Plain IO mode** — `--plainio` for scripting and piping. No TUI, just stdin/stdout.
-- **Session persistence** — Save and resume conversations with auto-save.
+- **Session persistence** — Save and resume conversations automatically when `--session` is specified.
 - **Skills system** — Extend the agent with instruction packages following the [Agent Skills](https://agentskills.io) spec.
 - **Themes** — Customizable color schemes with live switching.
 
