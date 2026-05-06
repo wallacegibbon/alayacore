@@ -80,7 +80,7 @@ Models are validated at load time (startup and after `:model_load`). A model is 
 - `base_url` is missing or not a valid URL
 - `model_name` is missing
 
-Rejected models are skipped — they won't appear in the model selector. Errors are printed at startup and as notifications after `:model_load`. Other valid models in the same file are unaffected.
+Rejected models are skipped — they won't appear in the model selector. Errors are printed at startup and shown as errors after `:model_load`. Other valid models in the same file are unaffected.
 
 If a field value has the wrong type (e.g. `context_limit: abc`), a warning is printed but the model is still loaded with the zero value for that field.
 
