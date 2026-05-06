@@ -1,6 +1,8 @@
 # AlayaCore
 
-A fast, minimal AI coding agent that runs in your terminal.
+[English](README.md) | [中文](README.zh-CN.md)
+
+A fast, minimal AI Agent that runs in your terminal.
 
 **TUI Mode** — split-pane interface with streaming output, vim navigation, and session management.
 
@@ -12,16 +14,19 @@ A fast, minimal AI coding agent that runs in your terminal.
 
 AlayaCore connects to any OpenAI-compatible or Anthropic-compatible LLM and gives it the tools to read, write, and edit files, and execute commands — all from an interactive TUI with streaming output, session persistence, and multi-step agentic tool-calling loops.
 
-You give AlayaCore a task in natural language. It calls an LLM, which reasons about the task and invokes tools — reading files to understand context, editing them to make changes, running commands to verify results — in an autonomous loop until the task is done. You watch the work happen in real time and can intervene at any point.
-
-Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Bubbles](https://github.com/charmbracelet/bubbles), and [Lip Gloss](https://github.com/charmbracelet/lipgloss) for a responsive terminal UI with vim-like keybindings, virtual scrolling, and a windowed display for concurrent streams.
-
 ## Quick Start
+
+**Option 1: Download from [GitHub Releases](https://github.com/alayacore/alayacore/releases)**
+
+Download the binary for your platform, extract it, and add it to your `PATH`.
+
+**Option 2: Install with Go**
 
 ```sh
 go install github.com/alayacore/alayacore@latest
-alayacore
 ```
+
+Then run `alayacore`.
 
 On first run, AlayaCore auto-creates a default model config at `~/.alayacore/model.conf` configured for Ollama. Edit it to point at your preferred provider — press `Ctrl+L` then `e` in the terminal, or edit the file directly.
 
@@ -43,7 +48,8 @@ On first run, AlayaCore auto-creates a default model config at `~/.alayacore/mod
 |----------|-------------|
 | [Getting Started](docs/getting-started.md) | Installation, CLI flags, and usage examples |
 | [Configuration](docs/configuration.md) | Model config, runtime config, and themes |
-| [Terminal UI](docs/terminal-ui.md) | Keybindings, commands, windows, task queue, plain IO mode |
+| [Terminal UI](docs/tui.md) | Keybindings, commands, windows, task queue |
+| [Plain IO Mode](docs/plainio.md) | stdin/stdout for scripts and pipes |
 | [Skills System](docs/skills.md) | Agent Skills specification, directory structure, SKILL.md format |
 | [Architecture](docs/architecture.md) | Layered architecture, TLV protocol, data flow, design decisions |
 

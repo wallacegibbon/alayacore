@@ -66,6 +66,15 @@ The session layer manages conversation state, task execution, and model interact
 | `ContextTokens` | Tracks conversation context size across API calls. See [context-tracking.md](context-tracking.md). |
 | `compactHistory()` | Truncates old tool results to save context. Configurable via `--compact-keep-steps` and `--compact-truncate-len`. |
 
+### Session Persistence
+
+- **Auto-save** — Enabled by default when `--session` is specified. The session is saved after each task completes.
+- **Manual save** — `:save [file]` or `Ctrl+S` at any time (TUI mode).
+- **Load** — On startup, AlayaCore starts a new empty session unless you specify `--session` to load an existing one.
+- **Auto-summarize** — When `--auto-summarize` is enabled and `context_limit` is set, AlayaCore automatically triggers `:summarize` when context reaches 65% of the limit.
+
+Session files use a Markdown-based format with YAML frontmatter. The body contains TLV-encoded conversation data (messages, tool calls, tool results) written directly as binary TLV records after the frontmatter.
+
 ### Truncation (`internal/truncation/`)
 
 Shared text truncation utilities used by the tools and session layers. All functions guarantee valid UTF-8 output (no split multi-byte characters). Two strategies:

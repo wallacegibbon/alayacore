@@ -112,5 +112,6 @@ alayacore --plainio
 ## Next Steps
 
 - **[Configuration](configuration.md)** — Set up multiple models, API keys, and themes
-- **[Terminal UI](terminal-ui.md)** — Learn the keybindings and commands
+- **[Terminal UI](tui.md)** — Learn the keybindings and commands
+- **[Plain IO Mode](plainio.md)** — Use AlayaCore without a terminal UI
 - **[Skills System](skills.md)** — Extend the agent with custom skill packages
