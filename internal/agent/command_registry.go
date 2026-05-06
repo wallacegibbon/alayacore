@@ -21,157 +21,46 @@ const (
 	commandNameThink           = "think"
 )
 
-// CommandHandler is the function signature for command handlers
-type CommandHandler func(ctx context.Context, args []string)
-
-// Command represents a registered command
+// Command describes a user-facing colon-command.  This is a pure metadata
+// type — actual dispatch lives in Session.dispatchCommand.
 type Command struct {
-	Name        string         // Command name (without colon)
-	Description string         // Short description for help
-	Usage       string         // Usage example (e.g., "<id>")
-	Handler     CommandHandler // The handler function
+	Name        string // Command name (without colon)
+	Description string // Short description for help
+	Usage       string // Usage example (e.g. "<id>")
 }
 
-// CommandRegistry holds all registered commands
-type CommandRegistry struct {
-	commands map[string]*Command
+// commandDefs is the single source of truth for all colon-commands.
+// Order here determines the order used by LookupCommand iteration.
+var commandDefs = []Command{
+	{commandNameSummarize, "Summarize the conversation to reduce context", ""},
+	{commandNameCancel, "Cancel the current task", ""},
+	{commandNameCancelAll, "Cancel current task and clear the task queue", ""},
+	{commandNameContinue, "Resume after an error; without args retries the prompt, with 'skip' skips it", "[skip]"},
+	{commandNameSave, "Save the current session", "[filename]"},
+	{commandNameModelSet, "Switch to a different model", "<id>"},
+	{commandNameModelLoad, "Reload models from configuration file", ""},
+	{commandNameTaskQueueGetAll, "List all queued tasks", ""},
+	{commandNameTaskQueueDel, "Delete a queued task", "<queue_id>"},
+	{commandNameThink, "Set think level (0=off, 1=normal, 2=max)", "[0|1|2]"},
 }
 
-// NewCommandRegistry creates a new command registry
-func NewCommandRegistry() *CommandRegistry {
-	return &CommandRegistry{
-		commands: make(map[string]*Command),
+// LookupCommand returns the command metadata for name, or (nil, false).
+func LookupCommand(name string) (*Command, bool) {
+	for i := range commandDefs {
+		if commandDefs[i].Name == name {
+			return &commandDefs[i], true
+		}
 	}
+	return nil, false
 }
 
-// Register adds a command to the registry
-func (r *CommandRegistry) Register(cmd *Command) {
-	r.commands[cmd.Name] = cmd
+// ListCommands returns all registered command metadata.
+func ListCommands() []Command {
+	return commandDefs
 }
 
-// Get retrieves a command by name
-func (r *CommandRegistry) Get(name string) (*Command, bool) {
-	cmd, ok := r.commands[name]
-	return cmd, ok
-}
-
-// List returns all registered commands
-func (r *CommandRegistry) List() []*Command {
-	cmds := make([]*Command, 0, len(r.commands))
-	for _, cmd := range r.commands {
-		cmds = append(cmds, cmd)
-	}
-	return cmds
-}
-
-// commandRegistry is the global command registry for the session
-var commandRegistry = NewCommandRegistry()
-
-// init registers all commands declaratively
-//
-//nolint:gochecknoinits // global command registry requires init-time registration
-func init() {
-	// Session management commands
-	commandRegistry.Register(&Command{
-		Name:        commandNameSummarize,
-		Description: "Summarize the conversation to reduce context",
-		Usage:       "",
-		Handler: func(_ context.Context, _ []string) {
-			// Handler is resolved at runtime via Session method
-		},
-	})
-
-	commandRegistry.Register(&Command{
-		Name:        commandNameCancel,
-		Description: "Cancel the current task",
-		Usage:       "",
-		Handler: func(_ context.Context, _ []string) {
-			// Handler is resolved at runtime via Session method
-		},
-	})
-
-	commandRegistry.Register(&Command{
-		Name:        commandNameCancelAll,
-		Description: "Cancel current task and clear the task queue",
-		Usage:       "",
-		Handler: func(_ context.Context, _ []string) {
-			// Handler is resolved at runtime via Session method
-		},
-	})
-
-	commandRegistry.Register(&Command{
-		Name:        commandNameContinue,
-		Description: "Resume after an error; without args retries the prompt, with 'skip' skips it",
-		Usage:       "[skip]",
-		Handler: func(_ context.Context, _ []string) {
-			// Handler is resolved at runtime via Session method
-		},
-	})
-
-	commandRegistry.Register(&Command{
-		Name:        commandNameSave,
-		Description: "Save the current session",
-		Usage:       "[filename]",
-		Handler: func(_ context.Context, _ []string) {
-			// Handler is resolved at runtime via Session method
-		},
-	})
-
-	// Model commands
-	commandRegistry.Register(&Command{
-		Name:        commandNameModelSet,
-		Description: "Switch to a different model",
-		Usage:       "<id>",
-		Handler: func(_ context.Context, _ []string) {
-			// Handler is resolved at runtime via Session method
-		},
-	})
-
-	commandRegistry.Register(&Command{
-		Name:        commandNameModelLoad,
-		Description: "Reload models from configuration file",
-		Usage:       "",
-		Handler: func(_ context.Context, _ []string) {
-			// Handler is resolved at runtime via Session method
-		},
-	})
-
-	// Task queue commands
-	commandRegistry.Register(&Command{
-		Name:        commandNameTaskQueueGetAll,
-		Description: "List all queued tasks",
-		Usage:       "",
-		Handler: func(_ context.Context, _ []string) {
-			// Handler is resolved at runtime via Session method
-		},
-	})
-
-	commandRegistry.Register(&Command{
-		Name:        commandNameTaskQueueDel,
-		Description: "Delete a queued task",
-		Usage:       "<queue_id>",
-		Handler: func(_ context.Context, _ []string) {
-			// Handler is resolved at runtime via Session method
-		},
-	})
-
-	commandRegistry.Register(&Command{
-		Name:        commandNameThink,
-		Description: "Set think level (0=off, 1=normal, 2=max)",
-		Usage:       "[0|1|2]",
-		Handler: func(_ context.Context, _ []string) {
-			// Handler is resolved at runtime via Session method
-		},
-	})
-}
-
-// GetCommandRegistry returns the global command registry
-func GetCommandRegistry() *CommandRegistry {
-	return commandRegistry
-}
-
-// DispatchCommand dispatches a command to the appropriate handler
-// This is called by Session.handleCommand
+// DispatchCommand dispatches a colon-command to the appropriate Session method.
+// Returns true if the command was recognized (even if execution failed).
 func (s *Session) dispatchCommand(ctx context.Context, cmd string) bool {
 	parts := strings.Fields(cmd)
 	if len(parts) == 0 {
@@ -182,12 +71,11 @@ func (s *Session) dispatchCommand(ctx context.Context, cmd string) bool {
 	commandName := parts[0]
 	args := parts[1:]
 
-	// Check if command exists in registry
-	if _, ok := commandRegistry.Get(commandName); !ok {
+	if _, ok := LookupCommand(commandName); !ok {
 		return false
 	}
 
-	// Dispatch to the handler methods (defined in session.go)
+	// Dispatch to the handler methods.
 	switch commandName {
 	case commandNameSummarize:
 		s.summarize(ctx)
