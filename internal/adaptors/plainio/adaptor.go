@@ -60,7 +60,7 @@ func (a *Adaptor) Start() int {
 	// all models are rejected.
 	if msgs := session.ModelManager.GetLoadErrors(); len(msgs) > 0 {
 		for _, m := range msgs {
-			fmt.Fprintf(os.Stderr, "error: %s\n", m)
+			fmt.Fprintf(os.Stderr, "%s\n", m)
 		}
 	}
 

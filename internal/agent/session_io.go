@@ -255,7 +255,7 @@ func (s *Session) handleModelLoad() {
 	// Report validation messages (unknown protocol_type, missing fields, etc.)
 	if msgs := s.ModelManager.GetLoadErrors(); len(msgs) > 0 {
 		for _, m := range msgs {
-			s.writeNotify("error: " + m)
+			s.writeNotify(m)
 		}
 	}
 
