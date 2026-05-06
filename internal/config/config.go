@@ -106,13 +106,18 @@ func Parse() *Settings {
 		printDefaults()
 	}
 
+	// Pre-compute default paths so they appear in --help output
+	defaultModelConfig := ResolveConfigPath("", "model.conf")
+	defaultRuntimeConfig := ResolveConfigPath("", "runtime.conf")
+	defaultThemesFolder := ResolveConfigPath("", "themes")
+
 	// Core
 	showVersion := flag.Bool("version", false, "Show version information")
 	plainIO := flag.Bool("plainio", false, "Use plain stdin/stdout mode instead of terminal UI")
 	debugAPI := flag.Bool("debug-api", false, "Write raw API requests and responses to log file")
-	modelConfig := flag.String("model-config", "", "Model config file `path` (default: ~/.alayacore/model.conf)")
-	runtimeConfig := flag.String("runtime-config", "", "Runtime config file `path` (default: ~/.alayacore/runtime.conf)")
-	themesFolder := flag.String("themes", "", "Themes folder `path` (default: ~/.alayacore/themes)")
+	modelConfig := flag.String("model-config", defaultModelConfig, "Model config file `path`")
+	runtimeConfig := flag.String("runtime-config", defaultRuntimeConfig, "Runtime config file `path`")
+	themesFolder := flag.String("themes", defaultThemesFolder, "Themes folder `path`")
 	skill := &stringSlice{}
 	flag.Var(skill, "skill", "Skill `path` (can be specified multiple times)")
 	session := flag.String("session", "", "Session file `path` to load/save conversations")
