@@ -370,11 +370,11 @@ func (s *Session) GetRuntimeManager() *RuntimeManager {
 
 func (s *Session) ensureAgentInitialized() string {
 	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if s.Agent != nil && s.Provider != nil {
-		s.mu.Unlock()
 		return ""
 	}
-	s.mu.Unlock()
 
 	if s.ModelManager == nil {
 		return "Model manager not initialized"
@@ -398,12 +398,13 @@ func (s *Session) ensureAgentInitialized() string {
 		MaxSteps:          s.maxSteps,
 	})
 
-	s.mu.Lock()
 	s.Agent = agent
 	s.Provider = provider
-	s.mu.Unlock()
 
-	s.applyModelContextLimit(activeModel)
+	// Apply context limit (we already hold s.mu).
+	if activeModel.ContextLimit > 0 {
+		s.ContextLimit = int64(activeModel.ContextLimit)
+	}
 	s.syncThinkToProvider()
 	return ""
 }

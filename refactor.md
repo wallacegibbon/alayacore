@@ -8,8 +8,8 @@
 
 ## Medium Priority
 
-- [ ] 4. `session.go` god object — extract output helpers, queue logic, compaction
-- [ ] 5. Provider code duplication — extract shared SSE/message utilities
+- [x] 4. `session.go` god object — extract output helpers, queue logic, compaction
+- [ ] 5. Provider code duplication — extract shared SSE/message utilities *(skipped: different wire formats make shared abstractions net-negative)*
 - [ ] 6. TOCTOU in `ensureAgentInitialized` — use `sync.Once` or dedicated mutex
 - [ ] 7. Unused sentinel errors — wire them up or remove dead definitions
 
