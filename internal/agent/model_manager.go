@@ -175,7 +175,6 @@ func (mm *ModelManager) createDefaultConfig(path string) error {
 func parseModelConfig(content string) ([]ModelConfig, []string) {
 	var warnings []string
 
-	// Split by "\n---\n" to get individual model blocks
 	blocks := config.ParseKeyValueBlocks(content)
 	models := make([]ModelConfig, 0, len(blocks))
 
@@ -186,39 +185,42 @@ func parseModelConfig(content string) ([]ModelConfig, []string) {
 		}
 
 		var model ModelConfig
-		parseWarnings := config.ParseKeyValueWithWarnings(block, &model)
-
-		// Collect type-conversion warnings
-		for _, w := range parseWarnings {
+		for _, w := range config.ParseKeyValueWithWarnings(block, &model) {
 			warnings = append(warnings, fmt.Sprintf("model block %d: %s", blockIdx+1, w.String()))
 		}
 
-		// Skip blocks with no identifying fields at all
 		if model.Name == "" && model.ModelName == "" {
 			continue
 		}
 
-		// Validate required fields
-		if model.ProtocolType == "" {
-			warnings = append(warnings, fmt.Sprintf("model %q: missing required field protocol_type", model.Name))
-		} else if !KnownProtocolTypes[strings.ToLower(model.ProtocolType)] {
-			warnings = append(warnings, fmt.Sprintf("model %q: unknown protocol_type %q (expected \"openai\" or \"anthropic\")", model.Name, model.ProtocolType))
-		}
-
-		if model.BaseURL == "" {
-			warnings = append(warnings, fmt.Sprintf("model %q: missing required field base_url", model.Name))
-		} else if _, err := url.Parse(model.BaseURL); err != nil {
-			warnings = append(warnings, fmt.Sprintf("model %q: invalid base_url %q: %v", model.Name, model.BaseURL, err))
-		}
-
-		if model.ModelName == "" {
-			warnings = append(warnings, fmt.Sprintf("model %q: missing required field model_name", model.Name))
-		}
-
+		warnings = append(warnings, validateModel(model)...)
 		models = append(models, model)
 	}
 
 	return models, warnings
+}
+
+// validateModel checks required fields and returns warnings for any issues found.
+func validateModel(m ModelConfig) []string {
+	var warnings []string
+
+	if m.ProtocolType == "" {
+		warnings = append(warnings, fmt.Sprintf("model %q: missing required field protocol_type", m.Name))
+	} else if !KnownProtocolTypes[strings.ToLower(m.ProtocolType)] {
+		warnings = append(warnings, fmt.Sprintf("model %q: unknown protocol_type %q (expected \"openai\" or \"anthropic\")", m.Name, m.ProtocolType))
+	}
+
+	if m.BaseURL == "" {
+		warnings = append(warnings, fmt.Sprintf("model %q: missing required field base_url", m.Name))
+	} else if _, err := url.Parse(m.BaseURL); err != nil {
+		warnings = append(warnings, fmt.Sprintf("model %q: invalid base_url %q: %v", m.Name, m.BaseURL, err))
+	}
+
+	if m.ModelName == "" {
+		warnings = append(warnings, fmt.Sprintf("model %q: missing required field model_name", m.Name))
+	}
+
+	return warnings
 }
 
 // Reload reloads models from the config file
