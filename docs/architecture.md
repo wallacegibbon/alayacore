@@ -62,7 +62,7 @@ The session layer manages conversation state, task execution, and model interact
 | `Task Queue` | FIFO queue for pending prompts and commands |
 | `ModelManager` | Loads and manages AI model configurations from `model.conf`. Never writes to the file. |
 | `RuntimeManager` | Persists runtime settings (active model, active theme) to `runtime.conf` |
-| `CommandRegistry` | Declarative registration of session commands (`:save`, `:cancel`, etc.) |
+| `CommandDefinitions` | Static metadata for session commands (`:save`, `:cancel`, etc.) |
 | `ContextTokens` | Tracks conversation context size across API calls. See [context-tracking.md](context-tracking.md). |
 | `compactHistory()` | Truncates old tool results to save context. Configurable via `--compact-keep-steps` and `--compact-truncate-len`. |
 
@@ -325,7 +325,7 @@ Agent.Stream() receives tool_call event
 2. **Task Queue** — Deferred task processing with cancellation support. Queued tasks execute sequentially.
 3. **Virtual Scrolling** — Only visible windows are rendered. 3.5x faster than naive rendering. See [virtual-rendering-performance.md](virtual-rendering-performance.md).
 4. **Domain Errors** — Structured error types with operation context for consistent error handling. See [error-handling.md](error-handling.md).
-5. **Command Registry** — Declarative command registration for extensibility.
+5. **Command Definitions** — Static metadata table for colon-commands, dispatch via `switch`.
 6. **Interface Abstraction** — OutputWriter interface for testability.
 7. **Provider Factory** — Decoupled provider creation from session logic.
 8. **Typed Tools** — `TypedExecute[T]` wrapper for type-safe tool implementations with auto-generated schemas.

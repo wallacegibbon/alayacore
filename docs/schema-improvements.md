@@ -14,7 +14,7 @@ type WriteFileInput struct {
 
 func NewWriteFileTool() llm.Tool {
 	return llm.NewTool("write_file", "Write content to a file").
-		WithSchema(llm.GenerateSchema(WriteFileInput{})).
+		WithSchema(llm.MustGenerateSchema(WriteFileInput{})).
 		WithExecute(llm.TypedExecute(executeWriteFile)).
 		Build()
 }
@@ -134,7 +134,7 @@ For simple tools:
 ```go
 func NewMyTool() llm.Tool {
 	return llm.NewTool("name", "description").
-		WithSchema(llm.GenerateSchema(MyInput{})).
+		WithSchema(llm.MustGenerateSchema(MyInput{})).
 		WithExecute(llm.TypedExecute(executeMyTool)).
 		Build()
 }
@@ -149,7 +149,7 @@ For tools needing closure variables:
 ```go
 func NewMyTool(dep *Dependency) llm.Tool {
 	return llm.NewTool("name", "description").
-		WithSchema(llm.GenerateSchema(MyInput{})).
+		WithSchema(llm.MustGenerateSchema(MyInput{})).
 		WithExecute(llm.TypedExecute(func(_ context.Context, args MyInput) (llm.ToolResultOutput, error) {
 			// Can use dep here
 		})).
@@ -162,7 +162,7 @@ func NewMyTool(dep *Dependency) llm.Tool {
 | File | Purpose |
 |------|---------|
 | `internal/llm/helpers.go` | Message constructors and tool builder |
-| `internal/llm/schema.go` | `GenerateSchema()` — reads struct tags, produces JSON schema |
+| `internal/llm/schema.go` | `MustGenerateSchema()` — reads struct tags, produces JSON schema |
 | `internal/llm/typed.go` | `TypedExecute[T]()` — generic unmarshaling + execution wrapper |
 | `internal/llm/schema_test.go` | Tests for schema generator |
 
