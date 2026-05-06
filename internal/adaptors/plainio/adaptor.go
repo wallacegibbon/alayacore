@@ -55,17 +55,19 @@ func (a *Adaptor) Start() int {
 		SkillsMgr:          a.Config.SkillsMgr,
 	})
 
-	// Check if we have any models available.
-	if !session.HasModels() {
-		fmt.Fprint(os.Stderr, agentpkg.NoModelsErrorMessage(session.ModelConfigPath()))
-		return 1
-	}
-
 	// Display config validation messages (unknown protocol_type, missing fields, etc.)
+	// Must come before HasModels() check so specific errors are shown even when
+	// all models are rejected.
 	if msgs := session.ModelManager.GetLoadErrors(); len(msgs) > 0 {
 		for _, m := range msgs {
 			fmt.Fprintf(os.Stderr, "error: %s\n", m)
 		}
+	}
+
+	// Check if we have any models available.
+	if !session.HasModels() {
+		fmt.Fprint(os.Stderr, agentpkg.NoModelsErrorMessage(session.ModelConfigPath()))
+		return 1
 	}
 
 	sigCh := make(chan os.Signal, 1)

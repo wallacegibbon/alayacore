@@ -70,17 +70,19 @@ func (a *Adaptor) Start() int {
 	// Update output with new styles
 	terminalOutput.SetStyles(styles)
 
-	// Check if we have any models available.
-	if !session.HasModels() {
-		fmt.Fprint(os.Stderr, agentpkg.NoModelsErrorMessage(session.ModelConfigPath()))
-		return 1
-	}
-
 	// Display config validation messages (unknown protocol_type, missing fields, etc.)
+	// Must come before HasModels() check so specific errors are shown even when
+	// all models are rejected.
 	if msgs := session.ModelManager.GetLoadErrors(); len(msgs) > 0 {
 		for _, m := range msgs {
 			fmt.Fprintf(os.Stderr, "error: %s\n", m)
 		}
+	}
+
+	// Check if we have any models available.
+	if !session.HasModels() {
+		fmt.Fprint(os.Stderr, agentpkg.NoModelsErrorMessage(session.ModelConfigPath()))
+		return 1
 	}
 
 	// Create terminal with loaded session, initial window size, theme, and theme manager
