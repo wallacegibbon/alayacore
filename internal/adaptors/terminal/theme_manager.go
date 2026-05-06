@@ -9,8 +9,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-
-	"github.com/alayacore/alayacore/internal/config"
 )
 
 // ThemeInfo represents a theme's metadata for display in the selector.
@@ -35,7 +33,7 @@ func NewThemeManager(themesFolder string) *ThemeManager {
 		wc: wc,
 	}
 
-	tm.themesFolder = config.ResolveConfigPath(themesFolder, "themes")
+	tm.themesFolder = themesFolder
 
 	// Initialize themes folder with default themes if needed
 	tm.initializeThemesFolder()

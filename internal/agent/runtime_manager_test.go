@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/alayacore/alayacore/internal/config"
 )
 
 func TestRuntimeManager(t *testing.T) {
@@ -45,10 +47,17 @@ func TestRuntimeManager(t *testing.T) {
 }
 
 func TestRuntimeManagerDefaultPath(t *testing.T) {
-	// Test creating RuntimeManager with empty runtime path (should use default ~/.alayacore/runtime.conf)
-	rm := NewRuntimeManager("", "")
+	// Default resolution is now in config.Parse(), not in the constructor.
+	// Verify that config.ResolveConfigPath produces the expected default.
 	home, _ := os.UserHomeDir()
 	expectedPath := filepath.Join(home, ".alayacore", "runtime.conf")
+	resolved := config.ResolveConfigPath("", "runtime.conf")
+	if resolved != expectedPath {
+		t.Errorf("Expected resolved path %s, got: %s", expectedPath, resolved)
+	}
+
+	// Verify the constructor uses the path as-is.
+	rm := NewRuntimeManager(expectedPath, "")
 	if rm.GetPath() != expectedPath {
 		t.Errorf("Expected path %s, got: %s", expectedPath, rm.GetPath())
 	}

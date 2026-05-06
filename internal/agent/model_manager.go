@@ -65,15 +65,13 @@ context_limit: 128000
 `
 
 // NewModelManager creates a new model manager
-// If configPath is empty, uses the default path (~/.alayacore/model.conf)
 func NewModelManager(configPath string) *ModelManager {
-	path := config.ResolveConfigPath(configPath, "model.conf")
 	mm := &ModelManager{
-		filePath: path,
+		filePath: configPath,
 		nextID:   1, // IDs start from 1; 0 is reserved as "no model"
 	}
-	if path != "" {
-		_ = mm.LoadFromFile(path) //nolint:errcheck // best-effort load on init
+	if configPath != "" {
+		_ = mm.LoadFromFile(configPath) //nolint:errcheck // best-effort load on init
 	}
 	return mm
 }
