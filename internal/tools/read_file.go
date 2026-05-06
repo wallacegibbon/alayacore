@@ -25,7 +25,7 @@ func NewReadFileTool() llm.Tool {
 		"read_file",
 		"Read the contents of a file. Supports optional line range using start_line and end_line parameters (1-indexed).",
 	).
-		WithSchema(llm.GenerateSchema(ReadFileInput{})).
+		WithSchema(llm.MustGenerateSchema(ReadFileInput{})).
 		WithExecute(llm.TypedExecute(executeReadFile)).
 		Build()
 }

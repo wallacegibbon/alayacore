@@ -36,7 +36,7 @@ func NewExecuteCommandTool() llm.Tool {
 		"execute_command",
 		shell.Detect().PromptFragment,
 	).
-		WithSchema(llm.GenerateSchema(executeCommandInput{})).
+		WithSchema(llm.MustGenerateSchema(executeCommandInput{})).
 		WithExecute(llm.TypedExecute(executeCommand)).
 		Build()
 }

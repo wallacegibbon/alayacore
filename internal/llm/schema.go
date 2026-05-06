@@ -2,6 +2,7 @@ package llm
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 )
@@ -57,14 +58,15 @@ func inferSchemaType(t reflect.Type) string {
 	}
 }
 
-// GenerateSchema generates a JSON schema from a struct using reflection
-func GenerateSchema(v interface{}) json.RawMessage {
+// GenerateSchema generates a JSON schema from a struct using reflection.
+// Returns an error if v is not a struct or marshaling fails.
+func GenerateSchema(v interface{}) (json.RawMessage, error) {
 	t := reflect.TypeOf(v)
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
 	if t.Kind() != reflect.Struct {
-		panic("GenerateSchema: expected struct")
+		return nil, fmt.Errorf("GenerateSchema: expected struct, got %s", t.Kind())
 	}
 
 	schema := map[string]interface{}{
@@ -123,7 +125,17 @@ func GenerateSchema(v interface{}) json.RawMessage {
 
 	result, err := json.Marshal(schema)
 	if err != nil {
-		panic("GenerateSchema: " + err.Error())
+		return nil, fmt.Errorf("GenerateSchema: %w", err)
 	}
-	return json.RawMessage(result)
+	return json.RawMessage(result), nil
+}
+
+// MustGenerateSchema is like GenerateSchema but panics on error.
+// Use only with statically-known struct types (e.g. tool input structs).
+func MustGenerateSchema(v interface{}) json.RawMessage {
+	schema, err := GenerateSchema(v)
+	if err != nil {
+		panic(err)
+	}
+	return schema
 }

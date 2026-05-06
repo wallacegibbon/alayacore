@@ -25,7 +25,7 @@ func Example_usage() {
 	}
 
 	tool := llm.NewTool("echo", "Echo back the input").
-		WithSchema(llm.GenerateSchema(EchoInput{})).
+		WithSchema(llm.MustGenerateSchema(EchoInput{})).
 		WithExecute(func(_ context.Context, input json.RawMessage) (llm.ToolResultOutput, error) {
 			var params EchoInput
 			if unmarshalErr := json.Unmarshal(input, &params); unmarshalErr != nil {

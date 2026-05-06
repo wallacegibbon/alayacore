@@ -15,7 +15,10 @@ func TestGenerateSchema(t *testing.T) {
 		Enabled     bool    `json:"enabled" jsonschema:"description=Whether enabled"`
 	}
 
-	schema := GenerateSchema(TestInput{})
+	schema, err := GenerateSchema(TestInput{})
+	if err != nil {
+		t.Fatalf("GenerateSchema failed: %v", err)
+	}
 
 	// Verify it's valid JSON
 	var result map[string]interface{}

@@ -34,7 +34,7 @@ func NewSearchContentTool() llm.Tool {
 		"search_content",
 		`Search file contents using ripgrep. Supports regex, file type filters, glob patterns, and case-insensitive search. Use this instead of reading files to locate code, definitions, and patterns.`,
 	).
-		WithSchema(llm.GenerateSchema(SearchContentInput{})).
+		WithSchema(llm.MustGenerateSchema(SearchContentInput{})).
 		WithExecute(llm.TypedExecute(executeSearchContent)).
 		Build()
 }

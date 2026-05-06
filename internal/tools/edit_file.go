@@ -25,7 +25,7 @@ func NewEditFileTool() llm.Tool {
 		"edit_file",
 		`Apply a search/replace edit to a file. old_string must match EXACTLY (every space, tab, newline). Use 3-5 lines of context to make it unique. If old_string appears multiple times, the edit fails.`,
 	).
-		WithSchema(llm.GenerateSchema(EditFileInput{})).
+		WithSchema(llm.MustGenerateSchema(EditFileInput{})).
 		WithExecute(llm.TypedExecute(executeEditFile)).
 		Build()
 }

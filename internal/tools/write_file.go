@@ -19,7 +19,7 @@ func NewWriteFileTool() llm.Tool {
 		"write_file",
 		"Create a new file or replace the entire content of an existing file. For surgical edits to existing files, prefer edit_file instead.",
 	).
-		WithSchema(llm.GenerateSchema(WriteFileInput{})).
+		WithSchema(llm.MustGenerateSchema(WriteFileInput{})).
 		WithExecute(llm.TypedExecute(executeWriteFile)).
 		Build()
 }
