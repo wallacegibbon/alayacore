@@ -173,7 +173,7 @@ func (s *Session) saveSession(args []string) {
 		}
 		path = s.SessionFile
 	case 1:
-		path = expandPath(args[0])
+		path = config.ExpandPath(args[0])
 	default:
 		s.writeError("usage: :save [filename]")
 		return

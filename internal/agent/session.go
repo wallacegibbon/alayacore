@@ -213,7 +213,7 @@ func (s *Session) WaitDone() {
 
 // LoadOrNewSession loads a session from file or creates a new one.
 func LoadOrNewSession(cfg SessionConfig) (*Session, string) {
-	cfg.SessionFile = expandPath(cfg.SessionFile)
+	cfg.SessionFile = config.ExpandPath(cfg.SessionFile)
 	if cfg.SessionFile != "" {
 		if data, err := LoadSession(cfg.SessionFile); err == nil {
 			return RestoreFromSession(cfg, data), cfg.SessionFile
@@ -641,10 +641,6 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) (int
 	return outputTokens, nil
 }
 
-// ============================================================================
-// Path Helpers
-// ============================================================================
-
 // buildSkillDirSet creates a slice of absolute skill directory paths.
 // Called once at session creation since skills are fixed during process lifetime.
 func buildSkillDirSet(skillsMgr *skills.Manager) []string {
@@ -652,10 +648,4 @@ func buildSkillDirSet(skillsMgr *skills.Manager) []string {
 		return nil
 	}
 	return skillsMgr.GetSkillDirs()
-}
-
-// expandPath expands ~ to the user's home directory.
-// See config.ExpandPath for the exported version.
-func expandPath(path string) string {
-	return config.ExpandPath(path)
 }
