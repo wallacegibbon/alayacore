@@ -5,7 +5,6 @@ package agent
 import (
 	"context"
 	"fmt"
-	"sync/atomic"
 	"time"
 
 	"github.com/alayacore/alayacore/internal/llm"
@@ -234,13 +233,4 @@ func (s *Session) DeleteQueueItem(queueID string) bool {
 		}
 	}
 	return false
-}
-
-// ============================================================================
-// Prompt ID Helper
-// ============================================================================
-
-// nextPromptIDValue returns a new unique prompt ID.
-func (s *Session) nextPromptIDValue() uint64 {
-	return atomic.AddUint64(&s.nextPromptID, 1) - 1
 }
