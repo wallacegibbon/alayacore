@@ -61,6 +61,13 @@ func (a *Adaptor) Start() int {
 		return 1
 	}
 
+	// Display config validation warnings (e.g. unknown protocol_type, missing fields)
+	if warnings := session.ModelManager.GetWarnings(); len(warnings) > 0 {
+		for _, w := range warnings {
+			fmt.Fprintf(os.Stderr, "warning: %s\n", w)
+		}
+	}
+
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT)
 	defer signal.Stop(sigCh)

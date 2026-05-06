@@ -76,6 +76,13 @@ func (a *Adaptor) Start() int {
 		return 1
 	}
 
+	// Display config validation warnings (e.g. unknown protocol_type, missing fields)
+	if warnings := session.ModelManager.GetWarnings(); len(warnings) > 0 {
+		for _, w := range warnings {
+			fmt.Fprintf(os.Stderr, "warning: %s\n", w)
+		}
+	}
+
 	// Create terminal with loaded session, initial window size, theme, and theme manager
 	t := NewTerminalWithTheme(session, terminalOutput, inputStream, a.Config, initialWidth, initialHeight, theme, themeManager)
 
