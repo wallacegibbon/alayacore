@@ -45,7 +45,11 @@ func printDefaults() {
 			placeholder = " " + s
 		}
 		usage = strings.ReplaceAll(usage, "`", "")
-		fmt.Fprintf(flag.CommandLine.Output(), "\t--%s%s\n", f.Name, placeholder)
+		if f.DefValue != "" && f.DefValue != "false" {
+			fmt.Fprintf(flag.CommandLine.Output(), "\t--%s%s (default: %s)\n", f.Name, placeholder, f.DefValue)
+		} else {
+			fmt.Fprintf(flag.CommandLine.Output(), "\t--%s%s\n", f.Name, placeholder)
+		}
 		fmt.Fprintf(flag.CommandLine.Output(), "\t\t%s\n", usage)
 	})
 }
