@@ -123,20 +123,6 @@ Without pausing, a network outage would cause every queued prompt to fail in seq
    - `:cancel_all` — clear the queue and the pause
    - Inspect the queue with Ctrl+Q
 
-### Command dispatch
-
-Commands are split into two paths:
-
-**Immediate commands** — run immediately on the input goroutine, regardless of queue state:
-`:cancel`, `:cancel_all`, `:model_set`, `:model_load`, `:taskqueue_get_all`, `:taskqueue_del`, `:think`
-
-**Deferred commands** — enqueued at the front of the task queue via `submitDeferredCommand`, which rejects if a task is already running (unless paused on error):
-`:continue`, `:summarize`, `:save`, and all others
-
-Note: `:quit` / `:q` is handled directly by each adaptor and never reaches the session.
-
-Deferred commands run on the `taskRunner` goroutine with a cancellable context, so `:cancel` can interrupt them at any time. They are placed at the front of the queue so they run ahead of any accumulated user prompts.
-
 ### Implementation
 
 `internal/agent/session.go`:

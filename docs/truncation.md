@@ -129,7 +129,20 @@ Note: `search_content` uses only truncation for limiting output. Ripgrep returns
 
 ### History Compaction
 
-`compactHistory()` truncates old tool results to save context tokens:
+`compactHistory()` truncates old tool results to save context tokens. In long agent sessions, tool result outputs accumulate and consume increasing amounts of context. A 10-step session with file reads and command executions can easily contain 100K+ tokens of old tool I/O.
+
+`compactHistory()` is called after each user prompt completes. It truncates tool result outputs that are older than the last N steps (default 3) to a configurable byte length (default 500). The most recent results are kept intact.
+
+```
+Before compaction (9 messages):
+  [user] [assistant] [tool result:  15KB] [assistant] [tool result:  20KB] [assistant] [tool result: 8KB] [assistant] [assistant]
+
+After compaction:
+  [user] [assistant] [tool result: ~500B] [assistant] [tool result: ~500B] [assistant] [tool result: 8KB] [assistant] [assistant]
+                      ^truncated                       ^truncated                       ^kept full
+```
+
+Old tool results are cut at the configured truncate length (default 500 bytes) and a `[truncated]` marker is appended so the LLM knows content was omitted. The LLM can re-read any truncated files if needed.
 
 | Setting | Default | Flag |
 |---------|---------|------|
@@ -217,5 +230,5 @@ const Marker = "\n[truncated]" // 12 bytes
 
 ## Related
 
-- [Context Tracking](context-tracking.md) — How truncation fits into history compaction
+- [Context Tracking](context-tracking.md) — How context tokens are tracked across API calls
 - [Error Handling](error-handling.md) — `max_tokens` truncation vs. errors

@@ -1,19 +1,5 @@
 # Getting Started
 
-## Installation
-
-```sh
-go install github.com/alayacore/alayacore@latest
-```
-
-Or build from source:
-
-```sh
-git clone https://github.com/alayacore/alayacore.git
-cd alayacore
-make install
-```
-
 ## Quick Start
 
 ```sh
