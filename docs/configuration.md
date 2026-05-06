@@ -72,6 +72,18 @@ model_name: "qwen3:30b-a3b"
 context_limit: 128000
 ```
 
+### Validation
+
+Models are validated at load time (startup and after `:model_load`). A model is **rejected** if:
+
+- `protocol_type` is missing or not `"openai"` / `"anthropic"`
+- `base_url` is missing or not a valid URL
+- `model_name` is missing
+
+Rejected models are skipped — they won't appear in the model selector. Errors are printed at startup and as notifications after `:model_load`. Other valid models in the same file are unaffected.
+
+If a field value has the wrong type (e.g. `context_limit: abc`), a warning is printed but the model is still loaded with the zero value for that field.
+
 ### Switching Models at Runtime
 
 Press `Ctrl+L` to open the model selector. From there:

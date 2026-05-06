@@ -28,7 +28,9 @@
 // Key Components:
 //
 //   - Session: Main session struct managing conversation state
-//   - ModelManager: Loads and manages AI model configurations
+//   - ModelManager: Loads and manages AI model configurations.
+//     Rejects models with invalid protocol_type, base_url, or model_name.
+//     Use GetLoadErrors() to retrieve validation messages.
 //   - RuntimeManager: Persists runtime settings (active model)
 //   - Task Queue: FIFO queue for pending prompts/commands
 //   - Command Registry: Declarative command registration
