@@ -53,6 +53,31 @@ type ModelManager struct {
 	filePath string
 }
 
+// NoModelsErrorMessage returns a formatted error message for when no models are configured.
+func NoModelsErrorMessage(configPath string) string {
+	var b strings.Builder
+	b.WriteString("\nError: No models configured.\n\n")
+	b.WriteString("Please edit the model config file:\n")
+	fmt.Fprintf(&b, "  %s\n", configPath)
+	b.WriteString("\nExample format:\n")
+	b.WriteString(`---
+name: "Ollama (127.0.0.1) / GPT OSS 20B"
+protocol_type: "anthropic"
+base_url: "http://127.0.0.1:11434"
+api_key: "no-key-by-default"
+model_name: "gpt-oss:20b"
+context_limit: 128000
+---
+name: "OpenAI GPT-4o"
+protocol_type: "openai"
+base_url: "https://api.openai.com/v1"
+api_key: "your-api-key"
+model_name: "gpt-4o"
+context_limit: 128000`)
+	b.WriteString("\n")
+	return b.String()
+}
+
 // DefaultModelConfig is the default model configuration written when config file is empty
 const DefaultModelConfig = `---
 name: "Ollama (127.0.0.1) / GPT OSS 20B"

@@ -207,6 +207,22 @@ func (s *Session) WaitDone() {
 	<-s.runnerDone
 }
 
+// HasModels returns true if any models are configured.
+func (s *Session) HasModels() bool {
+	if s.ModelManager == nil {
+		return false
+	}
+	return s.ModelManager.HasModels()
+}
+
+// ModelConfigPath returns the path to the model config file.
+func (s *Session) ModelConfigPath() string {
+	if s.ModelManager == nil {
+		return ""
+	}
+	return s.ModelManager.GetFilePath()
+}
+
 // ============================================================================
 // Session Lifecycle
 // ============================================================================

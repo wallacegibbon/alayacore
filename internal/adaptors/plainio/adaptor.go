@@ -5,6 +5,7 @@ package plainio
 // No terminal features are used — just plain IO.
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -53,6 +54,12 @@ func (a *Adaptor) Start() int {
 		ProxyURL:           a.Config.Cfg.Proxy,
 		SkillsMgr:          a.Config.SkillsMgr,
 	})
+
+	// Check if we have any models available.
+	if !session.HasModels() {
+		fmt.Fprint(os.Stderr, agentpkg.NoModelsErrorMessage(session.ModelConfigPath()))
+		return 1
+	}
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT)

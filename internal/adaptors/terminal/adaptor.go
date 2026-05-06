@@ -19,29 +19,18 @@ const defaultThemeName = "theme-dark"
 
 // Adaptor starts the TUI; use from main/app.
 type Adaptor struct {
-	Config       *app.Config
-	ThemesFolder string
+	Config *app.Config
 }
 
 // NewAdaptor creates a new Terminal adaptor.
 func NewAdaptor(cfg *app.Config) *Adaptor {
-	return &Adaptor{
-		Config: cfg,
-	}
+	return &Adaptor{Config: cfg}
 }
 
-// NewAdaptorWithThemes creates a new Terminal adaptor with a custom themes folder.
-func NewAdaptorWithThemes(cfg *app.Config, themesFolder string) *Adaptor {
-	return &Adaptor{
-		Config:       cfg,
-		ThemesFolder: themesFolder,
-	}
-}
-
-// Start runs the Terminal program.
-func (a *Adaptor) Start() {
+// Start runs the Terminal program. Returns exit code.
+func (a *Adaptor) Start() int {
 	// Create theme manager
-	themeManager := NewThemeManager(a.ThemesFolder)
+	themeManager := NewThemeManager(a.Config.Cfg.ThemesFolder)
 
 	inputStream := stream.NewChanInput(10)
 	terminalOutput := NewTerminalOutput(NewStyles(DefaultTheme()))
@@ -82,33 +71,9 @@ func (a *Adaptor) Start() {
 	terminalOutput.SetStyles(styles)
 
 	// Check if we have any models available.
-	modelSnap := terminalOutput.SnapshotModels()
-	if !modelSnap.HasModels {
-		// Print error to stderr and exit
-		modelPath := modelSnap.ConfigPath
-		fmt.Fprintln(os.Stderr, "")
-		fmt.Fprintln(os.Stderr, "Error: No models configured.")
-		fmt.Fprintln(os.Stderr, "")
-		fmt.Fprintln(os.Stderr, "Please edit the model config file:")
-		fmt.Fprintf(os.Stderr, "  %s\n", modelPath)
-		fmt.Fprintln(os.Stderr, "")
-		fmt.Fprintln(os.Stderr, "Example format:")
-		fmt.Fprintln(os.Stderr, `---
-name: "Ollama (127.0.0.1) / GPT OSS 20B"
-protocol_type: "anthropic"
-base_url: "http://127.0.0.1:11434"
-api_key: "no-key-by-default"
-model_name: "gpt-oss:20b"
-context_limit: 128000
----
-name: "OpenAI GPT-4o"
-protocol_type: "openai"
-base_url: "https://api.openai.com/v1"
-api_key: "your-api-key"
-model_name: "gpt-4o"
-context_limit: 128000`)
-		fmt.Fprintln(os.Stderr, "")
-		os.Exit(1)
+	if !session.HasModels() {
+		fmt.Fprint(os.Stderr, agentpkg.NoModelsErrorMessage(session.ModelConfigPath()))
+		return 1
 	}
 
 	// Create terminal with loaded session, initial window size, theme, and theme manager
@@ -120,8 +85,10 @@ context_limit: 128000`)
 	p := tea.NewProgram(t)
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error running terminal UI: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
+
+	return 0
 }
 
 // getTerminalSize returns the current terminal size, or defaults if not a TTY.

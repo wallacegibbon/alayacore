@@ -24,11 +24,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	var adaptor Adaptor
 	if cfg.PlainIO {
-		adaptor := plainio.NewAdaptor(appCfg)
-		os.Exit(adaptor.Start())
+		adaptor = plainio.NewAdaptor(appCfg)
+	} else {
+		adaptor = terminal.NewAdaptor(appCfg)
 	}
+	os.Exit(adaptor.Start())
+}
 
-	adaptor := terminal.NewAdaptorWithThemes(appCfg, cfg.ThemesFolder)
-	adaptor.Start()
+// Adaptor is the interface for all UI adaptors.
+type Adaptor interface {
+	Start() int
 }
