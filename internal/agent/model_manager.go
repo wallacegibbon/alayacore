@@ -8,6 +8,7 @@ package agent
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -51,6 +52,7 @@ type ModelManager struct {
 	nextID   int
 	mu       sync.RWMutex
 	filePath string
+	warnings []string // config validation warnings from last load
 }
 
 // DefaultModelConfig is the default model configuration written when config file is empty
@@ -63,6 +65,12 @@ model_name: "gpt-oss:20b"
 context_limit: 128000
 ---
 `
+
+// KnownProtocolTypes are the protocol types accepted by the provider factory.
+var KnownProtocolTypes = map[string]bool{
+	"openai":    true,
+	"anthropic": true,
+}
 
 // NoModelsErrorMessage returns a formatted error message for when no models are configured.
 func NoModelsErrorMessage(configPath string) string {
@@ -85,6 +93,13 @@ func NewModelManager(configPath string) *ModelManager {
 		_ = mm.LoadFromFile(configPath) //nolint:errcheck // best-effort load on init
 	}
 	return mm
+}
+
+// GetWarnings returns validation warnings from the last LoadFromFile call.
+func (mm *ModelManager) GetWarnings() []string {
+	mm.mu.RLock()
+	defer mm.mu.RUnlock()
+	return mm.warnings
 }
 
 // LoadFromFile loads models from a config file in key-value format
@@ -125,7 +140,7 @@ func (mm *ModelManager) LoadFromFile(path string) error {
 		data = []byte(DefaultModelConfig)
 	}
 
-	models := parseModelConfig(string(data))
+	models, warnings := parseModelConfig(string(data))
 
 	// Reset ID counter and generate IDs for models (start from 1; 0 is reserved as "no model")
 	mm.nextID = 1
@@ -135,6 +150,7 @@ func (mm *ModelManager) LoadFromFile(path string) error {
 	}
 
 	mm.models = models
+	mm.warnings = warnings
 
 	if mm.filePath == "" {
 		mm.filePath = path
@@ -154,27 +170,55 @@ func (mm *ModelManager) createDefaultConfig(path string) error {
 	return os.WriteFile(path, []byte(DefaultModelConfig), 0600)
 }
 
-// parseModelConfig parses the key-value model config format
-func parseModelConfig(content string) []ModelConfig {
+// parseModelConfig parses the key-value model config format.
+// Returns valid models and a list of validation warnings.
+func parseModelConfig(content string) ([]ModelConfig, []string) {
 	var models []ModelConfig
+	var warnings []string
 
 	// Split by "\n---\n" to get individual model blocks
 	blocks := config.ParseKeyValueBlocks(content)
 
-	for _, block := range blocks {
+	for blockIdx, block := range blocks {
 		block = strings.TrimSpace(block)
 		if block == "" {
 			continue
 		}
 
 		var model ModelConfig
-		config.ParseKeyValue(block, &model)
-		if model.Name != "" || model.ModelName != "" {
-			models = append(models, model)
+		parseWarnings := config.ParseKeyValueWithWarnings(block, &model)
+
+		// Collect type-conversion warnings
+		for _, w := range parseWarnings {
+			warnings = append(warnings, fmt.Sprintf("model block %d: %s", blockIdx+1, w.String()))
 		}
+
+		// Skip blocks with no identifying fields at all
+		if model.Name == "" && model.ModelName == "" {
+			continue
+		}
+
+		// Validate required fields
+		if model.ProtocolType == "" {
+			warnings = append(warnings, fmt.Sprintf("model %q: missing required field protocol_type", model.Name))
+		} else if !KnownProtocolTypes[strings.ToLower(model.ProtocolType)] {
+			warnings = append(warnings, fmt.Sprintf("model %q: unknown protocol_type %q (expected \"openai\" or \"anthropic\")", model.Name, model.ProtocolType))
+		}
+
+		if model.BaseURL == "" {
+			warnings = append(warnings, fmt.Sprintf("model %q: missing required field base_url", model.Name))
+		} else if _, err := url.Parse(model.BaseURL); err != nil {
+			warnings = append(warnings, fmt.Sprintf("model %q: invalid base_url %q: %v", model.Name, model.BaseURL, err))
+		}
+
+		if model.ModelName == "" {
+			warnings = append(warnings, fmt.Sprintf("model %q: missing required field model_name", model.Name))
+		}
+
+		models = append(models, model)
 	}
 
-	return models
+	return models, warnings
 }
 
 // Reload reloads models from the config file

@@ -85,7 +85,7 @@ func formatFrontmatter(meta *SessionMeta) string {
 
 	if meta.ActiveModel != "" {
 		buf.WriteString("active_model: \"")
-		buf.WriteString(meta.ActiveModel)
+		buf.WriteString(escapeQuoted(meta.ActiveModel))
 		buf.WriteString("\"\n")
 	}
 

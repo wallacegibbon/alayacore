@@ -15,6 +15,17 @@ import (
 	"github.com/alayacore/alayacore/internal/config"
 )
 
+// escapeQuoted escapes special characters in a string that will be written
+// inside double quotes in a config file. Without this, values containing
+// quotes or newlines would produce malformed output that cannot be parsed back.
+func escapeQuoted(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `"`, `\"`)
+	s = strings.ReplaceAll(s, "\n", `\n`)
+	s = strings.ReplaceAll(s, "\r", `\r`)
+	return s
+}
+
 // RuntimeConfig holds runtime configuration that can change during execution
 type RuntimeConfig struct {
 	ActiveModel string `json:"active_model" config:"active_model"` // Model name (from model.conf)
@@ -100,10 +111,10 @@ func formatRuntimeConfig(config RuntimeConfig) string {
 	sb.WriteString("# This file is automatically updated when you switch models or themes\n")
 	sb.WriteString("\n")
 	sb.WriteString("active_model: \"")
-	sb.WriteString(config.ActiveModel)
+	sb.WriteString(escapeQuoted(config.ActiveModel))
 	sb.WriteString("\"\n")
 	sb.WriteString("active_theme: \"")
-	sb.WriteString(config.ActiveTheme)
+	sb.WriteString(escapeQuoted(config.ActiveTheme))
 	sb.WriteString("\"\n")
 	return sb.String()
 }
