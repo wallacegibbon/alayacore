@@ -23,6 +23,9 @@ const (
 	DefaultMaxSteps         = 100
 	DefaultCompactKeepSteps = 3
 	DefaultCompactTruncLen  = 500
+
+	// boolFalse is used for flag default comparison in printDefaults.
+	boolFalse = "false"
 )
 
 // ResolveConfigPath returns the provided path, or the default ~/.alayacore/<filename>
@@ -61,7 +64,7 @@ func printDefaults() {
 			placeholder = " " + s
 		}
 		usage = strings.ReplaceAll(usage, "`", "")
-		if f.DefValue != "" && f.DefValue != "false" {
+		if f.DefValue != "" && f.DefValue != boolFalse {
 			fmt.Fprintf(flag.CommandLine.Output(), "\t--%s%s (default: %s)\n", f.Name, placeholder, f.DefValue)
 		} else {
 			fmt.Fprintf(flag.CommandLine.Output(), "\t--%s%s\n", f.Name, placeholder)

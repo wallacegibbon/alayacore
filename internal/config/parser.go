@@ -198,50 +198,62 @@ func setFieldValueWithWarning(field reflect.Value, value string, key string) *Pa
 	case reflect.String:
 		field.SetString(value)
 		return nil
-
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		if field.Type() == reflect.TypeOf(time.Duration(0)) {
-			if _, err := time.ParseDuration(value); err != nil {
-				return &ParseWarning{Key: key, Value: value, Err: "invalid duration"}
-			}
-			setFieldValue(field, value)
-			return nil
-		}
-		if _, err := strconv.ParseInt(value, 10, 64); err != nil {
-			return &ParseWarning{Key: key, Value: value, Err: "invalid integer"}
-		}
-		setFieldValue(field, value)
-		return nil
-
+		return warnIntField(field, value, key)
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		if _, err := strconv.ParseUint(value, 10, 64); err != nil {
-			return &ParseWarning{Key: key, Value: value, Err: "invalid unsigned integer"}
-		}
-		setFieldValue(field, value)
-		return nil
-
+		return warnUintField(field, value, key)
 	case reflect.Bool:
-		setBoolField(field, value)
-		lv := strings.ToLower(value)
-		switch lv {
-		case "true", "1", "yes", "on", "false", "0", "no", "off", "":
-			return nil
-		default:
-			return &ParseWarning{Key: key, Value: value, Err: "invalid boolean (expected true/false/yes/no/on/off/1/0)"}
-		}
-
+		return warnBoolField(field, value, key)
 	case reflect.Float32, reflect.Float64:
-		if _, err := strconv.ParseFloat(value, 64); err != nil {
-			return &ParseWarning{Key: key, Value: value, Err: "invalid float"}
-		}
-		setFieldValue(field, value)
-		return nil
-
+		return warnFloatField(field, value, key)
 	case reflect.Slice:
 		setSliceField(field, value)
 		return nil
 	}
 
+	return nil
+}
+
+//nolint:gocyclo // Each numeric type is a separate case, no meaningful reduction
+func warnIntField(field reflect.Value, value string, key string) *ParseWarning {
+	if field.Type() == reflect.TypeOf(time.Duration(0)) {
+		if _, err := time.ParseDuration(value); err != nil {
+			return &ParseWarning{Key: key, Value: value, Err: "invalid duration"}
+		}
+		setFieldValue(field, value)
+		return nil
+	}
+	if _, err := strconv.ParseInt(value, 10, 64); err != nil {
+		return &ParseWarning{Key: key, Value: value, Err: "invalid integer"}
+	}
+	setFieldValue(field, value)
+	return nil
+}
+
+func warnUintField(field reflect.Value, value string, key string) *ParseWarning {
+	if _, err := strconv.ParseUint(value, 10, 64); err != nil {
+		return &ParseWarning{Key: key, Value: value, Err: "invalid unsigned integer"}
+	}
+	setFieldValue(field, value)
+	return nil
+}
+
+func warnBoolField(field reflect.Value, value string, key string) *ParseWarning {
+	setBoolField(field, value)
+	lv := strings.ToLower(value)
+	switch lv {
+	case "true", "1", "yes", "on", "false", "0", "no", "off", "":
+		return nil
+	default:
+		return &ParseWarning{Key: key, Value: value, Err: "invalid boolean (expected true/false/yes/no/on/off/1/0)"}
+	}
+}
+
+func warnFloatField(field reflect.Value, value string, key string) *ParseWarning {
+	if _, err := strconv.ParseFloat(value, 64); err != nil {
+		return &ParseWarning{Key: key, Value: value, Err: "invalid float"}
+	}
+	setFieldValue(field, value)
 	return nil
 }
 

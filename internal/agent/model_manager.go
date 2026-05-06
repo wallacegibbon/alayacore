@@ -173,11 +173,11 @@ func (mm *ModelManager) createDefaultConfig(path string) error {
 // parseModelConfig parses the key-value model config format.
 // Returns valid models and a list of validation warnings.
 func parseModelConfig(content string) ([]ModelConfig, []string) {
-	var models []ModelConfig
 	var warnings []string
 
 	// Split by "\n---\n" to get individual model blocks
 	blocks := config.ParseKeyValueBlocks(content)
+	models := make([]ModelConfig, 0, len(blocks))
 
 	for blockIdx, block := range blocks {
 		block = strings.TrimSpace(block)
