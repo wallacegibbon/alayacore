@@ -170,10 +170,14 @@ context_limit: 64000`,
 		{
 			name: "partial model block",
 			input: `name: "Minimal Model"
+protocol_type: "openai"
+base_url: "https://api.example.com"
 model_name: "mini"`,
 			expected: ModelConfig{
-				Name:      "Minimal Model",
-				ModelName: "mini",
+				Name:         "Minimal Model",
+				ProtocolType: "openai",
+				BaseURL:      "https://api.example.com",
+				ModelName:    "mini",
 			},
 		},
 		{

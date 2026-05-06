@@ -193,34 +193,39 @@ func parseModelConfig(content string) ([]ModelConfig, []string) {
 			continue
 		}
 
-		warnings = append(warnings, validateModel(model)...)
+		if errs := validateModel(model); len(errs) > 0 {
+			warnings = append(warnings, errs...)
+			continue // skip broken model
+		}
+
 		models = append(models, model)
 	}
 
 	return models, warnings
 }
 
-// validateModel checks required fields and returns warnings for any issues found.
+// validateModel checks required fields and returns errors for any issues found.
+// A model with errors is unusable and should not be added to the model list.
 func validateModel(m ModelConfig) []string {
-	var warnings []string
+	var errs []string
 
 	if m.ProtocolType == "" {
-		warnings = append(warnings, fmt.Sprintf("model %q: missing required field protocol_type", m.Name))
+		errs = append(errs, fmt.Sprintf("model %q: missing required field protocol_type — skipped", m.Name))
 	} else if !KnownProtocolTypes[strings.ToLower(m.ProtocolType)] {
-		warnings = append(warnings, fmt.Sprintf("model %q: unknown protocol_type %q (expected \"openai\" or \"anthropic\")", m.Name, m.ProtocolType))
+		errs = append(errs, fmt.Sprintf("model %q: unknown protocol_type %q (expected \"openai\" or \"anthropic\") — skipped", m.Name, m.ProtocolType))
 	}
 
 	if m.BaseURL == "" {
-		warnings = append(warnings, fmt.Sprintf("model %q: missing required field base_url", m.Name))
+		errs = append(errs, fmt.Sprintf("model %q: missing required field base_url — skipped", m.Name))
 	} else if _, err := url.Parse(m.BaseURL); err != nil {
-		warnings = append(warnings, fmt.Sprintf("model %q: invalid base_url %q: %v", m.Name, m.BaseURL, err))
+		errs = append(errs, fmt.Sprintf("model %q: invalid base_url %q: %v — skipped", m.Name, m.BaseURL, err))
 	}
 
 	if m.ModelName == "" {
-		warnings = append(warnings, fmt.Sprintf("model %q: missing required field model_name", m.Name))
+		errs = append(errs, fmt.Sprintf("model %q: missing required field model_name — skipped", m.Name))
 	}
 
-	return warnings
+	return errs
 }
 
 // Reload reloads models from the config file

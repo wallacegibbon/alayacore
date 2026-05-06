@@ -15,8 +15,8 @@ api_key: "key"
 model_name: "model"`
 
 	models, warnings := parseModelConfig(input)
-	if len(models) != 1 {
-		t.Fatalf("expected 1 model, got %d", len(models))
+	if len(models) != 0 {
+		t.Fatalf("expected 0 models (broken model should be skipped), got %d", len(models))
 	}
 	found := false
 	for _, w := range warnings {
@@ -25,37 +25,41 @@ model_name: "model"`
 		}
 	}
 	if !found {
-		t.Errorf("expected warning about unknown protocol_type, got: %v", warnings)
+		t.Errorf("expected error about unknown protocol_type, got: %v", warnings)
 	}
 }
 
 func TestParseModelConfig_MissingRequiredFields(t *testing.T) {
 	tests := []struct {
-		name         string
-		input        string
-		wantWarning  string
-		dontWantWarn string
+		name        string
+		input       string
+		wantError   string
+		dontWantErr string
+		wantModels  int
 	}{
 		{
 			name: "missing protocol_type",
 			input: `name: "No Proto"
 base_url: "https://api.example.com"
 model_name: "model"`,
-			wantWarning: "missing required field protocol_type",
+			wantError:  "missing required field protocol_type",
+			wantModels: 0,
 		},
 		{
 			name: "missing base_url",
 			input: `name: "No URL"
 protocol_type: "openai"
 model_name: "model"`,
-			wantWarning: "missing required field base_url",
+			wantError:  "missing required field base_url",
+			wantModels: 0,
 		},
 		{
 			name: "missing model_name",
 			input: `name: "No Model"
 protocol_type: "openai"
 base_url: "https://api.example.com"`,
-			wantWarning: "missing required field model_name",
+			wantError:  "missing required field model_name",
+			wantModels: 0,
 		},
 		{
 			name: "all required present",
@@ -63,28 +67,32 @@ base_url: "https://api.example.com"`,
 protocol_type: "openai"
 base_url: "https://api.example.com"
 model_name: "model"`,
-			dontWantWarn: "missing required field",
+			dontWantErr: "missing required field",
+			wantModels:  1,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, warnings := parseModelConfig(tt.input)
-			if tt.wantWarning != "" {
+			models, warnings := parseModelConfig(tt.input)
+			if len(models) != tt.wantModels {
+				t.Errorf("expected %d models, got %d", tt.wantModels, len(models))
+			}
+			if tt.wantError != "" {
 				found := false
 				for _, w := range warnings {
-					if strings.Contains(w, tt.wantWarning) {
+					if strings.Contains(w, tt.wantError) {
 						found = true
 						break
 					}
 				}
 				if !found {
-					t.Errorf("expected warning containing %q, got: %v", tt.wantWarning, warnings)
+					t.Errorf("expected error containing %q, got: %v", tt.wantError, warnings)
 				}
 			}
-			if tt.dontWantWarn != "" {
+			if tt.dontWantErr != "" {
 				for _, w := range warnings {
-					if strings.Contains(w, tt.dontWantWarn) {
-						t.Errorf("unexpected warning: %s", w)
+					if strings.Contains(w, tt.dontWantErr) {
+						t.Errorf("unexpected error: %s", w)
 						break
 					}
 				}
@@ -100,7 +108,10 @@ base_url: ":://bad"
 api_key: "key"
 model_name: "model"`
 
-	_, warnings := parseModelConfig(input)
+	models, warnings := parseModelConfig(input)
+	if len(models) != 0 {
+		t.Fatalf("expected 0 models (broken model should be skipped), got %d", len(models))
+	}
 	found := false
 	for _, w := range warnings {
 		if strings.Contains(w, "invalid base_url") {
@@ -108,7 +119,7 @@ model_name: "model"`
 		}
 	}
 	if !found {
-		t.Errorf("expected warning about invalid base_url, got: %v", warnings)
+		t.Errorf("expected error about invalid base_url, got: %v", warnings)
 	}
 }
 
@@ -131,6 +142,32 @@ context_limit: abc`
 	}
 }
 
+func TestParseModelConfig_MixedValidAndInvalid(t *testing.T) {
+	input := `name: "Bad"
+protocol_type: "foobar"
+base_url: "https://api.example.com"
+model_name: "model"
+---
+name: "Good"
+protocol_type: "openai"
+base_url: "https://api.example.com"
+model_name: "gpt-4"
+`
+	models, warnings := parseModelConfig(input)
+	if len(models) != 1 {
+		t.Fatalf("expected 1 model (bad one skipped), got %d", len(models))
+	}
+	if models[0].Name != "Good" {
+		t.Errorf("expected model name %q, got %q", "Good", models[0].Name)
+	}
+	if len(warnings) != 1 {
+		t.Fatalf("expected 1 warning, got %d: %v", len(warnings), warnings)
+	}
+	if !strings.Contains(warnings[0], "unknown protocol_type") {
+		t.Errorf("expected protocol_type error, got: %s", warnings[0])
+	}
+}
+
 func TestModelManagerGetWarnings(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "model.conf")
@@ -149,10 +186,10 @@ model_name: ""
 	warnings := mm.GetWarnings()
 
 	if len(warnings) == 0 {
-		t.Fatal("expected warnings from invalid config, got none")
+		t.Fatal("expected errors from invalid config, got none")
 	}
 
-	// Check specific warnings are present
+	// Check specific errors are present
 	var foundProto, foundURL, foundModelName bool
 	for _, w := range warnings {
 		if strings.Contains(w, "unknown protocol_type") {
@@ -166,17 +203,22 @@ model_name: ""
 		}
 	}
 	if !foundProto {
-		t.Errorf("missing protocol_type warning in: %v", warnings)
+		t.Errorf("missing protocol_type error in: %v", warnings)
 	}
 	if !foundURL {
-		t.Errorf("missing base_url warning in: %v", warnings)
+		t.Errorf("missing base_url error in: %v", warnings)
 	}
 	if !foundModelName {
-		t.Errorf("missing model_name warning in: %v", warnings)
+		t.Errorf("missing model_name error in: %v", warnings)
+	}
+
+	// Broken model should not be in the list
+	if mm.ModelCount() != 0 {
+		t.Errorf("expected 0 models, got %d", mm.ModelCount())
 	}
 }
 
-func TestModelManagerNoWarningsOnValidConfig(t *testing.T) {
+func TestModelManagerNoErrorsOnValidConfig(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "model.conf")
 
