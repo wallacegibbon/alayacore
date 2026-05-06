@@ -42,10 +42,11 @@ func TestSaveAndLoadSession(t *testing.T) {
 
 	// Create a minimal session for testing
 	session := &Session{
-		Messages:  sessionData.Messages,
-		Input:     &stream.NopInput{},
-		Output:    &stream.NopOutput{},
-		taskQueue: make([]QueueItem, 0),
+		Messages:         sessionData.Messages,
+		Input:            &stream.NopInput{},
+		Output:           &stream.NopOutput{},
+		lastSaveMessages: -1,
+		taskQueue:        make([]QueueItem, 0),
 	}
 
 	// Save session

@@ -68,7 +68,7 @@ The session layer manages conversation state, task execution, and model interact
 
 ### Session Persistence
 
-- **Auto-save** — Always enabled when `--session` is specified. The session is saved after each step completes.
+- **Auto-save** — Always enabled when `--session` is specified. The session is saved after each step completes. Redundant writes are skipped when message count and content are unchanged (e.g. compaction didn't truncate anything).
 - **Manual save** — `:save [file]` or `Ctrl+S` at any time (TUI mode).
 - **Load** — On startup, AlayaCore starts a new empty session unless you specify `--session` to load an existing one.
 - **Auto-summarize** — When `--auto-summarize` is enabled and `context_limit` is set, AlayaCore automatically triggers `:summarize` when context reaches 65% of the limit.

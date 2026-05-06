@@ -157,6 +157,8 @@ type Session struct {
 	maxSteps             int
 	proxyURL             string
 	thinkLevel           int
+	lastSaveMessages     int  // len(s.Messages) at last successful auto-save; -1 means never saved
+	sessionDirty         bool // set when messages change in a way the count doesn't capture (e.g. compaction)
 
 	taskQueue     []QueueItem
 	cond          *sync.Cond         // signals when taskQueue becomes non-empty or pausedOnError clears
@@ -217,6 +219,7 @@ func NewSession(baseTools []llm.Tool, systemPrompt string, extraSystemPrompt str
 		proxyURL:             proxyURL,
 		maxSteps:             maxSteps,
 		thinkLevel:           config.DefaultThinkLevel,
+		lastSaveMessages:     -1,
 		taskQueue:            make([]QueueItem, 0),
 		sessionCtx:           sessionCtx,
 		sessionCancel:        sessionCancel,
@@ -255,6 +258,7 @@ func RestoreFromSession(baseTools []llm.Tool, systemPrompt string, extraSystemPr
 		maxSteps:             maxSteps,
 		thinkLevel:           data.ThinkLevel,
 		ContextTokens:        data.ContextTokens,
+		lastSaveMessages:     len(data.Messages),
 		taskQueue:            make([]QueueItem, 0),
 		sessionCtx:           sessionCtx,
 		sessionCancel:        sessionCancel,
@@ -1060,14 +1064,20 @@ func (s *Session) compactHistory() {
 	}
 
 	skillReadIDs := make(map[string]bool)
+	dirty := false
 	for i := 0; i < truncateBoundary; i++ {
 		msg := msgs[i]
 		switch msg.Role {
 		case llm.RoleAssistant:
 			s.collectSkillDirReads(msg, skillReadIDs)
 		case llm.RoleTool:
-			s.truncateToolResultsInMessage(msg, i, skillReadIDs, s.compactTruncateLen)
+			if s.truncateToolResultsInMessage(msg, i, skillReadIDs, s.compactTruncateLen) {
+				dirty = true
+			}
 		}
+	}
+	if dirty {
+		s.sessionDirty = true
 	}
 }
 
@@ -1102,8 +1112,10 @@ func (s *Session) collectSkillDirReads(msg llm.Message, skillReadIDs map[string]
 }
 
 // truncateToolResultsInMessage truncates tool results in a message,
-// preserving reads from skill directories.
-func (s *Session) truncateToolResultsInMessage(msg llm.Message, msgIndex int, skillReadIDs map[string]bool, maxLen int) {
+// preserving reads from skill directories. Returns true if any content
+// was actually truncated.
+func (s *Session) truncateToolResultsInMessage(msg llm.Message, msgIndex int, skillReadIDs map[string]bool, maxLen int) bool {
+	truncated := false
 	for j, part := range msg.Content {
 		tr, ok := part.(llm.ToolResultPart)
 		if !ok {
@@ -1116,16 +1128,18 @@ func (s *Session) truncateToolResultsInMessage(msg llm.Message, msgIndex int, sk
 		if !ok {
 			continue
 		}
-		truncated := truncation.Front(textOut.Text, maxLen, truncation.Marker)
-		if truncated == textOut.Text {
+		result := truncation.Front(textOut.Text, maxLen, truncation.Marker)
+		if len(result) == len(textOut.Text) {
 			continue
 		}
 		s.Messages[msgIndex].Content[j] = llm.ToolResultPart{
 			Type:       "tool_result",
 			ToolCallID: tr.ToolCallID,
-			Output:     llm.ToolResultOutputText{Type: "text", Text: truncated},
+			Output:     llm.ToolResultOutputText{Type: "text", Text: result},
 		}
+		truncated = true
 	}
+	return truncated
 }
 
 // ============================================================================

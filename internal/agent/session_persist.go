@@ -34,6 +34,10 @@ func (s *Session) saveSessionToFile(path string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if len(s.Messages) == s.lastSaveMessages && !s.sessionDirty {
+		return nil
+	}
+
 	data := SessionData{
 		SessionMeta: SessionMeta{
 			CreatedAt:     s.CreatedAt,
@@ -52,6 +56,8 @@ func (s *Session) saveSessionToFile(path string) error {
 	if err := os.WriteFile(path, raw, 0600); err != nil {
 		return fmt.Errorf("failed to write session file: %w", err)
 	}
+	s.lastSaveMessages = len(s.Messages)
+	s.sessionDirty = false
 	return nil
 }
 
