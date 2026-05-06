@@ -896,7 +896,7 @@ func (s *Session) writeGapped(tag string, msg string) {
 
 func (s *Session) writeToolCall(toolName, input, id string) {
 	// Send tool call as JSON via FC tag
-	tc := toolCallData{
+	tc := stream.ToolCallData{
 		ID:    id,
 		Name:  toolName,
 		Input: input,
@@ -910,7 +910,7 @@ func (s *Session) writeToolCall(toolName, input, id string) {
 
 func (s *Session) writeToolOutput(toolCallID string, output string) {
 	// Send tool result as JSON via FR tag
-	tr := toolResultData{
+	tr := stream.ToolResultData{
 		ID:     toolCallID,
 		Output: output,
 	}

@@ -119,7 +119,7 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 				writeTLV(&binaryBuf, stream.TagTextReasoning, p.Text)
 
 			case llm.ToolCallPart:
-				tc := toolCallData{
+				tc := stream.ToolCallData{
 					ID:    p.ToolCallID,
 					Name:  p.ToolName,
 					Input: string(p.Input),
@@ -131,7 +131,7 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 				writeTLV(&binaryBuf, stream.TagFunctionCall, string(jsonData))
 
 			case llm.ToolResultPart:
-				tr := toolResultData{
+				tr := stream.ToolResultData{
 					ID:     p.ToolCallID,
 					Output: formatToolResultOutput(p.Output),
 				}
@@ -162,17 +162,6 @@ func writeTLV(buf *strings.Builder, tag string, content string) {
 		byte(length),
 	})
 	buf.Write(data)
-}
-
-type toolCallData struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Input string `json:"input"`
-}
-
-type toolResultData struct {
-	ID     string `json:"id"`
-	Output string `json:"output"`
 }
 
 // parseSessionMarkdown parses markdown format with TLV encoding.
@@ -315,7 +304,7 @@ func parseMessagesTLV(body string) ([]llm.Message, []TLVChunk, error) {
 
 		case stream.TagFunctionCall:
 			msgRole = llm.RoleAssistant
-			var tc toolCallData
+			var tc stream.ToolCallData
 			if err := json.Unmarshal(content, &tc); err != nil {
 				return nil, nil, fmt.Errorf("failed to parse tool call: %w", err)
 			}
@@ -328,7 +317,7 @@ func parseMessagesTLV(body string) ([]llm.Message, []TLVChunk, error) {
 
 		case stream.TagFunctionResult:
 			msgRole = llm.RoleTool
-			var tr toolResultData
+			var tr stream.ToolResultData
 			if err := json.Unmarshal(content, &tr); err != nil {
 				return nil, nil, fmt.Errorf("failed to parse tool result: %w", err)
 			}

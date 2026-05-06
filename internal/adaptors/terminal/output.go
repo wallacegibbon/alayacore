@@ -132,7 +132,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 
 	// Function call (JSON: id, name, input)
 	case stream.TagFunctionCall:
-		var tc ToolCallData
+		var tc stream.ToolCallData
 		if err := json.Unmarshal([]byte(value), &tc); err != nil {
 			return
 		}
@@ -144,7 +144,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 
 	// Function result (JSON: id, output)
 	case stream.TagFunctionResult:
-		var tr ToolResultData
+		var tr stream.ToolResultData
 		if err := json.Unmarshal([]byte(value), &tr); err != nil {
 			return
 		}

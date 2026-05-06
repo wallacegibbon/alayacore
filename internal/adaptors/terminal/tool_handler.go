@@ -11,19 +11,6 @@ import (
 	"github.com/alayacore/alayacore/internal/tools"
 )
 
-// ToolCallData represents a tool call (FC tag payload).
-type ToolCallData struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Input string `json:"input"`
-}
-
-// ToolResultData represents a tool result (FR tag payload).
-type ToolResultData struct {
-	ID     string `json:"id"`
-	Output string `json:"output"`
-}
-
 // ToolDisplayHandler handles display formatting for a specific tool.
 type ToolDisplayHandler interface {
 	// FormatCall formats the tool call for display.

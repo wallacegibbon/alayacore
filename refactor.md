@@ -3,7 +3,7 @@
 ## High Priority
 
 - [x] 1. Session constructor explosion — extract `SessionConfig` struct (16 params → 3)
-- [ ] 2. CommandRegistry is decorative — make it drive dispatch or simplify to metadata
+- [x] 2. CommandRegistry is decorative — make it drive dispatch or simplify to metadata
 - [ ] 3. Duplicated `toolCallData`/`toolResultData` types — move to `stream` package
 
 ## Medium Priority

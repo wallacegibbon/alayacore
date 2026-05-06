@@ -178,3 +178,16 @@ func (n *NopOutput) WriteString(s string) (int, error) {
 func (n *NopOutput) Flush() error {
 	return nil
 }
+
+// ToolCallData represents a tool call (FC tag payload).
+type ToolCallData struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Input string `json:"input"`
+}
+
+// ToolResultData represents a tool result (FR tag payload).
+type ToolResultData struct {
+	ID     string `json:"id"`
+	Output string `json:"output"`
+}
