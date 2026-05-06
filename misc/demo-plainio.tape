@@ -14,8 +14,8 @@ Require alayacore
 
 Set Shell "bash"
 Set FontSize 16
-Set Width 900
-Set Height 450
+Set Width 1000
+Set Height 550
 Set Margin 8
 Set Padding 4
 Set BorderRadius 12
@@ -29,18 +29,28 @@ Enter
 Sleep 500ms
 Show
 
+# ── Test 1 ──────────────────────────────────────────────────────────
+Type "# Use directly"
+Enter
 Type "alayacore --plainio"
 Enter
-Sleep 1s
 
-# ── Give it a task ───────────────────────────────────────────
-
+Sleep 500ms
 Type "what Go version does this project use?"
 Enter
-Sleep 8s
+Sleep 6s
 
 # ── Exit ────────────────────────────────────────────────────────────
 
 Type ":quit"
 Enter
 Sleep 1s
+
+# ── Test 2 ──────────────────────────────────────────────────────────
+
+Type "# Use with pipe"
+Enter
+Sleep 500ms
+Type "echo 'what Go version does this project use?' | alayacore --plainio"
+Enter
+Sleep 6s

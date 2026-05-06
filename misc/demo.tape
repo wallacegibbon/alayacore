@@ -35,7 +35,7 @@ Type "alayacore"
 Enter
 Sleep 1s
 
-# ── Demo TUI navigation ────────────────────────────────────────────
+# ── Choose Model ────────────────────────────────────────────────────
 
 Ctrl+L
 Sleep 1s
@@ -46,7 +46,7 @@ Sleep 500ms
 Type "q"
 Sleep 500ms
 
-# ── Prompt 1: a quick question ──────────────────────────────────────
+# ── Task 1 ──────────────────────────────────────────────────────────
 
 Type "what Go version does this project use?"
 Enter
