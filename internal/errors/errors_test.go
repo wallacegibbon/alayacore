@@ -97,7 +97,6 @@ func TestDomainErrors(t *testing.T) {
 		{"ErrQueueItemNotFound", ErrQueueItemNotFound, "taskqueue_del"},
 		{"ErrNoSessionFile", ErrNoSessionFile, "save"},
 		{"ErrEmptyCommand", ErrEmptyCommand, "command"},
-		{"ErrUnknownCommand", ErrUnknownCommand, "command"},
 		{"ErrNothingToCancel", ErrNothingToCancel, "cancel"},
 		{"ErrInvalidInputTag", ErrInvalidInputTag, "input"},
 	}

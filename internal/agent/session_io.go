@@ -4,6 +4,7 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -179,7 +180,7 @@ func (s *Session) saveSession(args []string) {
 	}
 
 	if err := s.saveSessionToFile(path); err != nil {
-		s.writeError(domainerrors.Wrapf("save", err, "failed to save session").Error())
+		s.writeError(domainerrors.Wrap("save", fmt.Errorf("%w: %v", domainerrors.ErrFailedToSaveSession, err)).Error())
 	} else {
 		s.writeNotifyf("Session saved to %s", path)
 	}
@@ -212,7 +213,7 @@ func (s *Session) handleModelSet(args []string) {
 	}
 	model := s.ModelManager.GetModel(modelID)
 	if model == nil {
-		s.writeError(domainerrors.NewSessionErrorf("model_set", "model not found: %d", modelID).Error())
+		s.writeError(domainerrors.Wrapf("model_set", domainerrors.ErrModelNotFound, "model not found: %d", modelID).Error())
 		return
 	}
 
@@ -247,7 +248,7 @@ func (s *Session) handleModelLoad() {
 	}
 
 	if err := s.ModelManager.LoadFromFile(path); err != nil {
-		s.writeError(domainerrors.Wrapf("model_load", err, "failed to load models").Error())
+		s.writeError(domainerrors.Wrap("model_load", fmt.Errorf("%w: %v", domainerrors.ErrFailedToLoadModels, err)).Error())
 		return
 	}
 
@@ -270,7 +271,7 @@ func (s *Session) handleTaskQueueDel(args []string) {
 	if s.DeleteQueueItem(queueID) {
 		s.sendSystemInfo()
 	} else {
-		s.writeError(domainerrors.NewSessionErrorf("taskqueue_del", "queue item %s not found", queueID).Error())
+		s.writeError(domainerrors.Wrapf("taskqueue_del", domainerrors.ErrQueueItemNotFound, "queue item %s not found", queueID).Error())
 	}
 }
 

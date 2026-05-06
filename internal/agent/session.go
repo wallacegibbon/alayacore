@@ -519,7 +519,7 @@ func (s *Session) readFromInput() {
 			return
 		}
 		if tag != stream.TagTextUser {
-			s.writeError(domainerrors.NewSessionErrorf("input", "Invalid input tag: %s", tag).Error())
+			s.writeError(domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag, "invalid input tag: %s", tag).Error())
 			continue
 		}
 		if len(value) > 0 && value[0] == ':' {

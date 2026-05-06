@@ -43,9 +43,6 @@ var (
 	// ErrEmptyCommand indicates an empty command was received
 	ErrEmptyCommand = &SessionError{Op: "command", Err: fmt.Errorf("empty command")}
 
-	// ErrUnknownCommand indicates an unknown command was received
-	ErrUnknownCommand = &SessionError{Op: "command", Err: fmt.Errorf("unknown command")}
-
 	// ErrNothingToCancel indicates there is nothing to cancel
 	ErrNothingToCancel = &SessionError{Op: "cancel", Err: fmt.Errorf("nothing to cancel")}
 )

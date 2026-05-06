@@ -26,7 +26,6 @@
 //
 //	Command errors:
 //	  - ErrEmptyCommand: Empty command received
-//	  - ErrUnknownCommand: Unknown command
 //	  - ErrNothingToCancel: Nothing to cancel
 //
 // Input errors:
