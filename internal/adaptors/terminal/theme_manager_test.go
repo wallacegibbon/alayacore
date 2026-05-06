@@ -27,6 +27,7 @@ func TestThemeManagerCreatesDefaultThemes(t *testing.T) {
 	// Verify default themes were created
 	darkPath := filepath.Join(themesDir, "theme-dark.conf")
 	lightPath := filepath.Join(themesDir, "theme-light.conf")
+	redpandaPath := filepath.Join(themesDir, "theme-redpanda.conf")
 
 	if _, err := os.Stat(darkPath); os.IsNotExist(err) {
 		t.Errorf("theme-dark.conf was not created")
@@ -36,10 +37,14 @@ func TestThemeManagerCreatesDefaultThemes(t *testing.T) {
 		t.Errorf("theme-light.conf was not created")
 	}
 
+	if _, err := os.Stat(redpandaPath); os.IsNotExist(err) {
+		t.Errorf("theme-redpanda.conf was not created")
+	}
+
 	// Verify themes are loaded
 	themes := tm.GetThemes()
-	if len(themes) != 2 {
-		t.Errorf("Expected 2 themes, got %d", len(themes))
+	if len(themes) != 3 {
+		t.Errorf("Expected 3 themes, got %d", len(themes))
 	}
 
 	// Verify we can load the themes
@@ -50,6 +55,15 @@ func TestThemeManagerCreatesDefaultThemes(t *testing.T) {
 	}
 	if theme.Primary != "#89d4fa" {
 		t.Errorf("Expected theme-dark primary color #89d4fa, got %s", theme.Primary)
+	}
+
+	rpTheme := tm.LoadTheme("theme-redpanda")
+	if rpTheme == nil {
+		t.Fatalf("Failed to load theme-redpanda")
+		return
+	}
+	if rpTheme.Primary != "#e24328" {
+		t.Errorf("Expected theme-redpanda primary color #e24328, got %s", rpTheme.Primary)
 	}
 }
 
@@ -79,6 +93,7 @@ text: #ffffff
 	// Verify default themes were NOT created (folder already existed)
 	darkPath := filepath.Join(themesDir, "theme-dark.conf")
 	lightPath := filepath.Join(themesDir, "theme-light.conf")
+	redpandaPath := filepath.Join(themesDir, "theme-redpanda.conf")
 
 	if _, err := os.Stat(darkPath); !os.IsNotExist(err) {
 		t.Errorf("theme-dark.conf should not be created when folder exists")
@@ -86,6 +101,10 @@ text: #ffffff
 
 	if _, err := os.Stat(lightPath); !os.IsNotExist(err) {
 		t.Errorf("theme-light.conf should not be created when folder exists")
+	}
+
+	if _, err := os.Stat(redpandaPath); !os.IsNotExist(err) {
+		t.Errorf("theme-redpanda.conf should not be created when folder exists")
 	}
 
 	// Verify custom theme is loaded

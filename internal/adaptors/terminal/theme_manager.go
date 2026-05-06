@@ -153,6 +153,52 @@ removed: #d20f39
 	if err := os.WriteFile(lightPath, []byte(lightTheme), 0600); err != nil {
 		AddWarningf(tm.wc, "Warning: failed to create default light theme: %v", err)
 	}
+
+	// theme-redpanda.conf - Redpanda Dark terminal theme
+	// Warm reddish-brown palette with red/orange brand colors.
+	// https://github.com/redpanda-data/redpanda-terminal-themes
+	redpandaTheme := `# AlayaCore Redpanda Dark Theme
+# Warm reddish-brown palette with red/orange dominant colors,
+# inspired by the Redpanda brand palette.
+
+# Primary - brand red-orange for highlights and focused borders
+primary: #e24328
+
+# Dim - dark warm brown for unfocused borders
+dim: #2c1c18
+
+# Muted - warm brown for placeholder and secondary text
+muted: #6b4e44
+
+# Text - warm off-white for comfortable reading
+text: #f0e6e0
+
+# Warning - warm orange
+warning: #f77923
+
+# Error - bright red-orange
+error: #ea4a3e
+
+# Success - muted green
+success: #48bb78
+
+# Selection - warm dark red-brown for cursor border highlight
+selection: #943d28
+
+# Cursor - brand red-orange
+cursor: #e24328
+
+# Diff colors
+# Added lines (green)
+added: #68d391
+
+# Removed lines (bright red-orange)
+removed: #f9944f
+`
+	redpandaPath := filepath.Join(tm.themesFolder, "theme-redpanda.conf")
+	if err := os.WriteFile(redpandaPath, []byte(redpandaTheme), 0600); err != nil {
+		AddWarningf(tm.wc, "Warning: failed to create default redpanda theme: %v", err)
+	}
 }
 
 // ReloadThemes reloads the list of available themes from the themes folder.
