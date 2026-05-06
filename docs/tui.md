@@ -93,7 +93,7 @@ Each queued task shows its queue ID (Q1, Q2, …), type (`P` for prompt, `C` for
 
 ## Help Window
 
-Press `Ctrl+H` or type `:help` to open a help window listing all keybindings and commands. The filter input at the top lets you fuzzy-search for specific keys or commands (e.g. typing `gt` matches `:get_tasks`):
+Press `Ctrl+H` or type `:help` to open a help window listing all keybindings and commands. The filter input at the top lets you fuzzy-search for specific keys or commands (e.g. typing `gt` matches `:taskqueue_get_all`):
 
 | Key | Action |
 |-----|--------|
@@ -105,7 +105,7 @@ Press `Ctrl+H` or type `:help` to open a help window listing all keybindings and
 
 The help window is organized into three sections:
 
-- **Commands** — colon commands available in the input field
+- **Commands** — colon commands available in the input field (queue manager internals like `:taskqueue_get_all` and `:taskqueue_del` are omitted)
 - **Global Shortcuts** — keybindings that work from any context
 - **Display Mode** — navigation and editing keys for the display area
 

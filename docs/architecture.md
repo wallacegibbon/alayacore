@@ -126,7 +126,7 @@ Messages are appended incrementally in `OnStepFinish` so they're preserved even 
 
 Each tool is implemented with type-safe input structs and auto-generated JSON schemas. All tools accept a `context.Context` parameter and respect cancellation — `:cancel` will interrupt long-running tool execution. See [schema-improvements.md](schema-improvements.md) for the pattern.
 
-The `search_content` tool is conditionally registered — it is only available when the `rg` binary is found on the system `PATH` at startup. When available, the system prompt includes a `SEARCH:` section instructing the LLM to prefer `search_content` over reading files chunk by chunk to locate code, definitions, usages, and patterns.
+The `search_content` tool is conditionally registered — it is only available when the `rg` binary is found on the system `PATH` at startup. When available, the system prompt includes an instruction to prefer `search_content` over reading files chunk by chunk to locate code and patterns. This instruction is omitted when `rg` is not installed.
 
 #### Shell Detection (`internal/tools/shell/`)
 
@@ -240,7 +240,7 @@ System Message 1: Default Prompt (identity + rules + search preferences)
 System Message 2: Extra System Prompt (from --system flag, repeatable)
 ```
 
-When `rg` is available, the default prompt includes a `SEARCH:` section that instructs the LLM to prefer the `search_content` tool for locating content over reading files chunk by chunk. This section is omitted when `rg` is not installed.
+When `rg` is available, the default prompt includes an instruction to prefer the `search_content` tool for locating content over reading files chunk by chunk. This instruction is omitted when `rg` is not installed.
 
 When skill paths are provided via `--skill` and skills are discovered, the prompt includes instructions for reading skill `SKILL.md` files from their `<location>`, followed by an `<available_skills>` XML fragment listing each skill's name, description, and location. Both are omitted entirely when no skills are configured.
 

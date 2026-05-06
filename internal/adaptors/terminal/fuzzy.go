@@ -8,7 +8,7 @@ package terminal
 //   - FuzzyMatch("zhipuglm5", "zhipu / glm-5") → true (all chars appear in order)
 //   - FuzzyMatch("glm5", "zhipu / glm-5") → true (partial match)
 //   - FuzzyMatch("glmzhipu", "zhipu / glm-5") → false (wrong order)
-//   - FuzzyMatch("gt", ":get_tasks") → true
+//   - FuzzyMatch("gt", ":taskqueue_get_all") → true
 func FuzzyMatch(search, target string) bool {
 	if search == "" {
 		return true
