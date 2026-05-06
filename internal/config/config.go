@@ -17,6 +17,13 @@ const (
 	DefaultThinkLevel = ThinkLevelNormal
 )
 
+// Agent behavior defaults.
+const (
+	DefaultMaxSteps         = 100
+	DefaultCompactKeepSteps = 3
+	DefaultCompactTruncLen  = 500
+)
+
 // ResolveConfigPath returns the provided path, or the default ~/.alayacore/<filename>
 func ResolveConfigPath(providedPath, defaultFilename string) string {
 	if providedPath != "" {
@@ -112,13 +119,13 @@ func Parse() *Settings {
 	// Agent behavior
 	systemPrompt := &stringSlice{}
 	flag.Var(systemPrompt, "system", "Extra `system-prompt` (can be specified multiple times, will be appended to default)")
-	maxSteps := flag.Int("max-steps", 100, "Maximum agent loop steps")
+	maxSteps := flag.Int("max-steps", DefaultMaxSteps, "Maximum agent loop steps")
 	autoSummarize := flag.Bool("auto-summarize", false, "Automatically summarize conversation when context exceeds 65% of limit")
 
 	// Compaction
 	noCompact := flag.Bool("no-compact", false, "Disable automatic history compaction (old tool results are kept in full)")
-	compactKeepSteps := flag.Int("compact-keep-steps", 3, "Number of recent agent steps to preserve during compaction")
-	compactTruncateLen := flag.Int("compact-truncate-len", 500, "Byte-equivalent length to keep when truncating old tool results")
+	compactKeepSteps := flag.Int("compact-keep-steps", DefaultCompactKeepSteps, "Number of recent agent steps to preserve during compaction")
+	compactTruncateLen := flag.Int("compact-truncate-len", DefaultCompactTruncLen, "Byte-equivalent length to keep when truncating old tool results")
 
 	flag.Parse()
 
