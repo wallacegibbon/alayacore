@@ -376,8 +376,8 @@ func (m *Terminal) handleFileEditorFinished(msg FileEditorFinishedMsg) (tea.Mode
 		m.out.WriteNotify(fmt.Sprintf("Error editing file %s: %v", msg.Path, msg.Err))
 	}
 
-	// Reload models if the model config file was edited
-	if strings.HasSuffix(msg.Path, "model.conf") {
+	// Reload based on the file type rather than guessing from the filename.
+	if msg.Type == "model_config" {
 		m.emitCommand(":model_load")
 	}
 
@@ -740,6 +740,7 @@ type editorStartMsg struct {
 type FileEditorFinishedMsg struct {
 	Path string
 	Err  error
+	Type string // "model_config", "runtime_config", etc. — used to decide what to reload
 }
 
 // defaultEditors is the list of editor binaries to try when $EDITOR is not set.
@@ -836,20 +837,21 @@ func (e *Editor) createTempFile() (string, error) {
 	return tmpFileName, nil
 }
 
-// OpenFile opens an external editor for a specific file path
-func (e *Editor) OpenFile(path string) tea.Cmd {
+// OpenFile opens an external editor for a specific file path.
+// fileType indicates what kind of file is being edited (e.g. "model_config").
+func (e *Editor) OpenFile(path, fileType string) tea.Cmd {
 	editorCmd := getEditorCommand(os.Getenv("EDITOR"))
 
 	if editorCmd == "" {
 		return func() tea.Msg {
-			return FileEditorFinishedMsg{Path: path, Err: fmt.Errorf("no editor found (tried: %s; set $EDITOR to override)", strings.Join(defaultEditors, ", "))}
+			return FileEditorFinishedMsg{Path: path, Err: fmt.Errorf("no editor found (tried: %s; set $EDITOR to override)", strings.Join(defaultEditors, ", ")), Type: fileType}
 		}
 	}
 
 	cmd := exec.Command(editorCmd, path)
 
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
-		return FileEditorFinishedMsg{Path: path, Err: err}
+		return FileEditorFinishedMsg{Path: path, Err: err, Type: fileType}
 	})
 }
 

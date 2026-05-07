@@ -697,9 +697,10 @@ func (m *Terminal) openModelConfigFile() tea.Cmd {
 			return FileEditorFinishedMsg{
 				Path: "",
 				Err:  fmt.Errorf("no model config file path configured"),
+				Type: "model_config",
 			}
 		}
 	}
 
-	return m.editor.OpenFile(path)
+	return m.editor.OpenFile(path, "model_config")
 }
