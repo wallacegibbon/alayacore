@@ -109,8 +109,9 @@ active_theme: "theme-dark"
 
 ### Model Selection Priority
 
-1. If `runtime.conf` has a saved `active_model`, that model is used
-2. Otherwise, the **first model** in `model.conf` is active
+1. If `--model` is specified and the name exists in `model.conf`, that model is used
+2. If `runtime.conf` has a saved `active_model`, that model is used
+3. Otherwise, the **first model** in `model.conf` is active
 
 ## Theme Configuration
 

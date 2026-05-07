@@ -50,6 +50,7 @@ export ALAYACORE_SHELL=zsh
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--model-config` | `~/.alayacore/model.conf` | Path to model configuration file |
+| `--model` | *(none)* | Model name to activate (must exist in `model.conf`; overrides `runtime.conf`) |
 | `--runtime-config` | `~/.alayacore/runtime.conf` | Path to runtime configuration file |
 | `--system` | *(none)* | Extra system prompt text. Repeatable: `--system "rule 1" --system "rule 2"` |
 | `--skill` | *(none)* | Path to a skill directory. Repeatable: `--skill ./skills1 --skill ./skills2` |
@@ -74,6 +75,9 @@ alayacore
 
 # Custom model config
 alayacore --model-config ./my-model.conf
+
+# Override active model (must match a name in model.conf)
+alayacore --model "OpenAI GPT-4o"
 
 # Session persistence
 alayacore --session ~/sessions/refactor.md

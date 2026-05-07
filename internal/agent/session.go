@@ -150,6 +150,9 @@ type SessionConfig struct {
 
 	// External dependencies
 	SkillsMgr *skills.Manager
+
+	// Override
+	OverrideActiveModel string // If set, overrides the active model (must exist in model config)
 }
 
 // ============================================================================
@@ -183,8 +186,9 @@ type Session struct {
 	maxSteps             int
 	proxyURL             string
 	thinkLevel           int
-	lastSaveMessages     int  // len(s.Messages) at last successful auto-save; -1 means never saved
-	sessionDirty         bool // set when messages change in a way the count doesn't capture (e.g. compaction)
+	overrideActiveModel  string // If set, overrides the active model from runtime config
+	lastSaveMessages     int    // len(s.Messages) at last successful auto-save; -1 means never saved
+	sessionDirty         bool   // set when messages change in a way the count doesn't capture (e.g. compaction)
 
 	taskQueue     []QueueItem
 	cond          *sync.Cond         // signals when taskQueue becomes non-empty or pausedOnError clears
@@ -261,6 +265,7 @@ func NewSession(cfg SessionConfig) *Session {
 		proxyURL:             cfg.ProxyURL,
 		maxSteps:             cfg.MaxSteps,
 		thinkLevel:           config.DefaultThinkLevel,
+		overrideActiveModel:  cfg.OverrideActiveModel,
 		lastSaveMessages:     -1,
 		taskQueue:            make([]QueueItem, 0),
 		sessionCtx:           sessionCtx,
@@ -268,6 +273,7 @@ func NewSession(cfg SessionConfig) *Session {
 		runnerDone:           make(chan struct{}),
 	}
 	s.initModelManager()
+	s.applyModelOverride()
 	s.cond = sync.NewCond(&s.mu)
 	s.sendSystemInfo()
 	go s.readFromInput()
@@ -299,6 +305,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 		proxyURL:             cfg.ProxyURL,
 		maxSteps:             cfg.MaxSteps,
 		thinkLevel:           data.ThinkLevel,
+		overrideActiveModel:  cfg.OverrideActiveModel,
 		ContextTokens:        data.ContextTokens,
 		lastSaveMessages:     len(data.Messages),
 		taskQueue:            make([]QueueItem, 0),
@@ -314,6 +321,9 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 	if data.ActiveModel != "" {
 		_ = s.ModelManager.SetActiveByName(data.ActiveModel) //nolint:errcheck // best-effort restore, fall back to initModelManager default
 	}
+
+	// --model CLI flag takes highest priority: override whatever was resolved above.
+	s.applyModelOverride()
 
 	// Apply context limit from the resolved model so the status bar
 	// can show "tokens/limit (pct%)" immediately, before any API call.
@@ -366,6 +376,17 @@ func (s *Session) initModelManager() {
 		}
 	}
 	s.ModelManager.SetActiveToFirst()
+}
+
+// applyModelOverride applies the --model CLI flag override.
+// If overrideActiveModel is set and a model with that name exists in the
+// model config, it becomes the active model. If the name doesn't match
+// any configured model, the override is silently ignored.
+func (s *Session) applyModelOverride() {
+	if s.overrideActiveModel == "" || s.ModelManager == nil {
+		return
+	}
+	_ = s.ModelManager.SetActiveByName(s.overrideActiveModel) //nolint:errcheck // silently ignore if model not found
 }
 
 // activeModelName returns the display name of the currently active model.

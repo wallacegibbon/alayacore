@@ -103,6 +103,9 @@ type Settings struct {
 	Skills        []string
 	Session       string
 
+	// Model selection
+	ModelName string
+
 	// I/O
 	Proxy string
 
@@ -137,6 +140,7 @@ func Parse() *Settings {
 	modelConfig := flag.String("model-config", defaultModelConfig, "Model config file `path`")
 	runtimeConfig := flag.String("runtime-config", defaultRuntimeConfig, "Runtime config file `path`")
 	themesFolder := flag.String("themes", defaultThemesFolder, "Themes folder `path`")
+	modelName := flag.String("model", "", "Model `name` to activate (must exist in model config; overrides runtime config)")
 	skill := &stringSlice{}
 	flag.Var(skill, "skill", "Skill `path` (can be specified multiple times)")
 	session := flag.String("session", "", "Session file `path` to load/save conversations")
@@ -176,6 +180,7 @@ func Parse() *Settings {
 		ThemesFolder:       *themesFolder,
 		Skills:             skillPaths,
 		Session:            *session,
+		ModelName:          *modelName,
 		Proxy:              *proxy,
 		SystemPrompt:       mergedSystemPrompt,
 		MaxSteps:           *maxSteps,
