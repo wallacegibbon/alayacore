@@ -507,6 +507,7 @@ var displayKeyMap = map[string]func(*Terminal) tea.Cmd{
 	"e": func(m *Terminal) tea.Cmd {
 		content := m.display.GetCursorWindowContent()
 		if content != "" {
+			m.display.MarkUserScrolled()
 			return m.editor.OpenForDisplay(content)
 		}
 		return nil
