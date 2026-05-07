@@ -32,7 +32,7 @@ go install github.com/alayacore/alayacore@latest
 
 ## 功能特性
 
-- **自主工具调用循环** — LLM 规划、调用工具并迭代，直到任务完成。每次提示最多支持 100 个步骤。
+- **自主工具调用循环** — LLM 规划、调用工具并迭代，直到任务完成（默认无步骤限制，可通过 `--max-steps` 可选设限）。
 - **五种内置工具** — `read_file`、`edit_file`、`write_file`、`execute_command`、`search_content`（需安装 ripgrep `rg`）。
 - **跨平台** — 支持 Linux、macOS 和 Windows。`execute_command` 工具可自动检测 shell（Unix 上为 bash/zsh/sh，Windows 上为 PowerShell/cmd）。
 - **支持任何 LLM 提供商** — OpenAI、Anthropic、DeepSeek、Qwen、Ollama、LM Studio。一个配置文件支持多个模型，运行时可切换。
