@@ -442,7 +442,11 @@ func (m *Terminal) updateStatus() {
 		stepsVal = fmt.Sprintf("%d/%d", snap.LastCurrentStep, snap.LastMaxSteps)
 	} else if snap.InProgress && snap.CurrentStep > 0 {
 		showSteps = true
-		stepsVal = fmt.Sprintf("%d/%d", snap.CurrentStep, snap.MaxSteps)
+		if snap.MaxSteps > 0 {
+			stepsVal = fmt.Sprintf("%d/%d", snap.CurrentStep, snap.MaxSteps)
+		} else {
+			stepsVal = fmt.Sprintf("%d/INF", snap.CurrentStep)
+		}
 	}
 	if showSteps {
 		segments = append(segments,

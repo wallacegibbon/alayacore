@@ -17,6 +17,7 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"math"
 )
 
 // ErrMaxStepsExceeded is returned when the agent loop reaches the configured maximum number of steps
@@ -78,9 +79,15 @@ func (a *Agent) Stream(ctx context.Context, messages []Message, callbacks Stream
 
 	copy(allMessages, messages)
 
+	// Normalize: 0 means unlimited, map to max int so the loop condition stays simple.
+	maxSteps := a.config.MaxSteps
+	if maxSteps == 0 {
+		maxSteps = math.MaxInt
+	}
+
 	var truncErr error // non-nil when response hit output token limit
 
-	for step = 1; step <= a.config.MaxSteps; step++ {
+	for step = 1; step <= maxSteps; step++ {
 		// Check for context cancellation between steps
 		select {
 		case <-ctx.Done():
@@ -92,17 +99,11 @@ func (a *Agent) Stream(ctx context.Context, messages []Message, callbacks Stream
 			return nil, err
 		}
 
-		// Convert tools to definitions
-		toolDefs := make([]ToolDefinition, len(a.config.Tools))
-		for i, tool := range a.config.Tools {
-			toolDefs[i] = tool.Definition
-		}
-
 		// Stream from provider
 		events, err := a.config.Provider.StreamMessages(
 			ctx,
 			allMessages,
-			toolDefs,
+			a.toolDefinitions(),
 			a.config.SystemPrompt,
 			a.config.ExtraSystemPrompt,
 		)
@@ -147,7 +148,7 @@ func (a *Agent) Stream(ctx context.Context, messages []Message, callbacks Stream
 	}
 
 	// If the loop completed without a break (no final text-only response), we exceeded max steps.
-	if step > a.config.MaxSteps {
+	if step > maxSteps {
 		return result, ErrMaxStepsExceeded
 	}
 
@@ -162,6 +163,15 @@ func (a *Agent) invokeStepStart(callbacks StreamCallbacks, step int) error {
 		}
 	}
 	return nil
+}
+
+// toolDefinitions returns the tool definitions from the agent config.
+func (a *Agent) toolDefinitions() []ToolDefinition {
+	defs := make([]ToolDefinition, len(a.config.Tools))
+	for i, tool := range a.config.Tools {
+		defs[i] = tool.Definition
+	}
+	return defs
 }
 
 // executeToolStep runs tool calls, appends assistant + tool result messages,

@@ -20,7 +20,7 @@ const (
 
 // Agent behavior defaults.
 const (
-	DefaultMaxSteps         = 100
+	DefaultMaxSteps         = 0 // 0 means no limit; only bounded when user passes --max-steps
 	DefaultCompactKeepSteps = 3
 	DefaultCompactTruncLen  = 500
 
@@ -151,7 +151,7 @@ func Parse() *Settings {
 	// Agent behavior
 	systemPrompt := &stringSlice{}
 	flag.Var(systemPrompt, "system", "Extra `system-prompt` (can be specified multiple times, will be appended to default)")
-	maxSteps := flag.Int("max-steps", DefaultMaxSteps, "Maximum agent loop steps")
+	maxSteps := flag.Int("max-steps", DefaultMaxSteps, "Maximum agent loop steps (0 = no limit)")
 	autoSummarize := flag.Bool("auto-summarize", false, "Automatically summarize conversation when context exceeds 65% of limit")
 
 	// Compaction

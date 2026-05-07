@@ -57,7 +57,7 @@ export ALAYACORE_SHELL=zsh
 | `--session` | *(none)* | Path to session file for loading/saving conversations |
 | `--proxy` | *(none)* | Proxy URL. Supports `http://`, `https://`, and `socks5://` schemes |
 | `--themes` | `~/.alayacore/themes/` | Path to themes directory |
-| `--max-steps` | `100` | Maximum number of agent loop iterations per prompt. Exceeding this limit raises an error and pauses the task queue — use `:continue` to retry with a higher limit or `:continue skip` to proceed. |
+| `--max-steps` | `0` (no limit) | Maximum number of agent loop iterations per prompt. When set to 0 (the default), the agent loops until the model produces a final response. Exceeding this limit raises an error and pauses the task queue — use `:continue` to retry with a higher limit or `:continue skip` to proceed. |
 | `--auto-summarize` | `false` | Automatically summarize when context exceeds 65% of `context_limit` |
 | `--no-compact` | `false` | Disable automatic history compaction (old tool results are kept in full) |
 | `--compact-keep-steps` | `3` | Number of recent agent steps to preserve during compaction |
