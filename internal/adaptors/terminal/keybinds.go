@@ -420,6 +420,7 @@ func scrollDownLine(m *Terminal) tea.Cmd {
 	if !m.display.AtBottom() {
 		m.display.MarkUserScrolled()
 		m.display.ScrollDown(1)
+		m.display.updateContent()
 	}
 	return nil
 }
@@ -428,6 +429,7 @@ func scrollDownLine(m *Terminal) tea.Cmd {
 func scrollUpLine(m *Terminal) tea.Cmd {
 	m.display.MarkUserScrolled()
 	m.display.ScrollUp(1)
+	m.display.updateContent()
 	return nil
 }
 
@@ -442,11 +444,13 @@ var displayKeyMap = map[string]func(*Terminal) tea.Cmd{
 	"ctrl+d": func(m *Terminal) tea.Cmd {
 		m.display.MarkUserScrolled()
 		m.display.ScrollDown(max(1, m.display.GetHeight()/2))
+		m.display.updateContent()
 		return nil
 	},
 	"ctrl+u": func(m *Terminal) tea.Cmd {
 		m.display.MarkUserScrolled()
 		m.display.ScrollUp(max(1, m.display.GetHeight()/2))
+		m.display.updateContent()
 		return nil
 	},
 	"J":          scrollDownLine,
