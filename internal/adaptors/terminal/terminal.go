@@ -343,8 +343,9 @@ func (m *Terminal) handleEditorStart(msg editorStartMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	cmdArgs := append([]string{tmpFileName}, msg.editorArgs...)
 	//nolint:gosec // G204: Editor command from user config is intentional
-	cmd := exec.Command(msg.editorCmd, tmpFileName)
+	cmd := exec.Command(msg.editorCmd, cmdArgs...)
 
 	return m, tea.ExecProcess(cmd, func(err error) tea.Msg {
 		defer os.Remove(tmpFileName)
@@ -732,6 +733,7 @@ type displayEditorFinishedMsg struct {
 // editorStartMsg is sent to trigger actual editor execution (lazy temp file creation)
 type editorStartMsg struct {
 	editorCmd   string
+	editorArgs  []string
 	tmpFileName string
 	forDisplay  bool // true if opening display window content (don't populate input)
 }
@@ -779,13 +781,16 @@ func (e *Editor) Open(currentContent string) tea.Cmd {
 		}
 	}
 
+	cmd, args := splitEditorCmd(editorCmd)
+
 	// Store content for lazy temp file creation
 	e.content = currentContent
 
 	// Return a command that creates the temp file and runs the editor
 	return func() tea.Msg {
 		return editorStartMsg{
-			editorCmd:   editorCmd,
+			editorCmd:   cmd,
+			editorArgs:  args,
 			tmpFileName: "", // Will be created in handleEditorStart
 			forDisplay:  false,
 		}
@@ -803,13 +808,16 @@ func (e *Editor) OpenForDisplay(content string) tea.Cmd {
 		}
 	}
 
+	cmd, args := splitEditorCmd(editorCmd)
+
 	// Store content for lazy temp file creation
 	e.content = content
 
 	// Return a command that creates the temp file and runs the editor
 	return func() tea.Msg {
 		return editorStartMsg{
-			editorCmd:   editorCmd,
+			editorCmd:   cmd,
+			editorArgs:  args,
 			tmpFileName: "", // Will be created in handleEditorStart
 			forDisplay:  true,
 		}
@@ -848,9 +856,11 @@ func (e *Editor) OpenFile(path, fileType string) tea.Cmd {
 		}
 	}
 
-	cmd := exec.Command(editorCmd, path)
+	cmd, args := splitEditorCmd(editorCmd)
+	cmdArgs := append([]string{path}, args...)
 
-	return tea.ExecProcess(cmd, func(err error) tea.Msg {
+	//nolint:gosec // G204: Editor command from user config is intentional
+	return tea.ExecProcess(exec.Command(cmd, cmdArgs...), func(err error) tea.Msg {
 		return FileEditorFinishedMsg{Path: path, Err: err, Type: fileType}
 	})
 }
@@ -892,6 +902,16 @@ func getEditorCommand(editorCmd string) string {
 	}
 
 	return ""
+}
+
+// splitEditorCmd splits an editor command string into the executable and its arguments.
+// For example, "code --wait" becomes ("code", ["--wait"]).
+func splitEditorCmd(editorCmd string) (string, []string) {
+	parts := strings.Fields(editorCmd)
+	if len(parts) == 0 {
+		return "", nil
+	}
+	return parts[0], parts[1:]
 }
 
 // hasEditorPrefix checks if the value has an editor content prefix.
