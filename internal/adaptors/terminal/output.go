@@ -25,9 +25,9 @@ type outputWriter struct {
 	windowBuffer      *WindowBuffer
 	buffer            []byte
 	mu                sync.Mutex
-	dirty             atomic.Bool // true when display needs refresh
-	inProgress        bool        // Whether session has task in progress
-	styles            *Styles     // UI styles
+	dirty             atomic.Bool  // true when display needs refresh
+	inProgress        bool         // Whether session has task in progress
+	styles            *Styles      // UI styles
 	nextWindowID      atomic.Int64 // Monotonic counter for generating window IDs
 	models            []agentpkg.ModelInfo
 	activeModelID     int         // Current active model ID

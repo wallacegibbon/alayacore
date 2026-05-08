@@ -23,9 +23,9 @@ func TestFormatKeyValue_Basic(t *testing.T) {
 
 func TestFormatKeyValue_OmitEmpty(t *testing.T) {
 	type Cfg struct {
-		Name    string `config:"name,omitempty"`
-		Count   int    `config:"count,omitempty"`
-		Always  string `config:"always"`
+		Name   string `config:"name,omitempty"`
+		Count  int    `config:"count,omitempty"`
+		Always string `config:"always"`
 	}
 
 	out := FormatKeyValue(Cfg{Name: "", Count: 0, Always: "yes"})

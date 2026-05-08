@@ -64,7 +64,7 @@ func FormatKeyValue(v any) string {
 func formatFieldValue(v reflect.Value) string {
 	// time.Time
 	if v.Type() == reflect.TypeOf(time.Time{}) {
-		t := v.Interface().(time.Time)
+		t := v.Interface().(time.Time) //nolint:errcheck // guarded by type check above
 		return t.Format(time.RFC3339)
 	}
 

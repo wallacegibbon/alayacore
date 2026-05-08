@@ -37,7 +37,7 @@ func (s *Session) writeGapped(tag string, msg string) {
 	if s.Output == nil {
 		return
 	}
-	_ = stream.WriteTLV(s.Output, tag, msg)
+	_ = stream.WriteTLV(s.Output, tag, msg) //nolint:errcheck // best-effort write to adaptor
 	s.Output.Flush()
 }
 
@@ -46,8 +46,8 @@ func (s *Session) writeTLVJSON(tag string, v any) {
 	if s.Output == nil {
 		return
 	}
-	data, _ := json.Marshal(v)
-	_ = stream.WriteTLV(s.Output, tag, string(data))
+	data, _ := json.Marshal(v)                       //nolint:errcheck // best-effort marshal, value is always serializable
+	_ = stream.WriteTLV(s.Output, tag, string(data)) //nolint:errcheck // best-effort write to adaptor
 	s.Output.Flush()
 }
 
