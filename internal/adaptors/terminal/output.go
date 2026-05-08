@@ -148,11 +148,6 @@ func (to *outputWriter) writeColored(tag string, value string) {
 		if err := json.Unmarshal([]byte(value), &tr); err != nil {
 			return
 		}
-		handler := to.windowBuffer.GetHandler(tr.ID)
-		if handler != nil && !handler.ShouldShowOutput() {
-			// Skip output for tools that don't show it
-			return
-		}
 		// Pass raw output - styling is applied during render
 		to.windowBuffer.AppendOrUpdate(tr.ID, tag, tr.Output)
 

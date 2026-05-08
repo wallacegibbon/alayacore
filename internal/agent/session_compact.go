@@ -1,6 +1,19 @@
 package agent
 
-// Session compaction: truncates old tool result outputs to save context tokens.
+// Session compaction: compacts old messages to save context tokens.
+//
+// Three compaction strategies are applied to messages outside the recent window:
+//
+//  1. ReasoningPart — removed entirely. Raw thinking has no value once the step
+//     is complete; the conclusion is captured in the TextPart.
+//
+//  2. ToolResultPart — removed along with its matching ToolCallPart.
+//     The model can re-invoke the tool if it needs the data. Errors are preserved
+//     since they're small and actionable.
+//
+//  3. ToolCallPart inputs — body content stripped from write_file and edit_file
+//     calls (only for calls whose results are preserved, e.g. errors and skill
+//     reads). The path is preserved so the model knows what was touched.
 
 import (
 	"encoding/json"
@@ -9,13 +22,14 @@ import (
 	"strings"
 
 	"github.com/alayacore/alayacore/internal/llm"
-	"github.com/alayacore/alayacore/internal/truncation"
 )
 
 // Compaction defaults — not user-configurable.
 const (
-	compactKeepSteps   = 3   // number of recent agent steps to preserve in full
-	compactTruncateLen = 500 // byte-equivalent length to keep when truncating old tool results
+	compactKeepSteps = 3 // number of recent agent steps to preserve in full
+
+	toolNameWriteFile = "write_file"
+	toolNameEditFile  = "edit_file"
 )
 
 // cleanIncompleteToolCalls removes incomplete tool calls from messages.
@@ -70,12 +84,12 @@ func cleanIncompleteToolCalls(messages []llm.Message) []llm.Message {
 	return messages
 }
 
-// compactHistory truncates old tool result outputs to save context tokens.
-// Only tool results from the most recent steps are kept in full; older ones
-// are truncated to a summary. This prevents unbounded context growth in
-// long agent sessions where each step's tool I/O accumulates.
+// compactHistory compacts old messages to save context tokens.
+// Messages from the most recent steps are preserved in full; older ones
+// have reasoning stripped, tool call/result pairs removed, and empty
+// messages cleaned up.
 //
-// Files under skill directories are never truncated — skill instructions
+// Files under skill directories are never compacted — skill instructions
 // and their supporting files must remain intact for the LLM to follow.
 func (s *Session) compactHistory() {
 	if s.NoCompact {
@@ -84,27 +98,159 @@ func (s *Session) compactHistory() {
 	// Each agent step is typically 2 messages (tool call + tool result)
 	recentMessages := compactKeepSteps * 2
 	msgs := s.Messages
-	truncateBoundary := len(msgs) - recentMessages
-	if truncateBoundary <= 0 {
+	boundary := len(msgs) - recentMessages
+	if boundary <= 0 {
 		return
 	}
 
-	skillReadIDs := make(map[string]bool)
+	// Collect tool call IDs to keep from ALL messages: errors and skill reads.
+	// Must scan all messages (not just old ones) because a tool result just past
+	// the boundary still pairs with an old assistant tool call.
+	keepIDs := make(map[string]bool)
+	for _, msg := range msgs {
+		if msg.Role == llm.RoleAssistant {
+			s.collectSkillDirReads(msg, keepIDs)
+		}
+		if msg.Role == llm.RoleTool {
+			collectErrorResultIDs(msg, keepIDs)
+		}
+	}
+
+	// Remove compactable tool call/result pairs and reasoning from old messages.
 	dirty := false
-	for i := 0; i < truncateBoundary; i++ {
-		msg := msgs[i]
+	for i := 0; i < boundary; i++ {
+		msg := &s.Messages[i]
 		switch msg.Role {
 		case llm.RoleAssistant:
-			s.collectSkillDirReads(msg, skillReadIDs)
+			if compactAssistantParts(msg, keepIDs) {
+				dirty = true
+			}
 		case llm.RoleTool:
-			if s.truncateToolResultsInMessage(msg, i, skillReadIDs, compactTruncateLen) {
+			if compactToolResultParts(msg, keepIDs) {
 				dirty = true
 			}
 		}
 	}
+
+	// Remove empty tool messages left after compaction.
 	if dirty {
+		s.Messages = removeEmptyToolMessages(s.Messages)
 		s.sessionDirty = true
 	}
+}
+
+// compactAssistantParts removes reasoning and tool calls whose results are
+// also being removed. Tool calls in keepIDs are preserved (with their input
+// compacted if applicable). Returns true if any content was modified.
+func compactAssistantParts(msg *llm.Message, keepIDs map[string]bool) bool {
+	changed := false
+	filtered := msg.Content[:0] // reuse backing array
+	for _, part := range msg.Content {
+		switch p := part.(type) {
+		case llm.ReasoningPart:
+			changed = true // drop entirely — conclusion is in TextPart
+		case llm.ToolCallPart:
+			if keepIDs[p.ToolCallID] {
+				// Preserved call (error or skill read) — compact input if large.
+				if compacted := compactToolCallInput(p); compacted != nil {
+					filtered = append(filtered, *compacted)
+					changed = true
+				} else {
+					filtered = append(filtered, p)
+				}
+			} else {
+				changed = true // drop — result is being removed too
+			}
+		default:
+			filtered = append(filtered, p)
+		}
+	}
+	if changed {
+		msg.Content = filtered
+	}
+	return changed
+}
+
+// compactToolCallInput trims body content from write_file and edit_file inputs,
+// preserving only the file path. Returns nil if no compaction was needed.
+func compactToolCallInput(tc llm.ToolCallPart) *llm.ToolCallPart {
+	if tc.ToolName != toolNameWriteFile && tc.ToolName != toolNameEditFile {
+		return nil
+	}
+	var input struct {
+		Path string `json:"path"`
+	}
+	if err := json.Unmarshal(tc.Input, &input); err != nil || input.Path == "" {
+		return nil
+	}
+	// Already compacted (no content fields) — nothing to do.
+	var check struct {
+		Content   string `json:"content"`
+		OldString string `json:"old_string"`
+	}
+	if err := json.Unmarshal(tc.Input, &check); err != nil {
+		return nil
+	}
+	if check.Content == "" && check.OldString == "" {
+		return nil
+	}
+	newInput, err := json.Marshal(map[string]string{"path": input.Path})
+	if err != nil {
+		return nil
+	}
+	result := tc
+	result.Input = newInput
+	return &result
+}
+
+// compactToolResultParts removes tool results whose calls are also being
+// removed. Results for tool calls in keepIDs are preserved. Returns true if
+// any content was modified.
+func compactToolResultParts(msg *llm.Message, keepIDs map[string]bool) bool {
+	changed := false
+	filtered := msg.Content[:0]
+	for _, part := range msg.Content {
+		tr, ok := part.(llm.ToolResultPart)
+		if !ok {
+			filtered = append(filtered, part)
+			continue
+		}
+		if keepIDs[tr.ToolCallID] {
+			filtered = append(filtered, part)
+			continue
+		}
+		changed = true // drop
+	}
+	if changed {
+		msg.Content = filtered
+	}
+	return changed
+}
+
+// collectErrorResultIDs adds tool call IDs for error results to keepIDs.
+func collectErrorResultIDs(msg llm.Message, keepIDs map[string]bool) {
+	for _, part := range msg.Content {
+		tr, ok := part.(llm.ToolResultPart)
+		if !ok {
+			continue
+		}
+		if _, isErr := tr.Output.(llm.ToolResultOutputError); isErr {
+			keepIDs[tr.ToolCallID] = true
+		}
+	}
+}
+
+// removeEmptyToolMessages removes tool messages that have no content parts
+// left after compaction.
+func removeEmptyToolMessages(msgs []llm.Message) []llm.Message {
+	result := msgs[:0]
+	for _, msg := range msgs {
+		if msg.Role == llm.RoleTool && len(msg.Content) == 0 {
+			continue
+		}
+		result = append(result, msg)
+	}
+	return result
 }
 
 // collectSkillDirReads extracts tool call IDs for read_file calls targeting
@@ -135,35 +281,4 @@ func (s *Session) collectSkillDirReads(msg llm.Message, skillReadIDs map[string]
 			}
 		}
 	}
-}
-
-// truncateToolResultsInMessage truncates tool results in a message,
-// preserving reads from skill directories. Returns true if any content
-// was actually truncated.
-func (s *Session) truncateToolResultsInMessage(msg llm.Message, msgIndex int, skillReadIDs map[string]bool, maxLen int) bool {
-	truncated := false
-	for j, part := range msg.Content {
-		tr, ok := part.(llm.ToolResultPart)
-		if !ok {
-			continue
-		}
-		if skillReadIDs[tr.ToolCallID] {
-			continue // preserve skill directory reads
-		}
-		textOut, ok := tr.Output.(llm.ToolResultOutputText)
-		if !ok {
-			continue
-		}
-		result := truncation.Front(textOut.Text, maxLen, truncation.Marker)
-		if len(result) == len(textOut.Text) {
-			continue
-		}
-		s.Messages[msgIndex].Content[j] = llm.ToolResultPart{
-			Type:       "tool_result",
-			ToolCallID: tr.ToolCallID,
-			Output:     llm.ToolResultOutputText{Type: "text", Text: result},
-		}
-		truncated = true
-	}
-	return truncated
 }

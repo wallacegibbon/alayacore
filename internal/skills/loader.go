@@ -119,7 +119,7 @@ func (m *Manager) GetMetadata() []Skill {
 }
 
 // GetSkillDirs returns the absolute paths of all skill directories.
-// Used by session.compactHistory to exempt skill file reads from truncation.
+// Used by session.compactHistory to exempt skill file reads from compaction.
 func (m *Manager) GetSkillDirs() []string {
 	dirs := make([]string, 0, len(m.skills))
 	for _, skill := range m.skills {

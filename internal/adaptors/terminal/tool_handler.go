@@ -16,9 +16,6 @@ type ToolDisplayHandler interface {
 	// FormatCall formats the tool call for display.
 	// Returns the formatted string (may contain diff markers for edit_file).
 	FormatCall(input json.RawMessage, styles *Styles) string
-
-	// ShouldShowOutput returns true if tool output should be displayed.
-	ShouldShowOutput() bool
 }
 
 // ============================================================================
@@ -27,17 +24,12 @@ type ToolDisplayHandler interface {
 
 // GenericHandler handles tools with simple one-line display.
 type GenericHandler struct {
-	name       string
-	showOutput bool
+	name string
 }
 
 func (h *GenericHandler) FormatCall(input json.RawMessage, _ *Styles) string {
 	// Add newline at end so output starts on new line
 	return fmt.Sprintf("%s: %s\n", h.name, string(input))
-}
-
-func (h *GenericHandler) ShouldShowOutput() bool {
-	return h.showOutput
 }
 
 // ExecuteCommandHandler handles execute_command calls.
@@ -52,10 +44,6 @@ func (h *ExecuteCommandHandler) FormatCall(input json.RawMessage, _ *Styles) str
 	}
 	// Add newline at end so output starts on new line
 	return fmt.Sprintf("execute_command: %s\n", escapeNewlines(args.Command))
-}
-
-func (h *ExecuteCommandHandler) ShouldShowOutput() bool {
-	return true
 }
 
 // ReadFileHandler handles read_file calls.
@@ -78,10 +66,6 @@ func (h *ReadFileHandler) FormatCall(input json.RawMessage, _ *Styles) string {
 	return fmt.Sprintf("read_file: %s\n", strings.Join(parts, ", "))
 }
 
-func (h *ReadFileHandler) ShouldShowOutput() bool {
-	return true
-}
-
 // WriteFileHandler handles write_file calls.
 type WriteFileHandler struct{}
 
@@ -90,11 +74,12 @@ func (h *WriteFileHandler) FormatCall(input json.RawMessage, _ *Styles) string {
 	if err := json.Unmarshal(input, &args); err != nil {
 		return "write_file: <parse error>"
 	}
-	return fmt.Sprintf("write_file: %s\n%s", args.Path, args.Content)
-}
 
-func (h *WriteFileHandler) ShouldShowOutput() bool {
-	return false
+	if args.Content == "" {
+		// Compacted — just the path, result carries the note
+		return fmt.Sprintf("write_file: %s\n", args.Path)
+	}
+	return fmt.Sprintf("write_file: %s\n%s", args.Path, args.Content)
 }
 
 // EditFileHandler handles edit_file calls with diff display.
@@ -104,6 +89,11 @@ func (h *EditFileHandler) FormatCall(input json.RawMessage, _ *Styles) string {
 	var args tools.EditFileInput
 	if err := json.Unmarshal(input, &args); err != nil {
 		return "edit_file: <parse error>"
+	}
+
+	if args.OldString == "" && args.NewString == "" {
+		// Compacted — just the path, result carries the note
+		return fmt.Sprintf("edit_file: %s\n", args.Path)
 	}
 
 	var lines []string
@@ -136,10 +126,6 @@ func (h *EditFileHandler) FormatCall(input json.RawMessage, _ *Styles) string {
 	}
 
 	return strings.Join(lines, "\n")
-}
-
-func (h *EditFileHandler) ShouldShowOutput() bool {
-	return false
 }
 
 // SearchContentHandler handles search_content calls.
@@ -182,10 +168,6 @@ func (h *SearchContentHandler) FormatCall(input json.RawMessage, _ *Styles) stri
 	return fmt.Sprintf("search_content: %s\n", strings.Join(parts, ", "))
 }
 
-func (h *SearchContentHandler) ShouldShowOutput() bool {
-	return true
-}
-
 // ============================================================================
 // Handler Registry
 // ============================================================================
@@ -205,7 +187,7 @@ func GetHandler(toolName string) ToolDisplayHandler {
 		return h
 	}
 	// Fallback generic handler
-	return &GenericHandler{name: toolName, showOutput: true}
+	return &GenericHandler{name: toolName}
 }
 
 // ============================================================================

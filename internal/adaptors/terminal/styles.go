@@ -118,6 +118,7 @@ type Styles struct {
 	// Display styles
 	Input       lipgloss.Style
 	Status      lipgloss.Style
+	Separator   lipgloss.Style
 	Confirm     lipgloss.Style
 	InputBorder lipgloss.Style
 
@@ -171,6 +172,7 @@ func NewStyles(theme *Theme) *Styles {
 		// Display styles
 		Input:       baseStyle,
 		Status:      baseStyle.Foreground(lipgloss.Color(theme.Dim)),
+		Separator:   baseStyle.Foreground(lipgloss.Color(theme.Dim)),
 		Confirm:     baseStyle.Foreground(lipgloss.Color(theme.Error)).Bold(true),
 		InputBorder: baseStyle.Border(lipgloss.RoundedBorder()),
 

@@ -64,11 +64,11 @@ The session layer manages conversation state, task execution, and model interact
 | `RuntimeManager` | Persists runtime settings (active model, active theme) to `runtime.conf` |
 | `CommandDefinitions` | Static metadata for session commands (`:save`, `:cancel`, etc.) |
 | `ContextTokens` | Tracks conversation context size across API calls. See [context-tracking.md](context-tracking.md). |
-| `compactHistory()` | Truncates old tool results to save context. Disabled via `--no-compact`. |
+| `compactHistory()` | Compacts old messages (strips reasoning, removes tool call/result pairs, trims large tool inputs). Disabled via `--no-compact`. |
 
 ### Session Persistence
 
-- **Auto-save** — Always enabled when `--session` is specified. The session is saved after each step completes. Redundant writes are skipped when message count and content are unchanged (e.g. compaction didn't truncate anything).
+- **Auto-save** — Always enabled when `--session` is specified. The session is saved after each step completes. Redundant writes are skipped when message count and content are unchanged (e.g. compaction didn't modify anything).
 - **Manual save** — `:save [file]` or `Ctrl+S` at any time (TUI mode).
 - **Load** — On startup, AlayaCore starts a new empty session unless you specify `--session` to load an existing one.
 - **Auto-summarize** — When `--auto-summarize` is enabled and `context_limit` is set, AlayaCore automatically triggers `:summarize` when context reaches 65% of the limit.
@@ -82,7 +82,7 @@ Shared text truncation utilities used by the tools and session layers. All funct
 | Function | Strategy | Used by |
 |----------|----------|---------|
 | `Lines` | Keeps first N non-empty lines | `search_content` (100 lines default) |
-| `Front` | Keeps front of text within byte budget | `execute_command` (32KB limit), `compactHistory` (500 bytes) |
+| `Front` | Keeps front of text within byte budget | `execute_command` (32KB limit) |
 
 All strategies use a unified `[truncated]` marker so the LLM can recognize truncated output regardless of source. `Front` uses a byte budget and counts each rune's actual byte cost, so any mix of ASCII and multi-byte characters (CJK, emoji) is handled fairly without approximation.
 
@@ -331,7 +331,7 @@ Agent.Stream() receives tool_call event
 8. **Typed Tools** — `TypedExecute[T]` wrapper for type-safe tool implementations with auto-generated schemas.
 9. **Lazy Agent Init** — Agent and provider are created on first use, not at startup.
 10. **Sequential Tool Execution** — Tools execute one at a time. See [sequential-tool-execution.md](sequential-tool-execution.md).
-11. **Context Efficiency** — Tool descriptions are minimal, outputs are size-capped (32KB), search results limited (100 lines), and old tool results are compacted to save tokens. See [context-tracking.md](context-tracking.md).
+11. **Context Efficiency** — Tool descriptions are minimal, outputs are size-capped (32KB), search results limited (100 lines), and old messages are compacted to save tokens (reasoning stripped, tool call/result pairs removed, large inputs trimmed). See [context-tracking.md](context-tracking.md).
 12. **Think Mode** — Provider-specific reasoning fields are added to API requests. Three levels: 0=off, 1=normal, 2=max. Toggled via `:think [0|1|2]`.
 
 ## Gotchas

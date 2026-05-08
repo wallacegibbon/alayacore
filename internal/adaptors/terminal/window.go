@@ -29,6 +29,10 @@ import (
 	"github.com/alayacore/alayacore/internal/stream"
 )
 
+// toolResultSentinel separates tool call content from tool result in write_file/edit_file windows.
+// Uses null bytes which can't appear in valid UTF-8 content or file data.
+const toolResultSentinel = "\x00__TOOL_RESULT__\x00"
+
 // ============================================================================
 // Window - Single Display Window with Internal Caching
 // ============================================================================
@@ -116,13 +120,25 @@ func (w *Window) Render(width int, isCursor bool, styles *Styles, borderStyle, c
 func (w *Window) rebuildCache(width int, styles *Styles, borderStyle lipgloss.Style) {
 	innerWidth := max(0, width-4)
 
-	// Render content based on window type
-	var inner string
+	parts := strings.SplitN(w.Content, toolResultSentinel, 2)
+
+	// Render the call portion based on window type
+	var call string
 	switch {
 	case w.IsDiffWindow():
-		inner = RenderDiffContent(w.Content, w.Status, styles)
+		call = RenderDiffContent(parts[0], w.Status, styles)
 	default:
-		inner = w.renderGenericContent(innerWidth, styles)
+		call = w.renderGenericContent(innerWidth, styles, parts[0])
+	}
+
+	// If a tool result was appended, render call + separator + result
+	var inner string
+	if len(parts) == 2 {
+		sep := styles.Separator.Render("───")
+		result := styleMultiline(strings.TrimLeft(parts[1], "\n"), styles.Text)
+		inner = call + "\n" + sep + "\n" + result
+	} else {
+		inner = call
 	}
 
 	// Apply folding if needed
@@ -140,8 +156,8 @@ func (w *Window) rebuildCache(width int, styles *Styles, borderStyle lipgloss.St
 	w.cache.valid = true
 }
 
-// renderGenericContent renders a generic tool window content
-func (w *Window) renderGenericContent(innerWidth int, styles *Styles) string {
+// renderGenericContent renders content using styleContent with tag-based styling
+func (w *Window) renderGenericContent(innerWidth int, styles *Styles, content string) string {
 	innerWidth = max(0, innerWidth)
 
 	// FAST PATH: Use cached wrapped lines if width matches
@@ -151,10 +167,8 @@ func (w *Window) renderGenericContent(innerWidth int, styles *Styles) string {
 	}
 
 	// SLOW PATH: Full styling and wrapping
-	content := w.Content
 
-	// Prepare content FIRST: strip input ANSI and expand tabs
-	// This must happen BEFORE styling so we don't strip lipgloss ANSI
+	// Prepare content: strip ANSI and expand tabs
 	content = prepareContent(content)
 
 	// Apply styling based on tag
@@ -162,6 +176,7 @@ func (w *Window) renderGenericContent(innerWidth int, styles *Styles) string {
 
 	// Wrap content
 	if innerWidth <= 0 {
+		w.cache.wrappedLines = nil
 		return content
 	}
 
@@ -229,7 +244,8 @@ func (w *Window) styleContent(content string, styles *Styles) string {
 	// Apply styling based on tag
 	switch w.Tag {
 	case stream.TagFunctionCall:
-		return w.Status.Indicator(styles) + ColorizeTool(content, styles)
+		prefix := w.Status.Indicator(styles)
+		return prefix + ColorizeTool(content, styles)
 	case stream.TagFunctionResult:
 		return styleMultiline(content, styles.Text)
 	case stream.TagTextAssistant:
@@ -344,6 +360,10 @@ func (wb *WindowBuffer) AppendOrUpdate(id string, tag string, content string) {
 
 	if idx, ok := wb.idIndex[id]; ok {
 		w := wb.Windows[idx]
+		// Insert dimmed separator before result for write_file/edit_file
+		if w.IsToolWindow() && (w.ToolName == "write_file" || w.ToolName == "edit_file") {
+			w.AppendContent("\n"+toolResultSentinel+"\n", innerWidth)
+		}
 		w.AppendContent(content, innerWidth)
 		// Update visibility for delta windows when new content arrives
 		// Only need to check the delta (not accumulated content) since if Visible=false,
@@ -398,20 +418,6 @@ func (wb *WindowBuffer) AppendToolCall(id string, toolName string, content strin
 	wb.Windows = append(wb.Windows, w)
 	wb.idIndex[id] = len(wb.Windows) - 1
 	wb.markDirty(len(wb.Windows) - 1)
-}
-
-// GetHandler returns the tool display handler for a window by ID.
-func (wb *WindowBuffer) GetHandler(id string) ToolDisplayHandler {
-	wb.mu.Lock()
-	defer wb.mu.Unlock()
-
-	if idx, ok := wb.idIndex[id]; ok {
-		w := wb.Windows[idx]
-		if w.ToolName != "" {
-			return GetHandler(w.ToolName)
-		}
-	}
-	return nil
 }
 
 // markDirty marks that line heights need rebuilding.
@@ -738,7 +744,7 @@ func (wb *WindowBuffer) findWindowAtLine(line int) int {
 
 // RenderWindowContent renders the content of a window (for testing).
 func (wb *WindowBuffer) RenderWindowContent(w *Window, innerWidth int) string {
-	return w.renderGenericContent(innerWidth, wb.styles)
+	return w.renderGenericContent(innerWidth, wb.styles, w.Content)
 }
 
 // ============================================================================

@@ -65,7 +65,7 @@ func TestWindow_WithANSIContent(t *testing.T) {
 			}
 
 			// Render the window content
-			result := w.renderGenericContent(80, styles)
+			result := w.renderGenericContent(80, styles, w.Content)
 
 			// Strip lipgloss ANSI to check the actual text content
 			resultStripped := stripANSI(result)
@@ -129,7 +129,7 @@ func TestWindow_PreservesLipglossColors(t *testing.T) {
 			}
 
 			// Render the window content
-			result := w.renderGenericContent(80, styles)
+			result := w.renderGenericContent(80, styles, w.Content)
 
 			// Check if result contains ANSI codes
 			hasColor := containsANSI(result)

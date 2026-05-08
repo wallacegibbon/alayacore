@@ -11,7 +11,7 @@ Two truncation strategies are available, each suited to different use cases:
 | Strategy | Keeps | Use Case |
 |----------|-------|----------|
 | `Lines` | First N non-empty lines | Line-oriented output (search results) |
-| `Front` | Front of text within byte budget | Command output, compacted history |
+| `Front` | Front of text within byte budget | Command output |
 
 ## Lines Strategy
 
@@ -74,16 +74,12 @@ If `contentBudget <= 0`, returns only the marker.
 | Location | Budget | Description |
 |----------|--------|-------------|
 | `execute_command` | 32 KB | Command output truncation |
-| `compactHistory` | 500 bytes | Old tool result truncation |
 
 ### Example
 
 ```go
-// 500 byte budget with default marker
-output := truncation.Front(text, 500, truncation.Marker)
-
-// Marker takes 12 bytes, so content budget is 488 bytes
-// A 600-byte input becomes ~500 bytes: first 488 + "\n[truncated]"
+// 32KB budget with default marker
+output := truncation.Front(text, 32*1024, truncation.Marker)
 ```
 
 ### CJK Fairness
@@ -129,20 +125,31 @@ Note: `search_content` uses only truncation for limiting output. Ripgrep returns
 
 ### History Compaction
 
-`compactHistory()` truncates old tool results to save context tokens. In long agent sessions, tool result outputs accumulate and consume increasing amounts of context. A 10-step session with file reads and command executions can easily contain 100K+ tokens of old tool I/O.
+`compactHistory()` compacts old messages to save context tokens. In long agent sessions, reasoning blocks, tool results, and large tool call inputs accumulate and consume increasing amounts of context.
 
-`compactHistory()` is called after each user prompt completes. It truncates tool result outputs that are older than the last 3 steps to 500 bytes. The most recent results are kept intact.
+`compactHistory()` is called after each user prompt completes. Messages older than the last 3 steps are compacted using three strategies:
+
+1. **ReasoningPart** — removed entirely. Raw thinking has no value once the step is complete; the conclusion is captured in the TextPart.
+
+2. **Tool call/result pairs** — removed entirely from old messages. The model can re-invoke the tool if it needs the data. Error results are preserved since they're small and actionable. Skill directory reads are also preserved.
+
+3. **ToolCallPart inputs** — for preserved calls (errors, skill reads), body content is stripped from `write_file`/`edit_file` inputs. Only the file path is kept.
 
 ```
-Before compaction (9 messages):
-  [user] [assistant] [tool result:  15KB] [assistant] [tool result:  20KB] [assistant] [tool result: 8KB] [assistant] [assistant]
+Before compaction (10 messages, 5 steps):
+  [user] [assistant: reasoning + text + toolcall] [tool: 15KB result]
+  [assistant: reasoning + text + toolcall]        [tool: 20KB result]
+  [assistant: reasoning + text + toolcall]        [tool: 8KB result]
+  [assistant: reasoning + text + toolcall]        [tool: result]
+  [assistant: reasoning + text]
 
 After compaction:
-  [user] [assistant] [tool result: ~500B] [assistant] [tool result: ~500B] [assistant] [tool result: 8KB] [assistant] [assistant]
-                      ^truncated                       ^truncated                       ^kept full
+  [user] [assistant: text]
+         [assistant: text]
+         [assistant: reasoning + text + toolcall] [tool: 8KB result]  ← kept full
+         [assistant: reasoning + text + toolcall] [tool: result]      ← kept full
+         [assistant: reasoning + text]                                ← kept full
 ```
-
-Old tool results are cut at 500 bytes and a `[truncated]` marker is appended so the LLM knows content was omitted. The LLM can re-read any truncated files if needed.
 
 | Setting | Flag |
 |---------|------|
@@ -150,7 +157,7 @@ Old tool results are cut at 500 bytes and a `[truncated]` marker is appended so 
 
 ### Skill Directory Exemption
 
-Files under skill directories are **exempt from truncation** in `compactHistory()`:
+Files under skill directories are **exempt from compaction** in `compactHistory()`:
 
 - `SKILL.md` — skill instructions
 - `scripts/` — executable scripts
