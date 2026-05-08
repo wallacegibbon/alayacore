@@ -79,7 +79,8 @@ func parseKeyValueStrict(content string, target interface{}, skipHyphens bool) [
 	for i := 0; i < t.NumField(); i++ {
 		tag := t.Field(i).Tag.Get("config")
 		if tag != "" {
-			tagToField[tag] = i
+			key, _, _ := strings.Cut(tag, ",")
+			tagToField[key] = i
 		}
 	}
 
@@ -138,7 +139,8 @@ func parseKeyValueWithWarnings(content string, target interface{}, skipHyphens b
 	for i := 0; i < t.NumField(); i++ {
 		tag := t.Field(i).Tag.Get("config")
 		if tag != "" {
-			tagToField[tag] = i
+			key, _, _ := strings.Cut(tag, ",")
+			tagToField[key] = i
 		}
 	}
 

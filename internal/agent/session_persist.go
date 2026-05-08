@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -65,38 +64,10 @@ func (s *Session) saveSessionToFile(path string) error {
 // Markdown Format (TLV encoding)
 // ============================================================================
 
-// formatFrontmatter writes the frontmatter using struct tags for field names.
+// formatFrontmatter writes the frontmatter using config.FormatKeyValue,
+// which derives field names from `config` struct tags on SessionMeta.
 func formatFrontmatter(meta *SessionMeta) string {
-	var buf strings.Builder
-	buf.WriteString("---\n")
-
-	// Always write both fields for consistent format
-	buf.WriteString("created_at: ")
-	buf.WriteString(meta.CreatedAt.Format(time.RFC3339))
-	buf.WriteString("\n")
-
-	buf.WriteString("updated_at: ")
-	buf.WriteString(meta.UpdatedAt.Format(time.RFC3339))
-	buf.WriteString("\n")
-
-	buf.WriteString("think_level: ")
-	buf.WriteString(strconv.Itoa(meta.ThinkLevel))
-	buf.WriteString("\n")
-
-	if meta.ActiveModel != "" {
-		buf.WriteString("active_model: \"")
-		buf.WriteString(escapeQuoted(meta.ActiveModel))
-		buf.WriteString("\"\n")
-	}
-
-	if meta.ContextTokens > 0 {
-		buf.WriteString("context_tokens: ")
-		buf.WriteString(strconv.FormatInt(meta.ContextTokens, 10))
-		buf.WriteString("\n")
-	}
-
-	buf.WriteString("---\n")
-	return buf.String()
+	return "---\n" + config.FormatKeyValue(meta) + "---\n"
 }
 
 // formatSessionMarkdown converts SessionData to markdown format with TLV encoding.

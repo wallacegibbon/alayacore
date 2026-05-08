@@ -105,8 +105,8 @@ type SessionMeta struct {
 	CreatedAt     time.Time `config:"created_at"`
 	UpdatedAt     time.Time `config:"updated_at"`
 	ThinkLevel    int       `config:"think_level"`
-	ActiveModel   string    `config:"active_model"`
-	ContextTokens int64     `config:"context_tokens"`
+	ActiveModel   string    `config:"active_model,omitempty"`
+	ContextTokens int64     `config:"context_tokens,omitempty"`
 }
 
 // SessionData is the persisted form of a Session.
