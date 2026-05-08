@@ -414,6 +414,23 @@ func (s *Session) GetRuntimeManager() *RuntimeManager {
 	return s.RuntimeManager
 }
 
+// createProviderAndAgent creates a new provider and agent for the given model config.
+// This is the single source of truth for provider/agent construction.
+func (s *Session) createProviderAndAgent(modelConfig *ModelConfig) (llm.Provider, *llm.Agent, error) {
+	provider, err := createProviderFromConfig(modelConfig, s.debugAPI, s.proxyURL)
+	if err != nil {
+		return nil, nil, err
+	}
+	agent := llm.NewAgent(llm.AgentConfig{
+		Provider:          provider,
+		Tools:             s.baseTools,
+		SystemPrompt:      s.systemPrompt,
+		ExtraSystemPrompt: s.extraSystemPrompt,
+		MaxSteps:          s.maxSteps,
+	})
+	return provider, agent, nil
+}
+
 func (s *Session) ensureAgentInitialized() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -431,23 +448,14 @@ func (s *Session) ensureAgentInitialized() string {
 		return "No model configured. Please add a model to ~/.alayacore/model.conf"
 	}
 
-	provider, err := createProviderFromConfig(activeModel, s.debugAPI, s.proxyURL)
+	provider, agent, err := s.createProviderAndAgent(activeModel)
 	if err != nil {
 		return "Failed to create provider: " + err.Error()
 	}
 
-	agent := llm.NewAgent(llm.AgentConfig{
-		Provider:          provider,
-		Tools:             s.baseTools,
-		SystemPrompt:      s.systemPrompt,
-		ExtraSystemPrompt: s.extraSystemPrompt,
-		MaxSteps:          s.maxSteps,
-	})
-
 	s.Agent = agent
 	s.Provider = provider
 
-	// Apply context limit (we already hold s.mu).
 	if activeModel.ContextLimit > 0 {
 		s.ContextLimit = int64(activeModel.ContextLimit)
 	}
@@ -456,18 +464,10 @@ func (s *Session) ensureAgentInitialized() string {
 }
 
 func (s *Session) initAgentFromConfig(modelConfig *ModelConfig) error {
-	provider, err := createProviderFromConfig(modelConfig, s.debugAPI, s.proxyURL)
+	provider, agent, err := s.createProviderAndAgent(modelConfig)
 	if err != nil {
 		return err
 	}
-
-	agent := llm.NewAgent(llm.AgentConfig{
-		Provider:          provider,
-		Tools:             s.baseTools,
-		SystemPrompt:      s.systemPrompt,
-		ExtraSystemPrompt: s.extraSystemPrompt,
-		MaxSteps:          s.maxSteps,
-	})
 
 	s.mu.Lock()
 	s.Agent = agent
