@@ -29,7 +29,7 @@ import (
 	"github.com/alayacore/alayacore/internal/stream"
 )
 
-// toolResultSentinel separates tool call content from tool result in write_file/edit_file windows.
+// toolResultSentinel separates tool call content from tool result in tool windows.
 // Uses null bytes which can't appear in valid UTF-8 content or file data.
 const toolResultSentinel = "\x00__TOOL_RESULT__\x00"
 
@@ -360,8 +360,8 @@ func (wb *WindowBuffer) AppendOrUpdate(id string, tag string, content string) {
 
 	if idx, ok := wb.idIndex[id]; ok {
 		w := wb.Windows[idx]
-		// Insert dimmed separator before result for write_file/edit_file
-		if w.IsToolWindow() && (w.ToolName == "write_file" || w.ToolName == "edit_file") {
+		// Separator between call and result for content-heavy tool windows.
+		if w.ToolName == "write_file" || w.ToolName == "edit_file" {
 			w.AppendContent("\n"+toolResultSentinel+"\n", innerWidth)
 		}
 		w.AppendContent(content, innerWidth)

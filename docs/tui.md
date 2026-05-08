@@ -66,6 +66,10 @@ Note: `:quit` / `:q` and `:help` are handled directly by each adaptor (terminal 
 
 The display area organizes content into separate windows — one per message or tool call. Windows have synchronized widths and can be navigated independently.
 
+### Tool Result Separator
+
+`write_file` and `edit_file` windows insert a dimmed `───` separator between the tool call (showing the file path) and the tool result. This visually separates the content-heavy input from the output. Other tool windows (e.g. `read_file`, `execute_command`) don't use a separator — their call header is short and the result follows directly.
+
 ### Auto-Follow
 
 When new windows appear, the cursor automatically moves to the newest one. Pressing `k`, `g`, `H`, `M`, `K`, `Ctrl+D`, `Ctrl+U`, `e`, `f`, or `b` disables auto-follow. Pressing `G` (go to last window) re-enables it.
