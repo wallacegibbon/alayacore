@@ -202,7 +202,7 @@ func TestCompactHistory_RecentEditFileInputPreserved(t *testing.T) {
 				t.Fatalf("failed to parse input: %v", err)
 			}
 			if parsed.OldString == "" {
-				t.Error("recent edit_file input should not be compacted")
+				t.Error("recent edit_file input should not be stripped")
 			}
 		}
 	}
@@ -248,9 +248,9 @@ func TestCompactHistory_ErrorResultsPreserved(t *testing.T) {
 	}
 }
 
-func TestCompactHistory_ErrorWriteFileInputCompacted(t *testing.T) {
-	// A write_file call whose result is an error — the call is preserved but
-	// its input is compacted (content stripped, path kept).
+func TestCompactHistory_ErrorWriteFileInputPreserved(t *testing.T) {
+	// A write_file call whose result is an error — the call is preserved
+	// with its full input (path AND content) so the model has context for debugging.
 	msgs := []llm.Message{
 		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "write it"}}},
 		{Role: llm.RoleAssistant, Content: []llm.ContentPart{
@@ -287,8 +287,8 @@ func TestCompactHistory_ErrorWriteFileInputCompacted(t *testing.T) {
 		if parsed.Path != "/tmp/out.txt" {
 			t.Errorf("path = %q, want /tmp/out.txt", parsed.Path)
 		}
-		if parsed.Content != "" {
-			t.Errorf("content should be stripped, got %q", parsed.Content)
+		if parsed.Content != "hello world" {
+			t.Errorf("content should be preserved for error results, got %q", parsed.Content)
 		}
 		return
 	}
@@ -397,87 +397,6 @@ func TestCompactHistory_DirtyFlagSet(t *testing.T) {
 	s.compactHistory()
 	if !s.sessionDirty {
 		t.Error("sessionDirty should be true after compaction modifies content")
-	}
-}
-
-func TestCompactToolCallInput_WriteFile(t *testing.T) {
-	tc := llm.ToolCallPart{
-		Type:       "tool_use",
-		ToolCallID: "w1",
-		ToolName:   "write_file",
-		Input:      json.RawMessage(`{"path":"/tmp/f","content":"hello"}`),
-	}
-	result := compactToolCallInput(tc)
-	if result == nil {
-		t.Fatal("write_file inputs should be compacted")
-		return // satisfy staticcheck
-	}
-	var parsed struct {
-		Path    string `json:"path"`
-		Content string `json:"content"`
-	}
-	if err := json.Unmarshal(result.Input, &parsed); err != nil {
-		t.Fatalf("compacted input should be valid JSON: %v", err)
-	}
-	if parsed.Path != "/tmp/f" {
-		t.Errorf("path = %q, want /tmp/f", parsed.Path)
-	}
-	if parsed.Content != "" {
-		t.Errorf("content should be stripped, got %q", parsed.Content)
-	}
-}
-
-func TestCompactToolCallInput_EditFile(t *testing.T) {
-	tc := llm.ToolCallPart{
-		Type:       "tool_use",
-		ToolCallID: "ed1",
-		ToolName:   "edit_file",
-		Input:      json.RawMessage(`{"path":"/tmp/f","old_string":"aaa","new_string":"bbb"}`),
-	}
-	result := compactToolCallInput(tc)
-	if result == nil {
-		t.Fatal("edit_file inputs should be compacted")
-		return // satisfy staticcheck
-	}
-	var parsed struct {
-		Path      string `json:"path"`
-		OldString string `json:"old_string"`
-	}
-	if err := json.Unmarshal(result.Input, &parsed); err != nil {
-		t.Fatalf("compacted input should be valid JSON: %v", err)
-	}
-	if parsed.Path != "/tmp/f" {
-		t.Errorf("path = %q, want /tmp/f", parsed.Path)
-	}
-	if parsed.OldString != "" {
-		t.Errorf("old_string should be stripped, got %q", parsed.OldString)
-	}
-}
-
-func TestCompactToolCallInput_OtherTools(t *testing.T) {
-	tc := llm.ToolCallPart{
-		Type:       "tool_use",
-		ToolCallID: "sc1",
-		ToolName:   "search_content",
-		Input:      json.RawMessage(`{"pattern":"foo","path":"/tmp"}`),
-	}
-	result := compactToolCallInput(tc)
-	if result != nil {
-		t.Error("search_content inputs should not be compacted")
-	}
-}
-
-func TestCompactToolCallInput_Idempotent(t *testing.T) {
-	// Already compacted: only path field present.
-	tc := llm.ToolCallPart{
-		Type:       "tool_use",
-		ToolCallID: "w1",
-		ToolName:   "write_file",
-		Input:      json.RawMessage(`{"path":"/tmp/f"}`),
-	}
-	result := compactToolCallInput(tc)
-	if result != nil {
-		t.Error("already-compacted input should return nil (no change needed)")
 	}
 }
 

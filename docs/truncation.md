@@ -125,15 +125,13 @@ Note: `search_content` uses only truncation for limiting output. Ripgrep returns
 
 ### History Compaction
 
-`compactHistory()` compacts old messages to save context tokens. In long agent sessions, reasoning blocks, tool results, and large tool call inputs accumulate and consume increasing amounts of context.
+`compactHistory()` compacts old messages to save context tokens. In long agent sessions, reasoning blocks and tool results accumulate and consume increasing amounts of context.
 
-`compactHistory()` is called after each user prompt completes. Messages older than the last 3 steps are compacted using three strategies:
+`compactHistory()` is called after each user prompt completes. Messages older than the last 3 steps are compacted using two strategies:
 
 1. **ReasoningPart** — removed entirely. Raw thinking has no value once the step is complete; the conclusion is captured in the TextPart.
 
-2. **Tool call/result pairs** — removed entirely from old messages. The model can re-invoke the tool if it needs the data. Error results are preserved since they're small and actionable. Skill directory reads are also preserved.
-
-3. **ToolCallPart inputs** — for preserved calls (errors, skill reads), body content is stripped from `write_file`/`edit_file` inputs. Only the file path is kept.
+2. **Tool call/result pairs** — removed entirely from old messages. The model can re-invoke the tool if it needs the data. Error results are preserved since they're small and actionable. Skill directory reads are also preserved. Preserved calls keep their full input for debugging context.
 
 ```
 Before compaction (10 messages, 5 steps):

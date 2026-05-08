@@ -2,18 +2,14 @@ package agent
 
 // Session compaction: compacts old messages to save context tokens.
 //
-// Three compaction strategies are applied to messages outside the recent window:
+// Two compaction strategies are applied to messages outside the recent window:
 //
 //  1. ReasoningPart — removed entirely. Raw thinking has no value once the step
 //     is complete; the conclusion is captured in the TextPart.
 //
 //  2. ToolResultPart — removed along with its matching ToolCallPart.
-//     The model can re-invoke the tool if it needs the data. Errors are preserved
-//     since they're small and actionable.
-//
-//  3. ToolCallPart inputs — body content stripped from write_file and edit_file
-//     calls (only for calls whose results are preserved, e.g. errors and skill
-//     reads). The path is preserved so the model knows what was touched.
+//     The model can re-invoke the tool if it needs the data. Errors and skill
+//     reads are preserved since they're actionable or serve as instructions.
 
 import (
 	"encoding/json"
@@ -27,9 +23,6 @@ import (
 // Compaction defaults — not user-configurable.
 const (
 	compactKeepSteps = 3 // number of recent agent steps to preserve in full
-
-	toolNameWriteFile = "write_file"
-	toolNameEditFile  = "edit_file"
 )
 
 // cleanIncompleteToolCalls removes incomplete tool calls from messages.
@@ -151,13 +144,7 @@ func compactAssistantParts(msg *llm.Message, keepIDs map[string]bool) bool {
 			changed = true // drop entirely — conclusion is in TextPart
 		case llm.ToolCallPart:
 			if keepIDs[p.ToolCallID] {
-				// Preserved call (error or skill read) — compact input if large.
-				if compacted := compactToolCallInput(p); compacted != nil {
-					filtered = append(filtered, *compacted)
-					changed = true
-				} else {
-					filtered = append(filtered, p)
-				}
+				filtered = append(filtered, p) // preserved as-is
 			} else {
 				changed = true // drop — result is being removed too
 			}
@@ -169,38 +156,6 @@ func compactAssistantParts(msg *llm.Message, keepIDs map[string]bool) bool {
 		msg.Content = filtered
 	}
 	return changed
-}
-
-// compactToolCallInput trims body content from write_file and edit_file inputs,
-// preserving only the file path. Returns nil if no compaction was needed.
-func compactToolCallInput(tc llm.ToolCallPart) *llm.ToolCallPart {
-	if tc.ToolName != toolNameWriteFile && tc.ToolName != toolNameEditFile {
-		return nil
-	}
-	var input struct {
-		Path string `json:"path"`
-	}
-	if err := json.Unmarshal(tc.Input, &input); err != nil || input.Path == "" {
-		return nil
-	}
-	// Already compacted (no content fields) — nothing to do.
-	var check struct {
-		Content   string `json:"content"`
-		OldString string `json:"old_string"`
-	}
-	if err := json.Unmarshal(tc.Input, &check); err != nil {
-		return nil
-	}
-	if check.Content == "" && check.OldString == "" {
-		return nil
-	}
-	newInput, err := json.Marshal(map[string]string{"path": input.Path})
-	if err != nil {
-		return nil
-	}
-	result := tc
-	result.Input = newInput
-	return &result
 }
 
 // compactToolResultParts removes tool results whose calls are also being
