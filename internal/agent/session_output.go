@@ -32,48 +32,43 @@ func (s *Session) writeNotifyf(format string, args ...any) {
 	s.writeNotify(fmt.Sprintf(format, args...))
 }
 
+// writeGapped writes a string TLV frame and flushes. Best effort — errors are ignored.
 func (s *Session) writeGapped(tag string, msg string) {
 	if s.Output == nil {
 		return
 	}
-	//nolint:errcheck // Best effort write, errors ignored
 	_ = stream.WriteTLV(s.Output, tag, msg)
 	s.Output.Flush()
 }
 
+// writeTLVJSON marshals a value to JSON and writes it as a TLV frame. Best effort.
+func (s *Session) writeTLVJSON(tag string, v any) {
+	if s.Output == nil {
+		return
+	}
+	data, _ := json.Marshal(v)
+	_ = stream.WriteTLV(s.Output, tag, string(data))
+	s.Output.Flush()
+}
+
 func (s *Session) writeToolCall(toolName, input, id string) {
-	// Send tool call as JSON via FC tag
-	tc := stream.ToolCallData{
+	s.writeTLVJSON(stream.TagFunctionCall, stream.ToolCallData{
 		ID:    id,
 		Name:  toolName,
 		Input: input,
-	}
-	jsonData, _ := json.Marshal(tc) //nolint:errcheck // Best effort marshal, errors ignored
-	//nolint:errcheck // Best effort write, errors ignored
-	_ = stream.WriteTLV(s.Output, stream.TagFunctionCall, string(jsonData))
-	s.Output.Flush()
+	})
 	s.writeToolResult(id, "pending")
 }
 
 func (s *Session) writeToolOutput(toolCallID string, output string) {
-	// Send tool result as JSON via FR tag
-	tr := stream.ToolResultData{
+	s.writeTLVJSON(stream.TagFunctionResult, stream.ToolResultData{
 		ID:     toolCallID,
 		Output: output,
-	}
-	jsonData, _ := json.Marshal(tr) //nolint:errcheck // Best effort marshal, errors ignored
-	//nolint:errcheck // Best effort write, errors ignored
-	_ = stream.WriteTLV(s.Output, stream.TagFunctionResult, string(jsonData))
-	s.Output.Flush()
+	})
 }
 
 func (s *Session) writeToolResult(toolCallID string, status string) {
-	if s.Output == nil {
-		return
-	}
-	//nolint:errcheck // Best effort write, errors ignored
-	_ = stream.WriteTLV(s.Output, stream.TagFunctionState, stream.WrapDelta(toolCallID, status))
-	s.Output.Flush()
+	s.writeGapped(stream.TagFunctionState, stream.WrapDelta(toolCallID, status))
 }
 
 // ============================================================================
@@ -171,8 +166,5 @@ func (s *Session) sendSystemInfoInternal(activeModelConfig *ModelConfig) {
 		ModelConfigPath:   modelConfigPath,
 		ThinkLevel:        s.thinkLevel,
 	}
-	data, _ := json.Marshal(info) //nolint:errcheck // Best effort marshal, errors ignored
-	//nolint:errcheck // Best effort write, errors ignored
-	_ = stream.WriteTLV(s.Output, stream.TagSystemData, string(data))
-	s.Output.Flush()
+	s.writeTLVJSON(stream.TagSystemData, info)
 }
