@@ -14,8 +14,10 @@ func TestQueueItemUniqueIDs(t *testing.T) {
 	// Create a minimal session
 	session := &Session{
 		taskQueue: make([]QueueItem, 0),
-		Input:     &stream.ChanInput{},
-		Output:    &MockOutput{},
+		SessionConfig: SessionConfig{
+			Input:  &stream.ChanInput{},
+			Output: &MockOutput{},
+		},
 	}
 	session.sessionCtx, session.sessionCancel = context.WithCancel(context.Background())
 	session.cond = sync.NewCond(&session.mu)
@@ -57,8 +59,10 @@ func TestQueueItemUniqueIDs(t *testing.T) {
 func TestDeleteQueueItem(t *testing.T) {
 	session := &Session{
 		taskQueue: make([]QueueItem, 0),
-		Input:     &stream.ChanInput{},
-		Output:    &MockOutput{},
+		SessionConfig: SessionConfig{
+			Input:  &stream.ChanInput{},
+			Output: &MockOutput{},
+		},
 	}
 	session.sessionCtx, session.sessionCancel = context.WithCancel(context.Background())
 	session.cond = sync.NewCond(&session.mu)
@@ -98,8 +102,10 @@ func TestDeleteQueueItem(t *testing.T) {
 func TestQueueItemTypes(t *testing.T) {
 	session := &Session{
 		taskQueue: make([]QueueItem, 0),
-		Input:     &stream.ChanInput{},
-		Output:    &MockOutput{},
+		SessionConfig: SessionConfig{
+			Input:  &stream.ChanInput{},
+			Output: &MockOutput{},
+		},
 	}
 	session.sessionCtx, session.sessionCancel = context.WithCancel(context.Background())
 	session.cond = sync.NewCond(&session.mu)
@@ -132,8 +138,10 @@ func TestQueueItemTypes(t *testing.T) {
 func TestQueueTimestamps(t *testing.T) {
 	session := &Session{
 		taskQueue: make([]QueueItem, 0),
-		Input:     &stream.ChanInput{},
-		Output:    &MockOutput{},
+		SessionConfig: SessionConfig{
+			Input:  &stream.ChanInput{},
+			Output: &MockOutput{},
+		},
 	}
 	session.sessionCtx, session.sessionCancel = context.WithCancel(context.Background())
 	session.cond = sync.NewCond(&session.mu)
@@ -198,8 +206,10 @@ func TestCancelAllTasks(t *testing.T) {
 			session := &Session{
 				taskQueue:  make([]QueueItem, 0),
 				runnerDone: make(chan struct{}),
-				Input:      &stream.ChanInput{},
-				Output:     output,
+				SessionConfig: SessionConfig{
+					Input:  &stream.ChanInput{},
+					Output: output,
+				},
 				inProgress: tt.inProgress,
 			}
 			session.sessionCtx, session.sessionCancel = context.WithCancel(context.Background())
@@ -262,8 +272,10 @@ func TestCancelAllTasks(t *testing.T) {
 func TestPausedOnError(t *testing.T) {
 	session := &Session{
 		taskQueue: make([]QueueItem, 0),
-		Input:     &stream.ChanInput{},
-		Output:    &MockOutput{},
+		SessionConfig: SessionConfig{
+			Input:  &stream.ChanInput{},
+			Output: &MockOutput{},
+		},
 	}
 	session.sessionCtx, session.sessionCancel = context.WithCancel(context.Background())
 	session.cond = sync.NewCond(&session.mu)
@@ -301,8 +313,10 @@ func TestPausedOnError(t *testing.T) {
 func TestSubmitTaskFront(t *testing.T) {
 	session := &Session{
 		taskQueue: make([]QueueItem, 0),
-		Input:     &stream.ChanInput{},
-		Output:    &MockOutput{},
+		SessionConfig: SessionConfig{
+			Input:  &stream.ChanInput{},
+			Output: &MockOutput{},
+		},
 	}
 	session.sessionCtx, session.sessionCancel = context.WithCancel(context.Background())
 	session.cond = sync.NewCond(&session.mu)
@@ -349,8 +363,10 @@ func TestSubmitTaskFront(t *testing.T) {
 func TestPausedOnErrorBlocksDequeue(t *testing.T) {
 	session := &Session{
 		taskQueue: make([]QueueItem, 0),
-		Input:     &stream.ChanInput{},
-		Output:    &MockOutput{},
+		SessionConfig: SessionConfig{
+			Input:  &stream.ChanInput{},
+			Output: &MockOutput{},
+		},
 	}
 	session.sessionCtx, session.sessionCancel = context.WithCancel(context.Background())
 	session.cond = sync.NewCond(&session.mu)
@@ -411,8 +427,10 @@ func TestPausedOnErrorBlocksDequeue(t *testing.T) {
 func TestCommandCanRunWhilePaused(t *testing.T) {
 	session := &Session{
 		taskQueue: make([]QueueItem, 0),
-		Input:     &stream.ChanInput{},
-		Output:    &MockOutput{},
+		SessionConfig: SessionConfig{
+			Input:  &stream.ChanInput{},
+			Output: &MockOutput{},
+		},
 	}
 	session.sessionCtx, session.sessionCancel = context.WithCancel(context.Background())
 	session.cond = sync.NewCond(&session.mu)
@@ -462,8 +480,10 @@ func TestCommandBehindUserPromptWhilePaused(t *testing.T) {
 	// Test that a command behind a user prompt cannot run while paused
 	session := &Session{
 		taskQueue: make([]QueueItem, 0),
-		Input:     &stream.ChanInput{},
-		Output:    &MockOutput{},
+		SessionConfig: SessionConfig{
+			Input:  &stream.ChanInput{},
+			Output: &MockOutput{},
+		},
 	}
 	session.sessionCtx, session.sessionCancel = context.WithCancel(context.Background())
 	session.cond = sync.NewCond(&session.mu)
@@ -514,8 +534,10 @@ func TestCommandBehindUserPromptWhilePaused(t *testing.T) {
 func TestSubmitTaskDoesNotClearPauseWhenQueueNotEmpty(t *testing.T) {
 	session := &Session{
 		taskQueue: make([]QueueItem, 0),
-		Input:     &stream.ChanInput{},
-		Output:    &MockOutput{},
+		SessionConfig: SessionConfig{
+			Input:  &stream.ChanInput{},
+			Output: &MockOutput{},
+		},
 	}
 	session.sessionCtx, session.sessionCancel = context.WithCancel(context.Background())
 	session.cond = sync.NewCond(&session.mu)

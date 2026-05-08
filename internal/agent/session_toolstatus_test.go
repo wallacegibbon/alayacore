@@ -12,7 +12,7 @@ func TestWriteToolResult(t *testing.T) {
 	// Create a mock output to capture TLV messages
 	output := &mockOutput{}
 	session := &Session{
-		Output: output,
+		SessionConfig: SessionConfig{Output: output},
 	}
 
 	// Test success case
@@ -62,8 +62,8 @@ func TestOnToolResultCallback(t *testing.T) {
 	// Create a session with mock output
 	output := &mockOutput{}
 	session := &Session{
-		Output:   output,
-		Messages: []llm.Message{},
+		SessionConfig: SessionConfig{Output: output},
+		Messages:      []llm.Message{},
 	}
 
 	// Create a mock tool result callback (simulating what happens in processPrompt)
@@ -132,7 +132,7 @@ func TestWriteToolCallWithPending(t *testing.T) {
 	// Create a session with mock output
 	output := &mockOutput{}
 	session := &Session{
-		Output: output,
+		SessionConfig: SessionConfig{Output: output},
 	}
 
 	session.writeToolCall("execute_command", `{"command":"ls"}`, "tool123")

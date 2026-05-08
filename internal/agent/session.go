@@ -164,13 +164,10 @@ type Session struct {
 	Messages       []llm.Message
 	Agent          *llm.Agent
 	Provider       llm.Provider
-	SessionFile    string
 	CreatedAt      time.Time
 	TotalSpent     llm.Usage
 	ContextTokens  int64
 	ContextLimit   int64
-	Input          stream.Input
-	Output         stream.Output
 	ModelManager   *ModelManager
 	RuntimeManager *RuntimeManager
 	SkillsManager  *skills.Manager
@@ -240,10 +237,7 @@ func LoadOrNewSession(cfg SessionConfig) (*Session, string) {
 func NewSession(cfg SessionConfig) *Session {
 	sessionCtx, sessionCancel := context.WithCancel(context.Background())
 	s := &Session{
-		SessionFile:          cfg.SessionFile,
 		CreatedAt:            time.Now(),
-		Input:                cfg.Input,
-		Output:               cfg.Output,
 		ModelManager:         NewModelManager(cfg.ModelConfigPath),
 		RuntimeManager:       NewRuntimeManager(cfg.RuntimeConfigPath, cfg.ModelConfigPath),
 		SkillsManager:        cfg.SkillsMgr,
@@ -272,10 +266,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 	sessionCtx, sessionCancel := context.WithCancel(context.Background())
 	s := &Session{
 		Messages:             data.Messages,
-		SessionFile:          cfg.SessionFile,
 		CreatedAt:            data.CreatedAt,
-		Input:                cfg.Input,
-		Output:               cfg.Output,
 		ModelManager:         NewModelManager(cfg.ModelConfigPath),
 		RuntimeManager:       NewRuntimeManager(cfg.RuntimeConfigPath, cfg.ModelConfigPath),
 		SkillsManager:        cfg.SkillsMgr,

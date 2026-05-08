@@ -42,9 +42,11 @@ func TestSaveAndLoadSession(t *testing.T) {
 
 	// Create a minimal session for testing
 	session := &Session{
-		Messages:         sessionData.Messages,
-		Input:            &stream.NopInput{},
-		Output:           &stream.NopOutput{},
+		Messages: sessionData.Messages,
+		SessionConfig: SessionConfig{
+			Input:  &stream.NopInput{},
+			Output: &stream.NopOutput{},
+		},
 		lastSaveMessages: -1,
 		taskQueue:        make([]QueueItem, 0),
 	}
@@ -173,8 +175,10 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 				},
 			},
 		},
-		Input:     &stream.NopInput{},
-		Output:    &stream.NopOutput{},
+		SessionConfig: SessionConfig{
+			Input:  &stream.NopInput{},
+			Output: &stream.NopOutput{},
+		},
 		taskQueue: make([]QueueItem, 0),
 	}
 
@@ -258,8 +262,10 @@ func TestMarkdownFormat_HumanReadable(t *testing.T) {
 				Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "I'm doing well, thanks!"}},
 			},
 		},
-		Input:     &stream.NopInput{},
-		Output:    &stream.NopOutput{},
+		SessionConfig: SessionConfig{
+			Input:  &stream.NopInput{},
+			Output: &stream.NopOutput{},
+		},
 		taskQueue: make([]QueueItem, 0),
 	}
 
@@ -304,8 +310,10 @@ func TestReasoningOnlyMessage(t *testing.T) {
 				Content: []llm.ContentPart{llm.ReasoningPart{Type: "reasoning", Text: "The user is asking about Lisp. I should explain it."}},
 			},
 		},
-		Input:     &stream.NopInput{},
-		Output:    &stream.NopOutput{},
+		SessionConfig: SessionConfig{
+			Input:  &stream.NopInput{},
+			Output: &stream.NopOutput{},
+		},
 		taskQueue: make([]QueueItem, 0),
 	}
 
@@ -363,8 +371,10 @@ func TestTextAndReasoningInSameMessage(t *testing.T) {
 				},
 			},
 		},
-		Input:     &stream.NopInput{},
-		Output:    &stream.NopOutput{},
+		SessionConfig: SessionConfig{
+			Input:  &stream.NopInput{},
+			Output: &stream.NopOutput{},
+		},
 		taskQueue: make([]QueueItem, 0),
 	}
 
@@ -413,9 +423,11 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 
 	// Create a session with a model manager
 	session := &Session{
-		Messages:     []llm.Message{},
-		Input:        &stream.NopInput{},
-		Output:       output,
+		Messages: []llm.Message{},
+		SessionConfig: SessionConfig{
+			Input:  &stream.NopInput{},
+			Output: output,
+		},
 		taskQueue:    make([]QueueItem, 0),
 		ModelManager: NewModelManager(""),
 	}
@@ -712,8 +724,10 @@ func TestTLVFormatRecursionProtection(t *testing.T) {
 				Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Here's the file content..."}},
 			},
 		},
-		Input:     &stream.NopInput{},
-		Output:    &stream.NopOutput{},
+		SessionConfig: SessionConfig{
+			Input:  &stream.NopInput{},
+			Output: &stream.NopOutput{},
+		},
 		taskQueue: make([]QueueItem, 0),
 	}
 
