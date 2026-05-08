@@ -28,7 +28,7 @@ type outputWriter struct {
 	dirty             atomic.Bool // true when display needs refresh
 	inProgress        bool        // Whether session has task in progress
 	styles            *Styles     // UI styles
-	nextWindowID      int         // Monotonic counter for generating window IDs
+	nextWindowID      atomic.Int64 // Monotonic counter for generating window IDs
 	models            []agentpkg.ModelInfo
 	activeModelID     int         // Current active model ID
 	hasModels         bool        // Whether models are configured
@@ -305,8 +305,7 @@ func (to *outputWriter) GetQueueItems() []QueueItem {
 
 // generateWindowID returns a unique window ID for non-delta messages.
 func (to *outputWriter) generateWindowID() string {
-	to.nextWindowID++
-	return fmt.Sprintf("win%d", to.nextWindowID)
+	return fmt.Sprintf("win%d", to.nextWindowID.Add(1))
 }
 
 // SetWindowWidth updates the window buffer width.
