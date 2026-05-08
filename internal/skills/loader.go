@@ -42,9 +42,9 @@ func (m *Manager) discoverSkills() error {
 	for _, skillDir := range m.skillDirs {
 		entries, err := os.ReadDir(skillDir)
 		if err != nil {
-			// If directory doesn't exist, that's OK - no skills
+			// If directory doesn't exist, that's OK - skip it
 			if os.IsNotExist(err) {
-				return nil
+				continue
 			}
 			return err
 		}

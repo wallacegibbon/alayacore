@@ -264,6 +264,47 @@ description: Second skill from directory 2
 	}
 }
 
+func TestMultipleSkillPathsFirstMissing(t *testing.T) {
+	// Suppress warnings during this test
+	original := warnWriter
+	warnWriter = io.Discard
+	defer func() { warnWriter = original }()
+
+	missingDir := filepath.Join(t.TempDir(), "nonexistent")
+
+	// Create a real skill directory
+	tmpDir := t.TempDir()
+	skillDir := filepath.Join(tmpDir, "skill-two")
+	if err := os.Mkdir(skillDir, 0755); err != nil {
+		t.Fatalf("Failed to create skill dir: %v", err)
+	}
+
+	skillFile := filepath.Join(skillDir, "SKILL.md")
+	skillContent := `---
+name: skill-two
+description: Skill from second directory
+---
+
+# Skill Two`
+	if err := os.WriteFile(skillFile, []byte(skillContent), 0644); err != nil {
+		t.Fatalf("Failed to write skill file: %v", err)
+	}
+
+	// First path doesn't exist — should still discover skills from second path
+	m, err := NewManager([]string{missingDir, tmpDir})
+	if err != nil {
+		t.Fatalf("NewManager failed: %v", err)
+	}
+
+	metadata := m.GetMetadata()
+	if len(metadata) != 1 {
+		t.Fatalf("Expected 1 skill (from second dir), got %d", len(metadata))
+	}
+	if metadata[0].Name != "skill-two" {
+		t.Errorf("Expected skill name 'skill-two', got '%s'", metadata[0].Name)
+	}
+}
+
 func TestDuplicateSkillNames(t *testing.T) {
 	// Suppress warnings during this test
 	original := warnWriter
