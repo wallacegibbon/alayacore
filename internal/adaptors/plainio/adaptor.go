@@ -15,6 +15,9 @@ import (
 	"github.com/alayacore/alayacore/internal/stream"
 )
 
+// Compile-time check: Adaptor satisfies app.Adaptor.
+var _ app.Adaptor = (*Adaptor)(nil)
+
 // Adaptor reads prompts from stdin and prints assistant output to stdout.
 type Adaptor struct {
 	Config *app.Config

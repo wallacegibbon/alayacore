@@ -15,6 +15,9 @@ import (
 	"github.com/alayacore/alayacore/internal/stream"
 )
 
+// Compile-time check: Adaptor satisfies app.Adaptor.
+var _ app.Adaptor = (*Adaptor)(nil)
+
 const defaultThemeName = "theme-dark"
 
 // Adaptor starts the TUI; use from main/app.
