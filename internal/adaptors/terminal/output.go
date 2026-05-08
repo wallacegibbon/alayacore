@@ -206,59 +206,64 @@ func (to *outputWriter) triggerUpdateForTag(tag string) {
 
 // handleSystemTag processes system information tags
 func (to *outputWriter) handleSystemTag(value string) {
-	// Try to parse as SystemInfo
 	var info agentpkg.SystemInfo
-	if err := json.Unmarshal([]byte(value), &info); err == nil {
-		// Save step info when task completes (transition from in-progress to done)
-		if to.inProgress && !info.InProgress && to.maxSteps > 0 {
-			to.lastCurrentStep = to.currentStep
-			to.lastMaxSteps = to.maxSteps
-			to.lastTaskError = info.TaskError
-		}
-		// Reset last step info when new task starts (transition from not-in-progress to in-progress)
-		if !to.inProgress && info.InProgress {
-			to.lastCurrentStep = 0
-			to.lastMaxSteps = 0
-			to.lastTaskError = false
-		}
-
-		to.inProgress = info.InProgress
-		to.queueCount = len(info.QueueItems)
-		to.contextTokens = info.ContextTokens
-		to.contextLimit = info.ContextLimit
-		// Store model info
-		to.models = info.Models
-		to.activeModelID = info.ActiveModelID
-		to.hasModels = info.HasModels
-		to.modelConfigPath = info.ModelConfigPath
-		to.activeModelName = info.ActiveModelName
-
-		// Store queue items (always update, even if empty)
-		items := make([]QueueItem, len(info.QueueItems))
-		for i, item := range info.QueueItems {
-			createdAt, err := time.Parse(time.RFC3339, item.CreatedAt)
-			if err != nil {
-				createdAt = time.Now()
-			}
-			items[i] = QueueItem{
-				QueueID:   item.QueueID,
-				Type:      item.Type,
-				Content:   item.Content,
-				CreatedAt: createdAt,
-			}
-		}
-		to.pendingQueueItems = items
-
-		// Store step info
-		to.currentStep = info.CurrentStep
-		to.maxSteps = info.MaxSteps
-
-		// Store think state
-		to.thinkLevel = info.ThinkLevel
-
-		// Mark display as dirty so tick handler picks up changes
-		to.dirty.Store(true)
+	if err := json.Unmarshal([]byte(value), &info); err != nil {
+		return
 	}
+	to.updateStepTracking(info)
+	to.updateModelState(info)
+	to.updateQueueItems(info)
+	to.currentStep = info.CurrentStep
+	to.maxSteps = info.MaxSteps
+	to.thinkLevel = info.ThinkLevel
+	to.dirty.Store(true)
+}
+
+// updateStepTracking handles the step-info bookkeeping around task transitions.
+func (to *outputWriter) updateStepTracking(info agentpkg.SystemInfo) {
+	// Save step info when task completes (transition from in-progress to done)
+	if to.inProgress && !info.InProgress && to.maxSteps > 0 {
+		to.lastCurrentStep = to.currentStep
+		to.lastMaxSteps = to.maxSteps
+		to.lastTaskError = info.TaskError
+	}
+	// Reset last step info when new task starts (transition from not-in-progress to in-progress)
+	if !to.inProgress && info.InProgress {
+		to.lastCurrentStep = 0
+		to.lastMaxSteps = 0
+		to.lastTaskError = false
+	}
+	to.inProgress = info.InProgress
+	to.queueCount = len(info.QueueItems)
+	to.contextTokens = info.ContextTokens
+	to.contextLimit = info.ContextLimit
+}
+
+// updateModelState updates cached model-related fields from SystemInfo.
+func (to *outputWriter) updateModelState(info agentpkg.SystemInfo) {
+	to.models = info.Models
+	to.activeModelID = info.ActiveModelID
+	to.hasModels = info.HasModels
+	to.modelConfigPath = info.ModelConfigPath
+	to.activeModelName = info.ActiveModelName
+}
+
+// updateQueueItems converts and stores the queue items from SystemInfo.
+func (to *outputWriter) updateQueueItems(info agentpkg.SystemInfo) {
+	items := make([]QueueItem, len(info.QueueItems))
+	for i, item := range info.QueueItems {
+		createdAt, err := time.Parse(time.RFC3339, item.CreatedAt)
+		if err != nil {
+			createdAt = time.Now()
+		}
+		items[i] = QueueItem{
+			QueueID:   item.QueueID,
+			Type:      item.Type,
+			Content:   item.Content,
+			CreatedAt: createdAt,
+		}
+	}
+	to.pendingQueueItems = items
 }
 
 // SnapshotStatus returns a consistent point-in-time view of session status.
