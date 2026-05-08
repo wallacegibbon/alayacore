@@ -84,11 +84,18 @@ func formatFieldValue(v reflect.Value) string {
 	}
 }
 
-// escapeQuotedStr escapes special characters and wraps the result in double quotes.
-func escapeQuotedStr(s string) string {
+// EscapeQuoted escapes special characters in a string for safe inclusion
+// in a double-quoted config value. It escapes backslashes, double quotes,
+// newlines, and carriage returns.
+func EscapeQuoted(s string) string {
 	s = strings.ReplaceAll(s, `\`, `\\`)
 	s = strings.ReplaceAll(s, `"`, `\"`)
 	s = strings.ReplaceAll(s, "\n", `\n`)
 	s = strings.ReplaceAll(s, "\r", `\r`)
-	return `"` + s + `"`
+	return s
+}
+
+// escapeQuotedStr escapes a string and wraps it in double quotes.
+func escapeQuotedStr(s string) string {
+	return `"` + EscapeQuoted(s) + `"`
 }
