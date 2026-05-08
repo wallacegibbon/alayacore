@@ -72,11 +72,11 @@ func cleanIncompleteToolCalls(messages []llm.Message) []llm.Message {
 // Files under skill directories are never truncated — skill instructions
 // and their supporting files must remain intact for the LLM to follow.
 func (s *Session) compactHistory() {
-	if !s.compactEnabled {
+	if !s.cfg.compactEnabled {
 		return
 	}
 	// Each agent step is typically 2 messages (tool call + tool result)
-	recentMessages := s.compactKeepSteps * 2
+	recentMessages := s.cfg.compactKeepSteps * 2
 	msgs := s.Messages
 	truncateBoundary := len(msgs) - recentMessages
 	if truncateBoundary <= 0 {
@@ -91,7 +91,7 @@ func (s *Session) compactHistory() {
 		case llm.RoleAssistant:
 			s.collectSkillDirReads(msg, skillReadIDs)
 		case llm.RoleTool:
-			if s.truncateToolResultsInMessage(msg, i, skillReadIDs, s.compactTruncateLen) {
+			if s.truncateToolResultsInMessage(msg, i, skillReadIDs, s.cfg.compactTruncateLen) {
 				dirty = true
 			}
 		}
@@ -104,7 +104,7 @@ func (s *Session) compactHistory() {
 // collectSkillDirReads extracts tool call IDs for read_file calls targeting
 // files under any skill directory.
 func (s *Session) collectSkillDirReads(msg llm.Message, skillReadIDs map[string]bool) {
-	if len(s.skillDirs) == 0 {
+	if len(s.cfg.skillDirs) == 0 {
 		return
 	}
 	for _, part := range msg.Content {
@@ -122,7 +122,7 @@ func (s *Session) collectSkillDirReads(msg llm.Message, skillReadIDs map[string]
 		if abs, err := filepath.Abs(input.Path); err == nil {
 			absPath = abs
 		}
-		for _, dir := range s.skillDirs {
+		for _, dir := range s.cfg.skillDirs {
 			if strings.HasPrefix(absPath+string(os.PathSeparator), dir+string(os.PathSeparator)) {
 				skillReadIDs[tc.ToolCallID] = true
 				break
