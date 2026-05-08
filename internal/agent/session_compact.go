@@ -72,7 +72,7 @@ func cleanIncompleteToolCalls(messages []llm.Message) []llm.Message {
 // Files under skill directories are never truncated — skill instructions
 // and their supporting files must remain intact for the LLM to follow.
 func (s *Session) compactHistory() {
-	if !s.compactEnabled {
+	if s.NoCompact {
 		return
 	}
 	// Each agent step is typically 2 messages (tool call + tool result)

@@ -173,13 +173,11 @@ type Session struct {
 	SkillsManager  *skills.Manager
 	SessionConfig  // embedded — immutable config set once at construction
 	// Derived from SessionConfig at construction time (read-only after):
-	compactEnabled       bool
-	autoSummarizeEnabled bool
-	skillDirs            []string
-	thinkLevel           int   // mutable — changed by SetThinkLevel
-	initError            error // Set during construction if --model refers to a non-existent model
-	lastSaveMessages     int   // len(s.Messages) at last successful auto-save; -1 means never saved
-	sessionDirty         bool  // set when messages change in a way the count doesn't capture (e.g. compaction)
+	skillDirs        []string
+	thinkLevel       int   // mutable — changed by SetThinkLevel
+	initError        error // Set during construction if --model refers to a non-existent model
+	lastSaveMessages int   // len(s.Messages) at last successful auto-save; -1 means never saved
+	sessionDirty     bool  // set when messages change in a way the count doesn't capture (e.g. compaction)
 
 	taskQueue     []QueueItem
 	cond          *sync.Cond         // signals when taskQueue becomes non-empty or pausedOnError clears
@@ -237,20 +235,18 @@ func LoadOrNewSession(cfg SessionConfig) (*Session, string) {
 func NewSession(cfg SessionConfig) *Session {
 	sessionCtx, sessionCancel := context.WithCancel(context.Background())
 	s := &Session{
-		CreatedAt:            time.Now(),
-		ModelManager:         NewModelManager(cfg.ModelConfigPath),
-		RuntimeManager:       NewRuntimeManager(cfg.RuntimeConfigPath, cfg.ModelConfigPath),
-		SkillsManager:        cfg.SkillsMgr,
-		SessionConfig:        cfg,
-		compactEnabled:       !cfg.NoCompact,
-		autoSummarizeEnabled: cfg.AutoSummarize,
-		skillDirs:            buildSkillDirSet(cfg.SkillsMgr),
-		thinkLevel:           config.DefaultThinkLevel,
-		lastSaveMessages:     -1,
-		taskQueue:            make([]QueueItem, 0),
-		sessionCtx:           sessionCtx,
-		sessionCancel:        sessionCancel,
-		runnerDone:           make(chan struct{}),
+		CreatedAt:        time.Now(),
+		ModelManager:     NewModelManager(cfg.ModelConfigPath),
+		RuntimeManager:   NewRuntimeManager(cfg.RuntimeConfigPath, cfg.ModelConfigPath),
+		SkillsManager:    cfg.SkillsMgr,
+		SessionConfig:    cfg,
+		skillDirs:        buildSkillDirSet(cfg.SkillsMgr),
+		thinkLevel:       config.DefaultThinkLevel,
+		lastSaveMessages: -1,
+		taskQueue:        make([]QueueItem, 0),
+		sessionCtx:       sessionCtx,
+		sessionCancel:    sessionCancel,
+		runnerDone:       make(chan struct{}),
 	}
 	s.initModelManager()
 	s.applyModelOverride()
@@ -265,22 +261,20 @@ func NewSession(cfg SessionConfig) *Session {
 func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 	sessionCtx, sessionCancel := context.WithCancel(context.Background())
 	s := &Session{
-		Messages:             data.Messages,
-		CreatedAt:            data.CreatedAt,
-		ModelManager:         NewModelManager(cfg.ModelConfigPath),
-		RuntimeManager:       NewRuntimeManager(cfg.RuntimeConfigPath, cfg.ModelConfigPath),
-		SkillsManager:        cfg.SkillsMgr,
-		SessionConfig:        cfg,
-		compactEnabled:       !cfg.NoCompact,
-		autoSummarizeEnabled: cfg.AutoSummarize,
-		skillDirs:            buildSkillDirSet(cfg.SkillsMgr),
-		thinkLevel:           data.ThinkLevel,
-		ContextTokens:        data.ContextTokens,
-		lastSaveMessages:     len(data.Messages),
-		taskQueue:            make([]QueueItem, 0),
-		sessionCtx:           sessionCtx,
-		sessionCancel:        sessionCancel,
-		runnerDone:           make(chan struct{}),
+		Messages:         data.Messages,
+		CreatedAt:        data.CreatedAt,
+		ModelManager:     NewModelManager(cfg.ModelConfigPath),
+		RuntimeManager:   NewRuntimeManager(cfg.RuntimeConfigPath, cfg.ModelConfigPath),
+		SkillsManager:    cfg.SkillsMgr,
+		SessionConfig:    cfg,
+		skillDirs:        buildSkillDirSet(cfg.SkillsMgr),
+		thinkLevel:       data.ThinkLevel,
+		ContextTokens:    data.ContextTokens,
+		lastSaveMessages: len(data.Messages),
+		taskQueue:        make([]QueueItem, 0),
+		sessionCtx:       sessionCtx,
+		sessionCancel:    sessionCancel,
+		runnerDone:       make(chan struct{}),
 	}
 	s.initModelManager()
 
@@ -587,7 +581,7 @@ func (s *Session) handleUserPrompt(ctx context.Context, prompt string) {
 }
 
 func (s *Session) shouldAutoSummarize() bool {
-	return s.autoSummarizeEnabled && s.ContextLimit > 0 && s.ContextTokens > 0 &&
+	return s.AutoSummarize && s.ContextLimit > 0 && s.ContextTokens > 0 &&
 		s.ContextTokens >= s.ContextLimit*65/100
 }
 
