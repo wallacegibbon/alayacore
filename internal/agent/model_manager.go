@@ -332,9 +332,7 @@ func (mm *ModelManager) SetActiveToFirst() bool {
 	if len(mm.models) == 0 {
 		return false
 	}
-	if len(mm.models) > 0 {
-		mm.activeID = mm.models[0].ID
-	}
+	mm.activeID = mm.models[0].ID
 	return true
 }
 
