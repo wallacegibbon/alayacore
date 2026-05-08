@@ -156,7 +156,7 @@ func (s *Session) sendSystemInfoInternal(activeModelConfig *ModelConfig) {
 		QueueItems:        queueItems,
 		InProgress:        inProgress,
 		CurrentStep:       currentStep,
-		MaxSteps:          s.cfg.maxSteps,
+		MaxSteps:          s.MaxSteps,
 		TaskError:         s.pausedOnError,
 		Models:            models,
 		ActiveModelID:     activeID,

@@ -159,43 +159,30 @@ type SessionConfig struct {
 // Session Struct
 // ============================================================================
 
-// sessionConfig holds immutable configuration set once at construction.
-// These fields are never modified after NewSession/RestoreFromSession returns.
-type sessionConfig struct {
-	baseTools            []llm.Tool
-	systemPrompt         string
-	extraSystemPrompt    string
-	debugAPI             bool
-	autoSummarizeEnabled bool
-	compactEnabled       bool
-	compactKeepSteps     int
-	compactTruncateLen   int
-	skillDirs            []string
-	maxSteps             int
-	proxyURL             string
-	overrideActiveModel  string
-}
-
 // Session manages conversation state and task execution.
 type Session struct {
-	Messages         []llm.Message
-	Agent            *llm.Agent
-	Provider         llm.Provider
-	SessionFile      string
-	CreatedAt        time.Time
-	TotalSpent       llm.Usage
-	ContextTokens    int64
-	ContextLimit     int64
-	Input            stream.Input
-	Output           stream.Output
-	ModelManager     *ModelManager
-	RuntimeManager   *RuntimeManager
-	SkillsManager    *skills.Manager
-	cfg              sessionConfig
-	thinkLevel       int   // mutable — changed by SetThinkLevel
-	initError        error // Set during construction if --model refers to a non-existent model
-	lastSaveMessages int   // len(s.Messages) at last successful auto-save; -1 means never saved
-	sessionDirty     bool  // set when messages change in a way the count doesn't capture (e.g. compaction)
+	Messages       []llm.Message
+	Agent          *llm.Agent
+	Provider       llm.Provider
+	SessionFile    string
+	CreatedAt      time.Time
+	TotalSpent     llm.Usage
+	ContextTokens  int64
+	ContextLimit   int64
+	Input          stream.Input
+	Output         stream.Output
+	ModelManager   *ModelManager
+	RuntimeManager *RuntimeManager
+	SkillsManager  *skills.Manager
+	SessionConfig  // embedded — immutable config set once at construction
+	// Derived from SessionConfig at construction time (read-only after):
+	compactEnabled       bool
+	autoSummarizeEnabled bool
+	skillDirs            []string
+	thinkLevel           int   // mutable — changed by SetThinkLevel
+	initError            error // Set during construction if --model refers to a non-existent model
+	lastSaveMessages     int   // len(s.Messages) at last successful auto-save; -1 means never saved
+	sessionDirty         bool  // set when messages change in a way the count doesn't capture (e.g. compaction)
 
 	taskQueue     []QueueItem
 	cond          *sync.Cond         // signals when taskQueue becomes non-empty or pausedOnError clears
@@ -253,33 +240,23 @@ func LoadOrNewSession(cfg SessionConfig) (*Session, string) {
 func NewSession(cfg SessionConfig) *Session {
 	sessionCtx, sessionCancel := context.WithCancel(context.Background())
 	s := &Session{
-		SessionFile:    cfg.SessionFile,
-		CreatedAt:      time.Now(),
-		Input:          cfg.Input,
-		Output:         cfg.Output,
-		ModelManager:   NewModelManager(cfg.ModelConfigPath),
-		RuntimeManager: NewRuntimeManager(cfg.RuntimeConfigPath, cfg.ModelConfigPath),
-		SkillsManager:  cfg.SkillsMgr,
-		cfg: sessionConfig{
-			baseTools:            cfg.BaseTools,
-			systemPrompt:         cfg.SystemPrompt,
-			extraSystemPrompt:    cfg.ExtraSystemPrompt,
-			debugAPI:             cfg.DebugAPI,
-			autoSummarizeEnabled: cfg.AutoSummarize,
-			compactEnabled:       !cfg.NoCompact,
-			compactKeepSteps:     cfg.CompactKeepSteps,
-			compactTruncateLen:   cfg.CompactTruncateLen,
-			skillDirs:            buildSkillDirSet(cfg.SkillsMgr),
-			maxSteps:             cfg.MaxSteps,
-			proxyURL:             cfg.ProxyURL,
-			overrideActiveModel:  cfg.OverrideActiveModel,
-		},
-		thinkLevel:       config.DefaultThinkLevel,
-		lastSaveMessages: -1,
-		taskQueue:        make([]QueueItem, 0),
-		sessionCtx:       sessionCtx,
-		sessionCancel:    sessionCancel,
-		runnerDone:       make(chan struct{}),
+		SessionFile:          cfg.SessionFile,
+		CreatedAt:            time.Now(),
+		Input:                cfg.Input,
+		Output:               cfg.Output,
+		ModelManager:         NewModelManager(cfg.ModelConfigPath),
+		RuntimeManager:       NewRuntimeManager(cfg.RuntimeConfigPath, cfg.ModelConfigPath),
+		SkillsManager:        cfg.SkillsMgr,
+		SessionConfig:        cfg,
+		compactEnabled:       !cfg.NoCompact,
+		autoSummarizeEnabled: cfg.AutoSummarize,
+		skillDirs:            buildSkillDirSet(cfg.SkillsMgr),
+		thinkLevel:           config.DefaultThinkLevel,
+		lastSaveMessages:     -1,
+		taskQueue:            make([]QueueItem, 0),
+		sessionCtx:           sessionCtx,
+		sessionCancel:        sessionCancel,
+		runnerDone:           make(chan struct{}),
 	}
 	s.initModelManager()
 	s.applyModelOverride()
@@ -294,35 +271,25 @@ func NewSession(cfg SessionConfig) *Session {
 func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 	sessionCtx, sessionCancel := context.WithCancel(context.Background())
 	s := &Session{
-		Messages:       data.Messages,
-		SessionFile:    cfg.SessionFile,
-		CreatedAt:      data.CreatedAt,
-		Input:          cfg.Input,
-		Output:         cfg.Output,
-		ModelManager:   NewModelManager(cfg.ModelConfigPath),
-		RuntimeManager: NewRuntimeManager(cfg.RuntimeConfigPath, cfg.ModelConfigPath),
-		SkillsManager:  cfg.SkillsMgr,
-		cfg: sessionConfig{
-			baseTools:            cfg.BaseTools,
-			systemPrompt:         cfg.SystemPrompt,
-			extraSystemPrompt:    cfg.ExtraSystemPrompt,
-			debugAPI:             cfg.DebugAPI,
-			autoSummarizeEnabled: cfg.AutoSummarize,
-			compactEnabled:       !cfg.NoCompact,
-			compactKeepSteps:     cfg.CompactKeepSteps,
-			compactTruncateLen:   cfg.CompactTruncateLen,
-			skillDirs:            buildSkillDirSet(cfg.SkillsMgr),
-			maxSteps:             cfg.MaxSteps,
-			proxyURL:             cfg.ProxyURL,
-			overrideActiveModel:  cfg.OverrideActiveModel,
-		},
-		thinkLevel:       data.ThinkLevel,
-		ContextTokens:    data.ContextTokens,
-		lastSaveMessages: len(data.Messages),
-		taskQueue:        make([]QueueItem, 0),
-		sessionCtx:       sessionCtx,
-		sessionCancel:    sessionCancel,
-		runnerDone:       make(chan struct{}),
+		Messages:             data.Messages,
+		SessionFile:          cfg.SessionFile,
+		CreatedAt:            data.CreatedAt,
+		Input:                cfg.Input,
+		Output:               cfg.Output,
+		ModelManager:         NewModelManager(cfg.ModelConfigPath),
+		RuntimeManager:       NewRuntimeManager(cfg.RuntimeConfigPath, cfg.ModelConfigPath),
+		SkillsManager:        cfg.SkillsMgr,
+		SessionConfig:        cfg,
+		compactEnabled:       !cfg.NoCompact,
+		autoSummarizeEnabled: cfg.AutoSummarize,
+		skillDirs:            buildSkillDirSet(cfg.SkillsMgr),
+		thinkLevel:           data.ThinkLevel,
+		ContextTokens:        data.ContextTokens,
+		lastSaveMessages:     len(data.Messages),
+		taskQueue:            make([]QueueItem, 0),
+		sessionCtx:           sessionCtx,
+		sessionCancel:        sessionCancel,
+		runnerDone:           make(chan struct{}),
 	}
 	s.initModelManager()
 
@@ -394,10 +361,10 @@ func (s *Session) initModelManager() {
 // model config, it becomes the active model. If the name doesn't match
 // any configured model, an error is stored so the caller can report it and exit.
 func (s *Session) applyModelOverride() {
-	if s.cfg.overrideActiveModel == "" || s.ModelManager == nil {
+	if s.OverrideActiveModel == "" || s.ModelManager == nil {
 		return
 	}
-	if err := s.ModelManager.SetActiveByName(s.cfg.overrideActiveModel); err != nil {
+	if err := s.ModelManager.SetActiveByName(s.OverrideActiveModel); err != nil {
 		s.initError = err
 	}
 }
@@ -427,16 +394,16 @@ func (s *Session) GetRuntimeManager() *RuntimeManager {
 // createProviderAndAgent creates a new provider and agent for the given model config.
 // This is the single source of truth for provider/agent construction.
 func (s *Session) createProviderAndAgent(modelConfig *ModelConfig) (llm.Provider, *llm.Agent, error) {
-	provider, err := createProviderFromConfig(modelConfig, s.cfg.debugAPI, s.cfg.proxyURL)
+	provider, err := createProviderFromConfig(modelConfig, s.DebugAPI, s.ProxyURL)
 	if err != nil {
 		return nil, nil, err
 	}
 	agent := llm.NewAgent(llm.AgentConfig{
 		Provider:          provider,
-		Tools:             s.cfg.baseTools,
-		SystemPrompt:      s.cfg.systemPrompt,
-		ExtraSystemPrompt: s.cfg.extraSystemPrompt,
-		MaxSteps:          s.cfg.maxSteps,
+		Tools:             s.BaseTools,
+		SystemPrompt:      s.SystemPrompt,
+		ExtraSystemPrompt: s.ExtraSystemPrompt,
+		MaxSteps:          s.MaxSteps,
 	})
 	return provider, agent, nil
 }
@@ -629,7 +596,7 @@ func (s *Session) handleUserPrompt(ctx context.Context, prompt string) {
 }
 
 func (s *Session) shouldAutoSummarize() bool {
-	return s.cfg.autoSummarizeEnabled && s.ContextLimit > 0 && s.ContextTokens > 0 &&
+	return s.autoSummarizeEnabled && s.ContextLimit > 0 && s.ContextTokens > 0 &&
 		s.ContextTokens >= s.ContextLimit*65/100
 }
 
