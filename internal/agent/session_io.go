@@ -282,6 +282,21 @@ func (s *Session) handleTaskQueueDel(args []string) {
 	}
 }
 
+func (s *Session) handleTaskQueueEdit(args []string) {
+	if len(args) < 2 {
+		s.writeError("usage: :taskqueue_edit <queue_id> <new_content>")
+		return
+	}
+
+	queueID := args[0]
+	newContent := strings.Join(args[1:], " ")
+	if s.UpdateQueueItem(queueID, newContent) {
+		s.sendSystemInfo()
+	} else {
+		s.writeError(domainerrors.Wrapf("taskqueue_edit", domainerrors.ErrQueueItemNotFound, "queue item %s not found", queueID).Error())
+	}
+}
+
 func (s *Session) handleThink(args []string) {
 	if len(args) == 0 {
 		s.writeError("usage: :think [0|1|2]  (0=off, 1=normal, 2=max)")

@@ -99,6 +99,7 @@ var queueManagerKeyBindings = []KeyBinding{
 	{"esc", "Close queue manager", "queue-manager"},
 	{"q", "Close queue manager", "queue-manager"},
 	{"d", "Delete selected queue item", "queue-manager"},
+	{"e", "Edit selected queue item in external editor", "queue-manager"},
 }
 
 // Theme selector key bindings
@@ -314,6 +315,15 @@ func (m *Terminal) handleQueueManagerKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.emitCommand(":taskqueue_del " + selectedItem.QueueID)
 			// Request updated queue list
 			m.emitCommand(":taskqueue_get_all")
+		}
+		return m, nil
+	}
+
+	// Handle 'e' key for edit in external editor
+	if msg.String() == "e" {
+		selectedItem := m.queueManager.GetSelectedItem()
+		if selectedItem != nil {
+			return m, m.editor.OpenForQueue(selectedItem.Content, selectedItem.QueueID)
 		}
 		return m, nil
 	}

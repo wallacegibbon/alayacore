@@ -18,6 +18,7 @@ const (
 	commandNameModelLoad       = "model_load"
 	commandNameTaskQueueGetAll = "taskqueue_get_all"
 	commandNameTaskQueueDel    = "taskqueue_del"
+	commandNameTaskQueueEdit   = "taskqueue_edit"
 	commandNameThink           = "think"
 )
 
@@ -41,6 +42,7 @@ var commandDefs = []Command{
 	{commandNameModelLoad, "Reload models from configuration file", ""},
 	{commandNameTaskQueueGetAll, "List all queued tasks", ""},
 	{commandNameTaskQueueDel, "Delete a queued task", "<queue_id>"},
+	{commandNameTaskQueueEdit, "Edit a queued task's content", "<queue_id> <new_content>"},
 	{commandNameThink, "Set think level (0=off, 1=normal, 2=max)", "[0|1|2]"},
 }
 
@@ -95,6 +97,8 @@ func (s *Session) dispatchCommand(ctx context.Context, cmd string) bool {
 		s.handleTaskQueueGetAll()
 	case commandNameTaskQueueDel:
 		s.handleTaskQueueDel(args)
+	case commandNameTaskQueueEdit:
+		s.handleTaskQueueEdit(args)
 	case commandNameThink:
 		s.handleThink(args)
 	}

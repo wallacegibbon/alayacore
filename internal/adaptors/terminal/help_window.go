@@ -118,6 +118,13 @@ func buildHelpItems() []HelpItem {
 		{Key: "Ctrl+P", Description: "Open theme selector", Type: HelpItemKey},
 		{Key: "Ctrl+Q", Description: "Open queue manager", Type: HelpItemKey},
 
+		// Queue Manager
+		{IsSection: true, Description: "Queue Manager"},
+		{Key: "j/k", Description: "Navigate queue items", Type: HelpItemKey},
+		{Key: "d", Description: "Delete selected queue item", Type: HelpItemKey},
+		{Key: "e", Description: "Edit selected item in editor", Type: HelpItemKey},
+		{Key: "q/esc", Description: "Close queue manager", Type: HelpItemKey},
+
 		// Display Mode
 		{IsSection: true, Description: "Display Mode"},
 		{Key: "j/k", Description: "Move window cursor", Type: HelpItemKey},

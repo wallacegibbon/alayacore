@@ -142,6 +142,10 @@ func (qm *QueueManager) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	case "d":
 		// Delete is handled by parent
 		return nil
+
+	case "e":
+		// Edit is handled by parent
+		return nil
 	}
 
 	return nil
@@ -192,7 +196,7 @@ func (qm *QueueManager) View() string {
 	borderedBox := qm.styles.RenderBorderedBox(content, qm.width, borderColor, listHeight)
 
 	// Help text outside the bordered box
-	helpText := qm.styles.System.Render("j/k: navigate │ d: delete │ q/esc: close")
+	helpText := qm.styles.System.Render("j/k: navigate │ d: delete │ e: edit │ q/esc: close")
 	return borderedBox + "\n" + helpText
 }
 

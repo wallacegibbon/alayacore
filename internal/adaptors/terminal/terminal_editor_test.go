@@ -886,3 +886,81 @@ func TestGetWindowContentRegular(t *testing.T) {
 		t.Errorf("Expected regular content, got: %q", content)
 	}
 }
+
+func TestEKeyInQueueManagerOpensEditor(t *testing.T) {
+	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+
+	// Open queue manager with items
+	items := []QueueItem{
+		{QueueID: "Q1", Type: "prompt", Content: "test content to edit"},
+	}
+	terminal.queueManager.Open()
+	terminal.queueManager.SetItems(items)
+
+	// Press 'e' key while queue manager is open
+	msg := tea.KeyPressMsg(tea.Key{Code: 'e'})
+
+	model, cmd := terminal.Update(msg)
+
+	if model == nil {
+		t.Fatal("Update returned nil model")
+	}
+
+	// Should return a command (editor open)
+	if cmd == nil {
+		t.Fatal("Update returned nil command - should return editor command when 'e' pressed in queue manager with selected item")
+	}
+}
+
+func TestEKeyInQueueManagerNoItems(t *testing.T) {
+	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+
+	// Open queue manager with no items
+	terminal.queueManager.Open()
+	terminal.queueManager.SetItems(nil)
+
+	// Press 'e' key while queue manager is open
+	msg := tea.KeyPressMsg(tea.Key{Code: 'e'})
+
+	model, cmd := terminal.Update(msg)
+
+	if model == nil {
+		t.Fatal("Update returned nil model")
+	}
+
+	// Should NOT return a command (no item to edit)
+	if cmd != nil {
+		t.Fatal("Update should return nil command when no queue item is selected")
+	}
+}
+
+func TestQueueEditorFinishedUpdatesContent(t *testing.T) {
+	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+
+	// Simulate queue editor finishing with updated content
+	msg := queueEditorFinishedMsg{queueID: "Q1", content: "updated content", err: nil}
+
+	model, _ := terminal.Update(msg)
+	if model == nil {
+		t.Fatal("Update returned nil model")
+	}
+}
+
+func TestQueueEditorFinishedWithError(t *testing.T) {
+	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+	terminal.input.SetValue("original input")
+
+	// Simulate queue editor finishing with error
+	msg := queueEditorFinishedMsg{queueID: "Q1", content: "", err: fmt.Errorf("editor failed")}
+
+	model, _ := terminal.Update(msg)
+
+	if model == nil {
+		t.Fatal("Update returned nil model")
+	}
+
+	// Input should remain unchanged
+	if terminal.input.Value() != "original input" {
+		t.Errorf("Input should not be modified after queue editor error, got '%s'", terminal.input.Value())
+	}
+}

@@ -234,3 +234,24 @@ func (s *Session) DeleteQueueItem(queueID string) bool {
 	}
 	return false
 }
+
+// UpdateQueueItem updates the content of a queue item by ID.
+func (s *Session) UpdateQueueItem(queueID, newContent string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for i, item := range s.taskQueue {
+		if item.QueueID == queueID {
+			switch t := item.Task.(type) {
+			case UserPrompt:
+				t.Text = newContent
+				s.taskQueue[i].Task = t
+			case CommandPrompt:
+				t.Command = newContent
+				s.taskQueue[i].Task = t
+			}
+			return true
+		}
+	}
+	return false
+}

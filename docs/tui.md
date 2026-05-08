@@ -52,6 +52,7 @@ Commands are split into two categories:
 | `:think [0\|1\|2]` | Set think level (0=off, 1=normal, 2=max). Default: 1 |
 | `:taskqueue_get_all` | List all queued tasks (used by queue manager UI) |
 | `:taskqueue_del <id>` | Delete a queued task by ID (used by queue manager UI) |
+| `:taskqueue_edit <id> <content>` | Edit a queued task's content by ID (used by queue manager UI) |
 
 **Deferred commands** — enqueued at the front of the task queue; require no task currently running:
 | Command | Action |
@@ -92,6 +93,7 @@ When you submit prompts or commands while a previous task is running, they are q
 | `j`, `↓` | Move selection down |
 | `k`, `↑` | Move selection up |
 | `d` | Delete selected task |
+| `e` | Edit selected task in external editor |
 
 Each queued task shows its queue ID (Q1, Q2, …), type (`P` for prompt, `C` for command), and a truncated content preview.
 

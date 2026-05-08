@@ -226,6 +226,9 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case displayEditorFinishedMsg:
 		return m.handleDisplayEditorFinished(msg)
 
+	case queueEditorFinishedMsg:
+		return m.handleQueueEditorFinished(msg)
+
 	case FileEditorFinishedMsg:
 		return m.handleFileEditorFinished(msg)
 
@@ -333,6 +336,22 @@ func (m *Terminal) handleDisplayEditorFinished(msg displayEditorFinishedMsg) (te
 	return m, nil
 }
 
+// handleQueueEditorFinished handles completion of the external editor for queue item editing.
+func (m *Terminal) handleQueueEditorFinished(msg queueEditorFinishedMsg) (tea.Model, tea.Cmd) {
+	if msg.err != nil {
+		m.out.AppendError("Editor error: %v", msg.err)
+		return m, nil
+	}
+
+	if msg.content != "" && msg.queueID != "" {
+		// Send edit command to session via command pipeline
+		m.emitCommand(":taskqueue_edit " + msg.queueID + " " + msg.content)
+		// Refresh queue list
+		m.emitCommand(":taskqueue_get_all")
+	}
+	return m, nil
+}
+
 // handleEditorStart handles the lazy start of the external editor.
 // This is where the temp file is actually created, ensuring cleanup happens properly.
 func (m *Terminal) handleEditorStart(msg editorStartMsg) (tea.Model, tea.Cmd) {
@@ -354,6 +373,9 @@ func (m *Terminal) handleEditorStart(msg editorStartMsg) (tea.Model, tea.Cmd) {
 			if msg.forDisplay {
 				return displayEditorFinishedMsg{err: err}
 			}
+			if msg.forQueue {
+				return queueEditorFinishedMsg{queueID: msg.queueID, err: err}
+			}
 			return editorFinishedMsg{content: "", err: err}
 		}
 
@@ -364,7 +386,14 @@ func (m *Terminal) handleEditorStart(msg editorStartMsg) (tea.Model, tea.Cmd) {
 
 		content, readErr := os.ReadFile(tmpFileName)
 		if readErr != nil {
+			if msg.forQueue {
+				return queueEditorFinishedMsg{queueID: msg.queueID, err: readErr}
+			}
 			return editorFinishedMsg{content: "", err: readErr}
+		}
+
+		if msg.forQueue {
+			return queueEditorFinishedMsg{queueID: msg.queueID, content: string(content), err: nil}
 		}
 
 		return editorFinishedMsg{content: string(content), err: nil}
@@ -734,12 +763,21 @@ type displayEditorFinishedMsg struct {
 	err error
 }
 
+// queueEditorFinishedMsg is sent when external editor closes (for queue item editing)
+type queueEditorFinishedMsg struct {
+	queueID string
+	content string
+	err     error
+}
+
 // editorStartMsg is sent to trigger actual editor execution (lazy temp file creation)
 type editorStartMsg struct {
 	editorCmd   string
 	editorArgs  []string
 	tmpFileName string
 	forDisplay  bool // true if opening display window content (don't populate input)
+	forQueue    bool // true if editing a queue item
+	queueID     string
 }
 
 // FileEditorFinishedMsg is sent when external editor closes for a specific file
@@ -824,6 +862,34 @@ func (e *Editor) OpenForDisplay(content string) tea.Cmd {
 			editorArgs:  args,
 			tmpFileName: "", // Will be created in handleEditorStart
 			forDisplay:  true,
+		}
+	}
+}
+
+// OpenForQueue opens an external editor to edit a queue item's content.
+// When the editor closes, the content is sent back via queueEditorFinishedMsg.
+func (e *Editor) OpenForQueue(content string, queueID string) tea.Cmd {
+	editorCmd := getEditorCommand(os.Getenv("EDITOR"))
+
+	if editorCmd == "" {
+		return func() tea.Msg {
+			return queueEditorFinishedMsg{queueID: queueID, err: fmt.Errorf("no editor found (tried: %s; set $EDITOR to override)", strings.Join(defaultEditors, ", "))}
+		}
+	}
+
+	cmd, args := splitEditorCmd(editorCmd)
+
+	// Store content for lazy temp file creation
+	e.content = content
+
+	// Return a command that creates the temp file and runs the editor
+	return func() tea.Msg {
+		return editorStartMsg{
+			editorCmd:   cmd,
+			editorArgs:  args,
+			tmpFileName: "", // Will be created in handleEditorStart
+			forQueue:    true,
+			queueID:     queueID,
 		}
 	}
 }
