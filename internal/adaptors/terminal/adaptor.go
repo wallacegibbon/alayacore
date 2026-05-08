@@ -60,6 +60,12 @@ func (a *Adaptor) Start() int {
 		OverrideActiveModel: a.Config.Cfg.ModelName,
 	})
 
+	// --model CLI flag: fail immediately if the named model doesn't exist.
+	if err := session.InitError(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return 1
+	}
+
 	// Load active theme from runtime.conf (default to default theme if not set)
 	activeThemeName := session.GetRuntimeManager().GetActiveTheme()
 	if activeThemeName == "" {

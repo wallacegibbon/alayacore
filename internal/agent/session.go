@@ -187,6 +187,7 @@ type Session struct {
 	proxyURL             string
 	thinkLevel           int
 	overrideActiveModel  string // If set, overrides the active model from runtime config
+	initError            error  // Set during construction if --model refers to a non-existent model
 	lastSaveMessages     int    // len(s.Messages) at last successful auto-save; -1 means never saved
 	sessionDirty         bool   // set when messages change in a way the count doesn't capture (e.g. compaction)
 
@@ -381,12 +382,20 @@ func (s *Session) initModelManager() {
 // applyModelOverride applies the --model CLI flag override.
 // If overrideActiveModel is set and a model with that name exists in the
 // model config, it becomes the active model. If the name doesn't match
-// any configured model, the override is silently ignored.
+// any configured model, an error is stored so the caller can report it and exit.
 func (s *Session) applyModelOverride() {
 	if s.overrideActiveModel == "" || s.ModelManager == nil {
 		return
 	}
-	_ = s.ModelManager.SetActiveByName(s.overrideActiveModel) //nolint:errcheck // silently ignore if model not found
+	if err := s.ModelManager.SetActiveByName(s.overrideActiveModel); err != nil {
+		s.initError = err
+	}
+}
+
+// InitError returns a non-nil error if session construction encountered a
+// fatal problem (e.g. --model specified a non-existent model).
+func (s *Session) InitError() error {
+	return s.initError
 }
 
 // activeModelName returns the display name of the currently active model.

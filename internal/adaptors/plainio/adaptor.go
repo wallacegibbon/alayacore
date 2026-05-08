@@ -56,6 +56,12 @@ func (a *Adaptor) Start() int {
 		OverrideActiveModel: a.Config.Cfg.ModelName,
 	})
 
+	// --model CLI flag: fail immediately if the named model doesn't exist.
+	if err := session.InitError(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return 1
+	}
+
 	// Display config validation messages (unknown protocol_type, missing fields, etc.)
 	// Must come before HasModels() check so specific errors are shown even when
 	// all models are rejected.

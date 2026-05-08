@@ -424,7 +424,7 @@ func (mm *ModelManager) FindModelByName(name string) int {
 func (mm *ModelManager) SetActiveByName(name string) error {
 	id := mm.FindModelByName(name)
 	if id == 0 {
-		return fmt.Errorf("model not found: %s", name)
+		return fmt.Errorf("model not found: %q", name)
 	}
 	return mm.SetActive(id)
 }
