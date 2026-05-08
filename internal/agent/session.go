@@ -161,23 +161,22 @@ type SessionConfig struct {
 
 // Session manages conversation state and task execution.
 type Session struct {
-	Messages       []llm.Message
-	Agent          *llm.Agent
-	Provider       llm.Provider
-	CreatedAt      time.Time
-	TotalSpent     llm.Usage
-	ContextTokens  int64
-	ContextLimit   int64
-	ModelManager   *ModelManager
-	RuntimeManager *RuntimeManager
-	SkillsManager  *skills.Manager
-	SessionConfig  // embedded — immutable config set once at construction
-	// Derived from SessionConfig at construction time (read-only after):
-	skillDirs        []string
-	thinkLevel       int   // mutable — changed by SetThinkLevel
-	initError        error // Set during construction if --model refers to a non-existent model
-	lastSaveMessages int   // len(s.Messages) at last successful auto-save; -1 means never saved
-	sessionDirty     bool  // set when messages change in a way the count doesn't capture (e.g. compaction)
+	Messages         []llm.Message
+	Agent            *llm.Agent
+	Provider         llm.Provider
+	CreatedAt        time.Time
+	TotalSpent       llm.Usage
+	ContextTokens    int64
+	ContextLimit     int64
+	ModelManager     *ModelManager
+	RuntimeManager   *RuntimeManager
+	SkillsManager    *skills.Manager
+	SessionConfig             // embedded — immutable config set once at construction
+	skillDirs        []string // built from SkillsManager at construction; paths exempt from compaction
+	thinkLevel       int      // mutable — changed by SetThinkLevel
+	initError        error    // Set during construction if --model refers to a non-existent model
+	lastSaveMessages int      // len(s.Messages) at last successful auto-save; -1 means never saved
+	sessionDirty     bool     // set when messages change in a way the count doesn't capture (e.g. compaction)
 
 	taskQueue     []QueueItem
 	cond          *sync.Cond         // signals when taskQueue becomes non-empty or pausedOnError clears
