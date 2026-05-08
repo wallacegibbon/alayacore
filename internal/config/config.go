@@ -20,9 +20,7 @@ const (
 
 // Agent behavior defaults.
 const (
-	DefaultMaxSteps         = 0 // 0 means no limit; only bounded when user passes --max-steps
-	DefaultCompactKeepSteps = 3
-	DefaultCompactTruncLen  = 500
+	DefaultMaxSteps = 0 // 0 means no limit; only bounded when user passes --max-steps
 
 	// boolFalse is used for flag default comparison in printDefaults.
 	boolFalse = "false"
@@ -115,9 +113,7 @@ type Settings struct {
 	AutoSummarize bool
 
 	// Compaction
-	NoCompact          bool
-	CompactKeepSteps   int
-	CompactTruncateLen int
+	NoCompact bool
 }
 
 // Parse parses CLI flags and returns settings
@@ -156,8 +152,6 @@ func Parse() *Settings {
 
 	// Compaction
 	noCompact := flag.Bool("no-compact", false, "Disable automatic history compaction (old tool results are kept in full)")
-	compactKeepSteps := flag.Int("compact-keep-steps", DefaultCompactKeepSteps, "Number of recent agent steps to preserve during compaction")
-	compactTruncateLen := flag.Int("compact-truncate-len", DefaultCompactTruncLen, "Byte-equivalent length to keep when truncating old tool results")
 
 	flag.Parse()
 
@@ -172,22 +166,20 @@ func Parse() *Settings {
 	}
 
 	s := &Settings{
-		ShowVersion:        *showVersion,
-		PlainIO:            *plainIO,
-		DebugAPI:           *debugAPI,
-		ModelConfig:        *modelConfig,
-		RuntimeConfig:      *runtimeConfig,
-		ThemesFolder:       *themesFolder,
-		Skills:             skillPaths,
-		Session:            *session,
-		ModelName:          *modelName,
-		Proxy:              *proxy,
-		SystemPrompt:       mergedSystemPrompt,
-		MaxSteps:           *maxSteps,
-		AutoSummarize:      *autoSummarize,
-		NoCompact:          *noCompact,
-		CompactKeepSteps:   *compactKeepSteps,
-		CompactTruncateLen: *compactTruncateLen,
+		ShowVersion:   *showVersion,
+		PlainIO:       *plainIO,
+		DebugAPI:      *debugAPI,
+		ModelConfig:   *modelConfig,
+		RuntimeConfig: *runtimeConfig,
+		ThemesFolder:  *themesFolder,
+		Skills:        skillPaths,
+		Session:       *session,
+		ModelName:     *modelName,
+		Proxy:         *proxy,
+		SystemPrompt:  mergedSystemPrompt,
+		MaxSteps:      *maxSteps,
+		AutoSummarize: *autoSummarize,
+		NoCompact:     *noCompact,
 	}
 
 	return s

@@ -60,8 +60,6 @@ export ALAYACORE_SHELL=zsh
 | `--max-steps` | `0` (no limit) | Maximum number of agent loop iterations per prompt. When set to 0 (the default), the agent loops until the model produces a final response. Exceeding this limit raises an error and pauses the task queue — use `:continue` to retry with a higher limit or `:continue skip` to proceed. |
 | `--auto-summarize` | `false` | Automatically summarize when context exceeds 65% of `context_limit` |
 | `--no-compact` | `false` | Disable automatic history compaction (old tool results are kept in full) |
-| `--compact-keep-steps` | `3` | Number of recent agent steps to preserve during compaction |
-| `--compact-truncate-len` | `500` | Byte-equivalent length to keep when truncating old tool results |
 | `--plainio` | `false` | Plain stdin/stdout mode — no TUI, for scripting and piping |
 | `--debug-api` | `false` | Write raw API requests and responses to a log file |
 | `--version` | — | Print version and exit |

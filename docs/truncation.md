@@ -74,7 +74,7 @@ If `contentBudget <= 0`, returns only the marker.
 | Location | Budget | Description |
 |----------|--------|-------------|
 | `execute_command` | 32 KB | Command output truncation |
-| `compactHistory` | 500 bytes (default) | Old tool result truncation |
+| `compactHistory` | 500 bytes | Old tool result truncation |
 
 ### Example
 
@@ -131,7 +131,7 @@ Note: `search_content` uses only truncation for limiting output. Ripgrep returns
 
 `compactHistory()` truncates old tool results to save context tokens. In long agent sessions, tool result outputs accumulate and consume increasing amounts of context. A 10-step session with file reads and command executions can easily contain 100K+ tokens of old tool I/O.
 
-`compactHistory()` is called after each user prompt completes. It truncates tool result outputs that are older than the last N steps (default 3) to a configurable byte length (default 500). The most recent results are kept intact.
+`compactHistory()` is called after each user prompt completes. It truncates tool result outputs that are older than the last 3 steps to 500 bytes. The most recent results are kept intact.
 
 ```
 Before compaction (9 messages):
@@ -142,13 +142,11 @@ After compaction:
                       ^truncated                       ^truncated                       ^kept full
 ```
 
-Old tool results are cut at the configured truncate length (default 500 bytes) and a `[truncated]` marker is appended so the LLM knows content was omitted. The LLM can re-read any truncated files if needed.
+Old tool results are cut at 500 bytes and a `[truncated]` marker is appended so the LLM knows content was omitted. The LLM can re-read any truncated files if needed.
 
-| Setting | Default | Flag |
-|---------|---------|------|
-| Keep steps | 3 | `--compact-keep-steps` |
-| Truncate length | 500 bytes | `--compact-truncate-len` |
-| Disable | — | `--no-compact` |
+| Setting | Flag |
+|---------|------|
+| Disable | `--no-compact` |
 
 ### Skill Directory Exemption
 

@@ -12,6 +12,12 @@ import (
 	"github.com/alayacore/alayacore/internal/truncation"
 )
 
+// Compaction defaults — not user-configurable.
+const (
+	compactKeepSteps   = 3   // number of recent agent steps to preserve in full
+	compactTruncateLen = 500 // byte-equivalent length to keep when truncating old tool results
+)
+
 // cleanIncompleteToolCalls removes incomplete tool calls from messages.
 func cleanIncompleteToolCalls(messages []llm.Message) []llm.Message {
 	unmatchedCalls := make(map[string]bool)
@@ -76,7 +82,7 @@ func (s *Session) compactHistory() {
 		return
 	}
 	// Each agent step is typically 2 messages (tool call + tool result)
-	recentMessages := s.CompactKeepSteps * 2
+	recentMessages := compactKeepSteps * 2
 	msgs := s.Messages
 	truncateBoundary := len(msgs) - recentMessages
 	if truncateBoundary <= 0 {
@@ -91,7 +97,7 @@ func (s *Session) compactHistory() {
 		case llm.RoleAssistant:
 			s.collectSkillDirReads(msg, skillReadIDs)
 		case llm.RoleTool:
-			if s.truncateToolResultsInMessage(msg, i, skillReadIDs, s.CompactTruncateLen) {
+			if s.truncateToolResultsInMessage(msg, i, skillReadIDs, compactTruncateLen) {
 				dirty = true
 			}
 		}

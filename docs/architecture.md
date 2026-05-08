@@ -64,7 +64,7 @@ The session layer manages conversation state, task execution, and model interact
 | `RuntimeManager` | Persists runtime settings (active model, active theme) to `runtime.conf` |
 | `CommandDefinitions` | Static metadata for session commands (`:save`, `:cancel`, etc.) |
 | `ContextTokens` | Tracks conversation context size across API calls. See [context-tracking.md](context-tracking.md). |
-| `compactHistory()` | Truncates old tool results to save context. Configurable via `--compact-keep-steps` and `--compact-truncate-len`. |
+| `compactHistory()` | Truncates old tool results to save context. Disabled via `--no-compact`. |
 
 ### Session Persistence
 
@@ -82,7 +82,7 @@ Shared text truncation utilities used by the tools and session layers. All funct
 | Function | Strategy | Used by |
 |----------|----------|---------|
 | `Lines` | Keeps first N non-empty lines | `search_content` (100 lines default) |
-| `Front` | Keeps front of text within byte budget | `execute_command` (32KB limit), `compactHistory` (configurable length) |
+| `Front` | Keeps front of text within byte budget | `execute_command` (32KB limit), `compactHistory` (500 bytes) |
 
 All strategies use a unified `[truncated]` marker so the LLM can recognize truncated output regardless of source. `Front` uses a byte budget and counts each rune's actual byte cost, so any mix of ASCII and multi-byte characters (CJK, emoji) is handled fairly without approximation.
 

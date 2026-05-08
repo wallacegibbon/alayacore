@@ -141,12 +141,10 @@ type SessionConfig struct {
 	MaxSteps          int
 
 	// Feature flags
-	DebugAPI           bool
-	AutoSummarize      bool
-	NoCompact          bool
-	CompactKeepSteps   int
-	CompactTruncateLen int
-	ProxyURL           string
+	DebugAPI      bool
+	AutoSummarize bool
+	NoCompact     bool
+	ProxyURL      string
 
 	// External dependencies
 	SkillsMgr *skills.Manager
