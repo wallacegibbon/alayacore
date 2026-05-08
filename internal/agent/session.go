@@ -432,34 +432,44 @@ func (s *Session) createProviderAndAgent(modelConfig *ModelConfig) (llm.Provider
 }
 
 func (s *Session) ensureAgentInitialized() string {
+	// First check (fast path) — hold lock briefly.
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	if s.Agent != nil && s.Provider != nil {
+		s.mu.Unlock()
 		return ""
 	}
-
 	if s.ModelManager == nil {
+		s.mu.Unlock()
 		return "Model manager not initialized"
 	}
-
 	activeModel := s.ModelManager.GetActive()
 	if activeModel == nil {
+		s.mu.Unlock()
 		return "No model configured. Please add a model to ~/.alayacore/model.conf"
 	}
+	// Copy the config so we can release the lock during construction.
+	modelCopy := *activeModel
+	s.mu.Unlock()
 
-	provider, agent, err := s.createProviderAndAgent(activeModel)
+	// Slow operation (HTTP client creation) — no lock held.
+	provider, agent, err := s.createProviderAndAgent(&modelCopy)
 	if err != nil {
 		return "Failed to create provider: " + err.Error()
 	}
 
+	// Second check — another goroutine may have initialized while we were unlocked.
+	s.mu.Lock()
+	if s.Agent != nil && s.Provider != nil {
+		s.mu.Unlock()
+		return ""
+	}
 	s.Agent = agent
 	s.Provider = provider
-
-	if activeModel.ContextLimit > 0 {
-		s.ContextLimit = int64(activeModel.ContextLimit)
+	if modelCopy.ContextLimit > 0 {
+		s.ContextLimit = int64(modelCopy.ContextLimit)
 	}
 	s.syncThinkToProvider()
+	s.mu.Unlock()
 	return ""
 }
 
