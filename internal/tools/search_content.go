@@ -1,7 +1,6 @@
 package tools
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -98,7 +97,7 @@ func handleSearchContentResult(execErr error, stdout, stderr *bytes.Buffer, maxL
 
 	// If output exceeds maxLines, save full results to file and return metadata
 	if totalLines > maxLines {
-		return handleLargeSearchResult(output, totalLines, maxLines)
+		return handleLargeSearchResult(output, totalLines)
 	}
 
 	return llm.NewTextResponse(output)
@@ -106,44 +105,17 @@ func handleSearchContentResult(execErr error, stdout, stderr *bytes.Buffer, maxL
 
 // handleLargeSearchResult saves full search output to a temp file and returns
 // a message with the file path. This avoids partial results being misinterpreted.
-func handleLargeSearchResult(output string, totalLines, maxLines int) llm.ToolResultOutput {
+func handleLargeSearchResult(output string, totalLines int) llm.ToolResultOutput {
 	// Save full output to temp file
 	filePath, err := saveToTmpFile(output, "search-*.txt")
 	if err != nil {
-		// Fallback: return first maxLines lines if file save fails
-		lines := splitLines(output)
-		if len(lines) > maxLines {
-			lines = lines[:maxLines]
-		}
-		return llm.NewTextResponse(joinLines(lines) + "\n[truncated - file save failed]")
+		return llm.NewTextErrorResponse(fmt.Sprintf("failed to save large search results to temp file: %v", err))
 	}
 
 	return llm.NewTextResponse(fmt.Sprintf(
 		"Search found %d matching lines. Results saved to: %s\nUse read_file to access specific matches.",
 		totalLines, filePath,
 	))
-}
-
-// splitLines splits a string into lines.
-func splitLines(s string) []string {
-	scanner := bufio.NewScanner(bytes.NewBufferString(s))
-	var lines []string
-	for scanner.Scan() {
-		lines = append(lines, scanner.Text())
-	}
-	return lines
-}
-
-// joinLines joins lines with newlines.
-func joinLines(lines []string) string {
-	result := ""
-	for i, line := range lines {
-		if i > 0 {
-			result += "\n"
-		}
-		result += line
-	}
-	return result
 }
 
 func executeSearchContent(ctx context.Context, args SearchContentInput) (llm.ToolResultOutput, error) {

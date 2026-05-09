@@ -20,10 +20,8 @@ import (
 // never exit because they're waiting for terminal input that never arrives.
 const defaultCommandTimeout = 2 * time.Minute
 
-// maxCommandOutput is the maximum size of command output returned to the LLM.
-// Outputs larger than this are saved to a temp file; only the file path and
-// metadata are returned. maxCommandOutput is used as a fallback preview size
-// when the file save fails.
+// maxCommandOutput is the threshold for saving command output to a temp file.
+// Outputs larger than this return only the file path and metadata.
 const maxCommandOutput = 32 * 1024 // 32KB
 
 // executeCommandInput represents the input for the execute_command tool
@@ -155,7 +153,7 @@ func handleCommandCompletion(execErr error, stdout, stderr *bytes.Buffer) llm.To
 
 	output := formatCommandOutput(stdout, stderr, exitCode)
 
-	// For large outputs, save to file and return preview + path
+	// For large outputs, save to file and return path + metadata
 	if len(output) > maxCommandOutput {
 		return handleLargeCommandOutput(output, exitCode, execErr)
 	}
@@ -180,15 +178,7 @@ func handleLargeCommandOutput(output string, exitCode int, execErr error) llm.To
 	// Save full output to temp file
 	filePath, err := saveToTmpFile(output, "cmd-*.txt")
 	if err != nil {
-		// Fallback: return first maxCommandOutput bytes with marker
-		preview := output
-		if len(preview) > maxCommandOutput {
-			preview = preview[:maxCommandOutput]
-		}
-		if execErr != nil && exitCode > 0 {
-			return llm.NewTextErrorResponse(fmt.Sprintf("Exit Code: %d\n%s\n[truncated - file save failed]", exitCode, preview))
-		}
-		return llm.NewTextResponse(preview + "\n[truncated - file save failed]")
+		return llm.NewTextErrorResponse(fmt.Sprintf("failed to save large output to temp file: %v", err))
 	}
 
 	// Count total lines
