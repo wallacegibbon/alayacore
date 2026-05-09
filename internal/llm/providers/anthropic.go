@@ -198,8 +198,8 @@ type anthropicTool struct {
 	InputSchema json.RawMessage `json:"input_schema"`
 }
 
-// streamState tracks accumulation state during streaming
-type streamState struct {
+// anthropicStreamState tracks accumulation state during streaming
+type anthropicStreamState struct {
 	mu           sync.Mutex
 	contentParts []llm.ContentPart
 	usage        llm.Usage
@@ -214,7 +214,7 @@ type streamState struct {
 	currentName  string
 }
 
-func (s *streamState) startBlock(index int, blockType, id, name string) {
+func (s *anthropicStreamState) startBlock(index int, blockType, id, name string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.currentIndex = index
@@ -225,19 +225,19 @@ func (s *streamState) startBlock(index int, blockType, id, name string) {
 	s.currentInput.Reset()
 }
 
-func (s *streamState) appendText(text string) {
+func (s *anthropicStreamState) appendText(text string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.currentText.WriteString(text)
 }
 
-func (s *streamState) appendInput(jsonStr string) {
+func (s *anthropicStreamState) appendInput(jsonStr string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.currentInput.WriteString(jsonStr)
 }
 
-func (s *streamState) finishBlock() {
+func (s *anthropicStreamState) finishBlock() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -263,7 +263,7 @@ func (s *streamState) finishBlock() {
 	s.currentType = ""
 }
 
-func (s *streamState) setUsage(inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens int64) {
+func (s *anthropicStreamState) setUsage(inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.usage = llm.Usage{
@@ -274,7 +274,7 @@ func (s *streamState) setUsage(inputTokens, outputTokens, cacheReadTokens, cache
 	}
 }
 
-func (s *streamState) getMessage() llm.Message {
+func (s *anthropicStreamState) getMessage() llm.Message {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return llm.Message{
@@ -283,20 +283,20 @@ func (s *streamState) getMessage() llm.Message {
 	}
 }
 
-func (s *streamState) getUsage() llm.Usage {
+func (s *anthropicStreamState) getUsage() llm.Usage {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.usage
 }
 
-func (s *streamState) setStopReason(reason string) {
+func (s *anthropicStreamState) setStopReason(reason string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.stopReason = reason
 }
 
 // lastToolCall returns the last tool call if the current block is a tool_use
-func (s *streamState) lastToolCall() *llm.ToolCallPart {
+func (s *anthropicStreamState) lastToolCall() *llm.ToolCallPart {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -513,7 +513,7 @@ func (p *AnthropicProvider) parseStream(reader io.Reader) iter.Seq2[llm.StreamEv
 			}
 		}()
 
-		state := &streamState{
+		state := &anthropicStreamState{
 			contentParts: make([]llm.ContentPart, 0),
 		}
 
@@ -552,7 +552,7 @@ func (p *AnthropicProvider) parseStream(reader io.Reader) iter.Seq2[llm.StreamEv
 }
 
 // handleEvent handles a single SSE event. Returns false if iteration should stop.
-func (p *AnthropicProvider) handleEvent(eventType, data string, yield func(llm.StreamEvent, error) bool, state *streamState) bool {
+func (p *AnthropicProvider) handleEvent(eventType, data string, yield func(llm.StreamEvent, error) bool, state *anthropicStreamState) bool {
 	if data == "" {
 		return true
 	}
@@ -599,7 +599,7 @@ func (p *AnthropicProvider) handleEvent(eventType, data string, yield func(llm.S
 }
 
 // handleMessageStart handles message_start events - may contain initial usage
-func (p *AnthropicProvider) handleMessageStart(payload map[string]interface{}, _ func(llm.StreamEvent, error) bool, state *streamState) bool {
+func (p *AnthropicProvider) handleMessageStart(payload map[string]interface{}, _ func(llm.StreamEvent, error) bool, state *anthropicStreamState) bool {
 	// Extract usage from message_start if present
 	if msg, ok := payload["message"].(map[string]interface{}); ok {
 		if usage, ok := msg["usage"].(map[string]interface{}); ok {
@@ -612,7 +612,7 @@ func (p *AnthropicProvider) handleMessageStart(payload map[string]interface{}, _
 // extractAndSetUsage extracts token counts from usage map and updates state
 // Note: Usage events may come in multiple chunks (message_start, message_delta, message_stop)
 // Each chunk may contain partial usage data, so we accumulate/merge with existing values.
-func (p *AnthropicProvider) extractAndSetUsage(usage map[string]interface{}, state *streamState) {
+func (p *AnthropicProvider) extractAndSetUsage(usage map[string]interface{}, state *anthropicStreamState) {
 	// Get current usage to preserve values not present in this chunk
 	current := state.getUsage()
 
@@ -642,7 +642,7 @@ func (p *AnthropicProvider) extractAndSetUsage(usage map[string]interface{}, sta
 }
 
 // handleContentBlockStart handles content_block_start events
-func (p *AnthropicProvider) handleContentBlockStart(payload map[string]interface{}, _ func(llm.StreamEvent, error) bool, state *streamState) bool {
+func (p *AnthropicProvider) handleContentBlockStart(payload map[string]interface{}, _ func(llm.StreamEvent, error) bool, state *anthropicStreamState) bool {
 	index, ok := payload["index"].(float64)
 	if !ok {
 		return true
@@ -662,7 +662,7 @@ func (p *AnthropicProvider) handleContentBlockStart(payload map[string]interface
 }
 
 // handleContentDelta handles content block delta events
-func (p *AnthropicProvider) handleContentDelta(payload map[string]interface{}, yield func(llm.StreamEvent, error) bool, state *streamState) bool {
+func (p *AnthropicProvider) handleContentDelta(payload map[string]interface{}, yield func(llm.StreamEvent, error) bool, state *anthropicStreamState) bool {
 	delta, ok := payload["delta"].(map[string]interface{})
 	if !ok {
 		return true
@@ -698,7 +698,7 @@ func (p *AnthropicProvider) handleContentDelta(payload map[string]interface{}, y
 }
 
 // handleContentBlockStop handles content_block_stop events
-func (p *AnthropicProvider) handleContentBlockStop(_ map[string]interface{}, yield func(llm.StreamEvent, error) bool, state *streamState) bool {
+func (p *AnthropicProvider) handleContentBlockStop(_ map[string]interface{}, yield func(llm.StreamEvent, error) bool, state *anthropicStreamState) bool {
 	// Get the tool call info before finishBlock() clears it
 	tc := state.lastToolCall()
 
@@ -718,7 +718,7 @@ func (p *AnthropicProvider) handleContentBlockStop(_ map[string]interface{}, yie
 }
 
 // handleMessageDelta handles message-level delta events (usage, etc.)
-func (p *AnthropicProvider) handleMessageDelta(payload map[string]interface{}, yield func(llm.StreamEvent, error) bool, state *streamState) bool {
+func (p *AnthropicProvider) handleMessageDelta(payload map[string]interface{}, yield func(llm.StreamEvent, error) bool, state *anthropicStreamState) bool {
 	// Check for stop_reason in delta
 	if delta, ok := payload["delta"].(map[string]interface{}); ok {
 		if stopReason, ok := delta["stop_reason"].(string); ok {
@@ -747,7 +747,7 @@ func (p *AnthropicProvider) handleMessageDelta(payload map[string]interface{}, y
 }
 
 // handleMessageStop handles message_stop events - sends final StepCompleteEvent
-func (p *AnthropicProvider) handleMessageStop(payload map[string]interface{}, yield func(llm.StreamEvent, error) bool, state *streamState) bool {
+func (p *AnthropicProvider) handleMessageStop(payload map[string]interface{}, yield func(llm.StreamEvent, error) bool, state *anthropicStreamState) bool {
 	// Check for final usage in message_stop
 	if usage, ok := payload["usage"].(map[string]interface{}); ok {
 		p.extractAndSetUsage(usage, state)

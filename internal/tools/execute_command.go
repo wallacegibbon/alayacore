@@ -1,7 +1,6 @@
 package tools
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -206,12 +205,7 @@ func countLines(s string) int {
 	if s == "" {
 		return 0
 	}
-	scanner := bufio.NewScanner(strings.NewReader(s))
-	count := 0
-	for scanner.Scan() {
-		count++
-	}
-	return count
+	return strings.Count(s, "\n") + 1
 }
 
 func formatCommandOutput(stdout, stderr *bytes.Buffer, exitCode int) string {
