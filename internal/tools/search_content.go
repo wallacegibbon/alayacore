@@ -96,7 +96,7 @@ func handleSearchContentResult(execErr error, stdout, stderr *bytes.Buffer, maxL
 	// Count total lines in output
 	totalLines := countLines(output)
 
-	// If output exceeds maxLines, save full results to file and return preview
+	// If output exceeds maxLines, save full results to file and return metadata
 	if totalLines > maxLines {
 		return handleLargeSearchResult(output, totalLines, maxLines)
 	}

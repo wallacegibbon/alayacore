@@ -21,8 +21,9 @@ import (
 const defaultCommandTimeout = 2 * time.Minute
 
 // maxCommandOutput is the maximum size of command output returned to the LLM.
-// Outputs larger than this are saved to a temp file with the first maxCommandOutput
-// bytes shown as preview.
+// Outputs larger than this are saved to a temp file; only the file path and
+// metadata are returned. maxCommandOutput is used as a fallback preview size
+// when the file save fails.
 const maxCommandOutput = 32 * 1024 // 32KB
 
 // executeCommandInput represents the input for the execute_command tool

@@ -51,8 +51,7 @@ Search found 500 matching lines. Results saved to: .alayacore.tmp/search-12345.t
 Use read_file to access specific matches.
 ```
 
-- System prompt warns LLM about incomplete results
-- Agent must use `read_file` to see full results before making conclusions
+- Agent uses `read_file` to access the full results from the saved file
 
 ## Temp File Location
 
