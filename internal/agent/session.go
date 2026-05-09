@@ -168,11 +168,11 @@ type Session struct {
 	ModelManager     *ModelManager
 	RuntimeManager   *RuntimeManager
 	SkillsManager    *skills.Manager
-	SessionConfig             // embedded — immutable config set once at construction
-	thinkLevel       int      // mutable — changed by SetThinkLevel
-	initError        error    // Set during construction if --model refers to a non-existent model
-	lastSaveMessages int      // len(s.Messages) at last successful auto-save; -1 means never saved
-	sessionDirty     bool     // set when messages change in a way the count doesn't capture
+	SessionConfig          // embedded — immutable config set once at construction
+	thinkLevel       int   // mutable — changed by SetThinkLevel
+	initError        error // Set during construction if --model refers to a non-existent model
+	lastSaveMessages int   // len(s.Messages) at last successful auto-save; -1 means never saved
+	sessionDirty     bool  // set when messages change in a way the count doesn't capture
 
 	taskQueue     []QueueItem
 	cond          *sync.Cond         // signals when taskQueue becomes non-empty or pausedOnError clears
