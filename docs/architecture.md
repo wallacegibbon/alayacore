@@ -25,7 +25,8 @@ The adaptor layer handles user interaction and translates between user actions a
 |-----------|-------------|
 | `Terminal` | Main Bubble Tea model composing all UI components |
 | `DisplayModel` | Renders assistant output with virtual scrolling. See [virtual-rendering-performance.md](virtual-rendering-performance.md). |
-| `InputModel` | Handles user text input with external editor support. See [external-editor-windowsize.md](external-editor-windowsize.md). |
+| `InputModel` | Handles user text input. See [external-editor-windowsize.md](external-editor-windowsize.md). |
+| `Editor` | External editor operations (`$EDITOR`) for multi-line input, display viewing, and queue editing |
 | `ModelSelector` | Modal for switching between AI models |
 | `QueueManager` | Modal for managing the task queue |
 | `ThemeSelector` | Modal for switching between color themes |
