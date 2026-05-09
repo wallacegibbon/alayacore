@@ -117,7 +117,7 @@ Messages are appended incrementally in `OnStepFinish` so they're preserved even 
 
 | Tool | Description | Safety | Dependency |
 |------|-------------|--------|------------|
-| `read_file` | Read file contents with optional line ranges. 32KB max for full reads. | Safe | — |
+| `read_file` | Read file contents with optional line ranges. 256KB max for full reads (truncates at line boundary with metadata). | Safe | — |
 | `edit_file` | Search/replace edits on existing files | Medium | — |
 | `write_file` | Create or overwrite files | Dangerous | — |
 | `execute_command` | Execute commands in the detected shell (cross-platform). Output truncated at 32KB. | Most Dangerous | — |
@@ -330,7 +330,7 @@ Agent.Stream() receives tool_call event
 8. **Typed Tools** — `TypedExecute[T]` wrapper for type-safe tool implementations with auto-generated schemas.
 9. **Lazy Agent Init** — Agent and provider are created on first use, not at startup.
 10. **Sequential Tool Execution** — Tools execute one at a time. See [sequential-tool-execution.md](sequential-tool-execution.md).
-11. **Context Efficiency** — Tool descriptions are minimal, outputs are size-capped (32KB), search results limited (100 lines). See [context-tracking.md](context-tracking.md).
+11. **Context Efficiency** — Tool descriptions are minimal, outputs are size-capped (256KB for `read_file`, 32KB for `execute_command`), search results limited (100 lines). See [context-tracking.md](context-tracking.md).
 12. **Think Mode** — Provider-specific reasoning fields are added to API requests. Three levels: 0=off, 1=normal, 2=max. Toggled via `:think [0|1|2]`.
 
 ## Gotchas

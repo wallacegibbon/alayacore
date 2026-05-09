@@ -10,7 +10,7 @@ import (
 	"github.com/alayacore/alayacore/internal/llm"
 )
 
-const maxFullReadSize = 32 * 1024 // 32KB limit for full file reads (~8K tokens)
+const maxFullReadSize = 256 * 1024 // 256KB limit for full file reads (~64K tokens)
 
 // ReadFileInput represents the input for the read_file tool
 type ReadFileInput struct {
@@ -44,10 +44,7 @@ func executeReadFile(ctx context.Context, args ReadFileInput) (llm.ToolResultOut
 	// Full file read case
 	if args.StartLine == 0 && args.EndLine == 0 {
 		if info.Size() > maxFullReadSize {
-			return llm.NewTextErrorResponse(fmt.Sprintf(
-				"file is too large for full read (%d bytes, limit is %d). Use start_line and end_line to read a specific range.",
-				info.Size(), maxFullReadSize,
-			)), nil
+			return readLargeFileTruncated(args.Path, info.Size())
 		}
 		var content []byte
 		content, err = os.ReadFile(args.Path)
@@ -70,6 +67,64 @@ func executeReadFile(ctx context.Context, args ReadFileInput) (llm.ToolResultOut
 	}
 
 	return llm.NewTextResponse(strings.Join(lines, "\n")), nil
+}
+
+// readLargeFileTruncated reads a large file up to maxFullReadSize and returns
+// the content with metadata about the truncation.
+func readLargeFileTruncated(path string, totalSize int64) (llm.ToolResultOutput, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return llm.NewTextErrorResponse(err.Error()), nil
+	}
+	defer file.Close()
+
+	// First pass: count total lines
+	totalLines := 0
+	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
+	for scanner.Scan() {
+		totalLines++
+	}
+	if err := scanner.Err(); err != nil {
+		return llm.NewTextErrorResponse(err.Error()), nil
+	}
+
+	// Reset file position for second pass
+	if _, err := file.Seek(0, 0); err != nil {
+		return llm.NewTextErrorResponse(err.Error()), nil
+	}
+
+	// Second pass: read lines up to maxFullReadSize
+	var lines []string
+	var bytesRead int64
+	scanner = bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		lineBytes := int64(len(line)) + 1 // +1 for newline
+
+		// Stop if adding this line would exceed limit (but always include at least one line)
+		if bytesRead+lineBytes > maxFullReadSize && len(lines) > 0 {
+			break
+		}
+
+		lines = append(lines, line)
+		bytesRead += lineBytes
+	}
+	if err := scanner.Err(); err != nil {
+		return llm.NewTextErrorResponse(err.Error()), nil
+	}
+
+	shownLines := len(lines)
+	content := strings.Join(lines, "\n")
+	header := fmt.Sprintf(
+		"[Lines 1-%d of %d | %.1fKB of %.1fKB shown]\n",
+		shownLines, totalLines,
+		float64(bytesRead)/1024, float64(totalSize)/1024,
+	)
+
+	return llm.NewTextResponse(header + "\n" + content), nil
 }
 
 func validateLineRange(startLine, endLine int) error {

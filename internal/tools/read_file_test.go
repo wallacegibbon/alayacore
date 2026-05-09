@@ -166,12 +166,16 @@ func TestReadFileTooLarge(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	errResp, ok := result.(llm.ToolResultOutputError)
+	// Should get truncated content with metadata, not an error
+	textResp, ok := result.(llm.ToolResultOutputText)
 	if !ok {
-		t.Errorf("expected error response for large file, got %T", result)
+		t.Errorf("expected text response for truncated file, got %T", result)
 	}
-	if !strings.Contains(errResp.Error, "too large") {
-		t.Errorf("expected 'too large' error, got %q", errResp.Error)
+	if !strings.Contains(textResp.Text, "[Lines 1-") {
+		t.Errorf("expected truncation header, got %q", textResp.Text[:100])
+	}
+	if !strings.Contains(textResp.Text, "of ") {
+		t.Errorf("expected 'of' in truncation header, got %q", textResp.Text[:100])
 	}
 }
 
