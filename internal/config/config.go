@@ -111,9 +111,6 @@ type Settings struct {
 	SystemPrompt  string
 	MaxSteps      int
 	AutoSummarize bool
-
-	// Compaction
-	NoCompact bool
 }
 
 // Parse parses CLI flags and returns settings
@@ -150,9 +147,6 @@ func Parse() *Settings {
 	maxSteps := flag.Int("max-steps", DefaultMaxSteps, "Maximum agent loop steps (0 = no limit)")
 	autoSummarize := flag.Bool("auto-summarize", false, "Automatically summarize conversation when context exceeds 65% of limit")
 
-	// Compaction
-	noCompact := flag.Bool("no-compact", false, "Disable automatic history compaction (old messages are preserved in full)")
-
 	flag.Parse()
 
 	// Collect skill paths
@@ -179,7 +173,6 @@ func Parse() *Settings {
 		SystemPrompt:  mergedSystemPrompt,
 		MaxSteps:      *maxSteps,
 		AutoSummarize: *autoSummarize,
-		NoCompact:     *noCompact,
 	}
 
 	return s

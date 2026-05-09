@@ -357,6 +357,5 @@ func (s *Session) resendPrompt(ctx context.Context) {
 		return
 	}
 
-	s.compactHistory()
 	s.sendSystemInfo()
 }

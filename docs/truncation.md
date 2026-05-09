@@ -123,47 +123,6 @@ The leading newline ensures the marker appears on its own line, not appended to 
 
 Note: `search_content` uses only truncation for limiting output. Ripgrep returns all matches; the global `max_lines` parameter controls total output. This is simpler than using ripgrep's `--max-count` (which limits per-file) and provides predictable, consistent results.
 
-### History Compaction
-
-`compactHistory()` compacts old messages to save context tokens. In long agent sessions, tool results accumulate and consume increasing amounts of context.
-
-`compactHistory()` is called after each user prompt completes. Messages older than the last 3 steps are compacted using one strategy:
-
-1. **Tool call/result pairs** — removed entirely from old messages. The model can re-invoke the tool if it needs the data. Error results are preserved since they're small and actionable. Skill directory reads are also preserved. Preserved calls keep their full input for debugging context.
-
-Reasoning (chain of thought) is **never stripped** — it cannot be reconstructed and is essential for multi-step reasoning continuity.
-
-```
-Before compaction (10 messages, 5 steps):
-  [user] [assistant: reasoning + text + toolcall] [tool: 15KB result]
-  [assistant: reasoning + text + toolcall]        [tool: 20KB result]
-  [assistant: reasoning + text + toolcall]        [tool: 8KB result]
-  [assistant: reasoning + text + toolcall]        [tool: result]
-  [assistant: reasoning + text]
-
-After compaction:
-  [user] [assistant: reasoning + text]
-         [assistant: reasoning + text]
-         [assistant: reasoning + text + toolcall] [tool: 8KB result]  ← kept full
-         [assistant: reasoning + text + toolcall] [tool: result]      ← kept full
-         [assistant: reasoning + text]                                ← kept full
-```
-
-| Setting | Flag |
-|---------|------|
-| Disable | `--no-compact` |
-
-### Skill Directory Exemption
-
-Files under skill directories are **exempt from compaction** in `compactHistory()`:
-
-- `SKILL.md` — skill instructions
-- `scripts/` — executable scripts
-- `references/` — reference documents
-- `assets/` — supporting files
-
-This ensures skill instructions remain intact for the LLM to follow correctly.
-
 ## UTF-8 Safety Guarantee
 
 All truncation functions guarantee valid UTF-8 output:

@@ -76,7 +76,7 @@ func (h *WriteFileHandler) FormatCall(input json.RawMessage, _ *Styles) string {
 	}
 
 	if args.Content == "" {
-		// Compacted — just the path, result carries the note
+		// Empty content — just show the path
 		return fmt.Sprintf("write_file: %s\n", args.Path)
 	}
 	return fmt.Sprintf("write_file: %s\n%s", args.Path, args.Content)
@@ -92,7 +92,7 @@ func (h *EditFileHandler) FormatCall(input json.RawMessage, _ *Styles) string {
 	}
 
 	if args.OldString == "" && args.NewString == "" {
-		// Compacted — just the path, result carries the note
+		// Empty content — just show the path
 		return fmt.Sprintf("edit_file: %s\n", args.Path)
 	}
 

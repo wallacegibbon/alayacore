@@ -1,6 +1,6 @@
 # Context Token Tracking
 
-How AlayaCore tracks conversation context size across LLM API calls and providers, and how it manages context efficiency through history compaction.
+How AlayaCore tracks conversation context size across LLM API calls and providers.
 
 ## Overview
 
@@ -128,5 +128,4 @@ The apparent "drop" from 2118 to 2073 after model switch is the difference in to
 - `shouldAutoSummarize()` — triggers when `ContextTokens >= ContextLimit * 65%` (only when `--auto-summarize` is enabled)
 - `summarize()` — appends the summary prompt to Messages, calls `processPrompt`, then replaces conversation history with the summary and resets `ContextTokens` to the summary's output token count
 - `applyModelContextLimit()` — sets `ContextLimit` from the active model's config
-- `compactHistory()` — compacts old messages to save context tokens. Removes tool call/result pairs (errors and skill reads preserved with full context). Reasoning is kept. See [truncation.md](truncation.md) for details.
 - `SessionMeta.ContextTokens` — persisted to session file frontmatter so the status bar shows the correct context usage immediately after loading a session

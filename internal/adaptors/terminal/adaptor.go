@@ -55,7 +55,6 @@ func (a *Adaptor) Start() int {
 		MaxSteps:            a.Config.MaxSteps,
 		DebugAPI:            a.Config.Cfg.DebugAPI,
 		AutoSummarize:       a.Config.Cfg.AutoSummarize,
-		NoCompact:           a.Config.Cfg.NoCompact,
 		ProxyURL:            a.Config.Cfg.Proxy,
 		SkillsMgr:           a.Config.SkillsMgr,
 		OverrideActiveModel: a.Config.Cfg.ModelName,

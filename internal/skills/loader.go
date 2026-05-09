@@ -118,21 +118,6 @@ func (m *Manager) GetMetadata() []Skill {
 	return m.skills
 }
 
-// GetSkillDirs returns the absolute paths of all skill directories.
-// Used by session.compactHistory to exempt skill file reads from compaction.
-func (m *Manager) GetSkillDirs() []string {
-	dirs := make([]string, 0, len(m.skills))
-	for _, skill := range m.skills {
-		// Location is the SKILL.md path; the directory is its parent
-		dir := filepath.Dir(skill.Location)
-		if abs, err := filepath.Abs(dir); err == nil {
-			dir = abs
-		}
-		dirs = append(dirs, dir)
-	}
-	return dirs
-}
-
 // GenerateSystemPromptFragment generates the XML fragment for system prompt
 func (m *Manager) GenerateSystemPromptFragment() string {
 	if len(m.skills) == 0 {

@@ -143,7 +143,6 @@ type SessionConfig struct {
 	// Feature flags
 	DebugAPI      bool
 	AutoSummarize bool
-	NoCompact     bool
 	ProxyURL      string
 
 	// External dependencies
@@ -170,11 +169,10 @@ type Session struct {
 	RuntimeManager   *RuntimeManager
 	SkillsManager    *skills.Manager
 	SessionConfig             // embedded — immutable config set once at construction
-	skillDirs        []string // built from SkillsManager at construction; paths exempt from compaction
 	thinkLevel       int      // mutable — changed by SetThinkLevel
 	initError        error    // Set during construction if --model refers to a non-existent model
 	lastSaveMessages int      // len(s.Messages) at last successful auto-save; -1 means never saved
-	sessionDirty     bool     // set when messages change in a way the count doesn't capture (e.g. compaction)
+	sessionDirty     bool     // set when messages change in a way the count doesn't capture
 
 	taskQueue     []QueueItem
 	cond          *sync.Cond         // signals when taskQueue becomes non-empty or pausedOnError clears
@@ -237,7 +235,6 @@ func NewSession(cfg SessionConfig) *Session {
 		RuntimeManager:   NewRuntimeManager(cfg.RuntimeConfigPath, cfg.ModelConfigPath),
 		SkillsManager:    cfg.SkillsMgr,
 		SessionConfig:    cfg,
-		skillDirs:        buildSkillDirSet(cfg.SkillsMgr),
 		thinkLevel:       config.DefaultThinkLevel,
 		lastSaveMessages: -1,
 		taskQueue:        make([]QueueItem, 0),
@@ -264,7 +261,6 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 		RuntimeManager:   NewRuntimeManager(cfg.RuntimeConfigPath, cfg.ModelConfigPath),
 		SkillsManager:    cfg.SkillsMgr,
 		SessionConfig:    cfg,
-		skillDirs:        buildSkillDirSet(cfg.SkillsMgr),
 		thinkLevel:       data.ThinkLevel,
 		ContextTokens:    data.ContextTokens,
 		lastSaveMessages: len(data.Messages),
@@ -573,8 +569,6 @@ func (s *Session) handleUserPrompt(ctx context.Context, prompt string) {
 		s.sendSystemInfo()
 		return
 	}
-
-	s.compactHistory()
 }
 
 func (s *Session) shouldAutoSummarize() bool {
@@ -654,13 +648,4 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) (int
 	}
 
 	return outputTokens, nil
-}
-
-// buildSkillDirSet creates a slice of absolute skill directory paths.
-// Called once at session creation since skills are fixed during process lifetime.
-func buildSkillDirSet(skillsMgr *skills.Manager) []string {
-	if skillsMgr == nil {
-		return nil
-	}
-	return skillsMgr.GetSkillDirs()
 }
