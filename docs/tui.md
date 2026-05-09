@@ -111,7 +111,7 @@ Press `Ctrl+H` or type `:help` to open a help window listing all keybindings and
 
 The help window is organized into three sections:
 
-- **Commands** — colon commands available in the input field (queue manager internals like `:taskqueue_get_all` and `:taskqueue_del` are omitted; `:summarize` is omitted as it is only used internally)
+- **Commands** — colon commands available in the input field (queue manager internals like `:taskqueue_get_all` and `:taskqueue_del` are omitted)
 - **Global Shortcuts** — keybindings that work from any context
 - **Display Mode** — navigation and editing keys for the display area
 
