@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 
 	"github.com/alayacore/alayacore/internal/llm"
 )
@@ -109,7 +108,7 @@ func handleSearchContentResult(execErr error, stdout, stderr *bytes.Buffer, maxL
 // a message with the file path. This avoids partial results being misinterpreted.
 func handleLargeSearchResult(output string, totalLines, maxLines int) llm.ToolResultOutput {
 	// Save full output to temp file
-	filePath, err := saveSearchOutputToFile(output)
+	filePath, err := saveToTmpFile(output, "search-*.txt")
 	if err != nil {
 		// Fallback: return first maxLines lines if file save fails
 		lines := splitLines(output)
@@ -145,37 +144,6 @@ func joinLines(lines []string) string {
 		result += line
 	}
 	return result
-}
-
-// saveSearchOutputToFile saves the full search output to a temp file in
-// .alayacore.tmp/ directory under the current working directory.
-func saveSearchOutputToFile(output string) (string, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		cwd = "."
-	}
-
-	tmpDir := filepath.Join(cwd, ".alayacore.tmp")
-	if err := os.MkdirAll(tmpDir, 0755); err != nil {
-		return "", err
-	}
-
-	file, err := os.CreateTemp(tmpDir, "search-*.txt")
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
-
-	writer := bufio.NewWriter(file)
-	if _, err := writer.WriteString(output); err != nil {
-		return "", err
-	}
-
-	if err := writer.Flush(); err != nil {
-		return "", err
-	}
-
-	return file.Name(), nil
 }
 
 func executeSearchContent(ctx context.Context, args SearchContentInput) (llm.ToolResultOutput, error) {

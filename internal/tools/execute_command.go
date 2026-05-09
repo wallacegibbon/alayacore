@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -178,7 +177,7 @@ func handleCommandCompletion(execErr error, stdout, stderr *bytes.Buffer) llm.To
 // a message with the file path. This avoids re-running commands with side effects.
 func handleLargeCommandOutput(output string, exitCode int, execErr error) llm.ToolResultOutput {
 	// Save full output to temp file
-	filePath, err := saveOutputToFile(output)
+	filePath, err := saveToTmpFile(output, "cmd-*.txt")
 	if err != nil {
 		// Fallback: return first maxCommandOutput bytes with marker
 		preview := output
@@ -209,40 +208,6 @@ func handleLargeCommandOutput(output string, exitCode int, execErr error) llm.To
 		return llm.NewTextErrorResponse(msg)
 	}
 	return llm.NewTextResponse(msg)
-}
-
-// saveOutputToFile saves the full command output to a temp file in the
-// .alayacore.tmp/ directory under the current working directory.
-// Using CWD (not /tmp) avoids cross-filesystem issues when the agent
-// later reads the file with read_file.
-func saveOutputToFile(output string) (string, error) {
-	// Create .alayacore.tmp/ directory in CWD
-	cwd, err := os.Getwd()
-	if err != nil {
-		cwd = "."
-	}
-
-	tmpDir := filepath.Join(cwd, ".alayacore.tmp")
-	if err := os.MkdirAll(tmpDir, 0755); err != nil {
-		return "", err
-	}
-
-	file, err := os.CreateTemp(tmpDir, "cmd-*.txt")
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
-
-	writer := bufio.NewWriter(file)
-	if _, err := writer.WriteString(output); err != nil {
-		return "", err
-	}
-
-	if err := writer.Flush(); err != nil {
-		return "", err
-	}
-
-	return file.Name(), nil
 }
 
 // countLines counts the number of lines in a string.
