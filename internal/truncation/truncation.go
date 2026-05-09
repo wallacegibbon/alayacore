@@ -10,8 +10,8 @@
 //     (search results).  Useful for tools like ripgrep whose output is
 //     naturally line-based.
 //
-//   - Front: keeps the front of text (command output, tool results in
-//     compacted history).  Uses a byte budget so scripts with high
+//   - Front: keeps the front of text (command output, tool results).
+//     Uses a byte budget so scripts with high
 //     bytes-per-rune ratios (Chinese, Japanese, Korean) are handled
 //     fairly without any approximation.
 package truncation
