@@ -107,10 +107,10 @@ Messages are appended incrementally in `OnStepFinish` so they're preserved even 
 
 | Tool | Description | Safety | Dependency |
 |------|-------------|--------|------------|
-| `read_file` | Read file contents with optional line ranges. 256KB max for full reads (truncates at line boundary with metadata). | Safe | — |
+| `read_file` | Read file contents with optional line ranges. 64KB max for full reads (truncates at line boundary with metadata). | Safe | — |
 | `edit_file` | Search/replace edits on existing files | Medium | — |
 | `write_file` | Create or overwrite files | Dangerous | — |
-| `execute_command` | Execute commands in the detected shell (cross-platform). Large output (>32KB) saved to `.alayacore.tmp/cmd-*.txt`; only file path and metadata returned. | Most Dangerous | — |
+| `execute_command` | Execute commands in the detected shell (cross-platform). Large output (>64KB) saved to `.alayacore.tmp/cmd-*.txt`; only file path and metadata returned. | Most Dangerous | — |
 | `search_content` | Search file contents using ripgrep (`rg`). Results exceeding `max_lines` (default 100) saved to `.alayacore.tmp/search-*.txt`; only match count and file path returned. | Safe | Requires `rg` binary |
 
 Each tool is implemented with type-safe input structs and auto-generated JSON schemas. All tools accept a `context.Context` parameter and respect cancellation — `:cancel` will interrupt long-running tool execution. See [schema-improvements.md](schema-improvements.md) for the pattern.
@@ -320,7 +320,7 @@ Agent.Stream() receives tool_call event
 8. **Typed Tools** — `TypedExecute[T]` wrapper for type-safe tool implementations with auto-generated schemas.
 9. **Lazy Agent Init** — Agent and provider are created on first use, not at startup.
 10. **Sequential Tool Execution** — Tools execute one at a time. See [sequential-tool-execution.md](sequential-tool-execution.md).
-11. **Context Efficiency** — Tool descriptions are minimal. Large outputs saved to `.alayacore.tmp/`: `read_file` truncates at 256KB, `execute_command` and `search_content` save full output to file. See [truncation.md](truncation.md).
+11. **Context Efficiency** — Tool descriptions are minimal. Large outputs (>64KB) saved to `.alayacore.tmp/`: `read_file` truncates inline with metadata, `execute_command` and `search_content` save full output to file. See [truncation.md](truncation.md).
 12. **Think Mode** — Provider-specific reasoning fields are added to API requests. Three levels: 0=off, 1=normal, 2=max. Toggled via `:think [0|1|2]`.
 
 ## Gotchas

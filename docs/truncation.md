@@ -6,16 +6,16 @@ How AlayaCore handles large outputs from tools to stay within context budgets.
 
 | Tool | Behavior | File Pattern |
 |------|----------|--------------|
-| `read_file` | Truncates at 256KB with metadata header | N/A (in-memory) |
+| `read_file` | Truncates at 64KB with metadata header | N/A (in-memory) |
 | `execute_command` | Saves to file | `.alayacore.tmp/cmd-*.txt` |
 | `search_content` | Saves to file | `.alayacore.tmp/search-*.txt` |
 
 ## read_file
 
-Files larger than 256KB are truncated at a line boundary with metadata:
+Files larger than 64KB are truncated at a line boundary with metadata:
 
 ```
-[Lines 1-3375 of 10000 | 256.0KB of 760.6KB shown]
+[Lines 1-3375 of 10000 | 64.0KB of 760.6KB shown]
 
 [file content...]
 ```
@@ -25,7 +25,7 @@ Files larger than 256KB are truncated at a line boundary with metadata:
 
 ## execute_command
 
-Command output larger than 32KB is saved to a temp file:
+Command output larger than 64KB is saved to a temp file:
 
 ```
 Output (5000 lines, 194.2KB) saved to: .alayacore.tmp/cmd-12345.txt

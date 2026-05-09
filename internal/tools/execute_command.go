@@ -21,7 +21,7 @@ const defaultCommandTimeout = 2 * time.Minute
 
 // maxCommandOutput is the threshold for saving command output to a temp file.
 // Outputs larger than this return only the file path and metadata.
-const maxCommandOutput = 32 * 1024 // 32KB
+const maxCommandOutput = 64 * 1024 // 64KB
 
 // executeCommandInput represents the input for the execute_command tool
 type executeCommandInput struct {
