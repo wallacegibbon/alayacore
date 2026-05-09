@@ -37,12 +37,6 @@ A blank line separates messages of different types.
 # Pipe a single question
 echo "what is 2+2?" | alayacore --plainio
 
-# Interactive plain session
-alayacore --plainio
-> read the Makefile and list the build targets
-> now explain the architecture
-> :quit
-
 # Use in scripts
 alayacore --plainio < questions.txt > answers.txt
 ```

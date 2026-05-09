@@ -87,12 +87,6 @@ alayacore --proxy http://127.0.0.1:7890
 
 # Plain IO — pipe a question, get an answer
 echo "what is 2+2?" | alayacore --plainio
-
-# Multi-turn plain IO session
-alayacore --plainio
-> read the Makefile and explain the build targets
-> now add a target for cross-compiling to Windows
-> :quit
 ```
 
 ## Next Steps
