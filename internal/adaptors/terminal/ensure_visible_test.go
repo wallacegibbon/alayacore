@@ -284,3 +284,84 @@ func TestAutoFollow_OnlyGEnables(t *testing.T) {
 		t.Errorf("expected YOffset=%d (bottom), got %d", expectedOffset, yOffsetFinal)
 	}
 }
+
+// TestAutoFollow_JNoOpWhenNewWindowBetweenTicks is a regression test for a
+// race where a new window is appended to the buffer between key events and
+// the periodic tick.  Before the fix, pressing j while auto-following would
+// silently move the cursor to the (invisible) new window and disable
+// auto-follow, because MoveWindowCursorDown checked windowCount at the
+// moment of the keypress rather than honoring the auto-follow invariant.
+//
+// Expected behavior: when auto-follow is active, j (MoveWindowCursorDown)
+// and L (MoveWindowCursorToBottom) are always no-ops.
+func TestAutoFollow_JNoOpWhenNewWindowBetweenTicks(t *testing.T) {
+	wb := NewWindowBuffer(80, DefaultStyles())
+	display := NewDisplayModel(wb, DefaultStyles())
+
+	wb.AppendOrUpdate("w1", stream.TagTextAssistant, strings.Repeat("line\n", 5))
+	wb.AppendOrUpdate("w2", stream.TagTextAssistant, strings.Repeat("line\n", 5))
+	wb.AppendOrUpdate("w3", stream.TagTextAssistant, strings.Repeat("line\n", 5))
+
+	display.SetHeight(20)
+	display.updateContent()
+
+	// Simulate G: cursor at last window, auto-follow enabled.
+	display.SetCursorToLastWindow()
+	display.GotoBottom()
+	display.updateContent()
+
+	if !display.autoFollow {
+		t.Fatal("expected autoFollow=true after G")
+	}
+	cursorBefore := display.GetWindowCursor()
+	t.Logf("After G: cursor=%d, autoFollow=%v", cursorBefore, display.autoFollow)
+
+	// Press j while at the last window — should be a no-op.
+	moved := display.MoveWindowCursorDown()
+	if moved {
+		t.Fatal("j at last window with autoFollow should be a no-op")
+	}
+	if !display.autoFollow {
+		t.Fatal("autoFollow should still be true after j at last window")
+	}
+
+	// Now a new window arrives between ticks (buffer updated, tick not yet fired).
+	wb.AppendOrUpdate("w4", stream.TagTextAssistant, strings.Repeat("line\n", 5))
+	// Window count is now 4; cursor is still at old last (index 2).
+	// Before the fix, pressing j here would move cursor to index 3 and
+	// disable auto-follow.
+
+	moved = display.MoveWindowCursorDown()
+	if moved {
+		t.Errorf("j with autoFollow should be no-op even after new window; cursor=%d, windowCount=%d",
+			display.GetWindowCursor(), wb.GetWindowCount())
+	}
+	if !display.autoFollow {
+		t.Error("autoFollow should NOT be disabled by j when a new window was appended between ticks")
+	}
+	if display.GetWindowCursor() != cursorBefore {
+		t.Errorf("cursor should stay at %d, got %d", cursorBefore, display.GetWindowCursor())
+	}
+
+	// L (MoveWindowCursorToBottom) should also be a no-op while auto-following.
+	moved = display.MoveWindowCursorToBottom()
+	if moved {
+		t.Errorf("L with autoFollow should be no-op; cursor=%d", display.GetWindowCursor())
+	}
+	if !display.autoFollow {
+		t.Error("autoFollow should NOT be disabled by L when auto-following")
+	}
+
+	// Now simulate the tick handler: SetCursorToLastWindow advances cursor
+	// to the new last window and keeps auto-follow.
+	display.SetCursorToLastWindow()
+	display.GotoBottom()
+	display.updateContent()
+
+	if display.GetWindowCursor() != 3 {
+		t.Errorf("after tick, cursor should be at last window (3), got %d", display.GetWindowCursor())
+	}
+	if !display.autoFollow {
+		t.Error("autoFollow should still be true after tick")
+	}
+}

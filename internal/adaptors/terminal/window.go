@@ -813,7 +813,7 @@ type DisplayModel struct {
 	width          int
 	height         int
 	windowCursor   int
-	autoFollow     bool // true when G was pressed; cleared by any other navigation
+	autoFollow     bool // true on init and after G; cleared by navigation except j/J/L while active
 	displayFocused bool
 	lastContent    string
 }
@@ -975,8 +975,17 @@ func (m *DisplayModel) SetWindowCursor(index int) {
 	m.autoFollow = false
 }
 
-// MoveWindowCursorDown moves the window cursor down
+// MoveWindowCursorDown moves the window cursor down.
+// When auto-follow is active this is a no-op: new windows may have been
+// appended to the buffer between ticks, making the cursor appear to be
+// "not at the last window" even though the user never moved.  Allowing j
+// to move in that case would silently jump to an invisible window and
+// disable auto-follow.  Only the tick handler (SetCursorToLastWindow)
+// should advance the cursor while auto-following.
 func (m *DisplayModel) MoveWindowCursorDown() bool {
+	if m.autoFollow {
+		return false
+	}
 	windowCount := m.windowBuffer.GetWindowCount()
 	if windowCount == 0 || m.windowCursor == windowCount-1 {
 		return false
@@ -1115,8 +1124,12 @@ func (m *DisplayModel) MoveWindowCursorToTop() bool {
 	return false
 }
 
-// MoveWindowCursorToBottom moves cursor to bottom visible window
+// MoveWindowCursorToBottom moves cursor to bottom visible window.
+// No-op when auto-follow is active (same race as MoveWindowCursorDown).
 func (m *DisplayModel) MoveWindowCursorToBottom() bool {
+	if m.autoFollow {
+		return false
+	}
 	windowCount := m.windowBuffer.GetWindowCount()
 	if windowCount == 0 {
 		return false

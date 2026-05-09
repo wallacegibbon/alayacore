@@ -395,7 +395,7 @@ After `json.Unmarshal` into `json.RawMessage`, `args` becomes the 4 bytes `null`
 
 ### Terminal scroll position
 
-`DisplayModel.autoFollow` must be set to `false` for K (line scroll up) and Ctrl+D/Ctrl+U (half-page scroll) via `MarkUserScrolled()`, not just k/g/H/M (cursor move via `MoveWindowCursorUp`/`SetWindowCursor`/`MoveWindowCursorToTop`/`MoveWindowCursorToCenter`), or auto-follow is not properly disabled on manual scrolling. When auto-follow is active, j, J, and L are no-ops (cursor already at last window, viewport already at bottom) and do not disable auto-follow. Only `G` (`SetCursorToLastWindow`) re-enables it. See `window.go` → `MarkUserScrolled`.
+`DisplayModel.autoFollow` must be set to `false` for K (line scroll up) and Ctrl+D/Ctrl+U (half-page scroll) via `MarkUserScrolled()`, not just k/g/H/M (cursor move via `MoveWindowCursorUp`/`SetWindowCursor`/`MoveWindowCursorToTop`/`MoveWindowCursorToCenter`), or auto-follow is not properly disabled on manual scrolling. When auto-follow is active, j (`MoveWindowCursorDown`), J (`scrollDownLine`), and L (`MoveWindowCursorToBottom`) are no-ops and do not disable auto-follow. This prevents a race where a new window appended between ticks would let j/L silently jump to an invisible window and kill auto-follow. Only `G` (`SetCursorToLastWindow`) re-enables auto-follow. See `window.go` → `MarkUserScrolled`.
 
 ### Incomplete tool calls on cancel
 
