@@ -1,13 +1,15 @@
 package tools
 
 import (
+	"bufio"
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/alayacore/alayacore/internal/llm"
-	"github.com/alayacore/alayacore/internal/truncation"
 )
 
 // SearchContentInput represents the input for the search_content tool
@@ -92,12 +94,88 @@ func handleSearchContentResult(execErr error, stdout, stderr *bytes.Buffer, maxL
 		return llm.NewTextResponse("No matches found")
 	}
 
-	wasTruncated, truncatedOutput := truncation.Lines(output, maxLines)
-	if wasTruncated {
-		truncatedOutput += truncation.Marker
+	// Count total lines in output
+	totalLines := countLines(output)
+
+	// If output exceeds maxLines, save full results to file and return preview
+	if totalLines > maxLines {
+		return handleLargeSearchResult(output, totalLines, maxLines)
 	}
 
-	return llm.NewTextResponse(truncatedOutput)
+	return llm.NewTextResponse(output)
+}
+
+// handleLargeSearchResult saves full search output to a temp file and returns
+// a message with the file path. This avoids partial results being misinterpreted.
+func handleLargeSearchResult(output string, totalLines, maxLines int) llm.ToolResultOutput {
+	// Save full output to temp file
+	filePath, err := saveSearchOutputToFile(output)
+	if err != nil {
+		// Fallback: return first maxLines lines if file save fails
+		lines := splitLines(output)
+		if len(lines) > maxLines {
+			lines = lines[:maxLines]
+		}
+		return llm.NewTextResponse(joinLines(lines) + "\n[truncated - file save failed]")
+	}
+
+	return llm.NewTextResponse(fmt.Sprintf(
+		"Search found %d matching lines. Results saved to: %s\nUse read_file to access specific matches.",
+		totalLines, filePath,
+	))
+}
+
+// splitLines splits a string into lines.
+func splitLines(s string) []string {
+	scanner := bufio.NewScanner(bytes.NewBufferString(s))
+	var lines []string
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	return lines
+}
+
+// joinLines joins lines with newlines.
+func joinLines(lines []string) string {
+	result := ""
+	for i, line := range lines {
+		if i > 0 {
+			result += "\n"
+		}
+		result += line
+	}
+	return result
+}
+
+// saveSearchOutputToFile saves the full search output to a temp file in
+// .alayacore.tmp/ directory under the current working directory.
+func saveSearchOutputToFile(output string) (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		cwd = "."
+	}
+
+	tmpDir := filepath.Join(cwd, ".alayacore.tmp")
+	if err := os.MkdirAll(tmpDir, 0755); err != nil {
+		return "", err
+	}
+
+	file, err := os.CreateTemp(tmpDir, "search-*.txt")
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	writer := bufio.NewWriter(file)
+	if _, err := writer.WriteString(output); err != nil {
+		return "", err
+	}
+
+	if err := writer.Flush(); err != nil {
+		return "", err
+	}
+
+	return file.Name(), nil
 }
 
 func executeSearchContent(ctx context.Context, args SearchContentInput) (llm.ToolResultOutput, error) {

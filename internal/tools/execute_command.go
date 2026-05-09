@@ -1,16 +1,18 @@
 package tools
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/tools/shell"
-	"github.com/alayacore/alayacore/internal/truncation"
 )
 
 // defaultCommandTimeout is the maximum time a command may run before being
@@ -20,8 +22,8 @@ import (
 const defaultCommandTimeout = 2 * time.Minute
 
 // maxCommandOutput is the maximum size of command output returned to the LLM.
-// Large outputs (e.g. find /, verbose test runs) waste context tokens.
-// The agent can redirect to a file or use head/tail if more output is needed.
+// Outputs larger than this are saved to a temp file with the first maxCommandOutput
+// bytes shown as preview.
 const maxCommandOutput = 32 * 1024 // 32KB
 
 // executeCommandInput represents the input for the execute_command tool
@@ -115,7 +117,11 @@ func handleCommandCancellation(cmd *exec.Cmd, done chan error, stdout, stderr *b
 		shell.TerminateProcessGroup(process, done)
 	}
 	output := formatCommandOutput(stdout, stderr, -1) // canceled, always show labels
-	output = truncation.Front(output, maxCommandOutput, truncation.Marker)
+
+	if len(output) > maxCommandOutput {
+		return handleLargeCommandOutput(output, -1, nil)
+	}
+
 	if output != "" {
 		return llm.NewTextErrorResponse("Canceled\n" + output)
 	}
@@ -128,7 +134,11 @@ func handleCommandTimeout(cmd *exec.Cmd, done chan error, stdout, stderr *bytes.
 		shell.TerminateProcessGroup(process, done)
 	}
 	output := formatCommandOutput(stdout, stderr, -1)
-	output = truncation.Front(output, maxCommandOutput, truncation.Marker)
+
+	if len(output) > maxCommandOutput {
+		return handleLargeCommandOutput(output, -2, nil)
+	}
+
 	if output != "" {
 		return llm.NewTextErrorResponse("Timed out\n" + output)
 	}
@@ -144,8 +154,13 @@ func handleCommandCompletion(execErr error, stdout, stderr *bytes.Buffer) llm.To
 	}
 
 	output := formatCommandOutput(stdout, stderr, exitCode)
-	output = truncation.Front(output, maxCommandOutput, truncation.Marker)
 
+	// For large outputs, save to file and return preview + path
+	if len(output) > maxCommandOutput {
+		return handleLargeCommandOutput(output, exitCode, execErr)
+	}
+
+	// Small output: return as-is
 	if execErr != nil {
 		if exitCode != 0 {
 			return llm.NewTextErrorResponse(fmt.Sprintf("Exit Code: %d\n%s", exitCode, output))
@@ -157,6 +172,90 @@ func handleCommandCompletion(execErr error, stdout, stderr *bytes.Buffer) llm.To
 	}
 
 	return llm.NewTextResponse(output)
+}
+
+// handleLargeCommandOutput saves full output to a temp file and returns
+// a message with the file path. This avoids re-running commands with side effects.
+func handleLargeCommandOutput(output string, exitCode int, execErr error) llm.ToolResultOutput {
+	// Save full output to temp file
+	filePath, err := saveOutputToFile(output)
+	if err != nil {
+		// Fallback: return first maxCommandOutput bytes with marker
+		preview := output
+		if len(preview) > maxCommandOutput {
+			preview = preview[:maxCommandOutput]
+		}
+		if execErr != nil && exitCode > 0 {
+			return llm.NewTextErrorResponse(fmt.Sprintf("Exit Code: %d\n%s\n[truncated - file save failed]", exitCode, preview))
+		}
+		return llm.NewTextResponse(preview + "\n[truncated - file save failed]")
+	}
+
+	// Count total lines
+	totalLines := countLines(output)
+	totalKB := float64(len(output)) / 1024
+
+	var msg string
+	if execErr != nil && exitCode > 0 {
+		msg = fmt.Sprintf("Exit Code: %d\n", exitCode)
+	}
+
+	msg += fmt.Sprintf(
+		"Output (%d lines, %.1fKB) saved to: %s\nUse read_file to access specific sections.",
+		totalLines, totalKB, filePath,
+	)
+
+	if execErr != nil {
+		return llm.NewTextErrorResponse(msg)
+	}
+	return llm.NewTextResponse(msg)
+}
+
+// saveOutputToFile saves the full command output to a temp file in the
+// .alayacore.tmp/ directory under the current working directory.
+// Using CWD (not /tmp) avoids cross-filesystem issues when the agent
+// later reads the file with read_file.
+func saveOutputToFile(output string) (string, error) {
+	// Create .alayacore.tmp/ directory in CWD
+	cwd, err := os.Getwd()
+	if err != nil {
+		cwd = "."
+	}
+
+	tmpDir := filepath.Join(cwd, ".alayacore.tmp")
+	if err := os.MkdirAll(tmpDir, 0755); err != nil {
+		return "", err
+	}
+
+	file, err := os.CreateTemp(tmpDir, "cmd-*.txt")
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	writer := bufio.NewWriter(file)
+	if _, err := writer.WriteString(output); err != nil {
+		return "", err
+	}
+
+	if err := writer.Flush(); err != nil {
+		return "", err
+	}
+
+	return file.Name(), nil
+}
+
+// countLines counts the number of lines in a string.
+func countLines(s string) int {
+	if s == "" {
+		return 0
+	}
+	scanner := bufio.NewScanner(strings.NewReader(s))
+	count := 0
+	for scanner.Scan() {
+		count++
+	}
+	return count
 }
 
 func formatCommandOutput(stdout, stderr *bytes.Buffer, exitCode int) string {

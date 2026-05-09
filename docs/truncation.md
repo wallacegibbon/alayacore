@@ -1,193 +1,76 @@
-# Text Truncation
+# Tool Output Handling
 
-How AlayaCore truncates text output to stay within context budgets while preserving UTF-8 integrity.
+How AlayaCore handles large outputs from tools to stay within context budgets.
 
-## Overview
+## Strategy
 
-The `internal/truncation` package provides shared text truncation utilities used across the codebase. All functions guarantee valid UTF-8 output — they never split a multi-byte character.
+| Tool | Behavior | File Pattern |
+|------|----------|--------------|
+| `read_file` | Truncates at 256KB with metadata header | N/A (in-memory) |
+| `execute_command` | Saves to file | `.alayacore.tmp/cmd-*.txt` |
+| `search_content` | Saves to file | `.alayacore.tmp/search-*.txt` |
 
-Two truncation strategies are available, each suited to different use cases:
+## read_file
 
-| Strategy | Keeps | Use Case |
-|----------|-------|----------|
-| `Lines` | First N non-empty lines | Line-oriented output (search results) |
-| `Front` | Front of text within byte budget | Command output |
-
-## Lines Strategy
-
-`Lines(input string, maxLines int) (bool, string)` returns the first `maxLines` non-empty lines from input.
-
-### Behavior
-
-- Skips empty lines (they don't count toward the limit)
-- Returns `(wasTruncated, result)` tuple
-- Never slices by byte offset — uses `bufio.Scanner` to read complete lines
-- Each line in output is an intact, valid-UTF-8 substring
-
-### Usage
-
-Used by `search_content` tool for ripgrep output:
-
-```go
-truncated, output := truncation.Lines(input, maxLines)
-```
-
-Default limit is 100 lines, configurable via the `max_lines` parameter.
-
-Ripgrep returns all matches; truncation enforces a global line limit. This is simpler than using `--max-count` (which limits per-file) and provides predictable, consistent output.
-
-### Example
+Files larger than 256KB are truncated at a line boundary with metadata:
 
 ```
-Input (10 lines, 3 empty):
-  "line1\n\nline2\nline3\n\n\nline4\nline5\n\nline6\n"
+[Lines 1-3375 of 10000 | 256.0KB of 760.6KB shown]
 
-Lines(input, 3):
-  wasTruncated = true
-  output = "line1\nline2\nline3"
+[file content...]
 ```
 
-Empty lines are skipped, so the first 3 non-empty lines are returned.
+- Agent can use `start_line`/`end_line` to read specific ranges
+- No file is created; truncation happens in-memory
 
-## Front Strategy
+## execute_command
 
-`Front(text string, budget int, marker string) string` truncates text so the total output (content + marker) fits within `budget` bytes.
-
-### Behavior
-
-- Each rune pays its **actual byte cost** (`utf8.RuneLen`)
-- ASCII characters: 1 byte each
-- CJK characters: 3 bytes each
-- Emoji: 4 bytes each
-- Marker `"\n[truncated]"` (12 bytes) is appended when truncation occurs
-
-### Budget Calculation
+Command output larger than 32KB is saved to a temp file:
 
 ```
-contentBudget = totalBudget - len(marker)
+Output (5000 lines, 194.2KB) saved to: .alayacore.tmp/cmd-12345.txt
+Use read_file to access specific sections.
 ```
 
-If `contentBudget <= 0`, returns only the marker.
-
-### Usage Locations
-
-| Location | Budget | Description |
-|----------|--------|-------------|
-| `execute_command` | 32 KB | Command output truncation |
-
-### Example
-
-```go
-// 32KB budget with default marker
-output := truncation.Front(text, 32*1024, truncation.Marker)
+Or with error:
+```
+Exit Code: 1
+Output (5000 lines, 194.2KB) saved to: .alayacore.tmp/cmd-12345.txt
+Use read_file to access specific sections.
 ```
 
-### CJK Fairness
+- Agent uses `read_file` with line ranges to access specific sections
+- Same behavior for canceled/timed out commands
 
-The byte budget approach ensures fair handling of all scripts:
+## search_content
 
-| Text | Characters | Bytes | Result |
-|------|------------|-------|--------|
-| `"Hello world"` | 11 | 11 | Fits in 100-byte budget |
-| `"你好世界"` | 4 | 12 | Each CJK char = 3 bytes |
-| `"🎉🎊🎈"` | 3 | 12 | Each emoji = 4 bytes |
+Search results exceeding `max_lines` (default 100) are saved to a temp file:
 
-With a 10-byte budget:
-- `"Hello world"` → `"[truncated]"` (11 bytes exceeds 10-byte budget, marker only)
-- `"你好世界"` → `"[truncated]"` (12 bytes exceeds 10-byte budget, marker only)
-
-This approach avoids the approximation of "1 token ≈ 4 characters" which is wildly inaccurate for non-ASCII scripts.
-
-## Marker Format
-
-```go
-const Marker = "\n[truncated]"
+```
+Search found 500 matching lines. Results saved to: .alayacore.tmp/search-12345.txt
+Use read_file to access specific matches.
 ```
 
-The marker serves two purposes:
+- System prompt warns LLM about incomplete results
+- Agent must use `read_file` to see full results before making conclusions
 
-1. **LLM Awareness**: The LLM knows content was omitted and can re-read files if needed
-2. **Debugging**: Humans can see where truncation occurred
+## Temp File Location
 
-The leading newline ensures the marker appears on its own line, not appended to the last line of content.
+All temp files are saved to `.alayacore.tmp/` in the current working directory.
 
-## Where Truncation is Applied
+**Why CWD instead of /tmp?**
+- Avoids cross-filesystem issues when `/tmp` is on a different mount
+- Same approach as `edit_file` for atomic file operations
+- Uses `os.CreateTemp` for atomic file creation
 
-### Tool Output
-
-| Tool | Strategy | Limit | Configurable |
-|------|----------|-------|--------------|
-| `execute_command` | Front | 32 KB | No |
-| `search_content` | Lines | 100 lines default | Yes (`max_lines` param) |
-| `read_file` | Truncation | 256 KB max (truncates at line boundary with metadata header) | No |
-
-Note: `search_content` uses only truncation for limiting output. Ripgrep returns all matches; the global `max_lines` parameter controls total output. This is simpler than using ripgrep's `--max-count` (which limits per-file) and provides predictable, consistent results.
-
-## UTF-8 Safety Guarantee
-
-All truncation functions guarantee valid UTF-8 output:
-
-### Lines
-
-- Uses `bufio.Scanner` which reads complete lines
-- Never slices by byte offset
-- Each output line is an intact substring
-
-### Front
-
-- Uses `utf8.RuneLen(r)` to get each rune's byte cost
-- Cuts at rune boundaries, never mid-character
-- Even 4-byte emoji are handled correctly
-
-```go
-// Walk runes, accumulate actual byte cost, find the cut point.
-cut := 0
-for _, r := range text {
-    runeLen := utf8.RuneLen(r)
-    if cut+runeLen > contentBudget {
-        break
-    }
-    cut += runeLen
-}
-return text[:cut] + marker
+**Cleanup:**
+```bash
+rm -rf .alayacore.tmp/
 ```
 
-The slice `text[:cut]` is always valid UTF-8 because `cut` is accumulated by whole rune lengths.
-
-## API Reference
-
-### Lines
-
-```go
-func Lines(input string, maxLines int) (bool, string)
+Or add to `.gitignore`:
 ```
-
-**Parameters:**
-- `input`: Text to truncate
-- `maxLines`: Maximum non-empty lines to keep
-
-**Returns:**
-- `bool`: `true` if truncation occurred
-- `string`: Truncated output (no marker appended)
-
-### Front
-
-```go
-func Front(text string, budget int, marker string) string
-```
-
-**Parameters:**
-- `text`: Text to truncate
-- `budget`: Maximum total bytes (content + marker)
-- `marker`: String to append when truncated (use `truncation.Marker`)
-
-**Returns:**
-- `string`: Truncated output with marker, or original text if it fits
-
-### Marker Constant
-
-```go
-const Marker = "\n[truncated]" // 12 bytes
+.alayacore.tmp/
 ```
 
 ## Related

@@ -17,7 +17,9 @@ const systemPromptIdentity = `Your name is AlayaCore. You are a helpful AI assis
 
 const systemPromptRules = `Never assume - verify with tools.`
 
-const systemPromptSearch = `Use search_content to locate code and patterns before using read_file for detailed inspection.`
+const systemPromptSearch = `Use search_content to locate code and patterns before using read_file for detailed inspection.
+
+When search_content shows "[Lines X of Y shown]" with a file path, results are INCOMPLETE. You MUST use read_file to see the full results before making conclusions. Do not assume you've seen all matches.`
 
 const systemPromptSkills = `Check <available_skills> below; read the <location> file to load relevant skill instructions. Skill instructions may use relative paths - run them from the skill's directory (derived from <location>).`
 

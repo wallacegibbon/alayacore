@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/alayacore/alayacore/internal/llm"
-	"github.com/alayacore/alayacore/internal/truncation"
 )
 
 func TestRGAvailable(t *testing.T) {
@@ -193,26 +192,6 @@ func TestSearchContentIgnoreCase(t *testing.T) {
 	}
 }
 
-func TestTruncateLines(t *testing.T) {
-	input := "line1\nline2\nline3\nline4\nline5\n"
-	truncated, output := truncation.Lines(input, 3)
-	if !truncated {
-		t.Error("expected truncation")
-	}
-	if output != "line1\nline2\nline3" {
-		t.Errorf("unexpected output: %q", output)
-	}
-
-	// No truncation needed
-	truncated, output = truncation.Lines(input, 10)
-	if truncated {
-		t.Error("expected no truncation")
-	}
-	if output != "line1\nline2\nline3\nline4\nline5" {
-		t.Errorf("unexpected output: %q", output)
-	}
-}
-
 func TestSearchContentMaxLinesGlobal(t *testing.T) {
 	if !RGAvailable() {
 		t.Skip("rg not available on system")
@@ -235,7 +214,7 @@ func TestSearchContentMaxLinesGlobal(t *testing.T) {
 		}
 	}
 
-	// With MaxLines=5, output should be capped at 5 lines globally
+	// With MaxLines=5, output should be saved to file
 	result, err := executeSearchContent(context.Background(), SearchContentInput{
 		Pattern:  "match",
 		Path:     tmpDir,
@@ -249,15 +228,19 @@ func TestSearchContentMaxLinesGlobal(t *testing.T) {
 		t.Fatalf("expected text output, got %T", result)
 	}
 
-	lineCount := strings.Count(text.Text, "\n") + 1
-	if strings.HasSuffix(text.Text, truncation.Marker) {
-		lineCount-- // don't count the truncation indicator
+	// Should contain line count
+	if !strings.Contains(text.Text, "matching lines") {
+		t.Errorf("expected 'matching lines' in output, got:\n%s", text.Text)
 	}
-	if lineCount > 5 {
-		t.Errorf("expected at most 5 lines, got %d\nOutput:\n%s", lineCount, text.Text)
+
+	// Should mention file was saved
+	if !strings.Contains(text.Text, "Results saved to:") {
+		t.Errorf("expected 'Results saved to:' in output, got:\n%s", text.Text)
 	}
-	if !strings.Contains(text.Text, truncation.Marker) {
-		t.Errorf("expected truncation indicator in output:\n%s", text.Text)
+
+	// Should contain .alayacore.tmp path
+	if !strings.Contains(text.Text, ".alayacore.tmp/search-") {
+		t.Errorf("expected .alayacore.tmp/search- path, got:\n%s", text.Text)
 	}
 }
 

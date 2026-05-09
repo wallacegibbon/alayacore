@@ -10,3 +10,4 @@ alayacore-*.log
 .playwright-cli/
 REFACTOR.md
 TODO.md
+.alayacore.tmp/

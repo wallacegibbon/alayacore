@@ -74,17 +74,6 @@ The session layer manages conversation state, task execution, and model interact
 
 Session files use a Markdown-based format with YAML frontmatter. The body contains TLV-encoded conversation data (messages, tool calls, tool results) written directly as binary TLV records after the frontmatter.
 
-### Truncation (`internal/truncation/`)
-
-Shared text truncation utilities used by the tools and session layers. All functions guarantee valid UTF-8 output (no split multi-byte characters). Two strategies:
-
-| Function | Strategy | Used by |
-|----------|----------|---------|
-| `Lines` | Keeps first N non-empty lines | `search_content` (100 lines default) |
-| `Front` | Keeps front of text within byte budget | `execute_command` (32KB limit) |
-
-All strategies use a unified `[truncated]` marker so the LLM can recognize truncated output regardless of source. `Front` uses a byte budget and counts each rune's actual byte cost, so any mix of ASCII and multi-byte characters (CJK, emoji) is handled fairly without approximation.
-
 ### Agent Layer (`internal/llm/`)
 
 The agent layer handles LLM interaction and tool-calling orchestration.
@@ -120,8 +109,8 @@ Messages are appended incrementally in `OnStepFinish` so they're preserved even 
 | `read_file` | Read file contents with optional line ranges. 256KB max for full reads (truncates at line boundary with metadata). | Safe | — |
 | `edit_file` | Search/replace edits on existing files | Medium | — |
 | `write_file` | Create or overwrite files | Dangerous | — |
-| `execute_command` | Execute commands in the detected shell (cross-platform). Output truncated at 32KB. | Most Dangerous | — |
-| `search_content` | Search file contents using ripgrep (`rg`). 100 matching lines by default. | Safe | Requires `rg` binary |
+| `execute_command` | Execute commands in the detected shell (cross-platform). Large output (>32KB) saved to `.alayacore.tmp/cmd-*.txt` with preview. | Most Dangerous | — |
+| `search_content` | Search file contents using ripgrep (`rg`). 100 matching lines preview; full results saved to `.alayacore.tmp/search-*.txt`. | Safe | Requires `rg` binary |
 
 Each tool is implemented with type-safe input structs and auto-generated JSON schemas. All tools accept a `context.Context` parameter and respect cancellation — `:cancel` will interrupt long-running tool execution. See [schema-improvements.md](schema-improvements.md) for the pattern.
 
@@ -330,7 +319,7 @@ Agent.Stream() receives tool_call event
 8. **Typed Tools** — `TypedExecute[T]` wrapper for type-safe tool implementations with auto-generated schemas.
 9. **Lazy Agent Init** — Agent and provider are created on first use, not at startup.
 10. **Sequential Tool Execution** — Tools execute one at a time. See [sequential-tool-execution.md](sequential-tool-execution.md).
-11. **Context Efficiency** — Tool descriptions are minimal, outputs are size-capped (256KB for `read_file`, 32KB for `execute_command`), search results limited (100 lines). See [context-tracking.md](context-tracking.md).
+11. **Context Efficiency** — Tool descriptions are minimal. Large outputs saved to `.alayacore.tmp/`: `read_file` truncates at 256KB, `execute_command` and `search_content` save full output to file. See [truncation.md](truncation.md).
 12. **Think Mode** — Provider-specific reasoning fields are added to API requests. Three levels: 0=off, 1=normal, 2=max. Toggled via `:think [0|1|2]`.
 
 ## Gotchas
