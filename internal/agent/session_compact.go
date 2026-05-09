@@ -2,14 +2,14 @@ package agent
 
 // Session compaction: compacts old messages to save context tokens.
 //
-// Two compaction strategies are applied to messages outside the recent window:
+// Compaction is applied to messages outside the recent window:
 //
-//  1. ReasoningPart — removed entirely. Raw thinking has no value once the step
-//     is complete; the conclusion is captured in the TextPart.
-//
-//  2. ToolResultPart — removed along with its matching ToolCallPart.
+//  1. ToolResultPart — removed along with its matching ToolCallPart.
 //     The model can re-invoke the tool if it needs the data. Errors and skill
 //     reads are preserved since they're actionable or serve as instructions.
+//
+//  2. ReasoningPart — kept. The chain of thought cannot be reconstructed
+//     and is essential for multi-step reasoning continuity.
 
 import (
 	"encoding/json"
@@ -132,16 +132,16 @@ func (s *Session) compactHistory() {
 	}
 }
 
-// compactAssistantParts removes reasoning and tool calls whose results are
-// also being removed. Tool calls in keepIDs are preserved (with their input
-// compacted if applicable). Returns true if any content was modified.
+// compactAssistantParts removes tool calls whose results are also being
+// removed. Reasoning is preserved — the chain of thought cannot be
+// reconstructed and is essential for multi-step reasoning continuity.
+// Tool calls in keepIDs are preserved (with their input compacted if
+// applicable). Returns true if any content was modified.
 func compactAssistantParts(msg *llm.Message, keepIDs map[string]bool) bool {
 	changed := false
 	filtered := msg.Content[:0] // reuse backing array
 	for _, part := range msg.Content {
 		switch p := part.(type) {
-		case llm.ReasoningPart:
-			changed = true // drop entirely — conclusion is in TextPart
 		case llm.ToolCallPart:
 			if keepIDs[p.ToolCallID] {
 				filtered = append(filtered, p) // preserved as-is
@@ -149,7 +149,7 @@ func compactAssistantParts(msg *llm.Message, keepIDs map[string]bool) bool {
 				changed = true // drop — result is being removed too
 			}
 		default:
-			filtered = append(filtered, p)
+			filtered = append(filtered, p) // keep — text, reasoning, etc.
 		}
 	}
 	if changed {

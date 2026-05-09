@@ -64,7 +64,7 @@ The session layer manages conversation state, task execution, and model interact
 | `RuntimeManager` | Persists runtime settings (active model, active theme) to `runtime.conf` |
 | `CommandDefinitions` | Static metadata for session commands (`:save`, `:cancel`, etc.) |
 | `ContextTokens` | Tracks conversation context size across API calls. See [context-tracking.md](context-tracking.md). |
-| `compactHistory()` | Compacts old messages (strips reasoning, removes tool call/result pairs; errors and skill reads preserved). Disabled via `--no-compact`. |
+| `compactHistory()` | Compacts old messages (removes tool call/result pairs; errors and skill reads preserved). Reasoning is kept. Disabled via `--no-compact`. |
 
 ### Session Persistence
 
@@ -331,7 +331,7 @@ Agent.Stream() receives tool_call event
 8. **Typed Tools** — `TypedExecute[T]` wrapper for type-safe tool implementations with auto-generated schemas.
 9. **Lazy Agent Init** — Agent and provider are created on first use, not at startup.
 10. **Sequential Tool Execution** — Tools execute one at a time. See [sequential-tool-execution.md](sequential-tool-execution.md).
-11. **Context Efficiency** — Tool descriptions are minimal, outputs are size-capped (32KB), search results limited (100 lines), and old messages are compacted to save tokens (reasoning stripped, tool call/result pairs removed; errors and skill reads preserved with full context). See [context-tracking.md](context-tracking.md).
+11. **Context Efficiency** — Tool descriptions are minimal, outputs are size-capped (32KB), search results limited (100 lines), and old messages are compacted to save tokens (tool call/result pairs removed; errors and skill reads preserved with full context; reasoning is kept). See [context-tracking.md](context-tracking.md).
 12. **Think Mode** — Provider-specific reasoning fields are added to API requests. Three levels: 0=off, 1=normal, 2=max. Toggled via `:think [0|1|2]`.
 
 ## Gotchas

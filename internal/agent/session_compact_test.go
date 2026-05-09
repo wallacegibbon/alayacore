@@ -80,12 +80,12 @@ func buildMultiStepMessages() []llm.Message {
 
 // After compaction of buildMultiStepMessages (boundary=4, indices 0-3 are old):
 //   - Index 0: user — unchanged
-//   - Index 1: assistant — reasoning and c1 removed, only text remains
+//   - Index 1: assistant — c1 removed, reasoning + text remain
 //   - Index 2: tool — c1 result removed → empty → removed by removeEmptyToolMessages
-//   - Index 3: assistant — reasoning, c2, c2b removed, only text remains
+//   - Index 3: assistant — c2, c2b removed, reasoning + text remain
 //
 // Result: 9 messages (index 2 dropped).
-func TestCompactHistory_ReasoningRemovedFromOld(t *testing.T) {
+func TestCompactHistory_ReasoningPreservedInOld(t *testing.T) {
 	s := newTestSession(buildMultiStepMessages())
 	s.compactHistory()
 
@@ -93,15 +93,19 @@ func TestCompactHistory_ReasoningRemovedFromOld(t *testing.T) {
 		if msg.Role != llm.RoleAssistant {
 			continue
 		}
-		// Original indices 1, 3 are old → no reasoning.
+		// Original indices 1, 3 are old → reasoning should be preserved.
 		// After compaction they're at new indices 1, 2.
 		if i >= 3 {
 			break // past old window
 		}
+		found := false
 		for _, part := range msg.Content {
 			if _, ok := part.(llm.ReasoningPart); ok {
-				t.Errorf("msg[%d]: old reasoning should be removed", i)
+				found = true
 			}
+		}
+		if !found {
+			t.Errorf("msg[%d]: old reasoning should be preserved (chain of thought)", i)
 		}
 	}
 }
@@ -340,12 +344,16 @@ func TestCompactHistory_SkillDirReadsPreserved(t *testing.T) {
 		t.Error("skill read tool call should be preserved")
 	}
 
-	// But reasoning should still be removed.
+	// Reasoning should be preserved everywhere (chain of thought).
 	for _, part := range s.Messages[1].Content {
-		if _, ok := part.(llm.ReasoningPart); ok {
-			t.Error("reasoning should still be removed even in skill steps")
+		if rp, ok := part.(llm.ReasoningPart); ok {
+			if rp.Text != "Reading skill file." {
+				t.Errorf("reasoning text should be preserved, got %q", rp.Text)
+			}
+			return
 		}
 	}
+	t.Error("reasoning should be preserved in skill steps too")
 }
 
 func TestCompactHistory_Idempotent(t *testing.T) {
