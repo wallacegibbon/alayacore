@@ -119,7 +119,7 @@ The leading newline ensures the marker appears on its own line, not appended to 
 |------|----------|-------|--------------|
 | `execute_command` | Front | 32 KB | No |
 | `search_content` | Lines | 100 lines default | Yes (`max_lines` param) |
-| `read_file` | None | 32 KB hard limit | Use `start_line`/`end_line` for large files |
+| `read_file` | None | 32 KB max (returns error; use `start_line`/`end_line` for large files) | No |
 
 Note: `search_content` uses only truncation for limiting output. Ripgrep returns all matches; the global `max_lines` parameter controls total output. This is simpler than using ripgrep's `--max-count` (which limits per-file) and provides predictable, consistent results.
 

@@ -38,7 +38,7 @@ go install github.com/alayacore/alayacore@latest
 - **支持任何 LLM 提供商** — OpenAI、Anthropic、DeepSeek、Qwen、Ollama、LM Studio。一个配置文件支持多个模型，运行时可切换。
 - **流式 TUI** — 实时输出，支持虚拟滚动、可折叠窗口和类 Vim 快捷键。
 - **Plain IO 模式** — `--plainio` 用于脚本和管道。无 TUI，仅 stdin/stdout。
-- **会话持久化** — 支持保存和恢复对话，自动保存。
+- **会话持久化** — 支持保存和恢复对话，使用 `--session` 时自动保存。
 - **技能系统** — 可按照 [Agent Skills](https://agentskills.io) 规范扩展指令包来增强 Agent 能力。
 - **主题** — 可自定义配色方案，支持实时切换。
 

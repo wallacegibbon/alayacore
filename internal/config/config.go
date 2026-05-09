@@ -151,7 +151,7 @@ func Parse() *Settings {
 	autoSummarize := flag.Bool("auto-summarize", false, "Automatically summarize conversation when context exceeds 65% of limit")
 
 	// Compaction
-	noCompact := flag.Bool("no-compact", false, "Disable automatic history compaction (old tool results are kept in full)")
+	noCompact := flag.Bool("no-compact", false, "Disable automatic history compaction (old messages are preserved in full)")
 
 	flag.Parse()
 
