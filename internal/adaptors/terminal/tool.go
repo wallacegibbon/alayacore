@@ -100,7 +100,9 @@ func colorizeMultiLineTool(lines []string, styles *Styles) string {
 
 // RenderDiffContent renders a diff window from its raw Content.
 // The Content already has `- `, `+ `, `  ` prefixes - we just apply colors.
-func RenderDiffContent(content string, status ToolStatus, styles *Styles) string {
+// innerWidth controls line wrapping; pass 0 to disable wrapping.
+// Wraps per-line to preserve diff coloring on wrapped continuations.
+func RenderDiffContent(content string, status ToolStatus, styles *Styles, innerWidth int) string {
 	// Prepare content: strip ANSI and expand tabs before processing
 	content = prepareContent(content)
 
@@ -123,15 +125,20 @@ func RenderDiffContent(content string, status ToolStatus, styles *Styles) string
 		}
 
 		// Apply color based on prefix
+		var styled string
 		switch {
 		case strings.HasPrefix(line, "- "):
-			result = append(result, styles.DiffRemove.Render(line))
+			styled = styles.DiffRemove.Render(line)
 		case strings.HasPrefix(line, "+ "):
-			result = append(result, styles.DiffAdd.Render(line))
+			styled = styles.DiffAdd.Render(line)
 		default:
 			// Unchanged line (starts with "  ") or anything else
-			result = append(result, styles.Text.Render(line))
+			styled = styles.Text.Render(line)
 		}
+		if innerWidth > 0 {
+			styled = wrapContent(styled, innerWidth)
+		}
+		result = append(result, styled)
 	}
 
 	return strings.Join(result, "\n")

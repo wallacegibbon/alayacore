@@ -17,6 +17,26 @@ package terminal
 //   - Virtual rendering (only visible windows are rendered)
 //   - Line height tracking (for scroll positioning)
 //   - ID-based window lookup (for incremental updates)
+//
+// # Wrapping Strategy
+//
+// Line wrapping (wrapContent) happens in each rendering path, NOT in a
+// single centralized point. This is intentional for performance:
+//
+//   - renderGenericContent wraps and caches wrappedLines. AppendContent
+//     incrementally updates these cached lines via appendDeltaToLines,
+//     keeping the per-append cost at O(delta). Moving wrapping into
+//     rebuildCache would make every render O(n) instead of O(delta),
+//     destroying the incremental streaming performance.
+//
+//   - RenderDiffContent wraps per-line to preserve diff coloring (add/remove
+//     styles) on wrapped continuations.
+//
+//   - The tool result path in rebuildCache wraps once since tool results
+//     are short, appended once, and have no incremental concern.
+//
+// Do NOT consolidate these into a single wrapContent call in rebuildCache.
+// Each site owns its own wrapping for a reason.
 
 import (
 	"bytes"
@@ -129,16 +149,21 @@ func (w *Window) rebuildCache(width int, styles *Styles, borderStyle lipgloss.St
 	var call string
 	switch {
 	case w.IsDiffWindow():
-		call = RenderDiffContent(parts[0], w.Status, styles)
+		call = RenderDiffContent(parts[0], w.Status, styles, innerWidth)
 	default:
 		call = w.renderGenericContent(innerWidth, styles, parts[0])
 	}
 
-	// If a tool result was appended, render call + separator + result
+	// If a tool result was appended, render call + separator + result.
+	// Tool results are short and appended once (no incremental concern),
+	// so wrapping happens here rather than in a dedicated renderer.
 	var inner string
 	if len(parts) == 2 {
 		sep := styles.Separator.Render("───")
 		result := styleMultiline(strings.TrimLeft(parts[1], "\n"), styles.Text)
+		if innerWidth > 0 {
+			result = wrapContent(result, innerWidth)
+		}
 		inner = call + "\n" + sep + "\n" + result
 	} else {
 		inner = call
@@ -159,7 +184,10 @@ func (w *Window) rebuildCache(width int, styles *Styles, borderStyle lipgloss.St
 	w.cache.valid = true
 }
 
-// renderGenericContent renders content using styleContent with tag-based styling
+// renderGenericContent renders content using styleContent with tag-based styling.
+// Wraps and caches wrappedLines so that AppendContent can update them
+// incrementally (O(delta) per append instead of O(n) full re-wrap).
+// Do NOT move wrapping out of this function — see "Wrapping Strategy" above.
 func (w *Window) renderGenericContent(innerWidth int, styles *Styles, content string) string {
 	innerWidth = max(0, innerWidth)
 
@@ -217,7 +245,9 @@ func (w *Window) Invalidate() {
 	w.cache.wrappedLines = nil
 }
 
-// AppendContent adds content incrementally, updating wrapped lines if possible
+// AppendContent adds content incrementally, updating wrapped lines if possible.
+// This is the key to O(delta) streaming performance — it avoids re-wrapping
+// the entire content on every render. See "Wrapping Strategy" above.
 func (w *Window) AppendContent(delta string, innerWidth int) {
 	w.Content += delta
 

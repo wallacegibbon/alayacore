@@ -158,7 +158,7 @@ func TestWindow_DiffContentWithANSI(t *testing.T) {
 	newLine := "\x1b[32mnew line\x1b[0m"
 	content := "edit_file: /tmp/test.txt\n- " + oldLine + "\n+ " + newLine + "\n  unchanged"
 
-	result := RenderDiffContent(content, ToolStatusSuccess, styles)
+	result := RenderDiffContent(content, ToolStatusSuccess, styles, 0)
 
 	// Strip lipgloss ANSI to check the actual text
 	resultStripped := stripANSI(result)
