@@ -474,7 +474,7 @@ func (hw *HelpWindow) View() string {
 	if hw.filterInputFocused {
 		helpText = hw.styles.System.Render("tab: list │ esc: close")
 	} else {
-		helpText = hw.styles.System.Render("tab: filter │ j/k: navigate │ enter: copy command │ q/esc: close")
+		helpText = hw.styles.System.Render("tab: filter │ j/k: navigate │ enter: copy to input │ q/esc: close")
 	}
 
 	return filterBox + "\n" + listBox + "\n" + helpText
