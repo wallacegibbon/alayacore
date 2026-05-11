@@ -112,7 +112,7 @@ func buildHelpItems() []HelpItem {
 		{Key: "Enter", Description: "Submit prompt or command", Type: HelpItemKey},
 		{Key: "Ctrl+H", Description: "Open help window", Type: HelpItemKey},
 		{Key: "Ctrl+G", Description: "Cancel current request", Type: HelpItemKey},
-		{Key: "Ctrl+C", Description: "Clear input field", Type: HelpItemKey},
+		{Key: "Ctrl+C", Description: "Clear input field (input only)", Type: HelpItemKey},
 		{Key: "Ctrl+S", Description: "Save session", Type: HelpItemKey},
 		{Key: "Ctrl+O", Description: "Open external editor (input only)", Type: HelpItemKey},
 		{Key: "Ctrl+L", Description: "Open model selector", Type: HelpItemKey},

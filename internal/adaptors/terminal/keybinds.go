@@ -27,7 +27,6 @@ type KeyBinding struct {
 var globalKeyBindings = []KeyBinding{
 	{"tab", "Toggle focus between display and input", "global"},
 	{"ctrl+g", "Cancel current request (with confirmation)", "global"},
-	{"ctrl+c", "Clear input field", "global"},
 	{"ctrl+s", "Save session", "global"},
 	{"ctrl+l", "Open model selector", "global"},
 	{"ctrl+p", "Open theme selector", "global"},
@@ -579,13 +578,6 @@ func (m *Terminal) handleGlobalKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 		m.confirmFromCommand = false
 		return nil, true
 
-	case "ctrl+c":
-		if m.focusedWindow == focusInput {
-			m.input.SetValue("")
-			m.input.editorContent = ""
-		}
-		return nil, true
-
 	case "ctrl+s":
 		return m.submitCommand("save", false), true
 
@@ -614,9 +606,16 @@ func (m *Terminal) handleGlobalKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 
 // handleInputKeys handles keys when input is focused (default behavior).
 func (m *Terminal) handleInputKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Ctrl+O: open external editor (input focus only)
-	if msg.String() == "ctrl+o" && m.focusedWindow == focusInput {
-		return m, m.OpenEditor()
+	// Input-only global shortcuts
+	if m.focusedWindow == focusInput {
+		switch msg.String() {
+		case "ctrl+o":
+			return m, m.OpenEditor()
+		case "ctrl+c":
+			m.input.SetValue("")
+			m.input.editorContent = ""
+			return m, nil
+		}
 	}
 
 	// Block keys that would modify input content unexpectedly
