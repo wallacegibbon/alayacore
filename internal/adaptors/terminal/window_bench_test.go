@@ -727,28 +727,28 @@ func BenchmarkGetAllWithoutVirtual(b *testing.B) {
 // Virtual Rendering Performance (100 windows, viewport showing middle 30 lines):
 //
 // GetAll (rendering only):
-//   - With virtual rendering:    ~17μs (3.5x faster)
-//   - Without virtual rendering: ~59μs
+//   - With virtual rendering:    ~20μs (3.5x faster)
+//   - Without virtual rendering: ~71μs
 //
 // Full update cycle (delta + GetAll):
-//   - Incremental (1 dirty):     ~40μs
-//   - Full rebuild (all dirty):  ~4ms (100x slower)
+//   - Incremental (1 dirty):     ~41μs
+//   - Full rebuild (all dirty):  ~5.3ms (130x slower)
 //
-// Incremental wrapping:
-//   - Incremental append:        ~1.5μs
-//   - Full wrap:                 ~78μs (52x slower)
+// Incremental wrapping (wrap operation only):
+//   - Incremental append:        ~1.6μs
+//   - Full wrap:                 ~72μs (45x slower)
 //
 // Cursor movement (single):
-//   - EnsureCursorVisible + updateContent: ~210μs
+//   - EnsureCursorVisible + updateContent: ~340μs average (best ~210μs, worst ~800μs)
 //
 // Realistic streaming (profiled):
-//   - Average render time:       ~500-600μs per update
-//   - Render overhead:           ~1% of total time (at 50ms intervals)
-//   - Updates/second:            ~4500
+//   - Average render time:       ~700μs per update
+//   - Render overhead:           ~1.4% of total time (at 50ms intervals)
+//   - Updates/second:            ~3572
 //
 // Conclusion: NO RATE LIMITING NEEDED
-//   - Data ingestion already throttled at 100ms (output.go)
-//   - Render overhead is only 1% of wall time
+//   - UI refresh is polled at 250ms intervals (terminal.go → TickInterval)
+//   - Render overhead is only 1.4% of wall time
 //   - updateContent() skips unchanged content efficiently
 //   - Virtual rendering provides 3.5x speedup
 func BenchmarkWindowBufferResize(b *testing.B) {
