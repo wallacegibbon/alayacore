@@ -34,6 +34,7 @@ var globalKeyBindings = []KeyBinding{
 	{"ctrl+p", "Open theme selector", "global"},
 	{"ctrl+q", "Open queue manager", "global"},
 	{"ctrl+h", "Open help window", "global"},
+	{"f1", "Open help window", "global"},
 	{"enter", "Submit prompt/command", "global"},
 }
 
@@ -53,12 +54,16 @@ var displayKeyBindings = []KeyBinding{
 	{"shift+up", "Scroll up one line", "display"},
 	// Scroll down half screen
 	{"ctrl+d", "Scroll down half screen", "display"},
+	{"pgdown", "Scroll down half screen", "display"},
 	// Scroll up half screen
 	{"ctrl+u", "Scroll up half screen", "display"},
+	{"pgup", "Scroll up half screen", "display"},
 	// Go to bottom (last window)
 	{"G", "Go to bottom (last window)", "display"},
+	{"end", "Go to bottom (last window)", "display"},
 	// Go to top (first window)
 	{"g", "Go to top (first window)", "display"},
+	{"home", "Go to top (first window)", "display"},
 	// Move cursor to top window
 	{"H", "Move cursor to top window", "display"},
 	// Move cursor to bottom window
@@ -443,26 +448,50 @@ func scrollUpLine(m *Terminal) tea.Cmd {
 	return nil
 }
 
+// nolint:unparam
+func scrollDownHalf(m *Terminal) tea.Cmd {
+	m.display.MarkUserScrolled()
+	m.display.ScrollDown(max(1, m.display.GetHeight()/2))
+	m.display.updateContent()
+	return nil
+}
+
+// nolint:unparam
+func scrollUpHalf(m *Terminal) tea.Cmd {
+	m.display.MarkUserScrolled()
+	m.display.ScrollUp(max(1, m.display.GetHeight()/2))
+	m.display.updateContent()
+	return nil
+}
+
+// nolint:unparam
+func gotoBottom(m *Terminal) tea.Cmd {
+	m.display.SetCursorToLastWindow()
+	m.display.GotoBottom()
+	m.display.updateContent()
+	return nil
+}
+
+// nolint:unparam
+func gotoTop(m *Terminal) tea.Cmd {
+	m.display.SetWindowCursor(0)
+	m.display.GotoTop()
+	m.display.updateContent()
+	return nil
+}
+
 // displayKeyMap maps display key strings to their handler functions.
 // Each handler returns a tea.Cmd (may be nil) for follow-up commands.
 // nolint:unparam // Some handlers always return nil (no follow-up command)
 var displayKeyMap = map[string]func(*Terminal) tea.Cmd{
-	"j":    moveWindowCursorDown,
-	"down": moveWindowCursorDown,
-	"k":    moveWindowCursorUp,
-	"up":   moveWindowCursorUp,
-	"ctrl+d": func(m *Terminal) tea.Cmd {
-		m.display.MarkUserScrolled()
-		m.display.ScrollDown(max(1, m.display.GetHeight()/2))
-		m.display.updateContent()
-		return nil
-	},
-	"ctrl+u": func(m *Terminal) tea.Cmd {
-		m.display.MarkUserScrolled()
-		m.display.ScrollUp(max(1, m.display.GetHeight()/2))
-		m.display.updateContent()
-		return nil
-	},
+	"j":          moveWindowCursorDown,
+	"down":       moveWindowCursorDown,
+	"k":          moveWindowCursorUp,
+	"up":         moveWindowCursorUp,
+	"ctrl+d":     scrollDownHalf,
+	"pgdown":     scrollDownHalf,
+	"ctrl+u":     scrollUpHalf,
+	"pgup":       scrollUpHalf,
 	"J":          scrollDownLine,
 	"shift+down": scrollDownLine,
 	"K":          scrollUpLine,
@@ -488,18 +517,10 @@ var displayKeyMap = map[string]func(*Terminal) tea.Cmd{
 		}
 		return nil
 	},
-	"G": func(m *Terminal) tea.Cmd {
-		m.display.SetCursorToLastWindow()
-		m.display.GotoBottom()
-		m.display.updateContent()
-		return nil
-	},
-	"g": func(m *Terminal) tea.Cmd {
-		m.display.SetWindowCursor(0)
-		m.display.GotoTop()
-		m.display.updateContent()
-		return nil
-	},
+	"G":    gotoBottom,
+	"end":  gotoBottom,
+	"g":    gotoTop,
+	"home": gotoTop,
 	":": func(m *Terminal) tea.Cmd {
 		m.focusInput()
 		m.input.SetValue(":")
@@ -584,7 +605,7 @@ func (m *Terminal) handleGlobalKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 		m.openQueueManager()
 		return nil, true
 
-	case "ctrl+h":
+	case "ctrl+h", "f1":
 		m.openHelpWindow()
 		return nil, true
 
