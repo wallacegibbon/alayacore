@@ -72,7 +72,7 @@ type HelpWindow struct {
 // NewHelpWindow creates a new help window.
 func NewHelpWindow(styles *Styles) *HelpWindow {
 	filterInput := textinput.New()
-	filterInput.Placeholder = "Filter..."
+	filterInput.Placeholder = "Filter command or key..."
 	filterInput.Prompt = "/ "
 	filterInput.SetWidth(50)
 
