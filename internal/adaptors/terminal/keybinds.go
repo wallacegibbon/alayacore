@@ -29,7 +29,6 @@ var globalKeyBindings = []KeyBinding{
 	{"ctrl+g", "Cancel current request (with confirmation)", "global"},
 	{"ctrl+c", "Clear input field", "global"},
 	{"ctrl+s", "Save session", "global"},
-	{"ctrl+o", "Open external editor", "global"},
 	{"ctrl+l", "Open model selector", "global"},
 	{"ctrl+p", "Open theme selector", "global"},
 	{"ctrl+q", "Open queue manager", "global"},
@@ -590,9 +589,6 @@ func (m *Terminal) handleGlobalKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 	case "ctrl+s":
 		return m.submitCommand("save", false), true
 
-	case "ctrl+o":
-		return m.OpenEditor(), true
-
 	case "ctrl+l":
 		m.openModelSelector()
 		return nil, true
@@ -618,6 +614,11 @@ func (m *Terminal) handleGlobalKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 
 // handleInputKeys handles keys when input is focused (default behavior).
 func (m *Terminal) handleInputKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Ctrl+O: open external editor (input focus only)
+	if msg.String() == "ctrl+o" && m.focusedWindow == focusInput {
+		return m, m.OpenEditor()
+	}
+
 	// Block keys that would modify input content unexpectedly
 	switch msg.String() {
 	case "ctrl+u", "ctrl+d":
