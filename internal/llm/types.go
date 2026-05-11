@@ -8,9 +8,9 @@ import (
 )
 
 // DefaultMaxTokens is the default maximum output tokens when the user
-// doesn't specify one. Safe for all current models (Claude 3.5 maxes
-// at 8K; newer models support more).
-const DefaultMaxTokens = 8192
+// doesn't specify one. 128K covers coding agents generating large code
+// blocks, multi-file changes, and long tool call chains.
+const DefaultMaxTokens = 131072
 
 // MessageRole represents the role of a message
 type MessageRole string
