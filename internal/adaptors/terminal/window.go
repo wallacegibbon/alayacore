@@ -19,12 +19,15 @@ package terminal
 //   - ID-based window lookup (for incremental updates)
 
 import (
+	"bytes"
+	"io"
 	"strings"
 	"sync"
 
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	ansi "github.com/charmbracelet/x/ansi"
 
 	"github.com/alayacore/alayacore/internal/stream"
 )
@@ -180,7 +183,7 @@ func (w *Window) renderGenericContent(innerWidth int, styles *Styles, content st
 		return content
 	}
 
-	wrapped := lipgloss.Wrap(content, innerWidth, " ")
+	wrapped := wrapContent(content, innerWidth)
 	w.cache.wrappedLines = strings.Split(wrapped, "\n")
 	return wrapped
 }
@@ -751,12 +754,29 @@ func (wb *WindowBuffer) RenderWindowContent(w *Window, innerWidth int) string {
 // Line Wrapping Utilities
 // ============================================================================
 
+// wrapContent wraps styled content at the given display width, preserving
+// ANSI styles across line breaks. Updates the wrapping strategy here to
+// change how all window content is wrapped.
+func wrapContent(s string, width int) string {
+	if width < 1 {
+		return s
+	}
+	// Step 1: hard-wrap at character boundaries (like a terminal)
+	s = ansi.Hardwrap(s, width, false)
+	// Step 2: re-apply ANSI styles after each inserted newline
+	var buf bytes.Buffer
+	w := lipgloss.NewWrapWriter(&buf)
+	defer w.Close()
+	_, _ = io.WriteString(w, s) //nolint:errcheck // bytes.Buffer.Write never fails
+	return buf.String()
+}
+
 // wrapLines wraps content into lines at the given width.
 func wrapLines(content string, width int) []string {
 	if width <= 0 {
 		return []string{content}
 	}
-	wrapped := lipgloss.Wrap(content, width, " ")
+	wrapped := wrapContent(content, width)
 	return strings.Split(wrapped, "\n")
 }
 

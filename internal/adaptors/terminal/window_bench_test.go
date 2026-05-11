@@ -917,3 +917,26 @@ func BenchmarkFullWrappingPath(b *testing.B) {
 		_ = wb.GetTotalLines()
 	}
 }
+
+// BenchmarkWrapContentVsLipglossWrap compares wrapContent (character-boundary)
+// vs lipgloss.Wrap (word-boundary) on code-like content.
+func BenchmarkWrapContentVsLipglossWrap(b *testing.B) {
+	code := strings.Repeat(`func prepareContent(s string) string {
+	s = stripANSI(s)
+	s = expandTabs(s)
+	return s
+}
+`, 20)
+
+	b.Run("wrapContent", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			wrapContent(code, 60)
+		}
+	})
+
+	b.Run("lipglossWrap", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			lipgloss.Wrap(code, 60, " ")
+		}
+	})
+}

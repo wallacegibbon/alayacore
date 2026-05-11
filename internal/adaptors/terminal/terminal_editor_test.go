@@ -311,9 +311,7 @@ func TestColorizeToolMultiline(t *testing.T) {
 	// but for simplicity we just ensure styling per line.
 }
 
-func TestWordwrapPreservesANSI(t *testing.T) {
-	// Note: lipgloss.SetColorProfile is no longer needed in v2
-
+func TestWrapContentPreservesANSI(t *testing.T) {
 	// Create a styled line with ANSI escape sequences (dimmed reasoning style)
 	style := lipgloss.NewStyle().Foreground(lipgloss.Color("#585b70")).Italic(true)
 	styledText := style.Render("This is a long line of reasoning text that should wrap when width is limited.")
@@ -322,7 +320,7 @@ func TestWordwrapPreservesANSI(t *testing.T) {
 	widths := []int{20, 40, 60}
 	for _, width := range widths {
 		t.Run(fmt.Sprintf("width-%d", width), func(t *testing.T) {
-			wrapped := lipgloss.Wrap(styledText, width, " ")
+			wrapped := wrapContent(styledText, width)
 			lines := strings.Split(strings.TrimSuffix(wrapped, "\n"), "\n")
 			if len(lines) == 0 {
 				t.Fatal("No lines after wrapping")
