@@ -39,7 +39,6 @@ import (
 	"iter"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/alayacore/alayacore/internal/config"
@@ -48,13 +47,11 @@ import (
 
 // openAIStreamState tracks state across streaming events
 type openAIStreamState struct {
-	mu               sync.Mutex
+	streamUsage
 	textBuilder      strings.Builder
 	reasoningBuilder strings.Builder
 	toolCallArgs     map[int]*strings.Builder // tool call index -> arguments builder
 	toolCalls        []llm.ToolCallPart
-	usage            llm.Usage
-	stopReason       string
 }
 
 func (s *openAIStreamState) addTextDelta(delta string) {
@@ -121,12 +118,6 @@ func (s *openAIStreamState) finalizeToolCalls() {
 	}
 }
 
-func (s *openAIStreamState) setUsage(usage llm.Usage) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.usage = usage
-}
-
 func (s *openAIStreamState) getToolCalls() []llm.ToolCallPart {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -166,24 +157,6 @@ func (s *openAIStreamState) getMessage() llm.Message {
 		Role:    llm.RoleAssistant,
 		Content: content,
 	}
-}
-
-func (s *openAIStreamState) getUsage() llm.Usage {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.usage
-}
-
-func (s *openAIStreamState) setStopReason(reason string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.stopReason = reason
-}
-
-func (s *openAIStreamState) getStopReason() string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.stopReason
 }
 
 // OpenAIProvider implements the OpenAI API

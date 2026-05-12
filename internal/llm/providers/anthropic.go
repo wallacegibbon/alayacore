@@ -35,7 +35,6 @@ import (
 	"iter"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/alayacore/alayacore/internal/config"
@@ -200,10 +199,8 @@ type anthropicTool struct {
 
 // anthropicStreamState tracks accumulation state during streaming
 type anthropicStreamState struct {
-	mu           sync.Mutex
+	streamUsage
 	contentParts []llm.ContentPart
-	usage        llm.Usage
-	stopReason   string
 
 	// Current block being accumulated
 	currentIndex int
@@ -264,14 +261,12 @@ func (s *anthropicStreamState) finishBlock() {
 }
 
 func (s *anthropicStreamState) setUsage(inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens int64) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.usage = llm.Usage{
+	s.streamUsage.setUsage(llm.Usage{
 		CacheCreationTokens: cacheCreationTokens,
 		CacheReadTokens:     cacheReadTokens,
 		InputTokens:         inputTokens,
 		OutputTokens:        outputTokens,
-	}
+	})
 }
 
 func (s *anthropicStreamState) getMessage() llm.Message {
@@ -281,18 +276,6 @@ func (s *anthropicStreamState) getMessage() llm.Message {
 		Role:    llm.RoleAssistant,
 		Content: append([]llm.ContentPart{}, s.contentParts...),
 	}
-}
-
-func (s *anthropicStreamState) getUsage() llm.Usage {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.usage
-}
-
-func (s *anthropicStreamState) setStopReason(reason string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.stopReason = reason
 }
 
 // lastToolCall returns the last tool call if the current block is a tool_use
