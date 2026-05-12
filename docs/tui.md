@@ -97,6 +97,78 @@ When you submit prompts or commands while a previous task is running, they are q
 
 Each queued task shows its queue ID (Q1, Q2, …), type (`P` for prompt, `C` for command), and a truncated content preview.
 
+## Line Wrapping
+
+### How It Works
+
+Content in each window is soft-wrapped to fit the available width. The wrapping is **character-boundary** — it breaks mid-word when a word exceeds the line width, rather than waiting for a word boundary. This matches how a typical terminal behaves.
+
+Width calculation is **Unicode-aware**:
+
+- ASCII / Latin characters occupy **1 cell**
+- CJK characters (中文、日本語、한국어) occupy **2 cells**
+- Emoji occupy **2 cells** (the width calculation operates on grapheme clusters per Unicode UAX #29, so combining marks and ZWJ sequences are resolved as part of their parent cluster)
+- ANSI escape codes (colors, bold, etc.) occupy **0 cells** — they are invisible to the width calculation
+
+When a newline is inserted by the wrapper, ANSI styles are automatically carried forward to the next line. For example, if a red-styled sentence wraps, the continuation line stays red — you don't see style resets at wrap points.
+
+### How It's Implemented
+
+All wrapping flows through a single function, `wrapContent(s string, width int) string`. There are no duplicate wrapping paths.
+
+```
+wrapContent(s, width)
+  ├── Step 1: ansi.Hardwrap(s, width, false)
+  │     Inserts \n at the correct position by counting display
+  │     width of each grapheme cluster. Uses the charmbracelet/x/ansi
+  │     library which delegates to clipperhouse/displaywidth for
+  │     Unicode character width lookup (EastAsianWidth table).
+  │
+  └── Step 2: lipgloss.NewWrapWriter(buf)
+        Re-applies ANSI styles after each inserted \n.
+        Without this, terminals would reset colors/styles at
+        line breaks. The WrapWriter tracks the current style
+        state (SGR attributes + hyperlink) and re-emits it
+        on the new line.
+```
+
+**Incremental updates** avoid re-wrapping the entire content on every token. When `AppendContent(delta)` is called:
+
+1. The delta is styled (tag-based colors applied)
+2. The last cached line is concatenated with the styled delta
+3. Only that combined line is re-wrapped via `wrapContent`
+4. The result replaces the old last line in the cache
+
+This keeps per-token cost at O(delta) instead of O(total content), which is critical for streaming performance.
+
+#### Key Point: `lastLine + delta`
+
+```go
+// appendDeltaToLines core logic
+lastLine := lines[len(lines)-1]
+combined := lastLine + delta
+newLines := wrapLines(combined, width)
+return append(lines[:len(lines)-1], newLines...)
+```
+
+`lastLine` is the product of the previous wrap and already carries the full ANSI style state (e.g. `\x1b[31m...`). After concatenating `delta`, the resulting string has a continuous ANSI state. When fed to `wrapContent`:
+
+1. `Hardwrap` inserts `\n` at the correct display width
+2. `WrapWriter` resets and re-emits styles after each `\n`
+
+**Styles are never lost during incremental appends** — not because there is special style-preservation logic, but because `lastLine` already holds the complete ANSI context, and `wrapContent` handles cross-line style repair.
+
+**Full rebuild** happens when the window width changes or the cache is invalidated (e.g. style change, fold toggle). The full content is prepared (strip input ANSI, expand tabs), styled, and wrapped from scratch.
+
+**Callers that invoke `wrapContent`:**
+
+| Caller | Context |
+|--------|---------|
+| `renderGenericContent` | Full render of generic (non-diff) content |
+| `appendDeltaToLines` → `wrapLines` | Incremental streaming updates |
+| `RenderDiffContent` | Per-line wrapping of diff hunks (styled before wrapping) |
+| `rebuildCache` (tool result path) | Wraps tool result section |
+
 ## Help Window
 
 Press `Ctrl+H` or type `:help` to open a help window listing all keybindings and commands. The filter input at the top lets you fuzzy-search for specific keys or commands (e.g. typing `gt` matches `:taskqueue_get_all`):
