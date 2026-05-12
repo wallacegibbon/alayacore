@@ -41,6 +41,7 @@ Use read_file to access specific sections.
 
 - Agent uses `read_file` with line ranges to access specific sections
 - Same behavior for canceled/timed out commands
+- Exit code semantics differ by platform: on Windows, canceled/timed-out commands report exit code `1` (set by `TerminateJobObject`/`taskkill`); on Unix, a `SIGKILL`-terminated command reports `137` (128+9). See [architecture.md](architecture.md) for details.
 
 ## search_content
 

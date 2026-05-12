@@ -142,6 +142,15 @@ The tool description (shown to the LLM) is dynamically generated based on the de
 - **Unix**: `setsid` creates a new session; `SIGINT` → `SIGKILL` for cancellation
 - **Windows**: `CREATE_NO_WINDOW` isolates the child; `process.Kill()` for cancellation
 
+#### Exit Codes on Cancellation and Timeout
+
+When a command is canceled (via `:cancel`) or times out (2-minute default), AlayaCore terminates the process tree and reports the exit code to the user:
+
+- **Unix**: `SIGINT` is sent first (exit code `130` = 128+2). If the process doesn't exit within 2 seconds, `SIGKILL` is sent (exit code `137` = 128+9). These follow the Unix convention of `128 + signal_number`.
+- **Windows**: `TerminateJobObject` is called with exit code `1`. If the Job Object is unavailable (e.g. nested job restriction on pre-Win8), the fallback `taskkill /F /T` also defaults to exit code `1`. This is the conventional "abnormal termination" value on Windows, where there is no Unix-style signal concept. In all paths, `ExitCodeFromError` extracts this from `exec.ExitError.ExitCode()`.
+
+When a command completes normally but with a non-zero exit code, AlayaCore reports the actual exit code returned by the process (via `ExitCodeFromError`).
+
 The package uses Go build tags (`//go:build !windows` / `//go:build windows`) for all OS-specific code.
 
 ## TLV Protocol
