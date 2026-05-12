@@ -86,11 +86,11 @@ const (
 //   - Window focus management
 type Terminal struct {
 	// Core components
-	session     *agentpkg.Session
 	out         OutputWriter
 	streamInput *stream.ChanInput
 	appConfig   *app.Config
 	editor      *Editor
+	runtimeMgr  *agentpkg.RuntimeManager
 
 	// UI components
 	display       DisplayModel
@@ -121,18 +121,18 @@ type Terminal struct {
 
 // NewTerminal creates a new Terminal model with all components initialized.
 func NewTerminal(
-	session *agentpkg.Session,
+	runtimeMgr *agentpkg.RuntimeManager,
 	out OutputWriter,
 	inputStream *stream.ChanInput,
 	appCfg *app.Config,
 	initialWidth, initialHeight int,
 ) *Terminal {
-	return NewTerminalWithTheme(session, out, inputStream, appCfg, initialWidth, initialHeight, DefaultTheme(), nil)
+	return NewTerminalWithTheme(runtimeMgr, out, inputStream, appCfg, initialWidth, initialHeight, DefaultTheme(), nil)
 }
 
 // NewTerminalWithTheme creates a new Terminal model with a custom theme.
 func NewTerminalWithTheme(
-	session *agentpkg.Session,
+	runtimeMgr *agentpkg.RuntimeManager,
 	out OutputWriter,
 	inputStream *stream.ChanInput,
 	appCfg *app.Config,
@@ -145,11 +145,11 @@ func NewTerminalWithTheme(
 	editor := NewEditor()
 
 	m := &Terminal{
-		session:       session,
 		out:           out,
 		streamInput:   inputStream,
 		appConfig:     appCfg,
 		editor:        editor,
+		runtimeMgr:    runtimeMgr,
 		display:       NewDisplayModel(out.WindowBuffer(), styles),
 		input:         NewInputModel(styles),
 		modelSelector: NewModelSelector(styles),
@@ -617,7 +617,7 @@ func (m *Terminal) openThemeSelector() {
 		return
 	}
 
-	activeTheme := m.session.GetRuntimeManager().GetActiveTheme()
+	activeTheme := m.runtimeMgr.GetActiveTheme()
 	m.themeSelector.Open(m.themeManager.GetThemes(), activeTheme)
 	m.input.Blur()
 	m.display.SetDisplayFocused(false)

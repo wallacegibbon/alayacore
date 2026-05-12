@@ -92,8 +92,8 @@ func (a *Adaptor) Start() int {
 		return 1
 	}
 
-	// Create terminal with loaded session, initial window size, theme, and theme manager
-	t := NewTerminalWithTheme(session, terminalOutput, inputStream, a.Config, initialWidth, initialHeight, theme, themeManager)
+	// Create terminal with runtime manager, initial window size, theme, and theme manager
+	t := NewTerminalWithTheme(session.GetRuntimeManager(), terminalOutput, inputStream, a.Config, initialWidth, initialHeight, theme, themeManager)
 
 	// Create and run the program.
 	// Bubbletea automatically opens the real TTY when stdin is piped

@@ -208,7 +208,7 @@ func (m *Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	// Check if it's a reload request
 	if msg.String() == "r" && m.themeManager != nil {
 		m.themeManager.ReloadThemes()
-		m.themeSelector.Open(m.themeManager.GetThemes(), m.session.GetRuntimeManager().GetActiveTheme())
+		m.themeSelector.Open(m.themeManager.GetThemes(), m.runtimeMgr.GetActiveTheme())
 		return m, nil
 	}
 
@@ -228,7 +228,7 @@ func (m *Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		selectedTheme := m.themeSelector.GetSelectedTheme()
 		if selectedTheme != nil {
 			// Save to runtime.conf
-			_ = m.session.GetRuntimeManager().SetActiveTheme(selectedTheme.Name) //nolint:errcheck // best-effort save
+			_ = m.runtimeMgr.SetActiveTheme(selectedTheme.Name) //nolint:errcheck // best-effort save
 		}
 		m.restoreFocus()
 		return m, nil
