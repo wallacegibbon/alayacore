@@ -34,20 +34,22 @@ func (w ParseWarning) String() string {
 // Parse errors (e.g. non-numeric value for an int field) are also silently ignored.
 // Use ParseKeyValueWithWarnings to collect them.
 func ParseKeyValue(content string, target interface{}) {
-	parseKeyValue(content, target, false)
+	parseConfig(content, target, false, false)
 }
 
 // ParseKeyValueWithWarnings is like ParseKeyValue but also returns warnings for
 // values that could not be converted to the target field type. This helps surface
 // typos like context_limit: abc (which would otherwise silently default to 0).
 func ParseKeyValueWithWarnings(content string, target interface{}) []ParseWarning {
-	return parseKeyValueWithWarnings(content, target, false)
+	_, warnings := parseConfig(content, target, false, true)
+	return warnings
 }
 
 // ParseKeyValueStrict is like ParseKeyValue but returns any keys in content
 // that did not match a struct field tag.  Callers can log or error on these.
 func ParseKeyValueStrict(content string, target interface{}) []string {
-	return parseKeyValueStrict(content, target, false)
+	unknown, _ := parseConfig(content, target, true, false)
+	return unknown
 }
 
 // ParseKeyValueBlocks parses multiple config blocks separated by "---"
@@ -56,20 +58,15 @@ func ParseKeyValueBlocks(content string) []string {
 	return strings.Split(content, "\n---\n")
 }
 
-// parseKeyValue is the internal implementation
+// parseConfig is the unified internal implementation.
+// collectUnknown: return keys that don't match any struct field tag.
+// collectWarnings: return ParseWarning for values that fail type conversion.
 //
 //nolint:gocyclo // Multiple validation branches required for config parsing
-func parseKeyValue(content string, target interface{}, skipHyphens bool) {
-	parseKeyValueStrict(content, target, skipHyphens)
-}
-
-// parseKeyValueStrict is like parseKeyValue but returns unknown keys.
-//
-//nolint:gocyclo // Multiple validation branches required for config parsing
-func parseKeyValueStrict(content string, target interface{}, skipHyphens bool) []string {
+func parseConfig(content string, target interface{}, skipHyphens bool, collectWarnings bool) ([]string, []ParseWarning) {
 	v := reflect.ValueOf(target)
 	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Struct {
-		return nil
+		return nil, nil
 	}
 	v = v.Elem()
 	t := v.Type()
@@ -85,6 +82,7 @@ func parseKeyValueStrict(content string, target interface{}, skipHyphens bool) [
 	}
 
 	var unknownKeys []string
+	var warnings []ParseWarning
 
 	// Parse lines
 	for line := range strings.SplitSeq(content, "\n") {
@@ -105,7 +103,6 @@ func parseKeyValueStrict(content string, target interface{}, skipHyphens bool) [
 
 		key = strings.TrimSpace(key)
 		value = strings.TrimSpace(value)
-
 		value = unquoteValue(value)
 
 		// Look up field by tag
@@ -116,66 +113,16 @@ func parseKeyValueStrict(content string, target interface{}, skipHyphens bool) [
 		}
 
 		field := v.Field(fieldIdx)
-		setFieldValue(field, value)
-	}
-
-	return unknownKeys
-}
-
-// parseKeyValueWithWarnings is like parseKeyValueStrict but also returns
-// warnings for values that could not be converted to the target type.
-//
-//nolint:gocyclo // Multiple validation branches required for config parsing
-func parseKeyValueWithWarnings(content string, target interface{}, skipHyphens bool) []ParseWarning {
-	v := reflect.ValueOf(target)
-	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Struct {
-		return nil
-	}
-	v = v.Elem()
-	t := v.Type()
-
-	// Build map from config tag names to field indices
-	tagToField := make(map[string]int)
-	for i := 0; i < t.NumField(); i++ {
-		tag := t.Field(i).Tag.Get("config")
-		if tag != "" {
-			key, _, _ := strings.Cut(tag, ",")
-			tagToField[key] = i
+		if collectWarnings {
+			if w := setFieldValueWithWarning(field, value, key); w != nil {
+				warnings = append(warnings, *w)
+			}
+		} else {
+			setFieldValue(field, value)
 		}
 	}
 
-	var warnings []ParseWarning
-
-	for line := range strings.SplitSeq(content, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		if skipHyphens && line == "---" {
-			continue
-		}
-
-		key, value, found := strings.Cut(line, ":")
-		if !found {
-			continue
-		}
-		key = strings.TrimSpace(key)
-		value = strings.TrimSpace(value)
-
-		value = unquoteValue(value)
-
-		fieldIdx, ok := tagToField[key]
-		if !ok {
-			continue
-		}
-
-		field := v.Field(fieldIdx)
-		if w := setFieldValueWithWarning(field, value, key); w != nil {
-			warnings = append(warnings, *w)
-		}
-	}
-
-	return warnings
+	return unknownKeys, warnings
 }
 
 // setFieldValueWithWarning is like setFieldValue but returns a ParseWarning
