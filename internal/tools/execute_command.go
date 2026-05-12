@@ -109,46 +109,43 @@ func executeCommand(ctx context.Context, args executeCommandInput) (llm.ToolResu
 }
 
 func handleCommandCancellation(cmd *exec.Cmd, done chan error, stdout, stderr *bytes.Buffer) llm.ToolResultOutput {
+	exitCode := -1
 	process := cmd.Process
 	if process != nil {
-		shell.TerminateProcessGroup(process, done)
+		exitCode = shell.TerminateProcessGroup(process, done)
 	}
-	output := formatCommandOutput(stdout, stderr, -1) // canceled, always show labels
+	output := formatCommandOutput(stdout, stderr, exitCode)
 
 	if len(output) > maxCommandOutput {
-		return handleLargeCommandOutput(output, -1, nil)
+		return handleLargeCommandOutput(output, exitCode, nil)
 	}
 
 	if output != "" {
-		return llm.NewTextErrorResponse("Canceled\n" + output)
+		return llm.NewTextErrorResponse(fmt.Sprintf("Canceled (exit %d)\n%s", exitCode, output))
 	}
-	return llm.NewTextErrorResponse("Canceled")
+	return llm.NewTextErrorResponse(fmt.Sprintf("Canceled (exit %d)", exitCode))
 }
 
 func handleCommandTimeout(cmd *exec.Cmd, done chan error, stdout, stderr *bytes.Buffer) llm.ToolResultOutput {
+	exitCode := -1
 	process := cmd.Process
 	if process != nil {
-		shell.TerminateProcessGroup(process, done)
+		exitCode = shell.TerminateProcessGroup(process, done)
 	}
-	output := formatCommandOutput(stdout, stderr, -1)
+	output := formatCommandOutput(stdout, stderr, exitCode)
 
 	if len(output) > maxCommandOutput {
-		return handleLargeCommandOutput(output, -2, nil)
+		return handleLargeCommandOutput(output, exitCode, nil)
 	}
 
 	if output != "" {
-		return llm.NewTextErrorResponse("Timed out\n" + output)
+		return llm.NewTextErrorResponse(fmt.Sprintf("Timed out (exit %d)\n%s", exitCode, output))
 	}
-	return llm.NewTextErrorResponse("Timed out")
+	return llm.NewTextErrorResponse(fmt.Sprintf("Timed out (exit %d)", exitCode))
 }
 
 func handleCommandCompletion(execErr error, stdout, stderr *bytes.Buffer) llm.ToolResultOutput {
-	exitCode := 0
-	if execErr != nil {
-		if exitErr, ok := execErr.(*exec.ExitError); ok {
-			exitCode = exitErr.ExitCode()
-		}
-	}
+	exitCode := shell.ExitCodeFromError(execErr)
 
 	output := formatCommandOutput(stdout, stderr, exitCode)
 

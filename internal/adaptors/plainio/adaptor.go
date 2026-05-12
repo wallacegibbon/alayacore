@@ -29,7 +29,8 @@ func NewAdaptor(cfg *app.Config) *Adaptor {
 }
 
 // Start runs the plainio adaptor. It blocks until the session finishes.
-// Returns the exit code: 0 for graceful exit, 1 for Ctrl-C or errors.
+// Returns the exit code: 0 for graceful exit, 1 for errors, 130 (128+SIGINT)
+// for Ctrl-C.
 //
 // plainio processes prompts one at a time. If a task produces an error
 // (SE tag), the remaining input is discarded and the process exits
@@ -110,12 +111,12 @@ func (a *Adaptor) Start() int {
 	}()
 
 	// Main goroutine owns all signal handling. No SIGINT goroutine.
-	// First exit trigger wins: EOF (0), error (1), or Ctrl-C (1).
+	// First exit trigger wins: EOF (0), error (1), or Ctrl-C (130).
 	code := 0
 	select {
 	case code = <-exitCh:
 	case <-sigCh:
-		code = 1
+		code = 128 + int(syscall.SIGINT)
 		input.Close()
 	}
 
@@ -128,7 +129,7 @@ func (a *Adaptor) Start() int {
 	select {
 	case <-done:
 	case <-sigCh:
-		code = 1
+		code = 128 + int(syscall.SIGINT)
 	}
 
 	// Final check: even on a clean EOF path the session may have written

@@ -186,25 +186,27 @@ func loadJob() *Job {
 //
 // The done channel receives the result of cmd.Wait() and is used to
 // detect when the process has actually exited.
-func TerminateProcessGroup(process *os.Process, done <-chan error) {
+// Returns the exit code from the killed process.
+func TerminateProcessGroup(process *os.Process, done <-chan error) int {
 	// Try Job Object first (fast, kernel-level, covers entire tree).
 	if job := loadJob(); job != nil {
 		if err := job.Terminate(); err == nil {
-			waitWithTimeout(done, 3*time.Second)
-			return
+			waitErr := waitWithTimeout(done, 3*time.Second)
+			return ExitCodeFromError(waitErr)
 		}
 		// Job termination failed; fall through to taskkill.
 	}
 
 	// Fallback: taskkill /F /T kills the process tree.
 	if killProcessTree(process.Pid) {
-		waitWithTimeout(done, 3*time.Second)
-		return
+		waitErr := waitWithTimeout(done, 3*time.Second)
+		return ExitCodeFromError(waitErr)
 	}
 
 	// Last resort: kill only the direct child.
 	_ = process.Kill()
-	<-done
+	waitErr := <-done
+	return ExitCodeFromError(waitErr)
 }
 
 // killProcessTree runs "taskkill /F /T /PID <pid>" to kill an entire
@@ -220,13 +222,26 @@ func killProcessTree(pid int) bool {
 
 // waitWithTimeout waits for the process to exit (via done) or for the
 // timeout to elapse.  If the timeout fires, it falls back to Kill.
-func waitWithTimeout(done <-chan error, timeout time.Duration) {
+// Returns the error from cmd.Wait().
+func waitWithTimeout(done <-chan error, timeout time.Duration) error {
 	select {
-	case <-done:
-		return
+	case waitErr := <-done:
+		return waitErr
 	case <-time.After(timeout):
 		// Process didn't exit in time; leave it to KILL_ON_JOB_CLOSE
 		// or the caller's WaitDelay to clean up.
-		<-done
+		return <-done
 	}
+}
+
+// ExitCodeFromError extracts the exit code from a cmd.Wait error.
+// Returns 0 for nil, the ExitError exit code, or -1 for unrecognized errors.
+func ExitCodeFromError(err error) int {
+	if err == nil {
+		return 0
+	}
+	if exitErr, ok := err.(*exec.ExitError); ok {
+		return exitErr.ExitCode()
+	}
+	return -1
 }

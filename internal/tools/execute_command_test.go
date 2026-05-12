@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -64,8 +65,8 @@ func TestExecuteCommandCancellation(t *testing.T) {
 		if !ok {
 			t.Fatalf("expected error output, got %T", result)
 		}
-		if errOut.Error != "Canceled" {
-			t.Errorf("expected 'Canceled', got %q", errOut.Error)
+		if !strings.HasPrefix(errOut.Error, "Canceled") {
+			t.Errorf("expected message to start with 'Canceled', got %q", errOut.Error)
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("command was not canceled within timeout")
@@ -101,10 +102,10 @@ func TestExecuteCommandTimeout(t *testing.T) {
 		if !ok {
 			t.Fatalf("expected error output, got %T", result)
 		}
-		if errOut.Error != "Canceled" && errOut.Error != "Timed out" {
+		if !strings.HasPrefix(errOut.Error, "Canceled") && !strings.HasPrefix(errOut.Error, "Timed out") {
 			// Either is acceptable depending on whether the parent context
 			// or the internal timeout fires first
-			t.Errorf("expected 'Canceled' or 'Timed out', got %q", errOut.Error)
+			t.Errorf("expected message to start with 'Canceled' or 'Timed out', got %q", errOut.Error)
 		}
 	case <-time.After(10 * time.Second):
 		t.Fatal("command was not terminated within timeout")

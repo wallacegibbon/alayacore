@@ -11,7 +11,7 @@
 //   - A trailing backslash (\) before newline continues the prompt on the next line.
 //   - Ctrl-D (EOF) closes input; the program exits after the current task finishes (code 0).
 //   - Ctrl-C (SIGINT): closes input, waits for the current task to finish, then exits
-//     with code 1. A second Ctrl-C forces an immediate exit.
+//     with code 130 (128+SIGINT). A second Ctrl-C forces an immediate exit.
 //   - Errors during the session cause input to close. The program waits for the
 //     current task to finish, then exits with code 1. Remaining queued tasks
 //     are NOT executed.
