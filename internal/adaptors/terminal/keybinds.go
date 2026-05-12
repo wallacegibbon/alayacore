@@ -408,80 +408,64 @@ func (m *Terminal) handleConfirmDialog(msg tea.KeyMsg) (tea.Cmd, bool) {
 	return nil, true
 }
 
-// Display key handler helpers (shared between multiple keys)
-// Display key handler helpers (shared between multiple keys)
-// nolint:unparam
-func moveWindowCursorDown(m *Terminal) tea.Cmd {
+// Display key handler helpers (shared between multiple keys).
+// These don't return tea.Cmd — the map type doesn't require it.
+
+func moveWindowCursorDown(m *Terminal) {
 	if m.display.MoveWindowCursorDown() {
 		m.display.EnsureCursorVisible()
 		m.display.updateContent()
 	}
-	return nil
 }
 
-// nolint:unparam
-func moveWindowCursorUp(m *Terminal) tea.Cmd {
+func moveWindowCursorUp(m *Terminal) {
 	if m.display.MoveWindowCursorUp() {
 		m.display.EnsureCursorVisible()
 		m.display.updateContent()
 	}
-	return nil
 }
 
-// nolint:unparam
-func scrollDownLine(m *Terminal) tea.Cmd {
+func scrollDownLine(m *Terminal) {
 	if !m.display.AtBottom() {
 		m.display.MarkUserScrolled()
 		m.display.ScrollDown(1)
 		m.display.updateContent()
 	}
-	return nil
 }
 
-// nolint:unparam
-func scrollUpLine(m *Terminal) tea.Cmd {
+func scrollUpLine(m *Terminal) {
 	m.display.MarkUserScrolled()
 	m.display.ScrollUp(1)
 	m.display.updateContent()
-	return nil
 }
 
-// nolint:unparam
-func scrollDownHalf(m *Terminal) tea.Cmd {
+func scrollDownHalf(m *Terminal) {
 	m.display.MarkUserScrolled()
 	m.display.ScrollDown(max(1, m.display.GetHeight()/2))
 	m.display.updateContent()
-	return nil
 }
 
-// nolint:unparam
-func scrollUpHalf(m *Terminal) tea.Cmd {
+func scrollUpHalf(m *Terminal) {
 	m.display.MarkUserScrolled()
 	m.display.ScrollUp(max(1, m.display.GetHeight()/2))
 	m.display.updateContent()
-	return nil
 }
 
-// nolint:unparam
-func gotoBottom(m *Terminal) tea.Cmd {
+func gotoBottom(m *Terminal) {
 	m.display.SetCursorToLastWindow()
 	m.display.GotoBottom()
 	m.display.updateContent()
-	return nil
 }
 
-// nolint:unparam
-func gotoTop(m *Terminal) tea.Cmd {
+func gotoTop(m *Terminal) {
 	m.display.SetWindowCursor(0)
 	m.display.GotoTop()
 	m.display.updateContent()
-	return nil
 }
 
 // displayKeyMap maps display key strings to their handler functions.
-// Each handler returns a tea.Cmd (may be nil) for follow-up commands.
-// nolint:unparam // Some handlers always return nil (no follow-up command)
-var displayKeyMap = map[string]func(*Terminal) tea.Cmd{
+// Handlers that don't need to return a tea.Cmd use this map.
+var displayKeyMap = map[string]func(*Terminal){
 	"j":          moveWindowCursorDown,
 	"down":       moveWindowCursorDown,
 	"k":          moveWindowCursorUp,
@@ -494,64 +478,62 @@ var displayKeyMap = map[string]func(*Terminal) tea.Cmd{
 	"shift+down": scrollDownLine,
 	"K":          scrollUpLine,
 	"shift+up":   scrollUpLine,
-	"H": func(m *Terminal) tea.Cmd {
+	"H": func(m *Terminal) {
 		if m.display.MoveWindowCursorToTop() {
 			m.display.EnsureCursorVisible()
 			m.display.updateContent()
 		}
-		return nil
 	},
-	"L": func(m *Terminal) tea.Cmd {
+	"L": func(m *Terminal) {
 		if m.display.MoveWindowCursorToBottom() {
 			m.display.EnsureCursorVisible()
 			m.display.updateContent()
 		}
-		return nil
 	},
-	"M": func(m *Terminal) tea.Cmd {
+	"M": func(m *Terminal) {
 		if m.display.MoveWindowCursorToCenter() {
 			m.display.EnsureCursorVisible()
 			m.display.updateContent()
 		}
-		return nil
 	},
 	"G":    gotoBottom,
 	"end":  gotoBottom,
 	"g":    gotoTop,
 	"home": gotoTop,
-	":": func(m *Terminal) tea.Cmd {
+	":": func(m *Terminal) {
 		m.focusInput()
 		m.input.SetValue(":")
 		m.input.CursorEnd()
 		m.display.updateContent()
-		return nil
 	},
-	"space": func(m *Terminal) tea.Cmd {
+	"space": func(m *Terminal) {
 		if m.display.ToggleWindowFold() {
 			m.display.EnsureCursorVisible()
 			m.display.updateContent()
 		}
-		return nil
 	},
+	"f": func(m *Terminal) {
+		if m.display.MoveWindowCursorToNextUserPrompt() {
+			m.display.EnsureCursorVisible()
+			m.display.updateContent()
+		}
+	},
+	"b": func(m *Terminal) {
+		if m.display.MoveWindowCursorToPrevUserPrompt() {
+			m.display.EnsureCursorVisible()
+			m.display.updateContent()
+		}
+	},
+}
+
+// displayKeyCmdMap maps display keys that need to return a tea.Cmd.
+// Only keys that trigger follow-up commands are listed here.
+var displayKeyCmdMap = map[string]func(*Terminal) tea.Cmd{
 	"e": func(m *Terminal) tea.Cmd {
 		content := m.display.GetCursorWindowContent()
 		if content != "" {
 			m.display.MarkUserScrolled()
 			return m.editor.OpenForDisplay(content)
-		}
-		return nil
-	},
-	"f": func(m *Terminal) tea.Cmd {
-		if m.display.MoveWindowCursorToNextUserPrompt() {
-			m.display.EnsureCursorVisible()
-			m.display.updateContent()
-		}
-		return nil
-	},
-	"b": func(m *Terminal) tea.Cmd {
-		if m.display.MoveWindowCursorToPrevUserPrompt() {
-			m.display.EnsureCursorVisible()
-			m.display.updateContent()
 		}
 		return nil
 	},
@@ -563,11 +545,20 @@ var displayKeyMap = map[string]func(*Terminal) tea.Cmd{
 // updateContent(). This ensures the viewport position is updated before content
 // is regenerated, preventing blank areas in the virtual rendering.
 func (m *Terminal) handleDisplayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
-	handler, ok := displayKeyMap[msg.String()]
-	if !ok {
-		return nil, false
+	key := msg.String()
+
+	// Check command-returning keys first
+	if cmdFn, ok := displayKeyCmdMap[key]; ok {
+		return cmdFn(m), true
 	}
-	return handler(m), true
+
+	// Check regular display keys
+	if fn, ok := displayKeyMap[key]; ok {
+		fn(m)
+		return nil, true
+	}
+
+	return nil, false
 }
 
 // handleGlobalKeys handles global keyboard shortcuts.
