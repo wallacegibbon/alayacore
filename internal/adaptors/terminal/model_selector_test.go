@@ -216,29 +216,99 @@ func TestModelSelectorSetModelsUpdatesFilteredModels(t *testing.T) {
 	}
 }
 
+func TestModelSelectorLoadModelsBeforeOpen(t *testing.T) {
+	styles := DefaultStyles()
+	ms := NewModelSelector(styles)
+
+	// Simulate the output having models (loaded during session creation)
+	// but the model selector hasn't received them yet.
+	models := []agentpkg.ModelInfo{
+		{ID: 1, Name: "Model A", ProtocolType: "openai", ModelName: "model-a"},
+		{ID: 2, Name: "Model B", ProtocolType: "anthropic", ModelName: "model-b"},
+		{ID: 3, Name: "Model C", ProtocolType: "anthropic", ModelName: "model-c"},
+	}
+
+	// Load models first (models arrive via tick loop before the selector opens)
+	ms.LoadModels(models, 3) // Model C is active
+
+	// Then open (simulates Ctrl+L)
+	ms.Open()
+
+	// The cursor should be at the active model (Model C, index 2)
+	if ms.selectedIdx != 2 {
+		t.Errorf("Expected selectedIdx=2 (active model), got %d", ms.selectedIdx)
+	}
+	if ms.activeModel == nil {
+		t.Fatal("Expected activeModel to be set")
+	}
+	if ms.activeModel.Name != "Model C" {
+		t.Errorf("Expected activeModel.Name='Model C', got %q", ms.activeModel.Name)
+	}
+}
+
+func TestModelSelectorOpenBeforeLoadModelsThenTick(t *testing.T) {
+	styles := DefaultStyles()
+	ms := NewModelSelector(styles)
+
+	// Simulate the race: selector opens with no models loaded yet
+	ms.Open()
+
+	// Verify selector is open but empty
+	if !ms.IsOpen() {
+		t.Fatal("Expected selector to be open")
+	}
+	if len(ms.filteredModels) != 0 {
+		t.Fatalf("Expected 0 filtered models, got %d", len(ms.filteredModels))
+	}
+
+	// Now simulate the first tick loading models from output
+	models := []agentpkg.ModelInfo{
+		{ID: 1, Name: "Model A", ProtocolType: "openai", ModelName: "model-a"},
+		{ID: 2, Name: "Model B", ProtocolType: "anthropic", ModelName: "model-b"},
+		{ID: 3, Name: "Model C", ProtocolType: "anthropic", ModelName: "model-c"},
+	}
+	ms.LoadModels(models, 3) // Model C is active
+
+	// activeModel should be set correctly
+	if ms.activeModel == nil {
+		t.Fatal("Expected activeModel to be set after LoadModels")
+	}
+	if ms.activeModel.Name != "Model C" {
+		t.Errorf("Expected activeModel.Name='Model C', got %q", ms.activeModel.Name)
+	}
+	// filteredModels should have all models
+	if len(ms.filteredModels) != 3 {
+		t.Fatalf("Expected 3 filtered models, got %d", len(ms.filteredModels))
+	}
+	// Cursor should be positioned at the active model, not stuck at index 0
+	if ms.selectedIdx != 2 {
+		t.Errorf("Expected selectedIdx=2 (active Model C), got %d", ms.selectedIdx)
+	}
+}
+
 func TestModelSelectorLoadModelsPreservesSelection(t *testing.T) {
 	styles := DefaultStyles()
 	ms := NewModelSelector(styles)
 
-	// Set up initial models
-	models := []searchableModel{
-		{ModelInfo: agentpkg.ModelInfo{Name: "Model A", ProtocolType: "openai", ModelName: "model-a"}},
-		{ModelInfo: agentpkg.ModelInfo{Name: "Model B", ProtocolType: "anthropic", ModelName: "model-b"}},
+	// Set up initial models via LoadModels
+	models := []agentpkg.ModelInfo{
+		{ID: 1, Name: "Model A", ProtocolType: "openai", ModelName: "model-a"},
+		{ID: 2, Name: "Model B", ProtocolType: "anthropic", ModelName: "model-b"},
 	}
-	ms.SetModels(models)
+	ms.LoadModels(models, 1) // Model A is active
 	ms.Open()
 
-	// Select second model
+	// Select second model (simulates user navigating with j/k)
 	ms.selectedIdx = 1
 
-	// Set new models (simulating reload)
-	// The selection should be preserved when selector is open
-	newModels := []searchableModel{
-		{ModelInfo: agentpkg.ModelInfo{Name: "Model A", ProtocolType: "openai", ModelName: "model-a"}},
-		{ModelInfo: agentpkg.ModelInfo{Name: "Model B", ProtocolType: "anthropic", ModelName: "model-b"}},
-		{ModelInfo: agentpkg.ModelInfo{Name: "Model C", ProtocolType: "anthropic", ModelName: "model-c"}},
+	// Reload models (simulating 'r' key — user-triggered reload)
+	// The selection should be preserved when selector is open and models already existed
+	newModels := []agentpkg.ModelInfo{
+		{ID: 1, Name: "Model A", ProtocolType: "openai", ModelName: "model-a"},
+		{ID: 2, Name: "Model B", ProtocolType: "anthropic", ModelName: "model-b"},
+		{ID: 3, Name: "Model C", ProtocolType: "anthropic", ModelName: "model-c"},
 	}
-	ms.SetModels(newModels)
+	ms.LoadModels(newModels, 1) // Model A is still active
 
 	// Selection should still be at index 1 (Model B)
 	if ms.selectedIdx != 1 {

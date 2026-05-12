@@ -192,6 +192,9 @@ func (ms *ModelSelector) LoadModels(models []agentpkg.ModelInfo, activeID int) t
 		}
 	}
 
+	// Remember whether this is the first time models arrive so we can
+	// decide whether to preserve or reposition the cursor below.
+	prevModelCount := ms.lastModelCount
 	ms.lastModelCount = len(models)
 	ms.models = make([]searchableModel, len(models))
 
@@ -222,9 +225,17 @@ func (ms *ModelSelector) LoadModels(models []agentpkg.ModelInfo, activeID int) t
 	ms.lastSearchValue = "\x00"
 	ms.updateFilteredModels()
 	if shouldPreserveSelection {
-		ms.selectedIdx = savedSelectedIdx
-		ms.scrollIdx = savedScrollIdx
-		ms.clampSelection()
+		if prevModelCount == 0 {
+			// Models arrived while the selector was already open (e.g. user
+			// pressed Ctrl+L before the first tick).  Reposition the cursor
+			// on the active model instead of keeping the stale index 0.
+			ms.selectActiveModel()
+		} else {
+			// User-triggered reload ('r') — preserve manual navigation.
+			ms.selectedIdx = savedSelectedIdx
+			ms.scrollIdx = savedScrollIdx
+			ms.clampSelection()
+		}
 	}
 	return func() tea.Msg { return nil }
 }
