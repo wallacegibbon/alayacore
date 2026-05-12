@@ -5,8 +5,9 @@ package providers
 // during streaming. This file contains the common parts.
 
 import (
-	"github.com/alayacore/alayacore/internal/llm"
 	"sync"
+
+	"github.com/alayacore/alayacore/internal/llm"
 )
 
 // streamUsage tracks token usage and stop reason during streaming.

@@ -623,6 +623,18 @@ func (p *AnthropicProvider) mergeUsage(usage anthropicUsage, state *anthropicStr
 	state.setUsage(current.InputTokens, current.OutputTokens, current.CacheReadTokens, current.CacheCreationTokens)
 }
 
+// unmarshalSSE is a generic helper that unmarshals SSE event data into a typed struct.
+// On error, it yields the error and returns the zero value with ok=false.
+func unmarshalSSE[T any](data string, yield func(llm.StreamEvent, error) bool) (T, bool) {
+	var event T
+	if err := json.Unmarshal([]byte(data), &event); err != nil {
+		var zero T
+		yield(nil, fmt.Errorf("failed to parse SSE event: %w", err))
+		return zero, false
+	}
+	return event, true
+}
+
 // handleEvent handles a single SSE event. Returns false if iteration should stop.
 func (p *AnthropicProvider) handleEvent(eventType, data string, yield func(llm.StreamEvent, error) bool, state *anthropicStreamState) bool {
 	if data == "" {
@@ -631,27 +643,22 @@ func (p *AnthropicProvider) handleEvent(eventType, data string, yield func(llm.S
 
 	switch eventType {
 	case "message_start":
-		var event anthropicSSEMessageStart
-		if err := json.Unmarshal([]byte(data), &event); err != nil {
-			yield(nil, fmt.Errorf("failed to parse message_start: %w", err))
+		event, ok := unmarshalSSE[anthropicSSEMessageStart](data, yield)
+		if !ok {
 			return false
 		}
 		p.mergeUsage(event.Message.Usage, state)
-		return true
 
 	case "content_block_start":
-		var event anthropicSSEContentBlockStart
-		if err := json.Unmarshal([]byte(data), &event); err != nil {
-			yield(nil, fmt.Errorf("failed to parse content_block_start: %w", err))
+		event, ok := unmarshalSSE[anthropicSSEContentBlockStart](data, yield)
+		if !ok {
 			return false
 		}
 		state.startBlock(event.Index, event.ContentBlock.Type, event.ContentBlock.ID, event.ContentBlock.Name)
-		return true
 
 	case "content_block_delta":
-		var event anthropicSSEContentBlockDelta
-		if err := json.Unmarshal([]byte(data), &event); err != nil {
-			yield(nil, fmt.Errorf("failed to parse content_block_delta: %w", err))
+		event, ok := unmarshalSSE[anthropicSSEContentBlockDelta](data, yield)
+		if !ok {
 			return false
 		}
 		return p.handleContentDelta(event.Delta, yield, state)
@@ -660,21 +667,11 @@ func (p *AnthropicProvider) handleEvent(eventType, data string, yield func(llm.S
 		return p.handleContentBlockStop(yield, state)
 
 	case "message_delta":
-		var event anthropicSSEMessageDelta
-		if err := json.Unmarshal([]byte(data), &event); err != nil {
-			yield(nil, fmt.Errorf("failed to parse message_delta: %w", err))
-			return false
-		}
-		if !p.handleStopReason(event.Delta.StopReason, yield, state) {
-			return false
-		}
-		p.mergeUsage(event.Usage, state)
-		return true
+		return p.handleMessageDeltaEvent(data, yield, state)
 
 	case "message_stop":
-		var event anthropicSSEMessageStop
-		if err := json.Unmarshal([]byte(data), &event); err != nil {
-			yield(nil, fmt.Errorf("failed to parse message_stop: %w", err))
+		event, ok := unmarshalSSE[anthropicSSEMessageStop](data, yield)
+		if !ok {
 			return false
 		}
 		p.mergeUsage(event.Usage, state)
@@ -683,26 +680,42 @@ func (p *AnthropicProvider) handleEvent(eventType, data string, yield func(llm.S
 			Usage:      state.getUsage(),
 			StopReason: state.stopReason,
 		}, nil)
-		return true
 
 	case "ping":
-		return true
+		// Ignore
 
 	case "error":
-		var event anthropicSSEError
-		if err := json.Unmarshal([]byte(data), &event); err != nil {
-			yield(nil, fmt.Errorf("failed to parse error event: %w", err))
-			return false
-		}
-		if event.Error.Message != "" {
-			yield(nil, fmt.Errorf("API error: %s", event.Error.Message))
-		} else {
-			yield(nil, fmt.Errorf("unknown API error"))
-		}
-		return false
+		return p.handleSSEError(data, yield)
 	}
 
 	return true
+}
+
+// handleMessageDeltaEvent handles "message_delta" SSE events.
+func (p *AnthropicProvider) handleMessageDeltaEvent(data string, yield func(llm.StreamEvent, error) bool, state *anthropicStreamState) bool {
+	event, ok := unmarshalSSE[anthropicSSEMessageDelta](data, yield)
+	if !ok {
+		return false
+	}
+	if !p.handleStopReason(event.Delta.StopReason, yield, state) {
+		return false
+	}
+	p.mergeUsage(event.Usage, state)
+	return true
+}
+
+// handleSSEError handles "error" SSE events.
+func (p *AnthropicProvider) handleSSEError(data string, yield func(llm.StreamEvent, error) bool) bool {
+	event, ok := unmarshalSSE[anthropicSSEError](data, yield)
+	if !ok {
+		return false
+	}
+	if event.Error.Message != "" {
+		yield(nil, fmt.Errorf("API error: %s", event.Error.Message))
+	} else {
+		yield(nil, fmt.Errorf("unknown API error"))
+	}
+	return false
 }
 
 // handleStopReason validates the stop reason and updates state.
