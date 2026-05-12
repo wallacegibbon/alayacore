@@ -178,9 +178,9 @@ type anthropicContentBlock struct {
 	Input json.RawMessage `json:"input,omitempty"`
 
 	// For tool result
-	ToolUseID string      `json:"tool_use_id,omitempty"`
-	Content   interface{} `json:"content,omitempty"`
-	IsError   bool        `json:"is_error,omitempty"`
+	ToolUseID string `json:"tool_use_id,omitempty"`
+	Content   any    `json:"content,omitempty"`
+	IsError   bool   `json:"is_error,omitempty"`
 
 	// For thinking (extended thinking)
 	// Pointer so we can emit `"thinking": ""` (DeepSeek requires empty thinking block)
@@ -336,7 +336,7 @@ func anthropicConvertMessages(messages []llm.Message, reasoningLevel int) []anth
 					Input: v.Input,
 				})
 			case llm.ToolResultPart:
-				var content interface{}
+				var content any
 				switch out := v.Output.(type) {
 				case llm.ToolResultOutputText:
 					content = out.Text
@@ -541,10 +541,10 @@ func (p *AnthropicProvider) parseStream(reader io.Reader) iter.Seq2[llm.StreamEv
 // anthropicUsage represents token usage in SSE events.
 // Fields use pointers so absent fields stay nil (zero-value merge logic).
 type anthropicUsage struct {
-	InputTokens         *int64 `json:"input_tokens"`
-	OutputTokens        *int64 `json:"output_tokens"`
-	CacheReadTokens     *int64 `json:"cache_read_input_tokens"`
-	CreationTokens      *int64 `json:"cache_creation_input_tokens"`
+	InputTokens     *int64 `json:"input_tokens"`
+	OutputTokens    *int64 `json:"output_tokens"`
+	CacheReadTokens *int64 `json:"cache_read_input_tokens"`
+	CreationTokens  *int64 `json:"cache_creation_input_tokens"`
 }
 
 // anthropicSSEMessageStart is the payload for "message_start" events.
@@ -563,7 +563,7 @@ type anthropicSSEContentBlock struct {
 
 // anthropicSSEContentBlockStart is the payload for "content_block_start" events.
 type anthropicSSEContentBlockStart struct {
-	Index        int                    `json:"index"`
+	Index        int                      `json:"index"`
 	ContentBlock anthropicSSEContentBlock `json:"content_block"`
 }
 

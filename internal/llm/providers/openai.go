@@ -252,8 +252,8 @@ type openAIStreamOptions struct {
 }
 
 type openAIMessage struct {
-	Role    string      `json:"role"`
-	Content interface{} `json:"content,omitempty"`
+	Role    string `json:"role"`
+	Content any    `json:"content,omitempty"`
 	// Pointer so we can emit `"reasoning_content": ""` (DeepSeek requires it)
 	// vs. omitting the field entirely when reasoning is disabled.
 	ReasoningContent *string          `json:"reasoning_content,omitempty"`
@@ -497,10 +497,10 @@ func openaiConvertToolCalls(apiMsg *openAIMessage, content []llm.ContentPart) {
 
 // openaiConvertRegularContent handles conversion of regular text content.
 func openaiConvertRegularContent(apiMsg *openAIMessage, content []llm.ContentPart) {
-	var contentParts []map[string]interface{}
+	var contentParts []map[string]any
 	for _, part := range content {
 		if v, ok := part.(llm.TextPart); ok {
-			contentParts = append(contentParts, map[string]interface{}{
+			contentParts = append(contentParts, map[string]any{
 				"type": "text",
 				"text": v.Text,
 			})

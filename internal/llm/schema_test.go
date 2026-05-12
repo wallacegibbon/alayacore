@@ -21,7 +21,7 @@ func TestGenerateSchema(t *testing.T) {
 	}
 
 	// Verify it's valid JSON
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.Unmarshal(schema, &result); err != nil {
 		t.Fatalf("Generated invalid JSON: %v", err)
 	}
@@ -32,7 +32,7 @@ func TestGenerateSchema(t *testing.T) {
 	}
 
 	// Check required fields
-	required, ok := result["required"].([]interface{})
+	required, ok := result["required"].([]any)
 	if !ok {
 		t.Fatal("required field is not an array")
 	}
@@ -41,13 +41,13 @@ func TestGenerateSchema(t *testing.T) {
 	}
 
 	// Check properties
-	props, ok := result["properties"].(map[string]interface{})
+	props, ok := result["properties"].(map[string]any)
 	if !ok {
 		t.Fatal("properties is not an object")
 	}
 
 	// Check name field (string)
-	nameField, ok := props["name"].(map[string]interface{})
+	nameField, ok := props["name"].(map[string]any)
 	if !ok {
 		t.Fatal("name property is not an object")
 	}
@@ -59,7 +59,7 @@ func TestGenerateSchema(t *testing.T) {
 	}
 
 	// Check count field (int → integer)
-	countField, ok := props["count"].(map[string]interface{})
+	countField, ok := props["count"].(map[string]any)
 	if !ok {
 		t.Fatal("count property is not an object")
 	}
@@ -68,7 +68,7 @@ func TestGenerateSchema(t *testing.T) {
 	}
 
 	// Check rate field (float64 → number)
-	rateField, ok := props["rate"].(map[string]interface{})
+	rateField, ok := props["rate"].(map[string]any)
 	if !ok {
 		t.Fatal("rate property is not an object")
 	}
@@ -77,7 +77,7 @@ func TestGenerateSchema(t *testing.T) {
 	}
 
 	// Check enabled field (bool → boolean)
-	enabledField, ok := props["enabled"].(map[string]interface{})
+	enabledField, ok := props["enabled"].(map[string]any)
 	if !ok {
 		t.Fatal("enabled property is not an object")
 	}
@@ -86,11 +86,11 @@ func TestGenerateSchema(t *testing.T) {
 	}
 
 	// Check enum field
-	typeField, ok := props["type"].(map[string]interface{})
+	typeField, ok := props["type"].(map[string]any)
 	if !ok {
 		t.Fatal("type property is not an object")
 	}
-	enum, ok := typeField["enum"].([]interface{})
+	enum, ok := typeField["enum"].([]any)
 	if !ok {
 		t.Fatal("enum is not an array")
 	}

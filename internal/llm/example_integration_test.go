@@ -128,9 +128,9 @@ func TestAgentMultiTurnWithTools(t *testing.T) {
 		} else {
 			// Second call: return text response
 			// Verify the request has proper message structure
-			var reqBody map[string]interface{}
+			var reqBody map[string]any
 			if err := json.NewDecoder(r.Body).Decode(&reqBody); err == nil {
-				messages, ok := reqBody["messages"].([]interface{})
+				messages, ok := reqBody["messages"].([]any)
 				if ok {
 					// Should have: user, assistant with tool_use, user with tool_result
 					if len(messages) < 3 {
@@ -138,15 +138,15 @@ func TestAgentMultiTurnWithTools(t *testing.T) {
 					}
 					// Check that tool result is present with correct role
 					for _, m := range messages {
-						msg, ok := m.(map[string]interface{})
+						msg, ok := m.(map[string]any)
 						if !ok {
 							continue
 						}
-						content, ok := msg["content"].([]interface{})
+						content, ok := msg["content"].([]any)
 						if !ok || len(content) == 0 {
 							continue
 						}
-						block, ok := content[0].(map[string]interface{})
+						block, ok := content[0].(map[string]any)
 						if !ok {
 							continue
 						}
@@ -365,9 +365,9 @@ func TestOpenAIMultiTurnWithTools(t *testing.T) {
 			fmt.Fprint(w, "data: [DONE]\n\n")
 		} else {
 			// Second call: verify request has proper message structure
-			var reqBody map[string]interface{}
+			var reqBody map[string]any
 			if err := json.NewDecoder(r.Body).Decode(&reqBody); err == nil {
-				messages, ok := reqBody["messages"].([]interface{})
+				messages, ok := reqBody["messages"].([]any)
 				if ok {
 					// Should have: user, assistant with tool_calls, tool result
 					if len(messages) < 3 {
@@ -375,7 +375,7 @@ func TestOpenAIMultiTurnWithTools(t *testing.T) {
 					}
 					// Check that tool result is present with correct role
 					for _, m := range messages {
-						msg, ok := m.(map[string]interface{})
+						msg, ok := m.(map[string]any)
 						if !ok {
 							continue
 						}

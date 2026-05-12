@@ -20,7 +20,7 @@ type WarningCollector struct {
 }
 
 // Addf adds a warning to the collector
-func (wc *WarningCollector) Addf(format string, args ...interface{}) {
+func (wc *WarningCollector) Addf(format string, args ...any) {
 	wc.mu.Lock()
 	defer wc.mu.Unlock()
 
@@ -39,7 +39,7 @@ func (wc *WarningCollector) GetAndClear() []Warning {
 }
 
 // AddWarningf adds a warning to the collector (nil-safe)
-func AddWarningf(wc *WarningCollector, format string, args ...interface{}) {
+func AddWarningf(wc *WarningCollector, format string, args ...any) {
 	if wc != nil {
 		wc.Addf(format, args...)
 	}

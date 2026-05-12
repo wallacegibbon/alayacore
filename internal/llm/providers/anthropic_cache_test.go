@@ -57,13 +57,13 @@ func TestAnthropicPromptCacheFullFlow(t *testing.T) {
 	}
 
 	// Parse the captured request
-	var req map[string]interface{}
+	var req map[string]any
 	if err := json.Unmarshal(lastRequest, &req); err != nil {
 		t.Fatalf("Failed to parse request: %v", err)
 	}
 
 	// Verify top-level cache_control exists
-	cacheControl, ok := req["cache_control"].(map[string]interface{})
+	cacheControl, ok := req["cache_control"].(map[string]any)
 	if !ok {
 		t.Fatal("Expected top-level cache_control field for automatic caching")
 	}
@@ -73,7 +73,7 @@ func TestAnthropicPromptCacheFullFlow(t *testing.T) {
 	}
 
 	// Verify system messages do NOT have cache_control (automatic caching handles it)
-	system, ok := req["system"].([]interface{})
+	system, ok := req["system"].([]any)
 	if !ok {
 		t.Fatal("Expected system to be an array")
 	}
@@ -84,7 +84,7 @@ func TestAnthropicPromptCacheFullFlow(t *testing.T) {
 
 	// Verify system messages don't have individual cache_control
 	for i, msg := range system {
-		m := msg.(map[string]interface{})
+		m := msg.(map[string]any)
 		if _, hasCache := m["cache_control"]; hasCache {
 			t.Errorf("System message %d should NOT have cache_control in automatic caching mode", i)
 		}
@@ -139,7 +139,7 @@ func TestAnthropicPromptCacheDisabled(t *testing.T) {
 	}
 
 	// Parse the captured request
-	var req map[string]interface{}
+	var req map[string]any
 	if err := json.Unmarshal(lastRequest, &req); err != nil {
 		t.Fatalf("Failed to parse request: %v", err)
 	}
@@ -150,8 +150,8 @@ func TestAnthropicPromptCacheDisabled(t *testing.T) {
 	}
 
 	// Verify system messages do NOT have cache_control
-	system := req["system"].([]interface{})
-	first := system[0].(map[string]interface{})
+	system := req["system"].([]any)
+	first := system[0].(map[string]any)
 
 	if _, hasCache := first["cache_control"]; hasCache {
 		t.Error("Expected NO cache_control on system message when prompt_cache=false")

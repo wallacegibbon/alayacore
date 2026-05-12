@@ -28,12 +28,12 @@ func TestAnthropicSystemMessageArray(t *testing.T) {
 	t.Logf("Anthropic request:\n%s", string(data))
 
 	// Verify system is an array
-	var parsed map[string]interface{}
+	var parsed map[string]any
 	if err := json.Unmarshal(data, &parsed); err != nil {
 		t.Fatalf("Failed to unmarshal: %v", err)
 	}
 
-	system, ok := parsed["system"].([]interface{})
+	system, ok := parsed["system"].([]any)
 	if !ok {
 		t.Fatal("Expected system to be an array")
 	}
@@ -43,7 +43,7 @@ func TestAnthropicSystemMessageArray(t *testing.T) {
 	}
 
 	// Verify first message
-	first, ok := system[0].(map[string]interface{})
+	first, ok := system[0].(map[string]any)
 	if !ok {
 		t.Fatal("Expected system[0] to be a map")
 	}
@@ -55,7 +55,7 @@ func TestAnthropicSystemMessageArray(t *testing.T) {
 	}
 
 	// Verify second message
-	second, ok := system[1].(map[string]interface{})
+	second, ok := system[1].(map[string]any)
 	if !ok {
 		t.Fatal("Expected system[1] to be a map")
 	}
@@ -81,12 +81,12 @@ func TestAnthropicEmptyExtraPrompt(t *testing.T) {
 		t.Fatalf("Failed to marshal request: %v", err)
 	}
 
-	var parsed map[string]interface{}
+	var parsed map[string]any
 	if err := json.Unmarshal(data, &parsed); err != nil {
 		t.Fatalf("Failed to unmarshal: %v", err)
 	}
 
-	system, ok := parsed["system"].([]interface{})
+	system, ok := parsed["system"].([]any)
 	if !ok {
 		t.Fatal("Expected system to be an array")
 	}
@@ -117,13 +117,13 @@ func TestAnthropicPromptCacheControl(t *testing.T) {
 	t.Logf("Anthropic request with automatic caching:\n%s", string(data))
 
 	// Verify structure
-	var parsed map[string]interface{}
+	var parsed map[string]any
 	if err := json.Unmarshal(data, &parsed); err != nil {
 		t.Fatalf("Failed to unmarshal: %v", err)
 	}
 
 	// Verify top-level cache_control
-	cacheControl, ok := parsed["cache_control"].(map[string]interface{})
+	cacheControl, ok := parsed["cache_control"].(map[string]any)
 	if !ok {
 		t.Fatal("Expected top-level cache_control field")
 	}
@@ -133,12 +133,12 @@ func TestAnthropicPromptCacheControl(t *testing.T) {
 	}
 
 	// Verify system messages do NOT have cache_control (automatic caching handles it)
-	system, ok := parsed["system"].([]interface{})
+	system, ok := parsed["system"].([]any)
 	if !ok {
 		t.Fatal("Expected system to be an array")
 	}
 	for i, msg := range system {
-		m, ok := msg.(map[string]interface{})
+		m, ok := msg.(map[string]any)
 		if !ok {
 			t.Fatalf("Expected system[%d] to be a map", i)
 		}

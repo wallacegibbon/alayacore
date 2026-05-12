@@ -161,15 +161,15 @@ func TestToolCallStreaming(t *testing.T) {
 		flusher, _ := w.(http.Flusher)
 
 		// Send tool call
-		toolCall := map[string]interface{}{
-			"choices": []interface{}{
-				map[string]interface{}{
-					"delta": map[string]interface{}{
-						"tool_calls": []interface{}{
-							map[string]interface{}{
+		toolCall := map[string]any{
+			"choices": []any{
+				map[string]any{
+					"delta": map[string]any{
+						"tool_calls": []any{
+							map[string]any{
 								"id":   "call-123",
 								"type": "function",
-								"function": map[string]interface{}{
+								"function": map[string]any{
 									"name":      "test_tool",
 									"arguments": "{\"arg\":\"value\"}",
 								},
@@ -901,19 +901,19 @@ func TestOpenAIWithSystemPrompt(t *testing.T) {
 	// Test that system prompt is included in OpenAI requests
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Verify request body
-		var reqBody map[string]interface{}
+		var reqBody map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
 			t.Error(err)
 			return
 		}
 
-		messages, ok := reqBody["messages"].([]interface{})
+		messages, ok := reqBody["messages"].([]any)
 		if !ok || len(messages) == 0 {
 			t.Error("Expected messages array")
 		}
 
 		// First message should be system
-		firstMsg, ok := messages[0].(map[string]interface{})
+		firstMsg, ok := messages[0].(map[string]any)
 		if !ok || firstMsg["role"] != "system" {
 			t.Error("Expected first message to be system")
 		}
@@ -957,18 +957,18 @@ func TestAnthropicWithTools(t *testing.T) {
 	// Test that tools are properly sent to Anthropic API
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Verify request body
-		var reqBody map[string]interface{}
+		var reqBody map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
 			t.Error(err)
 			return
 		}
 
-		tools, ok := reqBody["tools"].([]interface{})
+		tools, ok := reqBody["tools"].([]any)
 		if !ok || len(tools) != 1 {
 			t.Error("Expected 1 tool in request")
 		}
 
-		tool, ok := tools[0].(map[string]interface{})
+		tool, ok := tools[0].(map[string]any)
 		if !ok || tool["name"] != "test_tool" {
 			t.Error("Expected tool name 'test_tool'")
 		}
@@ -1107,13 +1107,13 @@ func TestAnthropicToolResultMessageFormat(t *testing.T) {
 	// Tool results must be in a "user" role message, not "tool" role
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Verify request body
-		var reqBody map[string]interface{}
+		var reqBody map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
 			t.Error(err)
 			return
 		}
 
-		messages, ok := reqBody["messages"].([]interface{})
+		messages, ok := reqBody["messages"].([]any)
 		if !ok {
 			t.Fatal("Expected messages array")
 		}
@@ -1124,13 +1124,13 @@ func TestAnthropicToolResultMessageFormat(t *testing.T) {
 		}
 
 		// Check assistant message has tool_use
-		assistantMsg, ok := messages[1].(map[string]interface{})
+		assistantMsg, ok := messages[1].(map[string]any)
 		if !ok || assistantMsg["role"] != "assistant" {
 			t.Fatal("Expected second message to be assistant")
 		}
 
 		// Check tool result message is "user" role (not "tool")
-		toolResultMsg, ok := messages[2].(map[string]interface{})
+		toolResultMsg, ok := messages[2].(map[string]any)
 		if !ok {
 			t.Fatal("Expected third message to be an object")
 		}
@@ -1139,11 +1139,11 @@ func TestAnthropicToolResultMessageFormat(t *testing.T) {
 		}
 
 		// Check content has tool_result type
-		content, ok := toolResultMsg["content"].([]interface{})
+		content, ok := toolResultMsg["content"].([]any)
 		if !ok || len(content) == 0 {
 			t.Fatal("Expected tool result message to have content")
 		}
-		firstContent, ok := content[0].(map[string]interface{})
+		firstContent, ok := content[0].(map[string]any)
 		if !ok || firstContent["type"] != "tool_result" {
 			t.Errorf("Expected content type 'tool_result', got '%v'", firstContent["type"])
 		}
@@ -1268,13 +1268,13 @@ func TestOpenAIToolResultMessageFormat(t *testing.T) {
 	// Test that tool result messages are properly formatted for OpenAI API
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Verify request body
-		var reqBody map[string]interface{}
+		var reqBody map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
 			t.Error(err)
 			return
 		}
 
-		messages, ok := reqBody["messages"].([]interface{})
+		messages, ok := reqBody["messages"].([]any)
 		if !ok {
 			t.Fatal("Expected messages array")
 		}
@@ -1287,7 +1287,7 @@ func TestOpenAIToolResultMessageFormat(t *testing.T) {
 		// Find the tool result message (role: "tool")
 		var foundToolResult bool
 		for _, m := range messages {
-			msg, ok := m.(map[string]interface{})
+			msg, ok := m.(map[string]any)
 			if !ok {
 				continue
 			}
@@ -1356,13 +1356,13 @@ func TestOpenAIMultiToolResultMessageFormat(t *testing.T) {
 	// Test that multiple tool results in a single message are converted to separate API messages
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Verify request body
-		var reqBody map[string]interface{}
+		var reqBody map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
 			t.Error(err)
 			return
 		}
 
-		messages, ok := reqBody["messages"].([]interface{})
+		messages, ok := reqBody["messages"].([]any)
 		if !ok {
 			t.Fatal("Expected messages array")
 		}
@@ -1377,7 +1377,7 @@ func TestOpenAIMultiToolResultMessageFormat(t *testing.T) {
 		var toolResultCount int
 		var toolCallIDs []string
 		for _, m := range messages {
-			msg, ok := m.(map[string]interface{})
+			msg, ok := m.(map[string]any)
 			if !ok {
 				continue
 			}
@@ -1482,28 +1482,28 @@ func TestAnthropicToolResultError(t *testing.T) {
 	// Test that tool result errors are properly formatted
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Verify request body
-		var reqBody map[string]interface{}
+		var reqBody map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
 			t.Error(err)
 			return
 		}
 
-		messages, ok := reqBody["messages"].([]interface{})
+		messages, ok := reqBody["messages"].([]any)
 		if !ok {
 			t.Fatal("Expected messages array")
 		}
 
 		// Find tool result and check is_error field
 		for _, m := range messages {
-			msg, ok := m.(map[string]interface{})
+			msg, ok := m.(map[string]any)
 			if !ok || msg["role"] != "user" {
 				continue
 			}
-			content, ok := msg["content"].([]interface{})
+			content, ok := msg["content"].([]any)
 			if !ok || len(content) == 0 {
 				continue
 			}
-			block, ok := content[0].(map[string]interface{})
+			block, ok := content[0].(map[string]any)
 			if !ok || block["type"] != "tool_result" {
 				continue
 			}

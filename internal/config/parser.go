@@ -33,21 +33,21 @@ func (w ParseWarning) String() string {
 // Unknown keys are silently ignored.  Use ParseKeyValueStrict to detect them.
 // Parse errors (e.g. non-numeric value for an int field) are also silently ignored.
 // Use ParseKeyValueWithWarnings to collect them.
-func ParseKeyValue(content string, target interface{}) {
+func ParseKeyValue(content string, target any) {
 	parseConfig(content, target, false, false)
 }
 
 // ParseKeyValueWithWarnings is like ParseKeyValue but also returns warnings for
 // values that could not be converted to the target field type. This helps surface
 // typos like context_limit: abc (which would otherwise silently default to 0).
-func ParseKeyValueWithWarnings(content string, target interface{}) []ParseWarning {
+func ParseKeyValueWithWarnings(content string, target any) []ParseWarning {
 	_, warnings := parseConfig(content, target, false, true)
 	return warnings
 }
 
 // ParseKeyValueStrict is like ParseKeyValue but returns any keys in content
 // that did not match a struct field tag.  Callers can log or error on these.
-func ParseKeyValueStrict(content string, target interface{}) []string {
+func ParseKeyValueStrict(content string, target any) []string {
 	unknown, _ := parseConfig(content, target, true, false)
 	return unknown
 }
@@ -63,7 +63,7 @@ func ParseKeyValueBlocks(content string) []string {
 // collectWarnings: return ParseWarning for values that fail type conversion.
 //
 //nolint:gocyclo // Multiple validation branches required for config parsing
-func parseConfig(content string, target interface{}, skipHyphens bool, collectWarnings bool) ([]string, []ParseWarning) {
+func parseConfig(content string, target any, skipHyphens bool, collectWarnings bool) ([]string, []ParseWarning) {
 	v := reflect.ValueOf(target)
 	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Struct {
 		return nil, nil

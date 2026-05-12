@@ -60,7 +60,7 @@ func inferSchemaType(t reflect.Type) string {
 
 // GenerateSchema generates a JSON schema from a struct using reflection.
 // Returns an error if v is not a struct or marshaling fails.
-func GenerateSchema(v interface{}) (json.RawMessage, error) {
+func GenerateSchema(v any) (json.RawMessage, error) {
 	t := reflect.TypeOf(v)
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
@@ -69,7 +69,7 @@ func GenerateSchema(v interface{}) (json.RawMessage, error) {
 		return nil, fmt.Errorf("GenerateSchema: expected struct, got %s", t.Kind())
 	}
 
-	schema := map[string]interface{}{
+	schema := map[string]any{
 		"type":       "object",
 		"properties": make(map[string]SchemaField),
 	}
@@ -132,7 +132,7 @@ func GenerateSchema(v interface{}) (json.RawMessage, error) {
 
 // MustGenerateSchema is like GenerateSchema but panics on error.
 // Use only with statically-known struct types (e.g. tool input structs).
-func MustGenerateSchema(v interface{}) json.RawMessage {
+func MustGenerateSchema(v any) json.RawMessage {
 	schema, err := GenerateSchema(v)
 	if err != nil {
 		panic(err)
