@@ -551,154 +551,218 @@ func (p *AnthropicProvider) parseStream(reader io.Reader) iter.Seq2[llm.StreamEv
 	}
 }
 
+// ============================================================================
+// SSE Event Types
+// ============================================================================
+
+// anthropicUsage represents token usage in SSE events.
+// Fields use pointers so absent fields stay nil (zero-value merge logic).
+type anthropicUsage struct {
+	InputTokens         *int64 `json:"input_tokens"`
+	OutputTokens        *int64 `json:"output_tokens"`
+	CacheReadTokens     *int64 `json:"cache_read_input_tokens"`
+	CreationTokens      *int64 `json:"cache_creation_input_tokens"`
+}
+
+// anthropicSSEMessageStart is the payload for "message_start" events.
+type anthropicSSEMessageStart struct {
+	Message struct {
+		Usage anthropicUsage `json:"usage"`
+	} `json:"message"`
+}
+
+// anthropicSSEContentBlock is a content block in "content_block_start" events.
+type anthropicSSEContentBlock struct {
+	Type string `json:"type"`
+	ID   string `json:"id,omitempty"`
+	Name string `json:"name,omitempty"`
+}
+
+// anthropicSSEContentBlockStart is the payload for "content_block_start" events.
+type anthropicSSEContentBlockStart struct {
+	Index        int                    `json:"index"`
+	ContentBlock anthropicSSEContentBlock `json:"content_block"`
+}
+
+// anthropicSSEDelta is the delta in "content_block_delta" events.
+type anthropicSSEDelta struct {
+	Type        string `json:"type"`
+	Text        string `json:"text,omitempty"`
+	Thinking    string `json:"thinking,omitempty"`
+	PartialJSON string `json:"partial_json,omitempty"`
+}
+
+// anthropicSSEContentBlockDelta is the payload for "content_block_delta" events.
+type anthropicSSEContentBlockDelta struct {
+	Index int               `json:"index"`
+	Delta anthropicSSEDelta `json:"delta"`
+}
+
+// anthropicSSEMessageDelta is the payload for "message_delta" events.
+type anthropicSSEMessageDelta struct {
+	Delta struct {
+		StopReason string `json:"stop_reason"`
+	} `json:"delta"`
+	Usage anthropicUsage `json:"usage"`
+}
+
+// anthropicSSEMessageStop is the payload for "message_stop" events.
+type anthropicSSEMessageStop struct {
+	Usage anthropicUsage `json:"usage"`
+}
+
+// anthropicSSEError is the payload for "error" events.
+type anthropicSSEError struct {
+	Error struct {
+		Type    string `json:"type"`
+		Message string `json:"message"`
+	} `json:"error"`
+}
+
+// mergeUsage merges partial usage data from an SSE event into the current state.
+// Only overwrites fields that are present (non-nil) in the incoming data.
+func (p *AnthropicProvider) mergeUsage(usage anthropicUsage, state *anthropicStreamState) {
+	current := state.getUsage()
+
+	if usage.InputTokens != nil {
+		current.InputTokens = *usage.InputTokens
+	}
+	if usage.OutputTokens != nil {
+		current.OutputTokens = *usage.OutputTokens
+	}
+	if usage.CacheReadTokens != nil {
+		current.CacheReadTokens = *usage.CacheReadTokens
+	}
+	if usage.CreationTokens != nil {
+		current.CacheCreationTokens = *usage.CreationTokens
+	}
+
+	state.setUsage(current.InputTokens, current.OutputTokens, current.CacheReadTokens, current.CacheCreationTokens)
+}
+
 // handleEvent handles a single SSE event. Returns false if iteration should stop.
 func (p *AnthropicProvider) handleEvent(eventType, data string, yield func(llm.StreamEvent, error) bool, state *anthropicStreamState) bool {
 	if data == "" {
 		return true
 	}
 
-	var payload map[string]interface{}
-	if err := json.Unmarshal([]byte(data), &payload); err != nil {
-		yield(nil, fmt.Errorf("failed to parse event data: %w", err))
-		return false
-	}
-
 	switch eventType {
 	case "message_start":
-		return p.handleMessageStart(payload, yield, state)
+		var event anthropicSSEMessageStart
+		if err := json.Unmarshal([]byte(data), &event); err != nil {
+			yield(nil, fmt.Errorf("failed to parse message_start: %w", err))
+			return false
+		}
+		p.mergeUsage(event.Message.Usage, state)
+		return true
 
 	case "content_block_start":
-		return p.handleContentBlockStart(payload, yield, state)
+		var event anthropicSSEContentBlockStart
+		if err := json.Unmarshal([]byte(data), &event); err != nil {
+			yield(nil, fmt.Errorf("failed to parse content_block_start: %w", err))
+			return false
+		}
+		state.startBlock(event.Index, event.ContentBlock.Type, event.ContentBlock.ID, event.ContentBlock.Name)
+		return true
 
 	case "content_block_delta":
-		return p.handleContentDelta(payload, yield, state)
+		var event anthropicSSEContentBlockDelta
+		if err := json.Unmarshal([]byte(data), &event); err != nil {
+			yield(nil, fmt.Errorf("failed to parse content_block_delta: %w", err))
+			return false
+		}
+		return p.handleContentDelta(event.Delta, yield, state)
 
 	case "content_block_stop":
-		return p.handleContentBlockStop(payload, yield, state)
+		return p.handleContentBlockStop(yield, state)
 
 	case "message_delta":
-		return p.handleMessageDelta(payload, yield, state)
+		var event anthropicSSEMessageDelta
+		if err := json.Unmarshal([]byte(data), &event); err != nil {
+			yield(nil, fmt.Errorf("failed to parse message_delta: %w", err))
+			return false
+		}
+		if !p.handleStopReason(event.Delta.StopReason, yield, state) {
+			return false
+		}
+		p.mergeUsage(event.Usage, state)
+		return true
 
 	case "message_stop":
-		return p.handleMessageStop(payload, yield, state)
+		var event anthropicSSEMessageStop
+		if err := json.Unmarshal([]byte(data), &event); err != nil {
+			yield(nil, fmt.Errorf("failed to parse message_stop: %w", err))
+			return false
+		}
+		p.mergeUsage(event.Usage, state)
+		yield(llm.StepCompleteEvent{
+			Messages:   []llm.Message{state.getMessage()},
+			Usage:      state.getUsage(),
+			StopReason: state.stopReason,
+		}, nil)
+		return true
 
 	case "ping":
-		// Ignore ping events
 		return true
 
 	case "error":
-		if errMsg, ok := payload["error"].(map[string]interface{}); ok {
-			yield(nil, fmt.Errorf("API error: %v", errMsg["message"]))
+		var event anthropicSSEError
+		if err := json.Unmarshal([]byte(data), &event); err != nil {
+			yield(nil, fmt.Errorf("failed to parse error event: %w", err))
 			return false
 		}
-		yield(nil, fmt.Errorf("unknown API error"))
+		if event.Error.Message != "" {
+			yield(nil, fmt.Errorf("API error: %s", event.Error.Message))
+		} else {
+			yield(nil, fmt.Errorf("unknown API error"))
+		}
 		return false
 	}
 
 	return true
 }
 
-// handleMessageStart handles message_start events - may contain initial usage
-func (p *AnthropicProvider) handleMessageStart(payload map[string]interface{}, _ func(llm.StreamEvent, error) bool, state *anthropicStreamState) bool {
-	// Extract usage from message_start if present
-	if msg, ok := payload["message"].(map[string]interface{}); ok {
-		if usage, ok := msg["usage"].(map[string]interface{}); ok {
-			p.extractAndSetUsage(usage, state)
-		}
-	}
-	return true
-}
-
-// extractAndSetUsage extracts token counts from usage map and updates state
-// Note: Usage events may come in multiple chunks (message_start, message_delta, message_stop)
-// Each chunk may contain partial usage data, so we accumulate/merge with existing values.
-func (p *AnthropicProvider) extractAndSetUsage(usage map[string]interface{}, state *anthropicStreamState) {
-	// Get current usage to preserve values not present in this chunk
-	current := state.getUsage()
-
-	// Only update fields that are present in the incoming usage map
-	inputTokens := current.InputTokens
-	if v, ok := usage["input_tokens"].(float64); ok {
-		inputTokens = int64(v)
-	}
-
-	outputTokens := current.OutputTokens
-	if v, ok := usage["output_tokens"].(float64); ok {
-		outputTokens = int64(v)
-	}
-
-	// Cache tokens are part of input tokens
-	cacheReadTokens := current.CacheReadTokens
-	if v, ok := usage["cache_read_input_tokens"].(float64); ok {
-		cacheReadTokens = int64(v)
-	}
-
-	cacheCreationTokens := current.CacheCreationTokens
-	if v, ok := usage["cache_creation_input_tokens"].(float64); ok {
-		cacheCreationTokens = int64(v)
-	}
-
-	state.setUsage(inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens)
-}
-
-// handleContentBlockStart handles content_block_start events
-func (p *AnthropicProvider) handleContentBlockStart(payload map[string]interface{}, _ func(llm.StreamEvent, error) bool, state *anthropicStreamState) bool {
-	index, ok := payload["index"].(float64)
-	if !ok {
+// handleStopReason validates the stop reason and updates state.
+// Returns false if the stop reason indicates an error.
+func (p *AnthropicProvider) handleStopReason(stopReason string, yield func(llm.StreamEvent, error) bool, state *anthropicStreamState) bool {
+	if stopReason == "" {
 		return true
 	}
-
-	contentBlock, ok := payload["content_block"].(map[string]interface{})
-	if !ok {
-		return true
+	if stopReason == "refusal" {
+		yield(nil, fmt.Errorf("model refused to respond: content policy violation"))
+		return false
 	}
-
-	blockType, _ := contentBlock["type"].(string) //nolint:errcheck // type assertion for optional field
-	id, _ := contentBlock["id"].(string)          //nolint:errcheck // type assertion for optional field
-	name, _ := contentBlock["name"].(string)      //nolint:errcheck // type assertion for optional field
-
-	state.startBlock(int(index), blockType, id, name)
+	valid := stopReason == "end_turn" || stopReason == "max_tokens" ||
+		stopReason == "stop_sequence" || stopReason == "tool_use" || stopReason == "pause_turn"
+	if !valid {
+		yield(nil, fmt.Errorf("stream finished with unexpected stop reason: %s", stopReason))
+		return false
+	}
+	state.setStopReason(stopReason)
 	return true
 }
 
 // handleContentDelta handles content block delta events
-func (p *AnthropicProvider) handleContentDelta(payload map[string]interface{}, yield func(llm.StreamEvent, error) bool, state *anthropicStreamState) bool {
-	delta, ok := payload["delta"].(map[string]interface{})
-	if !ok {
-		return true
-	}
-
-	// Check the delta type
-	deltaType, _ := delta["type"].(string) //nolint:errcheck // type assertion for optional field
-
-	switch deltaType {
+func (p *AnthropicProvider) handleContentDelta(delta anthropicSSEDelta, yield func(llm.StreamEvent, error) bool, state *anthropicStreamState) bool {
+	switch delta.Type {
 	case anthropicDeltaTypeText:
-		if text, ok := delta["text"].(string); ok {
-			state.appendText(text)
-			if !yield(llm.TextDeltaEvent{Delta: text}, nil) {
-				return false
-			}
+		state.appendText(delta.Text)
+		if !yield(llm.TextDeltaEvent{Delta: delta.Text}, nil) {
+			return false
 		}
-
 	case anthropicDeltaTypeThinking:
-		if thinking, ok := delta["thinking"].(string); ok {
-			state.appendText(thinking)
-			if !yield(llm.ReasoningDeltaEvent{Delta: thinking}, nil) {
-				return false
-			}
+		state.appendText(delta.Thinking)
+		if !yield(llm.ReasoningDeltaEvent{Delta: delta.Thinking}, nil) {
+			return false
 		}
-
 	case anthropicDeltaTypeInputJSON:
-		if partialJSON, ok := delta["partial_json"].(string); ok {
-			state.appendInput(partialJSON)
-		}
+		state.appendInput(delta.PartialJSON)
 	}
-
 	return true
 }
 
 // handleContentBlockStop handles content_block_stop events
-func (p *AnthropicProvider) handleContentBlockStop(_ map[string]interface{}, yield func(llm.StreamEvent, error) bool, state *anthropicStreamState) bool {
+func (p *AnthropicProvider) handleContentBlockStop(yield func(llm.StreamEvent, error) bool, state *anthropicStreamState) bool {
 	// Get the tool call info before finishBlock() clears it
 	tc := state.lastToolCall()
 
@@ -714,51 +778,6 @@ func (p *AnthropicProvider) handleContentBlockStop(_ map[string]interface{}, yie
 			return false
 		}
 	}
-	return true
-}
-
-// handleMessageDelta handles message-level delta events (usage, etc.)
-func (p *AnthropicProvider) handleMessageDelta(payload map[string]interface{}, yield func(llm.StreamEvent, error) bool, state *anthropicStreamState) bool {
-	// Check for stop_reason in delta
-	if delta, ok := payload["delta"].(map[string]interface{}); ok {
-		if stopReason, ok := delta["stop_reason"].(string); ok {
-			// Check for error stop reasons
-			// Valid: "end_turn", "max_tokens", "stop_sequence", "tool_use", "pause_turn"
-			// Error: "refusal" (model refused to respond due to safety/content policy)
-			if stopReason == "refusal" {
-				yield(nil, fmt.Errorf("model refused to respond: content policy violation"))
-				return false
-			}
-			// Check for unknown stop reasons
-			if stopReason != "" && stopReason != "end_turn" && stopReason != "max_tokens" &&
-				stopReason != "stop_sequence" && stopReason != "tool_use" && stopReason != "pause_turn" {
-				yield(nil, fmt.Errorf("stream finished with unexpected stop reason: %s", stopReason))
-				return false
-			}
-			state.setStopReason(stopReason)
-		}
-	}
-
-	// Check for usage in payload["usage"]
-	if usage, ok := payload["usage"].(map[string]interface{}); ok {
-		p.extractAndSetUsage(usage, state)
-	}
-	return true
-}
-
-// handleMessageStop handles message_stop events - sends final StepCompleteEvent
-func (p *AnthropicProvider) handleMessageStop(payload map[string]interface{}, yield func(llm.StreamEvent, error) bool, state *anthropicStreamState) bool {
-	// Check for final usage in message_stop
-	if usage, ok := payload["usage"].(map[string]interface{}); ok {
-		p.extractAndSetUsage(usage, state)
-	}
-
-	// Send the accumulated message with usage and stop reason
-	yield(llm.StepCompleteEvent{
-		Messages:   []llm.Message{state.getMessage()},
-		Usage:      state.getUsage(),
-		StopReason: state.stopReason,
-	}, nil)
 	return true
 }
 
