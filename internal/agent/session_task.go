@@ -128,6 +128,11 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) (int
 			s.Output.Flush()
 			return nil
 		},
+		OnToolCallStart: func(toolCallID, toolName string) error {
+			s.writeToolCallStart(toolName, toolCallID)
+			s.Output.Flush()
+			return nil
+		},
 		OnToolCall: func(toolCallID, toolName string, input json.RawMessage) error {
 			s.writeToolCall(toolName, string(input), toolCallID)
 			s.Output.Flush()

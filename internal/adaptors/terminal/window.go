@@ -252,6 +252,15 @@ func (w *Window) AppendContent(delta string, innerWidth int) {
 	}
 }
 
+// ReplaceContent replaces the entire content, invalidating cached wrapped lines.
+// Used when a tool call placeholder (created by ToolCallStart) is replaced
+// with the full tool call content.
+func (w *Window) ReplaceContent(newContent string) {
+	w.Content = newContent
+	w.cache.valid = false
+	w.cache.wrappedLines = nil
+}
+
 // styleContent applies styling to content based on window tag
 func (w *Window) styleContent(content string, styles *Styles) string {
 	if styles == nil {

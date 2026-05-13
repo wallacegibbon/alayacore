@@ -665,11 +665,7 @@ func (p *AnthropicProvider) handleEvent(eventType, data string, yield func(llm.S
 		p.mergeUsage(event.Message.Usage, state)
 
 	case "content_block_start":
-		event, ok := unmarshalSSE[anthropicSSEContentBlockStart](data, yield)
-		if !ok {
-			return false
-		}
-		state.startBlock(event.Index, event.ContentBlock.Type, event.ContentBlock.ID, event.ContentBlock.Name, event.ContentBlock.Signature)
+		return p.handleContentBlockStart(data, yield, state)
 
 	case "content_block_delta":
 		event, ok := unmarshalSSE[anthropicSSEContentBlockDelta](data, yield)
@@ -750,6 +746,27 @@ func (p *AnthropicProvider) handleStopReason(stopReason string, yield func(llm.S
 		return false
 	}
 	state.setStopReason(stopReason)
+	return true
+}
+
+// handleContentBlockStart handles content_block_start events.
+func (p *AnthropicProvider) handleContentBlockStart(data string, yield func(llm.StreamEvent, error) bool, state *anthropicStreamState) bool {
+	event, ok := unmarshalSSE[anthropicSSEContentBlockStart](data, yield)
+	if !ok {
+		return false
+	}
+	state.startBlock(event.Index, event.ContentBlock.Type, event.ContentBlock.ID, event.ContentBlock.Name, event.ContentBlock.Signature)
+	// Emit ToolCallStartEvent for tool_use blocks so the UI can show the
+	// tool window immediately, before the (potentially large) input JSON
+	// finishes streaming.
+	if event.ContentBlock.Type == blockTypeToolUse {
+		if !yield(llm.ToolCallStartEvent{
+			ToolCallID: event.ContentBlock.ID,
+			ToolName:   event.ContentBlock.Name,
+		}, nil) {
+			return false
+		}
+	}
 	return true
 }
 

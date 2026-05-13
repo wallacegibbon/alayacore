@@ -96,6 +96,7 @@ The agent layer handles LLM interaction and tool-calling orchestration.
 Agent.Stream(ctx, messages, llm.StreamCallbacks{
 	OnTextDelta:      func(delta string) error { ... },
 	OnReasoningDelta: func(delta string) error { ... },
+	OnToolCallStart:  func(id, name string) error { ... },
 	OnToolCall:       func(id, name string, input json.RawMessage) error { ... },
 	OnToolResult:     func(id string, output ToolResultOutput) error { ... },
 	OnStepStart:      func(step int) error { ... },
@@ -312,11 +313,12 @@ User types prompt
 
 ```
 Agent.Stream() receives tool_call event
-  → OnToolCall callback → TLV(FS, "\x00<id>\x00pending") → UI shows tool indicator
-    → Agent executes tool: tool.Execute(ctx, input)
-      → OnToolResult callback → TLV(FS, "\x00<id>\x00success") → UI updates indicator
-        → Tool result added to messages
-          → Agent continues to next step (if under max_steps)
+  → OnToolCallStart callback → TLV(FC, placeholder) → UI shows tool window immediately
+    → OnToolCall callback → TLV(FC, full input) → UI replaces placeholder content
+      → Agent executes tool: tool.Execute(ctx, input)
+        → OnToolResult callback → TLV(FS, "\x00<id>\x00success") → UI updates indicator
+          → Tool result added to messages
+            → Agent continues to next step (if under max_steps)
 ```
 
 ## Design Decisions

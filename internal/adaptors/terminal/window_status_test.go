@@ -1,7 +1,10 @@
 package terminal
 
 import (
+	"encoding/json"
 	"testing"
+
+	"github.com/alayacore/alayacore/internal/stream"
 )
 
 func TestUpdateToolStatus(t *testing.T) {
@@ -113,4 +116,49 @@ func contains(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+func TestOutputWriterToolCallStartThenFull(t *testing.T) {
+	// End-to-end test: write TagFunctionCall TLVs through the actual
+	// outputWriter pipeline (Write → processBuffer → writeColored → AppendToolCall).
+	out := NewTerminalOutput(NewStyles(DefaultTheme()))
+	out.SetWindowWidth(80)
+
+	makeTLV := func(id, name, input string) []byte {
+		tc, _ := json.Marshal(stream.ToolCallData{ID: id, Name: name, Input: input})
+		return stream.EncodeTLV(stream.TagFunctionCall, string(tc))
+	}
+
+	// 1. Simulate ToolCallStart: placeholder with "{}" input
+	_, err := out.Write(makeTLV("call-abc", "write_file", "{}"))
+	if err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+
+	wb := out.WindowBuffer()
+	if wb.GetWindowCount() != 1 {
+		t.Fatalf("Expected 1 window after start event, got %d", wb.GetWindowCount())
+	}
+	w := wb.GetWindow(0)
+	if w.ToolName != "write_file" {
+		t.Errorf("Expected tool name 'write_file', got %q", w.ToolName)
+	}
+	// The placeholder should show "write_file: " (empty path, no content)
+	if w.Content == "" {
+		t.Error("Expected non-empty placeholder content")
+	}
+
+	// 2. Simulate ToolCallComplete: full input replaces placeholder
+	_, err = out.Write(makeTLV("call-abc", "write_file", `{"path":"/tmp/f.txt","content":"hello world"}`))
+	if err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+
+	if wb.GetWindowCount() != 1 {
+		t.Fatalf("Expected still 1 window, got %d", wb.GetWindowCount())
+	}
+	w = wb.GetWindow(0)
+	if w.Content != "write_file: /tmp/f.txt\nhello world" {
+		t.Errorf("Expected full content, got %q", w.Content)
+	}
 }

@@ -137,7 +137,18 @@ type ReasoningDeltaEvent struct {
 
 func (ReasoningDeltaEvent) isStreamEvent() {}
 
-// ToolCallEvent represents a tool call
+// ToolCallStartEvent signals that a tool call has started (name and ID known,
+// but arguments may still be streaming). Providers emit this as soon as the
+// tool name is available so the UI can show a placeholder window immediately,
+// before the potentially large argument payload finishes streaming.
+type ToolCallStartEvent struct {
+	ToolCallID string
+	ToolName   string
+}
+
+func (ToolCallStartEvent) isStreamEvent() {}
+
+// ToolCallEvent represents a complete tool call (all arguments received).
 type ToolCallEvent struct {
 	ToolCallID string
 	ToolName   string

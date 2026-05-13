@@ -57,6 +57,7 @@ func NewAgent(config AgentConfig) *Agent {
 type StreamCallbacks struct {
 	OnTextDelta      func(delta string) error
 	OnReasoningDelta func(delta string) error
+	OnToolCallStart  func(toolCallID, toolName string) error
 	OnToolCall       func(toolCallID, toolName string, input json.RawMessage) error
 	OnToolResult     func(toolCallID string, output ToolResultOutput) error
 	OnStepStart      func(step int) error
@@ -221,10 +222,13 @@ func (a *Agent) processStreamEvents(events iter.Seq2[StreamEvent, error], callba
 			}
 
 		case ReasoningDeltaEvent:
-			if callbacks.OnReasoningDelta != nil {
-				if err := callbacks.OnReasoningDelta(e.Delta); err != nil {
-					return nil, Usage{}, nil, fmt.Errorf("OnReasoningDelta callback failed: %w", err)
-				}
+			if err := fireOnReasoningDelta(callbacks, e); err != nil {
+				return nil, Usage{}, nil, err
+			}
+
+		case ToolCallStartEvent:
+			if err := a.fireOnToolCallStart(callbacks, e); err != nil {
+				return nil, Usage{}, nil, err
 			}
 
 		case ToolCallEvent:
@@ -234,11 +238,8 @@ func (a *Agent) processStreamEvents(events iter.Seq2[StreamEvent, error], callba
 				ToolName:   e.ToolName,
 				Input:      e.Input,
 			})
-
-			if callbacks.OnToolCall != nil {
-				if err := callbacks.OnToolCall(e.ToolCallID, e.ToolName, e.Input); err != nil {
-					return nil, Usage{}, nil, fmt.Errorf("OnToolCall callback failed: %w", err)
-				}
+			if err := a.fireOnToolCall(callbacks, e); err != nil {
+				return nil, Usage{}, nil, err
 			}
 
 		case StepCompleteEvent:
@@ -251,6 +252,36 @@ func (a *Agent) processStreamEvents(events iter.Seq2[StreamEvent, error], callba
 	}
 
 	return stepMessages, stepUsage, toolCalls, nil
+}
+
+// fireOnToolCallStart invokes the OnToolCallStart callback if set.
+func (a *Agent) fireOnToolCallStart(callbacks StreamCallbacks, e ToolCallStartEvent) error {
+	if callbacks.OnToolCallStart != nil {
+		if err := callbacks.OnToolCallStart(e.ToolCallID, e.ToolName); err != nil {
+			return fmt.Errorf("OnToolCallStart callback failed: %w", err)
+		}
+	}
+	return nil
+}
+
+// fireOnReasoningDelta invokes the OnReasoningDelta callback if set.
+func fireOnReasoningDelta(callbacks StreamCallbacks, e ReasoningDeltaEvent) error {
+	if callbacks.OnReasoningDelta != nil {
+		if err := callbacks.OnReasoningDelta(e.Delta); err != nil {
+			return fmt.Errorf("OnReasoningDelta callback failed: %w", err)
+		}
+	}
+	return nil
+}
+
+// fireOnToolCall invokes the OnToolCall callback if set.
+func (a *Agent) fireOnToolCall(callbacks StreamCallbacks, e ToolCallEvent) error {
+	if callbacks.OnToolCall != nil {
+		if err := callbacks.OnToolCall(e.ToolCallID, e.ToolName, e.Input); err != nil {
+			return fmt.Errorf("OnToolCall callback failed: %w", err)
+		}
+	}
+	return nil
 }
 
 // executeTools executes all tool calls and returns the results

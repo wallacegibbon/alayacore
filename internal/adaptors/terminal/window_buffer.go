@@ -140,13 +140,17 @@ func (wb *WindowBuffer) AppendOrUpdate(id string, tag string, content string) {
 }
 
 // AppendToolCall adds a tool call window with tool name.
+// If a window with the same ID already exists (e.g. from a ToolCallStart event),
+// its content is replaced with the full content.
 func (wb *WindowBuffer) AppendToolCall(id string, toolName string, content string) {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 
 	if idx, ok := wb.idIndex[id]; ok {
 		w := wb.Windows[idx]
-		w.AppendContent(content, max(0, wb.width-4))
+		// Replace content — the window was pre-created by a ToolCallStart event;
+		// now we have the full tool call content.
+		w.ReplaceContent(content)
 		wb.markDirty(idx)
 		return
 	}

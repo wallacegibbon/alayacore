@@ -445,6 +445,122 @@ func TestAnthropicToolCallStreaming(t *testing.T) {
 	}
 }
 
+func TestToolCallStartEventOpenAI(t *testing.T) {
+	// Verify ToolCallStartEvent is emitted before ToolCallEvent for OpenAI.
+	// This allows the UI to show a tool window immediately when the tool name
+	// is known, before the potentially large arguments finish streaming.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		flusher, _ := w.(http.Flusher)
+
+		// Chunk 1: tool name + id (empty arguments)
+		fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call-999\",\"type\":\"function\",\"function\":{\"name\":\"write_file\",\"arguments\":\"\"}}]}}]}\n\n")
+		flusher.Flush()
+		// Chunk 2: arguments part 1
+		fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"path\\\":\\\"/tmp/f.txt\\\",\"}}]}}]}\n\n")
+		flusher.Flush()
+		// Chunk 3: arguments part 2
+		fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\\\"content\\\":\\\"hello\\\"}\"}}]}}]}\n\n")
+		flusher.Flush()
+		fmt.Fprint(w, "data: [DONE]\n\n")
+		flusher.Flush()
+	}))
+	defer server.Close()
+
+	provider, err := providers.NewOpenAI(
+		providers.WithOpenAIAPIKey("test"),
+		providers.WithOpenAIBaseURL(server.URL),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	events, err := provider.StreamMessages(context.Background(), []llm.Message{
+		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "test"}}},
+	}, nil, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var order []string
+	for event := range events {
+		switch e := event.(type) {
+		case llm.ToolCallStartEvent:
+			order = append(order, fmt.Sprintf("start(%s)", e.ToolName))
+		case llm.ToolCallEvent:
+			order = append(order, fmt.Sprintf("complete(%s)", e.ToolName))
+		}
+	}
+
+	if len(order) < 2 {
+		t.Fatalf("Expected at least 2 events (start + complete), got %d: %v", len(order), order)
+	}
+	if order[0] != "start(write_file)" {
+		t.Errorf("Expected first event to be start(write_file), got %s", order[0])
+	}
+	if order[len(order)-1] != "complete(write_file)" {
+		t.Errorf("Expected last event to be complete(write_file), got %s", order[len(order)-1])
+	}
+}
+
+func TestToolCallStartEventAnthropic(t *testing.T) {
+	// Verify ToolCallStartEvent is emitted before ToolCallEvent for Anthropic.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		flusher, _ := w.(http.Flusher)
+
+		fmt.Fprint(w, "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_abc\",\"name\":\"write_file\"}}\n\n")
+		flusher.Flush()
+		fmt.Fprint(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"path\\\":\\\"/tmp/f.txt\\\",\"}}\n\n")
+		flusher.Flush()
+		fmt.Fprint(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"\\\"content\\\":\\\"hello\\\"}\"}}\n\n")
+		flusher.Flush()
+		fmt.Fprint(w, "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n")
+		flusher.Flush()
+		fmt.Fprint(w, "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"tool_use\"},\"usage\":{\"input_tokens\":10,\"output_tokens\":5}}\n\n")
+		fmt.Fprint(w, "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
+		flusher.Flush()
+	}))
+	defer server.Close()
+
+	provider, err := providers.NewAnthropic(
+		providers.WithAPIKey("test"),
+		providers.WithBaseURL(server.URL),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	events, err := provider.StreamMessages(context.Background(), []llm.Message{
+		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "test"}}},
+	}, nil, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var order []string
+	for event := range events {
+		switch e := event.(type) {
+		case llm.ToolCallStartEvent:
+			order = append(order, fmt.Sprintf("start(%s)", e.ToolName))
+		case llm.ToolCallEvent:
+			order = append(order, fmt.Sprintf("complete(%s)", e.ToolName))
+		}
+	}
+
+	if len(order) < 2 {
+		t.Fatalf("Expected at least 2 events (start + complete), got %d: %v", len(order), order)
+	}
+	if order[0] != "start(write_file)" {
+		t.Errorf("Expected first event to be start(write_file), got %s", order[0])
+	}
+	if order[len(order)-1] != "complete(write_file)" {
+		t.Errorf("Expected last event to be complete(write_file), got %s", order[len(order)-1])
+	}
+}
+
 func TestAnthropicReasoningStreaming(t *testing.T) {
 	// Test that reasoning/thinking content is properly streamed
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

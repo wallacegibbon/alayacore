@@ -28,6 +28,12 @@ type GenericHandler struct {
 }
 
 func (h *GenericHandler) FormatCall(input json.RawMessage, _ *Styles) string {
+	// Empty JSON object means placeholder from ToolCallStart — show just
+	// the tool name as a head line, consistent with built-in tool handlers
+	// that parse empty fields into "toolname: \n".
+	if string(input) == "{}" {
+		return fmt.Sprintf("%s: \n", h.name)
+	}
 	// Add newline at end so output starts on new line
 	return fmt.Sprintf("%s: %s\n", h.name, string(input))
 }

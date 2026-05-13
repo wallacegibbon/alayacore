@@ -60,6 +60,18 @@ func (s *Session) writeToolCall(toolName, input, id string) {
 	s.writeToolResult(id, "pending")
 }
 
+// writeToolCallStart writes a placeholder tool call window using an empty JSON
+// object as input. The full content is written later by writeToolCall when all
+// arguments have been received.
+func (s *Session) writeToolCallStart(toolName, id string) {
+	s.writeTLVJSON(stream.TagFunctionCall, stream.ToolCallData{
+		ID:    id,
+		Name:  toolName,
+		Input: "{}",
+	})
+	s.writeToolResult(id, "pending")
+}
+
 func (s *Session) writeToolOutput(toolCallID string, output string) {
 	s.writeTLVJSON(stream.TagFunctionResult, stream.ToolResultData{
 		ID:     toolCallID,

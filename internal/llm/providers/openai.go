@@ -681,9 +681,17 @@ func (p *OpenAIProvider) handleDelta(delta openAIDelta, yield func(llm.StreamEve
 		if len(tc.Function.Arguments) > 0 {
 			state.appendToolCallArgs(tc.Index, tc.Function.Arguments)
 		}
-		// Set name and ID when available (usually first chunk)
+		// Set name and ID when available (usually first chunk).
+		// Emit ToolCallStartEvent so the UI can show the tool window
+		// immediately, before the (potentially large) arguments finish.
 		if tc.Function.Name != "" {
 			state.setToolCallName(tc.Index, tc.ID, tc.Function.Name)
+			if !yield(llm.ToolCallStartEvent{
+				ToolCallID: tc.ID,
+				ToolName:   tc.Function.Name,
+			}, nil) {
+				return false
+			}
 		}
 	}
 
