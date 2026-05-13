@@ -70,7 +70,14 @@ func (s *Session) handleUserPrompt(ctx context.Context, prompt string) {
 		s.doAutoSummarize(ctx)
 	}
 
-	s.Messages = append(s.Messages, llm.NewUserMessage(prompt))
+	if len(s.Messages) > 0 && s.Messages[len(s.Messages)-1].Role == llm.RoleUser {
+		s.Messages[len(s.Messages)-1].Content = append(
+			s.Messages[len(s.Messages)-1].Content,
+			llm.TextPart{Type: "text", Text: prompt},
+		)
+	} else {
+		s.Messages = append(s.Messages, llm.NewUserMessage(prompt))
+	}
 
 	_, err := s.processPrompt(ctx, s.Messages)
 

@@ -119,7 +119,7 @@ Without pausing, a network outage would cause every queued prompt to fail in seq
 5. The user can now:
    - `:continue` — resend the failed prompt (or `:continue skip` to skip it and resume the queue)
    - `:model_set` — switch to a different model, then `:continue`
-   - Type a new prompt — submits a new task, clears the pause if the queue was empty
+   - Type a new prompt — appends to the existing user message (if the last message is user) or creates a new one. Clears the pause if the queue was empty.
    - `:cancel_all` — clear the queue and the pause
    - Inspect the queue with Ctrl+Q
 
@@ -136,6 +136,8 @@ Without pausing, a network outage would cause every queued prompt to fail in seq
 - `cancelAllTasks` clears `pausedOnError` and signals the condition variable
 - `handleContinue` clears `pausedOnError`, then either calls `resendPrompt` (no args) or skips and resumes the queue (`skip`)
 - `resendPrompt` re-sets `pausedOnError` on failure
+
+**User message merging:** When a user submits a new prompt after a failed one (instead of using `:continue`), the new text is appended as an additional `TextPart` to the existing user message rather than creating a separate message. This keeps the conversation valid (APIs require user/assistant alternation) and allows the user to add context or clarification to their original prompt.
 
 `internal/agent/command_registry.go`:
 - `:continue` is dispatched via `dispatchCommand` → `handleContinue`

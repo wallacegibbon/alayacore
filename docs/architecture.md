@@ -75,6 +75,8 @@ The session layer manages conversation state, task execution, and model interact
 
 Session files use a Markdown-based format with YAML frontmatter. The body contains TLV-encoded conversation data (messages, tool calls, tool results) written directly as binary TLV records after the frontmatter.
 
+**Message grouping on load:** The session format stores a flat sequence of TLV chunks with no explicit message boundaries. On load, chunks are grouped into messages by role: consecutive chunks with the same role are merged into a single message's `Content` array. This correctly handles multi-part user messages (e.g., when a user adds context after a failed prompt) and assistant messages containing reasoning + text + tool calls.
+
 ### Agent Layer (`internal/llm/`)
 
 The agent layer handles LLM interaction and tool-calling orchestration.
