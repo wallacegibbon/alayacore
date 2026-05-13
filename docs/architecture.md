@@ -412,7 +412,7 @@ When styling text with lipgloss, each segment must be rendered individually befo
 
 When think mode is set via `:think [0|1|2]`, each provider sends explicit thinking configuration in API requests. The key differences are:
 
-1. A top-level **`thinking`** field (`{"type": "enabled"}` or `{"type": "disabled"}`) controls whether reasoning is active.
+1. A top-level **`thinking`** field (`{"type": "enabled"}` or `{"type": "disabled"}`) controls whether reasoning is active. This is always set explicitly — even when thinking is off — because some providers (e.g. DeepSeek V4) default to thinking enabled. Omitting the field would leave thinking on at the API level, contradicting the UI state.
 2. When think mode is on (level 1 or 2), assistant messages that only contain tool calls must still include an **empty reasoning block** (required by DeepSeek and similar providers).
 
 | Provider | Level 1 (normal) | Level 2 (max) | Disabled |

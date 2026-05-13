@@ -452,6 +452,9 @@ func (p *AnthropicProvider) StreamMessages(
 	}
 
 	// Always include thinking config based on reasoning level.
+	// Must be explicit (not omitted) because some providers default to
+	// thinking enabled. Omitting the field when the user has thinking OFF
+	// would leave it ON at the API level.
 	if p.reasoningLevel > config.ThinkLevelOff {
 		reqBody.Thinking = &anthropicThinking{Type: "enabled"}
 		effort := "high"
