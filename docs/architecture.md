@@ -529,7 +529,7 @@ When think mode is **disabled**, assistant messages contain only the tool-use co
 }
 ```
 
-When think mode is **enabled**, every assistant message is padded with an empty `{"type": "thinking", "thinking": ""}` block when none is present, and the request includes `output_config`:
+When think mode is **enabled**, every assistant message is prepended with an empty `{"type": "thinking", "thinking": ""}` block when none is present, and the request includes `output_config`:
 
 ```json
 {
@@ -541,6 +541,10 @@ When think mode is **enabled**, every assistant message is padded with an empty 
 			"role": "assistant",
 			"content": [
 				{
+					"thinking": "",
+					"type": "thinking"
+				},
+				{
 					"id": "call_ca6eef24512147a6a9dae7bd",
 					"input": {
 						"end_line": 5,
@@ -548,10 +552,6 @@ When think mode is **enabled**, every assistant message is padded with an empty 
 					},
 					"name": "read_file",
 					"type": "tool_use"
-				},
-				{
-					"thinking": "",
-					"type": "thinking"
 				}
 			]
 		},
@@ -579,7 +579,7 @@ This means **all** intermediate assistant messages in a multi-turn tool call cha
 
 Both providers pad assistant messages with an empty reasoning value — but **only when reasoning mode is enabled** — to avoid wasting input tokens when it isn't needed.
 
-- **Anthropic provider** (`anthropicConvertMessages`): pads every assistant message with an empty `{"type": "thinking", "thinking": ""}` block when none is present.
+- **Anthropic provider** (`anthropicConvertMessages`): prepends an empty `{"type": "thinking", "thinking": ""}` block to every assistant message that lacks one. The thinking block must come first per Anthropic's API.
 - **OpenAI provider** (`openaiConvertMessages`): extracts reasoning text via `openaiExtractReasoning()` and sets `reasoning_content` on every assistant message — even as empty string when no reasoning text exists.
 
 Both are conditional on reasoning mode being enabled. When think mode is off, no padding is added.

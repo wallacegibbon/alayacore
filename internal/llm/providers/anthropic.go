@@ -19,9 +19,10 @@ package providers
 //
 // 5. EMPTY THINKING BLOCK PADDING: Per DeepSeek's documentation, between two
 //    user messages all intermediate assistant reasoning_content must be passed
-//    back. When reasoning mode is enabled, every assistant message is padded
-//    with an empty "thinking" block if none is present, so that assistant
+//    back. When reasoning mode is enabled, an empty "thinking" block is
+//    prepended to every assistant message that lacks one, so that assistant
 //    messages containing only tool calls still satisfy this requirement.
+//    The thinking block must come first per Anthropic's API.
 //    Conditional on reasoning mode to avoid wasting tokens when thinking is off.
 //    See docs/architecture.md → "Empty thinking block padding".
 
@@ -359,11 +360,11 @@ func anthropicConvertMessages(messages []llm.Message, reasoningLevel int) []anth
 		}
 
 		// Per DeepSeek's documentation, intermediate assistant reasoning_content
-		// must be passed back. Pad assistant messages with an empty "thinking"
-		// block when reasoning mode is enabled and none is present, so that
+		// must be passed back. Prepend an empty "thinking" block to assistant
+		// messages when reasoning mode is enabled and none is present, so that
 		// tool-call-only messages still satisfy this requirement. Other providers
 		// ignore the extra block. Only done when reasoning is enabled to avoid
-		// wasting tokens.
+		// wasting tokens. The thinking block must come first per Anthropic's API.
 		if reasoningLevel > config.ThinkLevelOff && msg.Role == llm.RoleAssistant {
 			hasThinking := false
 			for _, block := range apiMsg.Content {
@@ -373,10 +374,10 @@ func anthropicConvertMessages(messages []llm.Message, reasoningLevel int) []anth
 				}
 			}
 			if !hasThinking {
-				apiMsg.Content = append(apiMsg.Content, anthropicContentBlock{
+				apiMsg.Content = append([]anthropicContentBlock{{
 					Type:     anthropicBlockTypeThinking,
 					Thinking: ptrTo(""),
-				})
+				}}, apiMsg.Content...)
 			}
 		}
 
