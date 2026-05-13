@@ -266,11 +266,9 @@ func parseMessagesTLV(body string) ([]llm.Message, []TLVChunk, error) {
 
 		var msgPart llm.ContentPart
 		var msgRole llm.MessageRole
-		newMessage := false
 
 		switch tag {
 		case stream.TagTextUser:
-			newMessage = true
 			msgRole = llm.RoleUser
 			msgPart = llm.TextPart{Type: "text", Text: string(content)}
 
@@ -326,7 +324,7 @@ func parseMessagesTLV(body string) ([]llm.Message, []TLVChunk, error) {
 		}
 
 		roleMismatch := currentMsg != nil && currentMsg.Role != msgRole
-		if newMessage || currentMsg == nil || roleMismatch {
+		if currentMsg == nil || roleMismatch {
 			if currentMsg != nil {
 				messages = append(messages, *currentMsg)
 			}
