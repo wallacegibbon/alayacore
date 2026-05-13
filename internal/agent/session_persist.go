@@ -87,7 +87,20 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 				writeTLV(&binaryBuf, tag, p.Text)
 
 			case llm.ReasoningPart:
-				writeTLV(&binaryBuf, stream.TagTextReasoning, p.Text)
+				if p.Signature != "" {
+					// Store as JSON to preserve signature (required by Anthropic API)
+					rj := stream.ReasoningData{
+						Text:      p.Text,
+						Signature: p.Signature,
+					}
+					jsonData, err := json.Marshal(rj)
+					if err != nil {
+						return nil, fmt.Errorf("failed to marshal reasoning: %w", err)
+					}
+					writeTLV(&binaryBuf, stream.TagTextReasoning, string(jsonData))
+				} else {
+					writeTLV(&binaryBuf, stream.TagTextReasoning, p.Text)
+				}
 
 			case llm.ToolCallPart:
 				tc := stream.ToolCallData{
@@ -271,7 +284,17 @@ func parseMessagesTLV(body string) ([]llm.Message, []TLVChunk, error) {
 
 		case stream.TagTextReasoning:
 			msgRole = llm.RoleAssistant
-			msgPart = llm.ReasoningPart{Type: llm.ContentPartReasoning, Text: string(content)}
+			// Try JSON format first (with signature), fall back to plain text
+			var rd stream.ReasoningData
+			if err := json.Unmarshal(content, &rd); err == nil && rd.Text != "" {
+				msgPart = llm.ReasoningPart{
+					Type:      llm.ContentPartReasoning,
+					Text:      rd.Text,
+					Signature: rd.Signature,
+				}
+			} else {
+				msgPart = llm.ReasoningPart{Type: llm.ContentPartReasoning, Text: string(content)}
+			}
 
 		case stream.TagFunctionCall:
 			msgRole = llm.RoleAssistant

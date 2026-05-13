@@ -187,6 +187,10 @@ type anthropicContentBlock struct {
 	// Pointer so we can emit `"thinking": ""` (DeepSeek requires empty thinking block)
 	// vs. omitting the field on non-thinking blocks.
 	Thinking *string `json:"thinking,omitempty"`
+	// Signature verifies thinking block integrity. Only present on "thinking"
+	// blocks — Anthropic requires it to be passed back exactly as received.
+	// Omitted from JSON for non-thinking blocks (text, tool_use, etc.).
+	Signature string `json:"signature,omitempty"`
 
 	// Cache control
 	CacheControl *anthropicCacheControl `json:"cache_control,omitempty"`
@@ -204,21 +208,23 @@ type anthropicStreamState struct {
 	contentParts []llm.ContentPart
 
 	// Current block being accumulated
-	currentIndex int
-	currentType  string
-	currentText  strings.Builder
-	currentInput strings.Builder
-	currentID    string
-	currentName  string
+	currentIndex     int
+	currentType      string
+	currentText      strings.Builder
+	currentInput     strings.Builder
+	currentID        string
+	currentName      string
+	currentSignature string
 }
 
-func (s *anthropicStreamState) startBlock(index int, blockType, id, name string) {
+func (s *anthropicStreamState) startBlock(index int, blockType, id, name, signature string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.currentIndex = index
 	s.currentType = blockType
 	s.currentID = id
 	s.currentName = name
+	s.currentSignature = signature
 	s.currentText.Reset()
 	s.currentInput.Reset()
 }
@@ -247,8 +253,9 @@ func (s *anthropicStreamState) finishBlock() {
 		})
 	case anthropicBlockTypeThinking:
 		s.contentParts = append(s.contentParts, llm.ReasoningPart{
-			Type: llm.ContentPartReasoning,
-			Text: s.currentText.String(),
+			Type:      llm.ContentPartReasoning,
+			Text:      s.currentText.String(),
+			Signature: s.currentSignature,
 		})
 	case blockTypeToolUse:
 		s.contentParts = append(s.contentParts, llm.ToolCallPart{
@@ -326,8 +333,9 @@ func anthropicConvertMessages(messages []llm.Message, reasoningLevel int) []anth
 				// Domain "reasoning" maps to Anthropic wire format "thinking"
 				text := v.Text
 				apiMsg.Content = append(apiMsg.Content, anthropicContentBlock{
-					Type:     anthropicBlockTypeThinking,
-					Thinking: &text,
+					Type:      anthropicBlockTypeThinking,
+					Thinking:  &text,
+					Signature: v.Signature,
 				})
 			case llm.ToolCallPart:
 				apiMsg.Content = append(apiMsg.Content, anthropicContentBlock{
@@ -556,10 +564,13 @@ type anthropicSSEMessageStart struct {
 }
 
 // anthropicSSEContentBlock is a content block in "content_block_start" events.
+// Signature is only present on thinking blocks — Anthropic uses it to verify
+// thinking content integrity when passed back in multi-turn conversations.
 type anthropicSSEContentBlock struct {
-	Type string `json:"type"`
-	ID   string `json:"id,omitempty"`
-	Name string `json:"name,omitempty"`
+	Type      string `json:"type"`
+	ID        string `json:"id,omitempty"`
+	Name      string `json:"name,omitempty"`
+	Signature string `json:"signature,omitempty"`
 }
 
 // anthropicSSEContentBlockStart is the payload for "content_block_start" events.
@@ -655,7 +666,7 @@ func (p *AnthropicProvider) handleEvent(eventType, data string, yield func(llm.S
 		if !ok {
 			return false
 		}
-		state.startBlock(event.Index, event.ContentBlock.Type, event.ContentBlock.ID, event.ContentBlock.Name)
+		state.startBlock(event.Index, event.ContentBlock.Type, event.ContentBlock.ID, event.ContentBlock.Name, event.ContentBlock.Signature)
 
 	case "content_block_delta":
 		event, ok := unmarshalSSE[anthropicSSEContentBlockDelta](data, yield)

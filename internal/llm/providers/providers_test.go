@@ -536,6 +536,106 @@ func TestAnthropicReasoningStreaming(t *testing.T) {
 	}
 }
 
+func TestAnthropicThinkingSignature(t *testing.T) {
+	// Test that thinking block signatures are captured and passed back to the API.
+	// Anthropic requires signatures to be preserved exactly for multi-turn conversations.
+	const testSignature = "ErUBCkIJAklaGU2VDgUMw2xCrOAGAAoAGgA6AHO0eXAiOiJ0aGlua2luZ19ibG9jayIsImluZGV4IjowfQ=="
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Verify the request includes the signature in thinking blocks
+		var reqBody map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+			t.Error(err)
+			return
+		}
+
+		messages, ok := reqBody["messages"].([]any)
+		if !ok || len(messages) == 0 {
+			t.Fatal("Expected messages array")
+		}
+
+		// Find assistant message with thinking block
+		for _, msg := range messages {
+			m, ok := msg.(map[string]any)
+			if !ok || m["role"] != "assistant" {
+				continue
+			}
+			content, ok := m["content"].([]any)
+			if !ok {
+				continue
+			}
+			for _, block := range content {
+				b, ok := block.(map[string]any)
+				if !ok || b["type"] != "thinking" {
+					continue
+				}
+				sig, _ := b["signature"].(string)
+				if sig != testSignature {
+					t.Errorf("Expected signature %q, got %q", testSignature, sig)
+				}
+			}
+		}
+
+		// Send response with thinking block that has a signature
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		flusher, _ := w.(http.Flusher)
+		fmt.Fprintf(w, "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\",\"signature\":\"%s\"}}\n\n", testSignature)
+		fmt.Fprint(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"Thinking...\"}}\n\n")
+		fmt.Fprint(w, "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n")
+		fmt.Fprint(w, "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":1,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n")
+		fmt.Fprint(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"Done.\"}}\n\n")
+		fmt.Fprint(w, "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":1}\n\n")
+		fmt.Fprint(w, "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":10}}\n\n")
+		fmt.Fprint(w, "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
+		flusher.Flush()
+	}))
+	defer server.Close()
+
+	provider, err := providers.NewAnthropic(
+		providers.WithAPIKey("test"),
+		providers.WithBaseURL(server.URL),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Simulate multi-turn: assistant previously responded with thinking+text
+	messages := []llm.Message{
+		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Hello"}}},
+		{Role: llm.RoleAssistant, Content: []llm.ContentPart{
+			llm.ReasoningPart{Type: "reasoning", Text: "Previous thinking", Signature: testSignature},
+			llm.TextPart{Type: "text", Text: "Previous answer"},
+		}},
+	}
+
+	events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var stepComplete *llm.StepCompleteEvent
+	for event := range events {
+		if e, ok := event.(llm.StepCompleteEvent); ok {
+			stepComplete = &e
+		}
+	}
+
+	if stepComplete == nil {
+		t.Fatal("Expected StepCompleteEvent")
+	}
+
+	// Verify the new thinking block also has the signature
+	msg := stepComplete.Messages[0]
+	for _, part := range msg.Content {
+		if rp, ok := part.(llm.ReasoningPart); ok {
+			if rp.Signature != testSignature {
+				t.Errorf("Expected signature in response %q, got %q", testSignature, rp.Signature)
+			}
+		}
+	}
+}
+
 func TestAnthropicAPIError(t *testing.T) {
 	// Test API error handling
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

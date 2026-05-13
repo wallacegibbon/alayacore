@@ -191,3 +191,12 @@ type ToolResultData struct {
 	ID     string `json:"id"`
 	Output string `json:"output"`
 }
+
+// ReasoningData represents reasoning/thinking content with optional signature.
+// Used for persistence when Anthropic's thinking block includes a signature.
+// Text is the thinking content; Signature is Anthropic-specific and only
+// present on thinking blocks.
+type ReasoningData struct {
+	Text      string `json:"text"`
+	Signature string `json:"signature,omitempty"`
+}

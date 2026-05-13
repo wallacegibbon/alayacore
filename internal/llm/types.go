@@ -45,10 +45,14 @@ type TextPart struct {
 
 func (TextPart) isContentPart() {}
 
-// ReasoningPart represents reasoning/thinking content
+// ReasoningPart represents reasoning/thinking content.
+// Signature is Anthropic-specific: it verifies thinking block integrity
+// and must be passed back to the API exactly as received. Empty for
+// providers that don't use signatures (OpenAI, DeepSeek, etc.).
 type ReasoningPart struct {
-	Type string `json:"type"`
-	Text string `json:"text"`
+	Type      string `json:"type"`
+	Text      string `json:"text"`
+	Signature string `json:"signature,omitempty"`
 }
 
 func (ReasoningPart) isContentPart() {}
