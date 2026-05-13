@@ -1102,6 +1102,92 @@ func TestOpenAIWithReasoning(t *testing.T) {
 	}
 }
 
+func TestOpenAITextWithToolCallsConversion(t *testing.T) {
+	// Test that text content is preserved when converting assistant messages
+	// with tool calls back to wire format (for multi-turn tool call chains).
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Verify request body preserves text content alongside tool calls
+		var reqBody map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+			t.Error(err)
+			return
+		}
+
+		messages, ok := reqBody["messages"].([]any)
+		if !ok {
+			t.Fatal("Expected messages array")
+		}
+
+		// Find the assistant message with tool calls (should be second message)
+		var assistantMsg map[string]any
+		for _, msg := range messages {
+			m, ok := msg.(map[string]any)
+			if ok && m["role"] == "assistant" {
+				assistantMsg = m
+				break
+			}
+		}
+
+		if assistantMsg == nil {
+			t.Fatal("Expected assistant message")
+		}
+
+		// Verify text content is preserved
+		content, hasContent := assistantMsg["content"]
+		if !hasContent || content == nil {
+			t.Error("CRITICAL BUG: Assistant message content is nil! Text is lost when tool calls are present")
+		} else if contentStr, ok := content.(string); ok {
+			if contentStr != "Let me check that." {
+				t.Errorf("Expected text 'Let me check that.', got '%s'", contentStr)
+			}
+		} else {
+			t.Errorf("Expected content to be string, got %T", content)
+		}
+
+		// Verify tool calls are present
+		toolCalls, hasToolCalls := assistantMsg["tool_calls"]
+		if !hasToolCalls || toolCalls == nil {
+			t.Error("Expected tool_calls to be present")
+		}
+
+		// Send minimal response
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"Done.\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":5}}\n\n")
+		fmt.Fprint(w, "data: [DONE]\n\n")
+	}))
+	defer server.Close()
+
+	provider, err := providers.NewOpenAI(
+		providers.WithOpenAIAPIKey("test"),
+		providers.WithOpenAIBaseURL(server.URL),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Simulate a multi-turn conversation where assistant returned text + tool call
+	messages := []llm.Message{
+		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Check the weather"}}},
+		{Role: llm.RoleAssistant, Content: []llm.ContentPart{
+			llm.TextPart{Type: "text", Text: "Let me check that."},
+			llm.ToolCallPart{Type: "tool_use", ToolCallID: "call_123", ToolName: "get_weather", Input: json.RawMessage(`{"location":"SF"}`)},
+		}},
+		{Role: llm.RoleTool, Content: []llm.ContentPart{
+			llm.ToolResultPart{ToolCallID: "call_123", Output: llm.ToolResultOutputText{Text: "Sunny, 72°F"}},
+		}},
+	}
+
+	events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Drain events
+	for range events {
+	}
+}
+
 func TestAnthropicToolResultMessageFormat(t *testing.T) {
 	// Test that tool result messages are properly formatted for Anthropic API
 	// Tool results must be in a "user" role message, not "tool" role

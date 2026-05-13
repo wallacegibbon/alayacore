@@ -28,6 +28,11 @@ package providers
 //    accumulated arguments string. See docs/architecture.md →
 //    "Null arguments in tool call chunks".
 //    See `appendToolCallArgs()`.
+//
+// 6. TEXT CONTENT WITH TOOL CALLS: Some providers (DeepSeek, Qwen) return
+//    text content alongside tool calls in the same assistant message.
+//    openaiConvertToolCalls preserves text content when present, so
+//    multi-turn tool call chains don't lose the assistant's commentary.
 
 import (
 	"bufio"
@@ -469,30 +474,36 @@ func openaiExtractReasoning(content []llm.ContentPart) string {
 }
 
 // openaiConvertToolCalls handles conversion of assistant messages with tool calls.
+// Preserves any text content that accompanies tool calls (some providers return
+// text alongside tool calls in the same message).
 func openaiConvertToolCalls(apiMsg *openAIMessage, content []llm.ContentPart) {
 	apiMsg.ToolCalls = make([]openAIToolCall, 0)
+	var textParts []string
 	for _, part := range content {
-		v, ok := part.(llm.ToolCallPart)
-		if !ok {
-			continue
+		switch v := part.(type) {
+		case llm.ToolCallPart:
+			// OpenAI expects arguments to be a JSON-encoded string
+			// We need to marshal the raw JSON to a string
+			argsStr, err := json.Marshal(string(v.Input))
+			if err != nil {
+				argsStr = []byte("{}")
+			}
+			apiMsg.ToolCalls = append(apiMsg.ToolCalls, openAIToolCall{
+				ID:   v.ToolCallID,
+				Type: "function",
+				Function: openAIFunction{
+					Name:      v.ToolName,
+					Arguments: argsStr,
+				},
+			})
+		case llm.TextPart:
+			textParts = append(textParts, v.Text)
 		}
-		// OpenAI expects arguments to be a JSON-encoded string
-		// We need to marshal the raw JSON to a string
-		argsStr, err := json.Marshal(string(v.Input))
-		if err != nil {
-			argsStr = []byte("{}")
-		}
-		apiMsg.ToolCalls = append(apiMsg.ToolCalls, openAIToolCall{
-			ID:   v.ToolCallID,
-			Type: "function",
-			Function: openAIFunction{
-				Name:      v.ToolName,
-				Arguments: argsStr,
-			},
-		})
 	}
-	// Content can be nil for tool calls
-	apiMsg.Content = nil
+	// Preserve text content if present; nil if tool-call-only
+	if len(textParts) > 0 {
+		apiMsg.Content = strings.Join(textParts, "")
+	}
 }
 
 // openaiConvertRegularContent handles conversion of regular text content.
