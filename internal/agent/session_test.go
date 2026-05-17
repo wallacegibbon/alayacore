@@ -47,8 +47,7 @@ func TestSaveAndLoadSession(t *testing.T) {
 			Input:  &stream.NopInput{},
 			Output: &stream.NopOutput{},
 		},
-		lastSaveMessages: -1,
-		taskQueue:        make([]QueueItem, 0),
+		taskQueue: make([]QueueItem, 0),
 	}
 
 	// Save session
