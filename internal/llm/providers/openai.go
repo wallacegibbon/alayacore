@@ -425,6 +425,16 @@ func openaiConvertMessages(messages []llm.Message, reasoningLevel int) []openAIM
 			if reasoningText != "" || reasoningLevel > config.ThinkLevelOff {
 				apiMsg.ReasoningContent = &reasoningText
 			}
+
+			// Ensure the assistant message has at least one of {content, tool_calls}
+			// set. Some providers (e.g. DeepSeek) reject assistant messages that
+			// carry only reasoning_content without content or tool_calls.
+			// This can happen when a session is reconstructed from TLV-serialized
+			// data and the model produced reasoning but was interrupted before
+			// generating any text or tool calls.
+			if apiMsg.Content == nil && len(apiMsg.ToolCalls) == 0 {
+				apiMsg.Content = ""
+			}
 		}
 
 		apiMessages = append(apiMessages, apiMsg)
