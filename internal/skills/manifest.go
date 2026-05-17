@@ -47,16 +47,18 @@ func ParseSkillMarkdown(content string) (Metadata, string, error) {
 	}
 
 	// Validate required fields
-	if metadata.Name != "" {
-		if err := validateName(metadata.Name); err != nil {
-			return Metadata{}, content, fmt.Errorf("invalid name: %w", err)
-		}
+	if metadata.Name == "" {
+		return Metadata{}, content, fmt.Errorf("name is required")
+	}
+	if err := validateName(metadata.Name); err != nil {
+		return Metadata{}, content, fmt.Errorf("invalid name: %w", err)
 	}
 
-	if metadata.Description != "" {
-		if err := validateDescription(metadata.Description); err != nil {
-			return Metadata{}, content, fmt.Errorf("invalid description: %w", err)
-		}
+	if metadata.Description == "" {
+		return Metadata{}, content, fmt.Errorf("description is required")
+	}
+	if err := validateDescription(metadata.Description); err != nil {
+		return Metadata{}, content, fmt.Errorf("invalid description: %w", err)
 	}
 
 	// Extract body (content after frontmatter)

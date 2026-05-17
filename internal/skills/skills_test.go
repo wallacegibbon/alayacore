@@ -60,6 +60,38 @@ Some content here.`
 	}
 }
 
+func TestParseSkillMarkdownMissingName(t *testing.T) {
+	content := `---
+description: A skill without a name
+---
+
+# No Name Skill`
+
+	_, _, err := ParseSkillMarkdown(content)
+	if err == nil {
+		t.Fatal("Expected error for missing name, got nil")
+	}
+	if !contains(err.Error(), "name is required") {
+		t.Errorf("Expected 'name is required' error, got: %v", err)
+	}
+}
+
+func TestParseSkillMarkdownMissingDescription(t *testing.T) {
+	content := `---
+name: test-skill
+---
+
+# No Description Skill`
+
+	_, _, err := ParseSkillMarkdown(content)
+	if err == nil {
+		t.Fatal("Expected error for missing description, got nil")
+	}
+	if !contains(err.Error(), "description is required") {
+		t.Errorf("Expected 'description is required' error, got: %v", err)
+	}
+}
+
 func TestValidateName(t *testing.T) {
 	tests := []struct {
 		name    string

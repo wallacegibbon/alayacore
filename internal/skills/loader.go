@@ -96,13 +96,8 @@ func (m *Manager) loadSkillMetadata(skillFile, dirName string) (Skill, error) {
 	}
 
 	// Validate name matches directory
-	if metadata.Name != "" && metadata.Name != dirName {
+	if metadata.Name != dirName {
 		return Skill{}, fmt.Errorf("skill name '%s' does not match directory '%s'", metadata.Name, dirName)
-	}
-
-	// Use directory name if name not specified
-	if metadata.Name == "" {
-		metadata.Name = dirName
 	}
 
 	return Skill{
