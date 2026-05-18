@@ -365,3 +365,147 @@ func TestAutoFollow_JNoOpWhenNewWindowBetweenTicks(t *testing.T) {
 		t.Error("autoFollow should still be true after tick")
 	}
 }
+
+// TestScrollCursorToTop_PositionsWindowAtTop verifies that ScrollCursorToTop
+// scrolls the viewport so the cursor window's start line is at the top of the
+// viewport, even when the window is already partially visible.
+func TestScrollCursorToTop_PositionsWindowAtTop(t *testing.T) {
+	wb := NewWindowBuffer(80, DefaultStyles())
+	display := NewDisplayModel(wb, DefaultStyles())
+
+	// Create several windows with some content
+	for i := range 10 {
+		wb.AppendOrUpdate("prompt-"+strings.Repeat("x", i+1), stream.TagTextUser,
+			strings.Repeat("line\n", 5))
+		wb.AppendOrUpdate("response-"+strings.Repeat("x", i+1), stream.TagTextAssistant,
+			strings.Repeat("line\n", 5))
+	}
+
+	display.SetHeight(20)
+	display.updateContent()
+
+	// Place cursor on window 8 (near the end) and bring it into view
+	display.SetWindowCursor(8)
+	display.EnsureCursorVisible()
+	display.updateContent()
+
+	// Verify the window is visible but NOT necessarily at the top
+	startLine := wb.GetWindowStartLine(8)
+	viewportTop := display.viewport.YOffset()
+	t.Logf("Before ScrollCursorToTop: startLine=%d, viewportTop=%d", startLine, viewportTop)
+
+	// Now use ScrollCursorToTop — should position the window at the top
+	display.ScrollCursorToTop()
+	display.updateContent()
+
+	newViewportTop := display.viewport.YOffset()
+	t.Logf("After ScrollCursorToTop: startLine=%d, viewportTop=%d", startLine, newViewportTop)
+
+	if newViewportTop != startLine {
+		t.Errorf("expected viewport top at %d (window start), got %d", startLine, newViewportTop)
+	}
+}
+
+// TestScrollCursorToTop_PartiallyVisibleWindowMovesToTop verifies that
+// when a window is partially visible at the bottom of the viewport,
+// ScrollCursorToTop scrolls it to the top (unlike EnsureCursorVisible
+// which would leave it in place).
+func TestScrollCursorToTop_PartiallyVisibleWindowMovesToTop(t *testing.T) {
+	wb := NewWindowBuffer(80, DefaultStyles())
+	display := NewDisplayModel(wb, DefaultStyles())
+
+	// Create windows
+	for i := range 10 {
+		wb.AppendOrUpdate("window-"+strings.Repeat("x", i+1), stream.TagTextUser,
+			strings.Repeat("line\n", 5))
+	}
+
+	display.SetHeight(20)
+	display.updateContent()
+
+	// Set cursor to a window and ensure it's visible (but not at top)
+	display.SetWindowCursor(5)
+	display.EnsureCursorVisible()
+	display.updateContent()
+
+	startLine5 := wb.GetWindowStartLine(5)
+	endLine5 := wb.GetWindowEndLine(5)
+	t.Logf("Window 5: lines %d-%d", startLine5, endLine5)
+
+	// Position viewport so window 5 is partially visible at the bottom
+	viewportHeight := display.GetHeight()
+	display.viewport.SetYOffset(startLine5 - 2) // window starts 2 lines above viewport bottom
+	display.updateContent()
+
+	viewportTopBefore := display.viewport.YOffset()
+	t.Logf("Before: viewport=%d-%d, window starts at %d",
+		viewportTopBefore, viewportTopBefore+viewportHeight, startLine5)
+
+	// EnsureCursorVisible would NOT scroll (window is partially visible)
+	display.EnsureCursorVisible()
+	viewportTopAfterEnsure := display.viewport.YOffset()
+	if viewportTopAfterEnsure != viewportTopBefore {
+		t.Fatalf("EnsureCursorVisible should not have scrolled (it did: %d -> %d)",
+			viewportTopBefore, viewportTopAfterEnsure)
+	}
+
+	// ScrollCursorToTop SHOULD scroll to put window at top
+	display.ScrollCursorToTop()
+	viewportTopAfterScroll := display.viewport.YOffset()
+	t.Logf("After ScrollCursorToTop: viewportTop=%d, expected=%d", viewportTopAfterScroll, startLine5)
+
+	if viewportTopAfterScroll != startLine5 {
+		t.Errorf("expected viewport top at %d (window start), got %d", startLine5, viewportTopAfterScroll)
+	}
+}
+
+// TestScrollCursorToTop_NoCursorDoesNothing verifies that ScrollCursorToTop
+// is a no-op when no window cursor is set.
+func TestScrollCursorToTop_NoCursorDoesNothing(t *testing.T) {
+	wb := NewWindowBuffer(80, DefaultStyles())
+	display := NewDisplayModel(wb, DefaultStyles())
+
+	wb.AppendOrUpdate("window-1", stream.TagTextUser, "hello")
+	display.SetHeight(10)
+	display.updateContent()
+
+	// No cursor set (-1 is the default)
+	yOffsetBefore := display.viewport.YOffset()
+	display.ScrollCursorToTop()
+	yOffsetAfter := display.viewport.YOffset()
+
+	if yOffsetBefore != yOffsetAfter {
+		t.Errorf("ScrollCursorToTop should be no-op with no cursor; YOffset changed %d -> %d",
+			yOffsetBefore, yOffsetAfter)
+	}
+}
+
+// TestScrollCursorToTop_AlreadyAtTopIsStable verifies that calling
+// ScrollCursorToTop when the window is already at the top is idempotent.
+func TestScrollCursorToTop_AlreadyAtTopIsStable(t *testing.T) {
+	wb := NewWindowBuffer(80, DefaultStyles())
+	display := NewDisplayModel(wb, DefaultStyles())
+
+	for i := range 5 {
+		wb.AppendOrUpdate("window-"+strings.Repeat("x", i+1), stream.TagTextUser,
+			strings.Repeat("line\n", 5))
+	}
+
+	display.SetHeight(20)
+	display.updateContent()
+
+	display.SetWindowCursor(2)
+	display.ScrollCursorToTop()
+	display.updateContent()
+
+	yOffset1 := display.viewport.YOffset()
+
+	// Call again — should be stable
+	display.ScrollCursorToTop()
+	display.updateContent()
+
+	yOffset2 := display.viewport.YOffset()
+	if yOffset1 != yOffset2 {
+		t.Errorf("ScrollCursorToTop not stable: first=%d, second=%d", yOffset1, yOffset2)
+	}
+}

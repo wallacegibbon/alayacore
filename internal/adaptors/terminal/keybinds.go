@@ -514,13 +514,13 @@ var displayKeyMap = map[string]func(*Terminal){
 	},
 	"f": func(m *Terminal) {
 		if m.display.MoveWindowCursorToNextUserPrompt() {
-			m.display.EnsureCursorVisible()
+			m.display.ScrollCursorToTop()
 			m.display.updateContent()
 		}
 	},
 	"b": func(m *Terminal) {
 		if m.display.MoveWindowCursorToPrevUserPrompt() {
-			m.display.EnsureCursorVisible()
+			m.display.ScrollCursorToTop()
 			m.display.updateContent()
 		}
 	},
@@ -541,9 +541,10 @@ var displayKeyCmdMap = map[string]func(*Terminal) tea.Cmd{
 
 // handleDisplayKeys handles key events when display window is focused.
 //
-// IMPORTANT: When moving the cursor, always call EnsureCursorVisible() BEFORE
-// updateContent(). This ensures the viewport position is updated before content
-// is regenerated, preventing blank areas in the virtual rendering.
+// IMPORTANT: When moving the cursor, always call a scroll method
+// (EnsureCursorVisible() or ScrollCursorToTop()) BEFORE updateContent().
+// This ensures the viewport position is updated before content is
+// regenerated, preventing blank areas in the virtual rendering.
 func (m *Terminal) handleDisplayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 	key := msg.String()
 

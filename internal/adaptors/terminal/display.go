@@ -250,6 +250,18 @@ func (m *DisplayModel) EnsureCursorVisible() {
 	}
 }
 
+// ScrollCursorToTop scrolls the viewport so the cursor window's start line
+// is at the top of the viewport.  This is used when jumping to a specific
+// prompt (e.g. via b/f) so the user can see both the prompt and the
+// response that follows it.
+func (m *DisplayModel) ScrollCursorToTop() {
+	if m.windowCursor < 0 {
+		return
+	}
+	startLine := m.windowBuffer.GetWindowStartLine(m.windowCursor)
+	m.viewport.SetYOffset(startLine)
+}
+
 // ValidateCursor ensures the window cursor is valid.
 // Uses partial visibility check to avoid jarring scroll jumps on resize.
 func (m *DisplayModel) ValidateCursor() {
