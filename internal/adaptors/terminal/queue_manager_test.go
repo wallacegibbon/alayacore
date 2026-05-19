@@ -1,8 +1,10 @@
 package terminal
 
 import (
+	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 func TestQueueManagerSetItems(t *testing.T) {
@@ -200,5 +202,59 @@ func TestQueueManagerDeleteLastItem(t *testing.T) {
 	item = qm.GetSelectedItem()
 	if item != nil {
 		t.Error("Expected nil for empty queue")
+	}
+}
+
+func TestQueueManagerRenderItemTruncation(t *testing.T) {
+	styles := DefaultStyles()
+	qm := NewQueueManager(styles)
+	qm.width = 60
+	maxWidth := qm.width - 6 // 54 display cells
+
+	// ASCII content that fits — should not be truncated
+	short := QueueItem{QueueID: "Q1", Type: "prompt", Content: "hello world"}
+	rendered := qm.renderItem(short, false)
+	if strings.Contains(rendered, "...") {
+		t.Errorf("short ASCII content should not be truncated, got: %s", rendered)
+	}
+
+	// ASCII content that exceeds maxWidth — should be truncated
+	longASCII := QueueItem{QueueID: "Q2", Type: "prompt", Content: strings.Repeat("a", maxWidth+10)}
+	rendered = qm.renderItem(longASCII, false)
+	if !strings.Contains(rendered, "...") {
+		t.Errorf("long ASCII content should be truncated with ...")
+	}
+
+	// CJK content that fits display width (27 chars = 54 cells = maxWidth)
+	cjkFit := QueueItem{QueueID: "Q3", Type: "prompt", Content: strings.Repeat("日", maxWidth/2)}
+	rendered = qm.renderItem(cjkFit, false)
+	if strings.Contains(rendered, "...") {
+		t.Errorf("CJK content fitting maxWidth should not be truncated, got: %s", rendered)
+	}
+
+	// CJK content exceeding display width (28 chars = 56 cells > 54)
+	cjkOver := QueueItem{QueueID: "Q4", Type: "prompt", Content: strings.Repeat("日", maxWidth/2+1)}
+	rendered = qm.renderItem(cjkOver, false)
+	if !strings.Contains(rendered, "...") {
+		t.Errorf("CJK content exceeding maxWidth should be truncated with ..., got: %s", rendered)
+	}
+
+	// Verify rendered output is valid UTF-8
+	if !utf8.ValidString(rendered) {
+		t.Errorf("rendered content contains invalid UTF-8: %q", rendered)
+	}
+
+	// Mixed ASCII + CJK: "ab" (2 cells) + 26 CJK (52 cells) = 54 = maxWidth, should fit
+	mixedFit := QueueItem{QueueID: "Q5", Type: "prompt", Content: "ab" + strings.Repeat("日", 26)}
+	rendered = qm.renderItem(mixedFit, false)
+	if strings.Contains(rendered, "...") {
+		t.Errorf("mixed content fitting maxWidth should not be truncated, got: %s", rendered)
+	}
+
+	// Mixed: "ab" (2 cells) + 27 CJK (54 cells) = 56 > 54, should truncate
+	mixedOver := QueueItem{QueueID: "Q6", Type: "prompt", Content: "ab" + strings.Repeat("日", 27)}
+	rendered = qm.renderItem(mixedOver, false)
+	if !strings.Contains(rendered, "...") {
+		t.Errorf("mixed content exceeding maxWidth should be truncated with ..., got: %s", rendered)
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	ansi "github.com/charmbracelet/x/ansi"
 )
 
 // QueueItem represents a queued task for display
@@ -213,9 +214,8 @@ func (qm *QueueManager) updateScrollForHeight(height int) {
 }
 
 func (qm *QueueManager) renderItem(item QueueItem, selected bool) string {
-	// Calculate available width for content
-	// Inner width is qm.width - 4, account for "> Q123 " = ~8 characters overhead
-	maxWidth := qm.width - 16
+	// Bordered box takes 4 cells (border + padding), prefix takes 2 ("> " or "  ")
+	maxWidth := qm.width - 6
 	if maxWidth < 10 {
 		maxWidth = 10
 	}
@@ -230,8 +230,13 @@ func (qm *QueueManager) renderItem(item QueueItem, selected bool) string {
 		content = ":" + content
 	}
 
-	if len(content) > maxWidth {
-		content = content[:maxWidth-3] + "..."
+	// Truncate by display width (accounts for CJK double-width characters).
+	// ansi.Hardwrap inserts \n at the correct display-width boundary.
+	truncated := ansi.Hardwrap(content, maxWidth, false)
+	if truncated != content {
+		// Content wraps — trim to maxWidth-3 to leave room for "..."
+		truncated = ansi.Hardwrap(content, maxWidth-3, false)
+		content = strings.SplitN(truncated, "\n", 2)[0] + "..."
 	}
 
 	if selected {
