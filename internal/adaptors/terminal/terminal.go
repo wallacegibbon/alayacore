@@ -250,6 +250,9 @@ type tickMsg struct{}
 
 // handleWindowSize handles terminal resize events.
 func (m *Terminal) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
+	prevWidth := m.windowWidth
+	prevHeight := m.windowHeight
+
 	m.windowWidth = msg.Width
 	m.windowHeight = msg.Height
 
@@ -263,8 +266,13 @@ func (m *Terminal) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 	m.helpWindow.SetSize(msg.Width, msg.Height)
 	m.updateDisplayHeight()
 
-	// Validate cursor position after resize (window heights may have changed)
-	m.display.ValidateCursor()
+	// Validate cursor only when the dimensions actually changed. On resume
+	// from suspend (fg after Ctrl+Z), checkResize sends a WindowSizeMsg with
+	// the same dimensions as before — skipping ValidateCursor (which would
+	// call EnsureCursorVisible) preserves the user's scroll position.
+	if msg.Width != prevWidth || msg.Height != prevHeight {
+		m.display.ValidateCursor()
+	}
 
 	// Re-render display content with new width (windowBuffer was marked dirty by SetWindowWidth)
 	m.display.updateContent()
