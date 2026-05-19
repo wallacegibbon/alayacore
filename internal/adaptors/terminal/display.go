@@ -262,18 +262,26 @@ func (m *DisplayModel) ScrollCursorToTop() {
 	m.viewport.SetYOffset(startLine)
 }
 
-// ValidateCursor ensures the window cursor is valid.
+// ValidateCursor ensures the window cursor is valid and visible.
 // Uses partial visibility check to avoid jarring scroll jumps on resize.
 func (m *DisplayModel) ValidateCursor() {
+	m.ClampCursor()
+	if m.windowCursor >= 0 && m.windowBuffer.GetWindowCount() > 0 {
+		m.EnsureCursorVisible()
+	}
+}
+
+// ClampCursor clamps the window cursor to valid bounds without scrolling.
+// Unlike ValidateCursor, this does not call EnsureCursorVisible, preserving
+// the user's scroll position. Use this on resize events where only bounds
+// correction is needed.
+func (m *DisplayModel) ClampCursor() {
 	windowCount := m.windowBuffer.GetWindowCount()
 	if m.windowCursor >= windowCount {
 		m.windowCursor = windowCount - 1
 	}
 	if m.windowCursor < -1 {
 		m.windowCursor = -1
-	}
-	if m.windowCursor >= 0 && windowCount > 0 {
-		m.EnsureCursorVisible()
 	}
 }
 
