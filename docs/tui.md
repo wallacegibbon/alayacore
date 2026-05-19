@@ -34,6 +34,7 @@ AlayaCore's terminal UI is built with [Bubble Tea](https://github.com/charmbrace
 | `Ctrl+Q` | Open task queue manager |
 | `Ctrl+H` | Open help window |
 | `Ctrl+G` | Cancel current request (with confirmation) |
+| `Ctrl+Z` | Suspend process |
 | `Ctrl+C` | Clear input field (only when input is focused) |
 | `:` | Switch to input with `:` prefix (command mode) |
 | `Space` | Toggle window fold (expand/collapse) |
@@ -50,6 +51,7 @@ Commands are split into two categories:
 | `:model_set <id>` | Switch to a model by numeric ID |
 | `:model_load` | Reload model configs from the config file |
 | `:think [0\|1\|2]` | Set think level (0=off, 1=normal, 2=max). Default: 1 |
+| `:suspend` | Suspend the process (Ctrl+Z) |
 | `:taskqueue_get_all` | List all queued tasks (used by queue manager UI) |
 | `:taskqueue_del <id>` | Delete a queued task by ID (used by queue manager UI) |
 | `:taskqueue_edit <id> <content>` | Edit a queued task's content by ID (used by queue manager UI) |
@@ -61,7 +63,7 @@ Commands are split into two categories:
 | `:summarize` | Summarize conversation to reduce token usage |
 | `:save [filename]` | Save session. Uses `--session` path if no filename given. |
 
-Note: `:quit` / `:q` and `:help` are handled directly by each adaptor (terminal shows a confirmation dialog for quit, opens help window for help; plainio exits immediately for quit) and never reaches the session command dispatch.
+Note: `:quit` / `:q`, `:help`, and `:suspend` are handled directly by each adaptor (terminal shows a confirmation dialog for quit, opens help window for help, suspends the process for suspend; plainio exits immediately for quit and help, and does not support suspend) and never reaches the session command dispatch.
 
 ## Window Container
 
