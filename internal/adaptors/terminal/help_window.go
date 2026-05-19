@@ -105,6 +105,7 @@ func buildHelpItems() []HelpItem {
 		{Key: ":model_set", Description: "Switch model by ID", Type: HelpItemCommand},
 		{Key: ":model_load", Description: "Reload model config", Type: HelpItemCommand},
 		{Key: ":help", Description: "Open help window", Type: HelpItemCommand},
+		{Key: ":suspend", Description: "Suspend process (Ctrl+Z)", Type: HelpItemCommand},
 
 		// Global Shortcuts
 		{IsSection: true, Description: "Global Shortcuts"},
@@ -118,6 +119,7 @@ func buildHelpItems() []HelpItem {
 		{Key: "Ctrl+L", Description: "Open model selector", Type: HelpItemKey},
 		{Key: "Ctrl+P", Description: "Open theme selector", Type: HelpItemKey},
 		{Key: "Ctrl+Q", Description: "Open queue manager", Type: HelpItemKey},
+		{Key: "Ctrl+Z", Description: "Suspend process", Type: HelpItemKey},
 
 		// Queue Manager
 		{IsSection: true, Description: "Queue Manager"},
