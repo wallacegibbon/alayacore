@@ -33,6 +33,7 @@ var globalKeyBindings = []KeyBinding{
 	{"ctrl+q", "Open queue manager", "global"},
 	{"ctrl+h", "Open help window", "global"},
 	{"f1", "Open help window", "global"},
+	{"ctrl+z", "Suspend process", "global"},
 	{"enter", "Submit prompt/command", "global"},
 }
 
@@ -589,6 +590,9 @@ func (m *Terminal) handleGlobalKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 		m.openHelpWindow()
 		return nil, true
 
+	case "ctrl+z":
+		return tea.Suspend, true
+
 	case "enter":
 		return m.handleSubmit(), true
 	}
@@ -675,6 +679,12 @@ func (m *Terminal) handleCommand(command string) tea.Cmd {
 		m.confirmDialog = confirmCancelAll
 		m.confirmFromCommand = true
 		return nil
+	}
+
+	// Suspend command - suspends the process (like Ctrl+Z)
+	if command == "suspend" {
+		m.input.SetValue("")
+		return tea.Suspend
 	}
 
 	// Help command - opens help window locally, not sent to session
