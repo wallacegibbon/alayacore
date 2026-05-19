@@ -157,6 +157,11 @@ func GetAllKeyBindings() []KeyBinding {
 
 // handleKeyMsg routes keyboard input to the appropriate handler.
 func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Ctrl+Z works from any context, including overlays
+	if msg.String() == "ctrl+z" {
+		return m, tea.Suspend
+	}
+
 	// 1. Theme selector takes precedence when open
 	if m.themeSelector.IsOpen() {
 		return m.handleThemeSelectorKeys(msg)
@@ -589,9 +594,6 @@ func (m *Terminal) handleGlobalKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 	case "ctrl+h", "f1":
 		m.openHelpWindow()
 		return nil, true
-
-	case "ctrl+z":
-		return tea.Suspend, true
 
 	case "enter":
 		return m.handleSubmit(), true
