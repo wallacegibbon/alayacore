@@ -117,7 +117,11 @@ func RenderDiffContent(content string, status ToolStatus, styles *Styles, innerW
 			// Header line: "edit_file: /path"
 			// Need to re-render with status indicator
 			path := strings.TrimPrefix(line, "edit_file: ")
-			result = append(result, status.Indicator(styles)+styles.Tool.Render("edit_file: ")+styles.ToolContent.Render(path))
+			header := status.Indicator(styles) + styles.Tool.Render("edit_file: ") + styles.ToolContent.Render(path)
+			if innerWidth > 0 {
+				header = wrapContent(header, innerWidth)
+			}
+			result = append(result, header)
 			continue
 		}
 		if line == "" {
