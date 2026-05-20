@@ -156,6 +156,24 @@ When a command completes normally but with a non-zero exit code, AlayaCore repor
 
 The package uses Go build tags (`//go:build !windows` / `//go:build windows`) for all OS-specific code.
 
+#### Resource Safety
+
+The `execute_command` tool manages OS resources with the following guarantees on every code path — normal completion, non-zero exit, cancellation (`:cancel`), and timeout:
+
+| Resource | Acquired via | Released via |
+|---|---|---|
+| Child process | `cmd.Start()` | `cmd.Wait()` — always called; the buffered `done` channel and `TerminateProcessGroup` ensure every path drains it |
+| Stdin handle (`/dev/null` or `NUL`) | `OpenDevNull()` | `defer devNull.Close()` |
+| Windows Job Object | `AssignJob()` | `defer job.Close()` + `KILL_ON_JOB_CLOSE` (kernel-level guarantee even on crash) |
+| `cmd.Wait()` goroutine | `go func()` | Buffered channel (`make(chan error, 1)`) ensures the send never blocks; process kill ensures `cmd.Wait()` returns |
+| Timeout context | `context.WithTimeout()` | `defer timeoutCancel()` |
+| Temp file handle (>64KB output) | `os.CreateTemp()` | `defer file.Close()` |
+
+**Key invariants (do not break when modifying):**
+- `cmd.Wait()` MUST be called on every path — the `done` channel must remain buffered.
+- `TerminateProcessGroup` must always drain `done` after killing the process.
+- The Job Object handle must be closed on every path (`defer` after nil-check covers this).
+
 ## TLV Protocol
 
 Communication between adaptors and session uses a simple Tag-Length-Value (TLV) binary protocol.
