@@ -448,10 +448,10 @@ func (ms *ModelSelector) renderModelList(width int, borderColor color.Color) str
 		for i := ms.scrollIdx; i < min(ms.scrollIdx+listHeight, len(ms.filteredModels)); i++ {
 			m := ms.filteredModels[i]
 			if i == ms.selectedIdx && !ms.searchInputFocused {
-				idStr := fmt.Sprintf("%*d.", idWidth, m.ID)
+				idStr := fmt.Sprintf("%0*d.", idWidth, m.ID)
 				content.WriteString(fmt.Sprintf("> %s %s", ms.styles.Text.Render(idStr), ms.styles.Text.Render(m.Name)))
 			} else {
-				idStr := fmt.Sprintf("%*d.", idWidth, m.ID)
+				idStr := fmt.Sprintf("%0*d.", idWidth, m.ID)
 				content.WriteString(fmt.Sprintf("  %s %s", ms.styles.System.Render(idStr), ms.styles.System.Render(m.Name)))
 			}
 			if i < min(ms.scrollIdx+listHeight, len(ms.filteredModels))-1 {
