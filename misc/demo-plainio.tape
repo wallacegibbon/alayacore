@@ -20,6 +20,8 @@ Set Margin 8
 Set Padding 4
 Set BorderRadius 12
 Set Theme "Builtin Dark"
+Set WindowBar "Colorful"
+Set WindowBarSize 36
 
 # ── Launch in plain IO mode ─────────────────────────────────────────
 
