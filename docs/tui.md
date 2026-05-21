@@ -75,12 +75,30 @@ The display area organizes content into separate windows — one per message or 
 
 ### Auto-Follow
 
-When new windows appear, the cursor automatically moves to the newest one.
+Auto-follow is enabled by default at startup. When enabled, the viewport
+automatically scrolls to keep the newest content visible as it arrives.
+
 Auto-follow is disabled by any navigation that actually moves the cursor or
 scrolls the viewport. While auto-follow is active:
-- `j` and `L` are no-ops (race protection for new windows appearing between ticks)
-- `J` and `Ctrl+D` are no-ops when already at the bottom of the output
-- Pressing `G` re-enables auto-follow
+
+| Key | Behavior | Disables auto-follow? |
+|-----|----------|-----------------------|
+| `G` | Go to last window | ✅ Re-enables |
+| `j` / `↓` | Move cursor down | ❌ No-op (race protection) |
+| `L` | Move cursor to bottom | ❌ No-op (race protection) |
+| `J` / `Shift+Down` | Scroll down one line | ❌ No-op when at bottom |
+| `Ctrl+D` | Scroll down half screen | ❌ No-op when at bottom |
+| `k` / `↑` | Move cursor up | ✅ If cursor actually moves |
+| `H` | Move to top of visible area | ✅ If cursor actually moves |
+| `M` | Move to center of visible area | ✅ If cursor actually moves |
+| `f` | Jump to next user prompt | ✅ If cursor actually moves |
+| `b` | Jump to previous user prompt | ✅ If cursor actually moves |
+| `g` / `Home` | Go to first window | ✅ If cursor actually moves |
+| `K` / `Shift+Up` | Scroll up one line | ✅ Always |
+| `Ctrl+U` | Scroll up half screen | ✅ Always |
+| `e` | Open in editor | ✅ Always |
+| `Space` | Toggle window fold | ❌ Never |
+| `Tab` | Toggle focus | ❌ Never |
 
 ### Fold Mode
 
