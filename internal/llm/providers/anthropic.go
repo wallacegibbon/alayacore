@@ -3,21 +3,10 @@ package providers
 
 // Anthropic Provider Gotchas:
 //
-// 1. PROMPT CACHING: System message must be ≥1024 tokens for caching to activate.
-//    Shorter prompts won't be cached even with cache_control set.
+// 1. DUAL SYSTEM PROMPT: --system flag appends extra system prompt rather than
+//    replacing default. Both prompts become separate system messages.
 //
-// 2. CACHE CONTROL PLACEMENT: Cache control is applied as a top-level field on the
-//    request body (Anthropic's automatic caching). It is NOT applied to individual
-//    system messages.
-//
-// 3. DUAL SYSTEM PROMPT: --system flag appends extra system prompt rather than
-//    replacing default. Both prompts become separate system messages, each with
-//    cache_control for Anthropic APIs.
-//
-// 4. PROMPT CACHE PER-MODEL: prompt_cache: true in model.conf enables cache_control
-//    markers for Anthropic. Other providers auto-cache and ignore this setting.
-//
-// 5. EMPTY THINKING BLOCK PADDING: Per DeepSeek's documentation, between two
+// 2. EMPTY THINKING BLOCK PADDING: Per DeepSeek's documentation, between two
 //    user messages all intermediate assistant reasoning_content must be passed
 //    back. When reasoning mode is enabled, an empty "thinking" block is
 //    prepended to every assistant message that lacks one, so that assistant
@@ -60,7 +49,6 @@ type AnthropicProvider struct {
 	baseURL        string
 	client         *http.Client
 	model          string
-	promptCache    bool
 	maxTokens      int
 	reasoningLevel int // 0=off, 1=high, 2=max
 }
@@ -113,13 +101,6 @@ func WithAnthropicModel(model string) AnthropicOption {
 	}
 }
 
-// WithPromptCache enables prompt caching for Anthropic
-func WithPromptCache(enabled bool) AnthropicOption {
-	return func(p *AnthropicProvider) {
-		p.promptCache = enabled
-	}
-}
-
 // WithMaxTokens sets the maximum output tokens
 func WithMaxTokens(tokens int) AnthropicOption {
 	return func(p *AnthropicProvider) {
@@ -141,7 +122,6 @@ type anthropicRequest struct {
 	System       []anthropicSystemMessage `json:"system,omitempty"`
 	Tools        []anthropicTool          `json:"tools,omitempty"`
 	Stream       bool                     `json:"stream"`
-	CacheControl *anthropicCacheControl   `json:"cache_control,omitempty"`
 	Thinking     *anthropicThinking       `json:"thinking"`
 	OutputConfig *anthropicOutputConfig   `json:"output_config,omitempty"`
 }
@@ -154,14 +134,9 @@ type anthropicOutputConfig struct {
 	Effort string `json:"effort"`
 }
 
-type anthropicCacheControl struct {
-	Type string `json:"type"`
-}
-
 type anthropicSystemMessage struct {
-	Type         string                 `json:"type"`
-	Text         string                 `json:"text"`
-	CacheControl *anthropicCacheControl `json:"cache_control,omitempty"`
+	Type string `json:"type"`
+	Text string `json:"text"`
 }
 
 type anthropicMessage struct {
@@ -191,9 +166,6 @@ type anthropicContentBlock struct {
 	// blocks — Anthropic requires it to be passed back exactly as received.
 	// Omitted from JSON for non-thinking blocks (text, tool_use, etc.).
 	Signature string `json:"signature,omitempty"`
-
-	// Cache control
-	CacheControl *anthropicCacheControl `json:"cache_control,omitempty"`
 }
 
 type anthropicTool struct {
@@ -444,11 +416,6 @@ func (p *AnthropicProvider) StreamMessages(
 		System:    systemMessages,
 		Tools:     apiTools,
 		Stream:    true,
-	}
-
-	// Add top-level cache_control for automatic caching (Anthropic's automatic caching)
-	if p.promptCache {
-		reqBody.CacheControl = &anthropicCacheControl{Type: "ephemeral"}
 	}
 
 	// Always include thinking config based on reasoning level.

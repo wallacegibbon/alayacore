@@ -11,13 +11,12 @@ import (
 
 // ProviderConfig configures a provider
 type ProviderConfig struct {
-	Type        string // "anthropic", "openai"
-	APIKey      string
-	BaseURL     string
-	Model       string
-	HTTPClient  *http.Client
-	PromptCache bool // Enable prompt caching (Anthropic only)
-	MaxTokens   int  // Maximum output tokens (0 = provider default)
+	Type       string // "anthropic", "openai"
+	APIKey     string
+	BaseURL    string
+	Model      string
+	HTTPClient *http.Client
+	MaxTokens  int // Maximum output tokens (0 = provider default)
 }
 
 // NewProvider creates a provider based on configuration
@@ -26,7 +25,6 @@ func NewProvider(config ProviderConfig) (llm.Provider, error) {
 	case "anthropic":
 		opts := []providers.AnthropicOption{
 			providers.WithAPIKey(config.APIKey),
-			providers.WithPromptCache(config.PromptCache),
 		}
 		if config.BaseURL != "" {
 			opts = append(opts, providers.WithBaseURL(config.BaseURL))

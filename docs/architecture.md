@@ -286,8 +286,6 @@ The CWD is **not** persisted in the session file. On session load, it is
 rebuilt from the current runtime environment, ensuring the LLM always sees the
 correct base directory for the current session.
 
-For Anthropic APIs with `prompt_cache: true`, a top-level `cache_control: {"type": "ephemeral"}` is added to the request body for automatic prompt caching.
-
 ## Data Flow
 
 ### Startup Flow
@@ -406,13 +404,6 @@ Some providers emit no-op deltas with `"arguments": null` (JSON literal null):
 After `json.Unmarshal` into `json.RawMessage`, `args` becomes the 4 bytes `null`. Since `args[0]` is `'n'` (not `'"'`), it bypasses the unquote path and falls through to the raw append. Without a guard, the accumulated arguments become e.g. `{"path": "README.md"}null` — corrupting the JSON and causing tool execution to fail.
 
 **Fix:** skip chunks where `string(args) == "null"`. Safe because the `arguments` field is always a JSON string type in the OpenAI API spec, so the only time `args[0] != '"'` is for the null literal. See `openAIStreamState.appendToolCallArgs()`.
-
-### Anthropic prompt caching
-
-- System message must be ≥1024 tokens for caching to activate
-- Uses **automatic caching**: top-level `cache_control: {"type": "ephemeral"}` on the request body
-- Enabled per-model via `prompt_cache: true` in `model.conf` (other providers ignore)
-- Best for multi-turn conversations where growing message history should be cached automatically
 
 ### Terminal scroll position
 

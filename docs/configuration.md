@@ -28,7 +28,6 @@ base_url: "https://api.example.com/v1"
 api_key: "your-api-key"
 model_name: "model-identifier"
 context_limit: 128000
-prompt_cache: true
 ```
 
 ### Fields
@@ -42,7 +41,6 @@ prompt_cache: true
 | `model_name` | Yes | Model identifier sent to the API |
 | `context_limit` | No | Maximum context window in tokens. `0` means unlimited. Used for context display and auto-summarization. |
 | `max_tokens` | No | Maximum output tokens per response. `0` means use the default (131072). Sent as `max_tokens` for Anthropic, `max_completion_tokens` for OpenAI. Set explicitly for models with lower output limits. |
-| `prompt_cache` | No | Enable prompt caching for Anthropic APIs. Adds `cache_control` markers to system prompts for reduced latency and cost. Ignored by OpenAI providers. |
 
 ### Multiple Models
 
@@ -62,7 +60,6 @@ base_url: "https://api.anthropic.com"
 api_key: "sk-ant-..."
 model_name: "claude-sonnet-4-20250514"
 context_limit: 200000
-prompt_cache: true
 ---
 name: "Ollama / Qwen3 30B"
 protocol_type: "anthropic"

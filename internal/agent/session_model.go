@@ -195,12 +195,11 @@ func createProviderFromConfig(config *ModelConfig, debugAPI bool, proxyURL strin
 	}
 
 	return factory.NewProvider(factory.ProviderConfig{
-		Type:        config.ProtocolType,
-		APIKey:      config.APIKey,
-		BaseURL:     config.BaseURL,
-		Model:       config.ModelName,
-		HTTPClient:  client,
-		PromptCache: config.PromptCache,
-		MaxTokens:   config.MaxTokens,
+		Type:       config.ProtocolType,
+		APIKey:     config.APIKey,
+		BaseURL:    config.BaseURL,
+		Model:      config.ModelName,
+		HTTPClient: client,
+		MaxTokens:  config.MaxTokens,
 	})
 }

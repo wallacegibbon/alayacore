@@ -27,7 +27,6 @@ type ModelConfig struct {
 	ModelName    string `json:"model_name" config:"model_name"`       // Model identifier
 	ContextLimit int    `json:"context_limit" config:"context_limit"` // Maximum context length (0 means unlimited)
 	MaxTokens    int    `json:"max_tokens" config:"max_tokens"`       // Maximum output tokens (0 means use provider default)
-	PromptCache  bool   `json:"prompt_cache" config:"prompt_cache"`   // Enable prompt caching (adds cache_control for Anthropic)
 }
 
 // ModelInfo is the safe version for JSON responses (no API key)
@@ -39,7 +38,6 @@ type ModelInfo struct {
 	ModelName    string `json:"model_name"`
 	ContextLimit int    `json:"context_limit"`
 	MaxTokens    int    `json:"max_tokens"`
-	PromptCache  bool   `json:"prompt_cache"`
 	IsActive     bool   `json:"is_active"`
 }
 
@@ -288,7 +286,6 @@ func (mm *ModelManager) GetModels() []ModelInfo {
 			ModelName:    m.ModelName,
 			ContextLimit: m.ContextLimit,
 			MaxTokens:    m.MaxTokens,
-			PromptCache:  m.PromptCache,
 			IsActive:     m.ID == mm.activeID,
 		}
 	}
