@@ -206,6 +206,9 @@ func (m *DisplayModel) SetWindowCursor(index int) {
 		return
 	}
 done:
+	if m.windowCursor == index {
+		return // cursor unchanged, preserve autoFollow
+	}
 	m.windowCursor = index
 	m.autoFollow = false
 }
@@ -260,6 +263,9 @@ func (m *DisplayModel) MoveWindowCursorUp() bool {
 	if m.windowCursor < 0 || m.windowCursor >= windowCount {
 		for i := windowCount - 1; i >= 0; i-- {
 			if m.windowBuffer.Windows[i].Visible {
+				if m.windowCursor == i {
+					return false // already at this window
+				}
 				m.windowCursor = i
 				m.autoFollow = false
 				return true
@@ -271,6 +277,9 @@ func (m *DisplayModel) MoveWindowCursorUp() bool {
 	// Step backward to the previous visible window
 	for i := m.windowCursor - 1; i >= 0; i-- {
 		if m.windowBuffer.Windows[i].Visible {
+			if i == m.windowCursor {
+				return false // already at this window (defensive check)
+			}
 			m.windowCursor = i
 			m.autoFollow = false
 			return true
@@ -414,6 +423,9 @@ func (m *DisplayModel) MoveWindowCursorToTop() bool {
 		startLine := m.windowBuffer.GetWindowStartLine(i)
 		endLine := m.windowBuffer.GetWindowEndLine(i)
 		if (startLine <= viewportTop && endLine > viewportTop) || startLine >= viewportTop {
+			if i == m.windowCursor {
+				return false // cursor unchanged, preserve autoFollow
+			}
 			m.windowCursor = i
 			m.autoFollow = false
 			return true
@@ -471,6 +483,9 @@ func (m *DisplayModel) MoveWindowCursorToCenter() bool {
 
 		// Check if viewport center line falls within this window
 		if viewportCenter >= startLine && viewportCenter < endLine {
+			if i == m.windowCursor {
+				return false // cursor unchanged, preserve autoFollow
+			}
 			m.windowCursor = i
 			m.autoFollow = false
 			return true
@@ -507,6 +522,9 @@ func (m *DisplayModel) MoveWindowCursorToCenter() bool {
 	}
 
 	if bestDistance >= 0 {
+		if bestWindow == m.windowCursor {
+			return false // cursor unchanged, preserve autoFollow
+		}
 		m.windowCursor = bestWindow
 		m.autoFollow = false
 		return true
@@ -534,6 +552,9 @@ func (m *DisplayModel) MoveWindowCursorToNextUserPrompt() bool {
 	for i := start; i < windowCount; i++ {
 		w := m.windowBuffer.GetWindow(i)
 		if w != nil && w.Tag == stream.TagTextUser {
+			if i == m.windowCursor {
+				return false // cursor unchanged, preserve autoFollow
+			}
 			m.windowCursor = i
 			m.autoFollow = false
 			return true
@@ -561,6 +582,9 @@ func (m *DisplayModel) MoveWindowCursorToPrevUserPrompt() bool {
 	for i := start; i >= 0; i-- {
 		w := m.windowBuffer.GetWindow(i)
 		if w != nil && w.Tag == stream.TagTextUser {
+			if i == m.windowCursor {
+				return false // cursor unchanged, preserve autoFollow
+			}
 			m.windowCursor = i
 			m.autoFollow = false
 			return true

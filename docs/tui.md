@@ -75,7 +75,12 @@ The display area organizes content into separate windows — one per message or 
 
 ### Auto-Follow
 
-When new windows appear, the cursor automatically moves to the newest one. Pressing `k`, `g`, `H`, `M`, `K`, `Ctrl+D`, `Ctrl+U`, `e`, `f`, or `b` disables auto-follow. While auto-follow is active, `j`, `J`, and `L` are no-ops. Pressing `G` (go to last window) re-enables auto-follow.
+When new windows appear, the cursor automatically moves to the newest one.
+Auto-follow is disabled by any navigation that actually moves the cursor or
+scrolls the viewport. While auto-follow is active:
+- `j` and `L` are no-ops (race protection for new windows appearing between ticks)
+- `J` and `Ctrl+D` are no-ops when already at the bottom of the output
+- Pressing `G` re-enables auto-follow
 
 ### Fold Mode
 

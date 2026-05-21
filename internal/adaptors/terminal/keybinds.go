@@ -446,9 +446,11 @@ func scrollUpLine(m *Terminal) {
 }
 
 func scrollDownHalf(m *Terminal) {
-	m.display.MarkUserScrolled()
-	m.display.ScrollDown(max(1, m.display.GetHeight()/2))
-	m.display.updateContent()
+	if !m.display.AtBottom() {
+		m.display.MarkUserScrolled()
+		m.display.ScrollDown(max(1, m.display.GetHeight()/2))
+		m.display.updateContent()
+	}
 }
 
 func scrollUpHalf(m *Terminal) {
