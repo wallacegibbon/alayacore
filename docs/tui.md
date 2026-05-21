@@ -79,7 +79,7 @@ When new windows appear, the cursor automatically moves to the newest one. Press
 
 ### Fold Mode
 
-Press `Space` on any window to collapse it — the window shows the first line, a fold indicator, and the last 3 lines. Press `Space` again to expand.
+Press `Space` on any window to collapse it — the window shows the first 2 lines, a centered fold indicator, and the last 2 lines. Press `Space` again to expand.
 
 ### Virtual Scrolling
 

@@ -209,7 +209,8 @@ func (w *Window) renderGenericContent(innerWidth int, styles *Styles, content st
 	return wrapped
 }
 
-// applyFolding collapses content to first line + indicator + last 3 lines
+// applyFolding collapses content to first 2 lines + indicator + last 2 lines
+// The indicator (splitter row) sits at row 3, the center of the 5-line folded window.
 func (w *Window) applyFolding(content string, innerWidth int, styles *Styles) string {
 	lines := strings.Split(content, "\n")
 	if len(lines) <= 5 {
@@ -220,7 +221,7 @@ func (w *Window) applyFolding(content string, innerWidth int, styles *Styles) st
 		Foreground(styles.ColorDim).
 		Render(strings.Repeat("⁝", innerWidth))
 
-	return lines[0] + "\n" + indicator + "\n" + strings.Join(lines[len(lines)-3:], "\n")
+	return lines[0] + "\n" + lines[1] + "\n" + indicator + "\n" + strings.Join(lines[len(lines)-2:], "\n")
 }
 
 // Invalidate marks the cache as invalid (called when content changes)
