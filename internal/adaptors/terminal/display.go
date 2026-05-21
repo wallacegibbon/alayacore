@@ -167,56 +167,116 @@ func (m *DisplayModel) GetCursorWindowContent() string {
 	return m.windowBuffer.GetWindowContent(m.windowCursor)
 }
 
-// SetWindowCursor sets the window cursor to a specific index.
+// SetWindowCursor sets the window cursor to a specific visible window near the given index.
+// If the index points to an invisible window, the nearest visible window is chosen instead.
 // This disables auto-follow; only G re-enables it.
 func (m *DisplayModel) SetWindowCursor(index int) {
 	windowCount := m.windowBuffer.GetWindowCount()
-	if index < -1 {
-		index = -1
-	} else if index >= windowCount {
+	if windowCount == 0 {
+		m.windowCursor = -1
+		m.autoFollow = false
+		return
+	}
+	if index < 0 {
+		m.windowCursor = -1
+		m.autoFollow = false
+		return
+	}
+	if index >= windowCount {
 		index = windowCount - 1
 	}
+	// If target is invisible, find nearest visible window
+	if !m.windowBuffer.Windows[index].Visible {
+		// Search forward first, then backward
+		for i := index; i < windowCount; i++ {
+			if m.windowBuffer.Windows[i].Visible {
+				index = i
+				goto done
+			}
+		}
+		for i := index; i >= 0; i-- {
+			if m.windowBuffer.Windows[i].Visible {
+				index = i
+				goto done
+			}
+		}
+		// No visible windows at all
+		m.windowCursor = -1
+		m.autoFollow = false
+		return
+	}
+done:
 	m.windowCursor = index
 	m.autoFollow = false
 }
 
-// MoveWindowCursorDown moves the window cursor down.
+// MoveWindowCursorDown moves the window cursor down, skipping invisible windows.
 // When auto-follow is active this is a no-op: new windows may have been
 // appended to the buffer between ticks, making the cursor appear to be
 // "not at the last window" even though the user never moved.  Allowing j
-// to move in that case would silently jump to an invisible window and
-// disable auto-follow.  Only the tick handler (SetCursorToLastWindow)
+// to move in that case would silently jump to a window the user can't see
+// and disable auto-follow.  Only the tick handler (SetCursorToLastWindow)
 // should advance the cursor while auto-following.
 func (m *DisplayModel) MoveWindowCursorDown() bool {
 	if m.autoFollow {
 		return false
 	}
 	windowCount := m.windowBuffer.GetWindowCount()
-	if windowCount == 0 || m.windowCursor == windowCount-1 {
+	if windowCount == 0 {
 		return false
 	}
+
+	// If cursor is unset, start at the first visible window
 	if m.windowCursor < 0 {
-		m.windowCursor = 0
-	} else {
-		m.windowCursor++
+		for i := 0; i < windowCount; i++ {
+			if m.windowBuffer.Windows[i].Visible {
+				m.windowCursor = i
+				m.autoFollow = false
+				return true
+			}
+		}
+		return false
 	}
-	m.autoFollow = false
-	return true
+
+	// Step forward to the next visible window
+	for i := m.windowCursor + 1; i < windowCount; i++ {
+		if m.windowBuffer.Windows[i].Visible {
+			m.windowCursor = i
+			m.autoFollow = false
+			return true
+		}
+	}
+	return false
 }
 
-// MoveWindowCursorUp moves the window cursor up
+// MoveWindowCursorUp moves the window cursor up, skipping invisible windows.
 func (m *DisplayModel) MoveWindowCursorUp() bool {
 	windowCount := m.windowBuffer.GetWindowCount()
-	if windowCount == 0 || m.windowCursor == 0 {
+	if windowCount == 0 {
 		return false
 	}
-	if m.windowCursor < 0 {
-		m.windowCursor = 0
-	} else {
-		m.windowCursor--
+
+	// If cursor is unset or below the last window, start at the last visible window
+	if m.windowCursor < 0 || m.windowCursor >= windowCount {
+		for i := windowCount - 1; i >= 0; i-- {
+			if m.windowBuffer.Windows[i].Visible {
+				m.windowCursor = i
+				m.autoFollow = false
+				return true
+			}
+		}
+		return false
 	}
-	m.autoFollow = false
-	return true
+
+	// Step backward to the previous visible window
+	for i := m.windowCursor - 1; i >= 0; i-- {
+		if m.windowBuffer.Windows[i].Visible {
+			m.windowCursor = i
+			m.autoFollow = false
+			return true
+		}
+	}
+	return false
 }
 
 // MarkUserScrolled disables auto-follow. Called by scroll keys (J/K/Ctrl-D/Ctrl-U).
@@ -271,27 +331,65 @@ func (m *DisplayModel) ValidateCursor() {
 	}
 }
 
-// ClampCursor clamps the window cursor to valid bounds without scrolling.
+// ClampCursor clamps the window cursor to a visible window without scrolling.
 // Unlike ValidateCursor, this does not call EnsureCursorVisible, preserving
 // the user's scroll position. Use this on resize events where only bounds
 // correction is needed.
 func (m *DisplayModel) ClampCursor() {
 	windowCount := m.windowBuffer.GetWindowCount()
-	if m.windowCursor >= windowCount {
-		m.windowCursor = windowCount - 1
+	if windowCount == 0 {
+		m.windowCursor = -1
+		return
 	}
-	if m.windowCursor < -1 {
+	// Cursor is intentionally unset or negative — normalize to -1
+	if m.windowCursor < 0 {
+		m.windowCursor = -1
+		return
+	}
+	// Cursor is beyond the last window — clamp to last visible
+	if m.windowCursor >= windowCount {
+		for i := windowCount - 1; i >= 0; i-- {
+			if m.windowBuffer.Windows[i].Visible {
+				m.windowCursor = i
+				return
+			}
+		}
+		m.windowCursor = -1
+		return
+	}
+	// Cursor points to an invisible window — move to nearest visible one
+	if !m.windowBuffer.Windows[m.windowCursor].Visible {
+		// Search forward first, then backward
+		for i := m.windowCursor + 1; i < windowCount; i++ {
+			if m.windowBuffer.Windows[i].Visible {
+				m.windowCursor = i
+				return
+			}
+		}
+		for i := m.windowCursor - 1; i >= 0; i-- {
+			if m.windowBuffer.Windows[i].Visible {
+				m.windowCursor = i
+				return
+			}
+		}
 		m.windowCursor = -1
 	}
 }
 
-// SetCursorToLastWindow sets the cursor to the last window
+// SetCursorToLastWindow sets the cursor to the last visible window
 func (m *DisplayModel) SetCursorToLastWindow() {
 	windowCount := m.windowBuffer.GetWindowCount()
 	if windowCount == 0 {
 		m.windowCursor = -1
 	} else {
-		m.windowCursor = windowCount - 1
+		// Find the last visible window
+		m.windowCursor = -1
+		for i := windowCount - 1; i >= 0; i-- {
+			if m.windowBuffer.Windows[i].Visible {
+				m.windowCursor = i
+				break
+			}
+		}
 		m.autoFollow = true
 	}
 }
