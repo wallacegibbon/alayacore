@@ -18,7 +18,7 @@ type DisplayModel struct {
 	width          int
 	height         int
 	windowCursor   int
-	autoFollow     bool // true on init and after G; cleared by navigation except j/J/L while active
+	autoFollow     bool // true on init and after G; disabled by navigation that actually moves cursor or scrolls viewport
 	displayFocused bool
 	lastContent    string
 }
@@ -169,7 +169,7 @@ func (m *DisplayModel) GetCursorWindowContent() string {
 
 // SetWindowCursor sets the window cursor to a specific visible window near the given index.
 // If the index points to an invisible window, the nearest visible window is chosen instead.
-// This disables auto-follow; only G re-enables it.
+// Disables auto-follow only if the cursor actually moves; only G re-enables it.
 func (m *DisplayModel) SetWindowCursor(index int) {
 	windowCount := m.windowBuffer.GetWindowCount()
 	if windowCount == 0 {
