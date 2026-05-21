@@ -46,20 +46,31 @@ Sleep 500ms
 Type "q"
 Sleep 500ms
 
+# ── Task ────────────────────────────────────────────────────────────
+
+Type "what Go version does this project use?"
+Enter
+Sleep 5s
+
 # ── Choose Theme ────────────────────────────────────────────────────
 Ctrl+P
 Sleep 1s
 Type "j"
-Sleep 1s
+Sleep 200ms
 Type "j"
 Sleep 1s
-Type "q"
-
-# ── Task 1 ──────────────────────────────────────────────────────────
-
-Type "what Go version does this project use?"
 Enter
-Sleep 4s
+
+Tab
+Type "k"
+Sleep 200ms
+Type "k"
+Sleep 500ms
+Space
+Sleep 1s
+Space
+Sleep 500ms
+
 
 # ── Exit ────────────────────────────────────────────────────────────
 
