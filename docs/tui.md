@@ -71,7 +71,7 @@ The display area organizes content into separate windows — one per message or 
 
 ### Tool Result Separator
 
-`write_file` and `edit_file` windows insert a dimmed `───` separator between the tool call (showing the file path) and the tool result. This visually separates the content-heavy input from the output. Other tool windows (e.g. `read_file`, `execute_command`) don't use a separator — their call header is short and the result follows directly.
+`write_file` and `edit_file` windows insert a dimmed `OUTPUT:` label line between the tool call (showing the file path) and the tool result. This visually separates the content-heavy input from the output. Other tool windows (e.g. `read_file`, `execute_command`) don't use a separator — their call header is short and the result follows directly.
 
 ### Auto-Follow
 

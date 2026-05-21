@@ -152,7 +152,7 @@ func (w *Window) rebuildCache(width int, styles *Styles, borderStyle lipgloss.St
 	// so wrapping happens here rather than in a dedicated renderer.
 	var inner string
 	if len(parts) == 2 {
-		sep := styles.Separator.Render("───")
+		sep := styles.System.Render("OUTPUT:")
 		result := styleMultiline(strings.TrimLeft(parts[1], "\n"), styles.Text)
 		if innerWidth > 0 {
 			result = wrapContent(result, innerWidth)
