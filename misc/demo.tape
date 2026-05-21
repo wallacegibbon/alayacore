@@ -46,11 +46,20 @@ Sleep 500ms
 Type "q"
 Sleep 500ms
 
+# ── Choose Theme ────────────────────────────────────────────────────
+Ctrl+P
+Sleep 1s
+Type "j"
+Sleep 1s
+Type "j"
+Sleep 1s
+Type "q"
+
 # ── Task 1 ──────────────────────────────────────────────────────────
 
 Type "what Go version does this project use?"
 Enter
-Sleep 8s
+Sleep 4s
 
 # ── Exit ────────────────────────────────────────────────────────────
 

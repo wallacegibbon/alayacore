@@ -40,7 +40,7 @@ Enter
 Sleep 500ms
 Type "what Go version does this project use?"
 Enter
-Sleep 6s
+Sleep 4s
 
 # ── Exit ────────────────────────────────────────────────────────────
 
