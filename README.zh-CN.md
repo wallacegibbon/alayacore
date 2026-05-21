@@ -42,6 +42,12 @@ go install github.com/alayacore/alayacore@latest
 - **技能系统** — 可按照 [Agent Skills](https://agentskills.io) 规范扩展指令包来增强 Agent 能力。
 - **主题** — 可自定义配色方案，支持实时切换。
 
+## Anthropic API
+
+AlayaCore **不在请求体中发送** Anthropic 专用的 `cache_control` 字段。本项目面向兼容 Anthropic 协议的提供商（DeepSeek、MiniMax、MiMo、Ollama、LM Studio 等），这些提供商透明地处理缓存。
+
+如果你直接连接 Anthropic API 并希望使用提示缓存，请在 AlayaCore 与 Anthropic 之间放置一个代理，在 JSON 请求体中注入 `"cache_control":{"type":"ephemeral"}`。可使用 [mitmproxy](https://mitmproxy.org/)、OpenResty（nginx + Lua）或自行编写小型脚本等方式实现。
+
 ## 文档
 
 | 文档 | 说明 |

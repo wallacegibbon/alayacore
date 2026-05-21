@@ -42,6 +42,12 @@ On first run, AlayaCore auto-creates a default model config at `~/.alayacore/mod
 - **Skills system** — Extend the agent with instruction packages following the [Agent Skills](https://agentskills.io) spec.
 - **Themes** — Customizable color schemes with live switching.
 
+## Anthropic API
+
+AlayaCore does **not** send Anthropic-specific `cache_control` in the request body. This project targets anthropic-compatible providers (DeepSeek, MiniMax, MiMo, Ollama, LM Studio, etc.) that handle caching transparently.
+
+If you connect directly to the Anthropic API and want prompt caching, place a proxy between AlayaCore and Anthropic that injects `"cache_control":{"type":"ephemeral"}` into the JSON request body. Tools like [mitmproxy](https://mitmproxy.org/), OpenResty (nginx + Lua), or a small custom script all work well for this.
+
 ## Documentation
 
 | Document | Description |
