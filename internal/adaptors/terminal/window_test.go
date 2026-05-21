@@ -172,10 +172,10 @@ func TestWindowBufferDiff(t *testing.T) {
 			t.Errorf("Rendered diff has %d lines, should be folded to ~7-8", len(renderedLines))
 		}
 
-		// Verify it contains the fold indicator (tricolon)
-		hasIndicator := strings.Contains(rendered, "⁝")
+		// Verify it contains the fold indicator (horizontal rule)
+		hasIndicator := strings.Contains(rendered, foldIndicator)
 		if !hasIndicator {
-			t.Error("Folded diff should contain tricolon (⁝) separator")
+			t.Error("Folded diff should contain fold indicator", foldIndicator, "separator")
 		}
 	})
 

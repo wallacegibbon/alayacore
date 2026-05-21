@@ -19,15 +19,15 @@ func TestFoldIndicator(t *testing.T) {
 	// Render the window
 	rendered := wb.GetAll(-1)
 
-	// Should contain the tricolon separator (full row)
-	if !strings.Contains(rendered, "⁝") {
-		t.Errorf("Expected fold indicator '⁝', got: %s", rendered)
+	// Should contain the horizontal rule separator (full row)
+	if !strings.Contains(rendered, foldIndicator) {
+		t.Errorf("Expected fold indicator %q, got: %s", foldIndicator, rendered)
 	}
 
-	// Count the tricolons - should have many (full row of ~76)
-	tricolonCount := strings.Count(rendered, "⁝")
-	if tricolonCount < 50 {
-		t.Errorf("Expected many tricolons (full row), got %d", tricolonCount)
+	// Count the indicators - should have many (full row of ~76)
+	indicatorCount := strings.Count(rendered, foldIndicator)
+	if indicatorCount < 50 {
+		t.Errorf("Expected many fold indicators (full row), got %d", indicatorCount)
 	}
 }
 
@@ -49,9 +49,9 @@ func TestFoldIndicatorColor(t *testing.T) {
 	// Render the folded diff
 	rendered := wb.GetAll(-1)
 
-	// Should contain tricolon separator
-	if !strings.Contains(rendered, "⁝") {
-		t.Errorf("Expected tricolon separator in folded diff, got: %s", rendered)
+	// Should contain horizontal rule separator
+	if !strings.Contains(rendered, foldIndicator) {
+		t.Errorf("Expected fold indicator %q in folded diff, got: %s", foldIndicator, rendered)
 	}
 
 	// Verify it folds to fewer lines than the full diff
