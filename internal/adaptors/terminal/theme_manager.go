@@ -102,6 +102,9 @@ added: #a6e3a1
 
 # Removed lines (red)
 removed: #f38ba8
+
+# Fold indicator character
+fold_indicator: "⁝"
 `
 	darkPath := filepath.Join(tm.themesFolder, "theme-dark.conf")
 	if err := os.WriteFile(darkPath, []byte(darkTheme), 0600); err != nil {
@@ -146,6 +149,9 @@ added: #40a02b
 
 # Removed lines (deep red)
 removed: #d20f39
+
+# Fold indicator character
+fold_indicator: "⁝"
 `
 	lightPath := filepath.Join(tm.themesFolder, "theme-light.conf")
 	if err := os.WriteFile(lightPath, []byte(lightTheme), 0600); err != nil {
@@ -192,6 +198,9 @@ added: #68d391
 
 # Removed lines (bright red-orange)
 removed: #f9944f
+
+# Fold indicator character
+fold_indicator: "⁝"
 `
 	redpandaPath := filepath.Join(tm.themesFolder, "theme-redpanda.conf")
 	if err := os.WriteFile(redpandaPath, []byte(redpandaTheme), 0600); err != nil {

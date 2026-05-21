@@ -34,6 +34,9 @@ type Theme struct {
 	// Diff colors
 	Added   string `config:"added"`   // Added lines in diff (green)
 	Removed string `config:"removed"` // Removed lines in diff (red)
+
+	// Fold indicator character (repeated to form the fold splitter row)
+	FoldIndicator string `config:"fold_indicator"`
 }
 
 // DefaultTheme returns the default theme (Catppuccin Mocha)
@@ -50,6 +53,8 @@ func DefaultTheme() *Theme {
 		Cursor:    "#cdd6f4",
 		Added:     "#a6e3a1",
 		Removed:   "#f38ba8",
+
+		FoldIndicator: "⁝",
 	}
 }
 
@@ -135,6 +140,9 @@ type Styles struct {
 	ColorError   color.Color
 	ColorSuccess color.Color
 	CursorColor  color.Color
+
+	// Fold indicator character (repeated to form the fold splitter row)
+	FoldIndicator string
 }
 
 // RenderBorderedBox renders content with consistent border, padding, and width.
@@ -187,6 +195,8 @@ func NewStyles(theme *Theme) *Styles {
 		ColorError:   lipgloss.Color(theme.Error),
 		ColorSuccess: lipgloss.Color(theme.Success),
 		CursorColor:  lipgloss.Color(theme.Cursor),
+
+		FoldIndicator: theme.FoldIndicator,
 	}
 }
 

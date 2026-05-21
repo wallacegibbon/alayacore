@@ -49,9 +49,6 @@ import (
 // Uses null bytes which can't appear in valid UTF-8 content or file data.
 const toolResultSentinel = "\x00__TOOL_RESULT__\x00"
 
-// foldIndicator is the character repeated to form the fold splitter row.
-const foldIndicator = "#"
-
 // ============================================================================
 // Window - Single Display Window with Internal Caching
 // ============================================================================
@@ -222,7 +219,7 @@ func (w *Window) applyFolding(content string, innerWidth int, styles *Styles) st
 
 	indicator := lipgloss.NewStyle().
 		Foreground(styles.ColorDim).
-		Render(strings.Repeat(foldIndicator, innerWidth))
+		Render(strings.Repeat(styles.FoldIndicator, innerWidth))
 
 	return lines[0] + "\n" + lines[1] + "\n" + indicator + "\n" + strings.Join(lines[len(lines)-2:], "\n")
 }

@@ -173,9 +173,9 @@ func TestWindowBufferDiff(t *testing.T) {
 		}
 
 		// Verify it contains the fold indicator (horizontal rule)
-		hasIndicator := strings.Contains(rendered, foldIndicator)
+		hasIndicator := strings.Contains(rendered, DefaultStyles().FoldIndicator)
 		if !hasIndicator {
-			t.Error("Folded diff should contain fold indicator", foldIndicator, "separator")
+			t.Error("Folded diff should contain fold indicator", DefaultStyles().FoldIndicator, "separator")
 		}
 	})
 

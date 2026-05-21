@@ -20,12 +20,12 @@ func TestFoldIndicator(t *testing.T) {
 	rendered := wb.GetAll(-1)
 
 	// Should contain the horizontal rule separator (full row)
-	if !strings.Contains(rendered, foldIndicator) {
-		t.Errorf("Expected fold indicator %q, got: %s", foldIndicator, rendered)
+	if !strings.Contains(rendered, DefaultStyles().FoldIndicator) {
+		t.Errorf("Expected fold indicator %q, got: %s", DefaultStyles().FoldIndicator, rendered)
 	}
 
 	// Count the indicators - should have many (full row of ~76)
-	indicatorCount := strings.Count(rendered, foldIndicator)
+	indicatorCount := strings.Count(rendered, DefaultStyles().FoldIndicator)
 	if indicatorCount < 50 {
 		t.Errorf("Expected many fold indicators (full row), got %d", indicatorCount)
 	}
@@ -50,8 +50,8 @@ func TestFoldIndicatorColor(t *testing.T) {
 	rendered := wb.GetAll(-1)
 
 	// Should contain horizontal rule separator
-	if !strings.Contains(rendered, foldIndicator) {
-		t.Errorf("Expected fold indicator %q in folded diff, got: %s", foldIndicator, rendered)
+	if !strings.Contains(rendered, DefaultStyles().FoldIndicator) {
+		t.Errorf("Expected fold indicator %q in folded diff, got: %s", DefaultStyles().FoldIndicator, rendered)
 	}
 
 	// Verify it folds to fewer lines than the full diff
