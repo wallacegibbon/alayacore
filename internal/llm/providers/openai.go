@@ -44,7 +44,6 @@ import (
 	"iter"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/llm"
@@ -181,7 +180,7 @@ type OpenAIOption func(*OpenAIProvider)
 func NewOpenAI(opts ...OpenAIOption) (*OpenAIProvider, error) {
 	p := &OpenAIProvider{
 		baseURL:   "https://api.openai.com/v1",
-		client:    &http.Client{Timeout: 10 * time.Minute},
+		client:    &http.Client{},
 		model:     "gpt-4o",
 		maxTokens: llm.DefaultMaxTokens,
 	}

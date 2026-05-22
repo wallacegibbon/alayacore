@@ -286,7 +286,6 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 func NewHTTPClient() *http.Client {
 	Enable()
 	return &http.Client{
-		Timeout: 10 * time.Minute,
 		Transport: &Transport{
 			Transport: http.DefaultTransport,
 		},
@@ -327,7 +326,6 @@ func NewHTTPClientWithProxy(proxyURL string) (*http.Client, error) {
 	}
 
 	return &http.Client{
-		Timeout:   10 * time.Minute,
 		Transport: transport,
 	}, nil
 }
