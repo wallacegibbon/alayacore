@@ -37,6 +37,10 @@ jobs:
             alayacore-linux-arm64
             alayacore-linux-arm
             alayacore-linux-riscv64
+            alayacore-linux-loong64
+            alayacore-linux-386
+            alayacore-linux-ppc64le
+            alayacore-linux-s390x
             alayacore-darwin-amd64
             alayacore-darwin-arm64
             alayacore-windows-amd64.exe
