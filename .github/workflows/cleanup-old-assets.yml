@@ -33,16 +33,26 @@ jobs:
 
           echo "Keeping latest $KEEP releases for $REPO"
 
-          # Get all releases sorted by published date (newest first)
-          # Skip the first KEEP releases, delete assets from the rest
-          gh release list -R "$REPO" --limit 100 --json tagName,publishedAt,assets \
-            | jq -c "sort_by(.publishedAt) | reverse | .[$KEEP:][] | select(.assets | length > 0) | {tag: .tagName, assets: [.assets[].name]} " \
+          # Get all releases sorted by published date (newest first), skip the first KEEP
+          gh release list -R "$REPO" --limit 100 --json tagName,publishedAt \
+            | jq -c "sort_by(.publishedAt) | reverse | .[$KEEP:][] | {tag: .tagName}" \
             | while read -r release; do
                 tag=$(echo "$release" | jq -r '.tag')
+
+                # Fetch assets for this release using release view
+                assets=$(gh release view -R "$REPO" "$tag" --json assets --jq '.assets[].name' 2>/dev/null || true)
+
+                if [ -z "$assets" ]; then
+                  echo "No assets to clean from: $tag (or release not found)"
+                  continue
+                fi
+
                 echo "Cleaning assets from: $tag"
-                echo "$release" | jq -r '.assets[]' | while read -r asset; do
-                  echo "  deleting: $asset"
-                  gh release delete-asset -R "$REPO" "$tag" "$asset" --yes 2>/dev/null || true
+                echo "$assets" | while read -r asset; do
+                  if [ -n "$asset" ]; then
+                    echo "  deleting: $asset"
+                    gh release delete-asset -R "$REPO" "$tag" "$asset" --yes 2>/dev/null || true
+                  fi
                 done
               done
 
