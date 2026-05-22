@@ -35,15 +35,15 @@ jobs:
         with:
           generate_release_notes: true
           files: |
+            alayacore-windows-amd64.exe
+            alayacore-windows-arm64.exe
+            alayacore-darwin-amd64
+            alayacore-darwin-arm64
             alayacore-linux-amd64
             alayacore-linux-arm64
             alayacore-linux-arm
+            alayacore-linux-386
             alayacore-linux-riscv64
             alayacore-linux-loong64
-            alayacore-linux-386
             alayacore-linux-ppc64le
             alayacore-linux-s390x
-            alayacore-darwin-amd64
-            alayacore-darwin-arm64
-            alayacore-windows-amd64.exe
-            alayacore-windows-arm64.exe

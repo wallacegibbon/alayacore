@@ -1,5 +1,5 @@
 .PHONY: all build test lint fmt clean install run release release-all \
-       build-linux build-darwin build-windows
+       build-windows build-darwin build-linux
 
 # Go parameters
 GOCMD=go
@@ -25,26 +25,26 @@ all: test build
 build:
 	CGO_ENABLED=0 $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY) .
 
-## build-linux: Build for Linux (amd64, arm64, arm, riscv64, loong64, 386, ppc64le, s390x)
-build-linux:
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY)-linux-amd64 .
-	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY)-linux-arm64 .
-	CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY)-linux-arm .
-	CGO_ENABLED=0 GOOS=linux GOARCH=riscv64 $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY)-linux-riscv64 .
-	CGO_ENABLED=0 GOOS=linux GOARCH=loong64 $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY)-linux-loong64 .
-	CGO_ENABLED=0 GOOS=linux GOARCH=386 $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY)-linux-386 .
-	CGO_ENABLED=0 GOOS=linux GOARCH=ppc64le $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY)-linux-ppc64le .
-	CGO_ENABLED=0 GOOS=linux GOARCH=s390x $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY)-linux-s390x .
+## build-windows: Build for Windows (amd64 + arm64)
+build-windows:
+	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY)-windows-amd64.exe .
+	CGO_ENABLED=0 GOOS=windows GOARCH=arm64 $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY)-windows-arm64.exe .
 
 ## build-darwin: Build for macOS (amd64 + arm64)
 build-darwin:
 	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY)-darwin-amd64 .
 	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY)-darwin-arm64 .
 
-## build-windows: Build for Windows (amd64 + arm64)
-build-windows:
-	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY)-windows-amd64.exe .
-	CGO_ENABLED=0 GOOS=windows GOARCH=arm64 $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY)-windows-arm64.exe .
+## build-linux: Build for Linux (amd64, arm64, arm, 386, riscv64, loong64, ppc64le, s390x)
+build-linux:
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY)-linux-amd64 .
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY)-linux-arm64 .
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY)-linux-arm .
+	CGO_ENABLED=0 GOOS=linux GOARCH=386 $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY)-linux-386 .
+	CGO_ENABLED=0 GOOS=linux GOARCH=riscv64 $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY)-linux-riscv64 .
+	CGO_ENABLED=0 GOOS=linux GOARCH=loong64 $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY)-linux-loong64 .
+	CGO_ENABLED=0 GOOS=linux GOARCH=ppc64le $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY)-linux-ppc64le .
+	CGO_ENABLED=0 GOOS=linux GOARCH=s390x $(GOBUILD) $(BUILDTAGS) $(LDFLAGS) -o $(MAIN_BINARY)-linux-s390x .
 
 ## release: Build optimized release binary for the current OS (stripped)
 release:
@@ -52,18 +52,18 @@ release:
 
 ## release-all: Build optimized release binaries for all platforms
 release-all:
+	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 $(GOBUILD) $(BUILDTAGS) $(RELEASE_LDFLAGS) -o $(MAIN_BINARY)-windows-amd64.exe .
+	CGO_ENABLED=0 GOOS=windows GOARCH=arm64 $(GOBUILD) $(BUILDTAGS) $(RELEASE_LDFLAGS) -o $(MAIN_BINARY)-windows-arm64.exe .
+	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 $(GOBUILD) $(BUILDTAGS) $(RELEASE_LDFLAGS) -o $(MAIN_BINARY)-darwin-amd64 .
+	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(GOBUILD) $(BUILDTAGS) $(RELEASE_LDFLAGS) -o $(MAIN_BINARY)-darwin-arm64 .
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) $(BUILDTAGS) $(RELEASE_LDFLAGS) -o $(MAIN_BINARY)-linux-amd64 .
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 $(GOBUILD) $(BUILDTAGS) $(RELEASE_LDFLAGS) -o $(MAIN_BINARY)-linux-arm64 .
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 $(GOBUILD) $(BUILDTAGS) $(RELEASE_LDFLAGS) -o $(MAIN_BINARY)-linux-arm .
+	CGO_ENABLED=0 GOOS=linux GOARCH=386 $(GOBUILD) $(BUILDTAGS) $(RELEASE_LDFLAGS) -o $(MAIN_BINARY)-linux-386 .
 	CGO_ENABLED=0 GOOS=linux GOARCH=riscv64 $(GOBUILD) $(BUILDTAGS) $(RELEASE_LDFLAGS) -o $(MAIN_BINARY)-linux-riscv64 .
 	CGO_ENABLED=0 GOOS=linux GOARCH=loong64 $(GOBUILD) $(BUILDTAGS) $(RELEASE_LDFLAGS) -o $(MAIN_BINARY)-linux-loong64 .
-	CGO_ENABLED=0 GOOS=linux GOARCH=386 $(GOBUILD) $(BUILDTAGS) $(RELEASE_LDFLAGS) -o $(MAIN_BINARY)-linux-386 .
 	CGO_ENABLED=0 GOOS=linux GOARCH=ppc64le $(GOBUILD) $(BUILDTAGS) $(RELEASE_LDFLAGS) -o $(MAIN_BINARY)-linux-ppc64le .
 	CGO_ENABLED=0 GOOS=linux GOARCH=s390x $(GOBUILD) $(BUILDTAGS) $(RELEASE_LDFLAGS) -o $(MAIN_BINARY)-linux-s390x .
-	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 $(GOBUILD) $(BUILDTAGS) $(RELEASE_LDFLAGS) -o $(MAIN_BINARY)-darwin-amd64 .
-	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(GOBUILD) $(BUILDTAGS) $(RELEASE_LDFLAGS) -o $(MAIN_BINARY)-darwin-arm64 .
-	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 $(GOBUILD) $(BUILDTAGS) $(RELEASE_LDFLAGS) -o $(MAIN_BINARY)-windows-amd64.exe .
-	CGO_ENABLED=0 GOOS=windows GOARCH=arm64 $(GOBUILD) $(BUILDTAGS) $(RELEASE_LDFLAGS) -o $(MAIN_BINARY)-windows-arm64.exe .
 
 ## test: Run all tests
 test:
@@ -91,9 +91,9 @@ vet:
 clean:
 	$(GOCLEAN)
 	rm -f $(MAIN_BINARY) $(MAIN_BINARY).exe
-	rm -f $(MAIN_BINARY)-linux-amd64 $(MAIN_BINARY)-linux-arm64 $(MAIN_BINARY)-linux-arm $(MAIN_BINARY)-linux-riscv64 $(MAIN_BINARY)-linux-loong64 $(MAIN_BINARY)-linux-386 $(MAIN_BINARY)-linux-ppc64le $(MAIN_BINARY)-linux-s390x
-	rm -f $(MAIN_BINARY)-darwin-amd64 $(MAIN_BINARY)-darwin-arm64
 	rm -f $(MAIN_BINARY)-windows-amd64.exe $(MAIN_BINARY)-windows-arm64.exe
+	rm -f $(MAIN_BINARY)-darwin-amd64 $(MAIN_BINARY)-darwin-arm64
+	rm -f $(MAIN_BINARY)-linux-amd64 $(MAIN_BINARY)-linux-arm64 $(MAIN_BINARY)-linux-arm $(MAIN_BINARY)-linux-386 $(MAIN_BINARY)-linux-riscv64 $(MAIN_BINARY)-linux-loong64 $(MAIN_BINARY)-linux-ppc64le $(MAIN_BINARY)-linux-s390x
 	rm -f coverage.out coverage.html
 
 ## install: Install main binary to GOPATH/bin
