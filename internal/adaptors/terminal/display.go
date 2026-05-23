@@ -217,13 +217,10 @@ func (m *DisplayModel) MoveWindowCursorDown() bool {
 
 	// Step forward to the next visible window
 	found := false
-	m.windowBuffer.ForEachVisible(func(i int, _ *Window, _, _ int) bool {
-		if i > m.windowCursor {
-			m.windowCursor = i
-			found = true
-			return false
-		}
-		return true
+	m.windowBuffer.ForEachVisibleFrom(m.windowCursor+1, func(i int, _ *Window, _, _ int) bool {
+		m.windowCursor = i
+		found = true
+		return false
 	})
 	if found {
 		m.autoFollow = false
@@ -254,13 +251,10 @@ func (m *DisplayModel) MoveWindowCursorUp() bool {
 
 	// Step backward to the previous visible window
 	found := false
-	m.windowBuffer.ForEachVisibleBackward(func(i int, _ *Window, _, _ int) bool {
-		if i < m.windowCursor {
-			m.windowCursor = i
-			found = true
-			return false
-		}
-		return true
+	m.windowBuffer.ForEachVisibleBackwardFrom(m.windowCursor-1, func(i int, _ *Window, _, _ int) bool {
+		m.windowCursor = i
+		found = true
+		return false
 	})
 	if found {
 		m.autoFollow = false
@@ -519,10 +513,7 @@ func (m *DisplayModel) MoveWindowCursorToNextUserPrompt() bool {
 	}
 
 	found := false
-	m.windowBuffer.ForEachVisible(func(i int, w *Window, _, _ int) bool {
-		if i <= m.windowCursor {
-			return true
-		}
+	m.windowBuffer.ForEachVisibleFrom(m.windowCursor+1, func(i int, w *Window, _, _ int) bool {
 		if w.Tag == stream.TagTextUser {
 			m.windowCursor = i
 			found = true
@@ -547,10 +538,7 @@ func (m *DisplayModel) MoveWindowCursorToPrevUserPrompt() bool {
 	}
 
 	found := false
-	m.windowBuffer.ForEachVisibleBackward(func(i int, w *Window, _, _ int) bool {
-		if i >= m.windowCursor {
-			return true
-		}
+	m.windowBuffer.ForEachVisibleBackwardFrom(m.windowCursor-1, func(i int, w *Window, _, _ int) bool {
 		if w.Tag == stream.TagTextUser {
 			m.windowCursor = i
 			found = true
