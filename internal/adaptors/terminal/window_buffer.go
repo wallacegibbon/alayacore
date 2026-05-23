@@ -329,10 +329,11 @@ func (wb *WindowBuffer) ensureLineHeights() {
 	wb.dirtyIndex = dirtyClean
 }
 
-// GetWindowStartLine returns the starting line number for a window.
+// GetWindowLineRange returns the start and end line numbers for a window.
+// Returns (0, 0) if windowIndex is out of bounds.
 // IMPORTANT: This calls ensureLineHeights() to guarantee accurate positions,
 // since line heights may be stale after content updates.
-func (wb *WindowBuffer) GetWindowStartLine(windowIndex int) int {
+func (wb *WindowBuffer) GetWindowLineRange(windowIndex int) (start, end int) {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 
@@ -340,34 +341,26 @@ func (wb *WindowBuffer) GetWindowStartLine(windowIndex int) int {
 	wb.ensureLineHeights()
 
 	if windowIndex < 0 || windowIndex >= len(wb.lineHeights) {
-		return 0
+		return 0, 0
 	}
 
-	start := 0
 	for i := range windowIndex {
 		start += wb.lineHeights[i]
 	}
+	return start, start + wb.lineHeights[windowIndex]
+}
+
+// GetWindowStartLine returns the starting line number for a window.
+// Deprecated: use GetWindowLineRange instead.
+func (wb *WindowBuffer) GetWindowStartLine(windowIndex int) int {
+	start, _ := wb.GetWindowLineRange(windowIndex)
 	return start
 }
 
 // GetWindowEndLine returns the ending line number for a window.
-// IMPORTANT: This calls ensureLineHeights() to guarantee accurate positions,
-// since line heights may be stale after content updates.
+// Deprecated: use GetWindowLineRange instead.
 func (wb *WindowBuffer) GetWindowEndLine(windowIndex int) int {
-	wb.mu.Lock()
-	defer wb.mu.Unlock()
-
-	// Ensure line heights are current before calculating
-	wb.ensureLineHeights()
-
-	if windowIndex < 0 || windowIndex >= len(wb.lineHeights) {
-		return 0
-	}
-
-	end := 0
-	for i := 0; i <= windowIndex; i++ {
-		end += wb.lineHeights[i]
-	}
+	_, end := wb.GetWindowLineRange(windowIndex)
 	return end
 }
 

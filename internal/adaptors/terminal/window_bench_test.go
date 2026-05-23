@@ -87,9 +87,9 @@ func BenchmarkWindowBufferDeltaSingleWindow(b *testing.B) {
 	}
 }
 
-// BenchmarkWindowBufferGetWindowStartLine benchmarks the GetWindowStartLine function.
+// BenchmarkWindowBufferGetWindowLineRange benchmarks the GetWindowLineRange function.
 // This has O(n) behavior that could be optimized with a prefix sum array.
-func BenchmarkWindowBufferGetWindowStartLine(b *testing.B) {
+func BenchmarkWindowBufferGetWindowLineRange(b *testing.B) {
 	styles := NewStyles(DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
@@ -106,7 +106,7 @@ func BenchmarkWindowBufferGetWindowStartLine(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Access middle window (worst case for O(n) loop)
-		_ = wb.GetWindowStartLine(50)
+		_, _ = wb.GetWindowLineRange(50)
 	}
 }
 
@@ -810,8 +810,8 @@ func BenchmarkVirtualRenderingScroll(b *testing.B) {
 	}
 }
 
-// BenchmarkGetWindowStartLineCached benchmarks GetWindowStartLine when lineHeights are already cached.
-func BenchmarkGetWindowStartLineCached(b *testing.B) {
+// BenchmarkGetWindowLineRangeCached benchmarks GetWindowLineRange when lineHeights are already cached.
+func BenchmarkGetWindowLineRangeCached(b *testing.B) {
 	styles := NewStyles(DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
@@ -827,9 +827,9 @@ func BenchmarkGetWindowStartLineCached(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = wb.GetWindowStartLine(50)
-		_ = wb.GetWindowStartLine(25)
-		_ = wb.GetWindowStartLine(75)
+		_, _ = wb.GetWindowLineRange(50)
+		_, _ = wb.GetWindowLineRange(25)
+		_, _ = wb.GetWindowLineRange(75)
 	}
 }
 

@@ -286,8 +286,7 @@ func (m *DisplayModel) EnsureCursorVisible() {
 		return
 	}
 
-	startLine := m.windowBuffer.GetWindowStartLine(m.windowCursor)
-	endLine := m.windowBuffer.GetWindowEndLine(m.windowCursor)
+	startLine, endLine := m.windowBuffer.GetWindowLineRange(m.windowCursor)
 	viewportTop := m.viewport.YOffset()
 	viewportBottom := viewportTop + m.viewport.Height()
 
@@ -308,7 +307,7 @@ func (m *DisplayModel) ScrollCursorToTop() {
 	if m.windowCursor < 0 {
 		return
 	}
-	startLine := m.windowBuffer.GetWindowStartLine(m.windowCursor)
+	startLine, _ := m.windowBuffer.GetWindowLineRange(m.windowCursor)
 	m.viewport.SetYOffset(startLine)
 }
 

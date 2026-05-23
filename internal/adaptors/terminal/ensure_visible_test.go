@@ -88,8 +88,7 @@ func TestEnsureCursorVisible_OversizedWindowScrollsWhenOffScreen(t *testing.T) {
 	yOffsetAfter := display.viewport.YOffset()
 	t.Logf("YOffset after EnsureCursorVisible: %d", yOffsetAfter)
 
-	startLine := wb.GetWindowStartLine(0)
-	endLine := wb.GetWindowEndLine(0)
+	startLine, endLine := wb.GetWindowLineRange(0)
 	vpTop := yOffsetAfter
 	vpBottom := vpTop + 50
 
@@ -121,8 +120,7 @@ func TestEnsureCursorVisible_PartiallyVisibleWindowNotMoved(t *testing.T) {
 	// force the viewport to the bottom.
 	display.SetWindowCursor(10) // disables autoFollow
 
-	startLine := wb.GetWindowStartLine(10)
-	endLine := wb.GetWindowEndLine(10)
+	startLine, endLine := wb.GetWindowLineRange(10)
 	t.Logf("Window 10: lines %d-%d", startLine, endLine)
 
 	// Position viewport so the window is partially visible
@@ -175,7 +173,7 @@ func TestEnsureCursorVisible_OffScreenWindowScrolls(t *testing.T) {
 		t.Errorf("YOffset unchanged at %d for off-screen window (should scroll)", yOffsetBefore)
 	}
 
-	startLine := wb.GetWindowStartLine(10)
+	startLine, _ := wb.GetWindowLineRange(10)
 	vpTop := yOffsetAfter
 	vpBottom := vpTop + 20
 
@@ -207,7 +205,7 @@ func TestEnsureCursorVisible_EntirelyAboveScrolls(t *testing.T) {
 
 	display.EnsureCursorVisible()
 
-	endLine := wb.GetWindowEndLine(3)
+	_, endLine := wb.GetWindowLineRange(3)
 	vpTop := display.viewport.YOffset()
 
 	if endLine <= vpTop {
@@ -428,8 +426,7 @@ func TestScrollCursorToTop_PartiallyVisibleWindowMovesToTop(t *testing.T) {
 	display.EnsureCursorVisible()
 	display.updateContent()
 
-	startLine5 := wb.GetWindowStartLine(5)
-	endLine5 := wb.GetWindowEndLine(5)
+	startLine5, endLine5 := wb.GetWindowLineRange(5)
 	t.Logf("Window 5: lines %d-%d", startLine5, endLine5)
 
 	// Position viewport so window 5 is partially visible at the bottom
