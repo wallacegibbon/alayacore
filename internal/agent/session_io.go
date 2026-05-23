@@ -197,6 +197,7 @@ func (s *Session) handleModelSet(args []string) {
 		return
 	}
 
+	// Check inProgress under lock.
 	s.mu.Lock()
 	inProgress := s.inProgress
 	s.mu.Unlock()
@@ -229,6 +230,17 @@ func (s *Session) handleModelSet(args []string) {
 
 	if err := s.SwitchModel(model); err != nil {
 		s.writeError("Failed to switch model: " + err.Error())
+		return
+	}
+
+	// Post-check: a task may have started while SwitchModel was in progress
+	// (TOCTOU race).  The atomic Agent/Provider swap ensures the running task
+	// sees the new model, which is safe — just warn the user.
+	s.mu.Lock()
+	taskStarted := s.inProgress
+	s.mu.Unlock()
+	if taskStarted {
+		s.writeNotify("Warning: a task started during model switch. The new model is active.")
 		return
 	}
 

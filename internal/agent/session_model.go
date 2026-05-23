@@ -134,7 +134,7 @@ func (s *Session) ensureAgentInitialized() string {
 	if modelCopy.ContextLimit > 0 {
 		s.ContextLimit = int64(modelCopy.ContextLimit)
 	}
-	s.syncThinkToProvider()
+	s.syncThinkToProvider(s.thinkLevel)
 	s.mu.Unlock()
 	return ""
 }
@@ -148,9 +148,10 @@ func (s *Session) initAgentFromConfig(modelConfig *ModelConfig) error {
 	s.mu.Lock()
 	s.Agent.Store(agent)
 	s.Provider.Store(&providerHolder{provider: provider})
+	thinkLevel := s.thinkLevel
 	s.mu.Unlock()
 
-	s.syncThinkToProvider()
+	s.syncThinkToProvider(thinkLevel)
 	return nil
 }
 
@@ -165,9 +166,10 @@ func (s *Session) applyModelContextLimit(model *ModelConfig) {
 
 // syncThinkToProvider propagates the session's thinking level to the
 // current provider. Must be called after Provider is set.
-func (s *Session) syncThinkToProvider() {
+// The level is passed explicitly to avoid reading s.thinkLevel outside the mutex.
+func (s *Session) syncThinkToProvider(level int) {
 	if p := s.Provider.Load(); p != nil {
-		p.provider.SetReasoningLevel(s.thinkLevel)
+		p.provider.SetReasoningLevel(level)
 	}
 }
 
@@ -178,7 +180,7 @@ func (s *Session) SetThinkLevel(level int) {
 	s.thinkLevel = level
 	s.mu.Unlock()
 
-	s.syncThinkToProvider()
+	s.syncThinkToProvider(level)
 
 	s.sendSystemInfo()
 }

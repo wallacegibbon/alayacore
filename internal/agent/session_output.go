@@ -159,6 +159,8 @@ func (s *Session) sendSystemInfoInternal(activeModelConfig *ModelConfig) {
 	contextLimit := s.ContextLimit
 	totalTokens := s.TotalSpent.InputTokens + s.TotalSpent.OutputTokens
 	currentStep := s.currentStep
+	pausedOnError := s.pausedOnError
+	thinkLevel := s.thinkLevel
 	s.mu.Unlock()
 
 	info := SystemInfo{
@@ -169,14 +171,14 @@ func (s *Session) sendSystemInfoInternal(activeModelConfig *ModelConfig) {
 		InProgress:        inProgress,
 		CurrentStep:       currentStep,
 		MaxSteps:          s.MaxSteps,
-		TaskError:         s.pausedOnError,
+		TaskError:         pausedOnError,
 		Models:            models,
 		ActiveModelID:     activeID,
 		ActiveModelConfig: activeModelConfig,
 		ActiveModelName:   activeModelName,
 		HasModels:         hasModels,
 		ModelConfigPath:   modelConfigPath,
-		ThinkLevel:        s.thinkLevel,
+		ThinkLevel:        thinkLevel,
 	}
 	s.writeTLVJSON(stream.TagSystemData, info)
 }
