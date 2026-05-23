@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"context"
 	"strings"
 	"testing"
 	"time"
@@ -204,23 +203,9 @@ func TestCancelAllTasks(t *testing.T) {
 				},
 			}
 
-			// Add mock cancel function if task is in progress
+			// Add mock cancel request channel if task is in progress
 			if tt.inProgress {
-				canceled := false
-				// Store the cancel func like runTask would
-				_, cancel := context.WithCancel(context.Background())
-				session.cancelCurrent = cancel
-				defer func() {
-					if !canceled {
-						// cancelCurrent was set; call it for cleanup
-						cancel()
-					}
-				}()
-				// Override to track cancellation
-				session.cancelCurrent = func() {
-					canceled = true
-					cancel()
-				}
+				session.cancelReq = make(chan struct{}, 1)
 			}
 
 			// Add items to queue

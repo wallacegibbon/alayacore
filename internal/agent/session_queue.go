@@ -73,10 +73,24 @@ func (s *Session) enqueueTask(task Task, front bool) {
 
 func (s *Session) runTask(item QueueItem) {
 	ctx, cancel := context.WithCancel(context.Background())
-	s.cancelCurrent = cancel
-	defer cancel()
+
+	// Set up the cancel request channel so inputPump can signal cancellation.
+	// A separate goroutine listens on cancelReq and calls cancel() when a
+	// signal arrives. This avoids sharing a context.CancelFunc
+	// across goroutines — the channel makes the communication explicit.
+	reqCh := make(chan struct{}, 1)
+	s.cancelReq = reqCh
+	go func() {
+		select {
+		case <-reqCh:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
 	defer func() {
-		s.cancelCurrent = nil
+		cancel()
+		close(reqCh)
+		s.cancelReq = nil
 	}()
 
 	// Echo user prompts before any work so output ordering is correct even if
