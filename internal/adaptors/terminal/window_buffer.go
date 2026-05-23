@@ -424,7 +424,16 @@ func (wb *WindowBuffer) ForEachVisibleRangedFrom(start int, fn func(i int, start
 // with the window index and pointer. If fn returns false, iteration stops.
 // Returns true if all visible windows were visited.
 func (wb *WindowBuffer) ForEachVisibleBackward(fn func(i int, w *Window) bool) bool {
-	return wb.ForEachVisibleBackwardFrom(len(wb.Windows)-1, fn)
+	wb.mu.Lock()
+	defer wb.mu.Unlock()
+	wb.ensureLineHeights()
+
+	for i := len(wb.Windows) - 1; i >= 0; i-- {
+		if wb.Windows[i].Visible && !fn(i, wb.Windows[i]) {
+			return false
+		}
+	}
+	return true
 }
 
 // ForEachVisibleBackwardFrom iterates backward over visible windows starting
