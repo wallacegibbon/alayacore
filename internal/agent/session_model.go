@@ -4,8 +4,9 @@ package agent
 // syncing think levels. These methods handle the relationship between
 // Session, ModelManager, and the LLM provider.
 //
-// All methods in this file are called from the run() goroutine, so no
-// locking is needed.
+// These methods may be called from either the run() goroutine or the
+// task goroutine. Shared state is protected by sync.Mutex on the
+// Session struct.
 
 import (
 	"fmt"
@@ -93,6 +94,9 @@ func (s *Session) createProviderAndAgent(modelConfig *ModelConfig) (llm.Provider
 }
 
 func (s *Session) ensureAgentInitialized() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if s.agent != nil && s.provider != nil {
 		return ""
 	}
@@ -124,9 +128,12 @@ func (s *Session) initAgentFromConfig(modelConfig *ModelConfig) error {
 		return err
 	}
 
+	s.mu.Lock()
 	s.agent = agent
 	s.provider = provider
 	s.syncThinkToProvider(s.thinkLevel)
+	s.mu.Unlock()
+
 	return nil
 }
 
@@ -134,11 +141,13 @@ func (s *Session) applyModelContextLimit(model *ModelConfig) {
 	if model == nil || model.ContextLimit <= 0 {
 		return
 	}
+	s.mu.Lock()
 	s.ContextLimit = int64(model.ContextLimit)
+	s.mu.Unlock()
 }
 
 // syncThinkToProvider propagates the session's thinking level to the
-// current provider.
+// current provider. Caller must hold s.mu.
 func (s *Session) syncThinkToProvider(level int) {
 	if s.provider != nil {
 		s.provider.SetReasoningLevel(level)
@@ -146,10 +155,22 @@ func (s *Session) syncThinkToProvider(level int) {
 }
 
 // SetThinkLevel sets the think level.
+// If a task is currently running, the provider is not synced immediately
+// (to avoid races). Instead, thinkDirty is set and the sync happens at
+// the next step boundary in the task goroutine.
 // See config.ThinkLevelOff, config.ThinkLevelNormal, config.ThinkLevelMax.
 func (s *Session) SetThinkLevel(level int) {
+	s.mu.Lock()
 	s.thinkLevel = level
-	s.syncThinkToProvider(level)
+	if s.inProgress {
+		// Defer provider sync to next step boundary
+		s.thinkDirty = true
+		s.mu.Unlock()
+	} else {
+		s.syncThinkToProvider(level)
+		s.mu.Unlock()
+	}
+
 	s.sendSystemInfo()
 }
 

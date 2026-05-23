@@ -30,6 +30,7 @@ func LoadSession(path string) (*SessionData, error) {
 }
 
 func (s *Session) saveSessionToFile(path string) error {
+	s.mu.Lock()
 	data := SessionData{
 		SessionMeta: SessionMeta{
 			CreatedAt:     s.CreatedAt,
@@ -40,6 +41,7 @@ func (s *Session) saveSessionToFile(path string) error {
 		},
 		Messages: s.Messages,
 	}
+	s.mu.Unlock()
 
 	raw, err := formatSessionMarkdown(&data)
 	if err != nil {

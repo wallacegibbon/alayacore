@@ -3,16 +3,15 @@ package agent
 // Session output helpers: writing TLV messages to the adaptor output,
 // tracking token usage, and broadcasting system info.
 //
-// All methods in this file are called from the run() goroutine (or from
-// the inputPump goroutine for writeError calls only). The output writer
-// is documented as thread-safe, so this is fine.
+// These methods may be called from either the run() goroutine or the
+// task goroutine. Shared state is protected by sync.Mutex on the
+// Session struct.
 
 import (
 	"encoding/json"
 	"fmt"
 	"time"
 
-	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/stream"
 )
 
@@ -88,25 +87,6 @@ func (s *Session) writeToolResult(toolCallID string, status string) {
 }
 
 // ============================================================================
-// Usage Tracking
-// ============================================================================
-
-func (s *Session) trackUsage(usage llm.Usage) {
-	s.TotalSpent.InputTokens += usage.InputTokens
-	s.TotalSpent.OutputTokens += usage.OutputTokens
-	// Only overwrite ContextTokens if the provider reported a non-zero value.
-	// OpenAI-compatible providers (e.g. GLM-5.1) may omit the usage field from
-	// SSE chunks entirely. Go's json.Unmarshal leaves absent fields at their
-	// zero values, so Usage arrives as {InputTokens: 0, OutputTokens: 0, ...}.
-	// Without this guard, ContextTokens would be reset to 0.
-	newContext := usage.InputTokens + usage.CacheReadTokens + usage.CacheCreationTokens
-	if newContext > 0 {
-		s.ContextTokens = newContext
-	}
-	s.sendSystemInfo()
-}
-
-// ============================================================================
 // System Info Broadcasting
 // ============================================================================
 
@@ -137,6 +117,7 @@ func (s *Session) sendSystemInfoInternal(activeModelConfig *ModelConfig) {
 		hasModels = s.ModelManager.HasModels()
 	}
 
+	s.mu.Lock()
 	queueItems := make([]QueueItemInfo, len(s.taskQueue))
 	for i, item := range s.taskQueue {
 		var itemType, content string
@@ -173,5 +154,7 @@ func (s *Session) sendSystemInfoInternal(activeModelConfig *ModelConfig) {
 		ModelConfigPath:   modelConfigPath,
 		ThinkLevel:        s.thinkLevel,
 	}
+	s.mu.Unlock()
+
 	s.writeTLVJSON(stream.TagSystemData, info)
 }

@@ -1,17 +1,23 @@
 package agent
 
-// Session manages conversation state and task execution in a single goroutine.
+// Session manages conversation state and task execution.
 //
 // ARCHITECTURE:
-//   Session runs a single goroutine (run()) that owns ALL mutable state.
-//   Input is read via ChanInput.Channel() for non-blocking selects.
-//   An inputPump goroutine reads TLV frames and sends parsed messages to run().
-//   Cancellation uses a channel (taskCancelCh) instead of a mutex-guarded func.
+//   Session runs tasks in a separate goroutine so the main loop remains
+//   responsive to user input at all times. The run() goroutine owns input
+//   processing and task queue management. Tasks execute in their own
+//   goroutine via runTask(). Shared state is protected by sync.Mutex.
+//
+//   Two goroutines for I/O:
+//     1. inputPump — reads TLV frames from input, sends parsed messages
+//        to the main loop. It has access only to taskCancelCh.
+//     2. task goroutine — spawned by run() to execute each task.
 //
 //   Cross-goroutine communication:
-//     1. The input channel (ChanInput.Channel) — fed by adaptor, drained by inputPump
-//     2. sessionCancel — cancels the run() goroutine from outside
-//     3. taskCancelCh — inputPump sends to cancel the running task (buffered 1)
+//     1. msgCh (inputMsg channel) — fed by inputPump, drained by run()
+//     2. taskCancelCh — inputPump sends to cancel the running task
+//     3. taskDone — task goroutine sends on completion
+//     4. mu (sync.Mutex) — protects all shared mutable state
 //
 // Related files:
 //   - session_types.go — type definitions (Task, SystemInfo, SessionConfig, etc.)
@@ -23,6 +29,7 @@ package agent
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/alayacore/alayacore/internal/config"
@@ -33,6 +40,8 @@ import (
 
 // Session manages conversation state and task execution.
 type Session struct {
+	mu sync.Mutex // protects all mutable shared state between run() and task goroutines
+
 	Messages       []llm.Message
 	CreatedAt      time.Time
 	TotalSpent     llm.Usage
@@ -44,7 +53,7 @@ type Session struct {
 	SessionConfig        // embedded — immutable config set once at construction
 	initError      error // Set during construction if --model refers to a non-existent model
 
-	// === Single-goroutine state (owned by run()) ===
+	// === State shared between run() and task goroutines ===
 	agent         *llm.Agent
 	provider      llm.Provider
 	taskQueue     []QueueItem
@@ -54,11 +63,17 @@ type Session struct {
 	thinkLevel    int
 	nextPromptID  uint64
 	nextQueueID   uint64
+	thinkDirty    bool // true if thinkLevel changed during task execution
 
 	// taskCancelCh is a buffered channel (capacity 1) used by inputPump to
-	// signal cancellation of the currently running task. runTask() listens
-	// on this channel and cancels the task's context when a signal arrives.
+	// signal cancellation of the currently running task. The task goroutine
+	// listens on this channel and cancels its context when a signal arrives.
 	taskCancelCh chan struct{}
+
+	// taskDone is a buffered channel (capacity 1) that the task goroutine
+	// sends on when it completes. The main loop receives on this to know
+	// when to start the next task.
+	taskDone chan struct{}
 
 	sessionCtx    context.Context    // canceled when input is exhausted
 	sessionCancel context.CancelFunc // idempotent cancel
@@ -122,6 +137,7 @@ func NewSession(cfg SessionConfig) *Session {
 		thinkLevel:     config.DefaultThinkLevel,
 		taskQueue:      make([]QueueItem, 0),
 		taskCancelCh:   make(chan struct{}, 1),
+		taskDone:       make(chan struct{}, 1),
 		sessionCtx:     sessionCtx,
 		sessionCancel:  sessionCancel,
 		runDone:        make(chan struct{}),
@@ -147,6 +163,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 		ContextTokens:  data.ContextTokens,
 		taskQueue:      make([]QueueItem, 0),
 		taskCancelCh:   make(chan struct{}, 1),
+		taskDone:       make(chan struct{}, 1),
 		sessionCtx:     sessionCtx,
 		sessionCancel:  sessionCancel,
 		runDone:        make(chan struct{}),

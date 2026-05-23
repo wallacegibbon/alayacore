@@ -3,9 +3,9 @@ package agent
 // Session task execution: reading input, processing prompts,
 // executing the agent loop with streaming callbacks.
 //
-// All methods in this file are called from the single run() goroutine
-// (except inputPump which is a pure I/O goroutine that sends messages
-// to run() and uses taskCancelCh for :cancel commands).
+// The main loop (run()) starts each task in its own goroutine so it
+// remains responsive to user input at all times. Shared state between
+// the main loop and the task goroutine is protected by sync.Mutex.
 
 import (
 	"context"
@@ -21,8 +21,9 @@ import (
 // Main Event Loop
 // ============================================================================
 
-// run is the single goroutine that owns all mutable session state.
-// It reads input from the ChanInput channel and processes tasks sequentially.
+// run is the main loop that owns input processing and task queue management.
+// It runs in a single goroutine (started by Start()). Tasks are executed in
+// separate goroutines so the main loop stays responsive to user input.
 func (s *Session) run() {
 	defer close(s.runDone)
 	defer s.sessionCancel()
@@ -39,31 +40,38 @@ func (s *Session) run() {
 			return
 		}
 
-		// If a task is queued, execute it. New input accumulates in msgCh
-		// and is drained after the task returns.
-		if len(s.taskQueue) > 0 && s.sessionCtx.Err() == nil {
+		// Start next task if queue is non-empty and no task is running.
+		s.mu.Lock()
+		if len(s.taskQueue) > 0 && !s.inProgress && s.sessionCtx.Err() == nil {
 			item := s.taskQueue[0]
 			s.taskQueue = s.taskQueue[1:]
-
 			s.inProgress = true
-			s.runTask(item)
-			s.inProgress = len(s.taskQueue) > 0
-
-			// Drain any accumulated messages while the task was running.
-			s.drainMessages(msgCh)
-
-			// Send updated system info
-			s.sendSystemInfo()
-			continue
+			s.mu.Unlock()
+			go s.runTask(item)
+		} else {
+			s.mu.Unlock()
 		}
 
-		// No tasks — wait for input
+		// Wait for new input or task completion
 		select {
 		case msg, ok := <-msgCh:
 			if !ok {
 				return
 			}
 			s.handleInputMsg(msg)
+
+		case <-s.taskDone:
+			s.mu.Lock()
+			// inProgress was set to false by runTask before sending on taskDone.
+			// Check if more tasks are queued.
+			s.inProgress = len(s.taskQueue) > 0
+			s.mu.Unlock()
+
+			// Drain any messages that arrived while the select wasn't listening
+			// (though this is rare — the select loop catches most input).
+			s.drainMessages(msgCh)
+			s.sendSystemInfo()
+
 		case <-s.sessionCtx.Done():
 			return
 		}
@@ -176,6 +184,7 @@ func (s *Session) handleUserPrompt(ctx context.Context, prompt string) {
 		s.doAutoSummarize(ctx)
 	}
 
+	s.mu.Lock()
 	if len(s.Messages) > 0 && s.Messages[len(s.Messages)-1].Role == llm.RoleUser {
 		s.Messages[len(s.Messages)-1].Content = append(
 			s.Messages[len(s.Messages)-1].Content,
@@ -184,34 +193,44 @@ func (s *Session) handleUserPrompt(ctx context.Context, prompt string) {
 	} else {
 		s.Messages = append(s.Messages, llm.NewUserMessage(prompt))
 	}
+	s.mu.Unlock()
 
 	_, err := s.processPrompt(ctx, s.Messages)
 
+	s.mu.Lock()
 	s.Messages = cleanIncompleteToolCalls(s.Messages)
 
 	if err != nil {
 		s.writeError(err.Error())
 		s.pausedOnError = true
+		s.mu.Unlock()
 		s.sendSystemInfo()
 		return
 	}
+	s.mu.Unlock()
 }
 
 func (s *Session) shouldAutoSummarize() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	return s.AutoSummarize && s.ContextLimit > 0 && s.ContextTokens > 0 &&
 		s.ContextTokens >= s.ContextLimit*65/100
 }
 
 func (s *Session) doAutoSummarize(ctx context.Context) {
+	s.mu.Lock()
 	usage := float64(s.ContextTokens) * 100 / float64(s.ContextLimit)
+	s.mu.Unlock()
 	s.writeNotifyf("Context usage at %d/%d tokens (%.0f%%). Auto-summarizing...",
 		s.ContextTokens, s.ContextLimit, usage)
 	s.summarize(ctx)
 }
 
 func (s *Session) processPrompt(ctx context.Context, history []llm.Message) (int64, error) {
+	s.mu.Lock()
 	s.nextPromptID++
 	promptID := s.nextPromptID - 1
+	s.mu.Unlock()
 
 	var stepCount int
 	var outputTokens int64
@@ -256,15 +275,33 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) (int
 		},
 		OnStepStart: func(step int) error {
 			stepCount = step
+
+			s.mu.Lock()
 			s.currentStep = step
+			// Sync think level if it was changed during task execution
+			if s.thinkDirty {
+				s.syncThinkToProvider(s.thinkLevel)
+				s.thinkDirty = false
+			}
+			s.mu.Unlock()
+
 			s.sendSystemInfo()
 			return nil
 		},
 		OnStepFinish: func(messages []llm.Message, usage llm.Usage) error {
-			s.trackUsage(usage)
+			s.mu.Lock()
+			s.TotalSpent.InputTokens += usage.InputTokens
+			s.TotalSpent.OutputTokens += usage.OutputTokens
+			newContext := usage.InputTokens + usage.CacheReadTokens + usage.CacheCreationTokens
+			if newContext > 0 {
+				s.ContextTokens = newContext
+			}
 			if len(messages) > 0 {
 				s.Messages = append(s.Messages, messages...)
 			}
+			s.mu.Unlock()
+
+			s.sendSystemInfo()
 			outputTokens += usage.OutputTokens
 			s.autoSaveIfEnabled()
 			return nil

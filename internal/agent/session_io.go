@@ -2,8 +2,9 @@ package agent
 
 // Session I/O: command handling, prompt processing.
 //
-// All methods in this file are called from the run() goroutine, so no
-// locking is needed.
+// These methods are called from either the run() goroutine (for immediate
+// commands) or the task goroutine (for deferred commands). Shared state
+// is protected by sync.Mutex on the Session struct.
 
 import (
 	"context"
@@ -35,7 +36,11 @@ func (s *Session) handleCommand(ctx context.Context, cmd string) {
 }
 
 func (s *Session) cancelTask() {
-	if s.inProgress {
+	s.mu.Lock()
+	inProg := s.inProgress
+	s.mu.Unlock()
+
+	if inProg {
 		if s.cancelRunningTask() {
 			return
 		}
@@ -44,15 +49,19 @@ func (s *Session) cancelTask() {
 }
 
 func (s *Session) cancelAllTasks() {
+	s.mu.Lock()
 	queueLen := len(s.taskQueue)
 	s.taskQueue = make([]QueueItem, 0)
 
 	currentCanceled := false
 	if s.inProgress {
+		s.mu.Unlock()
 		if s.cancelRunningTask() {
 			currentCanceled = true
 		}
+		s.mu.Lock()
 	}
+	s.mu.Unlock()
 
 	// Send notification
 	switch {
@@ -68,7 +77,10 @@ func (s *Session) cancelAllTasks() {
 	}
 
 	// Clear paused-on-error state so the queue can resume if needed
+	s.mu.Lock()
 	s.pausedOnError = false
+	s.mu.Unlock()
+
 	s.sendSystemInfo()
 }
 
@@ -79,7 +91,9 @@ func (s *Session) handleContinue(ctx context.Context, args []string) {
 		return
 	}
 
+	s.mu.Lock()
 	s.pausedOnError = false
+	s.mu.Unlock()
 
 	// With no arguments, resend the last prompt.
 	if len(args) == 0 {
@@ -88,7 +102,10 @@ func (s *Session) handleContinue(ctx context.Context, args []string) {
 	}
 
 	// "skip" — skip the failed prompt and resume the remaining queue.
-	if len(s.taskQueue) == 0 {
+	s.mu.Lock()
+	qLen := len(s.taskQueue)
+	s.mu.Unlock()
+	if qLen == 0 {
 		s.writeNotify("Queue is empty")
 		return
 	}
@@ -112,31 +129,36 @@ Rules:
 - Include error messages verbatim
 - Skip completed exploration; only preserve findings that affect next steps`
 
+	s.mu.Lock()
 	s.Messages = append(s.Messages, llm.NewUserMessage(prompt))
+	beforeCount := len(s.Messages)
+	s.mu.Unlock()
 
 	s.writeNotify("Summarizing conversation...")
-
-	beforeCount := len(s.Messages)
 
 	outputTokens, err := s.processPrompt(ctx, s.Messages)
 	if err != nil {
 		s.writeError(err.Error())
+		s.mu.Lock()
 		s.pausedOnError = true
+		s.mu.Unlock()
 		s.sendSystemInfo()
 		return
 	}
 
+	s.mu.Lock()
 	var lastAssistantMsg llm.Message
 	for i := beforeCount; i < len(s.Messages); i++ {
 		if s.Messages[i].Role == llm.RoleAssistant {
 			lastAssistantMsg = s.Messages[i]
 		}
 	}
-
 	s.Messages = []llm.Message{lastAssistantMsg}
 	if outputTokens > 0 {
 		s.ContextTokens = outputTokens
 	}
+	s.mu.Unlock()
+
 	s.writeNotify("Summarized conversation")
 	s.sendSystemInfo()
 }
@@ -175,7 +197,11 @@ func (s *Session) handleModelSet(args []string) {
 		return
 	}
 
-	if s.inProgress {
+	s.mu.Lock()
+	inProg := s.inProgress
+	s.mu.Unlock()
+
+	if inProg {
 		s.writeError("Cannot switch model while a task is running. Please wait or cancel the current task.")
 		return
 	}
@@ -298,7 +324,9 @@ func (s *Session) handleThink(args []string) {
 //     or was canceled. A "Please continue." user message is appended so the
 //     model picks up where it left off.
 func (s *Session) resendPrompt(ctx context.Context) {
+	s.mu.Lock()
 	if len(s.Messages) == 0 {
+		s.mu.Unlock()
 		s.writeError("No messages to resend")
 		return
 	}
@@ -310,9 +338,11 @@ func (s *Session) resendPrompt(ctx context.Context) {
 		// cancel, or error mid-stream). Append a continuation prompt so the
 		// model resumes naturally.
 		s.Messages = append(s.Messages, llm.NewUserMessage("Please continue."))
+		s.mu.Unlock()
 		// Echo the inserted message to the adaptor so it is visible.
 		s.signalPromptStart("Please continue.")
 	} else {
+		s.mu.Unlock()
 		// If the last message is RoleUser or RoleTool, the conversation
 		// history is already at a valid point for the LLM to respond — just
 		// re-send as-is.
@@ -321,14 +351,18 @@ func (s *Session) resendPrompt(ctx context.Context) {
 
 	_, err := s.processPrompt(ctx, s.Messages)
 
+	s.mu.Lock()
 	s.Messages = cleanIncompleteToolCalls(s.Messages)
-
 	if err != nil {
+		s.mu.Unlock()
 		s.writeError(err.Error())
+		s.mu.Lock()
 		s.pausedOnError = true
+		s.mu.Unlock()
 		s.sendSystemInfo()
 		return
 	}
+	s.mu.Unlock()
 
 	s.sendSystemInfo()
 }
