@@ -35,9 +35,10 @@ func (s *Session) handleCommand(ctx context.Context, cmd string) {
 }
 
 func (s *Session) cancelTask() {
-	if s.inProgress && s.cancelCurrent != nil {
-		s.cancelCurrent()
-		return
+	if s.inProgress {
+		if s.cancelRunningTask() {
+			return
+		}
 	}
 	s.writeError(domainerrors.ErrNothingToCancel.Error())
 }
@@ -47,9 +48,10 @@ func (s *Session) cancelAllTasks() {
 	s.taskQueue = make([]QueueItem, 0)
 
 	currentCanceled := false
-	if s.inProgress && s.cancelCurrent != nil {
-		s.cancelCurrent()
-		currentCanceled = true
+	if s.inProgress {
+		if s.cancelRunningTask() {
+			currentCanceled = true
+		}
 	}
 
 	// Send notification

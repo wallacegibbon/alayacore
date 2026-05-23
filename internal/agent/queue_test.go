@@ -205,7 +205,7 @@ func TestCancelAllTasks(t *testing.T) {
 
 			// Add mock cancel current function if task is in progress
 			if tt.inProgress {
-				session.cancelCurrent = func() {} // no-op, just needs to be non-nil
+				session.setCancelFunc(func() {}) // no-op, just needs to be non-nil
 			}
 
 			// Add items to queue

@@ -76,12 +76,11 @@ func (s *Session) runTask(item QueueItem) {
 
 	// Store the cancel func on the session so inputPump can cancel the
 	// running task when it receives :cancel / :cancel_all commands.
-	// context.CancelFunc is documented as safe for concurrent use, so this
-	// is safe despite being read/written across goroutines.
-	s.cancelCurrent = cancel
+	// Protected by cancelMu to avoid data race across goroutines.
+	s.setCancelFunc(cancel)
 	defer func() {
 		cancel()
-		s.cancelCurrent = nil
+		s.setCancelFunc(nil)
 	}()
 
 	// Echo user prompts before any work so output ordering is correct even if

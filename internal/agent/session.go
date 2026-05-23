@@ -5,16 +5,15 @@ package agent
 // ARCHITECTURE:
 //   Session runs a single goroutine (run()) that owns ALL mutable state.
 //   Input is read via ChanInput.Channel() for non-blocking selects — no
-//   separate I/O goroutine touches session state, so no mutexes, no atomic
-//   pointers, and no condition variables are needed.
+//   separate I/O goroutine touches session state, so no mutexes are needed
+//   except for a single cross-goroutine case (see #3 below).
 //
 //   The only cross-goroutine communication is:
 //     1. The input channel (ChanInput.Channel) — fed by adaptor, drained by run()
 //     2. sessionCancel — cancels the run() goroutine from outside
-//     3. cancelCurrent — a context.CancelFunc set by runTask() before starting a
-//        task and cleared after. inputPump reads it to call for :cancel commands.
-//        context.CancelFunc is documented as safe for concurrent use, so this
-//        cross-goroutine access is safe.
+//     3. cancelFunc — a context.CancelFunc set by runTask() before starting a
+//        task and cleared after. Protected by cancelMu so inputPump can call it
+//        for :cancel commands without a data race.
 //
 // Related files:
 //   - session_types.go — type definitions (Task, SystemInfo, SessionConfig, etc.)
@@ -26,6 +25,7 @@ package agent
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/alayacore/alayacore/internal/config"
@@ -58,12 +58,10 @@ type Session struct {
 	nextPromptID  uint64
 	nextQueueID   uint64
 
-	// cancelCurrent is set by runTask() before starting a task and cleared after.
-	// It is read by inputPump (a separate goroutine) ONLY to call it for
-	// :cancel / :cancel_all commands. context.CancelFunc is documented as safe
-	// for concurrent use, making this safe despite being read/written across
-	// goroutines.
-	cancelCurrent context.CancelFunc
+	// cancelMu protects cancelFunc which is set by runTask() (run() goroutine)
+	// and read by inputPump (I/O goroutine) for :cancel / :cancel_all commands.
+	cancelMu   sync.Mutex
+	cancelFunc context.CancelFunc
 
 	sessionCtx    context.Context    // canceled when input is exhausted
 	sessionCancel context.CancelFunc // idempotent cancel
@@ -189,4 +187,28 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 // Must be called exactly once after construction.
 func (s *Session) Start() {
 	go s.run()
+}
+
+// setCancelFunc stores the cancel function for the current task.
+// Called from runTask() in the run() goroutine.
+// A mutex protects against concurrent read by inputPump.
+func (s *Session) setCancelFunc(fn context.CancelFunc) {
+	s.cancelMu.Lock()
+	s.cancelFunc = fn
+	s.cancelMu.Unlock()
+}
+
+// cancelRunningTask retrieves and calls the cancel function for the
+// currently running task, if any. Used by inputPump (I/O goroutine)
+// and by cancelTask / cancelAllTasks (run() goroutine).
+// Returns true if a cancel function was found and called.
+func (s *Session) cancelRunningTask() bool {
+	s.cancelMu.Lock()
+	fn := s.cancelFunc
+	s.cancelMu.Unlock()
+	if fn != nil {
+		fn()
+		return true
+	}
+	return false
 }

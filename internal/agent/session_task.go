@@ -5,7 +5,7 @@ package agent
 //
 // All methods in this file are called from the single run() goroutine
 // (except inputPump which is a pure I/O goroutine that sends messages
-// to run() and may call cancelCurrent for :cancel commands only).
+// to run() and may call cancelRunningTask for :cancel commands only).
 
 import (
 	"context"
@@ -29,7 +29,7 @@ func (s *Session) run() {
 
 	// Start the I/O pump goroutine — it reads TLV from the input and
 	// sends parsed messages to run() for processing. It has NO access
-	// to session state except cancelCurrent (for :cancel commands).
+	// to session state except cancelRunningTask() (for :cancel commands).
 	msgCh := make(chan inputMsg, 100)
 	go s.inputPump(msgCh)
 
@@ -51,16 +51,12 @@ func (s *Session) run() {
 			item := s.taskQueue[0]
 			s.taskQueue = s.taskQueue[1:]
 
-			// Run the task with a cancellable context
+			// Run the task with a cancellable context.
+			// runTask's defer already cancels the context and clears
+			// the cancel func via setCancelFunc(nil).
 			s.inProgress = true
 			s.runTask(item)
 			s.inProgress = len(s.taskQueue) > 0
-
-			// After the task completes (or gets canceled), reset
-			// cancelCurrent so the inputPump goroutine can't cancel
-			// a stale context (the context was already canceled in
-			// runTask's defer).
-			s.cancelCurrent = nil
 			currentTask = nil
 
 			// Drain any pending cancel commands from the input buffer
@@ -93,9 +89,8 @@ type inputMsg struct {
 
 // inputPump runs in its own goroutine and reads TLV frames from the
 // input stream. It sends parsed messages to msgCh. It does NOT access
-// any session state except cancelCurrent (for :cancel commands), which
-// is safe because context.CancelFunc is documented as safe for concurrent
-// use.
+// any session state directly; for :cancel / :cancel_all commands it calls
+// cancelRunningTask() which is mutex-protected.
 func (s *Session) inputPump(msgCh chan<- inputMsg) {
 	for {
 		tag, value, err := stream.ReadTLV(s.Input)
@@ -110,16 +105,11 @@ func (s *Session) inputPump(msgCh chan<- inputMsg) {
 		if len(value) > 0 && value[0] == ':' {
 			cmd := value[1:]
 			if cmd == commandNameCancel || cmd == commandNameCancelAll {
-				if s.cancelCurrent != nil {
-					// A task is running — cancel it directly and do NOT
-					// enqueue to msgCh. The cancellation stops the API
-					// call; runTask's deferred cleanup calls
-					// appendCancelMessage and autoSave. Enqueuing to
-					// msgCh would cause a spurious "nothing to cancel"
-					// message later when run() drains the channel after
-					// runTask returns (inProgress is already false by
-					// then).
-					s.cancelCurrent()
+				if s.cancelRunningTask() {
+					// A task was running — canceled it directly.
+					// Do NOT enqueue to msgCh to avoid a spurious
+					// "nothing to cancel" message when run() drains
+					// the channel after runTask returns.
 					continue
 				}
 				// No task running — fall through to msgCh so the
