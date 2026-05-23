@@ -64,18 +64,18 @@ type outputWriter struct {
 	// Status fields — read atomically by SnapshotStatus
 	contextTokens   atomic.Int64
 	contextLimit    atomic.Int64
-	queueCount      atomic.Int32
+	queueCount      atomic.Int64
 	inProgress      atomic.Bool
-	currentStep     atomic.Int32
-	maxSteps        atomic.Int32
-	lastCurrentStep atomic.Int32
-	lastMaxSteps    atomic.Int32
+	currentStep     atomic.Int64
+	maxSteps        atomic.Int64
+	lastCurrentStep atomic.Int64
+	lastMaxSteps    atomic.Int64
 	lastTaskError   atomic.Bool
-	thinkLevel      atomic.Int32
+	thinkLevel      atomic.Int64
 
 	// Model fields — read atomically by SnapshotModels
 	models          atomic.Pointer[modelsHolder]
-	activeModelID   atomic.Int32
+	activeModelID   atomic.Int64
 	activeModelName atomic.Pointer[stringHolder]
 	hasModels       atomic.Bool
 	modelConfigPath atomic.Pointer[stringHolder]
@@ -250,9 +250,9 @@ func (to *outputWriter) handleSystemTag(value string) {
 	to.updateStepTracking(info)
 	to.updateModelState(info)
 	to.updateQueueItems(info)
-	to.currentStep.Store(int32(info.CurrentStep))
-	to.maxSteps.Store(int32(info.MaxSteps))
-	to.thinkLevel.Store(int32(info.ThinkLevel))
+	to.currentStep.Store(int64(info.CurrentStep))
+	to.maxSteps.Store(int64(info.MaxSteps))
+	to.thinkLevel.Store(int64(info.ThinkLevel))
 	to.dirty.Store(true)
 }
 
@@ -271,7 +271,7 @@ func (to *outputWriter) updateStepTracking(info agentpkg.SystemInfo) {
 		to.lastTaskError.Store(false)
 	}
 	to.inProgress.Store(info.InProgress)
-	to.queueCount.Store(int32(len(info.QueueItems)))
+	to.queueCount.Store(int64(len(info.QueueItems)))
 	to.contextTokens.Store(info.ContextTokens)
 	to.contextLimit.Store(info.ContextLimit)
 }
@@ -279,7 +279,7 @@ func (to *outputWriter) updateStepTracking(info agentpkg.SystemInfo) {
 // updateModelState updates cached model-related fields from SystemInfo.
 func (to *outputWriter) updateModelState(info agentpkg.SystemInfo) {
 	to.models.Store(&modelsHolder{models: info.Models})
-	to.activeModelID.Store(int32(info.ActiveModelID))
+	to.activeModelID.Store(int64(info.ActiveModelID))
 	to.hasModels.Store(info.HasModels)
 	to.modelConfigPath.Store(&stringHolder{s: info.ModelConfigPath})
 	to.activeModelName.Store(&stringHolder{s: info.ActiveModelName})
