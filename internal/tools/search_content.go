@@ -136,36 +136,19 @@ func executeSearchContent(ctx context.Context, args SearchContentInput) (llm.Too
 	}
 
 	//nolint:gosec // G204: rg path is validated, args are from user input which is intentional
-	cmd := exec.Command(rgPath, rgArgs...)
+	cmd := exec.CommandContext(ctx, rgPath, rgArgs...)
 	cmd.Dir = cwd
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	if err := cmd.Start(); err != nil {
-		return llm.NewTextErrorResponse(err.Error()), nil
+	if err := cmd.Run(); err != nil {
+		// If the context was canceled, report cancellation
+		if ctx.Err() != nil {
+			return llm.NewTextErrorResponse("Canceled"), nil
+		}
+		return handleSearchContentResult(err, &stdout, &stderr, args.MaxLines), nil
 	}
-
-	// Wait for command to complete, handling cancellation
-	done := make(chan error, 1)
-	go func() {
-		done <- cmd.Wait()
-	}()
-
-	select {
-	case <-ctx.Done():
-		// Parent context was canceled — kill the rg process
-		killSearchContentProcess(cmd, done)
-		return llm.NewTextErrorResponse("Canceled"), nil
-	case execErr := <-done:
-		return handleSearchContentResult(execErr, &stdout, &stderr, args.MaxLines), nil
-	}
-}
-
-func killSearchContentProcess(cmd *exec.Cmd, done chan error) {
-	if cmd.Process != nil {
-		_ = cmd.Process.Kill() //nolint:errcheck // best-effort kill on cancel path
-		<-done                 // wait for Process to release resources
-	}
+	return handleSearchContentResult(nil, &stdout, &stderr, args.MaxLines), nil
 }
