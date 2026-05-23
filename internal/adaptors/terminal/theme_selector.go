@@ -3,6 +3,11 @@ package terminal
 // ThemeSelector provides a UI for selecting themes from a theme folder.
 // It displays a list of available themes and allows the user to preview
 // and select themes in real-time.
+//
+// SINGLE-GOROUTINE: All methods of ThemeSelector are called exclusively
+// from the Bubble Tea event loop. No mutex is needed because the
+// Bubble Tea model's Update and View methods are never invoked
+// concurrently across goroutines.
 
 import (
 	"fmt"

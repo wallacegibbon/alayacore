@@ -24,7 +24,12 @@ const (
 	QueueManagerList
 )
 
-// QueueManager manages the task queue UI
+// QueueManager manages the task queue UI.
+//
+// SINGLE-GOROUTINE: All methods of QueueManager are called exclusively
+// from the Bubble Tea event loop (goroutine running tea.Program.Run).
+// No mutex is needed because the Bubble Tea model's Update and View
+// methods are never invoked concurrently.
 type QueueManager struct {
 	state       QueueManagerState
 	items       []QueueItem

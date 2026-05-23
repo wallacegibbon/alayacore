@@ -31,6 +31,11 @@ const (
 
 // ModelSelector manages model selection and configuration UI.
 // It provides a searchable list of models with keyboard navigation.
+//
+// SINGLE-GOROUTINE: All methods of ModelSelector are called exclusively
+// from the Bubble Tea event loop. No mutex is needed because the
+// Bubble Tea model's Update and View methods are never invoked
+// concurrently across goroutines.
 type ModelSelector struct {
 	state          ModelSelectorState
 	models         []searchableModel

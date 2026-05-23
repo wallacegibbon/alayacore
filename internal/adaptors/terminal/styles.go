@@ -106,7 +106,14 @@ func LoadThemeFromPaths(explicitPath string, wc *WarningCollector) *Theme {
 // Styles - Derived Lipgloss Styles
 // ============================================================================
 
-// Styles holds all lipgloss styles for the terminal UI
+// Styles holds all lipgloss styles for the terminal UI.
+//
+// IMMUTABILITY: Styles is created by NewStyles and never modified after
+// construction. When the theme changes, a new Styles instance is created
+// and swapped in atomically via atomic.Pointer in outputWriter. Storing
+// a pointer obtained from to.styles.Load() and reading its fields is safe
+// because the underlying struct is never mutated in-place — SetStyles
+// always replaces the entire instance.
 type Styles struct {
 	// Output text styles
 	Text        lipgloss.Style

@@ -45,6 +45,11 @@ const (
 // HelpWindow manages a help overlay that displays keybindings and commands.
 // It provides a filter input to search items, following the same pattern
 // as ModelSelector.
+//
+// SINGLE-GOROUTINE: All methods of HelpWindow are called exclusively
+// from the Bubble Tea event loop. No mutex is needed because the
+// Bubble Tea model's Update and View methods are never invoked
+// concurrently across goroutines.
 type HelpWindow struct {
 	state         HelpWindowState
 	items         []HelpItem

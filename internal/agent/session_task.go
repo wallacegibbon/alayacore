@@ -159,8 +159,16 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) (int
 		},
 		OnStepFinish: func(messages []llm.Message, usage llm.Usage) error {
 			s.trackUsage(usage)
+			// Hold s.mu while appending to s.Messages so that
+			// saveSessionToFile (called by autoSaveIfEnabled below,
+			// which also acquires s.mu) sees a consistent snapshot.
+			// This also prevents future data races if s.Messages is
+			// ever read from the readFromInput goroutine, since
+			// trackUsage releases s.mu before we arrive here.
 			if len(messages) > 0 {
+				s.mu.Lock()
 				s.Messages = append(s.Messages, messages...)
+				s.mu.Unlock()
 			}
 			outputTokens += usage.OutputTokens
 			s.autoSaveIfEnabled()

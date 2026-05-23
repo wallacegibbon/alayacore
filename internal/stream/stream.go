@@ -133,6 +133,13 @@ type Input interface {
 }
 
 // Output defines the output interface for the agent processor.
+//
+// IMPORTANT: Implementations MUST be safe for concurrent use.
+// The session writes to Output from two goroutines:
+//   - taskRunner  (via processPrompt callbacks, writeGapped, etc.)
+//   - readFromInput (via immediate command handlers)
+// Both goroutines may call Write/WriteString/Flush concurrently.
+// Use a mutex or equivalent synchronization internally.
 type Output interface {
 	Write(p []byte) (n int, err error)
 	WriteString(s string) (n int, err error)
