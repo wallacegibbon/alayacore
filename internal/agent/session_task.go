@@ -115,7 +115,7 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) (int
 		return stream.NewStreamID(promptID, stepCount, id)
 	}
 
-	_, err := s.Agent.Stream(ctx, history, llm.StreamCallbacks{
+	_, err := s.Agent.Load().Stream(ctx, history, llm.StreamCallbacks{
 		OnTextDelta: func(delta string) error {
 			//nolint:errcheck // Best effort write, errors ignored
 			_ = stream.WriteTLV(s.Output, stream.TagTextAssistant, stream.WrapDelta(assembleID(stream.SuffixText), delta))

@@ -2,20 +2,11 @@ package agent
 
 // Session manages conversation state and task execution.
 //
-// Dependency flow:
-//
-//	model.conf --(ModelManager)--> available models
-//	      ^                               |
-//	      |                               v
-//	runtime.conf --(RuntimeManager)--> active model name
-//	      |                               |
-//	      +--------(Session)--------------+
-//
-// Session is responsible for:
-//   - Reading TLV input and turning it into tasks (prompts/commands)
-//   - Queueing and running tasks with cancellation support
-//   - Streaming model output and system status back over TLV
-//   - Delegating model listing/switching to ModelManager + RuntimeManager
+// DEPENDENCY FIELDS (Agent, Provider):
+//   These are read from the taskRunner goroutine (processPrompt, syncThinkToProvider)
+//   and written from immediate-command handlers in the readFromInput goroutine
+//   (SwitchModel via handleModelSet). They use atomic.Pointer so both reads and
+//   writes are safe without holding s.mu.
 //
 // Related files:
 //   - session_types.go — type definitions (Task, SystemInfo, SessionConfig, etc.)
@@ -28,6 +19,7 @@ package agent
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/alayacore/alayacore/internal/config"
@@ -36,11 +28,17 @@ import (
 	"github.com/alayacore/alayacore/internal/stream"
 )
 
+// providerHolder wraps llm.Provider so it can be stored in an atomic.Pointer.
+// atomic.Pointer requires a concrete type; interfaces cannot be used directly.
+type providerHolder struct {
+	provider llm.Provider
+}
+
 // Session manages conversation state and task execution.
 type Session struct {
 	Messages       []llm.Message
-	Agent          *llm.Agent
-	Provider       llm.Provider
+	Agent          atomic.Pointer[llm.Agent]
+	Provider       atomic.Pointer[providerHolder]
 	CreatedAt      time.Time
 	TotalSpent     llm.Usage
 	ContextTokens  int64

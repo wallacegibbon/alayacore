@@ -93,9 +93,14 @@ func (s *Session) createProviderAndAgent(modelConfig *ModelConfig) (llm.Provider
 }
 
 func (s *Session) ensureAgentInitialized() string {
-	// First check (fast path) — hold lock briefly.
+	// Fast path — atomic check without locking.
+	if s.Agent.Load() != nil && s.Provider.Load() != nil {
+		return ""
+	}
+
+	// Lock for the slow path — we may need to construct a new provider/agent.
 	s.mu.Lock()
-	if s.Agent != nil && s.Provider != nil {
+	if s.Agent.Load() != nil && s.Provider.Load() != nil {
 		s.mu.Unlock()
 		return ""
 	}
@@ -120,12 +125,12 @@ func (s *Session) ensureAgentInitialized() string {
 
 	// Second check — another goroutine may have initialized while we were unlocked.
 	s.mu.Lock()
-	if s.Agent != nil && s.Provider != nil {
+	if s.Agent.Load() != nil && s.Provider.Load() != nil {
 		s.mu.Unlock()
 		return ""
 	}
-	s.Agent = agent
-	s.Provider = provider
+	s.Agent.Store(agent)
+	s.Provider.Store(&providerHolder{provider: provider})
 	if modelCopy.ContextLimit > 0 {
 		s.ContextLimit = int64(modelCopy.ContextLimit)
 	}
@@ -141,8 +146,8 @@ func (s *Session) initAgentFromConfig(modelConfig *ModelConfig) error {
 	}
 
 	s.mu.Lock()
-	s.Agent = agent
-	s.Provider = provider
+	s.Agent.Store(agent)
+	s.Provider.Store(&providerHolder{provider: provider})
 	s.mu.Unlock()
 
 	s.syncThinkToProvider()
@@ -161,8 +166,8 @@ func (s *Session) applyModelContextLimit(model *ModelConfig) {
 // syncThinkToProvider propagates the session's thinking level to the
 // current provider. Must be called after Provider is set.
 func (s *Session) syncThinkToProvider() {
-	if s.Provider != nil {
-		s.Provider.SetReasoningLevel(s.thinkLevel)
+	if p := s.Provider.Load(); p != nil {
+		p.provider.SetReasoningLevel(s.thinkLevel)
 	}
 }
 
