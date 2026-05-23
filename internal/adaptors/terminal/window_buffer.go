@@ -401,19 +401,18 @@ func (wb *WindowBuffer) ForEachVisibleBackward(fn func(i int, w *Window, startLi
 	defer wb.mu.Unlock()
 	wb.ensureLineHeights()
 
-	// Compute cumulative positions
-	positions := make([]int, len(wb.Windows)+1) // positions[i] = start line of window i
-	pos := 0
-	for i := range wb.Windows {
-		positions[i] = pos
-		pos += wb.lineHeights[i]
+	// Pass 1: compute total lines
+	total := 0
+	for _, h := range wb.lineHeights {
+		total += h
 	}
-	positions[len(wb.Windows)] = pos
 
-	// Iterate backward
+	// Pass 2: walk backward, deriving start/end from total
+	pos := total
 	for i := len(wb.Windows) - 1; i >= 0; i-- {
+		pos -= wb.lineHeights[i]
 		w := wb.Windows[i]
-		if w.Visible && !fn(i, w, positions[i], positions[i+1]) {
+		if w.Visible && !fn(i, w, pos, pos+wb.lineHeights[i]) {
 			return false
 		}
 	}
