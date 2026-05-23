@@ -5,7 +5,7 @@ package agent
 //
 // All methods in this file are called from the single run() goroutine
 // (except inputPump which is a pure I/O goroutine that sends messages
-// to run() and may call cancelRunningTask for :cancel commands only).
+// to run() and uses taskCancelCh for :cancel commands).
 
 import (
 	"context"
@@ -29,39 +29,28 @@ func (s *Session) run() {
 
 	// Start the I/O pump goroutine — it reads TLV from the input and
 	// sends parsed messages to run() for processing. It has NO access
-	// to session state except cancelRunningTask() (for :cancel commands).
+	// to session state except taskCancelCh (for :cancel commands).
 	msgCh := make(chan inputMsg, 100)
 	go s.inputPump(msgCh)
-
-	var currentTask context.CancelFunc
 
 	for {
 		// Check for context cancellation (input closed externally)
 		if s.sessionCtx.Err() != nil {
-			if currentTask != nil {
-				currentTask()
-			}
 			return
 		}
 
-		// If a task is running (API call in progress), we block in
-		// processTask. New input accumulates in msgCh. We drain the
-		// channel after each step completes.
+		// If a task is queued, execute it. New input accumulates in msgCh
+		// and is drained after the task returns.
 		if len(s.taskQueue) > 0 && s.sessionCtx.Err() == nil {
 			item := s.taskQueue[0]
 			s.taskQueue = s.taskQueue[1:]
 
-			// Run the task with a cancellable context.
-			// runTask's defer already cancels the context and clears
-			// the cancel func via setCancelFunc(nil).
 			s.inProgress = true
 			s.runTask(item)
 			s.inProgress = len(s.taskQueue) > 0
-			currentTask = nil
 
-			// Drain any pending cancel commands from the input buffer
-			// before starting the next task.
-			s.drainCancels(msgCh)
+			// Drain any accumulated messages while the task was running.
+			s.drainMessages(msgCh)
 
 			// Send updated system info
 			s.sendSystemInfo()
@@ -89,8 +78,8 @@ type inputMsg struct {
 
 // inputPump runs in its own goroutine and reads TLV frames from the
 // input stream. It sends parsed messages to msgCh. It does NOT access
-// any session state directly; for :cancel / :cancel_all commands it calls
-// cancelRunningTask() which is mutex-protected.
+// any session state directly; for :cancel / :cancel_all commands it sends
+// to taskCancelCh (a buffered channel) which the task goroutine listens on.
 func (s *Session) inputPump(msgCh chan<- inputMsg) {
 	for {
 		tag, value, err := stream.ReadTLV(s.Input)
@@ -105,16 +94,18 @@ func (s *Session) inputPump(msgCh chan<- inputMsg) {
 		if len(value) > 0 && value[0] == ':' {
 			cmd := value[1:]
 			if cmd == commandNameCancel || cmd == commandNameCancelAll {
-				if s.cancelRunningTask() {
-					// A task was running — canceled it directly.
-					// Do NOT enqueue to msgCh to avoid a spurious
-					// "nothing to cancel" message when run() drains
-					// the channel after runTask returns.
+				// Signal cancellation to the running task (non-blocking).
+				// If no task is running, the signal is lost and the command
+				// is forwarded to msgCh so run() can handle queue clearing
+				// or report "nothing to cancel".
+				canceled := s.cancelRunningTask()
+				if canceled && cmd == commandNameCancel {
+					// Task was running and was canceled — don't send to msgCh
+					// to avoid a spurious "nothing to cancel" message.
 					continue
 				}
-				// No task running — fall through to msgCh so the
-				// cancel command can be processed normally (e.g.
-				// clearing the queue or reporting "nothing to cancel").
+				// For cancel_all, always send to msgCh for queue clearing.
+				// For cancel (when no task running), forward for error reporting.
 			}
 			msgCh <- inputMsg{text: cmd, isCmd: true}
 		} else {
@@ -123,10 +114,10 @@ func (s *Session) inputPump(msgCh chan<- inputMsg) {
 	}
 }
 
-// drainCancels reads from msgCh (non-blocking) and processes any pending
-// cancel commands. This ensures cancellation is prompt even when the
-// task processing loop doesn't select on msgCh.
-func (s *Session) drainCancels(msgCh <-chan inputMsg) {
+// drainMessages reads from msgCh (non-blocking) and processes any pending
+// messages. This ensures accumulated input is handled promptly after a
+// task completes, before the next task starts or the loop goes back to select.
+func (s *Session) drainMessages(msgCh <-chan inputMsg) {
 	for {
 		select {
 		case msg, ok := <-msgCh:

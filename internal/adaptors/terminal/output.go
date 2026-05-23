@@ -9,17 +9,17 @@ package terminal
 
 // LOCK ORDERING DESIGN:
 //
-// outputWriter.mu protects only the raw TLV buffer (buffer field) and the
-// processBuffer() → writeColored() → windowBuffer.* call chain. The lock
-// ordering is:
+// outputWriter.mu protects only the raw TLV buffer and the
+// processBuffer() → writeColored() → windowBuffer call chain.
 //
-//	outputWriter.mu → WindowBuffer.mu   (inside Write / processBuffer)
+// The sessionState embedded in outputWriter has its own mutex protecting
+// status/model/queue fields. Lock ordering across goroutines:
 //
-// SNAPSHOT METHODS (SnapshotStatus, SnapshotModels, GetQueueItems) never
-// acquire outputWriter.mu. All fields they read use atomic operations so
-// they are safe to call while WindowBuffer.mu is held. This eliminates the
-// lock ordering inversion that would occur if Bubble Tea's tick handler
-// held WindowBuffer.mu and then tried to acquire outputWriter.mu.
+//   outputWriter.mu → sessionState.mu      (session goroutine)
+//   WindowBuffer.mu  → sessionState.mu      (Bubble Tea goroutine)
+//
+// No path holds both outputWriter.mu and WindowBuffer.mu simultaneously
+// with sessionState.mu, so no deadlock is possible.
 
 import (
 	"encoding/binary"
@@ -27,61 +27,21 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	agentpkg "github.com/alayacore/alayacore/internal/agent"
 	"github.com/alayacore/alayacore/internal/stream"
 )
 
-// modelsHolder wraps a models slice for atomic.Pointer storage.
-type modelsHolder struct {
-	models []agentpkg.ModelInfo
-}
-
-// queueItemsHolder wraps a queue items slice for atomic.Pointer storage.
-type queueItemsHolder struct {
-	items []QueueItem
-}
-
-// stringHolder wraps a string for atomic.Pointer storage.
-type stringHolder struct {
-	s string
-}
-
 // outputWriter parses TLV from the session and writes styled content to the WindowBuffer.
 // It implements io.Writer for the agent/session output stream.
-//
-// All fields read by SnapshotStatus, SnapshotModels, and GetQueueItems are
-// atomic — these methods never acquire outputWriter.mu.
 type outputWriter struct {
 	windowBuffer *WindowBuffer
 	buffer       []byte
-	mu           sync.Mutex // protects buffer and processBuffer; NOT used by snapshot methods
+	mu           sync.Mutex // protects buffer and processBuffer
 	dirty        atomic.Bool
 	styles       atomic.Pointer[Styles]
 	nextWindowID atomic.Int64
-
-	// Status fields — read atomically by SnapshotStatus
-	contextTokens   atomic.Int64
-	contextLimit    atomic.Int64
-	queueCount      atomic.Int64
-	inProgress      atomic.Bool
-	currentStep     atomic.Int64
-	maxSteps        atomic.Int64
-	lastCurrentStep atomic.Int64
-	lastMaxSteps    atomic.Int64
-	lastTaskError   atomic.Bool
-	thinkLevel      atomic.Int64
-
-	// Model fields — read atomically by SnapshotModels
-	models          atomic.Pointer[modelsHolder]
-	activeModelID   atomic.Int64
-	activeModelName atomic.Pointer[stringHolder]
-	hasModels       atomic.Bool
-	modelConfigPath atomic.Pointer[stringHolder]
-
-	// Queue items — read atomically by GetQueueItems
-	pendingQueueItems atomic.Pointer[queueItemsHolder]
+	status       sessionState // cached session state (status, models, queue)
 }
 
 func NewTerminalOutput(styles *Styles) *outputWriter { //nolint:revive // tests need access to internal methods
@@ -239,116 +199,30 @@ func (to *outputWriter) triggerUpdateForTag(tag string) {
 }
 
 // handleSystemTag processes system information tags.
-// Called from processBuffer which holds outputWriter.mu, but all field
-// writes use atomic operations so snapshot methods (called without mu)
-// see consistent values.
+// Called from processBuffer which holds outputWriter.mu.
+// Delegates to sessionState for thread-safe field updates.
 func (to *outputWriter) handleSystemTag(value string) {
 	var info agentpkg.SystemInfo
 	if err := json.Unmarshal([]byte(value), &info); err != nil {
 		return
 	}
-	to.updateStepTracking(info)
-	to.updateModelState(info)
-	to.updateQueueItems(info)
-	to.currentStep.Store(int64(info.CurrentStep))
-	to.maxSteps.Store(int64(info.MaxSteps))
-	to.thinkLevel.Store(int64(info.ThinkLevel))
+	to.status.updateFromSystemInfo(info)
 	to.dirty.Store(true)
 }
 
-// updateStepTracking handles the step-info bookkeeping around task transitions.
-func (to *outputWriter) updateStepTracking(info agentpkg.SystemInfo) {
-	// Save step info when task completes (transition from in-progress to done)
-	if to.inProgress.Load() && !info.InProgress && to.maxSteps.Load() > 0 {
-		to.lastCurrentStep.Store(to.currentStep.Load())
-		to.lastMaxSteps.Store(to.maxSteps.Load())
-		to.lastTaskError.Store(info.TaskError)
-	}
-	// Reset last step info when new task starts (transition from not-in-progress to in-progress)
-	if !to.inProgress.Load() && info.InProgress {
-		to.lastCurrentStep.Store(0)
-		to.lastMaxSteps.Store(0)
-		to.lastTaskError.Store(false)
-	}
-	to.inProgress.Store(info.InProgress)
-	to.queueCount.Store(int64(len(info.QueueItems)))
-	to.contextTokens.Store(info.ContextTokens)
-	to.contextLimit.Store(info.ContextLimit)
-}
-
-// updateModelState updates cached model-related fields from SystemInfo.
-func (to *outputWriter) updateModelState(info agentpkg.SystemInfo) {
-	to.models.Store(&modelsHolder{models: info.Models})
-	to.activeModelID.Store(int64(info.ActiveModelID))
-	to.hasModels.Store(info.HasModels)
-	to.modelConfigPath.Store(&stringHolder{s: info.ModelConfigPath})
-	to.activeModelName.Store(&stringHolder{s: info.ActiveModelName})
-}
-
-// updateQueueItems converts and stores the queue items from SystemInfo.
-func (to *outputWriter) updateQueueItems(info agentpkg.SystemInfo) {
-	items := make([]QueueItem, len(info.QueueItems))
-	for i, item := range info.QueueItems {
-		createdAt, err := time.Parse(time.RFC3339, item.CreatedAt)
-		if err != nil {
-			createdAt = time.Now()
-		}
-		items[i] = QueueItem{
-			QueueID:   item.QueueID,
-			Type:      item.Type,
-			Content:   item.Content,
-			CreatedAt: createdAt,
-		}
-	}
-	to.pendingQueueItems.Store(&queueItemsHolder{items: items})
-}
-
 // SnapshotStatus returns a consistent point-in-time view of session status.
-// All fields use atomic operations — no mutex needed.
 func (to *outputWriter) SnapshotStatus() StatusSnapshot {
-	return StatusSnapshot{
-		ContextTokens:   to.contextTokens.Load(),
-		ContextLimit:    to.contextLimit.Load(),
-		QueueCount:      int(to.queueCount.Load()),
-		InProgress:      to.inProgress.Load(),
-		CurrentStep:     int(to.currentStep.Load()),
-		MaxSteps:        int(to.maxSteps.Load()),
-		LastCurrentStep: int(to.lastCurrentStep.Load()),
-		LastMaxSteps:    int(to.lastMaxSteps.Load()),
-		TaskError:       to.lastTaskError.Load(),
-		ThinkLevel:      int(to.thinkLevel.Load()),
-	}
+	return to.status.snapshotStatus()
 }
 
 // SnapshotModels returns a consistent point-in-time view of model state.
-// All fields use atomic operations — no mutex needed.
 func (to *outputWriter) SnapshotModels() ModelSnapshot {
-	snap := ModelSnapshot{
-		ActiveID:   int(to.activeModelID.Load()),
-		HasModels:  to.hasModels.Load(),
-		ConfigPath: "",
-		ActiveName: "",
-	}
-	if h := to.modelConfigPath.Load(); h != nil {
-		snap.ConfigPath = h.s
-	}
-	if h := to.activeModelName.Load(); h != nil {
-		snap.ActiveName = h.s
-	}
-	if h := to.models.Load(); h != nil {
-		snap.Models = h.models
-	}
-	return snap
+	return to.status.snapshotModels()
 }
 
 // GetQueueItems returns and clears the pending queue items.
-// Uses atomic swap — no mutex needed.
 func (to *outputWriter) GetQueueItems() []QueueItem {
-	h := to.pendingQueueItems.Swap(nil)
-	if h == nil {
-		return nil
-	}
-	return h.items
+	return to.status.takeQueueItems()
 }
 
 // generateWindowID returns a unique window ID for non-delta messages.

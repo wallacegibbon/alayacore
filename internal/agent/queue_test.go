@@ -194,18 +194,14 @@ func TestCancelAllTasks(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			output := &MockOutput{}
 			session := &Session{
-				taskQueue:  make([]QueueItem, 0),
-				runDone:    make(chan struct{}),
-				inProgress: tt.inProgress,
+				taskQueue:    make([]QueueItem, 0),
+				taskCancelCh: make(chan struct{}, 1),
+				runDone:      make(chan struct{}),
+				inProgress:   tt.inProgress,
 				SessionConfig: SessionConfig{
 					Input:  &stream.ChanInput{},
 					Output: output,
 				},
-			}
-
-			// Add mock cancel current function if task is in progress
-			if tt.inProgress {
-				session.setCancelFunc(func() {}) // no-op, just needs to be non-nil
 			}
 
 			// Add items to queue

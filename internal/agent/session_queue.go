@@ -74,14 +74,18 @@ func (s *Session) enqueueTask(task Task, front bool) {
 func (s *Session) runTask(item QueueItem) {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// Store the cancel func on the session so inputPump can cancel the
-	// running task when it receives :cancel / :cancel_all commands.
-	// Protected by cancelMu to avoid data race across goroutines.
-	s.setCancelFunc(cancel)
-	defer func() {
-		cancel()
-		s.setCancelFunc(nil)
+	// Start a goroutine to forward cancellation signals from inputPump
+	// to the task's context. This replaces the old mutex-guarded cancelFunc.
+	go func() {
+		select {
+		case <-s.taskCancelCh:
+			cancel()
+		case <-ctx.Done():
+			// Task finished on its own (or was canceled another way)
+		}
 	}()
+
+	defer cancel()
 
 	// Echo user prompts before any work so output ordering is correct even if
 	// the task is canceled during initialization.
