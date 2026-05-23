@@ -250,8 +250,16 @@ func (tm *ThemeManager) ReloadThemes() {
 }
 
 // GetThemes returns the list of available themes.
+// Returns a copy to prevent slice aliasing if the caller iterates while
+// ReloadThemes is called (both are called from the Bubble Tea goroutine,
+// but returning a copy is defensive against future concurrent access).
 func (tm *ThemeManager) GetThemes() []ThemeInfo {
-	return tm.themes
+	if tm.themes == nil {
+		return nil
+	}
+	result := make([]ThemeInfo, len(tm.themes))
+	copy(result, tm.themes)
+	return result
 }
 
 // GetThemesFolder returns the themes folder path.
