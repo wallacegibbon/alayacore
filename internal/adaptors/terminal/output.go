@@ -21,13 +21,16 @@ import (
 
 // outputWriter parses TLV from the session and writes styled content to the WindowBuffer.
 // It implements io.Writer for the agent/session output stream.
+//
+// LOCK ORDERING: outputWriter.mu MUST be acquired before WindowBuffer.mu.
+// Never acquire them in the opposite order — see Write() for the canonical path.
 type outputWriter struct {
 	windowBuffer      *WindowBuffer
 	buffer            []byte
 	mu                sync.Mutex
 	dirty             atomic.Bool  // true when display needs refresh
 	inProgress        bool         // Whether session has task in progress
-	styles            *Styles      // UI styles
+	styles            atomic.Pointer[Styles] // UI styles (accessed atomically for concurrent SetStyles/read)
 	nextWindowID      atomic.Int64 // Monotonic counter for generating window IDs
 	models            []agentpkg.ModelInfo
 	activeModelID     int         // Current active model ID
@@ -47,17 +50,16 @@ type outputWriter struct {
 }
 
 func NewTerminalOutput(styles *Styles) *outputWriter { //nolint:revive // tests need access to internal methods
-	return &outputWriter{
+	to := &outputWriter{
 		windowBuffer: NewWindowBuffer(DefaultWidth, styles),
-		styles:       styles,
 	}
+	to.styles.Store(styles)
+	return to
 }
 
 // SetStyles updates the styles for the output writer
 func (to *outputWriter) SetStyles(styles *Styles) {
-	to.mu.Lock()
-	to.styles = styles
-	to.mu.Unlock()
+	to.styles.Store(styles)
 	to.windowBuffer.SetStyles(styles)
 }
 
@@ -86,13 +88,15 @@ func (to *outputWriter) Flush() error {
 func (to *outputWriter) AppendError(format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	id := to.generateWindowID()
-	to.windowBuffer.AppendOrUpdate(id, stream.TagSystemError, to.styles.Error.Render(msg))
+	styles := to.styles.Load()
+	to.windowBuffer.AppendOrUpdate(id, stream.TagSystemError, styles.Error.Render(msg))
 }
 
 // WriteNotify writes a notification message to the display
 func (to *outputWriter) WriteNotify(msg string) {
 	id := to.generateWindowID()
-	to.windowBuffer.AppendOrUpdate(id, stream.TagSystemNotify, to.styles.System.Render(msg))
+	styles := to.styles.Load()
+	to.windowBuffer.AppendOrUpdate(id, stream.TagSystemNotify, styles.System.Render(msg))
 	to.triggerUpdateForTag(stream.TagSystemNotify)
 }
 
@@ -137,7 +141,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 			return
 		}
 		handler := GetHandler(tc.Name)
-		formatted := handler.FormatCall(json.RawMessage(tc.Input), to.styles)
+		formatted := handler.FormatCall(json.RawMessage(tc.Input), to.styles.Load())
 
 		// Pass formatted but unstyled content - styling is applied during render
 		to.windowBuffer.AppendToolCall(tc.ID, tc.Name, formatted)
