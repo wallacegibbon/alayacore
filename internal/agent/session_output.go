@@ -2,6 +2,10 @@ package agent
 
 // Session output helpers: writing TLV messages to the adaptor output,
 // tracking token usage, and broadcasting system info.
+//
+// All methods in this file are called from the run() goroutine (or from
+// the inputPump goroutine for writeError calls only). The output writer
+// is documented as thread-safe, so this is fine.
 
 import (
 	"encoding/json"
@@ -88,7 +92,6 @@ func (s *Session) writeToolResult(toolCallID string, status string) {
 // ============================================================================
 
 func (s *Session) trackUsage(usage llm.Usage) {
-	s.mu.Lock()
 	s.TotalSpent.InputTokens += usage.InputTokens
 	s.TotalSpent.OutputTokens += usage.OutputTokens
 	// Only overwrite ContextTokens if the provider reported a non-zero value.
@@ -100,7 +103,6 @@ func (s *Session) trackUsage(usage llm.Usage) {
 	if newContext > 0 {
 		s.ContextTokens = newContext
 	}
-	s.mu.Unlock()
 	s.sendSystemInfo()
 }
 
@@ -135,7 +137,6 @@ func (s *Session) sendSystemInfoInternal(activeModelConfig *ModelConfig) {
 		hasModels = s.ModelManager.HasModels()
 	}
 
-	s.mu.Lock()
 	queueItems := make([]QueueItemInfo, len(s.taskQueue))
 	for i, item := range s.taskQueue {
 		var itemType, content string
@@ -154,31 +155,23 @@ func (s *Session) sendSystemInfoInternal(activeModelConfig *ModelConfig) {
 			CreatedAt: item.CreatedAt.Format(time.RFC3339),
 		}
 	}
-	inProgress := s.inProgress
-	contextTokens := s.ContextTokens
-	contextLimit := s.ContextLimit
-	totalTokens := s.TotalSpent.InputTokens + s.TotalSpent.OutputTokens
-	currentStep := s.currentStep
-	pausedOnError := s.pausedOnError
-	thinkLevel := s.thinkLevel
-	s.mu.Unlock()
 
 	info := SystemInfo{
-		ContextTokens:     contextTokens,
-		ContextLimit:      contextLimit,
-		TotalTokens:       totalTokens,
+		ContextTokens:     s.ContextTokens,
+		ContextLimit:      s.ContextLimit,
+		TotalTokens:       s.TotalSpent.InputTokens + s.TotalSpent.OutputTokens,
 		QueueItems:        queueItems,
-		InProgress:        inProgress,
-		CurrentStep:       currentStep,
+		InProgress:        s.inProgress,
+		CurrentStep:       s.currentStep,
 		MaxSteps:          s.MaxSteps,
-		TaskError:         pausedOnError,
+		TaskError:         s.pausedOnError,
 		Models:            models,
 		ActiveModelID:     activeID,
 		ActiveModelConfig: activeModelConfig,
 		ActiveModelName:   activeModelName,
 		HasModels:         hasModels,
 		ModelConfigPath:   modelConfigPath,
-		ThinkLevel:        thinkLevel,
+		ThinkLevel:        s.thinkLevel,
 	}
 	s.writeTLVJSON(stream.TagSystemData, info)
 }

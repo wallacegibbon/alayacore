@@ -78,6 +78,11 @@ func (a *Adaptor) Start() int {
 		return 1
 	}
 
+	// Start the session's run() goroutine before reading stdin.
+	// The run() goroutine reads from ChanInput and processes tasks
+	// in a single select loop — no separate goroutines needed.
+	session.Start()
+
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT)
 	defer signal.Stop(sigCh)

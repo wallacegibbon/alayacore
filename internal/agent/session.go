@@ -1,12 +1,19 @@
 package agent
 
-// Session manages conversation state and task execution.
+// Session manages conversation state and task execution in a single goroutine.
 //
-// DEPENDENCY FIELDS (Agent, Provider):
-//   These are read from the taskRunner goroutine (processPrompt, syncThinkToProvider)
-//   and written from immediate-command handlers in the readFromInput goroutine
-//   (SwitchModel via handleModelSet). They use atomic.Pointer so both reads and
-//   writes are safe without holding s.mu.
+// ARCHITECTURE:
+//   Session runs a single goroutine (run()) that owns ALL mutable state.
+//   Input is read via ChanInput.Channel() for non-blocking selects — no
+//   separate I/O goroutine touches session state, so no mutexes, no atomic
+//   pointers, and no condition variables are needed.
+//
+//   The only cross-goroutine communication is:
+//     1. The input channel (ChanInput.Channel) — fed by adaptor, drained by run()
+//     2. sessionCancel — cancels the run() goroutine from outside
+//     3. cancelCurrent — a context.CancelFunc stored by run() and read by the
+//        inputPump goroutine (inputPump ONLY calls it for :cancel commands,
+//        never modifies session state)
 //
 // Related files:
 //   - session_types.go — type definitions (Task, SystemInfo, SessionConfig, etc.)
@@ -18,8 +25,6 @@ package agent
 
 import (
 	"context"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/alayacore/alayacore/internal/config"
@@ -28,17 +33,9 @@ import (
 	"github.com/alayacore/alayacore/internal/stream"
 )
 
-// providerHolder wraps llm.Provider so it can be stored in an atomic.Pointer.
-// atomic.Pointer requires a concrete type; interfaces cannot be used directly.
-type providerHolder struct {
-	provider llm.Provider
-}
-
 // Session manages conversation state and task execution.
 type Session struct {
 	Messages       []llm.Message
-	Agent          atomic.Pointer[llm.Agent]
-	Provider       atomic.Pointer[providerHolder]
 	CreatedAt      time.Time
 	TotalSpent     llm.Usage
 	ContextTokens  int64
@@ -47,35 +44,38 @@ type Session struct {
 	RuntimeManager *RuntimeManager
 	SkillsManager  *skills.Manager
 	SessionConfig        // embedded — immutable config set once at construction
-	thinkLevel     int   // mutable — changed by SetThinkLevel
 	initError      error // Set during construction if --model refers to a non-existent model
 
+	// === Single-goroutine state (owned by run()) ===
+	agent         *llm.Agent
+	provider      llm.Provider
 	taskQueue     []QueueItem
-	cond          *sync.Cond         // signals when taskQueue becomes non-empty or pausedOnError clears
-	sessionCtx    context.Context    // canceled when input is exhausted
-	sessionCancel context.CancelFunc // idempotent cancel
-	runnerDone    chan struct{}      // closed when taskRunner exits
 	inProgress    bool
-	pausedOnError bool           // set when a provider/network error occurs; blocks taskRunner until user acts
-	taskWg        sync.WaitGroup // tracks in-flight runTask
-	cancelCurrent func()
+	pausedOnError bool
+	currentStep   int
+	thinkLevel    int
 	nextPromptID  uint64
 	nextQueueID   uint64
-	currentStep   int
-	mu            sync.Mutex
+
+	// cancelCurrent is set by run() before starting a task and cleared after.
+	// It is read by inputPump (a separate goroutine) ONLY to call it for
+	// :cancel / :cancel_all commands — never to modify session state.
+	cancelCurrent context.CancelFunc
+
+	sessionCtx    context.Context    // canceled when input is exhausted
+	sessionCancel context.CancelFunc // idempotent cancel
+	runDone       chan struct{}      // closed when run() exits
 }
 
-// WaitDone blocks until the taskRunner has finished processing all queued tasks
+// WaitDone blocks until run() has finished processing all queued tasks
 // and exited. This should be called after closing the input.
 func (s *Session) WaitDone() {
-	<-s.runnerDone
+	<-s.runDone
 }
 
-// Done returns a channel that is closed when the taskRunner has exited.
-// Useful in select statements to wait for session completion without a
-// wrapper goroutine.
+// Done returns a channel that is closed when run() has exited.
 func (s *Session) Done() <-chan struct{} {
-	return s.runnerDone
+	return s.runDone
 }
 
 // HasModels returns true if any models are configured.
@@ -99,6 +99,8 @@ func (s *Session) ModelConfigPath() string {
 // ============================================================================
 
 // LoadOrNewSession loads a session from file or creates a new one.
+// The returned session is ready to use but NOT yet started —
+// call Start() to begin processing input.
 func LoadOrNewSession(cfg SessionConfig) (*Session, string) {
 	cfg.SessionFile = config.ExpandPath(cfg.SessionFile)
 	if cfg.SessionFile != "" {
@@ -109,7 +111,8 @@ func LoadOrNewSession(cfg SessionConfig) (*Session, string) {
 	return NewSession(cfg), cfg.SessionFile
 }
 
-// NewSession creates a fresh session.
+// NewSession creates a fresh session. Does NOT start goroutines —
+// call Start() to begin processing input.
 func NewSession(cfg SessionConfig) *Session {
 	sessionCtx, sessionCancel := context.WithCancel(context.Background())
 	s := &Session{
@@ -122,18 +125,16 @@ func NewSession(cfg SessionConfig) *Session {
 		taskQueue:      make([]QueueItem, 0),
 		sessionCtx:     sessionCtx,
 		sessionCancel:  sessionCancel,
-		runnerDone:     make(chan struct{}),
+		runDone:        make(chan struct{}),
 	}
 	s.initModelManager()
 	s.applyModelOverride()
-	s.cond = sync.NewCond(&s.mu)
 	s.sendSystemInfo()
-	go s.readFromInput()
-	go s.taskRunner()
 	return s
 }
 
 // RestoreFromSession creates a session from saved data.
+// Does NOT start goroutines — call Start() to begin processing input.
 func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 	sessionCtx, sessionCancel := context.WithCancel(context.Background())
 	s := &Session{
@@ -148,7 +149,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 		taskQueue:      make([]QueueItem, 0),
 		sessionCtx:     sessionCtx,
 		sessionCancel:  sessionCancel,
-		runnerDone:     make(chan struct{}),
+		runDone:        make(chan struct{}),
 	}
 	s.initModelManager()
 
@@ -168,10 +169,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 		s.applyModelContextLimit(model)
 	}
 
-	s.cond = sync.NewCond(&s.mu)
 	s.sendSystemInfo()
-	go s.readFromInput()
-	go s.taskRunner()
 
 	// Send TLV chunks directly to output (avoids reconstruction)
 	for _, chunk := range data.TLVChunks {
@@ -182,4 +180,10 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 		s.Output.Flush()
 	}
 	return s
+}
+
+// Start begins processing input in a single goroutine.
+// Must be called exactly once after construction.
+func (s *Session) Start() {
+	go s.run()
 }

@@ -189,8 +189,6 @@ type anthropicStreamState struct {
 }
 
 func (s *anthropicStreamState) startBlock(index int, blockType, id, name, signature string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.currentIndex = index
 	s.currentType = blockType
 	s.currentID = id
@@ -201,21 +199,14 @@ func (s *anthropicStreamState) startBlock(index int, blockType, id, name, signat
 }
 
 func (s *anthropicStreamState) appendText(text string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.currentText.WriteString(text)
 }
 
 func (s *anthropicStreamState) appendInput(jsonStr string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.currentInput.WriteString(jsonStr)
 }
 
 func (s *anthropicStreamState) finishBlock() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	switch s.currentType {
 	case anthropicBlockTypeText:
 		s.contentParts = append(s.contentParts, llm.TextPart{
@@ -249,8 +240,6 @@ func (s *anthropicStreamState) setUsage(inputTokens, outputTokens, cacheReadToke
 }
 
 func (s *anthropicStreamState) getMessage() llm.Message {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	return llm.Message{
 		Role:    llm.RoleAssistant,
 		Content: append([]llm.ContentPart{}, s.contentParts...),
@@ -259,9 +248,6 @@ func (s *anthropicStreamState) getMessage() llm.Message {
 
 // lastToolCall returns the last tool call if the current block is a tool_use
 func (s *anthropicStreamState) lastToolCall() *llm.ToolCallPart {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	if s.currentType == blockTypeToolUse {
 		return &llm.ToolCallPart{
 			Type:       blockTypeToolUse,

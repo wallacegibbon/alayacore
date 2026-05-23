@@ -30,9 +30,6 @@ func LoadSession(path string) (*SessionData, error) {
 }
 
 func (s *Session) saveSessionToFile(path string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	data := SessionData{
 		SessionMeta: SessionMeta{
 			CreatedAt:     s.CreatedAt,

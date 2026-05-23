@@ -95,6 +95,12 @@ func (a *Adaptor) Start() int {
 	// Create terminal with runtime manager, initial window size, theme, and theme manager
 	t := NewTerminalWithTheme(session.GetRuntimeManager(), terminalOutput, inputStream, a.Config, initialWidth, initialHeight, theme, themeManager)
 
+	// Start the session's run() goroutine before the Bubble Tea event loop.
+	// Bubble Tea sends input via inputStream (ChanInput), and Session.run()
+	// reads from its underlying channel in a select loop alongside task
+	// processing — no separate goroutines needed.
+	session.Start()
+
 	// Create and run the program.
 	// Bubbletea automatically opens the real TTY when stdin is piped
 	// (Unix: /dev/tty, Windows: CONIN$ + CONOUT$).

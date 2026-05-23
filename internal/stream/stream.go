@@ -67,6 +67,13 @@ func (i *ChanInput) Read(p []byte) (n int, err error) {
 	return n, nil
 }
 
+// Channel returns the underlying byte channel for non-blocking reads.
+// Each message is a complete TLV-encoded frame (6-byte header + value).
+// The channel is closed when the input is closed.
+func (i *ChanInput) Channel() <-chan []byte {
+	return i.ch
+}
+
 // Emit sends data to the input channel.
 func (i *ChanInput) Emit(data []byte) error {
 	i.ch <- data
@@ -103,6 +110,20 @@ func (i *ChanInput) EmitTLV(tag string, value string) error {
 func WriteTLV(output Output, tag string, value string) error {
 	_, err := output.Write(EncodeTLV(tag, value))
 	return err
+}
+
+// ParseTLV parses a TLV frame from raw bytes (as emitted by ChanInput).
+// Format: [2-byte tag][4-byte length][value]
+func ParseTLV(data []byte) (tag string, value string) {
+	if len(data) < 6 {
+		return "", ""
+	}
+	tag = string(data[0:2])
+	length := binary.BigEndian.Uint32(data[2:6])
+	if int(length) > len(data)-6 {
+		return "", ""
+	}
+	return tag, string(data[6 : 6+length])
 }
 
 // ReadTLV reads a single TLV-framed message from input.

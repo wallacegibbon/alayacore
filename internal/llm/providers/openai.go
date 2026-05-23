@@ -59,20 +59,14 @@ type openAIStreamState struct {
 }
 
 func (s *openAIStreamState) addTextDelta(delta string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.textBuilder.WriteString(delta)
 }
 
 func (s *openAIStreamState) addReasoningDelta(delta string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.reasoningBuilder.WriteString(delta)
 }
 
 func (s *openAIStreamState) appendToolCallArgs(index int, args json.RawMessage) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.toolCallArgs == nil {
 		s.toolCallArgs = make(map[int]*strings.Builder)
 	}
@@ -97,8 +91,6 @@ func (s *openAIStreamState) appendToolCallArgs(index int, args json.RawMessage) 
 }
 
 func (s *openAIStreamState) setToolCallName(index int, id, name string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	// Ensure tool calls slice is big enough
 	for len(s.toolCalls) <= index {
 		s.toolCalls = append(s.toolCalls, llm.ToolCallPart{
@@ -110,9 +102,6 @@ func (s *openAIStreamState) setToolCallName(index int, id, name string) {
 }
 
 func (s *openAIStreamState) finalizeToolCalls() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	// Merge accumulated arguments into tool calls
 	for i := range s.toolCalls {
 		if builder, exists := s.toolCallArgs[i]; exists {
@@ -123,15 +112,10 @@ func (s *openAIStreamState) finalizeToolCalls() {
 }
 
 func (s *openAIStreamState) getToolCalls() []llm.ToolCallPart {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	return s.toolCalls
 }
 
 func (s *openAIStreamState) getMessage() llm.Message {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	// Build content parts from accumulated text
 	// Preallocate for reasoning + text + tool calls
 	content := make([]llm.ContentPart, 0, 2+len(s.toolCalls))

@@ -1,6 +1,9 @@
 package agent
 
 // Session I/O: command handling, prompt processing.
+//
+// All methods in this file are called from the run() goroutine, so no
+// locking is needed.
 
 import (
 	"context"
@@ -32,34 +35,21 @@ func (s *Session) handleCommand(ctx context.Context, cmd string) {
 }
 
 func (s *Session) cancelTask() {
-	s.mu.Lock()
-	inProgress := s.inProgress
-	cancelCurrent := s.cancelCurrent
-	s.mu.Unlock()
-	if inProgress && cancelCurrent != nil {
-		cancelCurrent()
+	if s.inProgress && s.cancelCurrent != nil {
+		s.cancelCurrent()
 		return
 	}
 	s.writeError(domainerrors.ErrNothingToCancel.Error())
 }
 
 func (s *Session) cancelAllTasks() {
-	// Clear the task queue first (while holding lock)
-	s.mu.Lock()
 	queueLen := len(s.taskQueue)
 	s.taskQueue = make([]QueueItem, 0)
-	inProgress := s.inProgress
-	cancelCurrent := s.cancelCurrent
-	s.mu.Unlock()
 
-	// Then cancel current task (if running)
 	currentCanceled := false
-	if inProgress && cancelCurrent != nil {
-		cancelCurrent()
+	if s.inProgress && s.cancelCurrent != nil {
+		s.cancelCurrent()
 		currentCanceled = true
-		// Wait for runTask to finish so its output (errors, etc.)
-		// appears before our summary notification.
-		s.taskWg.Wait()
 	}
 
 	// Send notification
@@ -76,11 +66,7 @@ func (s *Session) cancelAllTasks() {
 	}
 
 	// Clear paused-on-error state so the queue can resume if needed
-	s.mu.Lock()
 	s.pausedOnError = false
-	s.cond.Signal()
-	s.mu.Unlock()
-
 	s.sendSystemInfo()
 }
 
@@ -91,10 +77,7 @@ func (s *Session) handleContinue(ctx context.Context, args []string) {
 		return
 	}
 
-	s.mu.Lock()
 	s.pausedOnError = false
-	s.cond.Signal()
-	s.mu.Unlock()
 
 	// With no arguments, resend the last prompt.
 	if len(args) == 0 {
@@ -103,10 +86,7 @@ func (s *Session) handleContinue(ctx context.Context, args []string) {
 	}
 
 	// "skip" — skip the failed prompt and resume the remaining queue.
-	s.mu.Lock()
-	queueLen := len(s.taskQueue)
-	s.mu.Unlock()
-	if queueLen == 0 {
+	if len(s.taskQueue) == 0 {
 		s.writeNotify("Queue is empty")
 		return
 	}
@@ -139,9 +119,7 @@ Rules:
 	outputTokens, err := s.processPrompt(ctx, s.Messages)
 	if err != nil {
 		s.writeError(err.Error())
-		s.mu.Lock()
 		s.pausedOnError = true
-		s.mu.Unlock()
 		s.sendSystemInfo()
 		return
 	}
@@ -155,9 +133,7 @@ Rules:
 
 	s.Messages = []llm.Message{lastAssistantMsg}
 	if outputTokens > 0 {
-		s.mu.Lock()
 		s.ContextTokens = outputTokens
-		s.mu.Unlock()
 	}
 	s.writeNotify("Summarized conversation")
 	s.sendSystemInfo()
@@ -197,11 +173,7 @@ func (s *Session) handleModelSet(args []string) {
 		return
 	}
 
-	// Check inProgress under lock.
-	s.mu.Lock()
-	inProgress := s.inProgress
-	s.mu.Unlock()
-	if inProgress {
+	if s.inProgress {
 		s.writeError("Cannot switch model while a task is running. Please wait or cancel the current task.")
 		return
 	}
@@ -230,17 +202,6 @@ func (s *Session) handleModelSet(args []string) {
 
 	if err := s.SwitchModel(model); err != nil {
 		s.writeError("Failed to switch model: " + err.Error())
-		return
-	}
-
-	// Post-check: a task may have started while SwitchModel was in progress
-	// (TOCTOU race).  The atomic Agent/Provider swap ensures the running task
-	// sees the new model, which is safe — just warn the user.
-	s.mu.Lock()
-	taskStarted := s.inProgress
-	s.mu.Unlock()
-	if taskStarted {
-		s.writeNotify("Warning: a task started during model switch. The new model is active.")
 		return
 	}
 
@@ -362,9 +323,7 @@ func (s *Session) resendPrompt(ctx context.Context) {
 
 	if err != nil {
 		s.writeError(err.Error())
-		s.mu.Lock()
 		s.pausedOnError = true
-		s.mu.Unlock()
 		s.sendSystemInfo()
 		return
 	}

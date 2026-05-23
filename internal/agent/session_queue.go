@@ -1,6 +1,9 @@
 package agent
 
 // Session task queue: submit, enqueue, run, and manage queued tasks.
+//
+// All methods in this file are called from the run() goroutine, so no
+// locking is needed.
 
 import (
 	"context"
@@ -15,16 +18,11 @@ import (
 // ============================================================================
 
 func (s *Session) submitTask(task Task) {
-	s.mu.Lock()
 	queueEmpty := len(s.taskQueue) == 0
 	// Clear paused-on-error only if queue was empty (new task will run immediately).
-	// This must happen before enqueueTask signals the condition variable so
-	// taskRunner sees consistent state when it wakes.
 	if queueEmpty {
 		s.pausedOnError = false
 	}
-	s.mu.Unlock()
-
 	s.enqueueTask(task, false)
 }
 
@@ -33,22 +31,16 @@ func (s *Session) submitTask(task Task) {
 // currently in progress. They are placed at the front so they run ahead of
 // any accumulated user prompts.
 func (s *Session) submitDeferredCommand(cmd string) {
-	s.mu.Lock()
 	if s.inProgress && !s.pausedOnError {
-		s.mu.Unlock()
 		s.writeError("Cannot run command while a task is running. Please wait or cancel first.")
 		return
 	}
-	s.mu.Unlock()
-
 	s.enqueueTask(CommandPrompt{Command: cmd}, true)
 }
 
 // enqueueTask adds a task to the queue. When front is true, the task is
 // placed at the front so it runs before previously queued items.
 func (s *Session) enqueueTask(task Task, front bool) {
-	s.mu.Lock()
-
 	s.nextQueueID++
 	queueID := fmt.Sprintf("Q%d", s.nextQueueID)
 
@@ -72,8 +64,6 @@ func (s *Session) enqueueTask(task Task, front bool) {
 	} else {
 		s.taskQueue = append(s.taskQueue, item)
 	}
-	s.cond.Signal()
-	s.mu.Unlock()
 	s.sendSystemInfo()
 }
 
@@ -81,80 +71,12 @@ func (s *Session) enqueueTask(task Task, front bool) {
 // Task Runner
 // ============================================================================
 
-func (s *Session) taskRunner() {
-	defer close(s.runnerDone)
-	for {
-		task, ok := s.waitForNextTask()
-		if !ok {
-			return
-		}
-		s.runTask(task)
-		if !s.hasQueuedTasks() {
-			s.setInProgress(false)
-		}
-	}
-}
-
-func (s *Session) waitForNextTask() (QueueItem, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for {
-		if !s.hasRunnableItemLocked() {
-			if s.sessionCtx.Err() != nil {
-				return QueueItem{}, false
-			}
-			s.cond.Wait()
-			continue
-		}
-		item := s.taskQueue[0]
-		s.taskQueue = s.taskQueue[1:]
-		s.inProgress = true
-		return item, true
-	}
-}
-
-// hasRunnableItemLocked reports whether the front of the task queue can be
-// dequeued right now.  Commands are always runnable; other tasks require
-// pausedOnError to be clear.
-//
-// Must be called with s.mu held.
-func (s *Session) hasRunnableItemLocked() bool {
-	if len(s.taskQueue) == 0 {
-		return false
-	}
-	_, isCommand := s.taskQueue[0].Task.(CommandPrompt)
-	return isCommand || !s.pausedOnError
-}
-
-func (s *Session) hasQueuedTasks() bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return len(s.taskQueue) > 0
-}
-
-func (s *Session) setInProgress(v bool) {
-	s.mu.Lock()
-	changed := s.inProgress != v
-	s.inProgress = v
-	s.mu.Unlock()
-	if changed {
-		s.sendSystemInfo()
-	}
-}
-
 func (s *Session) runTask(item QueueItem) {
-	s.taskWg.Add(1)
-	defer s.taskWg.Done()
-
 	ctx, cancel := context.WithCancel(context.Background())
-	s.mu.Lock()
 	s.cancelCurrent = cancel
-	s.mu.Unlock()
+	defer cancel()
 	defer func() {
-		cancel()
-		s.mu.Lock()
 		s.cancelCurrent = nil
-		s.mu.Unlock()
 	}()
 
 	// Echo user prompts before any work so output ordering is correct even if
@@ -172,9 +94,7 @@ func (s *Session) runTask(item QueueItem) {
 		return
 	}
 
-	s.mu.Lock()
 	s.currentStep = 0
-	s.mu.Unlock()
 
 	switch t := item.Task.(type) {
 	case UserPrompt:
@@ -214,8 +134,6 @@ func (s *Session) appendCancelMessage() {
 
 // GetQueueItems returns all queued items
 func (s *Session) GetQueueItems() []QueueItem {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	items := make([]QueueItem, len(s.taskQueue))
 	copy(items, s.taskQueue)
 	return items
@@ -223,9 +141,6 @@ func (s *Session) GetQueueItems() []QueueItem {
 
 // DeleteQueueItem removes a queue item by ID
 func (s *Session) DeleteQueueItem(queueID string) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	for i, item := range s.taskQueue {
 		if item.QueueID == queueID {
 			s.taskQueue = append(s.taskQueue[:i], s.taskQueue[i+1:]...)
@@ -237,9 +152,6 @@ func (s *Session) DeleteQueueItem(queueID string) bool {
 
 // UpdateQueueItem updates the content of a queue item by ID.
 func (s *Session) UpdateQueueItem(queueID, newContent string) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	for i, item := range s.taskQueue {
 		if item.QueueID == queueID {
 			switch t := item.Task.(type) {

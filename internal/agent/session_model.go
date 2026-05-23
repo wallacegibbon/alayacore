@@ -3,6 +3,9 @@ package agent
 // Session model management: switching models, creating providers,
 // syncing think levels. These methods handle the relationship between
 // Session, ModelManager, and the LLM provider.
+//
+// All methods in this file are called from the run() goroutine, so no
+// locking is needed.
 
 import (
 	"fmt"
@@ -14,9 +17,6 @@ import (
 )
 
 // SwitchModel switches the session to use a new model.
-//
-// DEADLOCK GOTCHA: Don't hold mutex while calling methods that may need the same mutex.
-// Pattern: lock → update fields → unlock → call methods.
 func (s *Session) SwitchModel(modelConfig *ModelConfig) error {
 	if err := s.initAgentFromConfig(modelConfig); err != nil {
 		return err
@@ -93,49 +93,28 @@ func (s *Session) createProviderAndAgent(modelConfig *ModelConfig) (llm.Provider
 }
 
 func (s *Session) ensureAgentInitialized() string {
-	// Fast path — atomic check without locking.
-	if s.Agent.Load() != nil && s.Provider.Load() != nil {
-		return ""
-	}
-
-	// Lock for the slow path — we may need to construct a new provider/agent.
-	s.mu.Lock()
-	if s.Agent.Load() != nil && s.Provider.Load() != nil {
-		s.mu.Unlock()
+	if s.agent != nil && s.provider != nil {
 		return ""
 	}
 	if s.ModelManager == nil {
-		s.mu.Unlock()
 		return "Model manager not initialized"
 	}
 	activeModel := s.ModelManager.GetActive()
 	if activeModel == nil {
-		s.mu.Unlock()
 		return "No model configured. Please add a model to ~/.alayacore/model.conf"
 	}
-	// Copy the config so we can release the lock during construction.
-	modelCopy := *activeModel
-	s.mu.Unlock()
 
-	// Slow operation (HTTP client creation) — no lock held.
-	provider, agent, err := s.createProviderAndAgent(&modelCopy)
+	provider, agent, err := s.createProviderAndAgent(activeModel)
 	if err != nil {
 		return "Failed to create provider: " + err.Error()
 	}
 
-	// Second check — another goroutine may have initialized while we were unlocked.
-	s.mu.Lock()
-	if s.Agent.Load() != nil && s.Provider.Load() != nil {
-		s.mu.Unlock()
-		return ""
-	}
-	s.Agent.Store(agent)
-	s.Provider.Store(&providerHolder{provider: provider})
-	if modelCopy.ContextLimit > 0 {
-		s.ContextLimit = int64(modelCopy.ContextLimit)
+	s.agent = agent
+	s.provider = provider
+	if activeModel.ContextLimit > 0 {
+		s.ContextLimit = int64(activeModel.ContextLimit)
 	}
 	s.syncThinkToProvider(s.thinkLevel)
-	s.mu.Unlock()
 	return ""
 }
 
@@ -145,13 +124,9 @@ func (s *Session) initAgentFromConfig(modelConfig *ModelConfig) error {
 		return err
 	}
 
-	s.mu.Lock()
-	s.Agent.Store(agent)
-	s.Provider.Store(&providerHolder{provider: provider})
-	thinkLevel := s.thinkLevel
-	s.mu.Unlock()
-
-	s.syncThinkToProvider(thinkLevel)
+	s.agent = agent
+	s.provider = provider
+	s.syncThinkToProvider(s.thinkLevel)
 	return nil
 }
 
@@ -159,29 +134,22 @@ func (s *Session) applyModelContextLimit(model *ModelConfig) {
 	if model == nil || model.ContextLimit <= 0 {
 		return
 	}
-	s.mu.Lock()
 	s.ContextLimit = int64(model.ContextLimit)
-	s.mu.Unlock()
 }
 
 // syncThinkToProvider propagates the session's thinking level to the
-// current provider. Must be called after Provider is set.
-// The level is passed explicitly to avoid reading s.thinkLevel outside the mutex.
+// current provider.
 func (s *Session) syncThinkToProvider(level int) {
-	if p := s.Provider.Load(); p != nil {
-		p.provider.SetReasoningLevel(level)
+	if s.provider != nil {
+		s.provider.SetReasoningLevel(level)
 	}
 }
 
 // SetThinkLevel sets the think level.
 // See config.ThinkLevelOff, config.ThinkLevelNormal, config.ThinkLevelMax.
 func (s *Session) SetThinkLevel(level int) {
-	s.mu.Lock()
 	s.thinkLevel = level
-	s.mu.Unlock()
-
 	s.syncThinkToProvider(level)
-
 	s.sendSystemInfo()
 }
 
