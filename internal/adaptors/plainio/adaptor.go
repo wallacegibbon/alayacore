@@ -115,13 +115,8 @@ func (a *Adaptor) Start() int {
 	}
 
 	// Let the current task finish, but a second Ctrl-C forces immediate exit.
-	done := make(chan struct{})
-	go func() {
-		session.WaitDone()
-		close(done)
-	}()
 	select {
-	case <-done:
+	case <-session.Done():
 	case <-sigCh:
 		code = 128 + int(syscall.SIGINT)
 	}

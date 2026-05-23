@@ -3,6 +3,7 @@ package tools
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -48,9 +49,21 @@ func executeCommand(ctx context.Context, args executeCommandInput) (llm.ToolResu
 
 	detectedShell := shell.Detect()
 
+	// Build a timeout context that derives from the parent context.
+	// When the parent is canceled (user :cancel), the timeout context is
+	// also canceled. When the timeout expires before the parent is
+	// canceled, the timeout context reports DeadlineExceeded.
+	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, defaultCommandTimeout)
+	defer timeoutCancel()
+
 	// Build the command using the detected shell's invocation style.
+	// We first construct a base command to get the shell-specific flags
+	// (e.g. bash -c, pwsh -NoLogo -NonInteractive -Command, cmd /C),
+	// then rebuild with CommandContext for automatic cancellation/timeout.
 	//nolint:gosec // G204: Command from user input is intentional for execute_command tool
-	cmd := detectedShell.BuildCmd(detectedShell.ResolvedBinary(), args.Command)
+	baseCmd := detectedShell.BuildCmd(detectedShell.ResolvedBinary(), args.Command)
+	//nolint:gosec // G204: Command from user input is intentional for execute_command tool
+	cmd := exec.CommandContext(timeoutCtx, baseCmd.Path, baseCmd.Args[1:]...)
 	cmd.Dir = cwd
 
 	// Close stdin so commands that read stdin see EOF immediately.
@@ -68,6 +81,19 @@ func executeCommand(ctx context.Context, args executeCommandInput) (llm.ToolResu
 	// Set OS-specific detach flags (setsid on Unix, Job Object on Windows).
 	shell.SetDetachFlags(cmd)
 
+	// Custom cancellation: send SIGINT to the process group (Unix) or
+	// terminate the Job Object (Windows) instead of the default SIGKILL.
+	// This gives the process a chance to clean up (flush buffers, kill
+	// subprocesses, etc.). The framework will follow up with a stronger
+	// signal after WaitDelay if the process hasn't exited.
+	cmd.Cancel = func() error {
+		if cmd.Process == nil {
+			return nil
+		}
+		return shell.SignalProcessGroup(cmd.Process)
+	}
+	cmd.WaitDelay = 2 * time.Second
+
 	if err := cmd.Start(); err != nil {
 		return llm.NewTextErrorResponse("failed to start command: " + err.Error()), nil
 	}
@@ -83,37 +109,33 @@ func executeCommand(ctx context.Context, args executeCommandInput) (llm.ToolResu
 		}()
 	}
 
-	// Apply a timeout so commands that hang (e.g. interactive programs like
-	// vim that start successfully but never exit without a TTY) are eventually
-	// killed.  The parent context cancellation is still honored.
-	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, defaultCommandTimeout)
-	defer timeoutCancel()
-
 	// Wait for command to complete, handling cancellation and timeout
-	done := make(chan error, 1)
-	go func() {
-		done <- cmd.Wait()
-	}()
+	// automatically via the context. No manual goroutine needed.
+	execErr := cmd.Wait()
 
-	select {
-	case <-timeoutCtx.Done():
-		if ctx.Err() != nil {
-			// Parent context was canceled (user sent :cancel)
-			return handleCommandCancellation(cmd, done, &stdout, &stderr), nil
-		}
-		// Timeout expired — kill the hung process
-		return handleCommandTimeout(cmd, done, &stdout, &stderr), nil
-	case execErr := <-done:
+	// Check parent context first to detect user cancellation regardless of
+	// what error cmd.Wait() returned.  When the process exits quickly in
+	// response to SIGINT (e.g. sleep → exit 130), cmd.Wait() returns an
+	// *exec.ExitError rather than context.Canceled, so we must check the
+	// context directly.
+	if ctx.Err() != nil {
+		// Parent context was canceled (user sent :cancel)
+		return handleCommandCancellation(&stdout, &stderr), nil
+	}
+	if errors.Is(execErr, context.DeadlineExceeded) || timeoutCtx.Err() != nil {
+		// Timeout expired — the process was killed by the framework
+		return handleCommandTimeout(&stdout, &stderr), nil
+	}
+	if execErr != nil {
+		// Non-zero exit or other error
 		return handleCommandCompletion(execErr, &stdout, &stderr), nil
 	}
+
+	return handleCommandCompletion(nil, &stdout, &stderr), nil
 }
 
-func handleCommandCancellation(cmd *exec.Cmd, done chan error, stdout, stderr *bytes.Buffer) llm.ToolResultOutput {
+func handleCommandCancellation(stdout, stderr *bytes.Buffer) llm.ToolResultOutput {
 	exitCode := -1
-	process := cmd.Process
-	if process != nil {
-		exitCode = shell.TerminateProcessGroup(process, done)
-	}
 	output := formatCommandOutput(stdout, stderr, exitCode)
 
 	if len(output) > maxCommandOutput {
@@ -126,12 +148,8 @@ func handleCommandCancellation(cmd *exec.Cmd, done chan error, stdout, stderr *b
 	return llm.NewTextErrorResponse(fmt.Sprintf("Canceled (exit %d)", exitCode))
 }
 
-func handleCommandTimeout(cmd *exec.Cmd, done chan error, stdout, stderr *bytes.Buffer) llm.ToolResultOutput {
+func handleCommandTimeout(stdout, stderr *bytes.Buffer) llm.ToolResultOutput {
 	exitCode := -1
-	process := cmd.Process
-	if process != nil {
-		exitCode = shell.TerminateProcessGroup(process, done)
-	}
 	output := formatCommandOutput(stdout, stderr, exitCode)
 
 	if len(output) > maxCommandOutput {

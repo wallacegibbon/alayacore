@@ -71,6 +71,13 @@ func (s *Session) WaitDone() {
 	<-s.runnerDone
 }
 
+// Done returns a channel that is closed when the taskRunner has exited.
+// Useful in select statements to wait for session completion without a
+// wrapper goroutine.
+func (s *Session) Done() <-chan struct{} {
+	return s.runnerDone
+}
+
 // HasModels returns true if any models are configured.
 func (s *Session) HasModels() bool {
 	if s.ModelManager == nil {

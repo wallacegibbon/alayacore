@@ -178,6 +178,32 @@ func loadJob() *Job {
 
 // --- termination ---
 
+// SignalProcessGroup initiates termination of the process tree on
+// Windows and returns immediately. The caller should ensure the
+// process is eventually cleaned up (e.g. via exec.Cmd.WaitDelay + the
+// Job Object's KILL_ON_JOB_CLOSE flag).
+//
+// This is a non-blocking alternative to TerminateProcessGroup, useful
+// when the framework handles the wait-and-kill cycle (e.g. via
+// exec.Cmd.Cancel + WaitDelay).
+func SignalProcessGroup(process *os.Process) error {
+	// Try Job Object first (fast, kernel-level, covers entire tree).
+	if job := loadJob(); job != nil {
+		if err := job.Terminate(); err == nil {
+			return nil
+		}
+		// Job termination failed; fall through to taskkill.
+	}
+
+	// Fallback: taskkill /F /T kills the process tree.
+	if killProcessTree(process.Pid) {
+		return nil
+	}
+
+	// Last resort: kill only the direct child.
+	return process.Kill()
+}
+
 // TerminateProcessGroup kills the process tree on Windows.
 //
 // It first tries the Job Object (kills the entire tree, including

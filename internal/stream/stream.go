@@ -138,6 +138,7 @@ type Input interface {
 // The session writes to Output from two goroutines:
 //   - taskRunner  (via processPrompt callbacks, writeGapped, etc.)
 //   - readFromInput (via immediate command handlers)
+//
 // Both goroutines may call Write/WriteString/Flush concurrently.
 // Use a mutex or equivalent synchronization internally.
 type Output interface {

@@ -15,6 +15,18 @@ type Job struct{}
 // Close is a no-op on Unix.
 func (j *Job) Close() error { return nil }
 
+// SignalProcessGroup sends SIGINT to the process group and returns
+// immediately. The caller should follow up with a stronger signal
+// (e.g. SIGKILL) after a grace period if the process hasn't exited.
+//
+// This is a non-blocking alternative to TerminateProcessGroup, useful
+// when the framework handles the wait-and-kill cycle (e.g. via
+// exec.Cmd.Cancel + WaitDelay).
+func SignalProcessGroup(process *os.Process) error {
+	pid := process.Pid
+	return syscall.Kill(-pid, syscall.SIGINT)
+}
+
 // TerminateProcessGroup sends SIGINT to the process group, waits briefly,
 // then sends SIGKILL if the group hasn't exited.
 // pid must be the session leader PID (same as process group ID when
@@ -24,7 +36,7 @@ func TerminateProcessGroup(process *os.Process, done <-chan error) int {
 	pid := process.Pid
 
 	//nolint:errcheck // Best effort signal, errors ignored
-	_ = syscall.Kill(-pid, syscall.SIGINT)
+	_ = SignalProcessGroup(process)
 
 	// Give the process group 2 seconds to clean up
 	var waitErr error
