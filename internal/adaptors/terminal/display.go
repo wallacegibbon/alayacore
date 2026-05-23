@@ -226,7 +226,7 @@ func (m *DisplayModel) MoveWindowCursorDown() bool {
 
 	// Step forward to the next visible window
 	found := false
-	m.windowBuffer.ForEachVisibleFrom(m.windowCursor+1, func(i int, _ *Window, _, _ int) bool {
+	m.windowBuffer.ForEachVisibleFrom(m.windowCursor+1, func(i int, _ *Window) bool {
 		m.setCursor(i)
 		found = true
 		return false
@@ -255,7 +255,7 @@ func (m *DisplayModel) MoveWindowCursorUp() bool {
 
 	// Step backward to the previous visible window
 	found := false
-	m.windowBuffer.ForEachVisibleBackwardFrom(m.windowCursor-1, func(i int, _ *Window, _, _ int) bool {
+	m.windowBuffer.ForEachVisibleBackwardFrom(m.windowCursor-1, func(i int, _ *Window) bool {
 		m.setCursor(i)
 		found = true
 		return false
@@ -364,7 +364,7 @@ func (m *DisplayModel) MoveWindowCursorToTop() bool {
 	viewportBottom := viewportTop + m.viewport.Height()
 	found := false
 
-	m.windowBuffer.ForEachVisible(func(i int, _ *Window, startLine, endLine int) bool {
+	m.windowBuffer.ForEachVisibleRanged(func(i int, startLine, endLine int) bool {
 		// Skip windows entirely below the viewport
 		if startLine >= viewportBottom {
 			return true
@@ -397,7 +397,7 @@ func (m *DisplayModel) MoveWindowCursorToBottom() bool {
 	viewportBottom := viewportTop + m.viewport.Height()
 	found := false
 
-	m.windowBuffer.ForEachVisibleBackward(func(i int, _ *Window, startLine, endLine int) bool {
+	m.windowBuffer.ForEachVisibleBackwardRanged(func(i int, startLine, endLine int) bool {
 		// Skip windows entirely above the viewport
 		if endLine <= viewportTop {
 			return true
@@ -456,7 +456,7 @@ func (m *DisplayModel) MoveWindowCursorToCenter() bool {
 // contains the given line, or -1 if no such window exists.
 func (m *DisplayModel) findWindowContainingLine(line int) int {
 	idx := -1
-	m.windowBuffer.ForEachVisible(func(i int, _ *Window, startLine, endLine int) bool {
+	m.windowBuffer.ForEachVisibleRanged(func(i int, startLine, endLine int) bool {
 		if line >= startLine && line < endLine {
 			idx = i
 			return false
@@ -474,7 +474,7 @@ func (m *DisplayModel) findClosestVisibleWindow(viewportTop, viewportBottom, vie
 	bestWindow := -1
 	bestDistance := -1
 
-	m.windowBuffer.ForEachVisible(func(i int, _ *Window, startLine, endLine int) bool {
+	m.windowBuffer.ForEachVisibleRanged(func(i int, startLine, endLine int) bool {
 		// Skip windows entirely outside the viewport
 		if startLine >= viewportBottom || endLine <= viewportTop {
 			return true
@@ -505,7 +505,7 @@ func (m *DisplayModel) MoveWindowCursorToNextUserPrompt() bool {
 	}
 
 	found := false
-	m.windowBuffer.ForEachVisibleFrom(m.windowCursor+1, func(i int, w *Window, _, _ int) bool {
+	m.windowBuffer.ForEachVisibleFrom(m.windowCursor+1, func(i int, w *Window) bool {
 		if w.Tag == stream.TagTextUser {
 			m.setCursor(i)
 			found = true
@@ -526,7 +526,7 @@ func (m *DisplayModel) MoveWindowCursorToPrevUserPrompt() bool {
 	}
 
 	found := false
-	m.windowBuffer.ForEachVisibleBackwardFrom(m.windowCursor-1, func(i int, w *Window, _, _ int) bool {
+	m.windowBuffer.ForEachVisibleBackwardFrom(m.windowCursor-1, func(i int, w *Window) bool {
 		if w.Tag == stream.TagTextUser {
 			m.setCursor(i)
 			found = true
