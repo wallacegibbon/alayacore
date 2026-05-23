@@ -18,6 +18,10 @@ import (
 // ============================================================================
 
 // WindowBuffer holds a sequence of windows with virtual rendering support.
+//
+// LOCK ORDERING: WindowBuffer.mu MUST be acquired AFTER outputWriter.mu.
+// Never acquire them in the opposite order, or a deadlock will result.
+// See outputWriter for the canonical acquisition path.
 type WindowBuffer struct {
 	mu          sync.Mutex
 	Windows     []*Window // public for tests
