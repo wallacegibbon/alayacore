@@ -171,41 +171,17 @@ func (m *DisplayModel) GetCursorWindowContent() string {
 // If the index points to an invisible window, the nearest visible window is chosen instead.
 // Disables auto-follow only if the cursor actually moves; only G re-enables it.
 func (m *DisplayModel) SetWindowCursor(index int) {
-	windowCount := m.windowBuffer.GetWindowCount()
-	if windowCount == 0 {
+	if index < 0 || m.windowBuffer.GetWindowCount() == 0 {
 		m.windowCursor = -1
 		m.autoFollow = false
 		return
 	}
+	index = m.windowBuffer.NearestVisibleIndex(index)
 	if index < 0 {
 		m.windowCursor = -1
 		m.autoFollow = false
 		return
 	}
-	if index >= windowCount {
-		index = windowCount - 1
-	}
-	// If target is invisible, find nearest visible window
-	if !m.windowBuffer.Windows[index].Visible {
-		// Search forward first, then backward
-		for i := index; i < windowCount; i++ {
-			if m.windowBuffer.Windows[i].Visible {
-				index = i
-				goto done
-			}
-		}
-		for i := index; i >= 0; i-- {
-			if m.windowBuffer.Windows[i].Visible {
-				index = i
-				goto done
-			}
-		}
-		// No visible windows at all
-		m.windowCursor = -1
-		m.autoFollow = false
-		return
-	}
-done:
 	if m.windowCursor == index {
 		return // cursor unchanged, preserve autoFollow
 	}
@@ -224,66 +200,71 @@ func (m *DisplayModel) MoveWindowCursorDown() bool {
 	if m.autoFollow {
 		return false
 	}
-	windowCount := m.windowBuffer.GetWindowCount()
-	if windowCount == 0 {
+	if m.windowBuffer.GetWindowCount() == 0 {
 		return false
 	}
 
 	// If cursor is unset, start at the first visible window
 	if m.windowCursor < 0 {
-		for i := 0; i < windowCount; i++ {
-			if m.windowBuffer.Windows[i].Visible {
-				m.windowCursor = i
-				m.autoFollow = false
-				return true
-			}
+		i := m.windowBuffer.FirstVisibleIndex()
+		if i >= 0 {
+			m.windowCursor = i
+			m.autoFollow = false
+			return true
 		}
 		return false
 	}
 
 	// Step forward to the next visible window
-	for i := m.windowCursor + 1; i < windowCount; i++ {
-		if m.windowBuffer.Windows[i].Visible {
+	found := false
+	m.windowBuffer.ForEachVisible(func(i int, _ *Window, _, _ int) bool {
+		if i > m.windowCursor {
 			m.windowCursor = i
-			m.autoFollow = false
-			return true
+			found = true
+			return false
 		}
+		return true
+	})
+	if found {
+		m.autoFollow = false
+		return true
 	}
 	return false
 }
 
 // MoveWindowCursorUp moves the window cursor up, skipping invisible windows.
 func (m *DisplayModel) MoveWindowCursorUp() bool {
-	windowCount := m.windowBuffer.GetWindowCount()
-	if windowCount == 0 {
+	if m.windowBuffer.GetWindowCount() == 0 {
 		return false
 	}
 
 	// If cursor is unset or below the last window, start at the last visible window
-	if m.windowCursor < 0 || m.windowCursor >= windowCount {
-		for i := windowCount - 1; i >= 0; i-- {
-			if m.windowBuffer.Windows[i].Visible {
-				if m.windowCursor == i {
-					return false // already at this window
-				}
-				m.windowCursor = i
-				m.autoFollow = false
-				return true
-			}
-		}
-		return false
-	}
-
-	// Step backward to the previous visible window
-	for i := m.windowCursor - 1; i >= 0; i-- {
-		if m.windowBuffer.Windows[i].Visible {
-			if i == m.windowCursor {
-				return false // already at this window (defensive check)
+	if m.windowCursor < 0 || m.windowCursor >= m.windowBuffer.GetWindowCount() {
+		i := m.windowBuffer.LastVisibleIndex()
+		if i >= 0 {
+			if m.windowCursor == i {
+				return false
 			}
 			m.windowCursor = i
 			m.autoFollow = false
 			return true
 		}
+		return false
+	}
+
+	// Step backward to the previous visible window
+	found := false
+	m.windowBuffer.ForEachVisibleBackward(func(i int, _ *Window, _, _ int) bool {
+		if i < m.windowCursor {
+			m.windowCursor = i
+			found = true
+			return false
+		}
+		return true
+	})
+	if found {
+		m.autoFollow = false
+		return true
 	}
 	return false
 }
@@ -345,8 +326,7 @@ func (m *DisplayModel) ValidateCursor() {
 // the user's scroll position. Use this on resize events where only bounds
 // correction is needed.
 func (m *DisplayModel) ClampCursor() {
-	windowCount := m.windowBuffer.GetWindowCount()
-	if windowCount == 0 {
+	if m.windowBuffer.GetWindowCount() == 0 {
 		m.windowCursor = -1
 		return
 	}
@@ -355,52 +335,20 @@ func (m *DisplayModel) ClampCursor() {
 		m.windowCursor = -1
 		return
 	}
-	// Cursor is beyond the last window — clamp to last visible
-	if m.windowCursor >= windowCount {
-		for i := windowCount - 1; i >= 0; i-- {
-			if m.windowBuffer.Windows[i].Visible {
-				m.windowCursor = i
-				return
-			}
-		}
-		m.windowCursor = -1
-		return
-	}
-	// Cursor points to an invisible window — move to nearest visible one
-	if !m.windowBuffer.Windows[m.windowCursor].Visible {
-		// Search forward first, then backward
-		for i := m.windowCursor + 1; i < windowCount; i++ {
-			if m.windowBuffer.Windows[i].Visible {
-				m.windowCursor = i
-				return
-			}
-		}
-		for i := m.windowCursor - 1; i >= 0; i-- {
-			if m.windowBuffer.Windows[i].Visible {
-				m.windowCursor = i
-				return
-			}
-		}
-		m.windowCursor = -1
-	}
+	// Use NearestVisibleIndex to handle out-of-bounds or invisible cursor
+	clamped := m.windowBuffer.NearestVisibleIndex(m.windowCursor)
+	m.windowCursor = clamped
 }
 
 // SetCursorToLastWindow sets the cursor to the last visible window
 func (m *DisplayModel) SetCursorToLastWindow() {
-	windowCount := m.windowBuffer.GetWindowCount()
-	if windowCount == 0 {
-		m.windowCursor = -1
+	i := m.windowBuffer.LastVisibleIndex()
+	if i >= 0 {
+		m.windowCursor = i
 	} else {
-		// Find the last visible window
 		m.windowCursor = -1
-		for i := windowCount - 1; i >= 0; i-- {
-			if m.windowBuffer.Windows[i].Visible {
-				m.windowCursor = i
-				break
-			}
-		}
-		m.autoFollow = true
 	}
+	m.autoFollow = true
 }
 
 // ToggleWindowFold toggles the fold state of the selected window
@@ -411,25 +359,35 @@ func (m *DisplayModel) ToggleWindowFold() bool {
 	return m.windowBuffer.ToggleFold(m.windowCursor)
 }
 
-// MoveWindowCursorToTop moves cursor to top visible window
+// MoveWindowCursorToTop moves cursor to top visible window.
 func (m *DisplayModel) MoveWindowCursorToTop() bool {
-	windowCount := m.windowBuffer.GetWindowCount()
-	if windowCount == 0 {
+	if m.windowBuffer.GetWindowCount() == 0 {
 		return false
 	}
 
 	viewportTop := m.viewport.YOffset()
-	for i := 0; i < windowCount; i++ {
-		startLine := m.windowBuffer.GetWindowStartLine(i)
-		endLine := m.windowBuffer.GetWindowEndLine(i)
-		if (startLine <= viewportTop && endLine > viewportTop) || startLine >= viewportTop {
-			if i == m.windowCursor {
-				return false // cursor unchanged, preserve autoFollow
-			}
-			m.windowCursor = i
-			m.autoFollow = false
+	viewportBottom := viewportTop + m.viewport.Height()
+	found := false
+
+	m.windowBuffer.ForEachVisible(func(i int, _ *Window, startLine, endLine int) bool {
+		// Skip windows entirely below the viewport
+		if startLine >= viewportBottom {
 			return true
 		}
+		// Check if this is the first visible window at or near the viewport top
+		if (startLine <= viewportTop && endLine > viewportTop) || startLine >= viewportTop {
+			if i != m.windowCursor {
+				m.windowCursor = i
+				found = true
+			}
+			return false
+		}
+		return true
+	})
+
+	if found {
+		m.autoFollow = false
+		return true
 	}
 	return false
 }
@@ -440,23 +398,34 @@ func (m *DisplayModel) MoveWindowCursorToBottom() bool {
 	if m.autoFollow {
 		return false
 	}
-	windowCount := m.windowBuffer.GetWindowCount()
-	if windowCount == 0 {
+	if m.windowBuffer.GetWindowCount() == 0 {
 		return false
 	}
 
-	viewportBottom := m.viewport.YOffset() + m.viewport.Height()
-	for i := windowCount - 1; i >= 0; i-- {
-		startLine := m.windowBuffer.GetWindowStartLine(i)
-		endLine := m.windowBuffer.GetWindowEndLine(i)
-		if (startLine < viewportBottom && endLine >= viewportBottom) || endLine <= viewportBottom {
-			if i == m.windowCursor {
-				return false
-			}
-			m.windowCursor = i
-			m.autoFollow = false
+	viewportTop := m.viewport.YOffset()
+	viewportBottom := viewportTop + m.viewport.Height()
+	found := false
+
+	m.windowBuffer.ForEachVisibleBackward(func(i int, _ *Window, startLine, endLine int) bool {
+		// Skip windows entirely above the viewport
+		if endLine <= viewportTop {
 			return true
 		}
+		// Skip windows entirely below the viewport
+		if startLine >= viewportBottom {
+			return true
+		}
+		// This window is at least partially visible and is the bottommost one
+		if i != m.windowCursor {
+			m.windowCursor = i
+			found = true
+		}
+		return false
+	})
+
+	if found {
+		m.autoFollow = false
+		return true
 	}
 	return false
 }
@@ -465,8 +434,7 @@ func (m *DisplayModel) MoveWindowCursorToBottom() bool {
 // It finds the window that contains the center line of the visible viewport.
 // If no window contains the center line, it finds the window closest to the center.
 func (m *DisplayModel) MoveWindowCursorToCenter() bool {
-	windowCount := m.windowBuffer.GetWindowCount()
-	if windowCount == 0 {
+	if m.windowBuffer.GetWindowCount() == 0 {
 		return false
 	}
 
@@ -476,40 +444,58 @@ func (m *DisplayModel) MoveWindowCursorToCenter() bool {
 	viewportCenter := viewportTop + viewportHeight/2
 
 	// First, try to find the window that contains the viewport center line
-	// endLine is exclusive, so we use < for the upper bound
-	for i := 0; i < windowCount; i++ {
-		startLine := m.windowBuffer.GetWindowStartLine(i)
-		endLine := m.windowBuffer.GetWindowEndLine(i)
-
-		// Check if viewport center line falls within this window
-		if viewportCenter >= startLine && viewportCenter < endLine {
-			if i == m.windowCursor {
-				return false // cursor unchanged, preserve autoFollow
-			}
-			m.windowCursor = i
-			m.autoFollow = false
-			return true
+	if idx := m.findWindowContainingLine(viewportCenter); idx >= 0 {
+		if idx == m.windowCursor {
+			return false // cursor unchanged, preserve autoFollow
 		}
+		m.windowCursor = idx
+		m.autoFollow = false
+		return true
 	}
 
 	// If center line falls in a gap (or all windows are above/below center),
 	// find the visible window whose center is closest to the viewport center
-	var bestWindow int
+	if idx := m.findClosestVisibleWindow(viewportTop, viewportTop+viewportHeight, viewportCenter); idx >= 0 {
+		if idx == m.windowCursor {
+			return false // cursor unchanged, preserve autoFollow
+		}
+		m.windowCursor = idx
+		m.autoFollow = false
+		return true
+	}
+
+	return false
+}
+
+// findWindowContainingLine returns the index of the first visible window that
+// contains the given line, or -1 if no such window exists.
+func (m *DisplayModel) findWindowContainingLine(line int) int {
+	idx := -1
+	m.windowBuffer.ForEachVisible(func(i int, _ *Window, startLine, endLine int) bool {
+		if line >= startLine && line < endLine {
+			idx = i
+			return false
+		}
+		return true
+	})
+	return idx
+}
+
+// findClosestVisibleWindow returns the index of the visible window whose
+// center is closest to viewportCenter, considering only windows that are
+// at least partially within [viewportTop, viewportBottom). Returns -1 if
+// no visible window is found in that range.
+func (m *DisplayModel) findClosestVisibleWindow(viewportTop, viewportBottom, viewportCenter int) int {
+	bestWindow := -1
 	bestDistance := -1
 
-	for i := 0; i < windowCount; i++ {
-		startLine := m.windowBuffer.GetWindowStartLine(i)
-		endLine := m.windowBuffer.GetWindowEndLine(i)
-
-		// Only consider visible windows
-		if startLine >= viewportTop+viewportHeight || endLine <= viewportTop {
-			continue
+	m.windowBuffer.ForEachVisible(func(i int, _ *Window, startLine, endLine int) bool {
+		// Skip windows entirely outside the viewport
+		if startLine >= viewportBottom || endLine <= viewportTop {
+			return true
 		}
 
-		// Calculate window center
 		windowCenter := (startLine + endLine) / 2
-
-		// Calculate absolute distance from window center to viewport center
 		distance := windowCenter - viewportCenter
 		if distance < 0 {
 			distance = -distance
@@ -519,76 +505,64 @@ func (m *DisplayModel) MoveWindowCursorToCenter() bool {
 			bestWindow = i
 			bestDistance = distance
 		}
-	}
-
-	if bestDistance >= 0 {
-		if bestWindow == m.windowCursor {
-			return false // cursor unchanged, preserve autoFollow
-		}
-		m.windowCursor = bestWindow
-		m.autoFollow = false
 		return true
-	}
+	})
 
-	return false
+	return bestWindow
 }
 
 // MoveWindowCursorToNextUserPrompt moves the window cursor forward (down) to
-// the next window whose tag is TagTextUser ("TU"). Returns false if no such
-// window exists below the current cursor.
+// the next visible window whose tag is TagTextUser ("TU"). Returns false if
+// no such window exists below the current cursor.
 func (m *DisplayModel) MoveWindowCursorToNextUserPrompt() bool {
-	windowCount := m.windowBuffer.GetWindowCount()
-	if windowCount == 0 {
+	if m.windowBuffer.GetWindowCount() == 0 {
 		return false
 	}
 
-	// Start searching from the window after the current cursor.
-	// If cursor is -1 (none), start from 0.
-	start := m.windowCursor + 1
-	if start < 0 {
-		start = 0
-	}
-
-	for i := start; i < windowCount; i++ {
-		w := m.windowBuffer.GetWindow(i)
-		if w != nil && w.Tag == stream.TagTextUser {
-			if i == m.windowCursor {
-				return false // cursor unchanged, preserve autoFollow
-			}
-			m.windowCursor = i
-			m.autoFollow = false
+	found := false
+	m.windowBuffer.ForEachVisible(func(i int, w *Window, _, _ int) bool {
+		if i <= m.windowCursor {
 			return true
 		}
+		if w.Tag == stream.TagTextUser {
+			m.windowCursor = i
+			found = true
+			return false
+		}
+		return true
+	})
+
+	if found {
+		m.autoFollow = false
+		return true
 	}
 	return false
 }
 
 // MoveWindowCursorToPrevUserPrompt moves the window cursor backward (up) to
-// the previous window whose tag is TagTextUser ("TU"). Returns false if no
-// such window exists above the current cursor.
+// the previous visible window whose tag is TagTextUser ("TU"). Returns false
+// if no such window exists above the current cursor.
 func (m *DisplayModel) MoveWindowCursorToPrevUserPrompt() bool {
-	windowCount := m.windowBuffer.GetWindowCount()
-	if windowCount == 0 {
+	if m.windowBuffer.GetWindowCount() == 0 {
 		return false
 	}
 
-	// Start searching from the window before the current cursor.
-	// Clamp cursor so we don't go out of bounds.
-	start := m.windowCursor - 1
-	if start >= windowCount {
-		start = windowCount - 1
-	}
-
-	for i := start; i >= 0; i-- {
-		w := m.windowBuffer.GetWindow(i)
-		if w != nil && w.Tag == stream.TagTextUser {
-			if i == m.windowCursor {
-				return false // cursor unchanged, preserve autoFollow
-			}
-			m.windowCursor = i
-			m.autoFollow = false
+	found := false
+	m.windowBuffer.ForEachVisibleBackward(func(i int, w *Window, _, _ int) bool {
+		if i >= m.windowCursor {
 			return true
 		}
+		if w.Tag == stream.TagTextUser {
+			m.windowCursor = i
+			found = true
+			return false
+		}
+		return true
+	})
+
+	if found {
+		m.autoFollow = false
+		return true
 	}
 	return false
 }

@@ -379,6 +379,109 @@ func (wb *WindowBuffer) GetTotalLines() int {
 	return wb.totalLines
 }
 
+// ForEachVisible iterates forward over all visible windows, calling fn
+// with the window index, the window pointer, and its line range [start, end).
+// If fn returns false, iteration stops. Returns true if all visible windows
+// were visited (fn never returned false).
+func (wb *WindowBuffer) ForEachVisible(fn func(i int, w *Window, startLine, endLine int) bool) bool {
+	wb.mu.Lock()
+	defer wb.mu.Unlock()
+	wb.ensureLineHeights()
+
+	pos := 0
+	for i, w := range wb.Windows {
+		end := pos + wb.lineHeights[i]
+		if w.Visible && !fn(i, w, pos, end) {
+			return false
+		}
+		pos = end
+	}
+	return true
+}
+
+// ForEachVisibleBackward iterates backward over all visible windows, calling fn
+// with the window index, the window pointer, and its line range [start, end).
+// If fn returns false, iteration stops. Returns true if all visible windows
+// were visited (fn never returned false).
+func (wb *WindowBuffer) ForEachVisibleBackward(fn func(i int, w *Window, startLine, endLine int) bool) bool {
+	wb.mu.Lock()
+	defer wb.mu.Unlock()
+	wb.ensureLineHeights()
+
+	// Compute cumulative positions
+	positions := make([]int, len(wb.Windows)+1) // positions[i] = start line of window i
+	pos := 0
+	for i := range wb.Windows {
+		positions[i] = pos
+		pos += wb.lineHeights[i]
+	}
+	positions[len(wb.Windows)] = pos
+
+	// Iterate backward
+	for i := len(wb.Windows) - 1; i >= 0; i-- {
+		w := wb.Windows[i]
+		if w.Visible && !fn(i, w, positions[i], positions[i+1]) {
+			return false
+		}
+	}
+	return true
+}
+
+// FirstVisibleIndex returns the index of the first visible window, or -1.
+func (wb *WindowBuffer) FirstVisibleIndex() int {
+	wb.mu.Lock()
+	defer wb.mu.Unlock()
+	for i, w := range wb.Windows {
+		if w.Visible {
+			return i
+		}
+	}
+	return -1
+}
+
+// LastVisibleIndex returns the index of the last visible window, or -1.
+func (wb *WindowBuffer) LastVisibleIndex() int {
+	wb.mu.Lock()
+	defer wb.mu.Unlock()
+	for i := len(wb.Windows) - 1; i >= 0; i-- {
+		if wb.Windows[i].Visible {
+			return i
+		}
+	}
+	return -1
+}
+
+// NearestVisibleIndex returns the index of a visible window nearest to the
+// given index, searching forward first then backward, or -1 if no visible
+// windows exist.
+func (wb *WindowBuffer) NearestVisibleIndex(index int) int {
+	wb.mu.Lock()
+	defer wb.mu.Unlock()
+	n := len(wb.Windows)
+	if n == 0 {
+		return -1
+	}
+	// Clamp index to bounds
+	if index < 0 {
+		index = 0
+	}
+	if index >= n {
+		index = n - 1
+	}
+	// Search forward first, then backward
+	for i := index; i < n; i++ {
+		if wb.Windows[i].Visible {
+			return i
+		}
+	}
+	for i := index - 1; i >= 0; i-- {
+		if wb.Windows[i].Visible {
+			return i
+		}
+	}
+	return -1
+}
+
 // ============================================================================
 // Virtual Rendering
 // ============================================================================
