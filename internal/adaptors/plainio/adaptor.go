@@ -100,21 +100,15 @@ func (a *Adaptor) Start() int {
 		}
 	}()
 
-	// Watch for errors — close input so queued tasks are abandoned.
-	go func() {
-		output.WaitForError()
-		input.Close()
-		select {
-		case exitCh <- 1:
-		default:
-		}
-	}()
-
 	// Main goroutine owns all signal handling. No SIGINT goroutine.
-	// First exit trigger wins: EOF (0), error (1), or Ctrl-C (130).
+	// First exit trigger wins: EOF (0), Ctrl-C (130), or error via
+	// the output.ErrorChannel() path (1).
 	code := 0
 	select {
 	case code = <-exitCh:
+	case <-output.ErrorChannel():
+		code = 1
+		input.Close()
 	case <-sigCh:
 		code = 128 + int(syscall.SIGINT)
 		input.Close()

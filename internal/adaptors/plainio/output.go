@@ -61,6 +61,13 @@ func (o *stdoutOutput) WaitForError() {
 	<-o.errorCh
 }
 
+// ErrorChannel returns a channel that is closed when an SE (system error)
+// tag is received. It can be used in a select to react to errors without
+// a dedicated goroutine.
+func (o *stdoutOutput) ErrorChannel() <-chan struct{} {
+	return o.errorCh
+}
+
 // HasError returns true if any SE tag was ever received.
 func (o *stdoutOutput) HasError() bool {
 	o.mu.Lock()
