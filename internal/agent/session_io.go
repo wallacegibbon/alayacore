@@ -35,13 +35,8 @@ func (s *Session) handleCommand(ctx context.Context, cmd string) {
 }
 
 func (s *Session) cancelTask() {
-	if s.inProgress && s.cancelReq != nil {
-		// Signal the running task's cancel listener goroutine.
-		// Non-blocking send; the listener may already be processing.
-		select {
-		case s.cancelReq <- struct{}{}:
-		default:
-		}
+	if s.inProgress && s.cancelCurrent != nil {
+		s.cancelCurrent()
 		return
 	}
 	s.writeError(domainerrors.ErrNothingToCancel.Error())
@@ -52,12 +47,9 @@ func (s *Session) cancelAllTasks() {
 	s.taskQueue = make([]QueueItem, 0)
 
 	currentCanceled := false
-	if s.inProgress && s.cancelReq != nil {
-		select {
-		case s.cancelReq <- struct{}{}:
-			currentCanceled = true
-		default:
-		}
+	if s.inProgress && s.cancelCurrent != nil {
+		s.cancelCurrent()
+		currentCanceled = true
 	}
 
 	// Send notification

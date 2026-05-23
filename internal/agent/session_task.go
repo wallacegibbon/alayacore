@@ -5,7 +5,7 @@ package agent
 //
 // All methods in this file are called from the single run() goroutine
 // (except inputPump which is a pure I/O goroutine that sends messages
-// to run() and may signal cancelReq for :cancel commands only).
+// to run() and may call cancelCurrent for :cancel commands only).
 
 import (
 	"context"
@@ -57,10 +57,10 @@ func (s *Session) run() {
 			s.inProgress = len(s.taskQueue) > 0
 
 			// After the task completes (or gets canceled), reset
-			// cancelReq so the inputPump goroutine can't signal
-			// a stale channel (the channel was already closed in
+			// cancelCurrent so the inputPump goroutine can't cancel
+			// a stale context (the context was already canceled in
 			// runTask's defer).
-			s.cancelReq = nil
+			s.cancelCurrent = nil
 			currentTask = nil
 
 			// Drain any pending cancel commands from the input buffer
@@ -93,9 +93,9 @@ type inputMsg struct {
 
 // inputPump runs in its own goroutine and reads TLV frames from the
 // input stream. It sends parsed messages to msgCh. It does NOT access
-// any session state except cancelReq (for :cancel commands), which is
-// an explicitly synchronized channel — the only cross-goroutine
-// communication besides msgCh itself.
+// any session state except cancelCurrent (for :cancel commands), which
+// is safe because context.CancelFunc is documented as safe for concurrent
+// use.
 func (s *Session) inputPump(msgCh chan<- inputMsg) {
 	for {
 		tag, value, err := stream.ReadTLV(s.Input)
@@ -110,20 +110,16 @@ func (s *Session) inputPump(msgCh chan<- inputMsg) {
 		if len(value) > 0 && value[0] == ':' {
 			cmd := value[1:]
 			if cmd == commandNameCancel || cmd == commandNameCancelAll {
-				if s.cancelReq != nil {
-					// A task is running — send the cancel signal directly
-					// and do NOT enqueue to msgCh. The task interrupt
-					// (via cancelReq) already handles stopping the API
+				if s.cancelCurrent != nil {
+					// A task is running — cancel it directly and do NOT
+					// enqueue to msgCh. The cancellation stops the API
 					// call; runTask's deferred cleanup calls
 					// appendCancelMessage and autoSave. Enqueuing to
 					// msgCh would cause a spurious "nothing to cancel"
 					// message later when run() drains the channel after
 					// runTask returns (inProgress is already false by
 					// then).
-					select {
-					case s.cancelReq <- struct{}{}:
-					default:
-					}
+					s.cancelCurrent()
 					continue
 				}
 				// No task running — fall through to msgCh so the

@@ -11,9 +11,10 @@ package agent
 //   The only cross-goroutine communication is:
 //     1. The input channel (ChanInput.Channel) — fed by adaptor, drained by run()
 //     2. sessionCancel — cancels the run() goroutine from outside
-//     3. cancelReq — a channel set by run() before starting a task and read by
-//        the inputPump goroutine (inputPump sends on it for :cancel commands,
-//        never modifies session state)
+//     3. cancelCurrent — a context.CancelFunc set by runTask() before starting a
+//        task and cleared after. inputPump reads it to call for :cancel commands.
+//        context.CancelFunc is documented as safe for concurrent use, so this
+//        cross-goroutine access is safe.
 //
 // Related files:
 //   - session_types.go — type definitions (Task, SystemInfo, SessionConfig, etc.)
@@ -57,13 +58,12 @@ type Session struct {
 	nextPromptID  uint64
 	nextQueueID   uint64
 
-	// cancelReq is a signal channel used by inputPump to request cancellation
-	// of the current task. It is created by runTask() before starting a task
-	// and set to nil after. inputPump sends (non-blocking) on this channel
-	// when it receives :cancel / :cancel_all commands. This makes the
-	// cross-goroutine cancellation explicit via a channel send rather than
-	// sharing a context.CancelFunc.
-	cancelReq chan struct{}
+	// cancelCurrent is set by runTask() before starting a task and cleared after.
+	// It is read by inputPump (a separate goroutine) ONLY to call it for
+	// :cancel / :cancel_all commands. context.CancelFunc is documented as safe
+	// for concurrent use, making this safe despite being read/written across
+	// goroutines.
+	cancelCurrent context.CancelFunc
 
 	sessionCtx    context.Context    // canceled when input is exhausted
 	sessionCancel context.CancelFunc // idempotent cancel
