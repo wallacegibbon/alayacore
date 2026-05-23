@@ -7,6 +7,20 @@ package terminal
 // expect it to work - the outer styling will not wrap the inner styled segments.
 // Always render segments separately, then join them.
 
+// LOCK ORDERING DESIGN:
+//
+// outputWriter.mu protects only the raw TLV buffer (buffer field) and the
+// processBuffer() → writeColored() → windowBuffer.* call chain. The lock
+// ordering is:
+//
+//	outputWriter.mu → WindowBuffer.mu   (inside Write / processBuffer)
+//
+// SNAPSHOT METHODS (SnapshotStatus, SnapshotModels, GetQueueItems) never
+// acquire outputWriter.mu. All fields they read use atomic operations so
+// they are safe to call while WindowBuffer.mu is held. This eliminates the
+// lock ordering inversion that would occur if Bubble Tea's tick handler
+// held WindowBuffer.mu and then tried to acquire outputWriter.mu.
+
 import (
 	"encoding/binary"
 	"encoding/json"
@@ -19,34 +33,55 @@ import (
 	"github.com/alayacore/alayacore/internal/stream"
 )
 
+// modelsHolder wraps a models slice for atomic.Pointer storage.
+type modelsHolder struct {
+	models []agentpkg.ModelInfo
+}
+
+// queueItemsHolder wraps a queue items slice for atomic.Pointer storage.
+type queueItemsHolder struct {
+	items []QueueItem
+}
+
+// stringHolder wraps a string for atomic.Pointer storage.
+type stringHolder struct {
+	s string
+}
+
 // outputWriter parses TLV from the session and writes styled content to the WindowBuffer.
 // It implements io.Writer for the agent/session output stream.
 //
-// LOCK ORDERING: outputWriter.mu MUST be acquired before WindowBuffer.mu.
-// Never acquire them in the opposite order — see Write() for the canonical path.
+// All fields read by SnapshotStatus, SnapshotModels, and GetQueueItems are
+// atomic — these methods never acquire outputWriter.mu.
 type outputWriter struct {
-	windowBuffer      *WindowBuffer
-	buffer            []byte
-	mu                sync.Mutex
-	dirty             atomic.Bool            // true when display needs refresh
-	inProgress        bool                   // Whether session has task in progress
-	styles            atomic.Pointer[Styles] // UI styles (accessed atomically for concurrent SetStyles/read)
-	nextWindowID      atomic.Int64           // Monotonic counter for generating window IDs
-	models            []agentpkg.ModelInfo
-	activeModelID     int         // Current active model ID
-	hasModels         bool        // Whether models are configured
-	modelConfigPath   string      // Path to model.conf
-	activeModelName   string      // Name of active model
-	pendingQueueItems []QueueItem // Queue items from taskqueue_get_all
-	queueCount        int         // Number of items in the queue
-	currentStep       int         // Current step in agent loop (1-indexed)
-	maxSteps          int         // Maximum steps allowed
-	lastCurrentStep   int         // Last step reached in completed task
-	lastMaxSteps      int         // Last max steps from completed task
-	lastTaskError     bool        // Whether last completed task ended with error
-	thinkLevel        int         // Think level: 0=off, 1=normal, 2=max
-	contextTokens     int64       // Current context token count
-	contextLimit      int64       // Context token limit (0 = unlimited)
+	windowBuffer *WindowBuffer
+	buffer       []byte
+	mu           sync.Mutex // protects buffer and processBuffer; NOT used by snapshot methods
+	dirty        atomic.Bool
+	styles       atomic.Pointer[Styles]
+	nextWindowID atomic.Int64
+
+	// Status fields — read atomically by SnapshotStatus
+	contextTokens   atomic.Int64
+	contextLimit    atomic.Int64
+	queueCount      atomic.Int32
+	inProgress      atomic.Bool
+	currentStep     atomic.Int32
+	maxSteps        atomic.Int32
+	lastCurrentStep atomic.Int32
+	lastMaxSteps    atomic.Int32
+	lastTaskError   atomic.Bool
+	thinkLevel      atomic.Int32
+
+	// Model fields — read atomically by SnapshotModels
+	models          atomic.Pointer[modelsHolder]
+	activeModelID   atomic.Int32
+	activeModelName atomic.Pointer[stringHolder]
+	hasModels       atomic.Bool
+	modelConfigPath atomic.Pointer[stringHolder]
+
+	// Queue items — read atomically by GetQueueItems
+	pendingQueueItems atomic.Pointer[queueItemsHolder]
 }
 
 func NewTerminalOutput(styles *Styles) *outputWriter { //nolint:revive // tests need access to internal methods
@@ -203,7 +238,10 @@ func (to *outputWriter) triggerUpdateForTag(tag string) {
 	}
 }
 
-// handleSystemTag processes system information tags
+// handleSystemTag processes system information tags.
+// Called from processBuffer which holds outputWriter.mu, but all field
+// writes use atomic operations so snapshot methods (called without mu)
+// see consistent values.
 func (to *outputWriter) handleSystemTag(value string) {
 	var info agentpkg.SystemInfo
 	if err := json.Unmarshal([]byte(value), &info); err != nil {
@@ -212,39 +250,39 @@ func (to *outputWriter) handleSystemTag(value string) {
 	to.updateStepTracking(info)
 	to.updateModelState(info)
 	to.updateQueueItems(info)
-	to.currentStep = info.CurrentStep
-	to.maxSteps = info.MaxSteps
-	to.thinkLevel = info.ThinkLevel
+	to.currentStep.Store(int32(info.CurrentStep))
+	to.maxSteps.Store(int32(info.MaxSteps))
+	to.thinkLevel.Store(int32(info.ThinkLevel))
 	to.dirty.Store(true)
 }
 
 // updateStepTracking handles the step-info bookkeeping around task transitions.
 func (to *outputWriter) updateStepTracking(info agentpkg.SystemInfo) {
 	// Save step info when task completes (transition from in-progress to done)
-	if to.inProgress && !info.InProgress && to.maxSteps > 0 {
-		to.lastCurrentStep = to.currentStep
-		to.lastMaxSteps = to.maxSteps
-		to.lastTaskError = info.TaskError
+	if to.inProgress.Load() && !info.InProgress && to.maxSteps.Load() > 0 {
+		to.lastCurrentStep.Store(to.currentStep.Load())
+		to.lastMaxSteps.Store(to.maxSteps.Load())
+		to.lastTaskError.Store(info.TaskError)
 	}
 	// Reset last step info when new task starts (transition from not-in-progress to in-progress)
-	if !to.inProgress && info.InProgress {
-		to.lastCurrentStep = 0
-		to.lastMaxSteps = 0
-		to.lastTaskError = false
+	if !to.inProgress.Load() && info.InProgress {
+		to.lastCurrentStep.Store(0)
+		to.lastMaxSteps.Store(0)
+		to.lastTaskError.Store(false)
 	}
-	to.inProgress = info.InProgress
-	to.queueCount = len(info.QueueItems)
-	to.contextTokens = info.ContextTokens
-	to.contextLimit = info.ContextLimit
+	to.inProgress.Store(info.InProgress)
+	to.queueCount.Store(int32(len(info.QueueItems)))
+	to.contextTokens.Store(info.ContextTokens)
+	to.contextLimit.Store(info.ContextLimit)
 }
 
 // updateModelState updates cached model-related fields from SystemInfo.
 func (to *outputWriter) updateModelState(info agentpkg.SystemInfo) {
-	to.models = info.Models
-	to.activeModelID = info.ActiveModelID
-	to.hasModels = info.HasModels
-	to.modelConfigPath = info.ModelConfigPath
-	to.activeModelName = info.ActiveModelName
+	to.models.Store(&modelsHolder{models: info.Models})
+	to.activeModelID.Store(int32(info.ActiveModelID))
+	to.hasModels.Store(info.HasModels)
+	to.modelConfigPath.Store(&stringHolder{s: info.ModelConfigPath})
+	to.activeModelName.Store(&stringHolder{s: info.ActiveModelName})
 }
 
 // updateQueueItems converts and stores the queue items from SystemInfo.
@@ -262,49 +300,55 @@ func (to *outputWriter) updateQueueItems(info agentpkg.SystemInfo) {
 			CreatedAt: createdAt,
 		}
 	}
-	to.pendingQueueItems = items
+	to.pendingQueueItems.Store(&queueItemsHolder{items: items})
 }
 
 // SnapshotStatus returns a consistent point-in-time view of session status.
-// All fields are read under a single lock, preventing torn reads.
+// All fields use atomic operations — no mutex needed.
 func (to *outputWriter) SnapshotStatus() StatusSnapshot {
-	to.mu.Lock()
-	defer to.mu.Unlock()
 	return StatusSnapshot{
-		ContextTokens:   to.contextTokens,
-		ContextLimit:    to.contextLimit,
-		QueueCount:      to.queueCount,
-		InProgress:      to.inProgress,
-		CurrentStep:     to.currentStep,
-		MaxSteps:        to.maxSteps,
-		LastCurrentStep: to.lastCurrentStep,
-		LastMaxSteps:    to.lastMaxSteps,
-		TaskError:       to.lastTaskError,
-		ThinkLevel:      to.thinkLevel,
+		ContextTokens:   to.contextTokens.Load(),
+		ContextLimit:    to.contextLimit.Load(),
+		QueueCount:      int(to.queueCount.Load()),
+		InProgress:      to.inProgress.Load(),
+		CurrentStep:     int(to.currentStep.Load()),
+		MaxSteps:        int(to.maxSteps.Load()),
+		LastCurrentStep: int(to.lastCurrentStep.Load()),
+		LastMaxSteps:    int(to.lastMaxSteps.Load()),
+		TaskError:       to.lastTaskError.Load(),
+		ThinkLevel:      int(to.thinkLevel.Load()),
 	}
 }
 
 // SnapshotModels returns a consistent point-in-time view of model state.
-// All fields are read under a single lock, preventing torn reads.
+// All fields use atomic operations — no mutex needed.
 func (to *outputWriter) SnapshotModels() ModelSnapshot {
-	to.mu.Lock()
-	defer to.mu.Unlock()
-	return ModelSnapshot{
-		Models:     to.models,
-		ActiveID:   to.activeModelID,
-		ActiveName: to.activeModelName,
-		HasModels:  to.hasModels,
-		ConfigPath: to.modelConfigPath,
+	snap := ModelSnapshot{
+		ActiveID:   int(to.activeModelID.Load()),
+		HasModels:  to.hasModels.Load(),
+		ConfigPath: "",
+		ActiveName: "",
 	}
+	if h := to.modelConfigPath.Load(); h != nil {
+		snap.ConfigPath = h.s
+	}
+	if h := to.activeModelName.Load(); h != nil {
+		snap.ActiveName = h.s
+	}
+	if h := to.models.Load(); h != nil {
+		snap.Models = h.models
+	}
+	return snap
 }
 
-// GetQueueItems returns and clears the pending queue items
+// GetQueueItems returns and clears the pending queue items.
+// Uses atomic swap — no mutex needed.
 func (to *outputWriter) GetQueueItems() []QueueItem {
-	to.mu.Lock()
-	defer to.mu.Unlock()
-	items := to.pendingQueueItems
-	to.pendingQueueItems = nil
-	return items
+	h := to.pendingQueueItems.Swap(nil)
+	if h == nil {
+		return nil
+	}
+	return h.items
 }
 
 // generateWindowID returns a unique window ID for non-delta messages.
