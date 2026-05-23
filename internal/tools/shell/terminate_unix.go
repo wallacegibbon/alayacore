@@ -71,3 +71,20 @@ func ExitCodeFromError(err error) int {
 	}
 	return -1
 }
+
+// ExitCodeFromProcessState extracts the exit code from an OS process state.
+// Unlike ProcessState.ExitCode() (which returns -1 for signal-killed
+// processes on Unix), this returns the conventional 128+signal value.
+// Returns -1 if ps is nil.
+func ExitCodeFromProcessState(ps *os.ProcessState) int {
+	if ps == nil {
+		return -1
+	}
+	if ws, ok := ps.Sys().(syscall.WaitStatus); ok {
+		if ws.Signaled() {
+			return 128 + int(ws.Signal())
+		}
+		return ws.ExitStatus()
+	}
+	return ps.ExitCode()
+}

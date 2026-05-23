@@ -271,3 +271,13 @@ func ExitCodeFromError(err error) int {
 	}
 	return -1
 }
+
+// ExitCodeFromProcessState extracts the exit code from an OS process state.
+// On Windows this delegates to ProcessState.ExitCode().
+// Returns -1 if ps is nil.
+func ExitCodeFromProcessState(ps *os.ProcessState) int {
+	if ps == nil {
+		return -1
+	}
+	return ps.ExitCode()
+}

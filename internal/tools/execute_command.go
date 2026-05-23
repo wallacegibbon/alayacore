@@ -113,6 +113,16 @@ func executeCommand(ctx context.Context, args executeCommandInput) (llm.ToolResu
 	// automatically via the context. No manual goroutine needed.
 	execErr := cmd.Wait()
 
+	// Extract the exit code.  When the process exits in response to SIGINT
+	// (e.g. sleep → exit 130) before WaitDelay expires, execErr is
+	// *exec.ExitError with the correct code.  When the framework kills the
+	// process after WaitDelay (SIGKILL), execErr may be a context error;
+	// in that case we fall back to ProcessState directly.
+	exitCode := shell.ExitCodeFromError(execErr)
+	if exitCode == -1 && cmd.ProcessState != nil {
+		exitCode = shell.ExitCodeFromProcessState(cmd.ProcessState)
+	}
+
 	// Check parent context first to detect user cancellation regardless of
 	// what error cmd.Wait() returned.  When the process exits quickly in
 	// response to SIGINT (e.g. sleep → exit 130), cmd.Wait() returns an
@@ -120,11 +130,11 @@ func executeCommand(ctx context.Context, args executeCommandInput) (llm.ToolResu
 	// context directly.
 	if ctx.Err() != nil {
 		// Parent context was canceled (user sent :cancel)
-		return handleCommandCancellation(&stdout, &stderr), nil
+		return handleCommandCancellation(&stdout, &stderr, exitCode), nil
 	}
 	if errors.Is(execErr, context.DeadlineExceeded) || timeoutCtx.Err() != nil {
 		// Timeout expired — the process was killed by the framework
-		return handleCommandTimeout(&stdout, &stderr), nil
+		return handleCommandTimeout(&stdout, &stderr, exitCode), nil
 	}
 	if execErr != nil {
 		// Non-zero exit or other error
@@ -134,8 +144,7 @@ func executeCommand(ctx context.Context, args executeCommandInput) (llm.ToolResu
 	return handleCommandCompletion(nil, &stdout, &stderr), nil
 }
 
-func handleCommandCancellation(stdout, stderr *bytes.Buffer) llm.ToolResultOutput {
-	exitCode := -1
+func handleCommandCancellation(stdout, stderr *bytes.Buffer, exitCode int) llm.ToolResultOutput {
 	output := formatCommandOutput(stdout, stderr, exitCode)
 
 	if len(output) > maxCommandOutput {
@@ -148,8 +157,7 @@ func handleCommandCancellation(stdout, stderr *bytes.Buffer) llm.ToolResultOutpu
 	return llm.NewTextErrorResponse(fmt.Sprintf("Canceled (exit %d)", exitCode))
 }
 
-func handleCommandTimeout(stdout, stderr *bytes.Buffer) llm.ToolResultOutput {
-	exitCode := -1
+func handleCommandTimeout(stdout, stderr *bytes.Buffer, exitCode int) llm.ToolResultOutput {
 	output := formatCommandOutput(stdout, stderr, exitCode)
 
 	if len(output) > maxCommandOutput {
