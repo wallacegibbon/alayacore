@@ -167,26 +167,36 @@ func (m *DisplayModel) GetCursorWindowContent() string {
 	return m.windowBuffer.GetWindowContent(m.windowCursor)
 }
 
+// setCursor sets the window cursor and disables auto-follow.
+// Only SetCursorToLastWindow re-enables auto-follow afterwards.
+func (m *DisplayModel) setCursor(i int) {
+	m.windowCursor = i
+	m.autoFollow = false
+}
+
+// clearCursor unsets the window cursor and disables auto-follow.
+func (m *DisplayModel) clearCursor() {
+	m.windowCursor = -1
+	m.autoFollow = false
+}
+
 // SetWindowCursor sets the window cursor to a specific visible window near the given index.
 // If the index points to an invisible window, the nearest visible window is chosen instead.
 // Disables auto-follow only if the cursor actually moves; only G re-enables it.
 func (m *DisplayModel) SetWindowCursor(index int) {
 	if index < 0 || m.windowBuffer.GetWindowCount() == 0 {
-		m.windowCursor = -1
-		m.autoFollow = false
+		m.clearCursor()
 		return
 	}
 	index = m.windowBuffer.NearestVisibleIndex(index)
 	if index < 0 {
-		m.windowCursor = -1
-		m.autoFollow = false
+		m.clearCursor()
 		return
 	}
 	if m.windowCursor == index {
 		return // cursor unchanged, preserve autoFollow
 	}
-	m.windowCursor = index
-	m.autoFollow = false
+	m.setCursor(index)
 }
 
 // MoveWindowCursorDown moves the window cursor down, skipping invisible windows.
@@ -208,8 +218,7 @@ func (m *DisplayModel) MoveWindowCursorDown() bool {
 	if m.windowCursor < 0 {
 		i := m.windowBuffer.FirstVisibleIndex()
 		if i >= 0 {
-			m.windowCursor = i
-			m.autoFollow = false
+			m.setCursor(i)
 			return true
 		}
 		return false
@@ -218,15 +227,11 @@ func (m *DisplayModel) MoveWindowCursorDown() bool {
 	// Step forward to the next visible window
 	found := false
 	m.windowBuffer.ForEachVisibleFrom(m.windowCursor+1, func(i int, _ *Window, _, _ int) bool {
-		m.windowCursor = i
+		m.setCursor(i)
 		found = true
 		return false
 	})
-	if found {
-		m.autoFollow = false
-		return true
-	}
-	return false
+	return found
 }
 
 // MoveWindowCursorUp moves the window cursor up, skipping invisible windows.
@@ -242,8 +247,7 @@ func (m *DisplayModel) MoveWindowCursorUp() bool {
 			if m.windowCursor == i {
 				return false
 			}
-			m.windowCursor = i
-			m.autoFollow = false
+			m.setCursor(i)
 			return true
 		}
 		return false
@@ -252,15 +256,11 @@ func (m *DisplayModel) MoveWindowCursorUp() bool {
 	// Step backward to the previous visible window
 	found := false
 	m.windowBuffer.ForEachVisibleBackwardFrom(m.windowCursor-1, func(i int, _ *Window, _, _ int) bool {
-		m.windowCursor = i
+		m.setCursor(i)
 		found = true
 		return false
 	})
-	if found {
-		m.autoFollow = false
-		return true
-	}
-	return false
+	return found
 }
 
 // MarkUserScrolled disables auto-follow. Called by scroll keys (J/K/Ctrl-D/Ctrl-U).
@@ -328,9 +328,11 @@ func (m *DisplayModel) ClampCursor() {
 		m.windowCursor = -1
 		return
 	}
-	// Use NearestVisibleIndex to handle out-of-bounds or invisible cursor
-	clamped := m.windowBuffer.NearestVisibleIndex(m.windowCursor)
-	m.windowCursor = clamped
+	// Use NearestVisibleIndex to handle out-of-bounds or invisible cursor.
+	// Note: we assign directly instead of using setCursor because ClampCursor
+	// intentionally does NOT modify autoFollow — it's a silent correction that
+	// preserves the user's scroll/follow state.
+	m.windowCursor = m.windowBuffer.NearestVisibleIndex(m.windowCursor)
 }
 
 // SetCursorToLastWindow sets the cursor to the last visible window
@@ -370,7 +372,7 @@ func (m *DisplayModel) MoveWindowCursorToTop() bool {
 		// Check if this is the first visible window at or near the viewport top
 		if (startLine <= viewportTop && endLine > viewportTop) || startLine >= viewportTop {
 			if i != m.windowCursor {
-				m.windowCursor = i
+				m.setCursor(i)
 				found = true
 			}
 			return false
@@ -378,11 +380,7 @@ func (m *DisplayModel) MoveWindowCursorToTop() bool {
 		return true
 	})
 
-	if found {
-		m.autoFollow = false
-		return true
-	}
-	return false
+	return found
 }
 
 // MoveWindowCursorToBottom moves cursor to bottom visible window.
@@ -410,17 +408,13 @@ func (m *DisplayModel) MoveWindowCursorToBottom() bool {
 		}
 		// This window is at least partially visible and is the bottommost one
 		if i != m.windowCursor {
-			m.windowCursor = i
+			m.setCursor(i)
 			found = true
 		}
 		return false
 	})
 
-	if found {
-		m.autoFollow = false
-		return true
-	}
-	return false
+	return found
 }
 
 // MoveWindowCursorToCenter moves cursor to the window at the visual center of the screen.
@@ -441,8 +435,7 @@ func (m *DisplayModel) MoveWindowCursorToCenter() bool {
 		if idx == m.windowCursor {
 			return false // cursor unchanged, preserve autoFollow
 		}
-		m.windowCursor = idx
-		m.autoFollow = false
+		m.setCursor(idx)
 		return true
 	}
 
@@ -452,8 +445,7 @@ func (m *DisplayModel) MoveWindowCursorToCenter() bool {
 		if idx == m.windowCursor {
 			return false // cursor unchanged, preserve autoFollow
 		}
-		m.windowCursor = idx
-		m.autoFollow = false
+		m.setCursor(idx)
 		return true
 	}
 
@@ -515,18 +507,14 @@ func (m *DisplayModel) MoveWindowCursorToNextUserPrompt() bool {
 	found := false
 	m.windowBuffer.ForEachVisibleFrom(m.windowCursor+1, func(i int, w *Window, _, _ int) bool {
 		if w.Tag == stream.TagTextUser {
-			m.windowCursor = i
+			m.setCursor(i)
 			found = true
 			return false
 		}
 		return true
 	})
 
-	if found {
-		m.autoFollow = false
-		return true
-	}
-	return false
+	return found
 }
 
 // MoveWindowCursorToPrevUserPrompt moves the window cursor backward (up) to
@@ -540,18 +528,14 @@ func (m *DisplayModel) MoveWindowCursorToPrevUserPrompt() bool {
 	found := false
 	m.windowBuffer.ForEachVisibleBackwardFrom(m.windowCursor-1, func(i int, w *Window, _, _ int) bool {
 		if w.Tag == stream.TagTextUser {
-			m.windowCursor = i
+			m.setCursor(i)
 			found = true
 			return false
 		}
 		return true
 	})
 
-	if found {
-		m.autoFollow = false
-		return true
-	}
-	return false
+	return found
 }
 
 var _ tea.Model = (*DisplayModel)(nil)
