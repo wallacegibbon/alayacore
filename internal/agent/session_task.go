@@ -227,10 +227,10 @@ func (s *Session) doAutoSummarize(ctx context.Context) {
 }
 
 func (s *Session) processPrompt(ctx context.Context, history []llm.Message) (int64, error) {
-	s.mu.Lock()
+	// nextPromptID is goroutine-local (only accessed from the task goroutine),
+	// so it's updated outside the mutex.
 	s.nextPromptID++
 	promptID := s.nextPromptID - 1
-	s.mu.Unlock()
 
 	var stepCount int
 	var outputTokens int64

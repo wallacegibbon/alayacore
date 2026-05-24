@@ -3,8 +3,9 @@ package agent
 // Session task queue: submit, enqueue, run, and manage queued tasks.
 //
 // The main loop (run()) manages the queue. Tasks are executed in their
-// own goroutine via runTask(). Shared state is protected by sync.Mutex
-// on the Session struct.
+// own goroutine via runTask(). Shared state (taskQueue, inProgress,
+// pausedOnError) is protected by sync.Mutex on the Session struct.
+// Goroutine-local fields (nextQueueID) are updated outside the lock.
 
 import (
 	"context"
@@ -48,8 +49,10 @@ func (s *Session) submitDeferredCommand(cmd string) {
 
 // enqueueTask adds a task to the queue. When front is true, the task is
 // placed at the front so it runs before previously queued items.
+//
+// nextQueueID is goroutine-local (only accessed from the run() goroutine),
+// so it's updated outside the mutex.
 func (s *Session) enqueueTask(task Task, front bool) {
-	s.mu.Lock()
 	s.nextQueueID++
 	queueID := fmt.Sprintf("Q%d", s.nextQueueID)
 
@@ -68,6 +71,7 @@ func (s *Session) enqueueTask(task Task, front bool) {
 		CreatedAt: time.Now(),
 	}
 
+	s.mu.Lock()
 	if front {
 		s.taskQueue = append([]QueueItem{item}, s.taskQueue...)
 	} else {
