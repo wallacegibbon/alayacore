@@ -3,9 +3,11 @@ package agent
 // Session task queue: submit, enqueue, run, and manage queued tasks.
 //
 // The main loop (run()) manages the queue. Tasks are executed in their
-// own goroutine via runTask(). Shared state (taskQueue) is protected by
-// sync.Mutex on the Session struct. Simple flags (inProgress, pausedOnError)
-// use atomic.Bool for lock-free access.
+// own goroutine via runTask(). The task queue is owned exclusively by
+// the run() goroutine — no mutex needed.
+//
+// The task goroutine communicates state changes (step progress, new
+// messages, token counts) back to run() via stateCh.
 
 import (
 	"context"
@@ -16,13 +18,11 @@ import (
 )
 
 // ============================================================================
-// Task Submission
+// Task Submission (called from run() goroutine only)
 // ============================================================================
 
 func (s *Session) submitTask(task Task) {
-	s.mu.Lock()
 	queueEmpty := len(s.taskQueue) == 0
-	s.mu.Unlock()
 	// Clear paused-on-error only if queue was empty (new task will run immediately).
 	if queueEmpty {
 		s.pausedOnError.Store(false)
@@ -46,7 +46,7 @@ func (s *Session) submitDeferredCommand(cmd string) {
 // placed at the front so it runs before previously queued items.
 //
 // nextQueueID is goroutine-local (only accessed from the run() goroutine),
-// so it's updated outside the mutex.
+// so it's updated without synchronization.
 func (s *Session) enqueueTask(task Task, front bool) {
 	s.nextQueueID++
 	queueID := fmt.Sprintf("Q%d", s.nextQueueID)
@@ -66,24 +66,26 @@ func (s *Session) enqueueTask(task Task, front bool) {
 		CreatedAt: time.Now(),
 	}
 
-	s.mu.Lock()
 	if front {
 		s.taskQueue = append([]QueueItem{item}, s.taskQueue...)
 	} else {
 		s.taskQueue = append(s.taskQueue, item)
 	}
-	s.mu.Unlock()
 
 	s.sendSystemInfo()
 }
 
 // ============================================================================
-// Task Runner
+// Task Runner (runs in its own goroutine)
 // ============================================================================
 
 // runTask executes a single task in its own goroutine. It is called from
 // run() via "go s.runTask(item)". On completion it sends on taskDone so
 // the main loop can start the next task.
+//
+// The task goroutine receives a snapshot of messages at task start. All
+// state mutations during execution (step progress, new messages, token
+// counts) are sent to run() via stateCh.
 func (s *Session) runTask(item QueueItem) {
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -122,9 +124,7 @@ func (s *Session) runTask(item QueueItem) {
 		return
 	}
 
-	s.mu.Lock()
-	s.currentStep = 0
-	s.mu.Unlock()
+	s.currentStep.Store(0)
 
 	switch t := item.Task.(type) {
 	case UserPrompt:
@@ -141,35 +141,31 @@ func (s *Session) runTask(item QueueItem) {
 }
 
 // autoSaveIfEnabled saves the session to file if a session file is set.
+// Called from the task goroutine. Sends a save request to run() which
+// has the authoritative copy of messages.
 func (s *Session) autoSaveIfEnabled() {
 	if s.SessionFile == "" {
 		return
 	}
-	if err := s.saveSessionToFile(s.SessionFile); err != nil {
-		s.writeNotifyf("Auto-save failed: %v", err)
-	}
+	s.sendEvent(taskEvent{typ: eventSaveRequest})
 }
 
 func (s *Session) appendCancelMessage() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if len(s.Messages) == 0 {
-		return
-	}
-	if s.Messages[len(s.Messages)-1].Role == llm.RoleUser {
-		s.Messages = append(s.Messages, llm.Message{
+	s.sendEvent(taskEvent{
+		typ: eventAppendMessages,
+		appendMsgs: []llm.Message{{
 			Role:    llm.RoleAssistant,
 			Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "The user canceled."}},
-		})
-	}
+		}},
+	})
 }
+
+// ============================================================================
+// Queue Accessors (called from run() goroutine only)
+// ============================================================================
 
 // GetQueueItems returns all queued items
 func (s *Session) GetQueueItems() []QueueItem {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	items := make([]QueueItem, len(s.taskQueue))
 	copy(items, s.taskQueue)
 	return items
@@ -177,9 +173,6 @@ func (s *Session) GetQueueItems() []QueueItem {
 
 // DeleteQueueItem removes a queue item by ID
 func (s *Session) DeleteQueueItem(queueID string) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	for i, item := range s.taskQueue {
 		if item.QueueID == queueID {
 			s.taskQueue = append(s.taskQueue[:i], s.taskQueue[i+1:]...)
@@ -191,9 +184,6 @@ func (s *Session) DeleteQueueItem(queueID string) bool {
 
 // UpdateQueueItem updates the content of a queue item by ID.
 func (s *Session) UpdateQueueItem(queueID, newContent string) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	for i, item := range s.taskQueue {
 		if item.QueueID == queueID {
 			switch t := item.Task.(type) {

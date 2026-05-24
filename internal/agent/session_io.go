@@ -3,9 +3,9 @@ package agent
 // Session I/O: command handling, prompt processing.
 //
 // These methods are called from either the run() goroutine (for immediate
-// commands) or the task goroutine (for deferred commands). Shared state
-// is protected by sync.Mutex on the Session struct. Simple flags
-// (inProgress, pausedOnError) use atomic.Bool for lock-free access.
+// commands) or the task goroutine (for deferred commands). No sync.Mutex
+// is needed — the task goroutine sends state mutations via stateCh, and
+// the run() goroutine owns taskQueue and runMessages directly.
 
 import (
 	"context"
@@ -48,10 +48,8 @@ func (s *Session) cancelTask() {
 }
 
 func (s *Session) cancelAllTasks() {
-	s.mu.Lock()
 	queueLen := len(s.taskQueue)
 	s.taskQueue = make([]QueueItem, 0)
-	s.mu.Unlock()
 
 	currentCanceled := false
 	if s.inProgress.Load() {
@@ -95,9 +93,7 @@ func (s *Session) handleContinue(ctx context.Context, args []string) {
 	}
 
 	// "skip" — skip the failed prompt and resume the remaining queue.
-	s.mu.Lock()
 	qLen := len(s.taskQueue)
-	s.mu.Unlock()
 	if qLen == 0 {
 		s.writeNotify("Queue is empty")
 		return
@@ -122,10 +118,8 @@ Rules:
 - Include error messages verbatim
 - Skip completed exploration; only preserve findings that affect next steps`
 
-	s.mu.Lock()
 	s.Messages = append(s.Messages, llm.NewUserMessage(prompt))
 	beforeCount := len(s.Messages)
-	s.mu.Unlock()
 
 	s.writeNotify("Summarizing conversation...")
 
@@ -137,7 +131,6 @@ Rules:
 		return
 	}
 
-	s.mu.Lock()
 	var lastAssistantMsg llm.Message
 	for i := beforeCount; i < len(s.Messages); i++ {
 		if s.Messages[i].Role == llm.RoleAssistant {
@@ -146,9 +139,8 @@ Rules:
 	}
 	s.Messages = []llm.Message{lastAssistantMsg}
 	if outputTokens > 0 {
-		s.ContextTokens = outputTokens
+		s.ContextTokens.Store(outputTokens)
 	}
-	s.mu.Unlock()
 
 	s.writeNotify("Summarized conversation")
 	s.requestSystemInfo()
@@ -313,9 +305,7 @@ func (s *Session) handleThink(args []string) {
 //     or was canceled. A "Please continue." user message is appended so the
 //     model picks up where it left off.
 func (s *Session) resendPrompt(ctx context.Context) {
-	s.mu.Lock()
 	if len(s.Messages) == 0 {
-		s.mu.Unlock()
 		s.writeError("No messages to resend")
 		return
 	}
@@ -327,11 +317,9 @@ func (s *Session) resendPrompt(ctx context.Context) {
 		// cancel, or error mid-stream). Append a continuation prompt so the
 		// model resumes naturally.
 		s.Messages = append(s.Messages, llm.NewUserMessage("Please continue."))
-		s.mu.Unlock()
 		// Echo the inserted message to the adaptor so it is visible.
 		s.signalPromptStart("Please continue.")
 	} else {
-		s.mu.Unlock()
 		// If the last message is RoleUser or RoleTool, the conversation
 		// history is already at a valid point for the LLM to respond — just
 		// re-send as-is.
@@ -340,16 +328,13 @@ func (s *Session) resendPrompt(ctx context.Context) {
 
 	_, err := s.processPrompt(ctx, s.Messages)
 
-	s.mu.Lock()
 	s.Messages = cleanIncompleteToolCalls(s.Messages)
 	if err != nil {
-		s.mu.Unlock()
 		s.writeError(err.Error())
 		s.pausedOnError.Store(true)
 		s.requestSystemInfo()
 		return
 	}
-	s.mu.Unlock()
 
 	s.requestSystemInfo()
 }

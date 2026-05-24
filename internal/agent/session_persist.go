@@ -30,18 +30,20 @@ func LoadSession(path string) (*SessionData, error) {
 }
 
 func (s *Session) saveSessionToFile(path string) error {
-	s.mu.Lock()
+	return s.saveSessionToFileWith(s.Messages, path)
+}
+
+func (s *Session) saveSessionToFileWith(messages []llm.Message, path string) error {
 	data := SessionData{
 		SessionMeta: SessionMeta{
 			CreatedAt:     s.CreatedAt,
 			UpdatedAt:     time.Now(),
-			ThinkLevel:    s.thinkLevel,
+			ThinkLevel:    int(s.thinkLevel.Load()),
 			ActiveModel:   s.activeModelName(),
-			ContextTokens: s.ContextTokens,
+			ContextTokens: s.ContextTokens.Load(),
 		},
-		Messages: s.Messages,
+		Messages: messages,
 	}
-	s.mu.Unlock()
 
 	raw, err := formatSessionMarkdown(&data)
 	if err != nil {

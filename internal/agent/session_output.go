@@ -5,9 +5,8 @@ package agent
 //
 // sendSystemInfo is called from the run() goroutine only; the task
 // goroutine requests updates via requestSystemInfo(), which sends on
-// infoUpdateCh. Shared state is protected by sync.Mutex on the
-// Session struct. Simple flags (inProgress, pausedOnError) use
-// atomic.Bool for lock-free access.
+// infoUpdateCh. All state reads are from fields owned by run() or
+// from atomic fields — no mutex needed.
 
 import (
 	"encoding/json"
@@ -130,7 +129,7 @@ func (s *Session) sendSystemInfoInternal(activeModelConfig *ModelConfig) {
 		hasModels = s.ModelManager.HasModels()
 	}
 
-	s.mu.Lock()
+	// taskQueue is owned by run() goroutine (or single-threaded during construction).
 	queueItems := make([]QueueItemInfo, len(s.taskQueue))
 	for i, item := range s.taskQueue {
 		var itemType, content string
@@ -151,12 +150,12 @@ func (s *Session) sendSystemInfoInternal(activeModelConfig *ModelConfig) {
 	}
 
 	info := SystemInfo{
-		ContextTokens:     s.ContextTokens,
+		ContextTokens:     s.ContextTokens.Load(),
 		ContextLimit:      s.ContextLimit,
 		TotalTokens:       s.TotalSpent.InputTokens + s.TotalSpent.OutputTokens,
 		QueueItems:        queueItems,
 		InProgress:        s.inProgress.Load(),
-		CurrentStep:       s.currentStep,
+		CurrentStep:       int(s.currentStep.Load()),
 		MaxSteps:          s.MaxSteps,
 		TaskError:         s.pausedOnError.Load(),
 		Models:            models,
@@ -165,9 +164,8 @@ func (s *Session) sendSystemInfoInternal(activeModelConfig *ModelConfig) {
 		ActiveModelName:   activeModelName,
 		HasModels:         hasModels,
 		ModelConfigPath:   modelConfigPath,
-		ThinkLevel:        s.thinkLevel,
+		ThinkLevel:        int(s.thinkLevel.Load()),
 	}
-	s.mu.Unlock()
 
 	s.writeTLVJSON(stream.TagSystemData, info)
 }

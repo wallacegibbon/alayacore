@@ -3,24 +3,31 @@ package agent
 // Session manages conversation state and task execution.
 //
 // ARCHITECTURE:
-//   Session runs tasks in a separate goroutine so the main loop remains
-//   responsive to user input at all times. The run() goroutine owns input
-//   processing and task queue management. Tasks execute in their own
-//   goroutine via runTask(). Shared state is protected by sync.Mutex.
+//   Session uses an actor model: the run() goroutine owns all mutable
+//   state, and the task goroutine communicates state changes via typed
+//   events on stateCh. There is no sync.Mutex — all cross-goroutine
+//   communication is channel-based.
 //
-//   Two goroutines for I/O:
+//   Three goroutines:
 //     1. inputPump — reads TLV frames from input, sends parsed messages
 //        to the main loop. It has access only to taskCancelCh.
-//     2. task goroutine — spawned by run() to execute each task.
+//     2. run() — main loop that owns task queue, messages, and system
+//        info. Processes input messages and task events.
+//     3. task goroutine — spawned by run() to execute each task. It
+//        receives a snapshot of messages at task start and sends state
+//        mutations (step progress, new messages, token counts) back to
+//        run() via stateCh.
 //
 //   Cross-goroutine communication:
-//     1. msgCh (inputMsg channel) — fed by inputPump, drained by run()
-//     2. taskCancelCh — inputPump sends to cancel the running task
-//     3. taskDone — task goroutine sends on completion
-//     4. mu (sync.Mutex) — protects all shared mutable state
+//     msgCh (inputMsg channel)  — inputPump → run()
+//     stateCh (taskEvent)        — task → run()
+//     taskCancelCh               — inputPump → task (cancellation)
+//     taskDone                   — task → run() (completion signal)
+//     infoUpdateCh               — task → run() (system-info refresh)
 //
 // Related files:
 //   - session_types.go — type definitions (Task, SystemInfo, SessionConfig, etc.)
+//   - session_event.go — taskEvent types for actor model communication
 //   - session_model.go — model management, provider creation, think level
 //   - session_task.go  — input processing, prompt execution, agent loop
 //   - session_io.go    — command handling, summarize, save
@@ -29,7 +36,6 @@ package agent
 
 import (
 	"context"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -41,30 +47,33 @@ import (
 
 // Session manages conversation state and task execution.
 type Session struct {
-	mu sync.Mutex // protects all mutable shared state between run() and task goroutines
-
-	Messages       []llm.Message
+	Messages       []llm.Message // owned by run() goroutine; task goroutine sends updates via stateCh
 	CreatedAt      time.Time
-	TotalSpent     llm.Usage
-	ContextTokens  int64
-	ContextLimit   int64
-	ModelManager   *ModelManager
+	TotalSpent     llm.Usage     // updated by run() from task events
+	ContextTokens  atomic.Int64  // read by both goroutines (shouldAutoSummarize, sendSystemInfo)
+	ContextLimit   int64         // immutable after construction
+	ModelManager   *ModelManager // thread-safe (own RWMutex)
 	RuntimeManager *RuntimeManager
 	SkillsManager  *skills.Manager
 	SessionConfig        // embedded — immutable config set once at construction
 	initError      error // Set during construction if --model refers to a non-existent model
 
-	// === State shared between run() and task goroutines ===
-	agent         *llm.Agent
-	provider      llm.Provider
-	taskQueue     []QueueItem
-	inProgress    atomic.Bool
-	pausedOnError atomic.Bool
-	currentStep   int
-	thinkLevel    int
-	nextPromptID  uint64
-	nextQueueID   uint64
-	thinkDirty    bool // true if thinkLevel changed during task execution
+	// === State owned by run() goroutine, updated via task events ===
+	agent       atomic.Pointer[llm.Agent]
+	provider    atomic.Value // stores llm.Provider
+	taskQueue   []QueueItem
+	currentStep atomic.Int64
+	thinkLevel  atomic.Int64
+	thinkDirty  atomic.Bool // true if thinkLevel changed during task execution
+
+	inProgress    atomic.Bool // set/cleared by run() goroutine
+	pausedOnError atomic.Bool // set by task goroutine via event
+
+	nextPromptID uint64 // goroutine-local (task goroutine)
+	nextQueueID  uint64 // goroutine-local (run() goroutine)
+
+	// stateCh carries state mutations from the task goroutine to run().
+	stateCh chan taskEvent
 
 	// taskCancelCh is a buffered channel (capacity 1) used by inputPump to
 	// signal cancellation of the currently running task. The task goroutine
@@ -140,8 +149,8 @@ func NewSession(cfg SessionConfig) *Session {
 		RuntimeManager: NewRuntimeManager(cfg.RuntimeConfigPath, cfg.ModelConfigPath),
 		SkillsManager:  cfg.SkillsMgr,
 		SessionConfig:  cfg,
-		thinkLevel:     config.DefaultThinkLevel,
 		taskQueue:      make([]QueueItem, 0),
+		stateCh:        make(chan taskEvent, 64),
 		taskCancelCh:   make(chan struct{}, 1),
 		taskDone:       make(chan struct{}, 1),
 		infoUpdateCh:   make(chan struct{}, 1),
@@ -149,6 +158,7 @@ func NewSession(cfg SessionConfig) *Session {
 		sessionCancel:  sessionCancel,
 		runDone:        make(chan struct{}),
 	}
+	s.thinkLevel.Store(int64(config.DefaultThinkLevel))
 	s.initModelManager()
 	s.applyModelOverride()
 	s.sendSystemInfo()
@@ -166,9 +176,8 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 		RuntimeManager: NewRuntimeManager(cfg.RuntimeConfigPath, cfg.ModelConfigPath),
 		SkillsManager:  cfg.SkillsMgr,
 		SessionConfig:  cfg,
-		thinkLevel:     data.ThinkLevel,
-		ContextTokens:  data.ContextTokens,
 		taskQueue:      make([]QueueItem, 0),
+		stateCh:        make(chan taskEvent, 64),
 		taskCancelCh:   make(chan struct{}, 1),
 		taskDone:       make(chan struct{}, 1),
 		infoUpdateCh:   make(chan struct{}, 1),
@@ -176,6 +185,9 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 		sessionCancel:  sessionCancel,
 		runDone:        make(chan struct{}),
 	}
+	s.thinkLevel.Store(int64(data.ThinkLevel))
+	s.ContextTokens.Store(data.ContextTokens)
+
 	s.initModelManager()
 
 	// Override runtime config default with the model saved in the session file.

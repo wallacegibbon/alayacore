@@ -3,11 +3,8 @@ package agent
 // Session task execution: reading input, processing prompts,
 // executing the agent loop with streaming callbacks.
 //
-// The main loop (run()) starts each task in its own goroutine so it
-// remains responsive to user input at all times. Shared state between
-// the main loop and the task goroutine is protected by sync.Mutex.
-// System info updates are requested by the task goroutine via
-// infoUpdateCh and processed by the run() goroutine.
+// The main loop (run()) owns all mutable state. The task goroutine
+// communicates state changes via stateCh events. No sync.Mutex needed.
 
 import (
 	"context"
@@ -23,12 +20,25 @@ import (
 // Main Event Loop
 // ============================================================================
 
-// run is the main loop that owns input processing and task queue management.
-// It runs in a single goroutine (started by Start()). Tasks are executed in
-// separate goroutines so the main loop stays responsive to user input.
+// run is the main loop that owns input processing, task queue management,
+// and the authoritative copy of session state (runMessages, taskQueue,
+// totals, etc.). It runs in a single goroutine (started by Start()).
+//
+// The loop processes three kinds of events:
+//   - Input messages from the user (via inputPump → msgCh)
+//   - Task state changes (via task goroutine → stateCh)
+//   - Task completion signals (via taskDone)
+//   - System info refresh requests (via infoUpdateCh)
 func (s *Session) run() {
 	defer close(s.runDone)
 	defer s.sessionCancel()
+
+	// runMessages is the run() goroutine's authoritative copy of messages.
+	// The task goroutine has its own working copy (s.Messages). At task
+	// start, runMessages is copied to s.Messages. During task execution,
+	// the task goroutine sends state changes via stateCh, which update
+	// runMessages. Between tasks, runMessages is the source of truth.
+	var runMessages []llm.Message
 
 	// Start the I/O pump goroutine — it reads TLV from the input and
 	// sends parsed messages to run() for processing. It has NO access
@@ -43,18 +53,19 @@ func (s *Session) run() {
 		}
 
 		// Start next task if queue is non-empty and no task is running.
-		s.mu.Lock()
 		if len(s.taskQueue) > 0 && !s.inProgress.Load() && s.sessionCtx.Err() == nil {
 			item := s.taskQueue[0]
 			s.taskQueue = s.taskQueue[1:]
 			s.inProgress.Store(true)
-			s.mu.Unlock()
+
+			// Copy runMessages to s.Messages as the task goroutine's working copy.
+			s.Messages = make([]llm.Message, len(runMessages))
+			copy(s.Messages, runMessages)
+
 			go s.runTask(item)
-		} else {
-			s.mu.Unlock()
 		}
 
-		// Wait for new input or task completion
+		// Wait for new input, task events, task completion, or info requests
 		select {
 		case msg, ok := <-msgCh:
 			if !ok {
@@ -62,12 +73,24 @@ func (s *Session) run() {
 			}
 			s.handleInputMsg(msg)
 
+		case ev := <-s.stateCh:
+			s.handleTaskEvent(ev, &runMessages)
+
 		case <-s.taskDone:
-			s.mu.Lock()
-			// inProgress was set to false by runTask before sending on taskDone.
-			// Check if more tasks are queued.
 			s.inProgress.Store(len(s.taskQueue) > 0)
-			s.mu.Unlock()
+
+			// Sync runMessages back from s.Messages (task goroutine's final state)
+			if len(s.Messages) > 0 {
+				runMessages = make([]llm.Message, len(s.Messages))
+				copy(runMessages, s.Messages)
+			}
+
+			// Auto-save if configured (uses runMessages which is now up-to-date)
+			if s.SessionFile != "" {
+				if err := s.saveSessionToFileWith(runMessages, s.SessionFile); err != nil {
+					s.writeNotifyf("Auto-save failed: %v", err)
+				}
+			}
 
 			s.sendSystemInfo()
 
@@ -76,6 +99,52 @@ func (s *Session) run() {
 
 		case <-s.sessionCtx.Done():
 			return
+		}
+	}
+}
+
+// handleTaskEvent processes a state change event from the task goroutine.
+// Only called from the run() goroutine.
+func (s *Session) handleTaskEvent(ev taskEvent, runMessages *[]llm.Message) {
+	switch ev.typ {
+	case eventStepStart:
+		s.currentStep.Store(int64(ev.step))
+
+	case eventStepFinish:
+		if len(ev.messages) > 0 {
+			*runMessages = append(*runMessages, ev.messages...)
+		}
+		s.TotalSpent.InputTokens += ev.inputTokens
+		s.TotalSpent.OutputTokens += ev.outputTokens
+		newContext := ev.inputTokens + ev.cacheReadTokens + ev.cacheCreationTokens
+		if newContext > 0 {
+			s.ContextTokens.Store(newContext)
+		}
+
+	case eventAppendMessages:
+		if len(ev.appendMsgs) > 0 {
+			*runMessages = append(*runMessages, ev.appendMsgs...)
+		}
+
+	case eventCleanMessages:
+		*runMessages = cleanIncompleteToolCalls(*runMessages)
+
+	case eventSetPaused:
+		s.pausedOnError.Store(ev.paused)
+
+	case eventSaveRequest:
+		if s.SessionFile != "" {
+			if err := s.saveSessionToFileWith(*runMessages, s.SessionFile); err != nil {
+				s.writeNotifyf("Auto-save failed: %v", err)
+			}
+		}
+
+	case eventSyncThink:
+		s.thinkLevel.Store(int64(ev.thinkLevel))
+		if p := s.provider.Load(); p != nil {
+			if prov, ok := p.(llm.Provider); ok {
+				prov.SetReasoningLevel(ev.thinkLevel)
+			}
 		}
 	}
 }
@@ -169,7 +238,6 @@ func (s *Session) handleUserPrompt(ctx context.Context, prompt string) {
 		s.doAutoSummarize(ctx)
 	}
 
-	s.mu.Lock()
 	if len(s.Messages) > 0 && s.Messages[len(s.Messages)-1].Role == llm.RoleUser {
 		s.Messages[len(s.Messages)-1].Content = append(
 			s.Messages[len(s.Messages)-1].Content,
@@ -178,36 +246,28 @@ func (s *Session) handleUserPrompt(ctx context.Context, prompt string) {
 	} else {
 		s.Messages = append(s.Messages, llm.NewUserMessage(prompt))
 	}
-	s.mu.Unlock()
 
 	_, err := s.processPrompt(ctx, s.Messages)
 
-	s.mu.Lock()
 	s.Messages = cleanIncompleteToolCalls(s.Messages)
 
 	if err != nil {
 		s.writeError(err.Error())
 		s.pausedOnError.Store(true)
-		s.mu.Unlock()
 		s.requestSystemInfo()
 		return
 	}
-	s.mu.Unlock()
 }
 
 func (s *Session) shouldAutoSummarize() bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.AutoSummarize && s.ContextLimit > 0 && s.ContextTokens > 0 &&
-		s.ContextTokens >= s.ContextLimit*65/100
+	return s.AutoSummarize && s.ContextLimit > 0 && s.ContextTokens.Load() > 0 &&
+		s.ContextTokens.Load() >= s.ContextLimit*65/100
 }
 
 func (s *Session) doAutoSummarize(ctx context.Context) {
-	s.mu.Lock()
-	usage := float64(s.ContextTokens) * 100 / float64(s.ContextLimit)
-	s.mu.Unlock()
+	usage := float64(s.ContextTokens.Load()) * 100 / float64(s.ContextLimit)
 	s.writeNotifyf("Context usage at %d/%d tokens (%.0f%%). Auto-summarizing...",
-		s.ContextTokens, s.ContextLimit, usage)
+		s.ContextTokens.Load(), s.ContextLimit, usage)
 	s.summarize(ctx)
 }
 
@@ -224,7 +284,7 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) (int
 		return stream.NewStreamID(promptID, stepCount, id)
 	}
 
-	_, err := s.agent.Stream(ctx, history, llm.StreamCallbacks{
+	_, err := s.agent.Load().Stream(ctx, history, llm.StreamCallbacks{
 		OnTextDelta: func(delta string) error {
 			//nolint:errcheck // Best effort write, errors ignored
 			_ = stream.WriteTLV(s.Output, stream.TagTextAssistant, stream.WrapDelta(assembleID(stream.SuffixText), delta))
@@ -261,34 +321,43 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) (int
 		OnStepStart: func(step int) error {
 			stepCount = step
 
-			s.mu.Lock()
-			s.currentStep = step
-			// Sync think level if it was changed during task execution
-			if s.thinkDirty {
-				s.syncThinkToProvider(s.thinkLevel)
-				s.thinkDirty = false
+			// Send step start event to run().
+			s.sendEvent(taskEvent{
+				typ:  eventStepStart,
+				step: step,
+			})
+
+			// Sync think level if it was changed during task execution.
+			if s.thinkDirty.Load() {
+				if p := s.provider.Load(); p != nil {
+					if prov, ok := p.(llm.Provider); ok {
+						prov.SetReasoningLevel(int(s.thinkLevel.Load()))
+					}
+				}
+				s.thinkDirty.Store(false)
 			}
-			s.mu.Unlock()
 
 			s.requestSystemInfo()
 			return nil
 		},
 		OnStepFinish: func(messages []llm.Message, usage llm.Usage) error {
-			s.mu.Lock()
-			s.TotalSpent.InputTokens += usage.InputTokens
-			s.TotalSpent.OutputTokens += usage.OutputTokens
-			newContext := usage.InputTokens + usage.CacheReadTokens + usage.CacheCreationTokens
-			if newContext > 0 {
-				s.ContextTokens = newContext
-			}
+			// Update local working copy.
 			if len(messages) > 0 {
 				s.Messages = append(s.Messages, messages...)
 			}
-			s.mu.Unlock()
 
-			s.requestSystemInfo()
+			// Send event to run() so it updates runMessages and totals.
+			s.sendEvent(taskEvent{
+				typ:                 eventStepFinish,
+				messages:            messages,
+				inputTokens:         usage.InputTokens,
+				outputTokens:        usage.OutputTokens,
+				cacheReadTokens:     usage.CacheReadTokens,
+				cacheCreationTokens: usage.CacheCreationTokens,
+			})
+
 			outputTokens += usage.OutputTokens
-			s.autoSaveIfEnabled()
+			s.requestSystemInfo()
 			return nil
 		},
 	})
