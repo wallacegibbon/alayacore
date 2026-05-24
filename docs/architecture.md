@@ -83,13 +83,16 @@ The session uses three goroutines for concurrent operation:
 | `msgCh` (buffered, cap 100) | inputPump | run() | Parsed user input messages |
 | `taskCancelCh` (buffered, cap 1) | inputPump | task worker | Cancel the running task |
 | `taskDone` (buffered, cap 1) | task worker | run() | Signal task completion |
+| `stateCh` (buffered, cap 64) | task worker | run() | Step progress, messages, token counts, paused state |
 | `infoUpdateCh` (buffered, cap 1) | task worker | run() | Request system-info broadcast |
-| `sync.Mutex` | both | — | Protects shared state (Messages, taskQueue, etc.) |
-| `atomic.Bool` | both | — | Lock-free access to inProgress, pausedOnError |
+| `atomic.Pointer[Agent]` | both | — | Lock-free agent pointer for task goroutine |
+| `atomic.Value` (Provider) | both | — | Lock-free provider pointer for task goroutine |
+| `atomic.Int64` | both | — | ContextTokens, currentStep, thinkLevel |
+| `atomic.Bool` | both | — | pausedOnError (written by task goroutine) |
 
 **State ownership:**
-- The `run()` goroutine is the sole owner of session state. It reads/writes `taskQueue`, `inProgress`, `pausedOnError`, `thinkLevel`, `thinkDirty`, and all command-handling logic.
-- The task goroutine LOS accesses shared state directly under the mutex for read/write (`Messages`, `TotalSpent`, `ContextTokens`, `currentStep`).
+- The `run()` goroutine is the sole owner of session state. It reads/writes `taskQueue`, `inProgress`, `pausedOnError`, `thinkLevel`, `thinkDirty`, and all command-handling logic. ModelManager and RuntimeManager are also accessed only from `run()`.
+- The task goroutine communicates state changes via typed events on `stateCh` (step progress, new messages, token counts) and reads atomic fields (`agent`, `provider`, `ContextTokens`, `currentStep`, `thinkLevel`, `thinkDirty`, `pausedOnError`) for lock-free access.
 - The input pump goroutine has NO access to session state except `taskCancelCh` (for `:cancel` commands).
 - `sendSystemInfo` runs only in the `run()` goroutine; the task goroutine requests updates via `infoUpdateCh`.
 
@@ -380,9 +383,9 @@ Agent.Stream() receives tool_call event
 10. **Sequential Tool Execution** — Tools execute one at a time. See [sequential-tool-execution.md](sequential-tool-execution.md).
 11. **Context Efficiency** — Tool descriptions are minimal. Large outputs (>64KB) saved to `.alayacore.tmp/`: `read_file` truncates inline with metadata, `execute_command` and `search_content` save full output to file. See [truncation.md](truncation.md).
 12. **Think Mode** — Provider-specific reasoning fields are added to API requests. Three levels: 0=off, 1=normal, 2=max. Toggled via `:think [0|1|2]`.
-13. **Concurrent Task Execution** — Each task runs in its own goroutine so the main loop remains responsive to user input during LLM streaming. Shared state is protected by `sync.Mutex`. Simple boolean flags (`inProgress`, `pausedOnError`) use `atomic.Bool` for lock-free cross-goroutine access.
+13. **Concurrent Task Execution** — Each task runs in its own goroutine so the main loop remains responsive to user input during LLM streaming. The task goroutine communicates state changes via typed channel events (`stateCh`). Lock-free atomic fields (`atomic.Pointer`, `atomic.Int64`, `atomic.Bool`) are used for the few values that the task goroutine reads directly (agent, provider, context tokens, think level). No `sync.Mutex` is needed.
 14. **Centralized System Info** — `sendSystemInfo()` runs only in the main loop goroutine. The task goroutine requests updates via a buffered channel (`infoUpdateCh`), which also wakes the main loop from its select to process the update promptly.
-15. **Goroutine-Local Counters** — Fields accessed by a single goroutine (`nextQueueID` on the main loop, `nextPromptID` on the task goroutine) are updated outside the mutex, narrowing the critical section.
+15. **Goroutine-Local Counters** — Fields accessed by a single goroutine (`nextQueueID` on the main loop, `nextPromptID` on the task goroutine) are plain fields with no synchronization needed.
 
 ## Gotchas
 
@@ -396,22 +399,10 @@ The provider's `StepCompleteEvent.Messages` contains the complete assistant mess
 
 `WindowBuffer.dirtyIndex` uses a sentinel (`dirtyFullRebuild = -2`) to signal that all windows need recalculation. State transitions must check whether the sentinel is already set before overwriting — an `else` branch that blindly assigns a new index can downgrade a full-rebuild to a single-window update, silently dropping windows from the display. See `window.go` → `markDirty`.
 
-### Mutex deadlock in SwitchModel
-
-Don't hold a mutex while calling methods that may need the same mutex.
-
-```
-❌ lock → update fields → call method (needs lock) → deadlock
-✅ lock → update fields → unlock → call method
-```
-
 ### Atomic flags must use Load/Store
 
-`inProgress` and `pausedOnError` are `atomic.Bool`. Always use `.Load()` to read
-and `.Store()` to write. Direct assignment (`s.inProgress = true`) will not
-compile. This applies in tests too — struct literals must leave the field as
-`atomic.Bool{}` (zero value = false), then call `.Store()` to set the desired
-state.
+`pausedOnError` is an `atomic.Bool`. Always use `.Load()` to read
+and `.Store()` to write. Direct assignment will not compile.
 
 ### OpenAI tool call chunking
 

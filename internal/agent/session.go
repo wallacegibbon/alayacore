@@ -5,8 +5,7 @@ package agent
 // ARCHITECTURE:
 //   Session uses an actor model: the run() goroutine owns all mutable
 //   state, and the task goroutine communicates state changes via typed
-//   events on stateCh. All cross-goroutine communication is channel-based
-//   (no sync.Mutex anywhere in this package).
+//   events on stateCh. All cross-goroutine communication is channel-based.
 //
 //   Three goroutines:
 //     1. inputPump — reads TLV frames from input, sends parsed messages
@@ -49,10 +48,10 @@ import (
 type Session struct {
 	Messages       []llm.Message // owned by run() goroutine; task goroutine sends updates via stateCh
 	CreatedAt      time.Time
-	TotalSpent     llm.Usage     // updated by run() from task events
-	ContextTokens  atomic.Int64  // read by both goroutines (shouldAutoSummarize, sendSystemInfo)
-	ContextLimit   int64         // immutable after construction
-	ModelManager   *ModelManager // thread-safe (own RWMutex)
+	TotalSpent     llm.Usage    // updated by run() from task events
+	ContextTokens  atomic.Int64 // read by both goroutines (shouldAutoSummarize, sendSystemInfo)
+	ContextLimit   int64        // immutable after construction
+	ModelManager   *ModelManager
 	RuntimeManager *RuntimeManager
 	SkillsManager  *skills.Manager
 	SessionConfig        // embedded — immutable config set once at construction
@@ -66,7 +65,7 @@ type Session struct {
 	thinkLevel  atomic.Int64
 	thinkDirty  atomic.Bool // true if thinkLevel changed during task execution
 
-	inProgress    bool    // set/cleared by run() goroutine only
+	inProgress    bool        // set/cleared by run() goroutine only
 	pausedOnError atomic.Bool // set by task goroutine via event
 
 	nextPromptID uint64 // goroutine-local (task goroutine)

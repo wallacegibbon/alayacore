@@ -8,7 +8,7 @@ package agent
 // The task goroutine sends state mutations as typed events on stateCh.
 // The run() goroutine processes them in order in its main select loop.
 // This keeps all cross-goroutine communication explicit and auditable
-// — the entire package uses channels and atomics, never sync.Mutex.
+// — the entire package uses channels and atomics for synchronization.
 
 import "github.com/alayacore/alayacore/internal/llm"
 

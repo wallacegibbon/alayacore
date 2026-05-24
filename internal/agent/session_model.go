@@ -7,8 +7,7 @@ package agent
 // The run() goroutine owns provider/agent creation (via SwitchModel,
 // model_set command) and all ModelManager/RuntimeManager access. The task
 // goroutine reads agent and provider via atomic pointers. Cross-goroutine
-// communication is channel-based (see session_event.go) — no sync.Mutex
-// is used anywhere.
+// communication is channel-based (see session_event.go).
 
 import (
 	"fmt"

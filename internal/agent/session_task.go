@@ -4,7 +4,7 @@ package agent
 // executing the agent loop with streaming callbacks.
 //
 // The main loop (run()) owns all mutable state. The task goroutine
-// communicates state changes via stateCh events — no sync.Mutex used.
+// communicates state changes via stateCh events.
 
 import (
 	"context"

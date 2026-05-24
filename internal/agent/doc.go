@@ -25,7 +25,7 @@
 //	  - A few buffered channels for cancellation, completion signaling,
 //	    and system-info refresh requests.
 //
-//	There is no sync.Mutex anywhere in this package. Cross-goroutine
+//	Cross-goroutine
 //	communication is exclusively through channels and atomics.
 //
 // Architecture Overview:
