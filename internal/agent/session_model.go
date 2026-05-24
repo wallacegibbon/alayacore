@@ -14,6 +14,7 @@ import (
 	"net/http"
 
 	debugpkg "github.com/alayacore/alayacore/internal/debug"
+	domainerrors "github.com/alayacore/alayacore/internal/errors"
 	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/llm/factory"
 )
@@ -178,7 +179,7 @@ func createProviderFromConfig(config *ModelConfig, debugAPI bool, proxyURL strin
 			client, err = debugpkg.NewHTTPClientWithProxy(proxyURL)
 		}
 		if err != nil {
-			return nil, fmt.Errorf("failed to create HTTP client with proxy: %w", err)
+			return nil, domainerrors.Wrap("provider", fmt.Errorf("failed to create HTTP client with proxy: %w", err))
 		}
 	} else if debugAPI {
 		client = debugpkg.NewHTTPClient()

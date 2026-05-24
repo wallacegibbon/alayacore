@@ -17,6 +17,7 @@ import (
 	"strings"
 
 	"github.com/alayacore/alayacore/internal/config"
+	domainerrors "github.com/alayacore/alayacore/internal/errors"
 )
 
 // ModelConfig represents a model configuration
@@ -237,7 +238,7 @@ func validateModel(m ModelConfig) []string {
 // Reload reloads models from the config file
 func (mm *ModelManager) Reload() error {
 	if mm.filePath == "" {
-		return fmt.Errorf("no config file path set")
+		return domainerrors.Wrap("model", fmt.Errorf("no config file path set"))
 	}
 	return mm.LoadFromFile(mm.filePath)
 }
@@ -297,7 +298,7 @@ func (mm *ModelManager) SetActive(id int) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("model not found: %d", id)
+	return domainerrors.Wrapf("model_set", domainerrors.ErrModelNotFound, "model not found: %d", id)
 }
 
 // SetActiveToFirst sets the active model to the first one in the list.
@@ -339,7 +340,7 @@ func (mm *ModelManager) DeleteModel(id int) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("model not found: %d", id)
+	return domainerrors.Wrapf("model_set", domainerrors.ErrModelNotFound, "model not found: %d", id)
 }
 
 // UpdateModel updates a model by ID in runtime list (does NOT persist to file)
@@ -351,7 +352,7 @@ func (mm *ModelManager) UpdateModel(id int, m ModelConfig) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("model not found: %d", id)
+	return domainerrors.Wrapf("model_set", domainerrors.ErrModelNotFound, "model not found: %d", id)
 }
 
 // GetFilePath returns the current file path
@@ -378,7 +379,7 @@ func (mm *ModelManager) FindModelByName(name string) int {
 func (mm *ModelManager) SetActiveByName(name string) error {
 	id := mm.FindModelByName(name)
 	if id == 0 {
-		return fmt.Errorf("model not found: %q", name)
+		return domainerrors.Wrapf("model_set", domainerrors.ErrModelNotFound, "model not found: %q", name)
 	}
 	return mm.SetActive(id)
 }
