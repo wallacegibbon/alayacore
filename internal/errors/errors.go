@@ -13,11 +13,11 @@ import "fmt"
 
 // Model errors
 var (
-	ErrModelNotFound             = &SessionError{Op: "model_set", Err: fmt.Errorf("model not found")}
+	ErrModelNotFound              = &SessionError{Op: "model_set", Err: fmt.Errorf("model not found")}
 	ErrModelManagerNotInitialized = &SessionError{Op: "model", Err: fmt.Errorf("model manager not initialized")}
-	ErrNoModelFilePath           = &SessionError{Op: "model_load", Err: fmt.Errorf("no model file path configured")}
-	ErrFailedToLoadModels        = &SessionError{Op: "model_load", Err: fmt.Errorf("failed to load models")}
-	ErrModelConfigInvalid        = &SessionError{Op: "model", Err: fmt.Errorf("invalid model configuration")}
+	ErrNoModelFilePath            = &SessionError{Op: "model_load", Err: fmt.Errorf("no model file path configured")}
+	ErrFailedToLoadModels         = &SessionError{Op: "model_load", Err: fmt.Errorf("failed to load models")}
+	ErrModelConfigInvalid         = &SessionError{Op: "model", Err: fmt.Errorf("invalid model configuration")}
 )
 
 // Queue errors
@@ -59,8 +59,8 @@ var (
 // SessionError represents an error with operation context.
 // It provides structured information about what operation failed.
 type SessionError struct {
-	Op  string // The operation that failed (e.g., "model_set", "save")
-	Err error  // The underlying error
+	Op   string    // The operation that failed (e.g., "model_set", "save")
+	Err  error     // The underlying error
 	Kind ErrorKind // Categorization for programmatic dispatch
 }
 
@@ -68,7 +68,7 @@ type SessionError struct {
 type ErrorKind int
 
 const (
-	KindOther      ErrorKind = iota
+	KindOther ErrorKind = iota
 	KindModel
 	KindQueue
 	KindSession
@@ -127,22 +127,48 @@ func Wrapf(op string, err error, format string, args ...any) *SessionError {
 	return &SessionError{Op: op, Err: fmt.Errorf(format+": %w", append(args, err)...), Kind: inferKind(op)}
 }
 
+// Common operation names for error context.
+const (
+	OpModelSet  = "model_set"
+	OpModelLoad = "model_load"
+	OpModel     = "model"
+
+	OpQueueDel  = "taskqueue_del"
+	OpQueueEdit = "taskqueue_edit"
+	OpQueue     = "taskqueue"
+
+	OpSave    = "save"
+	OpLoad    = "load"
+	OpSession = "session"
+
+	OpCommand   = "command"
+	OpCancel    = "cancel"
+	OpCancelAll = "cancel_all"
+
+	OpInput    = "input"
+	OpProvider = "provider"
+	OpStream   = "stream"
+	OpTool     = "tool"
+)
+
 // inferKind maps common operation names to ErrorKind.
+//
+//nolint:gocyclo // Simple string-to-enum mapping, intentional list of cases
 func inferKind(op string) ErrorKind {
-	switch {
-	case op == "model_set" || op == "model_load" || op == "model":
+	switch op {
+	case OpModelSet, OpModelLoad, OpModel:
 		return KindModel
-	case op == "taskqueue_del" || op == "taskqueue_edit" || op == "taskqueue":
+	case OpQueueDel, OpQueueEdit, OpQueue:
 		return KindQueue
-	case op == "save" || op == "load" || op == "session":
+	case OpSave, OpLoad, OpSession:
 		return KindSession
-	case op == "command" || op == "cancel" || op == "cancel_all":
+	case OpCommand, OpCancel, OpCancelAll:
 		return KindCommand
-	case op == "input":
+	case OpInput:
 		return KindInput
-	case op == "provider" || op == "stream":
+	case OpProvider, OpStream:
 		return KindProvider
-	case op == "tool":
+	case OpTool:
 		return KindTool
 	default:
 		return KindOther

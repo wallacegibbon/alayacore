@@ -88,7 +88,7 @@ func TestEditorFinishedMsgWithWhitespace(t *testing.T) {
 	terminal := NewTerminal(NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 
 	msg := EditorFinishedMsg{
-		Action: EditorActionSubmit,
+		Action:  EditorActionSubmit,
 		Content: "  content with leading and trailing spaces  \n",
 		Err:     nil,
 	}
@@ -110,7 +110,7 @@ func TestEditorFinishedMsgWithMultipleTrailingNewlines(t *testing.T) {
 	terminal := NewTerminal(NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 
 	msg := EditorFinishedMsg{
-		Action: EditorActionSubmit,
+		Action:  EditorActionSubmit,
 		Content: "content with multiple trailing newlines\n\n\n",
 		Err:     nil,
 	}
@@ -142,7 +142,7 @@ func TestEditorFinishedMsgMultiline(t *testing.T) {
 	terminal := NewTerminal(NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 
 	msg := EditorFinishedMsg{
-		Action: EditorActionSubmit,
+		Action:  EditorActionSubmit,
 		Content: "line1\nline2\nline3",
 		Err:     nil,
 	}
@@ -225,7 +225,7 @@ func TestEditorFinishedMsgWithError(t *testing.T) {
 	terminal.input.SetValue("original content")
 
 	msg := EditorFinishedMsg{
-		Action: EditorActionSubmit,
+		Action:  EditorActionSubmit,
 		Content: "",
 		Err:     fmt.Errorf("editor failed"),
 	}

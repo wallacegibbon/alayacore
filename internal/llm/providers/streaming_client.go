@@ -8,7 +8,6 @@
 //
 // Provider-specific wire formats (message conversion, event parsing,
 // tool formatting) live in anthropic.go and openai.go respectively.
-
 package providers
 
 import (
@@ -49,19 +48,19 @@ func newBaseProvider(apiKey, baseURL, defaultModel string, maxTokens int) basePr
 }
 
 // buildRequest creates an HTTP POST request with common headers.
-func (b *baseProvider) buildRequest(ctx context.Context, urlSuffix string, body any) (*http.Request, []byte, error) {
+func (b *baseProvider) buildRequest(ctx context.Context, urlSuffix string, body any) (*http.Request, error) {
 	bodyBytes, err := json.Marshal(body)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to marshal request: %w", err)
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", b.baseURL+urlSuffix, bytes.NewReader(bodyBytes))
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	return req, bodyBytes, nil
+	return req, nil
 }
 
 // doRequest sends the request and handles non-200 responses.
@@ -87,12 +86,6 @@ func (b *baseProvider) doRequest(req *http.Request) (io.ReadCloser, error) {
 // ============================================================================
 // SSE Line Scanning
 // ============================================================================
-
-// sseLine represents a single SSE event line after parsing.
-type sseLine struct {
-	eventType string // "message_start", "content_block_delta", etc. (empty for data-only SSE)
-	data      string // the event payload
-}
 
 // sseScanner reads SSE-formatted lines from an io.Reader.
 // It supports two modes:
@@ -199,9 +192,4 @@ func computeThinkingConfig(level int) thinkingConfig {
 		return thinkingConfig{Enabled: true, Effort: effort}
 	}
 	return thinkingConfig{Enabled: false, Effort: ""}
-}
-
-// formatAPIError creates a consistent error message from an API error response.
-func formatAPIError(statusCode int, body []byte) error {
-	return fmt.Errorf("API error (status %d): %s", statusCode, string(body))
 }

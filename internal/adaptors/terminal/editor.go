@@ -21,7 +21,7 @@ import (
 type EditorAction int
 
 const (
-	EditorActionNone        EditorAction = iota // e.g. display viewing — no side effects
+	EditorActionNone         EditorAction = iota // e.g. display viewing — no side effects
 	EditorActionSubmit                           // submit content as user input
 	EditorActionQueueEdit                        // update a queued task's content
 	EditorActionReloadConfig                     // reload model/runtime config after edit
@@ -36,23 +36,22 @@ const (
 // - For EditorActionQueueEdit: content + QueueID identify the queue item to update.
 // - For EditorActionReloadConfig: Path + FileType identify the edited file.
 type EditorFinishedMsg struct {
-	Content string
-	Err     error
-	Action  EditorAction
-	QueueID string // for EditorActionQueueEdit
-	Path    string // for EditorActionReloadConfig
+	Content  string
+	Err      error
+	Action   EditorAction
+	QueueID  string // for EditorActionQueueEdit
+	Path     string // for EditorActionReloadConfig
 	FileType string // for EditorActionReloadConfig ("model_config", etc.)
 }
 
 // editorStartMsg is sent to trigger actual editor execution (lazy temp file creation)
 type editorStartMsg struct {
-	editorCmd   string
-	editorArgs  []string
-	tmpFileName string
-	action      EditorAction
-	queueID     string
-	path        string
-	fileType    string
+	editorCmd  string
+	editorArgs []string
+	action     EditorAction
+	queueID    string
+	path       string
+	fileType   string
 }
 
 // ============================================================================
@@ -62,11 +61,6 @@ type editorStartMsg struct {
 // errEditorNotFound is returned when no text editor binary is found.
 func errEditorNotFound() error {
 	return fmt.Errorf("no editor found (tried: %s; set $EDITOR to override)", strings.Join(defaultEditors, ", "))
-}
-
-// newEditorFinishedMsg creates an EditorFinishedMsg with an error.
-func newEditorFinishedMsg(err error) EditorFinishedMsg {
-	return EditorFinishedMsg{Err: err}
 }
 
 // ============================================================================

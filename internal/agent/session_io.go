@@ -164,7 +164,7 @@ func (s *Session) saveSession(args []string) {
 	}
 
 	if err := s.saveSessionToFile(path); err != nil {
-		s.writeError(domainerrors.Wrap("save", fmt.Errorf("%w: %v", domainerrors.ErrFailedToSaveSession, err)).Error())
+		s.writeError(domainerrors.Wrap(domainerrors.OpSave, fmt.Errorf("%w: %v", domainerrors.ErrFailedToSaveSession, err)).Error())
 	} else {
 		s.writeNotifyf("Session saved to %s", path)
 	}
@@ -191,12 +191,12 @@ func (s *Session) handleModelSet(args []string) {
 	modelIDStr := args[0]
 	modelID, err := strconv.Atoi(modelIDStr)
 	if err != nil {
-		s.writeError(domainerrors.NewSessionErrorf("model_set", "invalid model ID: %s", modelIDStr).Error())
+		s.writeError(domainerrors.NewSessionErrorf(domainerrors.OpModelSet, "invalid model ID: %s", modelIDStr).Error())
 		return
 	}
 	model := s.ModelManager.GetModel(modelID)
 	if model == nil {
-		s.writeError(domainerrors.Wrapf("model_set", domainerrors.ErrModelNotFound, "model not found: %d", modelID).Error())
+		s.writeError(domainerrors.Wrapf(domainerrors.OpModelSet, domainerrors.ErrModelNotFound, "model not found: %d", modelID).Error())
 		return
 	}
 
@@ -231,7 +231,7 @@ func (s *Session) handleModelLoad() {
 	}
 
 	if err := s.ModelManager.LoadFromFile(path); err != nil {
-		s.writeError(domainerrors.Wrap("model_load", fmt.Errorf("%w: %v", domainerrors.ErrFailedToLoadModels, err)).Error())
+		s.writeError(domainerrors.Wrap(domainerrors.OpModelLoad, fmt.Errorf("%w: %v", domainerrors.ErrFailedToLoadModels, err)).Error())
 		return
 	}
 

@@ -40,8 +40,7 @@ func (m InputModel) Init() tea.Cmd {
 
 // Update handles messages for the input model
 func (m InputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
+	if msg, ok := msg.(tea.WindowSizeMsg); ok {
 		m.width = msg.Width
 		m.input.SetWidth(max(0, msg.Width-8))
 	}

@@ -282,7 +282,7 @@ func (p *AnthropicProvider) StreamMessages(
 	}
 
 	// Build and send HTTP request
-	req, _, err := p.buildRequest(ctx, "/v1/messages", reqBody)
+	req, err := p.buildRequest(ctx, "/v1/messages", reqBody)
 	if err != nil {
 		return nil, err
 	}

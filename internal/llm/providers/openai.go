@@ -237,7 +237,7 @@ func (p *OpenAIProvider) StreamMessages(
 	}
 
 	// Build and send HTTP request
-	req, _, err := p.buildRequest(ctx, "/chat/completions", reqBody)
+	req, err := p.buildRequest(ctx, "/chat/completions", reqBody)
 	if err != nil {
 		return nil, err
 	}
