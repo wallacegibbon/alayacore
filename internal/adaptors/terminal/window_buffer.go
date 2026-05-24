@@ -375,16 +375,20 @@ func (wb *WindowBuffer) GetTotalLines() int {
 	return wb.totalLines
 }
 
-// ForEachVisible iterates forward over all visible windows, calling fn
-// with the window index and pointer. If fn returns false, iteration stops.
-// Returns true if all visible windows were visited (fn never returned false).
-func (wb *WindowBuffer) ForEachVisible(fn func(i int, w *Window) bool) bool {
-	return wb.ForEachVisibleFrom(0, fn)
-}
-
-// ForEachVisibleFrom iterates forward over visible windows starting from the
-// given index (inclusive). See ForEachVisible for callback semantics.
-func (wb *WindowBuffer) ForEachVisibleFrom(start int, fn func(i int, w *Window) bool) bool {
+// ForEachVisible iterates forward over visible windows starting from the
+// given index (inclusive), calling fn with the window index and pointer.
+// If fn returns false, iteration stops. Returns true if all visible windows
+// were visited (fn never returned false).
+//
+// This is one of four core iteration methods:
+//   - ForEachVisible(index, fn(i, w))        — forward from index
+//   - ForEachVisibleBackward(index, fn(i, w)) — backward from index
+//   - ForEachVisibleRanged(fn(i, start, end)) — forward from 0 with line ranges
+//   - ForEachVisibleBackwardRanged(fn(i, start, end)) — backward from end with line ranges
+//
+// Use the non-ranged variants for property-based searches (j, k, f, b).
+// Use the ranged variants for position-based searches (H, L, M, center helpers).
+func (wb *WindowBuffer) ForEachVisible(start int, fn func(i int, w *Window) bool) bool {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 	wb.ensureLineHeights()
@@ -397,52 +401,9 @@ func (wb *WindowBuffer) ForEachVisibleFrom(start int, fn func(i int, w *Window) 
 	return true
 }
 
-// ForEachVisibleRanged iterates forward over all visible windows, calling fn
-// with the window index and its line range [start, end). If fn returns false,
-// iteration stops. Returns true if all visible windows were visited.
-func (wb *WindowBuffer) ForEachVisibleRanged(fn func(i int, startLine, endLine int) bool) bool {
-	return wb.ForEachVisibleRangedFrom(0, fn)
-}
-
-// ForEachVisibleRangedFrom iterates forward over visible windows starting from
-// the given index (inclusive), passing line ranges. See ForEachVisibleRanged
-// for callback semantics.
-func (wb *WindowBuffer) ForEachVisibleRangedFrom(start int, fn func(i int, startLine, endLine int) bool) bool {
-	wb.mu.Lock()
-	defer wb.mu.Unlock()
-	wb.ensureLineHeights()
-
-	pos := 0
-	for i, w := range wb.Windows {
-		end := pos + wb.lineHeights[i]
-		if i >= start && w.Visible && !fn(i, pos, end) {
-			return false
-		}
-		pos = end
-	}
-	return true
-}
-
-// ForEachVisibleBackward iterates backward over all visible windows, calling fn
-// with the window index and pointer. If fn returns false, iteration stops.
-// Returns true if all visible windows were visited.
-func (wb *WindowBuffer) ForEachVisibleBackward(fn func(i int, w *Window) bool) bool {
-	wb.mu.Lock()
-	defer wb.mu.Unlock()
-	wb.ensureLineHeights()
-
-	for i := len(wb.Windows) - 1; i >= 0; i-- {
-		if wb.Windows[i].Visible && !fn(i, wb.Windows[i]) {
-			return false
-		}
-	}
-	return true
-}
-
-// ForEachVisibleBackwardFrom iterates backward over visible windows starting
-// from the given index (inclusive). See ForEachVisibleBackward for callback
-// semantics.
-func (wb *WindowBuffer) ForEachVisibleBackwardFrom(start int, fn func(i int, w *Window) bool) bool {
+// ForEachVisibleBackward iterates backward over visible windows starting
+// from the given index (inclusive). See ForEachVisible for callback semantics.
+func (wb *WindowBuffer) ForEachVisibleBackward(start int, fn func(i int, w *Window) bool) bool {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 	wb.ensureLineHeights()
@@ -458,6 +419,28 @@ func (wb *WindowBuffer) ForEachVisibleBackwardFrom(start int, fn func(i int, w *
 		if wb.Windows[i].Visible && !fn(i, wb.Windows[i]) {
 			return false
 		}
+	}
+	return true
+}
+
+// ForEachVisibleRanged iterates forward over all visible windows, calling fn
+// with the window index and its line range [start, end). If fn returns false,
+// iteration stops. Returns true if all visible windows were visited.
+//
+// Use this variant for viewport-aware positioning (H, M, L, center helpers).
+// For property-based searches, use ForEachVisible instead.
+func (wb *WindowBuffer) ForEachVisibleRanged(fn func(i int, startLine, endLine int) bool) bool {
+	wb.mu.Lock()
+	defer wb.mu.Unlock()
+	wb.ensureLineHeights()
+
+	pos := 0
+	for i, w := range wb.Windows {
+		end := pos + wb.lineHeights[i]
+		if w.Visible && !fn(i, pos, end) {
+			return false
+		}
+		pos = end
 	}
 	return true
 }
@@ -482,37 +465,6 @@ func (wb *WindowBuffer) ForEachVisibleBackwardRanged(fn func(i int, startLine, e
 	for i := len(wb.Windows) - 1; i >= 0; i-- {
 		pos -= wb.lineHeights[i]
 		if wb.Windows[i].Visible && !fn(i, pos, pos+wb.lineHeights[i]) {
-			return false
-		}
-	}
-	return true
-}
-
-// ForEachVisibleBackwardRangedFrom iterates backward over visible windows
-// starting from the given index (inclusive), passing line ranges.
-func (wb *WindowBuffer) ForEachVisibleBackwardRangedFrom(start int, fn func(i int, startLine, endLine int) bool) bool {
-	wb.mu.Lock()
-	defer wb.mu.Unlock()
-	wb.ensureLineHeights()
-
-	if start >= len(wb.Windows) {
-		start = len(wb.Windows) - 1
-	}
-	if start < 0 {
-		return true
-	}
-
-	// Compute end line of window start
-	pos := 0
-	for i := 0; i <= start; i++ {
-		pos += wb.lineHeights[i]
-	}
-
-	// Walk backward from start
-	for i := start; i >= 0; i-- {
-		end := pos
-		pos -= wb.lineHeights[i]
-		if wb.Windows[i].Visible && !fn(i, pos, end) {
 			return false
 		}
 	}
