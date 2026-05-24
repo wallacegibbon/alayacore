@@ -5,12 +5,14 @@ package agent
 // the active model name). Unlike ModelManager, it is allowed to write
 // its file and is used by the session layer to remember the last active
 // model across process restarts.
+//
+// All methods are called from the session's run() goroutine only, so no
+// sync.Mutex is needed.
 
 import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 
 	"github.com/alayacore/alayacore/internal/config"
 )
@@ -24,7 +26,6 @@ type RuntimeConfig struct {
 // RuntimeManager manages runtime configuration
 type RuntimeManager struct {
 	config RuntimeConfig
-	mu     sync.RWMutex
 	path   string
 }
 
@@ -43,9 +44,6 @@ func NewRuntimeManager(runtimePath, _ string) *RuntimeManager {
 
 // Load reads the runtime config from file
 func (rm *RuntimeManager) Load() error {
-	rm.mu.Lock()
-	defer rm.mu.Unlock()
-
 	if rm.path == "" {
 		return nil
 	}
@@ -53,8 +51,8 @@ func (rm *RuntimeManager) Load() error {
 	data, err := os.ReadFile(rm.path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// Create the file with default content (already holding lock)
-			return rm.saveLocked()
+			// Create the file with default content
+			return rm.save()
 		}
 		return err
 	}
@@ -63,15 +61,8 @@ func (rm *RuntimeManager) Load() error {
 	return nil
 }
 
-// Save writes the runtime config to file
-func (rm *RuntimeManager) Save() error {
-	rm.mu.Lock()
-	defer rm.mu.Unlock()
-	return rm.saveLocked()
-}
-
-// saveLocked writes the runtime config to file (caller must hold lock)
-func (rm *RuntimeManager) saveLocked() error {
+// save writes the runtime config to file
+func (rm *RuntimeManager) save() error {
 	if rm.path == "" {
 		return nil
 	}
@@ -84,6 +75,11 @@ func (rm *RuntimeManager) saveLocked() error {
 
 	content := formatRuntimeConfig(rm.config)
 	return os.WriteFile(rm.path, []byte(content), 0600)
+}
+
+// Save writes the runtime config to file (public wrapper).
+func (rm *RuntimeManager) Save() error {
+	return rm.save()
 }
 
 // parseRuntimeConfig parses the key-value runtime config format
@@ -110,37 +106,27 @@ func formatRuntimeConfig(config RuntimeConfig) string {
 
 // GetActiveModel returns the active model name
 func (rm *RuntimeManager) GetActiveModel() string {
-	rm.mu.RLock()
-	defer rm.mu.RUnlock()
 	return rm.config.ActiveModel
 }
 
 // SetActiveModel sets the active model name and saves to file
 func (rm *RuntimeManager) SetActiveModel(name string) error {
-	rm.mu.Lock()
 	rm.config.ActiveModel = name
-	rm.mu.Unlock()
-	return rm.Save()
+	return rm.save()
 }
 
 // GetActiveTheme returns the active theme name
 func (rm *RuntimeManager) GetActiveTheme() string {
-	rm.mu.RLock()
-	defer rm.mu.RUnlock()
 	return rm.config.ActiveTheme
 }
 
 // SetActiveTheme sets the active theme name and saves to file
 func (rm *RuntimeManager) SetActiveTheme(name string) error {
-	rm.mu.Lock()
 	rm.config.ActiveTheme = name
-	rm.mu.Unlock()
-	return rm.Save()
+	return rm.save()
 }
 
 // GetPath returns the runtime config file path
 func (rm *RuntimeManager) GetPath() string {
-	rm.mu.RLock()
-	defer rm.mu.RUnlock()
 	return rm.path
 }
