@@ -265,6 +265,13 @@ func (m *DisplayModel) MoveWindowCursorUp() bool {
 
 // MarkUserScrolled disables auto-follow. Called by scroll keys (J/K/Ctrl-D/Ctrl-U).
 func (m *DisplayModel) MarkUserScrolled() {
+	m.DisableAutoFollow()
+}
+
+// DisableAutoFollow explicitly disables auto-follow.
+// This is the single method that scroll key handlers should call to
+// disable auto-follow, ensuring the state transition is clear.
+func (m *DisplayModel) DisableAutoFollow() {
 	m.autoFollow = false
 }
 
