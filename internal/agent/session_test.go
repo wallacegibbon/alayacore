@@ -459,7 +459,7 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 
 	// Test 2: model_set should fail when task is running
 	output.Messages = nil // Clear previous messages
-	session.inProgress = true
+	session.inProgress.Store(true)
 	session.handleModelSet([]string{"test-model-1"})
 
 	// Check that the model was NOT switched (error should be in output)
@@ -476,7 +476,7 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 
 	// Test 3: model_set should work again after task completes
 	output.Messages = nil // Clear previous messages
-	session.inProgress = false
+	session.inProgress.Store(false)
 	session.handleModelSet([]string{"test-model-1"})
 
 	// Check that the model was switched (no error should be in output)

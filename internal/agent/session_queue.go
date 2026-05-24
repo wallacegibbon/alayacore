@@ -3,9 +3,9 @@ package agent
 // Session task queue: submit, enqueue, run, and manage queued tasks.
 //
 // The main loop (run()) manages the queue. Tasks are executed in their
-// own goroutine via runTask(). Shared state (taskQueue, inProgress,
-// pausedOnError) is protected by sync.Mutex on the Session struct.
-// Goroutine-local fields (nextQueueID) are updated outside the lock.
+// own goroutine via runTask(). Shared state (taskQueue) is protected by
+// sync.Mutex on the Session struct. Simple flags (inProgress, pausedOnError)
+// use atomic.Bool for lock-free access.
 
 import (
 	"context"
@@ -22,11 +22,11 @@ import (
 func (s *Session) submitTask(task Task) {
 	s.mu.Lock()
 	queueEmpty := len(s.taskQueue) == 0
+	s.mu.Unlock()
 	// Clear paused-on-error only if queue was empty (new task will run immediately).
 	if queueEmpty {
-		s.pausedOnError = false
+		s.pausedOnError.Store(false)
 	}
-	s.mu.Unlock()
 	s.enqueueTask(task, false)
 }
 
@@ -35,12 +35,7 @@ func (s *Session) submitTask(task Task) {
 // currently in progress. They are placed at the front so they run ahead of
 // any accumulated user prompts.
 func (s *Session) submitDeferredCommand(cmd string) {
-	s.mu.Lock()
-	inProg := s.inProgress
-	paused := s.pausedOnError
-	s.mu.Unlock()
-
-	if inProg && !paused {
+	if s.inProgress.Load() && !s.pausedOnError.Load() {
 		s.writeError("Cannot run command while a task is running. Please wait or cancel first.")
 		return
 	}

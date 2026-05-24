@@ -42,10 +42,10 @@ func (s *Session) run() {
 
 		// Start next task if queue is non-empty and no task is running.
 		s.mu.Lock()
-		if len(s.taskQueue) > 0 && !s.inProgress && s.sessionCtx.Err() == nil {
+		if len(s.taskQueue) > 0 && !s.inProgress.Load() && s.sessionCtx.Err() == nil {
 			item := s.taskQueue[0]
 			s.taskQueue = s.taskQueue[1:]
-			s.inProgress = true
+			s.inProgress.Store(true)
 			s.mu.Unlock()
 			go s.runTask(item)
 		} else {
@@ -64,7 +64,7 @@ func (s *Session) run() {
 			s.mu.Lock()
 			// inProgress was set to false by runTask before sending on taskDone.
 			// Check if more tasks are queued.
-			s.inProgress = len(s.taskQueue) > 0
+			s.inProgress.Store(len(s.taskQueue) > 0)
 			s.mu.Unlock()
 
 			// Drain any messages that arrived while the select wasn't listening
@@ -202,7 +202,7 @@ func (s *Session) handleUserPrompt(ctx context.Context, prompt string) {
 
 	if err != nil {
 		s.writeError(err.Error())
-		s.pausedOnError = true
+		s.pausedOnError.Store(true)
 		s.mu.Unlock()
 		s.sendSystemInfo()
 		return

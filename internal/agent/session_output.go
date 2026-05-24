@@ -5,7 +5,8 @@ package agent
 //
 // These methods may be called from either the run() goroutine or the
 // task goroutine. Shared state is protected by sync.Mutex on the
-// Session struct.
+// Session struct. Simple flags (inProgress, pausedOnError) use
+// atomic.Bool for lock-free access.
 
 import (
 	"encoding/json"
@@ -142,10 +143,10 @@ func (s *Session) sendSystemInfoInternal(activeModelConfig *ModelConfig) {
 		ContextLimit:      s.ContextLimit,
 		TotalTokens:       s.TotalSpent.InputTokens + s.TotalSpent.OutputTokens,
 		QueueItems:        queueItems,
-		InProgress:        s.inProgress,
+		InProgress:        s.inProgress.Load(),
 		CurrentStep:       s.currentStep,
 		MaxSteps:          s.MaxSteps,
-		TaskError:         s.pausedOnError,
+		TaskError:         s.pausedOnError.Load(),
 		Models:            models,
 		ActiveModelID:     activeID,
 		ActiveModelConfig: activeModelConfig,

@@ -197,12 +197,12 @@ func TestCancelAllTasks(t *testing.T) {
 				taskQueue:    make([]QueueItem, 0),
 				taskCancelCh: make(chan struct{}, 1),
 				runDone:      make(chan struct{}),
-				inProgress:   tt.inProgress,
 				SessionConfig: SessionConfig{
 					Input:  &stream.ChanInput{},
 					Output: output,
 				},
 			}
+			session.inProgress.Store(tt.inProgress)
 
 			// Add items to queue
 			for i := 0; i < tt.queueSize; i++ {
@@ -251,17 +251,17 @@ func TestPausedOnError(t *testing.T) {
 	}
 
 	// Initially not paused
-	if session.pausedOnError {
+	if session.pausedOnError.Load() {
 		t.Error("Session should not be paused initially")
 	}
 
 	// Set paused on error
-	session.pausedOnError = true
+	session.pausedOnError.Store(true)
 
 	// Submit a task with empty queue — should clear the paused flag
 	session.submitTask(UserPrompt{Text: "recovery prompt"})
 
-	if session.pausedOnError {
+	if session.pausedOnError.Load() {
 		t.Error("submitTask should clear pausedOnError when queue was empty")
 	}
 
@@ -306,11 +306,11 @@ func TestSubmitTaskFront(t *testing.T) {
 	}
 
 	// enqueueTask should NOT clear pausedOnError (that's handled by specific commands)
-	session.pausedOnError = true
+	session.pausedOnError.Store(true)
 
 	session.enqueueTask(CommandPrompt{Command: commandNameContinue}, true)
 
-	if !session.pausedOnError {
+	if !session.pausedOnError.Load() {
 		t.Error("enqueueTask should NOT clear pausedOnError")
 	}
 }
@@ -338,8 +338,8 @@ func TestCommandCanRunWhilePaused(t *testing.T) {
 	session.submitTask(UserPrompt{Text: "queued prompt"})
 
 	// Set paused — user prompts should not run, but commands should
-	session.pausedOnError = true
-	session.inProgress = true
+	session.pausedOnError.Store(true)
+	session.inProgress.Store(true)
 
 	// Add a command to the front of the queue (simulates submitDeferredCommand)
 	session.enqueueTask(CommandPrompt{Command: commandNameSave}, true)
@@ -362,7 +362,7 @@ func TestCommandCanRunWhilePaused(t *testing.T) {
 	}
 
 	// Paused state should still be set
-	if !session.pausedOnError {
+	if !session.pausedOnError.Load() {
 		t.Error("pausedOnError should still be true after command is queued")
 	}
 }
@@ -388,8 +388,8 @@ func TestCommandBehindUserPromptWhilePaused(t *testing.T) {
 	session.enqueueTask(CommandPrompt{Command: commandNameSave}, false)
 
 	// Set paused — the user prompt at front should be blocked
-	session.pausedOnError = true
-	session.inProgress = true
+	session.pausedOnError.Store(true)
+	session.inProgress.Store(true)
 
 	// Now add a command to the front (like :continue does)
 	session.enqueueTask(CommandPrompt{Command: commandNameContinue}, true)
@@ -418,12 +418,12 @@ func TestSubmitTaskDoesNotClearPauseWhenQueueNotEmpty(t *testing.T) {
 	session.submitTask(UserPrompt{Text: "first prompt"})
 
 	// Set paused on error
-	session.pausedOnError = true
+	session.pausedOnError.Store(true)
 
 	// Submit another task — should NOT clear the paused flag (queue not empty)
 	session.submitTask(UserPrompt{Text: "second prompt"})
 
-	if !session.pausedOnError {
+	if !session.pausedOnError.Load() {
 		t.Error("submitTask should NOT clear pausedOnError when queue is not empty")
 	}
 	if len(session.taskQueue) != 2 {

@@ -6,7 +6,8 @@ package agent
 //
 // These methods may be called from either the run() goroutine or the
 // task goroutine. Shared state is protected by sync.Mutex on the
-// Session struct.
+// Session struct. Simple flags (inProgress, pausedOnError) use
+// atomic.Bool for lock-free access.
 
 import (
 	"fmt"
@@ -158,11 +159,12 @@ func (s *Session) syncThinkToProvider(level int) {
 // If a task is currently running, the provider is not synced immediately
 // (to avoid races). Instead, thinkDirty is set and the sync happens at
 // the next step boundary in the task goroutine.
+// inProgress is an atomic.Bool so it can be read without the mutex.
 // See config.ThinkLevelOff, config.ThinkLevelNormal, config.ThinkLevelMax.
 func (s *Session) SetThinkLevel(level int) {
 	s.mu.Lock()
 	s.thinkLevel = level
-	if s.inProgress {
+	if s.inProgress.Load() {
 		// Defer provider sync to next step boundary
 		s.thinkDirty = true
 		s.mu.Unlock()

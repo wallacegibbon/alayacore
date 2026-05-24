@@ -4,7 +4,8 @@ package agent
 //
 // These methods are called from either the run() goroutine (for immediate
 // commands) or the task goroutine (for deferred commands). Shared state
-// is protected by sync.Mutex on the Session struct.
+// is protected by sync.Mutex on the Session struct. Simple flags
+// (inProgress, pausedOnError) use atomic.Bool for lock-free access.
 
 import (
 	"context"
@@ -36,9 +37,7 @@ func (s *Session) handleCommand(ctx context.Context, cmd string) {
 }
 
 func (s *Session) cancelTask() {
-	s.mu.Lock()
-	inProg := s.inProgress
-	s.mu.Unlock()
+	inProg := s.inProgress.Load()
 
 	if inProg {
 		if s.cancelRunningTask() {
@@ -52,16 +51,14 @@ func (s *Session) cancelAllTasks() {
 	s.mu.Lock()
 	queueLen := len(s.taskQueue)
 	s.taskQueue = make([]QueueItem, 0)
+	s.mu.Unlock()
 
 	currentCanceled := false
-	if s.inProgress {
-		s.mu.Unlock()
+	if s.inProgress.Load() {
 		if s.cancelRunningTask() {
 			currentCanceled = true
 		}
-		s.mu.Lock()
 	}
-	s.mu.Unlock()
 
 	// Send notification
 	switch {
@@ -77,9 +74,7 @@ func (s *Session) cancelAllTasks() {
 	}
 
 	// Clear paused-on-error state so the queue can resume if needed
-	s.mu.Lock()
-	s.pausedOnError = false
-	s.mu.Unlock()
+	s.pausedOnError.Store(false)
 
 	s.sendSystemInfo()
 }
@@ -91,9 +86,7 @@ func (s *Session) handleContinue(ctx context.Context, args []string) {
 		return
 	}
 
-	s.mu.Lock()
-	s.pausedOnError = false
-	s.mu.Unlock()
+	s.pausedOnError.Store(false)
 
 	// With no arguments, resend the last prompt.
 	if len(args) == 0 {
@@ -139,8 +132,7 @@ Rules:
 	outputTokens, err := s.processPrompt(ctx, s.Messages)
 	if err != nil {
 		s.writeError(err.Error())
-		s.mu.Lock()
-		s.pausedOnError = true
+		s.pausedOnError.Store(true)
 		s.mu.Unlock()
 		s.sendSystemInfo()
 		return
@@ -197,9 +189,7 @@ func (s *Session) handleModelSet(args []string) {
 		return
 	}
 
-	s.mu.Lock()
-	inProg := s.inProgress
-	s.mu.Unlock()
+	inProg := s.inProgress.Load()
 
 	if inProg {
 		s.writeError("Cannot switch model while a task is running. Please wait or cancel the current task.")
@@ -356,9 +346,7 @@ func (s *Session) resendPrompt(ctx context.Context) {
 	if err != nil {
 		s.mu.Unlock()
 		s.writeError(err.Error())
-		s.mu.Lock()
-		s.pausedOnError = true
-		s.mu.Unlock()
+		s.pausedOnError.Store(true)
 		s.sendSystemInfo()
 		return
 	}

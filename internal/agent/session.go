@@ -30,6 +30,7 @@ package agent
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/alayacore/alayacore/internal/config"
@@ -57,8 +58,8 @@ type Session struct {
 	agent         *llm.Agent
 	provider      llm.Provider
 	taskQueue     []QueueItem
-	inProgress    bool
-	pausedOnError bool
+	inProgress    atomic.Bool
+	pausedOnError atomic.Bool
 	currentStep   int
 	thinkLevel    int
 	nextPromptID  uint64
