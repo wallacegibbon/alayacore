@@ -78,9 +78,7 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) (int
 			// Sync think level if it was changed during task execution.
 			if s.thinkDirty.Load() {
 				if p := s.provider.Load(); p != nil {
-					if prov, ok := p.(llm.Provider); ok {
-						prov.SetReasoningLevel(int(s.thinkLevel.Load()))
-					}
+					(*p).SetReasoningLevel(int(s.thinkLevel.Load()))
 				}
 				s.thinkDirty.Store(false)
 			}

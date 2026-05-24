@@ -93,8 +93,7 @@ func (s *Session) createProviderAndAgent(modelConfig *ModelConfig) (llm.Provider
 func (s *Session) ensureAgentInitialized() string {
 	// Fast path: already initialized.
 	if s.agent.Load() != nil {
-		p := s.provider.Load()
-		if p != nil {
+		if s.provider.Load() != nil {
 			// provider is set — agent is ready
 			return ""
 		}
@@ -114,14 +113,12 @@ func (s *Session) ensureAgentInitialized() string {
 	}
 
 	s.agent.Store(agent)
-	s.provider.Store(provider)
+	s.provider.Store(&provider)
 	if activeModel.ContextLimit > 0 {
 		s.ContextLimit = int64(activeModel.ContextLimit)
 	}
 	if p := s.provider.Load(); p != nil {
-		if prov, ok := p.(llm.Provider); ok {
-			prov.SetReasoningLevel(int(s.thinkLevel.Load()))
-		}
+		(*p).SetReasoningLevel(int(s.thinkLevel.Load()))
 	}
 	return ""
 }
@@ -133,11 +130,9 @@ func (s *Session) initAgentFromConfig(modelConfig *ModelConfig) error {
 	}
 
 	s.agent.Store(agent)
-	s.provider.Store(provider)
+	s.provider.Store(&provider)
 	if p := s.provider.Load(); p != nil {
-		if prov, ok := p.(llm.Provider); ok {
-			prov.SetReasoningLevel(int(s.thinkLevel.Load()))
-		}
+		(*p).SetReasoningLevel(int(s.thinkLevel.Load()))
 	}
 	return nil
 }
@@ -161,9 +156,7 @@ func (s *Session) SetThinkLevel(level int) {
 		s.thinkDirty.Store(true)
 	} else {
 		if p := s.provider.Load(); p != nil {
-			if prov, ok := p.(llm.Provider); ok {
-				prov.SetReasoningLevel(level)
-			}
+			(*p).SetReasoningLevel(level)
 		}
 	}
 	s.sendSystemInfo()

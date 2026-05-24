@@ -59,7 +59,7 @@ type Session struct {
 
 	// === State owned by run() goroutine, updated via task events ===
 	agent       atomic.Pointer[llm.Agent]
-	provider    atomic.Value // stores llm.Provider
+	provider    atomic.Pointer[llm.Provider]
 	taskQueue   []QueueItem
 	currentStep atomic.Int64
 	thinkLevel  atomic.Int64

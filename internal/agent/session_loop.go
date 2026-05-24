@@ -209,9 +209,7 @@ func (s *Session) handleTaskEvent(ev taskEvent, runMessages *[]llm.Message) {
 	case eventSyncThink:
 		s.thinkLevel.Store(int64(ev.thinkLevel))
 		if p := s.provider.Load(); p != nil {
-			if prov, ok := p.(llm.Provider); ok {
-				prov.SetReasoningLevel(ev.thinkLevel)
-			}
+			(*p).SetReasoningLevel(ev.thinkLevel)
 		}
 	}
 }
