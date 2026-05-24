@@ -2,10 +2,12 @@ package terminal
 
 // WarningCollector collects warnings during initialization before the TUI is ready.
 // This prevents stderr output from corrupting the terminal display.
+//
+// WarningCollector is NOT safe for concurrent use. It is only used during
+// single-threaded program initialization (before any goroutines are running).
 
 import (
 	"fmt"
-	"sync"
 )
 
 // Warning represents a single warning message
@@ -15,24 +17,17 @@ type Warning struct {
 
 // WarningCollector buffers warnings until they can be displayed
 type WarningCollector struct {
-	mu       sync.Mutex
 	warnings []Warning
 }
 
 // Addf adds a warning to the collector
 func (wc *WarningCollector) Addf(format string, args ...any) {
-	wc.mu.Lock()
-	defer wc.mu.Unlock()
-
 	msg := fmt.Sprintf(format, args...)
 	wc.warnings = append(wc.warnings, Warning{Message: msg})
 }
 
 // GetAndClear returns all warnings and clears the buffer
 func (wc *WarningCollector) GetAndClear() []Warning {
-	wc.mu.Lock()
-	defer wc.mu.Unlock()
-
 	warnings := wc.warnings
 	wc.warnings = nil
 	return warnings
@@ -47,7 +42,5 @@ func AddWarningf(wc *WarningCollector, format string, args ...any) {
 
 // HasWarnings checks if there are any warnings
 func (wc *WarningCollector) HasWarnings() bool {
-	wc.mu.Lock()
-	defer wc.mu.Unlock()
 	return len(wc.warnings) > 0
 }
