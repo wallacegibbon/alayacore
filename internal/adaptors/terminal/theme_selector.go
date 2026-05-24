@@ -3,11 +3,6 @@ package terminal
 // ThemeSelector provides a UI for selecting themes from a theme folder.
 // It displays a list of available themes and allows the user to preview
 // and select themes in real-time.
-//
-// SINGLE-GOROUTINE: All methods of ThemeSelector are called exclusively
-// from the Bubble Tea event loop. No mutex is needed because the
-// Bubble Tea model's Update and View methods are never invoked
-// concurrently across goroutines.
 
 import (
 	"fmt"
@@ -18,23 +13,10 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-// ThemeSelectorState represents the current state of the theme selector.
-type ThemeSelectorState int
-
-const (
-	ThemeSelectorClosed ThemeSelectorState = iota
-	ThemeSelectorOpen
-)
-
 // ThemeSelector manages theme selection UI.
 type ThemeSelector struct {
-	state       ThemeSelectorState
-	themes      []ThemeInfo
-	selectedIdx int
-	scrollIdx   int
-	width       int
-	height      int
-	styles      *Styles
+	ScrollableListCore
+	themes []ThemeInfo
 
 	// Preview state
 	previewTheme     *Theme
@@ -44,51 +26,43 @@ type ThemeSelector struct {
 	// Selection state
 	themeJustSelected bool
 	originalThemeName string // Theme name when selector was opened (for cancel)
-
-	// App focus state
-	hasFocus bool
 }
 
 // NewThemeSelector creates a new theme selector.
 func NewThemeSelector(styles *Styles) *ThemeSelector {
-	return &ThemeSelector{
-		state:    ThemeSelectorClosed,
-		themes:   []ThemeInfo{},
-		styles:   styles,
-		width:    60,
-		height:   20,
-		hasFocus: true,
+	ts := &ThemeSelector{
+		themes: []ThemeInfo{},
 	}
+	ts.Width = 60
+	ts.Height = 20
+	ts.HasFocus = true
+	ts.Styles = styles
+	return ts
 }
 
 // --- State Management ---
 
-func (ts *ThemeSelector) IsOpen() bool              { return ts.state != ThemeSelectorClosed }
-func (ts *ThemeSelector) State() ThemeSelectorState { return ts.state }
-
 func (ts *ThemeSelector) Open(themes []ThemeInfo, activeTheme string) {
 	ts.themes = themes
-	ts.state = ThemeSelectorOpen
-	ts.scrollIdx = 0
-	ts.selectedIdx = 0
-	ts.originalThemeName = activeTheme // Save original theme for cancel
+	ts.State = ScrollableListOpen
+	ts.ScrollIdx = 0
+	ts.SelectedIdx = 0
+	ts.originalThemeName = activeTheme
 	ts.previewTheme = nil
 	ts.previewThemeName = ""
 
-	// Find active theme and position cursor
 	for i, theme := range ts.themes {
 		if theme.Name == activeTheme {
-			ts.selectedIdx = i
+			ts.SelectedIdx = i
 			break
 		}
 	}
 
-	// Ensure selected theme is visible
-	ts.ensureVisible()
+	ts.EnsureVisible()
 }
 
 func (ts *ThemeSelector) Close() {
-	ts.state = ThemeSelectorClosed
+	ts.State = ScrollableListClosed
 	ts.previewTheme = nil
 	ts.previewThemeName = ""
 	if ts.previewTimer != nil {
@@ -99,26 +73,18 @@ func (ts *ThemeSelector) Close() {
 
 func (ts *ThemeSelector) SetSize(width, height int) {
 	if width > 0 {
-		ts.width = width
+		ts.Width = width
 	}
-	ts.height = min(height-LayoutGap, SelectorMaxHeight)
-}
-
-func (ts *ThemeSelector) SetStyles(styles *Styles) {
-	ts.styles = styles
-}
-
-func (ts *ThemeSelector) SetHasFocus(hasFocus bool) {
-	ts.hasFocus = hasFocus
+	ts.Height = min(height-LayoutGap, SelectorMaxHeight)
 }
 
 // --- Theme Management ---
 
 func (ts *ThemeSelector) GetSelectedTheme() *ThemeInfo {
-	if len(ts.themes) == 0 || ts.selectedIdx < 0 || ts.selectedIdx >= len(ts.themes) {
+	if len(ts.themes) == 0 || ts.SelectedIdx < 0 || ts.SelectedIdx >= len(ts.themes) {
 		return nil
 	}
-	return &ts.themes[ts.selectedIdx]
+	return &ts.themes[ts.SelectedIdx]
 }
 
 func (ts *ThemeSelector) GetPreviewTheme() *Theme {
@@ -142,14 +108,14 @@ func (ts *ThemeSelector) ConsumeThemeSelected() bool {
 func (ts *ThemeSelector) Init() tea.Cmd { return nil }
 
 func (ts *ThemeSelector) Update(_ tea.Msg) (tea.Model, tea.Cmd) {
-	if ts.state == ThemeSelectorClosed {
+	if ts.State == ScrollableListClosed {
 		return ts, nil
 	}
 	return ts, nil
 }
 
 func (ts *ThemeSelector) View() tea.View {
-	if ts.state == ThemeSelectorClosed {
+	if ts.State == ScrollableListClosed {
 		return tea.NewView("")
 	}
 	return tea.NewView(lipgloss.NewStyle().Padding(1, 2).Render(ts.renderList()))
@@ -158,7 +124,7 @@ func (ts *ThemeSelector) View() tea.View {
 // --- Key Handling ---
 
 func (ts *ThemeSelector) HandleKeyMsg(msg tea.KeyMsg, themeManager *ThemeManager) (*Theme, bool) {
-	if ts.state == ThemeSelectorClosed {
+	if ts.State == ScrollableListClosed {
 		return nil, false
 	}
 
@@ -167,28 +133,27 @@ func (ts *ThemeSelector) HandleKeyMsg(msg tea.KeyMsg, themeManager *ThemeManager
 
 	switch key {
 	case "up", "k":
-		if ts.selectedIdx > 0 {
-			ts.selectedIdx--
-			ts.ensureVisible()
+		if ts.SelectedIdx > 0 {
+			ts.SelectedIdx--
+			ts.EnsureVisible()
 			previewTheme = ts.getPreviewTheme(themeManager)
 		}
 	case "down", "j":
-		if ts.selectedIdx < len(ts.themes)-1 {
-			ts.selectedIdx++
-			ts.ensureVisible()
+		if ts.SelectedIdx < len(ts.themes)-1 {
+			ts.SelectedIdx++
+			ts.EnsureVisible()
 			previewTheme = ts.getPreviewTheme(themeManager)
 		}
 	case "enter":
-		if len(ts.themes) > 0 && ts.selectedIdx >= 0 {
+		if len(ts.themes) > 0 && ts.SelectedIdx >= 0 {
 			ts.themeJustSelected = true
-			ts.state = ThemeSelectorClosed
+			ts.State = ScrollableListClosed
 			previewTheme = ts.getPreviewTheme(themeManager)
 			ts.previewTheme = nil
 			return previewTheme, true
 		}
 	case "r":
-		// Reload themes - signal to parent
-		return nil, false // Parent will handle reload
+		return nil, false // Parent handles reload
 	case "esc", "q":
 		ts.Close()
 		return nil, true
@@ -202,11 +167,11 @@ func (ts *ThemeSelector) getPreviewTheme(themeManager *ThemeManager) *Theme {
 		return nil
 	}
 
-	if len(ts.themes) == 0 || ts.selectedIdx < 0 || ts.selectedIdx >= len(ts.themes) {
+	if len(ts.themes) == 0 || ts.SelectedIdx < 0 || ts.SelectedIdx >= len(ts.themes) {
 		return nil
 	}
 
-	themeName := ts.themes[ts.selectedIdx].Name
+	themeName := ts.themes[ts.SelectedIdx].Name
 	if themeName == ts.previewThemeName && ts.previewTheme != nil {
 		return ts.previewTheme
 	}
@@ -220,67 +185,40 @@ func (ts *ThemeSelector) getPreviewTheme(themeManager *ThemeManager) *Theme {
 
 func (ts *ThemeSelector) renderList() string {
 	var sb strings.Builder
-
 	listHeight := SelectorListRows
-
-	// Build content
 	var lines []string
 
 	switch {
 	case len(ts.themes) == 0:
-		lines = append(lines, ts.styles.System.Render("  No Theme"))
+		lines = append(lines, ts.Styles.System.Render("  No Theme"))
 	default:
-		ts.ensureVisible()
-
-		for i := ts.scrollIdx; i < min(ts.scrollIdx+listHeight, len(ts.themes)); i++ {
+		ts.EnsureVisible()
+		for i := ts.ScrollIdx; i < min(ts.ScrollIdx+listHeight, len(ts.themes)); i++ {
 			theme := ts.themes[i]
-			if i == ts.selectedIdx {
-				lines = append(lines, fmt.Sprintf("> %s", ts.styles.Text.Render(theme.Name)))
+			if i == ts.SelectedIdx {
+				lines = append(lines, fmt.Sprintf("> %s", ts.Styles.Text.Render(theme.Name)))
 			} else {
-				lines = append(lines, fmt.Sprintf("  %s", ts.styles.System.Render(theme.Name)))
+				lines = append(lines, fmt.Sprintf("  %s", ts.Styles.System.Render(theme.Name)))
 			}
 		}
 	}
 
-	// Pad lines to fill the list height (for consistent box height)
 	for len(lines) < listHeight {
 		lines = append(lines, "")
 	}
 
-	// Join lines
 	content := strings.Join(lines, "\n")
-
-	// Render with border
-	borderColor := ts.styles.BorderFocused
-	if !ts.hasFocus {
-		borderColor = ts.styles.BorderBlurred
-	}
-
-	sb.WriteString(ts.styles.RenderBorderedBox(content, ts.width, borderColor, listHeight))
-
-	// Compact command help
+	borderColor := ts.ListBorderColor()
+	sb.WriteString(ts.Styles.RenderBorderedBox(content, ts.Width, borderColor, listHeight))
 	sb.WriteString("\n")
-	sb.WriteString(ts.styles.System.Render("j/k: navigate │ r: reload │ enter: select │ q/esc: close"))
+	sb.WriteString(ts.Styles.System.Render("j/k: navigate │ r: reload │ enter: select │ q/esc: close"))
 
 	return sb.String()
 }
 
+// RenderOverlay renders the theme selector as an overlay on top of base content.
 func (ts *ThemeSelector) RenderOverlay(baseContent string, screenWidth, screenHeight int) string {
-	if ts.state == ThemeSelectorClosed {
-		return baseContent
-	}
-	return renderOverlay(baseContent, ts.renderList(), screenWidth, screenHeight)
-}
-
-// --- Helpers ---
-
-func (ts *ThemeSelector) ensureVisible() {
-	listHeight := SelectorListRows
-	if ts.selectedIdx < ts.scrollIdx {
-		ts.scrollIdx = ts.selectedIdx
-	} else if ts.selectedIdx >= ts.scrollIdx+listHeight {
-		ts.scrollIdx = ts.selectedIdx - listHeight + 1
-	}
+	return ts.ScrollableListCore.RenderOverlay(baseContent, ts.renderList(), screenWidth, screenHeight)
 }
 
 var _ tea.Model = (*ThemeSelector)(nil)

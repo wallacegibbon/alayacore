@@ -49,40 +49,40 @@ func TestQueueManagerNavigation(t *testing.T) {
 	qm.SetItems(items)
 
 	// Initially selected first item
-	if qm.selectedIdx != 0 {
-		t.Errorf("Expected selectedIdx to be 0, got %d", qm.selectedIdx)
+	if qm.SelectedIdx != 0 {
+		t.Errorf("Expected SelectedIdx to be 0, got %d", qm.SelectedIdx)
 	}
 
 	// Move down - simulate key handling
-	if len(qm.items) > 0 && qm.selectedIdx < len(qm.items)-1 {
-		qm.selectedIdx++
+	if len(qm.items) > 0 && qm.SelectedIdx < len(qm.items)-1 {
+		qm.SelectedIdx++
 	}
-	if qm.selectedIdx != 1 {
-		t.Errorf("Expected selectedIdx to be 1 after j, got %d", qm.selectedIdx)
+	if qm.SelectedIdx != 1 {
+		t.Errorf("Expected SelectedIdx to be 1 after j, got %d", qm.SelectedIdx)
 	}
 
 	// Move down again
-	if len(qm.items) > 0 && qm.selectedIdx < len(qm.items)-1 {
-		qm.selectedIdx++
+	if len(qm.items) > 0 && qm.SelectedIdx < len(qm.items)-1 {
+		qm.SelectedIdx++
 	}
-	if qm.selectedIdx != 2 {
-		t.Errorf("Expected selectedIdx to be 2 after second j, got %d", qm.selectedIdx)
+	if qm.SelectedIdx != 2 {
+		t.Errorf("Expected SelectedIdx to be 2 after second j, got %d", qm.SelectedIdx)
 	}
 
 	// Try to move past end - should stay at 2
-	if len(qm.items) > 0 && qm.selectedIdx < len(qm.items)-1 {
-		qm.selectedIdx++
+	if len(qm.items) > 0 && qm.SelectedIdx < len(qm.items)-1 {
+		qm.SelectedIdx++
 	}
-	if qm.selectedIdx != 2 {
-		t.Errorf("Expected selectedIdx to stay at 2, got %d", qm.selectedIdx)
+	if qm.SelectedIdx != 2 {
+		t.Errorf("Expected SelectedIdx to stay at 2, got %d", qm.SelectedIdx)
 	}
 
 	// Move up
-	if qm.selectedIdx > 0 {
-		qm.selectedIdx--
+	if qm.SelectedIdx > 0 {
+		qm.SelectedIdx--
 	}
-	if qm.selectedIdx != 1 {
-		t.Errorf("Expected selectedIdx to be 1 after k, got %d", qm.selectedIdx)
+	if qm.SelectedIdx != 1 {
+		t.Errorf("Expected SelectedIdx to be 1 after k, got %d", qm.SelectedIdx)
 	}
 }
 
@@ -115,7 +115,7 @@ func TestQueueManagerGetSelectedItem(t *testing.T) {
 	}
 
 	// Move to second item
-	qm.selectedIdx = 1
+	qm.SelectedIdx = 1
 	item = qm.GetSelectedItem()
 	if item == nil {
 		t.Fatal("Expected non-nil item")
@@ -159,8 +159,8 @@ func TestQueueManagerDeleteLastItem(t *testing.T) {
 	qm.SetItems(items)
 
 	// Move to last item
-	qm.selectedIdx = 2
-	qm.scrollIdx = 0
+	qm.SelectedIdx = 2
+	qm.ScrollIdx = 0
 
 	// Simulate deleting the last item - set items to 2 items
 	newItems := []QueueItem{
@@ -170,8 +170,8 @@ func TestQueueManagerDeleteLastItem(t *testing.T) {
 	qm.SetItems(newItems)
 
 	// selectedIdx should be clamped to 1 (last valid index)
-	if qm.selectedIdx != 1 {
-		t.Errorf("Expected selectedIdx to be clamped to 1, got %d", qm.selectedIdx)
+	if qm.SelectedIdx != 1 {
+		t.Errorf("Expected selectedIdx to be clamped to 1, got %d", qm.SelectedIdx)
 	}
 
 	// GetSelectedItem should return Q2
@@ -189,13 +189,13 @@ func TestQueueManagerDeleteLastItem(t *testing.T) {
 	qm.SetItems(emptyItems)
 
 	// selectedIdx should be 0
-	if qm.selectedIdx != 0 {
-		t.Errorf("Expected selectedIdx to be 0 for empty list, got %d", qm.selectedIdx)
+	if qm.SelectedIdx != 0 {
+		t.Errorf("Expected selectedIdx to be 0 for empty list, got %d", qm.SelectedIdx)
 	}
 
 	// scrollIdx should also be 0
-	if qm.scrollIdx != 0 {
-		t.Errorf("Expected scrollIdx to be 0 for empty list, got %d", qm.scrollIdx)
+	if qm.ScrollIdx != 0 {
+		t.Errorf("Expected scrollIdx to be 0 for empty list, got %d", qm.ScrollIdx)
 	}
 
 	// GetSelectedItem should return nil for empty list
@@ -208,8 +208,8 @@ func TestQueueManagerDeleteLastItem(t *testing.T) {
 func TestQueueManagerRenderItemTruncation(t *testing.T) {
 	styles := DefaultStyles()
 	qm := NewQueueManager(styles)
-	qm.width = 60
-	maxWidth := qm.width - 6 // 54 display cells
+	qm.Width = 60
+	maxWidth := qm.Width - 6 // 54 display cells
 
 	// ASCII content that fits — should not be truncated
 	short := QueueItem{QueueID: "Q1", Type: "prompt", Content: "hello world"}

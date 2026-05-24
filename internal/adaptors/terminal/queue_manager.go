@@ -16,110 +16,52 @@ type QueueItem struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// QueueManagerState represents the current state of the queue manager
-type QueueManagerState int
-
-const (
-	QueueManagerClosed QueueManagerState = iota
-	QueueManagerList
-)
-
 // QueueManager manages the task queue UI.
-//
-// SINGLE-GOROUTINE: All methods of QueueManager are called exclusively
-// from the Bubble Tea event loop (goroutine running tea.Program.Run).
-// No mutex is needed because the Bubble Tea model's Update and View
-// methods are never invoked concurrently.
 type QueueManager struct {
-	state       QueueManagerState
-	items       []QueueItem
-	selectedIdx int
-	scrollIdx   int
-	width       int
-	height      int
-	styles      *Styles
-
-	// App focus state (when app loses focus, dim all UI elements)
-	hasFocus bool
+	ScrollableListCore
+	items []QueueItem
 }
 
 // NewQueueManager creates a new queue manager
 func NewQueueManager(styles *Styles) *QueueManager {
-	return &QueueManager{
-		state:    QueueManagerClosed,
-		items:    []QueueItem{},
-		styles:   styles,
-		width:    60,
-		height:   20,
-		hasFocus: true,
+	qm := &QueueManager{
+		items: []QueueItem{},
 	}
+	qm.Width = 60
+	qm.Height = 20
+	qm.HasFocus = true
+	qm.Styles = styles
+	return qm
 }
 
 // --- State Management ---
 
-func (qm *QueueManager) IsOpen() bool             { return qm.state != QueueManagerClosed }
-func (qm *QueueManager) State() QueueManagerState { return qm.state }
 func (qm *QueueManager) SetItems(items []QueueItem) {
 	qm.items = items
-	qm.clampSelection()
+	qm.ClampSelection(len(qm.items))
 }
 
 func (qm *QueueManager) Open() {
-	qm.state = QueueManagerList
-	qm.selectedIdx = 0
-	qm.scrollIdx = 0
-	qm.clampSelection()
-}
-
-func (qm *QueueManager) Close() {
-	qm.state = QueueManagerClosed
+	qm.State = ScrollableListOpen
+	qm.SelectedIdx = 0
+	qm.ScrollIdx = 0
+	qm.ClampSelection(len(qm.items))
 }
 
 // --- Selection Management ---
 
 func (qm *QueueManager) GetSelectedItem() *QueueItem {
-	if len(qm.items) == 0 || qm.selectedIdx >= len(qm.items) {
+	if len(qm.items) == 0 || qm.SelectedIdx >= len(qm.items) {
 		return nil
 	}
-	return &qm.items[qm.selectedIdx]
-}
-
-func (qm *QueueManager) clampSelection() {
-	if len(qm.items) == 0 {
-		qm.selectedIdx = 0
-		qm.scrollIdx = 0
-		return
-	}
-	if qm.selectedIdx >= len(qm.items) {
-		qm.selectedIdx = len(qm.items) - 1
-	}
-	if qm.selectedIdx < 0 {
-		qm.selectedIdx = 0
-	}
-	// Ensure scrollIdx is valid
-	if qm.scrollIdx < 0 {
-		qm.scrollIdx = 0
-	}
-	if qm.scrollIdx > qm.selectedIdx {
-		qm.scrollIdx = qm.selectedIdx
-	}
+	return &qm.items[qm.SelectedIdx]
 }
 
 // --- Size Management ---
 
 func (qm *QueueManager) SetSize(width, height int) {
-	qm.width = width
-	qm.height = height
-}
-
-func (qm *QueueManager) SetStyles(styles *Styles) {
-	qm.styles = styles
-}
-
-// SetHasFocus sets the application focus state.
-// When the app loses focus, all UI elements should be dimmed.
-func (qm *QueueManager) SetHasFocus(hasFocus bool) {
-	qm.hasFocus = hasFocus
+	qm.Width = width
+	qm.Height = height
 }
 
 // --- Input Handling ---
@@ -128,19 +70,19 @@ func (qm *QueueManager) SetHasFocus(hasFocus bool) {
 func (qm *QueueManager) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	switch msg.String() {
 	case "q", "esc", "ctrl+c":
-		qm.Close()
+		qm.State = ScrollableListClosed
 		return nil
 
 	case "j", "down":
-		if len(qm.items) > 0 && qm.selectedIdx < len(qm.items)-1 {
-			qm.selectedIdx++
+		if len(qm.items) > 0 && qm.SelectedIdx < len(qm.items)-1 {
+			qm.SelectedIdx++
 			qm.updateScrollForHeight(SelectorListRows)
 		}
 		return nil
 
 	case "k", "up":
-		if qm.selectedIdx > 0 {
-			qm.selectedIdx--
+		if qm.SelectedIdx > 0 {
+			qm.SelectedIdx--
 			qm.updateScrollForHeight(SelectorListRows)
 		}
 		return nil
@@ -160,100 +102,81 @@ func (qm *QueueManager) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 // --- Rendering ---
 
 func (qm *QueueManager) View() string {
-	if qm.state == QueueManagerClosed {
+	if qm.State == ScrollableListClosed {
 		return ""
 	}
 
 	listHeight := SelectorListRows // content rows inside border
 	maxItems := SelectorListRows   // All rows for items
 
-	// Build content
 	var lines []string
 
 	if len(qm.items) == 0 {
-		emptyStyle := qm.styles.System
+		emptyStyle := qm.Styles.System
 		lines = append(lines, emptyStyle.Render("  No queued tasks"))
 	} else {
 		qm.updateScrollForHeight(maxItems)
 
-		endIdx := qm.scrollIdx + maxItems
+		endIdx := qm.ScrollIdx + maxItems
 		if endIdx > len(qm.items) {
 			endIdx = len(qm.items)
 		}
 
-		for i := qm.scrollIdx; i < endIdx; i++ {
+		for i := qm.ScrollIdx; i < endIdx; i++ {
 			item := qm.items[i]
-			lines = append(lines, qm.renderItem(item, i == qm.selectedIdx))
+			lines = append(lines, qm.renderItem(item, i == qm.SelectedIdx))
 		}
 	}
 
-	// Pad lines to fill the list height
 	for len(lines) < listHeight {
 		lines = append(lines, "")
 	}
 
-	// Wrap in border with same style as input box
-	// Dim border when app doesn't have focus
-	borderColor := qm.styles.BorderFocused
-	if !qm.hasFocus {
-		borderColor = qm.styles.BorderBlurred
-	}
+	borderColor := qm.ListBorderColor()
 	content := strings.Join(lines, "\n")
-	borderedBox := qm.styles.RenderBorderedBox(content, qm.width, borderColor, listHeight)
+	borderedBox := qm.Styles.RenderBorderedBox(content, qm.Width, borderColor, listHeight)
 
-	// Help text outside the bordered box
-	helpText := qm.styles.System.Render("j/k: navigate │ d: delete │ e: edit │ q/esc: close")
+	helpText := qm.Styles.System.Render("j/k: navigate │ d: delete │ e: edit │ q/esc: close")
 	return borderedBox + "\n" + helpText
 }
 
 func (qm *QueueManager) updateScrollForHeight(height int) {
-	// Scroll down if selection is below visible area
-	if qm.selectedIdx >= qm.scrollIdx+height {
-		qm.scrollIdx = qm.selectedIdx - height + 1
+	if qm.SelectedIdx >= qm.ScrollIdx+height {
+		qm.ScrollIdx = qm.SelectedIdx - height + 1
 	}
 
-	// Scroll up if selection is above visible area
-	if qm.selectedIdx < qm.scrollIdx {
-		qm.scrollIdx = qm.selectedIdx
+	if qm.SelectedIdx < qm.ScrollIdx {
+		qm.ScrollIdx = qm.SelectedIdx
 	}
 }
 
 func (qm *QueueManager) renderItem(item QueueItem, selected bool) string {
-	// Bordered box takes 4 cells (border + padding), prefix takes 2 ("> " or "  ")
-	maxWidth := qm.width - 6
+	maxWidth := qm.Width - 6
 	if maxWidth < 10 {
 		maxWidth = 10
 	}
 
 	content := item.Content
-	// Escape newlines and tabs for single-line display
 	content = strings.ReplaceAll(content, "\n", "\\n")
 	content = strings.ReplaceAll(content, "\t", "\\t")
 
-	// Prefix commands with ":"
 	if item.Type == "command" {
 		content = ":" + content
 	}
 
-	// Truncate by display width (accounts for CJK double-width characters).
-	// ansi.Hardwrap inserts \n at the correct display-width boundary.
 	truncated := ansi.Hardwrap(content, maxWidth, false)
 	if truncated != content {
-		// Content wraps — trim to maxWidth-3 to leave room for "..."
 		truncated = ansi.Hardwrap(content, maxWidth-3, false)
 		content = strings.SplitN(truncated, "\n", 2)[0] + "..."
 	}
 
 	if selected {
-		return qm.styles.Prompt.Render("> " + content)
+		return qm.Styles.Prompt.Render("> " + content)
 	}
-	return "  " + qm.styles.System.Render(content)
+	return "  " + qm.Styles.System.Render(content)
 }
 
 // RenderOverlay renders the queue manager as an overlay on top of base content
 func (qm *QueueManager) RenderOverlay(baseContent string, screenWidth, screenHeight int) string {
-	if qm.state == QueueManagerClosed {
-		return baseContent
-	}
-	return renderOverlay(baseContent, qm.View(), screenWidth, screenHeight)
+	return qm.ScrollableListCore.RenderOverlay(baseContent, qm.View(), screenWidth, screenHeight)
 }
