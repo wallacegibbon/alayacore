@@ -44,17 +44,6 @@ func (m InputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.input.SetWidth(max(0, msg.Width-8))
-	case editorFinishedMsg:
-		if msg.err != nil {
-			return m, nil
-		}
-		if msg.content != "" {
-			m.editorContent = msg.content
-			m.input.SetValue(FormatEditorContent(msg.content))
-			m.input.CursorEnd()
-			m.focused = true
-			m.input.Focus()
-		}
 	}
 
 	oldValue := m.input.Value()

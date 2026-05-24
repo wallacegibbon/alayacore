@@ -213,17 +213,8 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case editorStartMsg:
 		return m.handleEditorStart(msg)
 
-	case editorFinishedMsg:
+	case EditorFinishedMsg:
 		return m.handleEditorFinished(msg)
-
-	case displayEditorFinishedMsg:
-		return m.handleDisplayEditorFinished(msg)
-
-	case queueEditorFinishedMsg:
-		return m.handleQueueEditorFinished(msg)
-
-	case FileEditorFinishedMsg:
-		return m.handleFileEditorFinished(msg)
 
 	case tea.BlurMsg:
 		return m.handleBlur()
@@ -308,57 +299,50 @@ func (m *Terminal) handleTick() (tea.Model, tea.Cmd) {
 }
 
 // handleEditorFinished handles completion of the external editor.
-func (m *Terminal) handleEditorFinished(msg editorFinishedMsg) (tea.Model, tea.Cmd) {
-	if msg.err != nil {
-		m.out.AppendError("Editor error: %v", msg.err)
-	} else if msg.content != "" {
-		// Strip trailing newlines that text editors add by default
-		content := strings.TrimRight(msg.content, "\n")
-		m.input.editorContent = content
-		m.input.SetValue(FormatEditorContent(content))
-		m.input.CursorEnd()
-		m.focusInput()
-	}
-	return m, nil
-}
-
-// handleDisplayEditorFinished handles completion of the external editor for display viewing.
-// This is a no-op - we just opened the editor to view content, nothing to do when it closes.
-func (m *Terminal) handleDisplayEditorFinished(msg displayEditorFinishedMsg) (tea.Model, tea.Cmd) {
-	if msg.err != nil {
-		m.out.AppendError("Editor error: %v", msg.err)
-	}
-	return m, nil
-}
-
-// handleQueueEditorFinished handles completion of the external editor for queue item editing.
-func (m *Terminal) handleQueueEditorFinished(msg queueEditorFinishedMsg) (tea.Model, tea.Cmd) {
-	if msg.err != nil {
-		m.out.AppendError("Editor error: %v", msg.err)
+// Dispatches based on the EditorAction to handle different editor scenarios:
+//
+//   - EditorActionNone:          view-only (display), no side effects
+//   - EditorActionSubmit:        submit content as user input
+//   - EditorActionQueueEdit:     update a queued task's content
+//   - EditorActionReloadConfig:  reload configuration after file edit
+func (m *Terminal) handleEditorFinished(msg EditorFinishedMsg) (tea.Model, tea.Cmd) {
+	if msg.Err != nil {
+		m.out.AppendError("Editor error: %v", msg.Err)
 		return m, nil
 	}
 
-	if msg.content != "" && msg.queueID != "" {
-		// Send edit command to session via command pipeline
-		m.emitCommand(":taskqueue_edit " + msg.queueID + " " + msg.content)
-		// Refresh queue list
-		m.emitCommand(":taskqueue_get_all")
-	}
-	return m, nil
-}
+	switch msg.Action {
+	case EditorActionNone:
+		// View-only (display window viewing) — nothing to do
+		return m, nil
 
-// handleFileEditorFinished handles completion of file editing (e.g., model config).
-func (m *Terminal) handleFileEditorFinished(msg FileEditorFinishedMsg) (tea.Model, tea.Cmd) {
-	if msg.Err != nil {
-		m.out.WriteNotify(fmt.Sprintf("Error editing file %s: %v", msg.Path, msg.Err))
-	}
+	case EditorActionSubmit:
+		if msg.Content != "" {
+			// Strip trailing newlines that text editors add by default
+			content := strings.TrimRight(msg.Content, "\n")
+			m.input.editorContent = content
+			m.input.SetValue(FormatEditorContent(content))
+			m.input.CursorEnd()
+			m.focusInput()
+		}
+		return m, nil
 
-	// Reload based on the file type rather than guessing from the filename.
-	if msg.Type == "model_config" {
-		m.emitCommand(":model_load")
-	}
+	case EditorActionQueueEdit:
+		if msg.Content != "" && msg.QueueID != "" {
+			m.emitCommand(":taskqueue_edit " + msg.QueueID + " " + msg.Content)
+			m.emitCommand(":taskqueue_get_all")
+		}
+		return m, nil
 
-	return m, nil
+	case EditorActionReloadConfig:
+		if msg.FileType == "model_config" {
+			m.emitCommand(":model_load")
+		}
+		return m, nil
+
+	default:
+		return m, nil
+	}
 }
 
 // updateDisplayHeight updates the display viewport height based on window size.

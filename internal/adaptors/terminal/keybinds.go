@@ -736,10 +736,10 @@ func (m *Terminal) openModelConfigFile() tea.Cmd {
 	path := m.out.SnapshotModels().ConfigPath
 	if path == "" {
 		return func() tea.Msg {
-			return FileEditorFinishedMsg{
-				Path: "",
-				Err:  fmt.Errorf("no model config file path configured"),
-				Type: "model_config",
+			return EditorFinishedMsg{
+				Err:      fmt.Errorf("no model config file path configured"),
+				Action:   EditorActionReloadConfig,
+				FileType: "model_config",
 			}
 		}
 	}

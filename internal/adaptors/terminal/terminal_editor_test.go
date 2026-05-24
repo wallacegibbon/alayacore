@@ -60,9 +60,10 @@ func TestCtrlOWithExistingContent(t *testing.T) {
 func TestEditorFinishedMsg(t *testing.T) {
 	terminal := NewTerminal(NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 
-	msg := editorFinishedMsg{
-		content: "test content from editor",
-		err:     nil,
+	msg := EditorFinishedMsg{
+		Action:  EditorActionSubmit,
+		Content: "test content from editor",
+		Err:     nil,
 	}
 
 	model, _ := terminal.Update(msg)
@@ -86,9 +87,10 @@ func TestEditorFinishedMsg(t *testing.T) {
 func TestEditorFinishedMsgWithWhitespace(t *testing.T) {
 	terminal := NewTerminal(NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 
-	msg := editorFinishedMsg{
-		content: "  content with leading and trailing spaces  \n",
-		err:     nil,
+	msg := EditorFinishedMsg{
+		Action: EditorActionSubmit,
+		Content: "  content with leading and trailing spaces  \n",
+		Err:     nil,
 	}
 
 	model, _ := terminal.Update(msg)
@@ -107,9 +109,10 @@ func TestEditorFinishedMsgWithWhitespace(t *testing.T) {
 func TestEditorFinishedMsgWithMultipleTrailingNewlines(t *testing.T) {
 	terminal := NewTerminal(NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 
-	msg := editorFinishedMsg{
-		content: "content with multiple trailing newlines\n\n\n",
-		err:     nil,
+	msg := EditorFinishedMsg{
+		Action: EditorActionSubmit,
+		Content: "content with multiple trailing newlines\n\n\n",
+		Err:     nil,
 	}
 
 	model, _ := terminal.Update(msg)
@@ -138,9 +141,10 @@ func TestEditorContentSubmittedOnEnter(t *testing.T) {
 func TestEditorFinishedMsgMultiline(t *testing.T) {
 	terminal := NewTerminal(NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 
-	msg := editorFinishedMsg{
-		content: "line1\nline2\nline3",
-		err:     nil,
+	msg := EditorFinishedMsg{
+		Action: EditorActionSubmit,
+		Content: "line1\nline2\nline3",
+		Err:     nil,
 	}
 
 	model, _ := terminal.Update(msg)
@@ -220,9 +224,10 @@ func TestEditorFinishedMsgWithError(t *testing.T) {
 	terminal := NewTerminal(NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 	terminal.input.SetValue("original content")
 
-	msg := editorFinishedMsg{
-		content: "",
-		err:     fmt.Errorf("editor failed"),
+	msg := EditorFinishedMsg{
+		Action: EditorActionSubmit,
+		Content: "",
+		Err:     fmt.Errorf("editor failed"),
 	}
 
 	model, _ := terminal.Update(msg)
@@ -799,7 +804,7 @@ func TestDisplayEditorFinishedDoesNotPopulateInput(t *testing.T) {
 	terminal.input.SetValue("original input")
 
 	// Simulate display editor finishing (user viewed content, then quit)
-	msg := displayEditorFinishedMsg{err: nil}
+	msg := EditorFinishedMsg{Action: EditorActionNone, Err: nil}
 
 	model, _ := terminal.Update(msg)
 
@@ -823,7 +828,7 @@ func TestDisplayEditorFinishedWithError(t *testing.T) {
 	terminal.input.SetValue("original input")
 
 	// Simulate display editor finishing with error
-	msg := displayEditorFinishedMsg{err: fmt.Errorf("editor failed")}
+	msg := EditorFinishedMsg{Action: EditorActionNone, Err: fmt.Errorf("editor failed")}
 
 	model, _ := terminal.Update(msg)
 
@@ -936,7 +941,7 @@ func TestQueueEditorFinishedUpdatesContent(t *testing.T) {
 	terminal := NewTerminal(NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 
 	// Simulate queue editor finishing with updated content
-	msg := queueEditorFinishedMsg{queueID: "Q1", content: "updated content", err: nil}
+	msg := EditorFinishedMsg{Action: EditorActionQueueEdit, QueueID: "Q1", Content: "updated content", Err: nil}
 
 	model, _ := terminal.Update(msg)
 	if model == nil {
@@ -949,7 +954,7 @@ func TestQueueEditorFinishedWithError(t *testing.T) {
 	terminal.input.SetValue("original input")
 
 	// Simulate queue editor finishing with error
-	msg := queueEditorFinishedMsg{queueID: "Q1", content: "", err: fmt.Errorf("editor failed")}
+	msg := EditorFinishedMsg{Action: EditorActionQueueEdit, QueueID: "Q1", Content: "", Err: fmt.Errorf("editor failed")}
 
 	model, _ := terminal.Update(msg)
 

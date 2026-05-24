@@ -14,25 +14,34 @@ import (
 )
 
 // ============================================================================
-// Editor Message Types
+// Editor Action Types
 // ============================================================================
 
-// editorFinishedMsg is sent when external editor closes (for input)
-type editorFinishedMsg struct {
-	content string
-	err     error
-}
+// EditorAction classifies what should happen after the editor closes.
+type EditorAction int
 
-// displayEditorFinishedMsg is sent when external editor closes (for display window viewing)
-type displayEditorFinishedMsg struct {
-	err error
-}
+const (
+	EditorActionNone        EditorAction = iota // e.g. display viewing — no side effects
+	EditorActionSubmit                           // submit content as user input
+	EditorActionQueueEdit                        // update a queued task's content
+	EditorActionReloadConfig                     // reload model/runtime config after edit
+)
 
-// queueEditorFinishedMsg is sent when external editor closes (for queue item editing)
-type queueEditorFinishedMsg struct {
-	queueID string
-	content string
-	err     error
+// EditorFinishedMsg is sent when an external editor closes.
+// It replaces four separate message types (editorFinishedMsg,
+// displayEditorFinishedMsg, queueEditorFinishedMsg, FileEditorFinishedMsg).
+//
+// - For EditorActionNone: content is empty, no side effects.
+// - For EditorActionSubmit: content contains the editor's text.
+// - For EditorActionQueueEdit: content + QueueID identify the queue item to update.
+// - For EditorActionReloadConfig: Path + FileType identify the edited file.
+type EditorFinishedMsg struct {
+	Content string
+	Err     error
+	Action  EditorAction
+	QueueID string // for EditorActionQueueEdit
+	Path    string // for EditorActionReloadConfig
+	FileType string // for EditorActionReloadConfig ("model_config", etc.)
 }
 
 // editorStartMsg is sent to trigger actual editor execution (lazy temp file creation)
@@ -40,16 +49,24 @@ type editorStartMsg struct {
 	editorCmd   string
 	editorArgs  []string
 	tmpFileName string
-	forDisplay  bool // true if opening display window content (don't populate input)
-	forQueue    bool // true if editing a queue item
+	action      EditorAction
 	queueID     string
+	path        string
+	fileType    string
 }
 
-// FileEditorFinishedMsg is sent when external editor closes for a specific file
-type FileEditorFinishedMsg struct {
-	Path string
-	Err  error
-	Type string // "model_config", "runtime_config", etc. — used to decide what to reload
+// ============================================================================
+// Editor Message Helpers
+// ============================================================================
+
+// errEditorNotFound is returned when no text editor binary is found.
+func errEditorNotFound() error {
+	return fmt.Errorf("no editor found (tried: %s; set $EDITOR to override)", strings.Join(defaultEditors, ", "))
+}
+
+// newEditorFinishedMsg creates an EditorFinishedMsg with an error.
+func newEditorFinishedMsg(err error) EditorFinishedMsg {
+	return EditorFinishedMsg{Err: err}
 }
 
 // ============================================================================
@@ -82,67 +99,58 @@ func NewEditor() *Editor {
 }
 
 // Open opens an external editor for multi-line input.
-// The temp file is created lazily when the command executes, not during construction.
 func (e *Editor) Open(currentContent string) tea.Cmd {
-	editorCmd := getEditorCommand(os.Getenv("EDITOR"))
-
-	if editorCmd == "" {
-		return func() tea.Msg {
-			return editorFinishedMsg{content: "", err: fmt.Errorf("no editor found (tried: %s; set $EDITOR to override)", strings.Join(defaultEditors, ", "))}
-		}
-	}
-
-	cmd, args := splitEditorCmd(editorCmd)
-
-	// Store content for lazy temp file creation
-	e.content = currentContent
-
-	// Return a command that creates the temp file and runs the editor
-	return func() tea.Msg {
-		return editorStartMsg{
-			editorCmd:   cmd,
-			editorArgs:  args,
-			tmpFileName: "", // Will be created in handleEditorStart
-			forDisplay:  false,
-		}
-	}
+	return e.openWithAction(currentContent, EditorActionSubmit, "", "", "")
 }
 
 // OpenForDisplay opens an external editor to view display window content.
-// Unlike Open, this does not populate the input box when the editor closes.
+// Content is NOT read back — this is a view-only operation.
 func (e *Editor) OpenForDisplay(content string) tea.Cmd {
-	editorCmd := getEditorCommand(os.Getenv("EDITOR"))
-
-	if editorCmd == "" {
-		return func() tea.Msg {
-			return displayEditorFinishedMsg{err: fmt.Errorf("no editor found (tried: %s; set $EDITOR to override)", strings.Join(defaultEditors, ", "))}
-		}
-	}
-
-	cmd, args := splitEditorCmd(editorCmd)
-
-	// Store content for lazy temp file creation
-	e.content = content
-
-	// Return a command that creates the temp file and runs the editor
-	return func() tea.Msg {
-		return editorStartMsg{
-			editorCmd:   cmd,
-			editorArgs:  args,
-			tmpFileName: "", // Will be created in handleEditorStart
-			forDisplay:  true,
-		}
-	}
+	return e.openWithAction(content, EditorActionNone, "", "", "")
 }
 
 // OpenForQueue opens an external editor to edit a queue item's content.
-// When the editor closes, the content is sent back via queueEditorFinishedMsg.
 func (e *Editor) OpenForQueue(content string, queueID string) tea.Cmd {
+	return e.openWithAction(content, EditorActionQueueEdit, queueID, "", "")
+}
+
+// OpenFile opens an external editor for a specific file path.
+func (e *Editor) OpenFile(path, fileType string) tea.Cmd {
 	editorCmd := getEditorCommand(os.Getenv("EDITOR"))
 
 	if editorCmd == "" {
 		return func() tea.Msg {
-			return queueEditorFinishedMsg{queueID: queueID, err: fmt.Errorf("no editor found (tried: %s; set $EDITOR to override)", strings.Join(defaultEditors, ", "))}
+			return EditorFinishedMsg{
+				Err:      errEditorNotFound(),
+				Action:   EditorActionReloadConfig,
+				Path:     path,
+				FileType: fileType,
+			}
+		}
+	}
+
+	cmd, args := splitEditorCmd(editorCmd)
+	cmdArgs := append([]string{path}, args...)
+
+	//nolint:gosec // G204: Editor command from user config is intentional
+	return tea.ExecProcess(exec.Command(cmd, cmdArgs...), func(err error) tea.Msg {
+		return EditorFinishedMsg{
+			Err:      err,
+			Action:   EditorActionReloadConfig,
+			Path:     path,
+			FileType: fileType,
+		}
+	})
+}
+
+// openWithAction is the shared implementation for all editor operations
+// that require temp file creation (input, display viewing, queue editing).
+func (e *Editor) openWithAction(content string, action EditorAction, queueID, path, fileType string) tea.Cmd {
+	editorCmd := getEditorCommand(os.Getenv("EDITOR"))
+
+	if editorCmd == "" {
+		return func() tea.Msg {
+			return EditorFinishedMsg{Err: errEditorNotFound(), Action: action, QueueID: queueID, Path: path, FileType: fileType}
 		}
 	}
 
@@ -151,14 +159,14 @@ func (e *Editor) OpenForQueue(content string, queueID string) tea.Cmd {
 	// Store content for lazy temp file creation
 	e.content = content
 
-	// Return a command that creates the temp file and runs the editor
 	return func() tea.Msg {
 		return editorStartMsg{
-			editorCmd:   cmd,
-			editorArgs:  args,
-			tmpFileName: "", // Will be created in handleEditorStart
-			forQueue:    true,
-			queueID:     queueID,
+			editorCmd:  cmd,
+			editorArgs: args,
+			action:     action,
+			queueID:    queueID,
+			path:       path,
+			fileType:   fileType,
 		}
 	}
 }
@@ -184,34 +192,13 @@ func (e *Editor) createTempFile() (string, error) {
 	return tmpFileName, nil
 }
 
-// OpenFile opens an external editor for a specific file path.
-// fileType indicates what kind of file is being edited (e.g. "model_config").
-func (e *Editor) OpenFile(path, fileType string) tea.Cmd {
-	editorCmd := getEditorCommand(os.Getenv("EDITOR"))
-
-	if editorCmd == "" {
-		return func() tea.Msg {
-			return FileEditorFinishedMsg{Path: path, Err: fmt.Errorf("no editor found (tried: %s; set $EDITOR to override)", strings.Join(defaultEditors, ", ")), Type: fileType}
-		}
-	}
-
-	cmd, args := splitEditorCmd(editorCmd)
-	cmdArgs := append([]string{path}, args...)
-
-	//nolint:gosec // G204: Editor command from user config is intentional
-	return tea.ExecProcess(exec.Command(cmd, cmdArgs...), func(err error) tea.Msg {
-		return FileEditorFinishedMsg{Path: path, Err: err, Type: fileType}
-	})
-}
-
 // ============================================================================
 // Editor Helpers
 // ============================================================================
 
 // handleEditorStart handles the lazy start of the external editor.
-// This is where the temp file is actually created, ensuring cleanup happens properly.
+// Temp file is created here, ensuring cleanup happens properly.
 func (m *Terminal) handleEditorStart(msg editorStartMsg) (tea.Model, tea.Cmd) {
-	// Create temp file lazily
 	tmpFileName, err := m.editor.createTempFile()
 	if err != nil {
 		m.out.AppendError("Failed to create temp file: %v", err)
@@ -225,34 +212,32 @@ func (m *Terminal) handleEditorStart(msg editorStartMsg) (tea.Model, tea.Cmd) {
 	return m, tea.ExecProcess(cmd, func(err error) tea.Msg {
 		defer os.Remove(tmpFileName)
 
-		if err != nil {
-			if msg.forDisplay {
-				return displayEditorFinishedMsg{err: err}
-			}
-			if msg.forQueue {
-				return queueEditorFinishedMsg{queueID: msg.queueID, err: err}
-			}
-			return editorFinishedMsg{content: "", err: err}
+		// Build the result message with common fields
+		result := EditorFinishedMsg{
+			Err:      err,
+			Action:   msg.action,
+			QueueID:  msg.queueID,
+			Path:     msg.path,
+			FileType: msg.fileType,
 		}
 
-		// For display viewing, we don't need to read the content back
-		if msg.forDisplay {
-			return displayEditorFinishedMsg{err: nil}
+		if err != nil {
+			return result
+		}
+
+		// For view-only (display), don't read content back
+		if msg.action == EditorActionNone {
+			return result
 		}
 
 		content, readErr := os.ReadFile(tmpFileName)
 		if readErr != nil {
-			if msg.forQueue {
-				return queueEditorFinishedMsg{queueID: msg.queueID, err: readErr}
-			}
-			return editorFinishedMsg{content: "", err: readErr}
+			result.Err = readErr
+			return result
 		}
 
-		if msg.forQueue {
-			return queueEditorFinishedMsg{queueID: msg.queueID, content: string(content), err: nil}
-		}
-
-		return editorFinishedMsg{content: string(content), err: nil}
+		result.Content = string(content)
+		return result
 	})
 }
 
