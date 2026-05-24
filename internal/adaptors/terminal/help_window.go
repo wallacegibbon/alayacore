@@ -211,8 +211,7 @@ func (hw *HelpWindow) handleFilterInputKey(msg tea.KeyMsg, key string) tea.Cmd {
 	if key == "ctrl+c" {
 		hw.HandleFilterCtrlC()
 		hw.updateFilteredItems()
-		hw.ClampSelection(hw.filteredLen())
-		hw.skipSectionHeaders()
+		hw.clampSelection()
 		return nil
 	}
 
@@ -226,8 +225,7 @@ func (hw *HelpWindow) handleFilterInputKey(msg tea.KeyMsg, key string) tea.Cmd {
 
 	if oldValue != hw.FilterInput.Value() {
 		hw.updateFilteredItems()
-		hw.ClampSelection(hw.filteredLen())
-		hw.skipSectionHeaders()
+		hw.clampSelection()
 	}
 
 	return cmd

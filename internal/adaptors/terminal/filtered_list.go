@@ -33,13 +33,13 @@ const (
 
 // FilteredListCore holds shared state and methods for filtered list components.
 type FilteredListCore struct {
-	State        FilteredListState
-	SelectedIdx  int
-	ScrollIdx    int
-	Width        int
-	Height       int
-	Styles       *Styles
-	HasFocus     bool
+	State       FilteredListState
+	SelectedIdx int
+	ScrollIdx   int
+	Width       int
+	Height      int
+	Styles      *Styles
+	HasFocus    bool
 
 	FilterInput        textinput.Model
 	FilterInputFocused bool

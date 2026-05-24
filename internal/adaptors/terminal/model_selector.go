@@ -94,7 +94,10 @@ func (ms *ModelSelector) SetModels(models []searchableModel) {
 }
 
 func (ms *ModelSelector) LoadModels(models []agentpkg.ModelInfo, activeID int) tea.Cmd {
-	// Skip update if model list hasn't changed
+	// Skip update if model list hasn't changed.
+	// We check both ms.models length AND ms.lastModelCount because
+	// SetModels may have been called independently between LoadModels calls.
+	//nolint:gocritic // intentional double-check against stale state
 	if len(models) == len(ms.models) && len(models) == ms.lastModelCount {
 		modelsChanged := false
 		for i, m := range models {
