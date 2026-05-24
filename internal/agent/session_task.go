@@ -6,6 +6,8 @@ package agent
 // The main loop (run()) starts each task in its own goroutine so it
 // remains responsive to user input at all times. Shared state between
 // the main loop and the task goroutine is protected by sync.Mutex.
+// System info updates are requested by the task goroutine via
+// infoUpdateCh and processed by the run() goroutine.
 
 import (
 	"context"
@@ -67,6 +69,9 @@ func (s *Session) run() {
 			s.inProgress.Store(len(s.taskQueue) > 0)
 			s.mu.Unlock()
 
+			s.sendSystemInfo()
+
+		case <-s.infoUpdateCh:
 			s.sendSystemInfo()
 
 		case <-s.sessionCtx.Done():
@@ -184,7 +189,7 @@ func (s *Session) handleUserPrompt(ctx context.Context, prompt string) {
 		s.writeError(err.Error())
 		s.pausedOnError.Store(true)
 		s.mu.Unlock()
-		s.sendSystemInfo()
+		s.requestSystemInfo()
 		return
 	}
 	s.mu.Unlock()
@@ -265,7 +270,7 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) (int
 			}
 			s.mu.Unlock()
 
-			s.sendSystemInfo()
+			s.requestSystemInfo()
 			return nil
 		},
 		OnStepFinish: func(messages []llm.Message, usage llm.Usage) error {
@@ -281,7 +286,7 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) (int
 			}
 			s.mu.Unlock()
 
-			s.sendSystemInfo()
+			s.requestSystemInfo()
 			outputTokens += usage.OutputTokens
 			s.autoSaveIfEnabled()
 			return nil

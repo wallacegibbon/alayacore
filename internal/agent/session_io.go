@@ -104,7 +104,7 @@ func (s *Session) handleContinue(ctx context.Context, args []string) {
 	}
 
 	s.writeNotify("Resuming queue...")
-	s.sendSystemInfo()
+	s.requestSystemInfo()
 }
 
 func (s *Session) summarize(ctx context.Context) {
@@ -133,8 +133,7 @@ Rules:
 	if err != nil {
 		s.writeError(err.Error())
 		s.pausedOnError.Store(true)
-		s.mu.Unlock()
-		s.sendSystemInfo()
+		s.requestSystemInfo()
 		return
 	}
 
@@ -152,7 +151,7 @@ Rules:
 	s.mu.Unlock()
 
 	s.writeNotify("Summarized conversation")
-	s.sendSystemInfo()
+	s.requestSystemInfo()
 }
 
 func (s *Session) saveSession(args []string) {
@@ -347,10 +346,10 @@ func (s *Session) resendPrompt(ctx context.Context) {
 		s.mu.Unlock()
 		s.writeError(err.Error())
 		s.pausedOnError.Store(true)
-		s.sendSystemInfo()
+		s.requestSystemInfo()
 		return
 	}
 	s.mu.Unlock()
 
-	s.sendSystemInfo()
+	s.requestSystemInfo()
 }

@@ -76,6 +76,11 @@ type Session struct {
 	// when to start the next task.
 	taskDone chan struct{}
 
+	// infoUpdateCh is a buffered channel (capacity 1) used by the task
+	// goroutine to request a system-info update from the run() goroutine.
+	// This centralizes all sendSystemInfo calls in one place.
+	infoUpdateCh chan struct{}
+
 	sessionCtx    context.Context    // canceled when input is exhausted
 	sessionCancel context.CancelFunc // idempotent cancel
 	runDone       chan struct{}      // closed when run() exits
@@ -139,6 +144,7 @@ func NewSession(cfg SessionConfig) *Session {
 		taskQueue:      make([]QueueItem, 0),
 		taskCancelCh:   make(chan struct{}, 1),
 		taskDone:       make(chan struct{}, 1),
+		infoUpdateCh:   make(chan struct{}, 1),
 		sessionCtx:     sessionCtx,
 		sessionCancel:  sessionCancel,
 		runDone:        make(chan struct{}),
@@ -165,6 +171,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 		taskQueue:      make([]QueueItem, 0),
 		taskCancelCh:   make(chan struct{}, 1),
 		taskDone:       make(chan struct{}, 1),
+		infoUpdateCh:   make(chan struct{}, 1),
 		sessionCtx:     sessionCtx,
 		sessionCancel:  sessionCancel,
 		runDone:        make(chan struct{}),

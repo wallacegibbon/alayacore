@@ -3,8 +3,9 @@ package agent
 // Session output helpers: writing TLV messages to the adaptor output,
 // tracking token usage, and broadcasting system info.
 //
-// These methods may be called from either the run() goroutine or the
-// task goroutine. Shared state is protected by sync.Mutex on the
+// sendSystemInfo is called from the run() goroutine only; the task
+// goroutine requests updates via requestSystemInfo(), which sends on
+// infoUpdateCh. Shared state is protected by sync.Mutex on the
 // Session struct. Simple flags (inProgress, pausedOnError) use
 // atomic.Bool for lock-free access.
 
@@ -90,6 +91,17 @@ func (s *Session) writeToolResult(toolCallID string, status string) {
 // ============================================================================
 // System Info Broadcasting
 // ============================================================================
+
+// requestSystemInfo signals the run() goroutine to broadcast system info.
+// Non-blocking — if a signal is already pending, this is a no-op.
+// Called from the task goroutine whenever state changes that should be
+// reflected in the UI (step boundaries, errors, etc.).
+func (s *Session) requestSystemInfo() {
+	select {
+	case s.infoUpdateCh <- struct{}{}:
+	default:
+	}
+}
 
 func (s *Session) sendSystemInfo() {
 	s.sendSystemInfoInternal(nil)

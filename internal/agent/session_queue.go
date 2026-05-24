@@ -113,12 +113,12 @@ func (s *Session) runTask(item QueueItem) {
 		s.signalPromptStart(prompt.Text)
 	}
 
-	s.sendSystemInfo()
+	s.requestSystemInfo()
 
 	errMsg := s.ensureAgentInitialized()
 	if errMsg != "" {
 		s.writeError(errMsg)
-		s.sendSystemInfo()
+		s.requestSystemInfo()
 		return
 	}
 
