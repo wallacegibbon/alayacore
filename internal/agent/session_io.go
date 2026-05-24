@@ -1,6 +1,6 @@
 package agent
 
-// Session I/O: command handling, prompt processing.
+// Session I/O: input pump, command handling, prompt processing.
 //
 // These methods are called from either the run() goroutine (for immediate
 // commands) or the task goroutine (for deferred commands). The task
@@ -16,6 +16,7 @@ import (
 	"github.com/alayacore/alayacore/internal/config"
 	domainerrors "github.com/alayacore/alayacore/internal/errors"
 	"github.com/alayacore/alayacore/internal/llm"
+	"github.com/alayacore/alayacore/internal/stream"
 )
 
 // ============================================================================
@@ -351,4 +352,84 @@ func (s *Session) resendPrompt(ctx context.Context) {
 	}
 
 	s.requestSystemInfo()
+}
+
+// ============================================================================
+// Input Pump (reads TLV frames from input stream)
+// ============================================================================
+
+// inputMsg carries a parsed input message from the I/O pump to run().
+type inputMsg struct {
+	text  string // the raw user text or command text (without ':')
+	isCmd bool   // true if text starts with ':'
+}
+
+// inputPump runs in its own goroutine and reads TLV frames from the
+// input stream. It sends parsed messages to msgCh. It does NOT access
+// any session state directly; for :cancel / :cancel_all commands it sends
+// to taskCancelCh (a buffered channel) which the task goroutine listens on.
+func (s *Session) inputPump(msgCh chan<- inputMsg) {
+	for {
+		tag, value, err := stream.ReadTLV(s.Input)
+		if err != nil {
+			close(msgCh)
+			return
+		}
+		if tag != stream.TagTextUser {
+			s.writeError(domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag, "invalid input tag: %s", tag).Error())
+			continue
+		}
+		if len(value) > 0 && value[0] == ':' {
+			cmd := value[1:]
+			if cmd == commandNameCancel || cmd == commandNameCancelAll {
+				// Signal cancellation to the running task (non-blocking).
+				// If no task is running, the signal is lost and the command
+				// is forwarded to msgCh so run() can handle queue clearing
+				// or report "nothing to cancel".
+				canceled := s.cancelRunningTask()
+				if canceled && cmd == commandNameCancel {
+					// Task was running and was canceled — don't send to msgCh
+					// to avoid a spurious "nothing to cancel" message.
+					continue
+				}
+				// For cancel_all, always send to msgCh for queue clearing.
+				// For cancel (when no task running), forward for error reporting.
+			}
+			msgCh <- inputMsg{text: cmd, isCmd: true}
+		} else {
+			msgCh <- inputMsg{text: value, isCmd: false}
+		}
+	}
+}
+
+// handleInputMsg processes a parsed input message. Called from run() goroutine.
+func (s *Session) handleInputMsg(msg inputMsg) {
+	if msg.isCmd {
+		cmd := msg.text
+		// Immediate commands are handled directly; deferred commands
+		// go through the task queue.
+		if isCommandImmediate(cmd) {
+			s.handleCommand(context.Background(), cmd)
+		} else {
+			s.submitDeferredCommand(cmd)
+		}
+	} else {
+		s.submitTask(UserPrompt{Text: msg.text})
+	}
+}
+
+// isCommandImmediate returns true if the command should be handled immediately
+// without queuing. Immediate commands are those that control task execution
+// (cancel, continue) or query/modify session state (model_load, taskqueue operations).
+func isCommandImmediate(cmd string) bool {
+	// Extract the command name (first word) for commands that accept arguments.
+	name := cmd
+	if idx := strings.IndexByte(cmd, ' '); idx >= 0 {
+		name = cmd[:idx]
+	}
+	switch name {
+	case commandNameCancel, commandNameCancelAll, commandNameModelLoad, commandNameTaskQueueGetAll, commandNameTaskQueueEdit, commandNameThink, commandNameSave:
+		return true
+	}
+	return strings.HasPrefix(cmd, commandNameTaskQueueDel+" ") || strings.HasPrefix(cmd, commandNameModelSet+" ") || strings.HasPrefix(cmd, commandNameThemeSet+" ")
 }
