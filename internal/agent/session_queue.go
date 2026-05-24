@@ -151,12 +151,9 @@ func (s *Session) autoSaveIfEnabled() {
 }
 
 func (s *Session) appendCancelMessage() {
-	s.sendEvent(taskEvent{
-		typ: eventAppendMessages,
-		appendMsgs: []llm.Message{{
-			Role:    llm.RoleAssistant,
-			Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "The user canceled."}},
-		}},
+	s.Messages = append(s.Messages, llm.Message{
+		Role:    llm.RoleAssistant,
+		Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "The user canceled."}},
 	})
 }
 
