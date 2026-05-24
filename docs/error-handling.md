@@ -142,6 +142,8 @@ Without pausing, a network outage would cause every queued prompt to fail in seq
 `internal/agent/command_registry.go`:
 - `:continue` is dispatched via `dispatchCommand` → `handleContinue`
 
+**Deferred execution:** `:continue` is a deferred command — it is enqueued at the front of the task queue and runs in a task goroutine. This means it can be canceled with `:cancel` while the LLM call is in progress. See [architecture.md](architecture.md) for details on the task goroutine model.
+
 ## Testing
 
 Error handling is tested in `internal/llm/providers/providers_test.go`:

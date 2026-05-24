@@ -123,6 +123,34 @@ When switching models (e.g. Anthropic → OpenAI), the reported context size may
 
 The apparent "drop" from 2118 to 2073 after model switch is the difference in tokenization between the two models. The full conversation was sent correctly.
 
+## Manual Summarization (`:summarize`)
+
+The `:summarize` command is a **deferred command** — it runs in a task goroutine and can be canceled with `:cancel`. It is the only way to reduce context usage manually when auto-summarize is disabled.
+
+### What it does
+
+1. Appends a structured summary prompt to the conversation history asking the LLM to condense everything into five sections:
+   - **Task** — Original request and success criteria
+   - **Done** — Completed items with specifics (file paths, function names, values)
+   - **State** — Files created/modified/deleted, key decisions and rationale
+   - **Blocked** — Unresolved errors, failing tests, open questions
+   - **Next** — Ordered actions to resume
+2. Calls the LLM to generate the summary
+3. **Replaces the entire conversation history** with just the last assistant response (the summary)
+4. Resets `ContextTokens` to the summary's output token count
+
+### ⚠️ Important caveats
+
+- **Destructive** — The conversation history is replaced by the summary. Previous turns are lost. Only run `:summarize` when you're confident the summary captures everything needed.
+- **One-shot** — There is no undo. Consider saving the session first (`:save`) if you might need the full history later.
+- **Error risk** — If the LLM fails during summarization (network error, rate limit, etc.), the session enters the paused-on-error state. Use `:continue` to retry or `:continue skip` to resume queued tasks.
+
+### When to use
+
+- **Auto-summarize is disabled** — Run it manually when the status bar shows high context usage.
+- **Before switching tasks** — Summarize a completed task before starting a new one to keep context focused.
+- **Before `:model_set`** — Different models use different tokenizers. Summarizing first ensures the new model receives a concise, consistent input.
+
 ## Related
 
 - `shouldAutoSummarize()` — triggers when `ContextTokens >= ContextLimit * 65%` (only when `--auto-summarize` is enabled)
