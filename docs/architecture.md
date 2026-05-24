@@ -86,7 +86,7 @@ The session uses three goroutines for concurrent operation:
 | `stateCh` (buffered, cap 64) | task worker | run() | Step progress, messages, token counts, paused state |
 | `infoUpdateCh` (buffered, cap 1) | task worker | run() | Request system-info broadcast |
 | `atomic.Pointer[Agent]` | both | — | Lock-free agent pointer for task goroutine |
-| `atomic.Value` (Provider) | both | — | Lock-free provider pointer for task goroutine |
+| `atomic.Pointer[llm.Provider]` | both | — | Lock-free provider pointer for task goroutine |
 | `atomic.Int64` | both | — | ContextTokens, currentStep, thinkLevel |
 | `atomic.Bool` | both | — | pausedOnError (written by task goroutine) |
 
