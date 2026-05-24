@@ -52,18 +52,7 @@ func (s *Session) run() {
 			return
 		}
 
-		// Start next task if queue is non-empty and no task is running.
-		if len(s.taskQueue) > 0 && !s.inProgress.Load() && s.sessionCtx.Err() == nil {
-			item := s.taskQueue[0]
-			s.taskQueue = s.taskQueue[1:]
-			s.inProgress.Store(true)
-
-			// Copy runMessages to s.Messages as the task goroutine's working copy.
-			s.Messages = make([]llm.Message, len(runMessages))
-			copy(s.Messages, runMessages)
-
-			go s.runTask(item)
-		}
+		s.tryStartNextTask(&runMessages)
 
 		// Wait for new input, task events, task completion, or info requests
 		select {
@@ -77,22 +66,7 @@ func (s *Session) run() {
 			s.handleTaskEvent(ev, &runMessages)
 
 		case <-s.taskDone:
-			s.inProgress.Store(len(s.taskQueue) > 0)
-
-			// Sync runMessages back from s.Messages (task goroutine's final state)
-			if len(s.Messages) > 0 {
-				runMessages = make([]llm.Message, len(s.Messages))
-				copy(runMessages, s.Messages)
-			}
-
-			// Auto-save if configured (uses runMessages which is now up-to-date)
-			if s.SessionFile != "" {
-				if err := s.saveSessionToFileWith(runMessages, s.SessionFile); err != nil {
-					s.writeNotifyf("Auto-save failed: %v", err)
-				}
-			}
-
-			s.sendSystemInfo()
+			s.handleTaskDone(&runMessages)
 
 		case <-s.infoUpdateCh:
 			s.sendSystemInfo()
@@ -101,6 +75,59 @@ func (s *Session) run() {
 			return
 		}
 	}
+}
+
+// tryStartNextTask checks whether a new task can be started from the queue
+// and launches it if so. When paused on error, only command tasks are
+// allowed to run — user prompts must wait for explicit recovery via :continue.
+// Returns true if a task was started.
+func (s *Session) tryStartNextTask(runMessages *[]llm.Message) bool {
+	if len(s.taskQueue) == 0 || s.inProgress.Load() || s.sessionCtx.Err() != nil {
+		return false
+	}
+
+	item := s.taskQueue[0]
+
+	// When paused on error, skip user prompts — they need :continue first.
+	if s.pausedOnError.Load() {
+		if _, ok := item.Task.(CommandPrompt); !ok {
+			return false
+		}
+	}
+
+	s.taskQueue = s.taskQueue[1:]
+	s.inProgress.Store(true)
+
+	// Copy runMessages to s.Messages as the task goroutine's working copy.
+	s.Messages = make([]llm.Message, len(*runMessages))
+	copy(s.Messages, *runMessages)
+
+	go s.runTask(item)
+	return true
+}
+
+// handleTaskDone processes a task completion signal from the task goroutine.
+// It marks the task as finished, syncs messages, and auto-saves if configured.
+func (s *Session) handleTaskDone(runMessages *[]llm.Message) {
+	// Mark the task as finished so the next queue item can start.
+	// Previously this was set to len(s.taskQueue) > 0, which prevented
+	// the loop from ever starting the next task when items remained.
+	s.inProgress.Store(false)
+
+	// Sync runMessages back from s.Messages (task goroutine's final state)
+	if len(s.Messages) > 0 {
+		*runMessages = make([]llm.Message, len(s.Messages))
+		copy(*runMessages, s.Messages)
+	}
+
+	// Auto-save if configured (uses runMessages which is now up-to-date)
+	if s.SessionFile != "" {
+		if err := s.saveSessionToFileWith(*runMessages, s.SessionFile); err != nil {
+			s.writeNotifyf("Auto-save failed: %v", err)
+		}
+	}
+
+	s.sendSystemInfo()
 }
 
 // handleTaskEvent processes a state change event from the task goroutine.
