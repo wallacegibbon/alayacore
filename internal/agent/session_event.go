@@ -5,12 +5,10 @@ package agent
 // Session actor model: channel-based state communication between the
 // task goroutine and the run() goroutine.
 //
-// Instead of sharing state via sync.Mutex, the task goroutine sends
-// state mutations as typed events on stateCh. The run() goroutine
-// processes them in order in its main select loop.
-//
-// This eliminates all mutex contention and makes cross-goroutine
-// communication explicit and auditable.
+// The task goroutine sends state mutations as typed events on stateCh.
+// The run() goroutine processes them in order in its main select loop.
+// This keeps all cross-goroutine communication explicit and auditable
+// — the entire package uses channels and atomics, never sync.Mutex.
 
 import "github.com/alayacore/alayacore/internal/llm"
 

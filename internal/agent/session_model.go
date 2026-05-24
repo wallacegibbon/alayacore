@@ -5,9 +5,10 @@ package agent
 // Session, ModelManager, and the LLM provider.
 //
 // The run() goroutine owns provider/agent creation (via SwitchModel,
-// model_set command). The task goroutine reads them via atomic pointers.
-// No sync.Mutex is needed — all cross-goroutine communication is
-// channel-based (see session_event.go).
+// model_set command) and all ModelManager/RuntimeManager access. The task
+// goroutine reads agent and provider via atomic pointers. Cross-goroutine
+// communication is channel-based (see session_event.go) — no sync.Mutex
+// is used anywhere.
 
 import (
 	"fmt"

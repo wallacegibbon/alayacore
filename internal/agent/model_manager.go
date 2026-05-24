@@ -7,7 +7,7 @@ package agent
 // query/update methods and receives safe JSON-ready views via ModelInfo.
 //
 // All methods are called from the session's run() goroutine only, so no
-// sync.Mutex is needed.
+// synchronization is needed.
 
 import (
 	"fmt"

@@ -3,9 +3,9 @@ package agent
 // Session I/O: command handling, prompt processing.
 //
 // These methods are called from either the run() goroutine (for immediate
-// commands) or the task goroutine (for deferred commands). No sync.Mutex
-// is needed — the task goroutine sends state mutations via stateCh, and
-// the run() goroutine owns taskQueue and runMessages directly.
+// commands) or the task goroutine (for deferred commands). The task
+// goroutine sends state mutations via stateCh, and the run() goroutine
+// owns taskQueue and runMessages directly — no sync.Mutex is used.
 
 import (
 	"context"

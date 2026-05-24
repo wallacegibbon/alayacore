@@ -5,8 +5,8 @@ package agent
 // ARCHITECTURE:
 //   Session uses an actor model: the run() goroutine owns all mutable
 //   state, and the task goroutine communicates state changes via typed
-//   events on stateCh. There is no sync.Mutex — all cross-goroutine
-//   communication is channel-based.
+//   events on stateCh. All cross-goroutine communication is channel-based
+//   (no sync.Mutex anywhere in this package).
 //
 //   Three goroutines:
 //     1. inputPump — reads TLV frames from input, sends parsed messages

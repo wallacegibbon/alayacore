@@ -9,6 +9,25 @@
 //   - Command processing (:save, :model_set, :taskqueue_*, etc.)
 //   - Session persistence (save/load conversations)
 //
+// Concurrency Model:
+//
+//	The session uses an actor model with three goroutines:
+//	  1. run() — owns all mutable session state (messages, task queue,
+//	     token counts). Processes input messages and task events.
+//	  2. task goroutine — spawned per task, runs in background, sends
+//	     state mutations via typed channel events (stateCh) to run().
+//	  3. inputPump — reads TLV frames from input, forwards to run()
+//	     via a message channel.
+//
+//	The only mutable state accessed from more than one goroutine are:
+//	  - sync/atomic fields for lock-free reads by the task goroutine
+//	    (agent pointer, provider, think level, context tokens, etc.)
+//	  - A few buffered channels for cancellation, completion signaling,
+//	    and system-info refresh requests.
+//
+//	There is no sync.Mutex anywhere in this package. Cross-goroutine
+//	communication is exclusively through channels and atomics.
+//
 // Architecture Overview:
 //
 //	Session wires together the model, tools, IO streams, and managers:
