@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/alayacore/alayacore/internal/stream"
 	"github.com/alayacore/alayacore/internal/tools"
@@ -20,12 +21,14 @@ type systemInfo struct {
 
 // stdoutOutput implements stream.Output.
 // It parses TLV messages and prints human-readable text to stdout.
+//
+// stdoutOutput is NOT safe for concurrent writes, but the session
+// goroutine is the sole writer — no mutex is needed.
 type stdoutOutput struct {
-	mu           sync.Mutex
 	writer       io.Writer
 	buf          []byte
-	inProgress   bool
-	hasError     bool
+	inProgress   atomic.Bool
+	hasError     atomic.Bool
 	errorOnce    sync.Once
 	errorCh      chan struct{} // closed on first SE tag
 	lastTag      string        // last tag that produced visible output
@@ -40,10 +43,8 @@ func newStdoutOutput() *stdoutOutput {
 }
 
 func (o *stdoutOutput) Write(p []byte) (int, error) {
-	o.mu.Lock()
 	o.buf = append(o.buf, p...)
 	o.processBuffer()
-	o.mu.Unlock()
 	return len(p), nil
 }
 
@@ -55,12 +56,6 @@ func (o *stdoutOutput) Flush() error {
 	return nil
 }
 
-// WaitForError blocks until an SE (system error) tag is received.
-// Returns immediately if an error has already been recorded.
-func (o *stdoutOutput) WaitForError() {
-	<-o.errorCh
-}
-
 // ErrorChannel returns a channel that is closed when an SE (system error)
 // tag is received. It can be used in a select to react to errors without
 // a dedicated goroutine.
@@ -70,9 +65,7 @@ func (o *stdoutOutput) ErrorChannel() <-chan struct{} {
 
 // HasError returns true if any SE tag was ever received.
 func (o *stdoutOutput) HasError() bool {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	return o.hasError
+	return o.hasError.Load()
 }
 
 // processBuffer parses and prints complete TLV frames from the buffer.
@@ -117,7 +110,7 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 	case stream.TagSystemError:
 		o.emitSeparator(tag)
 		fmt.Fprintf(o.writer, "[error: %s]", value)
-		o.hasError = true
+		o.hasError.Store(true)
 		o.errorOnce.Do(func() { close(o.errorCh) })
 
 	case stream.TagSystemNotify:
@@ -271,10 +264,10 @@ func (o *stdoutOutput) handleSystemData(value string) {
 	if err := json.Unmarshal([]byte(value), &info); err != nil {
 		return
 	}
-	if o.inProgress && !info.InProgress {
+	if o.inProgress.Load() && !info.InProgress {
 		fmt.Fprintln(o.writer)
 		o.lastTag = ""
 		o.lastStreamID = ""
 	}
-	o.inProgress = info.InProgress
+	o.inProgress.Store(info.InProgress)
 }
