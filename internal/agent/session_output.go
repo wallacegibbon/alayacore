@@ -154,7 +154,7 @@ func (s *Session) sendSystemInfoInternal(activeModelConfig *ModelConfig) {
 		ContextLimit:      s.ContextLimit,
 		TotalTokens:       s.TotalSpent.InputTokens + s.TotalSpent.OutputTokens,
 		QueueItems:        queueItems,
-		InProgress:        s.inProgress.Load(),
+		InProgress:        s.inProgress,
 		CurrentStep:       int(s.currentStep.Load()),
 		MaxSteps:          s.MaxSteps,
 		TaskError:         s.pausedOnError.Load(),

@@ -155,7 +155,7 @@ func (s *Session) applyModelContextLimit(model *ModelConfig) {
 // See config.ThinkLevelOff, config.ThinkLevelNormal, config.ThinkLevelMax.
 func (s *Session) SetThinkLevel(level int) {
 	s.thinkLevel.Store(int64(level))
-	if s.inProgress.Load() {
+	if s.inProgress {
 		// Defer provider sync to next step boundary
 		s.thinkDirty.Store(true)
 	} else {

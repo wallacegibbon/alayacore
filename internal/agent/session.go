@@ -66,7 +66,7 @@ type Session struct {
 	thinkLevel  atomic.Int64
 	thinkDirty  atomic.Bool // true if thinkLevel changed during task execution
 
-	inProgress    atomic.Bool // set/cleared by run() goroutine
+	inProgress    bool    // set/cleared by run() goroutine only
 	pausedOnError atomic.Bool // set by task goroutine via event
 
 	nextPromptID uint64 // goroutine-local (task goroutine)

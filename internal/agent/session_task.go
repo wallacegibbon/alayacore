@@ -89,7 +89,7 @@ func (s *Session) run() {
 // allowed to run — user prompts must wait for explicit recovery via :continue.
 // Returns true if a task was started.
 func (s *Session) tryStartNextTask(runMessages *[]llm.Message) bool {
-	if len(s.taskQueue) == 0 || s.inProgress.Load() || s.sessionCtx.Err() != nil {
+	if len(s.taskQueue) == 0 || s.inProgress || s.sessionCtx.Err() != nil {
 		return false
 	}
 
@@ -103,14 +103,14 @@ func (s *Session) tryStartNextTask(runMessages *[]llm.Message) bool {
 	}
 
 	s.taskQueue = s.taskQueue[1:]
-	s.inProgress.Store(true)
+	s.inProgress = true
 
 	// Ensure agent is initialized before spawning the task goroutine.
 	// This avoids calling ModelManager from the task goroutine and keeps
 	// all model state access in the run() goroutine.
 	if errMsg := s.ensureAgentInitialized(); errMsg != "" {
 		s.writeError(errMsg)
-		s.inProgress.Store(false)
+		s.inProgress = false
 		s.requestSystemInfo()
 		return false
 	}
@@ -129,7 +129,7 @@ func (s *Session) handleTaskDone(runMessages *[]llm.Message) {
 	// Mark the task as finished so the next queue item can start.
 	// Previously this was set to len(s.taskQueue) > 0, which prevented
 	// the loop from ever starting the next task when items remained.
-	s.inProgress.Store(false)
+	s.inProgress = false
 
 	// Sync runMessages back from s.Messages (task goroutine's final state)
 	if len(s.Messages) > 0 {
