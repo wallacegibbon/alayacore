@@ -1,3 +1,4 @@
+// Package providers implements LLM provider clients
 package providers
 
 // OpenAI Provider Gotchas:
@@ -21,7 +22,6 @@ package providers
 //    messages containing only tool calls still satisfy this requirement.
 //    Conditional on reasoning mode to avoid wasting tokens. The logic lives
 //    in openaiConvertMessages, not in the sub-converters.
-//    See docs/architecture.md → "Empty thinking block padding".
 //
 // 5. NULL ARGUMENTS IN TOOL CALL CHUNKS: Some providers emit no-op deltas
 //    with "arguments": null. Must be skipped to avoid corrupting the
@@ -35,8 +35,6 @@ package providers
 //    multi-turn tool call chains don't lose the assistant's commentary.
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -49,112 +47,75 @@ import (
 	"github.com/alayacore/alayacore/internal/llm"
 )
 
-// openAIStreamState tracks state across streaming events
-type openAIStreamState struct {
-	streamUsage
-	textBuilder      strings.Builder
-	reasoningBuilder strings.Builder
-	toolCallArgs     map[int]*strings.Builder // tool call index -> arguments builder
-	toolCalls        []llm.ToolCallPart
+// ============================================================================
+// OpenAI Wire Format Types
+// ============================================================================
+
+type openAIRequest struct {
+	Model               string               `json:"model"`
+	Messages            []openAIMessage      `json:"messages"`
+	Tools               []openAITool         `json:"tools,omitempty"`
+	Stream              bool                 `json:"stream"`
+	StreamOptions       *openAIStreamOptions `json:"stream_options,omitempty"`
+	MaxCompletionTokens int                  `json:"max_completion_tokens,omitempty"`
+	Temperature         float64              `json:"temperature,omitempty"`
+	ReasoningEffort     string               `json:"reasoning_effort,omitempty"`
+	Thinking            *openAIThinkingField `json:"thinking"`
 }
 
-func (s *openAIStreamState) addTextDelta(delta string) {
-	s.textBuilder.WriteString(delta)
+type openAIThinkingField struct {
+	Type string `json:"type"`
 }
 
-func (s *openAIStreamState) addReasoningDelta(delta string) {
-	s.reasoningBuilder.WriteString(delta)
+type openAIStreamOptions struct {
+	IncludeUsage bool `json:"include_usage"`
 }
 
-func (s *openAIStreamState) appendToolCallArgs(index int, args json.RawMessage) {
-	if s.toolCallArgs == nil {
-		s.toolCallArgs = make(map[int]*strings.Builder)
-	}
-	if _, exists := s.toolCallArgs[index]; !exists {
-		s.toolCallArgs[index] = &strings.Builder{}
-	}
-	// Each arguments chunk may be a JSON string or raw JSON
-	// If it starts with a quote, unquote it first
-	if len(args) > 0 && args[0] == '"' {
-		var unquoted string
-		if err := json.Unmarshal(args, &unquoted); err == nil {
-			s.toolCallArgs[index].WriteString(unquoted)
-			return
-		}
-	}
-	// Otherwise append as-is (building up JSON object)
-	// Some providers send "arguments": null as a no-op chunk; skip it to avoid
-	// corrupting the accumulated argument string.
-	if string(args) != "null" {
-		s.toolCallArgs[index].WriteString(string(args))
-	}
+type openAIMessage struct {
+	Role             string           `json:"role"`
+	Content          any              `json:"content,omitempty"`
+	ReasoningContent *string          `json:"reasoning_content,omitempty"`
+	ToolCalls        []openAIToolCall `json:"tool_calls,omitempty"`
+	ToolCallID       string           `json:"tool_call_id,omitempty"`
 }
 
-func (s *openAIStreamState) setToolCallName(index int, id, name string) {
-	// Ensure tool calls slice is big enough
-	for len(s.toolCalls) <= index {
-		s.toolCalls = append(s.toolCalls, llm.ToolCallPart{
-			Type: llm.ContentPartToolUse,
-		})
-	}
-	s.toolCalls[index].ToolCallID = id
-	s.toolCalls[index].ToolName = name
+type openAIToolCall struct {
+	Index    int            `json:"index"`
+	ID       string         `json:"id"`
+	Type     string         `json:"type"`
+	Function openAIFunction `json:"function"`
 }
 
-func (s *openAIStreamState) finalizeToolCalls() {
-	// Merge accumulated arguments into tool calls
-	for i := range s.toolCalls {
-		if builder, exists := s.toolCallArgs[i]; exists {
-			args := builder.String()
-			s.toolCalls[i].Input = json.RawMessage(args)
-		}
-	}
+type openAIFunction struct {
+	Name      string          `json:"name"`
+	Arguments json.RawMessage `json:"arguments"`
 }
 
-func (s *openAIStreamState) getToolCalls() []llm.ToolCallPart {
-	return s.toolCalls
+type openAITool struct {
+	Type     string         `json:"type"`
+	Function openAIToolFunc `json:"function"`
 }
 
-func (s *openAIStreamState) getMessage() llm.Message {
-	// Build content parts from accumulated text
-	// Preallocate for reasoning + text + tool calls
-	content := make([]llm.ContentPart, 0, 2+len(s.toolCalls))
-
-	// Add reasoning first (thinking before response)
-	if s.reasoningBuilder.Len() > 0 {
-		content = append(content, llm.ReasoningPart{
-			Type: llm.ContentPartReasoning,
-			Text: s.reasoningBuilder.String(),
-		})
-	}
-
-	// Add text content
-	if s.textBuilder.Len() > 0 {
-		content = append(content, llm.TextPart{
-			Type: llm.ContentPartText,
-			Text: s.textBuilder.String(),
-		})
-	}
-
-	// Add tool calls
-	for _, tc := range s.toolCalls {
-		content = append(content, tc)
-	}
-
-	return llm.Message{
-		Role:    llm.RoleAssistant,
-		Content: content,
-	}
+type openAIToolFunc struct {
+	Name        string          `json:"name"`
+	Description string          `json:"description"`
+	Parameters  json.RawMessage `json:"parameters"`
 }
+
+// openAIDelta represents the delta content from a streaming chunk.
+type openAIDelta struct {
+	Content          string           `json:"content"`
+	ReasoningContent string           `json:"reasoning_content"`
+	ToolCalls        []openAIToolCall `json:"tool_calls"`
+}
+
+// ============================================================================
+// OpenAI Provider
+// ============================================================================
 
 // OpenAIProvider implements the OpenAI API
 type OpenAIProvider struct {
-	apiKey         string
-	baseURL        string
-	client         *http.Client
-	model          string
-	maxTokens      int // Maximum output tokens (0 = provider default)
-	reasoningLevel int // 0=off, 1=high, 2=xhigh
+	baseProvider
 }
 
 // OpenAIOption configures the provider
@@ -163,10 +124,7 @@ type OpenAIOption func(*OpenAIProvider)
 // NewOpenAI creates a new OpenAI provider
 func NewOpenAI(opts ...OpenAIOption) (*OpenAIProvider, error) {
 	p := &OpenAIProvider{
-		baseURL:   "https://api.openai.com/v1",
-		client:    &http.Client{},
-		model:     "gpt-4o",
-		maxTokens: llm.DefaultMaxTokens,
+		baseProvider: newBaseProvider("", "https://api.openai.com/v1", "gpt-4o", llm.DefaultMaxTokens),
 	}
 	for _, opt := range opts {
 		opt(p)
@@ -218,60 +176,6 @@ func (p *OpenAIProvider) SetReasoningLevel(level int) {
 	p.reasoningLevel = level
 }
 
-// openAIRequest represents the OpenAI API request
-type openAIRequest struct {
-	Model               string               `json:"model"`
-	Messages            []openAIMessage      `json:"messages"`
-	Tools               []openAITool         `json:"tools,omitempty"`
-	Stream              bool                 `json:"stream"`
-	StreamOptions       *openAIStreamOptions `json:"stream_options,omitempty"`
-	MaxCompletionTokens int                  `json:"max_completion_tokens,omitempty"`
-	Temperature         float64              `json:"temperature,omitempty"`
-	ReasoningEffort     string               `json:"reasoning_effort,omitempty"`
-	Thinking            *openAIThinking      `json:"thinking"`
-}
-
-type openAIThinking struct {
-	Type string `json:"type"`
-}
-
-type openAIStreamOptions struct {
-	IncludeUsage bool `json:"include_usage"`
-}
-
-type openAIMessage struct {
-	Role    string `json:"role"`
-	Content any    `json:"content,omitempty"`
-	// Pointer so we can emit `"reasoning_content": ""` (DeepSeek requires it)
-	// vs. omitting the field entirely when reasoning is disabled.
-	ReasoningContent *string          `json:"reasoning_content,omitempty"`
-	ToolCalls        []openAIToolCall `json:"tool_calls,omitempty"`
-	ToolCallID       string           `json:"tool_call_id,omitempty"`
-}
-
-type openAIToolCall struct {
-	Index    int            `json:"index"`
-	ID       string         `json:"id"`
-	Type     string         `json:"type"`
-	Function openAIFunction `json:"function"`
-}
-
-type openAIFunction struct {
-	Name      string          `json:"name"`
-	Arguments json.RawMessage `json:"arguments"`
-}
-
-type openAITool struct {
-	Type     string         `json:"type"`
-	Function openAIToolFunc `json:"function"`
-}
-
-type openAIToolFunc struct {
-	Name        string          `json:"name"`
-	Description string          `json:"description"`
-	Parameters  json.RawMessage `json:"parameters"`
-}
-
 // StreamMessages streams messages from OpenAI
 func (p *OpenAIProvider) StreamMessages(
 	ctx context.Context,
@@ -282,23 +186,12 @@ func (p *OpenAIProvider) StreamMessages(
 ) (iter.Seq2[llm.StreamEvent, error], error) {
 	// Convert messages to OpenAI format
 	apiMessages := make([]openAIMessage, 0, len(messages)+2)
-
-	// Add system messages separately
 	if systemPrompt != "" {
-		apiMessages = append(apiMessages, openAIMessage{
-			Role:    "system",
-			Content: systemPrompt,
-		})
+		apiMessages = append(apiMessages, openAIMessage{Role: "system", Content: systemPrompt})
 	}
-
 	if extraSystemPrompt != "" {
-		apiMessages = append(apiMessages, openAIMessage{
-			Role:    "system",
-			Content: extraSystemPrompt,
-		})
+		apiMessages = append(apiMessages, openAIMessage{Role: "system", Content: extraSystemPrompt})
 	}
-
-	// Convert conversation messages
 	apiMessages = append(apiMessages, openaiConvertMessages(messages, p.reasoningLevel)...)
 
 	// Convert tools to OpenAI format
@@ -314,7 +207,20 @@ func (p *OpenAIProvider) StreamMessages(
 		})
 	}
 
-	// Build request
+	// Build request body with thinking config
+	tc := computeThinkingConfig(p.reasoningLevel)
+	var reasoningEffort string
+	var thinking *openAIThinkingField
+	if tc.Enabled {
+		thinking = &openAIThinkingField{Type: "enabled"}
+		reasoningEffort = tc.Effort
+		if p.reasoningLevel >= config.ThinkLevelMax {
+			reasoningEffort = "xhigh"
+		}
+	} else {
+		thinking = &openAIThinkingField{Type: "disabled"}
+	}
+
 	reqBody := openAIRequest{
 		Model:    p.model,
 		Messages: apiMessages,
@@ -323,63 +229,253 @@ func (p *OpenAIProvider) StreamMessages(
 		StreamOptions: &openAIStreamOptions{
 			IncludeUsage: true,
 		},
+		Thinking:        thinking,
+		ReasoningEffort: reasoningEffort,
 	}
 	if p.maxTokens > 0 {
 		reqBody.MaxCompletionTokens = p.maxTokens
 	}
 
-	// Always include thinking config based on reasoning level.
-	// Must be explicit (not omitted) because some providers default to
-	// thinking enabled (e.g. DeepSeek V4). Omitting the field when the
-	// user has thinking OFF would leave it ON at the API level.
-	if p.reasoningLevel > config.ThinkLevelOff {
-		reqBody.Thinking = &openAIThinking{Type: "enabled"}
-		effort := "high"
-		if p.reasoningLevel >= config.ThinkLevelMax {
-			effort = "xhigh"
-		}
-		reqBody.ReasoningEffort = effort
-	} else {
-		reqBody.Thinking = &openAIThinking{Type: "disabled"}
-	}
-
-	bodyBytes, err := json.Marshal(reqBody)
+	// Build and send HTTP request
+	req, _, err := p.buildRequest(ctx, "/chat/completions", reqBody)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
+		return nil, err
 	}
-
-	req, err := http.NewRequestWithContext(ctx, "POST", p.baseURL+"/chat/completions", bytes.NewReader(bodyBytes))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+p.apiKey)
 
-	resp, err := p.client.Do(req)
+	body, err := p.doRequest(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to send request: %w", err)
+		return nil, err
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		body, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		if err != nil {
-			return nil, fmt.Errorf("API error (status %d): failed to read error body: %w", resp.StatusCode, err)
-		}
-		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
-	}
-
-	return p.parseStream(resp.Body), nil
+	return p.parseStream(body), nil
 }
 
+// ============================================================================
+// SSE Stream Parsing (OpenAI data-only format)
+// ============================================================================
+
+// parseStream returns an iterator that yields SSE events from the OpenAI response.
+func (p *OpenAIProvider) parseStream(reader io.Reader) iter.Seq2[llm.StreamEvent, error] {
+	return func(yield func(llm.StreamEvent, error) bool) {
+		defer func() {
+			if closer, ok := reader.(io.Closer); ok {
+				_ = closer.Close()
+			}
+		}()
+
+		state := &openAIStreamState{}
+		scanner := newSSEScanner(reader)
+
+		for scanner.Next() {
+			_, data := scanner.Event()
+			if data == "[DONE]" {
+				break
+			}
+			if !p.handleEvent(data, yield, state) {
+				return
+			}
+		}
+
+		if err := scanner.Err(); err != nil {
+			yield(nil, err)
+			return
+		}
+
+		// Finalize tool calls and emit events
+		state.finalizeToolCalls()
+		for _, tc := range state.getToolCalls() {
+			if !yield(llm.ToolCallEvent{
+				ToolCallID: tc.ToolCallID,
+				ToolName:   tc.ToolName,
+				Input:      tc.Input,
+			}, nil) {
+				return
+			}
+		}
+
+		yield(llm.StepCompleteEvent{
+			Messages:   []llm.Message{state.getMessage()},
+			Usage:      state.getUsage(),
+			StopReason: state.getStopReason(),
+		}, nil)
+	}
+}
+
+// openAIStreamState tracks state across streaming events
+type openAIStreamState struct {
+	streamUsage
+	textBuilder      strings.Builder
+	reasoningBuilder strings.Builder
+	toolCallArgs     map[int]*strings.Builder // tool call index -> arguments builder
+	toolCalls        []llm.ToolCallPart
+}
+
+func (s *openAIStreamState) addTextDelta(delta string) {
+	s.textBuilder.WriteString(delta)
+}
+
+func (s *openAIStreamState) addReasoningDelta(delta string) {
+	s.reasoningBuilder.WriteString(delta)
+}
+
+func (s *openAIStreamState) appendToolCallArgs(index int, args json.RawMessage) {
+	if s.toolCallArgs == nil {
+		s.toolCallArgs = make(map[int]*strings.Builder)
+	}
+	if _, exists := s.toolCallArgs[index]; !exists {
+		s.toolCallArgs[index] = &strings.Builder{}
+	}
+	if len(args) > 0 && args[0] == '"' {
+		var unquoted string
+		if err := json.Unmarshal(args, &unquoted); err == nil {
+			s.toolCallArgs[index].WriteString(unquoted)
+			return
+		}
+	}
+	if string(args) != "null" {
+		s.toolCallArgs[index].WriteString(string(args))
+	}
+}
+
+func (s *openAIStreamState) setToolCallName(index int, id, name string) {
+	for len(s.toolCalls) <= index {
+		s.toolCalls = append(s.toolCalls, llm.ToolCallPart{Type: llm.ContentPartToolUse})
+	}
+	s.toolCalls[index].ToolCallID = id
+	s.toolCalls[index].ToolName = name
+}
+
+func (s *openAIStreamState) finalizeToolCalls() {
+	for i := range s.toolCalls {
+		if builder, exists := s.toolCallArgs[i]; exists {
+			s.toolCalls[i].Input = json.RawMessage(builder.String())
+		}
+	}
+}
+
+func (s *openAIStreamState) getToolCalls() []llm.ToolCallPart {
+	return s.toolCalls
+}
+
+func (s *openAIStreamState) getMessage() llm.Message {
+	content := make([]llm.ContentPart, 0, 2+len(s.toolCalls))
+	if s.reasoningBuilder.Len() > 0 {
+		content = append(content, llm.ReasoningPart{
+			Type: llm.ContentPartReasoning,
+			Text: s.reasoningBuilder.String(),
+		})
+	}
+	if s.textBuilder.Len() > 0 {
+		content = append(content, llm.TextPart{
+			Type: llm.ContentPartText,
+			Text: s.textBuilder.String(),
+		})
+	}
+	for _, tc := range s.toolCalls {
+		content = append(content, tc)
+	}
+	return llm.Message{
+		Role:    llm.RoleAssistant,
+		Content: content,
+	}
+}
+
+// ============================================================================
+// Event Handlers
+// ============================================================================
+
+// handleEvent handles a single SSE data event. Returns false if iteration should stop.
+func (p *OpenAIProvider) handleEvent(data string, yield func(llm.StreamEvent, error) bool, state *openAIStreamState) bool {
+	var streamResp struct {
+		Choices []struct {
+			Delta        openAIDelta `json:"delta"`
+			FinishReason string      `json:"finish_reason"`
+		} `json:"choices"`
+		Usage struct {
+			PromptTokens     int `json:"prompt_tokens"`
+			CompletionTokens int `json:"completion_tokens"`
+		} `json:"usage"`
+	}
+
+	if err := json.Unmarshal([]byte(data), &streamResp); err != nil {
+		yield(nil, fmt.Errorf("failed to parse event: %w", err))
+		return false
+	}
+
+	for _, choice := range streamResp.Choices {
+		if ok, err := p.checkFinishReason(choice.FinishReason); !ok {
+			yield(nil, err)
+			return false
+		}
+		if choice.FinishReason != "" {
+			state.setStopReason(choice.FinishReason)
+		}
+		if ok := p.handleDelta(choice.Delta, yield, state); !ok {
+			return false
+		}
+	}
+
+	if streamResp.Usage.PromptTokens > 0 || streamResp.Usage.CompletionTokens > 0 {
+		state.setUsage(llm.Usage{
+			InputTokens:  int64(streamResp.Usage.PromptTokens),
+			OutputTokens: int64(streamResp.Usage.CompletionTokens),
+		})
+	}
+
+	return true
+}
+
+// checkFinishReason validates the finish reason.
+func (p *OpenAIProvider) checkFinishReason(reason string) (bool, error) {
+	if reason == "content_filter" {
+		return false, fmt.Errorf("content blocked by safety filter")
+	}
+	if reason != "" && reason != "stop" && reason != "length" && reason != "tool_calls" {
+		return false, fmt.Errorf("stream finished with unexpected reason: %s", reason)
+	}
+	return true, nil
+}
+
+// handleDelta processes the delta content from a streaming chunk.
+func (p *OpenAIProvider) handleDelta(delta openAIDelta, yield func(llm.StreamEvent, error) bool, state *openAIStreamState) bool {
+	if delta.ReasoningContent != "" {
+		state.addReasoningDelta(delta.ReasoningContent)
+		if !yield(llm.ReasoningDeltaEvent{Delta: delta.ReasoningContent}, nil) {
+			return false
+		}
+	}
+
+	if delta.Content != "" {
+		state.addTextDelta(delta.Content)
+		if !yield(llm.TextDeltaEvent{Delta: delta.Content}, nil) {
+			return false
+		}
+	}
+
+	for _, tc := range delta.ToolCalls {
+		if len(tc.Function.Arguments) > 0 {
+			state.appendToolCallArgs(tc.Index, tc.Function.Arguments)
+		}
+		if tc.Function.Name != "" {
+			state.setToolCallName(tc.Index, tc.ID, tc.Function.Name)
+			if !yield(llm.ToolCallStartEvent{
+				ToolCallID: tc.ID,
+				ToolName:   tc.Function.Name,
+			}, nil) {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+// ============================================================================
+// Message Conversion (OpenAI wire format)
+// ============================================================================
+
 // openaiConvertMessages converts domain messages to OpenAI wire format.
-//
-// Wire-format mappings:
-//   - llm.TextPart       → content (string or parts array)
-//   - llm.ReasoningPart  → reasoning_content field  (domain "reasoning" → wire "reasoning_content")
-//   - llm.ToolCallPart   → tool_calls array
-//   - llm.ToolResultPart → role="tool" message with tool_call_id (1:N expansion)
 func openaiConvertMessages(messages []llm.Message, reasoningLevel int) []openAIMessage {
 	apiMessages := make([]openAIMessage, 0, len(messages))
 	for _, msg := range messages {
@@ -388,9 +484,7 @@ func openaiConvertMessages(messages []llm.Message, reasoningLevel int) []openAIM
 			continue
 		}
 
-		apiMsg := openAIMessage{
-			Role: string(msg.Role),
-		}
+		apiMsg := openAIMessage{Role: string(msg.Role)}
 
 		if msg.Role == llm.RoleAssistant && openaiHasToolCalls(msg.Content) {
 			openaiConvertToolCalls(&apiMsg, msg.Content)
@@ -398,23 +492,11 @@ func openaiConvertMessages(messages []llm.Message, reasoningLevel int) []openAIM
 			openaiConvertRegularContent(&apiMsg, msg.Content)
 		}
 
-		// Per DeepSeek's documentation, between two user messages all
-		// intermediate assistant reasoning_content must be passed back.
-		// Set reasoning_content on every assistant message when thinking is
-		// enabled — even as empty string for tool-call-only messages.
-		// Only for assistant messages to avoid wasting tokens.
 		if msg.Role == llm.RoleAssistant {
 			reasoningText := openaiExtractReasoning(msg.Content)
 			if reasoningText != "" || reasoningLevel > config.ThinkLevelOff {
 				apiMsg.ReasoningContent = &reasoningText
 			}
-
-			// Ensure the assistant message has at least one of {content, tool_calls}
-			// set. Some providers (e.g. DeepSeek) reject assistant messages that
-			// carry only reasoning_content without content or tool_calls.
-			// This can happen when a session is reconstructed from TLV-serialized
-			// data and the model produced reasoning but was interrupted before
-			// generating any text or tool calls.
 			if apiMsg.Content == nil && len(apiMsg.ToolCalls) == 0 {
 				apiMsg.Content = ""
 			}
@@ -470,16 +552,12 @@ func openaiExtractReasoning(content []llm.ContentPart) string {
 }
 
 // openaiConvertToolCalls handles conversion of assistant messages with tool calls.
-// Preserves any text content that accompanies tool calls (some providers return
-// text alongside tool calls in the same message).
 func openaiConvertToolCalls(apiMsg *openAIMessage, content []llm.ContentPart) {
 	apiMsg.ToolCalls = make([]openAIToolCall, 0)
 	var textParts []string
 	for _, part := range content {
 		switch v := part.(type) {
 		case llm.ToolCallPart:
-			// OpenAI expects arguments to be a JSON-encoded string
-			// We need to marshal the raw JSON to a string
 			argsStr, err := json.Marshal(string(v.Input))
 			if err != nil {
 				argsStr = []byte("{}")
@@ -496,7 +574,6 @@ func openaiConvertToolCalls(apiMsg *openAIMessage, content []llm.ContentPart) {
 			textParts = append(textParts, v.Text)
 		}
 	}
-	// Preserve text content if present; nil if tool-call-only
 	if len(textParts) > 0 {
 		apiMsg.Content = strings.Join(textParts, "")
 	}
@@ -513,180 +590,12 @@ func openaiConvertRegularContent(apiMsg *openAIMessage, content []llm.ContentPar
 			})
 		}
 	}
-
 	switch len(contentParts) {
 	case 1:
-		// Single text part - use simple string
 		apiMsg.Content = contentParts[0]["text"]
 	case 0:
 		// No content parts
 	default:
 		apiMsg.Content = contentParts
 	}
-}
-
-// parseStream returns an iterator that yields SSE events from the OpenAI response.
-func (p *OpenAIProvider) parseStream(reader io.Reader) iter.Seq2[llm.StreamEvent, error] {
-	return func(yield func(llm.StreamEvent, error) bool) {
-		defer func() {
-			closer, ok := reader.(io.Closer)
-			if ok {
-				_ = closer.Close()
-			}
-		}()
-
-		state := &openAIStreamState{}
-		scanner := bufio.NewScanner(reader)
-
-		for scanner.Scan() {
-			line := scanner.Text()
-
-			if !strings.HasPrefix(line, "data: ") {
-				continue
-			}
-
-			data := strings.TrimPrefix(line, "data: ")
-			if data == "[DONE]" {
-				break
-			}
-
-			if !p.handleEvent(data, yield, state) {
-				return
-			}
-		}
-
-		if err := scanner.Err(); err != nil {
-			yield(nil, err)
-			return
-		}
-
-		// Finalize tool calls and emit events
-		state.finalizeToolCalls()
-		for _, tc := range state.getToolCalls() {
-			if !yield(llm.ToolCallEvent{
-				ToolCallID: tc.ToolCallID,
-				ToolName:   tc.ToolName,
-				Input:      tc.Input,
-			}, nil) {
-				return
-			}
-		}
-
-		// Send final StepCompleteEvent with accumulated message
-		yield(llm.StepCompleteEvent{
-			Messages:   []llm.Message{state.getMessage()},
-			Usage:      state.getUsage(),
-			StopReason: state.getStopReason(),
-		}, nil)
-	}
-}
-
-// handleEvent handles a single SSE event. Returns false if iteration should stop.
-func (p *OpenAIProvider) handleEvent(data string, yield func(llm.StreamEvent, error) bool, state *openAIStreamState) bool {
-	var streamResp struct {
-		Choices []struct {
-			Delta        openAIDelta `json:"delta"`
-			FinishReason string      `json:"finish_reason"`
-		} `json:"choices"`
-		Usage struct {
-			PromptTokens     int `json:"prompt_tokens"`
-			CompletionTokens int `json:"completion_tokens"`
-		} `json:"usage"`
-	}
-
-	if err := json.Unmarshal([]byte(data), &streamResp); err != nil {
-		yield(nil, fmt.Errorf("failed to parse event: %w", err))
-		return false
-	}
-
-	for _, choice := range streamResp.Choices {
-		if ok, err := p.checkFinishReason(choice.FinishReason); !ok {
-			yield(nil, err)
-			return false
-		}
-
-		if choice.FinishReason != "" {
-			state.setStopReason(choice.FinishReason)
-		}
-
-		if ok := p.handleDelta(choice.Delta, yield, state); !ok {
-			return false
-		}
-	}
-
-	// Track usage if available (may come in a chunk with empty choices)
-	if streamResp.Usage.PromptTokens > 0 || streamResp.Usage.CompletionTokens > 0 {
-		state.setUsage(llm.Usage{
-			CacheCreationTokens: 0,
-			CacheReadTokens:     0,
-			InputTokens:         int64(streamResp.Usage.PromptTokens),
-			OutputTokens:        int64(streamResp.Usage.CompletionTokens),
-		})
-	}
-
-	return true
-}
-
-// checkFinishReason validates the finish reason. Returns (ok, nil) for valid reasons,
-// or (false, error) for error conditions.
-func (p *OpenAIProvider) checkFinishReason(reason string) (bool, error) {
-	// Valid: "stop" (normal), "length" (truncated), "tool_calls" (function calling)
-	// Error: "content_filter" (blocked by safety), anything else
-	if reason == "content_filter" {
-		return false, fmt.Errorf("content blocked by safety filter")
-	}
-	// Allow empty, "stop", "length", and "tool_calls"
-	if reason != "" && reason != "stop" && reason != "length" && reason != "tool_calls" {
-		return false, fmt.Errorf("stream finished with unexpected reason: %s", reason)
-	}
-	return true, nil
-}
-
-// openAIDelta represents the delta content from a streaming chunk.
-type openAIDelta struct {
-	Content          string           `json:"content"`
-	ReasoningContent string           `json:"reasoning_content"`
-	ToolCalls        []openAIToolCall `json:"tool_calls"`
-}
-
-// handleDelta processes the delta content from a streaming chunk.
-// Returns false if iteration should stop.
-func (p *OpenAIProvider) handleDelta(delta openAIDelta, yield func(llm.StreamEvent, error) bool, state *openAIStreamState) bool {
-	// Handle reasoning content (DeepSeek, Qwen, etc.)
-	if delta.ReasoningContent != "" {
-		state.addReasoningDelta(delta.ReasoningContent)
-		if !yield(llm.ReasoningDeltaEvent{Delta: delta.ReasoningContent}, nil) {
-			return false
-		}
-	}
-
-	// Handle text content
-	if delta.Content != "" {
-		state.addTextDelta(delta.Content)
-		if !yield(llm.TextDeltaEvent{Delta: delta.Content}, nil) {
-			return false
-		}
-	}
-
-	// Handle tool calls - arguments may come in chunks
-	for _, tc := range delta.ToolCalls {
-		// Accumulate arguments (may come in multiple chunks)
-		if len(tc.Function.Arguments) > 0 {
-			state.appendToolCallArgs(tc.Index, tc.Function.Arguments)
-		}
-		// Set name and ID when available (usually first chunk).
-		// Emit ToolCallStartEvent so the UI can show the tool window
-		// immediately, before the (potentially large) arguments finish.
-		if tc.Function.Name != "" {
-			state.setToolCallName(tc.Index, tc.ID, tc.Function.Name)
-			if !yield(llm.ToolCallStartEvent{
-				ToolCallID: tc.ID,
-				ToolName:   tc.Function.Name,
-			}, nil) {
-				return false
-			}
-		}
-	}
-
-	return true
 }
