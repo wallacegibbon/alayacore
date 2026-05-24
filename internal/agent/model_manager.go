@@ -5,6 +5,9 @@ package agent
 // It never writes to the config file – all persistence is manual via
 // a text editor. The session layer uses ModelManager only through its
 // query/update methods and receives safe JSON-ready views via ModelInfo.
+//
+// All methods are called from the session's run() goroutine only, so no
+// sync.Mutex is needed.
 
 import (
 	"fmt"
@@ -12,7 +15,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 
 	"github.com/alayacore/alayacore/internal/config"
 )
@@ -48,7 +50,6 @@ type ModelManager struct {
 	models      []ModelConfig
 	activeID    int
 	nextID      int
-	mu          sync.RWMutex
 	filePath    string
 	warnings    []string // config validation messages from last load (parse warnings + model errors)
 	hasRejected bool     // true if any model blocks were rejected during last load
@@ -103,8 +104,6 @@ func NewModelManager(configPath string) *ModelManager {
 // These include both parse warnings (e.g. non-numeric value for an int field)
 // and model errors (e.g. unknown protocol_type, missing required fields).
 func (mm *ModelManager) GetLoadErrors() []string {
-	mm.mu.RLock()
-	defer mm.mu.RUnlock()
 	return mm.warnings
 }
 
@@ -122,9 +121,6 @@ func (mm *ModelManager) GetLoadErrors() []string {
 //	name: "Another Model"
 //	...
 func (mm *ModelManager) LoadFromFile(path string) error {
-	mm.mu.Lock()
-	defer mm.mu.Unlock()
-
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -248,23 +244,16 @@ func (mm *ModelManager) Reload() error {
 
 // HasModels returns true if there are any models available
 func (mm *ModelManager) HasModels() bool {
-	mm.mu.RLock()
-	defer mm.mu.RUnlock()
 	return len(mm.models) > 0
 }
 
 // HasRejected returns true if any model blocks were rejected during the last load.
 func (mm *ModelManager) HasRejected() bool {
-	mm.mu.RLock()
-	defer mm.mu.RUnlock()
 	return mm.hasRejected
 }
 
 // AddModel adds a new model to the runtime list (does NOT persist to file)
 func (mm *ModelManager) AddModel(m ModelConfig) int {
-	mm.mu.Lock()
-	defer mm.mu.Unlock()
-
 	m.ID = mm.nextID
 	mm.nextID++
 	mm.models = append(mm.models, m)
@@ -273,9 +262,6 @@ func (mm *ModelManager) AddModel(m ModelConfig) int {
 
 // GetModels returns all models (without API keys)
 func (mm *ModelManager) GetModels() []ModelInfo {
-	mm.mu.RLock()
-	defer mm.mu.RUnlock()
-
 	result := make([]ModelInfo, len(mm.models))
 	for i, m := range mm.models {
 		result[i] = ModelInfo{
@@ -294,9 +280,6 @@ func (mm *ModelManager) GetModels() []ModelInfo {
 
 // GetModel returns a model by ID (includes API key for internal use)
 func (mm *ModelManager) GetModel(id int) *ModelConfig {
-	mm.mu.RLock()
-	defer mm.mu.RUnlock()
-
 	for i := range mm.models {
 		if mm.models[i].ID == id {
 			return &mm.models[i]
@@ -307,9 +290,6 @@ func (mm *ModelManager) GetModel(id int) *ModelConfig {
 
 // SetActive sets the active model by ID (does NOT persist to file)
 func (mm *ModelManager) SetActive(id int) error {
-	mm.mu.Lock()
-	defer mm.mu.Unlock()
-
 	// Verify the model exists
 	for _, m := range mm.models {
 		if m.ID == id {
@@ -323,9 +303,6 @@ func (mm *ModelManager) SetActive(id int) error {
 // SetActiveToFirst sets the active model to the first one in the list.
 // Returns false if there are no models.
 func (mm *ModelManager) SetActiveToFirst() bool {
-	mm.mu.Lock()
-	defer mm.mu.Unlock()
-
 	if len(mm.models) == 0 {
 		return false
 	}
@@ -335,9 +312,6 @@ func (mm *ModelManager) SetActiveToFirst() bool {
 
 // GetActive returns the active model (includes API key)
 func (mm *ModelManager) GetActive() *ModelConfig {
-	mm.mu.RLock()
-	defer mm.mu.RUnlock()
-
 	for _, m := range mm.models {
 		if m.ID == mm.activeID {
 			return &m
@@ -348,16 +322,11 @@ func (mm *ModelManager) GetActive() *ModelConfig {
 
 // GetActiveID returns the active model ID
 func (mm *ModelManager) GetActiveID() int {
-	mm.mu.RLock()
-	defer mm.mu.RUnlock()
 	return mm.activeID
 }
 
 // DeleteModel removes a model by ID from runtime list (does NOT persist to file)
 func (mm *ModelManager) DeleteModel(id int) error {
-	mm.mu.Lock()
-	defer mm.mu.Unlock()
-
 	for i, m := range mm.models {
 		if m.ID == id {
 			mm.models = append(mm.models[:i], mm.models[i+1:]...)
@@ -375,9 +344,6 @@ func (mm *ModelManager) DeleteModel(id int) error {
 
 // UpdateModel updates a model by ID in runtime list (does NOT persist to file)
 func (mm *ModelManager) UpdateModel(id int, m ModelConfig) error {
-	mm.mu.Lock()
-	defer mm.mu.Unlock()
-
 	m.ID = id // Preserve the ID
 	for i, existing := range mm.models {
 		if existing.ID == id {
@@ -390,23 +356,16 @@ func (mm *ModelManager) UpdateModel(id int, m ModelConfig) error {
 
 // GetFilePath returns the current file path
 func (mm *ModelManager) GetFilePath() string {
-	mm.mu.RLock()
-	defer mm.mu.RUnlock()
 	return mm.filePath
 }
 
 // ModelCount returns the number of models in the runtime list
 func (mm *ModelManager) ModelCount() int {
-	mm.mu.RLock()
-	defer mm.mu.RUnlock()
 	return len(mm.models)
 }
 
 // FindModelByName finds a model by its name and returns its ID
 func (mm *ModelManager) FindModelByName(name string) int {
-	mm.mu.RLock()
-	defer mm.mu.RUnlock()
-
 	for _, m := range mm.models {
 		if m.Name == name {
 			return m.ID

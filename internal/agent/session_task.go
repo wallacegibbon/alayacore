@@ -105,6 +105,16 @@ func (s *Session) tryStartNextTask(runMessages *[]llm.Message) bool {
 	s.taskQueue = s.taskQueue[1:]
 	s.inProgress.Store(true)
 
+	// Ensure agent is initialized before spawning the task goroutine.
+	// This avoids calling ModelManager from the task goroutine and keeps
+	// all model state access in the run() goroutine.
+	if errMsg := s.ensureAgentInitialized(); errMsg != "" {
+		s.writeError(errMsg)
+		s.inProgress.Store(false)
+		s.requestSystemInfo()
+		return false
+	}
+
 	// Copy runMessages to s.Messages as the task goroutine's working copy.
 	s.Messages = make([]llm.Message, len(*runMessages))
 	copy(s.Messages, *runMessages)

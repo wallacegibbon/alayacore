@@ -117,13 +117,6 @@ func (s *Session) runTask(item QueueItem) {
 
 	s.requestSystemInfo()
 
-	errMsg := s.ensureAgentInitialized()
-	if errMsg != "" {
-		s.writeError(errMsg)
-		s.requestSystemInfo()
-		return
-	}
-
 	s.currentStep.Store(0)
 
 	switch t := item.Task.(type) {
