@@ -31,26 +31,26 @@ func TestHelpWindowNavigation(t *testing.T) {
 	hw.Open()
 
 	// First selectable item should be index 1 (index 0 is a section header)
-	if hw.selectedIdx != 1 {
-		t.Errorf("Expected selectedIdx to be 1 (first non-header), got %d", hw.selectedIdx)
+	if hw.SelectedIdx != 1 {
+		t.Errorf("Expected selectedIdx to be 1 (first non-header), got %d", hw.SelectedIdx)
 	}
 
 	// Move down
 	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'j'}))
-	if hw.selectedIdx != 2 {
-		t.Errorf("Expected selectedIdx to be 2 after j, got %d", hw.selectedIdx)
+	if hw.SelectedIdx != 2 {
+		t.Errorf("Expected selectedIdx to be 2 after j, got %d", hw.SelectedIdx)
 	}
 
 	// Move down again
 	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'j'}))
-	if hw.selectedIdx != 3 {
-		t.Errorf("Expected selectedIdx to be 3 after second j, got %d", hw.selectedIdx)
+	if hw.SelectedIdx != 3 {
+		t.Errorf("Expected selectedIdx to be 3 after second j, got %d", hw.SelectedIdx)
 	}
 
 	// Move up
 	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'k'}))
-	if hw.selectedIdx != 2 {
-		t.Errorf("Expected selectedIdx to be 2 after k, got %d", hw.selectedIdx)
+	if hw.SelectedIdx != 2 {
+		t.Errorf("Expected selectedIdx to be 2 after k, got %d", hw.SelectedIdx)
 	}
 }
 
@@ -68,20 +68,20 @@ func TestHelpWindowSkipsSectionHeaders(t *testing.T) {
 	hw.Open()
 
 	// Should start at index 1 (first non-header)
-	if hw.selectedIdx != 1 {
-		t.Errorf("Expected selectedIdx to be 1, got %d", hw.selectedIdx)
+	if hw.SelectedIdx != 1 {
+		t.Errorf("Expected selectedIdx to be 1, got %d", hw.SelectedIdx)
 	}
 
 	// Move down should skip header at index 2 and land on index 3
 	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'j'}))
-	if hw.selectedIdx != 3 {
-		t.Errorf("Expected selectedIdx to be 3 (skipping header), got %d", hw.selectedIdx)
+	if hw.SelectedIdx != 3 {
+		t.Errorf("Expected selectedIdx to be 3 (skipping header), got %d", hw.SelectedIdx)
 	}
 
 	// Move up should skip header at index 2 and land on index 1
 	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'k'}))
-	if hw.selectedIdx != 1 {
-		t.Errorf("Expected selectedIdx to be 1 (skipping header up), got %d", hw.selectedIdx)
+	if hw.SelectedIdx != 1 {
+		t.Errorf("Expected selectedIdx to be 1 (skipping header up), got %d", hw.SelectedIdx)
 	}
 }
 
@@ -97,26 +97,26 @@ func TestHelpWindowNavigationBoundary(t *testing.T) {
 	hw.Open()
 
 	// Start at index 1
-	if hw.selectedIdx != 1 {
-		t.Errorf("Expected selectedIdx to be 1, got %d", hw.selectedIdx)
+	if hw.SelectedIdx != 1 {
+		t.Errorf("Expected selectedIdx to be 1, got %d", hw.SelectedIdx)
 	}
 
 	// Move up at top - should stay at 1
 	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'k'}))
-	if hw.selectedIdx != 1 {
-		t.Errorf("Expected selectedIdx to stay at 1 at top, got %d", hw.selectedIdx)
+	if hw.SelectedIdx != 1 {
+		t.Errorf("Expected selectedIdx to stay at 1 at top, got %d", hw.SelectedIdx)
 	}
 
 	// Move down to last item
 	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'j'}))
-	if hw.selectedIdx != 2 {
-		t.Errorf("Expected selectedIdx to be 2, got %d", hw.selectedIdx)
+	if hw.SelectedIdx != 2 {
+		t.Errorf("Expected selectedIdx to be 2, got %d", hw.SelectedIdx)
 	}
 
 	// Move down at bottom - should stay at 2
 	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'j'}))
-	if hw.selectedIdx != 2 {
-		t.Errorf("Expected selectedIdx to stay at 2 at bottom, got %d", hw.selectedIdx)
+	if hw.SelectedIdx != 2 {
+		t.Errorf("Expected selectedIdx to stay at 2 at bottom, got %d", hw.SelectedIdx)
 	}
 }
 
@@ -146,8 +146,8 @@ func TestHelpWindowViewWhenClosed(t *testing.T) {
 
 	// View should return empty when closed
 	view := hw.View()
-	if view != "" {
-		t.Errorf("Expected empty view when closed, got %q", view)
+	if view.Content != "" {
+		t.Errorf("Expected empty view when closed, got %q", view.Content)
 	}
 
 	// RenderOverlay should return baseContent unchanged
@@ -164,22 +164,22 @@ func TestHelpWindowViewWhenOpen(t *testing.T) {
 	hw.Open()
 
 	view := hw.View()
-	if view == "" {
+	if view.Content == "" {
 		t.Error("Expected non-empty view when open")
 	}
 
 	// Should contain section headers
-	if !containsStr(view, "Commands") {
+	if !containsStr(view.Content, "Commands") {
 		t.Error("View should contain 'Commands' section")
 	}
 
 	// Should contain command entries
-	if !containsStr(view, ":continue") {
+	if !containsStr(view.Content, ":continue") {
 		t.Error("View should contain ':continue' command")
 	}
 
 	// Should contain help text
-	if !containsStr(view, "j/k: navigate") {
+	if !containsStr(view.Content, "j/k: navigate") {
 		t.Error("View should contain navigation help text")
 	}
 }
@@ -189,11 +189,12 @@ func TestHelpWindowSetSize(t *testing.T) {
 	hw := NewHelpWindow(styles)
 
 	hw.SetSize(80, 30)
-	if hw.width != 80 {
-		t.Errorf("Expected width 80, got %d", hw.width)
+	if hw.Width != 80 {
+		t.Errorf("Expected width 80, got %d", hw.Width)
 	}
-	if hw.height != 30 {
-		t.Errorf("Expected height 30, got %d", hw.height)
+	// SetSize clamps height to min(height-LayoutGap, SelectorMaxHeight)
+	if hw.Height != 30-4 {
+		t.Errorf("Expected height %d, got %d", 30-4, hw.Height)
 	}
 }
 
@@ -252,8 +253,8 @@ func TestHelpWindowEnterOnCommand(t *testing.T) {
 	}
 	hw.Open()
 	// Should start at index 1 (first non-header)
-	if hw.selectedIdx != 1 {
-		t.Fatalf("Expected selectedIdx to be 1, got %d", hw.selectedIdx)
+	if hw.SelectedIdx != 1 {
+		t.Fatalf("Expected selectedIdx to be 1, got %d", hw.SelectedIdx)
 	}
 
 	// Press Enter on :quit
@@ -316,8 +317,8 @@ func TestHelpWindowFilter(t *testing.T) {
 	}
 
 	// Type "quit" into filter
-	hw.filterInputFocused = true
-	hw.filterInput.Focus()
+	hw.FilterInputFocused = true
+	hw.FilterInput.Focus()
 	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'q'}))
 	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'u'}))
 	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'i'}))
@@ -353,8 +354,8 @@ func TestHelpWindowFilterSectionHeaders(t *testing.T) {
 	hw.Open()
 
 	// Filter for "Ctrl" - should only show Global Shortcuts section (has Ctrl+ entries)
-	hw.filterInputFocused = true
-	hw.filterInput.Focus()
+	hw.FilterInputFocused = true
+	hw.FilterInput.Focus()
 	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'C'}))
 	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 't'}))
 	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'r'}))
@@ -386,19 +387,19 @@ func TestHelpWindowTabToggle(t *testing.T) {
 	hw.Open()
 
 	// Initially list is focused
-	if hw.filterInputFocused {
+	if hw.FilterInputFocused {
 		t.Error("Expected list focused initially")
 	}
 
 	// Tab to filter
 	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
-	if !hw.filterInputFocused {
+	if !hw.FilterInputFocused {
 		t.Error("Expected filter focused after Tab")
 	}
 
 	// Tab back to list
 	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
-	if hw.filterInputFocused {
+	if hw.FilterInputFocused {
 		t.Error("Expected list focused after second Tab")
 	}
 }
@@ -409,7 +410,7 @@ func TestHelpWindowFilterEmptyResult(t *testing.T) {
 	hw.Open()
 
 	// Directly set filter value to test filtering logic
-	hw.filterInput.SetValue("zzz")
+	hw.FilterInput.SetValue("zzz")
 	hw.lastFilterValue = "" // Force update
 	hw.updateFilteredItems()
 
@@ -419,7 +420,7 @@ func TestHelpWindowFilterEmptyResult(t *testing.T) {
 
 	// View should still render without error
 	view := hw.View()
-	if view == "" {
+	if view.Content == "" {
 		t.Error("Expected non-empty view even with no matches")
 	}
 }
@@ -445,10 +446,10 @@ func TestHelpWindowHeaderReappearsOnScrollBack(t *testing.T) {
 	hw.Open()
 
 	// Verify header is visible at start (scrollIdx = 0)
-	if hw.scrollIdx != 0 {
-		t.Fatalf("Expected scrollIdx=0 at start, got %d", hw.scrollIdx)
+	if hw.ScrollIdx != 0 {
+		t.Fatalf("Expected scrollIdx=0 at start, got %d", hw.ScrollIdx)
 	}
-	if !containsStr(hw.View(), "Commands") {
+	if !containsStr(hw.View().Content, "Commands") {
 		t.Fatal("Header should be visible at start")
 	}
 
@@ -458,10 +459,10 @@ func TestHelpWindowHeaderReappearsOnScrollBack(t *testing.T) {
 	}
 
 	// Header should be out of view now
-	if hw.scrollIdx == 0 {
+	if hw.ScrollIdx == 0 {
 		t.Fatal("Expected scrollIdx > 0 after scrolling down")
 	}
-	if containsStr(hw.View(), "── Commands") {
+	if containsStr(hw.View().Content, "── Commands") {
 		t.Fatal("Header should be out of view after scrolling down")
 	}
 
@@ -471,10 +472,10 @@ func TestHelpWindowHeaderReappearsOnScrollBack(t *testing.T) {
 	}
 
 	// Header should reappear
-	if hw.scrollIdx != 0 {
-		t.Errorf("Expected scrollIdx=0 after scrolling back up, got %d", hw.scrollIdx)
+	if hw.ScrollIdx != 0 {
+		t.Errorf("Expected scrollIdx=0 after scrolling back up, got %d", hw.ScrollIdx)
 	}
-	if !containsStr(hw.View(), "── Commands") {
+	if !containsStr(hw.View().Content, "── Commands") {
 		t.Error("Header should be visible again after scrolling back up")
 	}
 }

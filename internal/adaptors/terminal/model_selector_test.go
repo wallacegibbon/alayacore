@@ -132,16 +132,16 @@ func TestModelSelectorCtrlCClearsSearch(t *testing.T) {
 	ms.Open()
 
 	// Focus the search input first (simulates user pressing Tab to focus search)
-	ms.searchInputFocused = true
-	ms.searchInput.Focus()
-	ms.updateSearchInputStyles()
+	ms.FilterInputFocused = true
+	ms.FilterInput.Focus()
+	ms.updateFilterInputStyles()
 
 	// Type in search input
-	ms.searchInput.SetValue("gpt4")
+	ms.FilterInput.SetValue("gpt4")
 	ms.updateFilteredModels()
 
-	if ms.searchInput.Value() != "gpt4" {
-		t.Fatalf("Expected search input to be 'gpt4', got %q", ms.searchInput.Value())
+	if ms.FilterInput.Value() != "gpt4" {
+		t.Fatalf("Expected search input to be 'gpt4', got %q", ms.FilterInput.Value())
 	}
 
 	// Press Ctrl+C
@@ -149,8 +149,8 @@ func TestModelSelectorCtrlCClearsSearch(t *testing.T) {
 	cmd := ms.HandleKeyMsg(msg)
 
 	// Check that search input is cleared
-	if ms.searchInput.Value() != "" {
-		t.Errorf("Ctrl+C should clear search input, got %q", ms.searchInput.Value())
+	if ms.FilterInput.Value() != "" {
+		t.Errorf("Ctrl+C should clear search input, got %q", ms.FilterInput.Value())
 	}
 
 	// Check that all models are shown again after clearing
@@ -182,7 +182,7 @@ func TestModelSelectorSetModelsUpdatesFilteredModels(t *testing.T) {
 	}
 
 	// Simulate user typing a search (so lastSearchValue is set)
-	ms.searchInput.SetValue("gpt")
+	ms.FilterInput.SetValue("gpt")
 	ms.updateFilteredModels()
 
 	// Verify filtered models are now filtered
@@ -209,7 +209,7 @@ func TestModelSelectorSetModelsUpdatesFilteredModels(t *testing.T) {
 	}
 
 	// Clear search and verify all 3 models are shown
-	ms.searchInput.SetValue("")
+	ms.FilterInput.SetValue("")
 	ms.updateFilteredModels()
 	if len(ms.filteredModels) != 3 {
 		t.Errorf("Expected 3 filtered models after clearing search, got %d", len(ms.filteredModels))
@@ -235,8 +235,8 @@ func TestModelSelectorLoadModelsBeforeOpen(t *testing.T) {
 	ms.Open()
 
 	// The cursor should be at the active model (Model C, index 2)
-	if ms.selectedIdx != 2 {
-		t.Errorf("Expected selectedIdx=2 (active model), got %d", ms.selectedIdx)
+	if ms.SelectedIdx != 2 {
+		t.Errorf("Expected selectedIdx=2 (active model), got %d", ms.SelectedIdx)
 	}
 	if ms.activeModel == nil {
 		t.Fatal("Expected activeModel to be set")
@@ -281,8 +281,8 @@ func TestModelSelectorOpenBeforeLoadModelsThenTick(t *testing.T) {
 		t.Fatalf("Expected 3 filtered models, got %d", len(ms.filteredModels))
 	}
 	// Cursor should be positioned at the active model, not stuck at index 0
-	if ms.selectedIdx != 2 {
-		t.Errorf("Expected selectedIdx=2 (active Model C), got %d", ms.selectedIdx)
+	if ms.SelectedIdx != 2 {
+		t.Errorf("Expected selectedIdx=2 (active Model C), got %d", ms.SelectedIdx)
 	}
 }
 
@@ -299,7 +299,7 @@ func TestModelSelectorLoadModelsPreservesSelection(t *testing.T) {
 	ms.Open()
 
 	// Select second model (simulates user navigating with j/k)
-	ms.selectedIdx = 1
+	ms.SelectedIdx = 1
 
 	// Reload models (simulating 'r' key — user-triggered reload)
 	// The selection should be preserved when selector is open and models already existed
@@ -311,7 +311,7 @@ func TestModelSelectorLoadModelsPreservesSelection(t *testing.T) {
 	ms.LoadModels(newModels, 1) // Model A is still active
 
 	// Selection should still be at index 1 (Model B)
-	if ms.selectedIdx != 1 {
-		t.Errorf("Expected selectedIdx to be preserved at 1, got %d", ms.selectedIdx)
+	if ms.SelectedIdx != 1 {
+		t.Errorf("Expected selectedIdx to be preserved at 1, got %d", ms.SelectedIdx)
 	}
 }
