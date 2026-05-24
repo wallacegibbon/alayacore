@@ -154,7 +154,7 @@ func isCommandImmediate(cmd string) bool {
 		name = cmd[:idx]
 	}
 	switch name {
-	case commandNameCancel, commandNameCancelAll, commandNameModelLoad, commandNameTaskQueueGetAll, commandNameTaskQueueEdit, commandNameThink:
+	case commandNameCancel, commandNameCancelAll, commandNameModelLoad, commandNameTaskQueueGetAll, commandNameTaskQueueEdit, commandNameThink, commandNameSave:
 		return true
 	}
 	return strings.HasPrefix(cmd, commandNameTaskQueueDel+" ") || strings.HasPrefix(cmd, commandNameModelSet+" ")

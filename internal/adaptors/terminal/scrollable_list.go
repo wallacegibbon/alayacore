@@ -57,6 +57,15 @@ func (sl *ScrollableListCore) SetHasFocus(hasFocus bool) {
 	sl.HasFocus = hasFocus
 }
 
+// SetSize updates the width and height of the scrollable list.
+// Height is clamped to prevent the overlay from exceeding the available space.
+func (sl *ScrollableListCore) SetSize(width, height int) {
+	if width > 0 {
+		sl.Width = width
+	}
+	sl.Height = min(height-LayoutGap, SelectorMaxHeight)
+}
+
 // ClampSelection clamps SelectedIdx and ScrollIdx to valid bounds
 // for the given number of items. Resets both to 0 when itemsLen is 0.
 func (sl *ScrollableListCore) ClampSelection(itemsLen int) {

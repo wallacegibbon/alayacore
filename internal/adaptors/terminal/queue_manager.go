@@ -57,13 +57,6 @@ func (qm *QueueManager) GetSelectedItem() *QueueItem {
 	return &qm.items[qm.SelectedIdx]
 }
 
-// --- Size Management ---
-
-func (qm *QueueManager) SetSize(width, height int) {
-	qm.Width = width
-	qm.Height = height
-}
-
 // --- Input Handling ---
 
 // HandleKeyMsg processes keyboard input and returns a tea.Cmd

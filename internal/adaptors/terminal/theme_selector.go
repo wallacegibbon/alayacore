@@ -71,13 +71,6 @@ func (ts *ThemeSelector) Close() {
 	}
 }
 
-func (ts *ThemeSelector) SetSize(width, height int) {
-	if width > 0 {
-		ts.Width = width
-	}
-	ts.Height = min(height-LayoutGap, SelectorMaxHeight)
-}
-
 // --- Theme Management ---
 
 func (ts *ThemeSelector) GetSelectedTheme() *ThemeInfo {
