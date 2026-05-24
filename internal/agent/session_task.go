@@ -38,7 +38,14 @@ func (s *Session) run() {
 	// start, runMessages is copied to s.Messages. During task execution,
 	// the task goroutine sends state changes via stateCh, which update
 	// runMessages. Between tasks, runMessages is the source of truth.
-	var runMessages []llm.Message
+	//
+	// When restoring from a session (RestoreFromSession), s.Messages
+	// already contains the loaded history — initialize runMessages from
+	// it so the loaded messages are not lost on the first task.
+	runMessages := s.Messages
+	if runMessages == nil {
+		runMessages = make([]llm.Message, 0)
+	}
 
 	// Start the I/O pump goroutine — it reads TLV from the input and
 	// sends parsed messages to run() for processing. It has NO access
