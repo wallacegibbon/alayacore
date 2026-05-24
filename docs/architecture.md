@@ -66,6 +66,35 @@ The session layer manages conversation state, task execution, and model interact
 | `CommandDefinitions` | Static metadata for session commands (`:save`, `:cancel`, etc.) |
 | `ContextTokens` | Tracks conversation context size across API calls. See [context-tracking.md](context-tracking.md). |
 
+#### Concurrency Model
+
+The session uses three goroutines for concurrent operation:
+
+| Goroutine | Source | Role |
+|-----------|--------|------|
+| **Main loop** (`run()`) | `Session.Start()` | Owns all mutable state, manages the task queue, processes commands |
+| **Input pump** (`inputPump()`) | launched by `run()` | Reads TLV frames from the input stream, sends parsed messages to the main loop |
+| **Task worker** (`runTask()`) | spawned by `run()` per task | Executes a single task (LLM streaming + tool calls), signals completion via `taskDone` |
+
+**Cross-goroutine communication:**
+
+| Mechanism | From | To | Purpose |
+|-----------|------|----|---------|
+| `msgCh` (buffered, cap 100) | inputPump | run() | Parsed user input messages |
+| `taskCancelCh` (buffered, cap 1) | inputPump | task worker | Cancel the running task |
+| `taskDone` (buffered, cap 1) | task worker | run() | Signal task completion |
+| `infoUpdateCh` (buffered, cap 1) | task worker | run() | Request system-info broadcast |
+| `sync.Mutex` | both | — | Protects shared state (Messages, taskQueue, etc.) |
+| `atomic.Bool` | both | — | Lock-free access to inProgress, pausedOnError |
+
+**State ownership:**
+- The `run()` goroutine is the sole owner of session state. It reads/writes `taskQueue`, `inProgress`, `pausedOnError`, `thinkLevel`, `thinkDirty`, and all command-handling logic.
+- The task goroutine LOS accesses shared state directly under the mutex for read/write (`Messages`, `TotalSpent`, `ContextTokens`, `currentStep`).
+- The input pump goroutine has NO access to session state except `taskCancelCh` (for `:cancel` commands).
+- `sendSystemInfo` runs only in the `run()` goroutine; the task goroutine requests updates via `infoUpdateCh`.
+
+**Design rationale:** Tasks must run in a separate goroutine because LLM streaming is blocking (3-10s per step). If tasks ran synchronously in `run()`, the main loop could not process user input (`:cancel`, new prompts, immediate commands) during task execution. The per-task goroutine pattern keeps the main loop responsive while avoiding a persistent worker goroutine that would sit idle between tasks.
+
 ### Session Persistence
 
 - **Auto-save** — Always enabled when `--session` is specified. The session is saved after each step completes. Redundant writes are skipped when message count and content are unchanged.
@@ -311,10 +340,10 @@ main.go → config.Parse() → Settings
 User types prompt
   → InputModel captures input
     → Emit TLV(TU, prompt)
-      → Session.readFromInput()
+      → inputPump reads TLV
         → submitTask(UserPrompt)
           → Task Queue
-            → taskRunner()
+            → runTask() (task goroutine)
               → handleUserPrompt()
                 → processPrompt()
                   → Agent.Stream()
@@ -351,6 +380,9 @@ Agent.Stream() receives tool_call event
 10. **Sequential Tool Execution** — Tools execute one at a time. See [sequential-tool-execution.md](sequential-tool-execution.md).
 11. **Context Efficiency** — Tool descriptions are minimal. Large outputs (>64KB) saved to `.alayacore.tmp/`: `read_file` truncates inline with metadata, `execute_command` and `search_content` save full output to file. See [truncation.md](truncation.md).
 12. **Think Mode** — Provider-specific reasoning fields are added to API requests. Three levels: 0=off, 1=normal, 2=max. Toggled via `:think [0|1|2]`.
+13. **Concurrent Task Execution** — Each task runs in its own goroutine so the main loop remains responsive to user input during LLM streaming. Shared state is protected by `sync.Mutex`. Simple boolean flags (`inProgress`, `pausedOnError`) use `atomic.Bool` for lock-free cross-goroutine access.
+14. **Centralized System Info** — `sendSystemInfo()` runs only in the main loop goroutine. The task goroutine requests updates via a buffered channel (`infoUpdateCh`), which also wakes the main loop from its select to process the update promptly.
+15. **Goroutine-Local Counters** — Fields accessed by a single goroutine (`nextQueueID` on the main loop, `nextPromptID` on the task goroutine) are updated outside the mutex, narrowing the critical section.
 
 ## Gotchas
 
@@ -372,6 +404,14 @@ Don't hold a mutex while calling methods that may need the same mutex.
 ❌ lock → update fields → call method (needs lock) → deadlock
 ✅ lock → update fields → unlock → call method
 ```
+
+### Atomic flags must use Load/Store
+
+`inProgress` and `pausedOnError` are `atomic.Bool`. Always use `.Load()` to read
+and `.Store()` to write. Direct assignment (`s.inProgress = true`) will not
+compile. This applies in tests too — struct literals must leave the field as
+`atomic.Bool{}` (zero value = false), then call `.Store()` to set the desired
+state.
 
 ### OpenAI tool call chunking
 
