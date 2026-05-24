@@ -67,9 +67,6 @@ func (s *Session) run() {
 			s.inProgress.Store(len(s.taskQueue) > 0)
 			s.mu.Unlock()
 
-			// Drain any messages that arrived while the select wasn't listening
-			// (though this is rare — the select loop catches most input).
-			s.drainMessages(msgCh)
 			s.sendSystemInfo()
 
 		case <-s.sessionCtx.Done():
@@ -118,23 +115,6 @@ func (s *Session) inputPump(msgCh chan<- inputMsg) {
 			msgCh <- inputMsg{text: cmd, isCmd: true}
 		} else {
 			msgCh <- inputMsg{text: value, isCmd: false}
-		}
-	}
-}
-
-// drainMessages reads from msgCh (non-blocking) and processes any pending
-// messages. This ensures accumulated input is handled promptly after a
-// task completes, before the next task starts or the loop goes back to select.
-func (s *Session) drainMessages(msgCh <-chan inputMsg) {
-	for {
-		select {
-		case msg, ok := <-msgCh:
-			if !ok {
-				return
-			}
-			s.handleInputMsg(msg)
-		default:
-			return
 		}
 	}
 }
