@@ -260,7 +260,7 @@ func isCommandImmediate(cmd string) bool {
 	case commandNameCancel, commandNameCancelAll, commandNameModelLoad, commandNameTaskQueueGetAll, commandNameTaskQueueEdit, commandNameThink, commandNameSave:
 		return true
 	}
-	return strings.HasPrefix(cmd, commandNameTaskQueueDel+" ") || strings.HasPrefix(cmd, commandNameModelSet+" ")
+	return strings.HasPrefix(cmd, commandNameTaskQueueDel+" ") || strings.HasPrefix(cmd, commandNameModelSet+" ") || strings.HasPrefix(cmd, commandNameThemeSet+" ")
 }
 
 // ============================================================================

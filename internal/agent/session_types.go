@@ -69,6 +69,7 @@ type SystemInfo struct {
 	HasModels         bool            `json:"has_models"`
 	ModelConfigPath   string          `json:"model_config_path,omitempty"`
 	ThinkLevel        int             `json:"think_level"`
+	ActiveTheme       string          `json:"active_theme,omitempty"`
 }
 
 // SessionMeta is the frontmatter metadata.

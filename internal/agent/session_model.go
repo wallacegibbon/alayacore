@@ -72,11 +72,6 @@ func (s *Session) activeModelName() string {
 	return ""
 }
 
-// GetRuntimeManager returns the runtime manager for the session
-func (s *Session) GetRuntimeManager() *RuntimeManager {
-	return s.RuntimeManager
-}
-
 // createProviderAndAgent creates a new provider and agent for the given model config.
 // This is the single source of truth for provider/agent construction.
 func (s *Session) createProviderAndAgent(modelConfig *ModelConfig) (llm.Provider, *llm.Agent, error) {

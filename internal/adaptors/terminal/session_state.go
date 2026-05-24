@@ -44,6 +44,9 @@ type sessionState struct {
 
 	// Queue items — set by handleSystemTag, cleared by GetQueueItems
 	pendingQueueItems []QueueItem
+
+	// Theme
+	activeTheme string
 }
 
 // updateFromSystemInfo atomically updates all fields from a SystemInfo message.
@@ -55,6 +58,7 @@ func (s *sessionState) updateFromSystemInfo(info agentpkg.SystemInfo) {
 	s.currentStep = info.CurrentStep
 	s.maxSteps = info.MaxSteps
 	s.thinkLevel = info.ThinkLevel
+	s.activeTheme = info.ActiveTheme
 	s.mu.Unlock()
 }
 
@@ -123,6 +127,7 @@ func (s *sessionState) snapshotStatus() StatusSnapshot {
 		LastMaxSteps:    s.lastMaxSteps,
 		TaskError:       s.lastTaskError,
 		ThinkLevel:      s.thinkLevel,
+		ActiveTheme:     s.activeTheme,
 	}
 }
 

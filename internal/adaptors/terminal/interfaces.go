@@ -22,6 +22,7 @@ type StatusSnapshot struct {
 	LastMaxSteps    int
 	TaskError       bool
 	ThinkLevel      int
+	ActiveTheme     string
 }
 
 // ModelSnapshot holds a consistent point-in-time view of model state.

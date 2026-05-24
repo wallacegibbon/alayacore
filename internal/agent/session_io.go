@@ -292,6 +292,20 @@ func (s *Session) handleThink(args []string) {
 	s.SetThinkLevel(level)
 }
 
+// handleThemeSet sets the active theme and persists it to runtime config.
+func (s *Session) handleThemeSet(args []string) {
+	if len(args) == 0 {
+		s.writeError("usage: :theme_set <name>")
+		return
+	}
+	if s.RuntimeManager != nil {
+		//nolint:errcheck // Best effort save, errors ignored
+		_ = s.RuntimeManager.SetActiveTheme(args[0])
+	}
+	s.writeNotifyf("Theme set to: %s", args[0])
+	s.sendSystemInfo()
+}
+
 // resendPrompt resends the conversation history to the LLM.
 // This is called by handleContinue (no args) to resend the failed prompt.
 //

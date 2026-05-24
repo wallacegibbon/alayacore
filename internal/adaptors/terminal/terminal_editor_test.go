@@ -15,7 +15,7 @@ func visibleLength(s string) int {
 }
 
 func TestCtrlOOpensEditor(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 
 	msg := tea.KeyPressMsg(tea.Key{
 		Code: 'o',
@@ -34,7 +34,7 @@ func TestCtrlOOpensEditor(t *testing.T) {
 }
 
 func TestCtrlOWithExistingContent(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 	terminal.input.SetValue("existing input text")
 
 	msg := tea.KeyPressMsg(tea.Key{
@@ -58,7 +58,7 @@ func TestCtrlOWithExistingContent(t *testing.T) {
 }
 
 func TestEditorFinishedMsg(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 
 	msg := editorFinishedMsg{
 		content: "test content from editor",
@@ -84,7 +84,7 @@ func TestEditorFinishedMsg(t *testing.T) {
 }
 
 func TestEditorFinishedMsgWithWhitespace(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 
 	msg := editorFinishedMsg{
 		content: "  content with leading and trailing spaces  \n",
@@ -105,7 +105,7 @@ func TestEditorFinishedMsgWithWhitespace(t *testing.T) {
 }
 
 func TestEditorFinishedMsgWithMultipleTrailingNewlines(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 
 	msg := editorFinishedMsg{
 		content: "content with multiple trailing newlines\n\n\n",
@@ -125,7 +125,7 @@ func TestEditorFinishedMsgWithMultipleTrailingNewlines(t *testing.T) {
 }
 
 func TestEditorContentSubmittedOnEnter(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 	terminal.input.editorContent = "line1\nline2\nline3"
 
 	// editorContent is cleared before submission when Enter is pressed
@@ -136,7 +136,7 @@ func TestEditorContentSubmittedOnEnter(t *testing.T) {
 }
 
 func TestEditorFinishedMsgMultiline(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 
 	msg := editorFinishedMsg{
 		content: "line1\nline2\nline3",
@@ -205,7 +205,7 @@ func TestFormatEditorContent(t *testing.T) {
 }
 
 func TestEditorContentUsedInsteadOfInputValue(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 	terminal.input.editorContent = "editor content"
 	terminal.input.SetValue("input value")
 
@@ -217,7 +217,7 @@ func TestEditorContentUsedInsteadOfInputValue(t *testing.T) {
 }
 
 func TestEditorFinishedMsgWithError(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 	terminal.input.SetValue("original content")
 
 	msg := editorFinishedMsg{
@@ -345,7 +345,7 @@ func TestWrapContentPreservesANSI(t *testing.T) {
 }
 
 func TestCtrlCClearsInput(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 	terminal.input.SetValue("test input text")
 
 	// Press Ctrl+C while in input window
@@ -371,7 +371,7 @@ func TestCtrlCClearsInput(t *testing.T) {
 }
 
 func TestCtrlCInDisplayWindow(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 	terminal.input.SetValue("test input text")
 
 	// Press Ctrl+C while in display window
@@ -397,7 +397,7 @@ func TestCtrlCInDisplayWindow(t *testing.T) {
 }
 
 func TestCtrlGTriggersCancel(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 	terminal.input.SetValue("test input text")
 
 	// Press Ctrl+G (should work regardless of focus)
@@ -441,7 +441,7 @@ func TestCtrlGTriggersCancel(t *testing.T) {
 }
 
 func TestCancelAllCommandRequiresConfirm(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 	terminal.input.SetValue(":cancel_all")
 
 	// Press Enter to submit the command
@@ -480,7 +480,7 @@ func TestCancelAllCommandRequiresConfirm(t *testing.T) {
 }
 
 func TestCtrlUDoesNothingInInput(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 	terminal.input.SetValue("test input text")
 
 	// Press Ctrl+U while in input window
@@ -723,7 +723,7 @@ func TestWindowBufferWidthMatchesInput(t *testing.T) {
 }
 
 func TestEKeyOpensDisplayWindowInEditor(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 	terminal.focusDisplay()
 
 	// Add a window with content
@@ -748,7 +748,7 @@ func TestEKeyOpensDisplayWindowInEditor(t *testing.T) {
 }
 
 func TestEKeyDoesNothingWithNoWindow(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 	terminal.focusDisplay()
 
 	// No windows in buffer
@@ -770,7 +770,7 @@ func TestEKeyDoesNothingWithNoWindow(t *testing.T) {
 }
 
 func TestEKeyDoesNothingInInputWindow(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 	terminal.focusInput()
 
 	// Add a window with content
@@ -795,7 +795,7 @@ func TestEKeyDoesNothingInInputWindow(t *testing.T) {
 }
 
 func TestDisplayEditorFinishedDoesNotPopulateInput(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 	terminal.input.SetValue("original input")
 
 	// Simulate display editor finishing (user viewed content, then quit)
@@ -819,7 +819,7 @@ func TestDisplayEditorFinishedDoesNotPopulateInput(t *testing.T) {
 }
 
 func TestDisplayEditorFinishedWithError(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 	terminal.input.SetValue("original input")
 
 	// Simulate display editor finishing with error
@@ -886,7 +886,7 @@ func TestGetWindowContentRegular(t *testing.T) {
 }
 
 func TestEKeyInQueueManagerOpensEditor(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 
 	// Open queue manager with items
 	items := []QueueItem{
@@ -911,7 +911,7 @@ func TestEKeyInQueueManagerOpensEditor(t *testing.T) {
 }
 
 func TestEKeyInQueueManagerNoItems(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 
 	// Open queue manager with no items
 	terminal.queueManager.Open()
@@ -933,7 +933,7 @@ func TestEKeyInQueueManagerNoItems(t *testing.T) {
 }
 
 func TestQueueEditorFinishedUpdatesContent(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 
 	// Simulate queue editor finishing with updated content
 	msg := queueEditorFinishedMsg{queueID: "Q1", content: "updated content", err: nil}
@@ -945,7 +945,7 @@ func TestQueueEditorFinishedUpdatesContent(t *testing.T) {
 }
 
 func TestQueueEditorFinishedWithError(t *testing.T) {
-	terminal := NewTerminal(nil, NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
+	terminal := NewTerminal(NewTerminalOutput(DefaultStyles()), stream.NewChanInput(10), nil, 80, 24)
 	terminal.input.SetValue("original input")
 
 	// Simulate queue editor finishing with error

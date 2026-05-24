@@ -41,7 +41,7 @@
 //
 // Usage:
 //
-//	terminal := NewTerminal(runtimeMgr, output, input, config, width, height)
+//	terminal := NewTerminal(output, input, config, width, height)
 //	p := tea.NewProgram(terminal)
 //	p.Run()
 package terminal

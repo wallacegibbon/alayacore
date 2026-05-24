@@ -167,5 +167,9 @@ func (s *Session) sendSystemInfoInternal(activeModelConfig *ModelConfig) {
 		ThinkLevel:        int(s.thinkLevel.Load()),
 	}
 
+	if s.RuntimeManager != nil {
+		info.ActiveTheme = s.RuntimeManager.GetActiveTheme()
+	}
+
 	s.writeTLVJSON(stream.TagSystemData, info)
 }

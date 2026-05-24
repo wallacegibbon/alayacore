@@ -48,6 +48,7 @@
 //
 //	input := stream.NewChanInput(10)
 //	output := &bufferOutput{}
-//	session := agent.NewSession(model, input, output, modelMgr, runtimeMgr)
-//	go session.Run(ctx)
+//	cfg := agent.SessionConfig{Input: input, Output: output, ...}
+//	session := agent.NewSession(cfg)
+//	session.Start()
 package agent

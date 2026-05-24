@@ -42,14 +42,16 @@ func (a *Adaptor) Start() int {
 	terminalOutput.SetWindowWidth(initialWidth)
 
 	// Load session synchronously before starting the UI
-	session, err := app.StartSession(a.Config, inputStream, terminalOutput)
+	_, err := app.StartSession(a.Config, inputStream, terminalOutput)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return 1
 	}
 
-	// Load active theme from runtime.conf (default to default theme if not set)
-	activeThemeName := session.GetRuntimeManager().GetActiveTheme()
+	// The session's first sendSystemInfo() has already been written to
+	// terminalOutput synchronously during StartSession. Read the active theme
+	// from the cached session state (default to default theme if not set).
+	activeThemeName := terminalOutput.SnapshotStatus().ActiveTheme
 	if activeThemeName == "" {
 		activeThemeName = defaultThemeName
 	}
@@ -59,8 +61,8 @@ func (a *Adaptor) Start() int {
 	// Update output with new styles
 	terminalOutput.SetStyles(styles)
 
-	// Create terminal with runtime manager, initial window size, theme, and theme manager
-	t := NewTerminalWithTheme(session.GetRuntimeManager(), terminalOutput, inputStream, a.Config, initialWidth, initialHeight, theme, themeManager)
+	// Create terminal with initial window size, theme, and theme manager
+	t := NewTerminalWithTheme(terminalOutput, inputStream, a.Config, initialWidth, initialHeight, theme, themeManager)
 
 	// Create and run the program.
 	// Bubbletea automatically opens the real TTY when stdin is piped

@@ -20,6 +20,7 @@ const (
 	commandNameTaskQueueDel    = "taskqueue_del"
 	commandNameTaskQueueEdit   = "taskqueue_edit"
 	commandNameThink           = "think"
+	commandNameThemeSet        = "theme_set"
 )
 
 // Command describes a user-facing colon-command.  This is a pure metadata
@@ -44,6 +45,7 @@ var commandDefs = []Command{
 	{commandNameTaskQueueDel, "Delete a queued task", "<queue_id>"},
 	{commandNameTaskQueueEdit, "Edit a queued task's content", "<queue_id> <new_content>"},
 	{commandNameThink, "Set think level (0=off, 1=normal, 2=max)", "[0|1|2]"},
+	{commandNameThemeSet, "Set the active theme", "<name>"},
 }
 
 // LookupCommand returns the command metadata for name, or (nil, false).
@@ -101,6 +103,8 @@ func (s *Session) dispatchCommand(ctx context.Context, cmd string) bool {
 		s.handleTaskQueueEdit(args)
 	case commandNameThink:
 		s.handleThink(args)
+	case commandNameThemeSet:
+		s.handleThemeSet(args)
 	}
 
 	return true

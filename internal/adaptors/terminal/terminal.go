@@ -15,7 +15,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	agentpkg "github.com/alayacore/alayacore/internal/agent"
 	"github.com/alayacore/alayacore/internal/app"
 	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/stream"
@@ -90,7 +89,6 @@ type Terminal struct {
 	streamInput *stream.ChanInput
 	appConfig   *app.Config
 	editor      *Editor
-	runtimeMgr  *agentpkg.RuntimeManager
 
 	// UI components
 	display       DisplayModel
@@ -113,7 +111,8 @@ type Terminal struct {
 	windowWidth        int
 	windowHeight       int
 	styles             *Styles
-	hasFocus           bool // tracks whether the terminal has application focus
+	hasFocus           bool   // tracks whether the terminal has application focus
+	activeTheme        string // cached from system info updates
 
 	// Theme preview debouncing
 	themePreviewID int // ID of the current pending theme preview
@@ -121,18 +120,16 @@ type Terminal struct {
 
 // NewTerminal creates a new Terminal model with all components initialized.
 func NewTerminal(
-	runtimeMgr *agentpkg.RuntimeManager,
 	out OutputWriter,
 	inputStream *stream.ChanInput,
 	appCfg *app.Config,
 	initialWidth, initialHeight int,
 ) *Terminal {
-	return NewTerminalWithTheme(runtimeMgr, out, inputStream, appCfg, initialWidth, initialHeight, DefaultTheme(), nil)
+	return NewTerminalWithTheme(out, inputStream, appCfg, initialWidth, initialHeight, DefaultTheme(), nil)
 }
 
 // NewTerminalWithTheme creates a new Terminal model with a custom theme.
 func NewTerminalWithTheme(
-	runtimeMgr *agentpkg.RuntimeManager,
 	out OutputWriter,
 	inputStream *stream.ChanInput,
 	appCfg *app.Config,
@@ -149,7 +146,6 @@ func NewTerminalWithTheme(
 		streamInput:   inputStream,
 		appConfig:     appCfg,
 		editor:        editor,
-		runtimeMgr:    runtimeMgr,
 		display:       NewDisplayModel(out.WindowBuffer(), styles),
 		input:         NewInputModel(styles),
 		modelSelector: NewModelSelector(styles),
@@ -446,6 +442,7 @@ func (m *Terminal) updateStatus() {
 
 	m.statusText = status
 	m.inProgress = snap.InProgress
+	m.activeTheme = snap.ActiveTheme
 }
 
 // View renders the complete terminal UI.
@@ -619,8 +616,7 @@ func (m *Terminal) openThemeSelector() {
 		return
 	}
 
-	activeTheme := m.runtimeMgr.GetActiveTheme()
-	m.themeSelector.Open(m.themeManager.GetThemes(), activeTheme)
+	m.themeSelector.Open(m.themeManager.GetThemes(), m.activeTheme)
 	m.input.Blur()
 	m.display.SetDisplayFocused(false)
 	m.display.updateContent()
