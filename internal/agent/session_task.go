@@ -65,6 +65,12 @@ func (s *Session) run() {
 		select {
 		case msg, ok := <-msgCh:
 			if !ok {
+				// Input is closed (EOF on stdin). If a task is still running,
+				// keep processing events until it completes so that output
+				// (prompt echo, assistant response) is flushed before exit.
+				if s.inProgress {
+					s.drainUntilTaskDone(&runMessages)
+				}
 				return
 			}
 			s.handleInputMsg(msg)
@@ -145,6 +151,26 @@ func (s *Session) handleTaskDone(runMessages *[]llm.Message) {
 	}
 
 	s.sendSystemInfo()
+}
+
+// drainUntilTaskDone processes task events and completion signals until the
+// currently running task finishes. Called when input is closed but a task is
+// still in progress, ensuring final output (prompt echo, assistant response)
+// is flushed before the session exits.
+func (s *Session) drainUntilTaskDone(runMessages *[]llm.Message) {
+	for {
+		select {
+		case ev := <-s.stateCh:
+			s.handleTaskEvent(ev, runMessages)
+		case <-s.taskDone:
+			s.handleTaskDone(runMessages)
+			return
+		case <-s.infoUpdateCh:
+			s.sendSystemInfo()
+		case <-s.sessionCtx.Done():
+			return
+		}
+	}
 }
 
 // handleTaskEvent processes a state change event from the task goroutine.

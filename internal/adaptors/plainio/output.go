@@ -22,17 +22,19 @@ type systemInfo struct {
 // stdoutOutput implements stream.Output.
 // It parses TLV messages and prints human-readable text to stdout.
 //
-// stdoutOutput is NOT safe for concurrent writes, but the session
-// goroutine is the sole writer — no mutex is needed.
+// Concurrency: the session writes from two goroutines (task and run),
+// so a mutex protects the buffer, tag/stream-ID state, and the close-once
+// guard for errorCh. See stream/doc.go for the full contract.
 type stdoutOutput struct {
 	writer       io.Writer
+	mu           sync.Mutex // protects buf, lastTag, lastStreamID, errorClosed
 	buf          []byte
 	inProgress   atomic.Bool
 	hasError     atomic.Bool
-	errorOnce    sync.Once
-	errorCh      chan struct{} // closed on first SE tag
-	lastTag      string        // last tag that produced visible output
-	lastStreamID string        // tracks last stream ID prefix within TA/TR group
+	errorClosed  atomic.Bool // true once errorCh has been closed
+	errorCh      chan struct{}
+	lastTag      string
+	lastStreamID string
 }
 
 func newStdoutOutput() *stdoutOutput {
@@ -43,8 +45,10 @@ func newStdoutOutput() *stdoutOutput {
 }
 
 func (o *stdoutOutput) Write(p []byte) (int, error) {
+	o.mu.Lock()
 	o.buf = append(o.buf, p...)
 	o.processBuffer()
+	o.mu.Unlock()
 	return len(p), nil
 }
 
@@ -89,19 +93,7 @@ func (o *stdoutOutput) printMessage(tag string, value string) {
 func (o *stdoutOutput) handleTag(tag, value string) {
 	switch tag {
 	case stream.TagTextAssistant, stream.TagTextReasoning:
-		id, content, _ := stream.UnwrapDelta(value)
-		// When id is "" (replayed from session file, no NUL prefix),
-		// we just track it as-is — no stream transition to detect.
-		if o.lastTag != "" && (o.lastTag != stream.TagTextAssistant && o.lastTag != stream.TagTextReasoning) {
-			// Transitioning from a different tag group → separator
-			fmt.Fprintln(o.writer)
-		} else if o.lastStreamID != "" && id != o.lastStreamID {
-			// Same group but different stream → separator
-			fmt.Fprintln(o.writer)
-		}
-		o.lastTag = tag
-		o.lastStreamID = id
-		fmt.Fprint(o.writer, content)
+		o.handleTextDelta(tag, value)
 
 	case stream.TagTextUser:
 		o.emitSeparator(tag)
@@ -111,7 +103,9 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 		o.emitSeparator(tag)
 		fmt.Fprintf(o.writer, "[error: %s]", value)
 		o.hasError.Store(true)
-		o.errorOnce.Do(func() { close(o.errorCh) })
+		if o.errorClosed.CompareAndSwap(false, true) {
+			close(o.errorCh)
+		}
 
 	case stream.TagSystemNotify:
 		o.emitSeparator(tag)
@@ -138,6 +132,25 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 		o.emitSeparator(tag)
 		fmt.Fprintf(o.writer, "[unknown-tag:%s %s]", tag, value)
 	}
+}
+
+// handleTextDelta handles TA (assistant text) and TR (reasoning text) tags.
+// It prints a separator when transitioning between different tag groups or
+// stream IDs, then prints the content delta.
+func (o *stdoutOutput) handleTextDelta(tag, value string) {
+	id, content, _ := stream.UnwrapDelta(value)
+	// When id is "" (replayed from session file, no NUL prefix),
+	// we just track it as-is — no stream transition to detect.
+	if o.lastTag != "" && (o.lastTag != stream.TagTextAssistant && o.lastTag != stream.TagTextReasoning) {
+		// Transitioning from a different tag group → separator
+		fmt.Fprintln(o.writer)
+	} else if o.lastStreamID != "" && id != o.lastStreamID {
+		// Same group but different stream → separator
+		fmt.Fprintln(o.writer)
+	}
+	o.lastTag = tag
+	o.lastStreamID = id
+	fmt.Fprint(o.writer, content)
 }
 
 // emitSeparator prints a newline if the previous visible tag differs from the
