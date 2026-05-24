@@ -14,6 +14,9 @@
 //	The session uses an actor model with three goroutines:
 //	  1. run() — owns all mutable session state (messages, task queue,
 //	     token counts). Processes input messages and task events.
+//	     When the input stream reaches EOF while a task is in progress,
+//	     it drains remaining events until the task completes before
+//	     exiting (see drainUntilTaskDone).
 //	  2. task goroutine — spawned per task, runs in background, sends
 //	     state mutations via typed channel events (stateCh) to run().
 //	  3. inputPump — reads TLV frames from input, forwards to run()

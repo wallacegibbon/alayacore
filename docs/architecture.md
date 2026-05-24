@@ -90,6 +90,29 @@ The session uses three goroutines for concurrent operation:
 | `atomic.Int64` | both | — | ContextTokens, currentStep, thinkLevel |
 | `atomic.Bool` | both | — | pausedOnError (written by task goroutine) |
 
+**Lifecycle — drain on EOF:**
+
+When the input stream reaches EOF (e.g. a piped `echo` command closes stdin),
+the inputPump closes `msgCh` and exits. If a task is still in progress, `run()`
+does not return immediately — it enters `drainUntilTaskDone()`, which processes
+state events and the task completion signal before letting the session exit.
+This ensures that all output (prompt echo, assistant response, tool results) is
+flushed before the process terminates.
+
+```
+stdin EOF ──▶ inputPump closes msgCh ──▶ run() detects closed channel
+                                                │
+                                           [task running?]
+                                           /              \
+                                         yes              no
+                                          │                │
+                              drainUntilTaskDone()      return
+                                   │
+                            wait for taskDone
+                            + process state events
+                                   │
+                                return
+
 **State ownership:**
 - The `run()` goroutine is the sole owner of session state. It reads/writes `taskQueue`, `inProgress`, `pausedOnError`, `thinkLevel`, `thinkDirty`, and all command-handling logic. ModelManager and RuntimeManager are also accessed only from `run()`.
 - The task goroutine communicates state changes via typed events on `stateCh` (step progress, new messages, token counts) and reads atomic fields (`agent`, `provider`, `ContextTokens`, `currentStep`, `thinkLevel`, `thinkDirty`, `pausedOnError`) for lock-free access.
@@ -386,6 +409,7 @@ Agent.Stream() receives tool_call event
 13. **Concurrent Task Execution** — Each task runs in its own goroutine so the main loop remains responsive to user input during LLM streaming. The task goroutine communicates state changes via typed channel events (`stateCh`). Lock-free atomic fields (`atomic.Pointer`, `atomic.Int64`, `atomic.Bool`) are used for the few values that the task goroutine reads directly (agent, provider, context tokens, think level). No `sync.Mutex` is needed.
 14. **Centralized System Info** — `sendSystemInfo()` runs only in the main loop goroutine. The task goroutine requests updates via a buffered channel (`infoUpdateCh`), which also wakes the main loop from its select to process the update promptly.
 15. **Goroutine-Local Counters** — Fields accessed by a single goroutine (`nextQueueID` on the main loop, `nextPromptID` on the task goroutine) are plain fields with no synchronization needed.
+16. **Drain on EOF** — When stdin is closed (EOF from a piped command), the session waits for the currently running task to finish before exiting. This ensures piped input produces visible output even though the pipe closes before the API responds. See `drainUntilTaskDone()` in `session_task.go`.
 
 ## Gotchas
 
