@@ -10,7 +10,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"golang.org/x/term"
 
-	agentpkg "github.com/alayacore/alayacore/internal/agent"
 	"github.com/alayacore/alayacore/internal/app"
 	"github.com/alayacore/alayacore/internal/stream"
 )
@@ -43,25 +42,8 @@ func (a *Adaptor) Start() int {
 	terminalOutput.SetWindowWidth(initialWidth)
 
 	// Load session synchronously before starting the UI
-	session, _ := agentpkg.LoadOrNewSession(agentpkg.SessionConfig{
-		Input:               inputStream,
-		Output:              terminalOutput,
-		SessionFile:         a.Config.Cfg.Session,
-		ModelConfigPath:     a.Config.Cfg.ModelConfig,
-		RuntimeConfigPath:   a.Config.Cfg.RuntimeConfig,
-		BaseTools:           a.Config.AgentTools,
-		SystemPrompt:        a.Config.SystemPrompt,
-		ExtraSystemPrompt:   a.Config.ExtraSystemPrompt,
-		MaxSteps:            a.Config.MaxSteps,
-		DebugAPI:            a.Config.Cfg.DebugAPI,
-		AutoSummarize:       a.Config.Cfg.AutoSummarize,
-		ProxyURL:            a.Config.Cfg.Proxy,
-		SkillsMgr:           a.Config.SkillsMgr,
-		OverrideActiveModel: a.Config.Cfg.ModelName,
-	})
-
-	// --model CLI flag: fail immediately if the named model doesn't exist.
-	if err := session.InitError(); err != nil {
+	session, err := app.StartSession(a.Config, inputStream, terminalOutput)
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return 1
 	}
@@ -77,29 +59,8 @@ func (a *Adaptor) Start() int {
 	// Update output with new styles
 	terminalOutput.SetStyles(styles)
 
-	// Display config validation messages (unknown protocol_type, missing fields, etc.)
-	// Must come before HasModels() check so specific errors are shown even when
-	// all models are rejected.
-	if msgs := session.ModelManager.GetLoadErrors(); len(msgs) > 0 {
-		for _, m := range msgs {
-			fmt.Fprintf(os.Stderr, "%s\n", m)
-		}
-	}
-
-	// Check if we have any models available.
-	if !session.HasModels() {
-		fmt.Fprint(os.Stderr, agentpkg.NoModelsErrorMessage(session.ModelConfigPath(), session.ModelManager.HasRejected()))
-		return 1
-	}
-
 	// Create terminal with runtime manager, initial window size, theme, and theme manager
 	t := NewTerminalWithTheme(session.GetRuntimeManager(), terminalOutput, inputStream, a.Config, initialWidth, initialHeight, theme, themeManager)
-
-	// Start the session's run() goroutine before the Bubble Tea event loop.
-	// Bubble Tea sends input via inputStream (ChanInput), and Session.run()
-	// reads from its underlying channel in a select loop alongside task
-	// processing — no separate goroutines needed.
-	session.Start()
 
 	// Create and run the program.
 	// Bubbletea automatically opens the real TTY when stdin is piped

@@ -10,7 +10,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	agentpkg "github.com/alayacore/alayacore/internal/agent"
 	"github.com/alayacore/alayacore/internal/app"
 	"github.com/alayacore/alayacore/internal/stream"
 )
@@ -40,48 +39,11 @@ func (a *Adaptor) Start() int {
 	output := newStdoutOutput()
 
 	// Load session
-	session, _ := agentpkg.LoadOrNewSession(agentpkg.SessionConfig{
-		Input:               input,
-		Output:              output,
-		SessionFile:         a.Config.Cfg.Session,
-		ModelConfigPath:     a.Config.Cfg.ModelConfig,
-		RuntimeConfigPath:   a.Config.Cfg.RuntimeConfig,
-		BaseTools:           a.Config.AgentTools,
-		SystemPrompt:        a.Config.SystemPrompt,
-		ExtraSystemPrompt:   a.Config.ExtraSystemPrompt,
-		MaxSteps:            a.Config.MaxSteps,
-		DebugAPI:            a.Config.Cfg.DebugAPI,
-		AutoSummarize:       a.Config.Cfg.AutoSummarize,
-		ProxyURL:            a.Config.Cfg.Proxy,
-		SkillsMgr:           a.Config.SkillsMgr,
-		OverrideActiveModel: a.Config.Cfg.ModelName,
-	})
-
-	// --model CLI flag: fail immediately if the named model doesn't exist.
-	if err := session.InitError(); err != nil {
+	session, err := app.StartSession(a.Config, input, output)
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return 1
 	}
-
-	// Display config validation messages (unknown protocol_type, missing fields, etc.)
-	// Must come before HasModels() check so specific errors are shown even when
-	// all models are rejected.
-	if msgs := session.ModelManager.GetLoadErrors(); len(msgs) > 0 {
-		for _, m := range msgs {
-			fmt.Fprintf(os.Stderr, "%s\n", m)
-		}
-	}
-
-	// Check if we have any models available.
-	if !session.HasModels() {
-		fmt.Fprint(os.Stderr, agentpkg.NoModelsErrorMessage(session.ModelConfigPath(), session.ModelManager.HasRejected()))
-		return 1
-	}
-
-	// Start the session's run() goroutine before reading stdin.
-	// The run() goroutine reads from ChanInput and processes tasks
-	// in a single select loop — no separate goroutines needed.
-	session.Start()
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT)
