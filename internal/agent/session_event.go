@@ -23,7 +23,7 @@ const (
 	eventSetPaused
 	eventSaveRequest
 	eventTaskDone
-	eventSyncThink
+	eventSyncReason
 )
 
 // taskEvent carries a state mutation from the task goroutine to run().
@@ -48,8 +48,8 @@ type taskEvent struct {
 
 	// eventSaveRequest (payload not needed — uses s.Messages)
 
-	// eventSyncThink
-	thinkLevel int
+	// eventSyncReason
+	reasoningLevel int
 }
 
 // sendEvent sends a task event to the run() goroutine.

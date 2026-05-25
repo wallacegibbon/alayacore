@@ -164,7 +164,7 @@ func (s *Session) sendSystemInfoInternal(activeModelConfig *ModelConfig) {
 		ActiveModelName:   activeModelName,
 		HasModels:         hasModels,
 		ModelConfigPath:   modelConfigPath,
-		ThinkLevel:        int(s.thinkLevel.Load()),
+		ReasoningLevel:    int(s.reasoningLevel.Load()),
 	}
 
 	if s.RuntimeManager != nil {

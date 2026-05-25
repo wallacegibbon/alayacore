@@ -174,22 +174,22 @@ func (s *sseScanner) Event() (eventType string, data string) {
 // Common Types
 // ============================================================================
 
-// thinkingConfig holds the thinking/reasoning configuration for a provider request.
+// reasoningConfig holds the thinking/reasoning configuration for a provider request.
 // Both Anthropic and OpenAI use parallel fields for this.
-type thinkingConfig struct {
-	Enabled bool   // true if thinking is enabled
+type reasoningConfig struct {
+	Enabled bool   // true if reasoning is enabled
 	Effort  string // "high", "max", "xhigh" — provider-dependent semantics
 }
 
-// computeThinkingConfig returns the thinking config based on reasoning level.
+// computeReasoningConfig returns the reasoning config based on reasoning level.
 // level 0 = off, 1 = normal (high), 2 = max/xhigh.
-func computeThinkingConfig(level int) thinkingConfig {
+func computeReasoningConfig(level int) reasoningConfig {
 	if level > 0 {
 		effort := "high"
 		if level >= 2 {
 			effort = "max" // will be overridden by OpenAI to "xhigh"
 		}
-		return thinkingConfig{Enabled: true, Effort: effort}
+		return reasoningConfig{Enabled: true, Effort: effort}
 	}
-	return thinkingConfig{Enabled: false, Effort: ""}
+	return reasoningConfig{Enabled: false, Effort: ""}
 }

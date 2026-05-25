@@ -63,6 +63,9 @@ type openAIRequest struct {
 	Thinking            *openAIThinkingField `json:"thinking"`
 }
 
+// openAIThinkingField maps to the OpenAI/DeepSeek `thinking` API field.
+// The wire name is "thinking" (provider API convention), while the
+// codebase uses "reasoning" for the domain-level concept.
 type openAIThinkingField struct {
 	Type string `json:"type"`
 }
@@ -208,13 +211,13 @@ func (p *OpenAIProvider) StreamMessages(
 	}
 
 	// Build request body with thinking config
-	tc := computeThinkingConfig(p.reasoningLevel)
+	tc := computeReasoningConfig(p.reasoningLevel)
 	var reasoningEffort string
 	var thinking *openAIThinkingField
 	if tc.Enabled {
 		thinking = &openAIThinkingField{Type: "enabled"}
 		reasoningEffort = tc.Effort
-		if p.reasoningLevel >= config.ThinkLevelMax {
+		if p.reasoningLevel >= config.ReasoningLevelMax {
 			reasoningEffort = "xhigh"
 		}
 	} else {
@@ -494,7 +497,7 @@ func openaiConvertMessages(messages []llm.Message, reasoningLevel int) []openAIM
 
 		if msg.Role == llm.RoleAssistant {
 			reasoningText := openaiExtractReasoning(msg.Content)
-			if reasoningText != "" || reasoningLevel > config.ThinkLevelOff {
+			if reasoningText != "" || reasoningLevel > config.ReasoningLevelOff {
 				apiMsg.ReasoningContent = &reasoningText
 			}
 			if apiMsg.Content == nil && len(apiMsg.ToolCalls) == 0 {

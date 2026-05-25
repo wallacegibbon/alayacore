@@ -54,9 +54,9 @@ func TestFormatRuntimeConfig_RoundTrip(t *testing.T) {
 
 func TestFormatFrontmatter_RoundTrip(t *testing.T) {
 	meta := SessionMeta{
-		ActiveModel:   `model "name" \\ thing`,
-		ThinkLevel:    1,
-		ContextTokens: 12345,
+		ActiveModel:    `model "name" \\ thing`,
+		ReasoningLevel: 1,
+		ContextTokens:  12345,
 	}
 	meta.CreatedAt = time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC)
 	meta.UpdatedAt = time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC)
@@ -122,8 +122,8 @@ func TestRuntimeManager_NewlineInModel_RoundTrip(t *testing.T) {
 // Verify formatFrontmatter doesn't produce broken output for special chars
 func TestFormatFrontmatter_NoBrokenOutput(t *testing.T) {
 	meta := SessionMeta{
-		ActiveModel: "has\nnewlines",
-		ThinkLevel:  1,
+		ActiveModel:    "has\nnewlines",
+		ReasoningLevel: 1,
 	}
 	meta.CreatedAt = time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC)
 	meta.UpdatedAt = time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC)

@@ -87,7 +87,7 @@ The session uses three goroutines for concurrent operation:
 | `infoUpdateCh` (buffered, cap 1) | task worker | run() | Request system-info broadcast |
 | `atomic.Pointer[Agent]` | both | — | Lock-free agent pointer for task goroutine |
 | `atomic.Pointer[llm.Provider]` | both | — | Lock-free provider pointer for task goroutine |
-| `atomic.Int64` | both | — | ContextTokens, currentStep, thinkLevel |
+| `atomic.Int64` | both | — | ContextTokens, currentStep, reasoningLevel |
 | `atomic.Bool` | both | — | pausedOnError (written by task goroutine) |
 
 **Lifecycle — drain on EOF:**
@@ -114,8 +114,8 @@ stdin EOF ──▶ inputPump closes msgCh ──▶ run() detects closed channe
                                 return
 
 **State ownership:**
-- The `run()` goroutine is the sole owner of session state. It reads/writes `taskQueue`, `inProgress`, `pausedOnError`, `thinkLevel`, `thinkDirty`, and all command-handling logic. ModelManager and RuntimeManager are also accessed only from `run()`.
-- The task goroutine communicates state changes via typed events on `stateCh` (step progress, new messages, token counts) and reads atomic fields (`agent`, `provider`, `ContextTokens`, `currentStep`, `thinkLevel`, `thinkDirty`, `pausedOnError`) for lock-free access.
+- The `run()` goroutine is the sole owner of session state. It reads/writes `taskQueue`, `inProgress`, `pausedOnError`, `reasoningLevel`, `reasoningDirty`, and all command-handling logic. ModelManager and RuntimeManager are also accessed only from `run()`.
+- The task goroutine communicates state changes via typed events on `stateCh` (step progress, new messages, token counts) and reads atomic fields (`agent`, `provider`, `ContextTokens`, `currentStep`, `reasoningLevel`, `reasoningDirty`, `pausedOnError`) for lock-free access.
 - The input pump goroutine has NO access to session state except `taskCancelCh` (for `:cancel` commands).
 - `sendSystemInfo` runs only in the `run()` goroutine; the task goroutine requests updates via `infoUpdateCh`.
 
@@ -405,8 +405,8 @@ Agent.Stream() receives tool_call event
 9. **Lazy Agent Init** — Agent and provider are created on first use, not at startup.
 10. **Sequential Tool Execution** — Tools execute one at a time. See [sequential-tool-execution.md](sequential-tool-execution.md).
 11. **Context Efficiency** — Tool descriptions are minimal. Large outputs (>64KB) saved to `.alayacore.tmp/`: `read_file` truncates inline with metadata, `execute_command` and `search_content` save full output to file. See [truncation.md](truncation.md).
-12. **Think Mode** — Provider-specific reasoning fields are added to API requests. Three levels: 0=off, 1=normal, 2=max. Toggled via `:think [0|1|2]`.
-13. **Concurrent Task Execution** — Each task runs in its own goroutine so the main loop remains responsive to user input during LLM streaming. The task goroutine communicates state changes via typed channel events (`stateCh`). Lock-free atomic fields (`atomic.Pointer`, `atomic.Int64`, `atomic.Bool`) are used for the few values that the task goroutine reads directly (agent, provider, context tokens, think level). No `sync.Mutex` is needed.
+12. **Reasoning Mode** — Provider-specific reasoning fields are added to API requests. Three levels: 0=off, 1=normal, 2=max. Toggled via `:reason [0|1|2]`.
+13. **Concurrent Task Execution** — Each task runs in its own goroutine so the main loop remains responsive to user input during LLM streaming. The task goroutine communicates state changes via typed channel events (`stateCh`). Lock-free atomic fields (`atomic.Pointer`, `atomic.Int64`, `atomic.Bool`) are used for the few values that the task goroutine reads directly (agent, provider, context tokens, reasoning level). No `sync.Mutex` is needed.
 14. **Centralized System Info** — `sendSystemInfo()` runs only in the main loop goroutine. The task goroutine requests updates via a buffered channel (`infoUpdateCh`), which also wakes the main loop from its select to process the update promptly.
 15. **Goroutine-Local Counters** — Fields accessed by a single goroutine (`nextQueueID` on the main loop, `nextPromptID` on the task goroutine) are plain fields with no synchronization needed.
 16. **Drain on EOF** — When stdin is closed (EOF from a piped command), the session waits for the currently running task to finish before exiting. This ensures piped input produces visible output even though the pipe closes before the API responds. See `drainUntilTaskDone()` in `session_task.go`.
@@ -476,12 +476,12 @@ When user cancels mid-tool-call, messages may have `tool_use` without matching `
 
 When styling text with lipgloss, each segment must be rendered individually before concatenation. You cannot render a string that already contains ANSI codes with a new style and expect it to work.
 
-### Think mode and reasoning_content
+### Reasoning mode and reasoning_content
 
-When think mode is set via `:think [0|1|2]`, each provider sends explicit thinking configuration in API requests. The key differences are:
+When reasoning mode is set via `:reason [0|1|2]`, each provider sends explicit thinking configuration in API requests. The key differences are:
 
-1. A top-level **`thinking`** field (`{"type": "enabled"}` or `{"type": "disabled"}`) controls whether reasoning is active. This is always set explicitly — even when thinking is off — because some providers (e.g. DeepSeek V4) default to thinking enabled. Omitting the field would leave thinking on at the API level, contradicting the UI state.
-2. When think mode is on (level 1 or 2), assistant messages that only contain tool calls must still include an **empty reasoning block** (required by DeepSeek and similar providers).
+1. A top-level **`thinking`** field (`{"type": "enabled"}` or `{"type": "disabled"}`) controls whether reasoning is active. This is always set explicitly — even when reasoning is off — because some providers (e.g. DeepSeek V4) default to thinking enabled. Omitting the field would leave thinking on at the API level, contradicting the UI state.
+2. When reasoning mode is on (level 1 or 2), assistant messages that only contain tool calls must still include an **empty reasoning block** (required by DeepSeek and similar providers).
 
 | Provider | Level 1 (normal) | Level 2 (max) | Disabled |
 |----------|------------------|---------------|----------|
@@ -492,7 +492,7 @@ When think mode is set via `:think [0|1|2]`, each provider sends explicit thinki
 
 #### OpenAI-compatible — request examples
 
-When think mode is **disabled**, assistant messages contain only the tool calls — no `reasoning_content` field:
+When reasoning mode is **disabled**, assistant messages contain only the tool calls — no `reasoning_content` field:
 
 ```json
 {
@@ -525,7 +525,7 @@ When think mode is **disabled**, assistant messages contain only the tool calls 
 }
 ```
 
-When think mode is **enabled**, every assistant message is padded with `"reasoning_content": ""` even when there is no actual reasoning text, and the request includes `reasoning_effort`:
+When reasoning mode is **enabled**, every assistant message is padded with `"reasoning_content": ""` even when there is no actual reasoning text, and the request includes `reasoning_effort`:
 
 ```json
 {
@@ -562,7 +562,7 @@ When think mode is **enabled**, every assistant message is padded with `"reasoni
 
 #### Anthropic-compatible — request examples
 
-When think mode is **disabled**, assistant messages contain only the tool-use content block — no `thinking` block:
+When reasoning mode is **disabled**, assistant messages contain only the tool-use content block — no `thinking` block:
 
 ```json
 {
@@ -597,7 +597,7 @@ When think mode is **disabled**, assistant messages contain only the tool-use co
 }
 ```
 
-When think mode is **enabled**, every assistant message is prepended with an empty `{"type": "thinking", "thinking": ""}` block when none is present, and the request includes `output_config`:
+When reasoning mode is **enabled**, every assistant message is prepended with an empty `{"type": "thinking", "thinking": ""}` block when none is present, and the request includes `output_config`:
 
 ```json
 {
@@ -643,13 +643,13 @@ Some OpenAI-compatible providers (e.g. DeepSeek) return `reasoning_content` in a
 
 This means **all** intermediate assistant messages in a multi-turn tool call chain must include their `reasoning_content`. Dropping it causes a 400 error from providers that require it.
 
-#### Empty thinking block padding — implementation
+#### Empty reasoning block padding — implementation
 
 Both providers pad assistant messages with an empty reasoning value — but **only when reasoning mode is enabled** — to avoid wasting input tokens when it isn't needed.
 
 - **Anthropic provider** (`anthropicConvertMessages`): prepends an empty `{"type": "thinking", "thinking": ""}` block to every assistant message that lacks one. The thinking block must come first per Anthropic's API.
 - **OpenAI provider** (`openaiConvertMessages`): extracts reasoning text via `openaiExtractReasoning()` and sets `reasoning_content` on every assistant message — even as empty string when no reasoning text exists.
 
-Both are conditional on reasoning mode being enabled. When think mode is off, no padding is added.
+Both are conditional on reasoning mode being enabled. When reasoning mode is off, no padding is added.
 
 

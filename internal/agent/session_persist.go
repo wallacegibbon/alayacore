@@ -36,11 +36,11 @@ func (s *Session) saveSessionToFile(path string) error {
 func (s *Session) saveSessionToFileWith(messages []llm.Message, path string) error {
 	data := SessionData{
 		SessionMeta: SessionMeta{
-			CreatedAt:     s.CreatedAt,
-			UpdatedAt:     time.Now(),
-			ThinkLevel:    int(s.thinkLevel.Load()),
-			ActiveModel:   s.activeModelName(),
-			ContextTokens: s.ContextTokens.Load(),
+			CreatedAt:      s.CreatedAt,
+			UpdatedAt:      time.Now(),
+			ReasoningLevel: int(s.reasoningLevel.Load()),
+			ActiveModel:    s.activeModelName(),
+			ContextTokens:  s.ContextTokens.Load(),
 		},
 		Messages: messages,
 	}
@@ -166,18 +166,22 @@ func parseSessionMeta(frontmatter string) SessionMeta {
 	var meta SessionMeta
 	config.ParseKeyValue(frontmatter, &meta)
 
-	// Default think_level to 1 (normal) when the key is absent from the
+	// Default reasoning_level to 1 (normal) when the key is absent from the
 	// frontmatter.  config.ParseKeyValue leaves the field at its zero value
-	// (0) when the key is missing, which would incorrectly disable thinking.
-	if !strings.Contains(frontmatter, "think_level:") {
-		meta.ThinkLevel = config.DefaultThinkLevel
+	// (0) when the key is missing, which would incorrectly disable reasoning.
+	// Also checks for the legacy "think_level" key for backward compatibility
+	// with session files created before the rename.
+	hasReasoningKey := strings.Contains(frontmatter, "reasoning_level:")
+	hasLegacyThinkKey := strings.Contains(frontmatter, "think_level:")
+	if !hasReasoningKey && !hasLegacyThinkKey {
+		meta.ReasoningLevel = config.DefaultReasoningLevel
 	}
 
-	// Validate think_level range: 0=off, 1=normal, 2=max.
+	// Validate reasoning_level range: 0=off, 1=normal, 2=max.
 	// Clamp to default if the stored value is out of range (e.g. corrupted
 	// or hand-edited session file).
-	if meta.ThinkLevel < config.ThinkLevelOff || meta.ThinkLevel > config.ThinkLevelMax {
-		meta.ThinkLevel = config.DefaultThinkLevel
+	if meta.ReasoningLevel < config.ReasoningLevelOff || meta.ReasoningLevel > config.ReasoningLevelMax {
+		meta.ReasoningLevel = config.DefaultReasoningLevel
 	}
 
 	return meta

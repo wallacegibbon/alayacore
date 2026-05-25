@@ -21,7 +21,7 @@ type StatusSnapshot struct {
 	LastCurrentStep int
 	LastMaxSteps    int
 	TaskError       bool
-	ThinkLevel      int
+	ReasoningLevel  int
 	ActiveTheme     string
 }
 

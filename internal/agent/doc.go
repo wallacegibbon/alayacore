@@ -24,7 +24,7 @@
 //
 //	The only mutable state accessed from more than one goroutine are:
 //	  - sync/atomic fields for lock-free reads by the task goroutine
-//	    (agent pointer, provider, think level, context tokens, etc.)
+//	    (agent pointer, provider, reasoning level, context tokens, etc.)
 //	  - A few buffered channels for cancellation, completion signaling,
 //	    and system-info refresh requests.
 //

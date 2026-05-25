@@ -27,7 +27,7 @@ package agent
 // Related files:
 //   - session_types.go — type definitions (Task, SystemInfo, SessionConfig, etc.)
 //   - session_event.go — taskEvent types for actor model communication
-//   - session_model.go — model management, provider creation, think level
+//   - session_model.go — model management, provider creation, reasoning level
 //   - session_task.go  — input processing, prompt execution, agent loop
 //   - session_io.go    — command handling, summarize, save
 //   - session_output.go — TLV write helpers, usage tracking, system info
@@ -58,12 +58,12 @@ type Session struct {
 	initError      error // Set during construction if --model refers to a non-existent model
 
 	// === State owned by run() goroutine, updated via task events ===
-	agent       atomic.Pointer[llm.Agent]
-	provider    atomic.Pointer[llm.Provider]
-	taskQueue   []QueueItem
-	currentStep atomic.Int64
-	thinkLevel  atomic.Int64
-	thinkDirty  atomic.Bool // true if thinkLevel changed during task execution
+	agent          atomic.Pointer[llm.Agent]
+	provider       atomic.Pointer[llm.Provider]
+	taskQueue      []QueueItem
+	currentStep    atomic.Int64
+	reasoningLevel atomic.Int64
+	reasoningDirty atomic.Bool // true if reasoningLevel changed during task execution
 
 	inProgress    bool        // set/cleared by run() goroutine only
 	pausedOnError atomic.Bool // set by task goroutine via event
@@ -157,7 +157,7 @@ func NewSession(cfg SessionConfig) *Session {
 		sessionCancel:  sessionCancel,
 		runDone:        make(chan struct{}),
 	}
-	s.thinkLevel.Store(int64(config.DefaultThinkLevel))
+	s.reasoningLevel.Store(int64(config.DefaultReasoningLevel))
 	s.initModelManager()
 	s.applyModelOverride()
 	s.sendSystemInfo()
@@ -184,7 +184,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 		sessionCancel:  sessionCancel,
 		runDone:        make(chan struct{}),
 	}
-	s.thinkLevel.Store(int64(data.ThinkLevel))
+	s.reasoningLevel.Store(int64(data.ReasoningLevel))
 	s.ContextTokens.Store(data.ContextTokens)
 
 	s.initModelManager()

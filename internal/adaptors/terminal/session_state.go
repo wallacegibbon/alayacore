@@ -33,7 +33,7 @@ type sessionState struct {
 	lastCurrentStep int
 	lastMaxSteps    int
 	lastTaskError   bool
-	thinkLevel      int
+	reasoningLevel  int
 
 	// Model fields
 	models          []agentpkg.ModelInfo
@@ -57,7 +57,7 @@ func (s *sessionState) updateFromSystemInfo(info agentpkg.SystemInfo) {
 	s.updateQueueItems(info)
 	s.currentStep = info.CurrentStep
 	s.maxSteps = info.MaxSteps
-	s.thinkLevel = info.ThinkLevel
+	s.reasoningLevel = info.ReasoningLevel
 	s.activeTheme = info.ActiveTheme
 	s.mu.Unlock()
 }
@@ -126,7 +126,7 @@ func (s *sessionState) snapshotStatus() StatusSnapshot {
 		LastCurrentStep: s.lastCurrentStep,
 		LastMaxSteps:    s.lastMaxSteps,
 		TaskError:       s.lastTaskError,
-		ThinkLevel:      s.thinkLevel,
+		ReasoningLevel:  s.reasoningLevel,
 		ActiveTheme:     s.activeTheme,
 	}
 }

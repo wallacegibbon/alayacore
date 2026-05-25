@@ -9,13 +9,13 @@ import (
 	"strings"
 )
 
-// Think level constants.
+// Reasoning level constants.
 // 0 = off (no reasoning), 1 = normal, 2 = max.
 const (
-	ThinkLevelOff     = 0
-	ThinkLevelNormal  = 1
-	ThinkLevelMax     = 2
-	DefaultThinkLevel = ThinkLevelNormal
+	ReasoningLevelOff     = 0
+	ReasoningLevelNormal  = 1
+	ReasoningLevelMax     = 2
+	DefaultReasoningLevel = ReasoningLevelNormal
 )
 
 // Agent behavior defaults.

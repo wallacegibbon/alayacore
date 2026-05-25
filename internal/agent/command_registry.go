@@ -19,7 +19,7 @@ const (
 	commandNameTaskQueueGetAll = "taskqueue_get_all"
 	commandNameTaskQueueDel    = "taskqueue_del"
 	commandNameTaskQueueEdit   = "taskqueue_edit"
-	commandNameThink           = "think"
+	commandNameReason          = "reason"
 	commandNameThemeSet        = "theme_set"
 )
 
@@ -44,7 +44,7 @@ var commandDefs = []Command{
 	{commandNameTaskQueueGetAll, "List all queued tasks", ""},
 	{commandNameTaskQueueDel, "Delete a queued task", "<queue_id>"},
 	{commandNameTaskQueueEdit, "Edit a queued task's content", "<queue_id> <new_content>"},
-	{commandNameThink, "Set think level (0=off, 1=normal, 2=max)", "[0|1|2]"},
+	{commandNameReason, "Set reasoning level (0=off, 1=normal, 2=max)", "[0|1|2]"},
 	{commandNameThemeSet, "Set the active theme", "<name>"},
 }
 
@@ -101,8 +101,8 @@ func (s *Session) dispatchCommand(ctx context.Context, cmd string) bool {
 		s.handleTaskQueueDel(args)
 	case commandNameTaskQueueEdit:
 		s.handleTaskQueueEdit(args)
-	case commandNameThink:
-		s.handleThink(args)
+	case commandNameReason:
+		s.handleReason(args)
 	case commandNameThemeSet:
 		s.handleThemeSet(args)
 	}

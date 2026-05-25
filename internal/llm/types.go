@@ -189,7 +189,7 @@ type Provider interface {
 		extraSystemPrompt string,
 	) (iter.Seq2[StreamEvent, error], error)
 
-	// SetReasoningLevel sets the think/reasoning level.
+	// SetReasoningLevel sets the reasoning level.
 	// 0 = off, 1 = normal (high), 2 = maximum.
 	SetReasoningLevel(level int)
 }

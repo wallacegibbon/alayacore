@@ -1,7 +1,7 @@
 package agent
 
 // Session model management: switching models, creating providers,
-// syncing think levels. These methods handle the relationship between
+// syncing reasoning levels. These methods handle the relationship between
 // Session, ModelManager, and the LLM provider.
 //
 // The run() goroutine owns provider/agent creation (via SwitchModel,
@@ -118,7 +118,7 @@ func (s *Session) ensureAgentInitialized() string {
 		s.ContextLimit = int64(activeModel.ContextLimit)
 	}
 	if p := s.provider.Load(); p != nil {
-		(*p).SetReasoningLevel(int(s.thinkLevel.Load()))
+		(*p).SetReasoningLevel(int(s.reasoningLevel.Load()))
 	}
 	return ""
 }
@@ -132,7 +132,7 @@ func (s *Session) initAgentFromConfig(modelConfig *ModelConfig) error {
 	s.agent.Store(agent)
 	s.provider.Store(&provider)
 	if p := s.provider.Load(); p != nil {
-		(*p).SetReasoningLevel(int(s.thinkLevel.Load()))
+		(*p).SetReasoningLevel(int(s.reasoningLevel.Load()))
 	}
 	return nil
 }
@@ -144,16 +144,16 @@ func (s *Session) applyModelContextLimit(model *ModelConfig) {
 	s.ContextLimit = int64(model.ContextLimit)
 }
 
-// SetThinkLevel sets the think level.
+// SetReasoningLevel sets the reasoning level.
 // If a task is currently running, the provider is not synced immediately
-// (to avoid races). Instead, thinkDirty is set and the sync happens at
+// (to avoid races). Instead, reasoningDirty is set and the sync happens at
 // the next step boundary in the task goroutine.
-// See config.ThinkLevelOff, config.ThinkLevelNormal, config.ThinkLevelMax.
-func (s *Session) SetThinkLevel(level int) {
-	s.thinkLevel.Store(int64(level))
+// See config.ReasoningLevelOff, config.ReasoningLevelNormal, config.ReasoningLevelMax.
+func (s *Session) SetReasoningLevel(level int) {
+	s.reasoningLevel.Store(int64(level))
 	if s.inProgress {
 		// Defer provider sync to next step boundary
-		s.thinkDirty.Store(true)
+		s.reasoningDirty.Store(true)
 	} else {
 		if p := s.provider.Load(); p != nil {
 			(*p).SetReasoningLevel(level)

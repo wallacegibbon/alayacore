@@ -280,17 +280,17 @@ func (s *Session) handleTaskQueueEdit(args []string) {
 	}
 }
 
-func (s *Session) handleThink(args []string) {
+func (s *Session) handleReason(args []string) {
 	if len(args) == 0 {
-		s.writeError("usage: :think [0|1|2]  (0=off, 1=normal, 2=max)")
+		s.writeError("usage: :reason [0|1|2]  (0=off, 1=normal, 2=max)")
 		return
 	}
 	level, err := strconv.Atoi(args[0])
-	if err != nil || level < config.ThinkLevelOff || level > config.ThinkLevelMax {
-		s.writeError("usage: :think [0|1|2]  (0=off, 1=normal, 2=max)")
+	if err != nil || level < config.ReasoningLevelOff || level > config.ReasoningLevelMax {
+		s.writeError("usage: :reason [0|1|2]  (0=off, 1=normal, 2=max)")
 		return
 	}
-	s.SetThinkLevel(level)
+	s.SetReasoningLevel(level)
 }
 
 // handleThemeSet sets the active theme and persists it to runtime config.
@@ -428,7 +428,7 @@ func isCommandImmediate(cmd string) bool {
 		name = cmd[:idx]
 	}
 	switch name {
-	case commandNameCancel, commandNameCancelAll, commandNameModelLoad, commandNameTaskQueueGetAll, commandNameTaskQueueEdit, commandNameThink, commandNameSave:
+	case commandNameCancel, commandNameCancelAll, commandNameModelLoad, commandNameTaskQueueGetAll, commandNameTaskQueueEdit, commandNameReason, commandNameSave:
 		return true
 	}
 	return strings.HasPrefix(cmd, commandNameTaskQueueDel+" ") || strings.HasPrefix(cmd, commandNameModelSet+" ") || strings.HasPrefix(cmd, commandNameThemeSet+" ")

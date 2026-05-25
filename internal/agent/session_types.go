@@ -68,17 +68,17 @@ type SystemInfo struct {
 	ActiveModelName   string          `json:"active_model_name,omitempty"`
 	HasModels         bool            `json:"has_models"`
 	ModelConfigPath   string          `json:"model_config_path,omitempty"`
-	ThinkLevel        int             `json:"think_level"`
+	ReasoningLevel    int             `json:"reasoning_level"`
 	ActiveTheme       string          `json:"active_theme,omitempty"`
 }
 
 // SessionMeta is the frontmatter metadata.
 type SessionMeta struct {
-	CreatedAt     time.Time `config:"created_at"`
-	UpdatedAt     time.Time `config:"updated_at"`
-	ThinkLevel    int       `config:"think_level"`
-	ActiveModel   string    `config:"active_model,omitempty"`
-	ContextTokens int64     `config:"context_tokens,omitempty"`
+	CreatedAt      time.Time `config:"created_at"`
+	UpdatedAt      time.Time `config:"updated_at"`
+	ReasoningLevel int       `config:"reasoning_level"`
+	ActiveModel    string    `config:"active_model,omitempty"`
+	ContextTokens  int64     `config:"context_tokens,omitempty"`
 }
 
 // SessionData is the persisted form of a Session.

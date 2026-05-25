@@ -52,7 +52,7 @@ Commands are split into two categories:
 | `:model_set <id>` | Switch to a model by numeric ID |
 | `:model_load` | Reload model configs from the config file |
 | `:theme_set <name>` | Set the active theme |
-| `:think [0\|1\|2]` | Set think level (0=off, 1=normal, 2=max). Default: 1 |
+| `:reason [0\|1\|2]` | Set reasoning level (0=off, 1=normal, 2=max). Default: 1 |
 | `:suspend` | Suspend the process (Ctrl+Z) |
 | `:taskqueue_get_all` | List all queued tasks (used by queue manager UI) |
 | `:taskqueue_del <id>` | Delete a queued task by ID (used by queue manager UI) |

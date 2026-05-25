@@ -56,6 +56,9 @@ type anthropicRequest struct {
 	OutputConfig *anthropicOutputConfig   `json:"output_config,omitempty"`
 }
 
+// anthropicThinkingField maps to the Anthropic `thinking` API field.
+// The wire name is "thinking" (Anthropic API convention), while the
+// codebase uses "reasoning" for the domain-level concept.
 type anthropicThinkingField struct {
 	Type string `json:"type"`
 }
@@ -278,7 +281,7 @@ func (p *AnthropicProvider) StreamMessages(
 		System:    systemMessages,
 		Tools:     apiTools,
 		Stream:    true,
-		Thinking:  computeAnthropicThinking(p.reasoningLevel),
+		Thinking:  computeAnthropicReasoning(p.reasoningLevel),
 	}
 
 	// Build and send HTTP request
@@ -297,9 +300,9 @@ func (p *AnthropicProvider) StreamMessages(
 	return p.parseStream(body), nil
 }
 
-// computeAnthropicThinking returns the thinking field for an Anthropic request.
-func computeAnthropicThinking(level int) *anthropicThinkingField {
-	if level > config.ThinkLevelOff {
+// computeAnthropicReasoning returns the thinking field for an Anthropic request.
+func computeAnthropicReasoning(level int) *anthropicThinkingField {
+	if level > config.ReasoningLevelOff {
 		return &anthropicThinkingField{Type: "enabled"}
 	}
 	return &anthropicThinkingField{Type: "disabled"}
@@ -679,7 +682,7 @@ func anthropicConvertMessages(messages []llm.Message, reasoningLevel int) []anth
 		}
 
 		// Empty thinking block padding when reasoning is enabled
-		if reasoningLevel > config.ThinkLevelOff && msg.Role == llm.RoleAssistant {
+		if reasoningLevel > config.ReasoningLevelOff && msg.Role == llm.RoleAssistant {
 			hasThinking := false
 			for _, block := range apiMsg.Content {
 				if block.Type == anthropicBlockTypeThinking {

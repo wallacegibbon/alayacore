@@ -768,11 +768,11 @@ func TestTLVFormatRecursionProtection(t *testing.T) {
 	}
 }
 
-// TestLoadSessionMissingThinkLevel verifies that when a session file's
-// frontmatter does not contain a think_level key, the think_level defaults
+// TestLoadSessionMissingReasoningLevel verifies that when a session file's
+// frontmatter does not contain a reasoning_level key, the reasoning_level defaults
 // to 1 (normal) rather than 0 (off).
-func TestLoadSessionMissingThinkLevel(t *testing.T) {
-	// Frontmatter without think_level, mimicking an older session file.
+func TestLoadSessionMissingReasoningLevel(t *testing.T) {
+	// Frontmatter without reasoning_level, mimicking an older session file.
 	raw := []byte("---\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\n---\n")
 
 	data, err := parseSessionMarkdown(raw)
@@ -780,39 +780,39 @@ func TestLoadSessionMissingThinkLevel(t *testing.T) {
 		t.Fatalf("parseSessionMarkdown failed: %v", err)
 	}
 
-	if data.ThinkLevel != 1 {
-		t.Errorf("expected ThinkLevel=1 when think_level is absent from frontmatter, got %d", data.ThinkLevel)
+	if data.ReasoningLevel != 1 {
+		t.Errorf("expected ReasoningLevel=1 when reasoning_level is absent from frontmatter, got %d", data.ReasoningLevel)
 	}
 
-	// Also verify that an explicit think_level: 0 is preserved.
-	raw2 := []byte("---\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\nthink_level: 0\n---\n")
+	// Also verify that an explicit reasoning_level: 0 is preserved.
+	raw2 := []byte("---\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\nreasoning_level: 0\n---\n")
 
 	data2, err := parseSessionMarkdown(raw2)
 	if err != nil {
 		t.Fatalf("parseSessionMarkdown failed: %v", err)
 	}
 
-	if data2.ThinkLevel != 0 {
-		t.Errorf("expected ThinkLevel=0 when think_level is explicitly 0, got %d", data2.ThinkLevel)
+	if data2.ReasoningLevel != 0 {
+		t.Errorf("expected ReasoningLevel=0 when reasoning_level is explicitly 0, got %d", data2.ReasoningLevel)
 	}
 }
 
-// TestLoadSessionInvalidThinkLevel verifies that out-of-range think_level
+// TestLoadSessionInvalidReasoningLevel verifies that out-of-range reasoning_level
 // values in the session file are reset to the default (1) rather than being
 // passed through to the provider.
-func TestLoadSessionInvalidThinkLevel(t *testing.T) {
+func TestLoadSessionInvalidReasoningLevel(t *testing.T) {
 	tests := []struct {
 		name  string
 		value string
 		want  int
 	}{
-		{"negative", "think_level: -1", 1},
-		{"too high", "think_level: 3", 1},
-		{"large positive", "think_level: 999", 1},
-		{"large negative", "think_level: -100", 1},
-		{"valid zero", "think_level: 0", 0},
-		{"valid one", "think_level: 1", 1},
-		{"valid two", "think_level: 2", 2},
+		{"negative", "reasoning_level: -1", 1},
+		{"too high", "reasoning_level: 3", 1},
+		{"large positive", "reasoning_level: 999", 1},
+		{"large negative", "reasoning_level: -100", 1},
+		{"valid zero", "reasoning_level: 0", 0},
+		{"valid one", "reasoning_level: 1", 1},
+		{"valid two", "reasoning_level: 2", 2},
 	}
 
 	for _, tt := range tests {
@@ -824,8 +824,8 @@ func TestLoadSessionInvalidThinkLevel(t *testing.T) {
 				t.Fatalf("parseSessionMarkdown failed: %v", err)
 			}
 
-			if data.ThinkLevel != tt.want {
-				t.Errorf("think_level=%s: expected %d, got %d", tt.value, tt.want, data.ThinkLevel)
+			if data.ReasoningLevel != tt.want {
+				t.Errorf("reasoning_level=%s: expected %d, got %d", tt.value, tt.want, data.ReasoningLevel)
 			}
 		})
 	}

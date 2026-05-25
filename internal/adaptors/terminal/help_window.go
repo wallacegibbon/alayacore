@@ -74,7 +74,7 @@ func buildHelpItems() []HelpItem {
 		{Key: ":cancel", Description: "Cancel current task", Type: HelpItemCommand},
 		{Key: ":cancel_all", Description: "Cancel all & clear queue", Type: HelpItemCommand},
 		{Key: ":summarize", Description: "Summarize conversation", Type: HelpItemCommand},
-		{Key: ":think", Description: "Set think level (0/1/2)", Type: HelpItemCommand},
+		{Key: ":reason", Description: "Set reasoning level (0/1/2)", Type: HelpItemCommand},
 		{Key: ":save", Description: "Save session", Type: HelpItemCommand},
 		{Key: ":quit", Description: "Exit application", Type: HelpItemCommand},
 		{Key: ":model_set", Description: "Switch model by ID", Type: HelpItemCommand},
