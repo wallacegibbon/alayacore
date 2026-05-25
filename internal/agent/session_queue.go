@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/alayacore/alayacore/internal/llm"
+	"github.com/alayacore/alayacore/internal/stream"
 )
 
 // ============================================================================
@@ -143,11 +144,19 @@ func (s *Session) autoSaveIfEnabled() {
 	s.sendEvent(taskEvent{typ: eventSaveRequest})
 }
 
+// cancelMessage is inserted into the conversation history and displayed in the
+// message window when a task is canceled by the user.
+const cancelMessage = "The user canceled."
+
 func (s *Session) appendCancelMessage() {
 	s.Messages = append(s.Messages, llm.Message{
 		Role:    llm.RoleAssistant,
-		Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "The user canceled."}},
+		Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: cancelMessage}},
 	})
+	// Also push to the output so the cancel message appears live in the UI,
+	// matching the behavior on session restore where TLV chunks are replayed.
+	_ = stream.WriteTLV(s.Output, stream.TagTextAssistant, cancelMessage) //nolint:errcheck // best-effort write to adaptor
+	s.Output.Flush()
 }
 
 // ============================================================================
