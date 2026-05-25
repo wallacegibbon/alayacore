@@ -157,7 +157,7 @@ type Input interface {
 //
 // IMPORTANT: Implementations MUST be safe for concurrent use.
 // The session writes to Output from two goroutines:
-//   - taskRunner  (via processPrompt callbacks, writeGapped, etc.)
+//   - taskRunner  (via processPrompt callbacks, writeTLVStr, etc.)
 //   - readFromInput (via immediate command handlers)
 //
 // Both goroutines may call Write/WriteString/Flush concurrently.

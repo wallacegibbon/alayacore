@@ -21,23 +21,23 @@ import (
 // ============================================================================
 
 func (s *Session) signalPromptStart(prompt string) {
-	s.writeGapped(stream.TagTextUser, prompt)
+	s.writeTLVStr(stream.TagTextUser, prompt)
 }
 
 func (s *Session) writeError(msg string) {
-	s.writeGapped(stream.TagSystemError, msg)
+	s.writeTLVStr(stream.TagSystemError, msg)
 }
 
 func (s *Session) writeNotify(msg string) {
-	s.writeGapped(stream.TagSystemNotify, msg)
+	s.writeTLVStr(stream.TagSystemNotify, msg)
 }
 
 func (s *Session) writeNotifyf(format string, args ...any) {
 	s.writeNotify(fmt.Sprintf(format, args...))
 }
 
-// writeGapped writes a string TLV frame and flushes. Best effort — errors are ignored.
-func (s *Session) writeGapped(tag string, msg string) {
+// writeTLVStr writes a string TLV frame and flushes. Best effort — errors are ignored.
+func (s *Session) writeTLVStr(tag string, msg string) {
 	if s.Output == nil {
 		return
 	}
@@ -84,7 +84,7 @@ func (s *Session) writeToolOutput(toolCallID string, output string) {
 }
 
 func (s *Session) writeToolResult(toolCallID string, status string) {
-	s.writeGapped(stream.TagFunctionState, stream.WrapDelta(toolCallID, status))
+	s.writeTLVStr(stream.TagFunctionState, stream.WrapDelta(toolCallID, status))
 }
 
 // ============================================================================
