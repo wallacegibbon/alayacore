@@ -58,6 +58,7 @@ If you connect directly to the Anthropic API and want prompt caching, place a pr
 | [Plain IO Mode](docs/plainio.md) | stdin/stdout for scripts and pipes |
 | [Skills System](docs/skills.md) | Agent Skills specification, directory structure, SKILL.md format |
 | [Architecture](docs/architecture.md) | Layered architecture, TLV protocol, data flow, design decisions |
+| [Step Messages](docs/step-messages.md) | Message structure within an agentic step (assistant + tool results) |
 
 ## License
 
