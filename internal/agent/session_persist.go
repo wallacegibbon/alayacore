@@ -169,11 +169,7 @@ func parseSessionMeta(frontmatter string) SessionMeta {
 	// Default reasoning_level to 1 (normal) when the key is absent from the
 	// frontmatter.  config.ParseKeyValue leaves the field at its zero value
 	// (0) when the key is missing, which would incorrectly disable reasoning.
-	// Also checks for the legacy "think_level" key for backward compatibility
-	// with session files created before the rename.
-	hasReasoningKey := strings.Contains(frontmatter, "reasoning_level:")
-	hasLegacyThinkKey := strings.Contains(frontmatter, "think_level:")
-	if !hasReasoningKey && !hasLegacyThinkKey {
+	if !strings.Contains(frontmatter, "reasoning_level:") {
 		meta.ReasoningLevel = config.DefaultReasoningLevel
 	}
 
