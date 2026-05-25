@@ -32,11 +32,12 @@ func (s *Session) run() {
 	defer close(s.runDone)
 	defer s.sessionCancel()
 
-	// runMessages is the run() goroutine's authoritative copy of messages.
+	// runMessages is the run() goroutine's copy of the conversation history.
 	// The task goroutine has its own working copy (s.Messages). At task
 	// start, runMessages is copied to s.Messages. During task execution,
-	// the task goroutine sends state changes via stateCh, which update
-	// runMessages. Between tasks, runMessages is the source of truth.
+	// OnStepFinish sends the agent's allMessages (full history) via
+	// eventStepFinish, which replaces runMessages entirely.
+	// Between tasks, runMessages is the source of truth.
 	//
 	// When restoring from a session (RestoreFromSession), s.Messages
 	// already contains the loaded history — initialize runMessages from
@@ -130,6 +131,11 @@ func (s *Session) tryStartNextTask(runMessages *[]llm.Message) bool {
 
 // handleTaskDone processes a task completion signal from the task goroutine.
 // It marks the task as finished, syncs messages, and auto-saves if configured.
+//
+// runMessages is already kept in sync during the task via eventStepFinish
+// (which carries allMessages from the agent). The sync from s.Messages
+// below serves as a final safety net for error/cancel cases where the
+// last OnStepFinish might not have been called.
 func (s *Session) handleTaskDone(runMessages *[]llm.Message) {
 	// Mark the task as finished so the next queue item can start.
 	s.inProgress = false
@@ -179,7 +185,7 @@ func (s *Session) handleTaskEvent(ev taskEvent, runMessages *[]llm.Message) {
 
 	case eventStepFinish:
 		if len(ev.messages) > 0 {
-			*runMessages = append(*runMessages, ev.messages...)
+			*runMessages = ev.messages // allMessages from agent — full history
 		}
 		s.TotalSpent.InputTokens += ev.inputTokens
 		s.TotalSpent.OutputTokens += ev.outputTokens

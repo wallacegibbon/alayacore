@@ -87,9 +87,10 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) (int
 			return nil
 		},
 		OnStepFinish: func(messages []llm.Message, usage llm.Usage) error {
-			// Update local working copy.
+			// messages is allMessages (full history) from the agent.
+			// Replace s.Messages directly — no append needed.
 			if len(messages) > 0 {
-				s.Messages = append(s.Messages, messages...)
+				s.Messages = messages
 			}
 
 			// Send event to run() so it updates runMessages and totals.

@@ -2,10 +2,11 @@ package llm
 
 // Agent Tool-Calling Gotchas:
 //
-// 1. TOOL RESULT MESSAGE ORDERING: OnStepFinish callback receives complete step messages.
-//    For tool-using steps, this includes both the assistant message (with tool calls) AND
-//    the tool result message. The OnToolResult callback should only send UI notifications,
-//    not append to session messages - the agent loop handles message assembly.
+// 1. ONSTEPFINISH RECEIVES FULL HISTORY: OnStepFinish callback receives
+//    the complete allMessages slice (full conversation history), not just
+//    the current step's messages. The session layer replaces its state
+//    from this rather than appending increments. OnToolResult should only
+//    send UI notifications, not append to session messages.
 //
 // 2. INCOMPLETE TOOL CALLS ON CANCEL: When user cancels mid-tool-call, messages may have
 //    tool_use without matching tool_result. Clean up these orphaned tool uses before the
@@ -64,7 +65,13 @@ type StreamCallbacks struct {
 	OnStepFinish     func(messages []Message, usage Usage) error
 }
 
-// StreamResult is the final result of streaming
+// StreamResult is the final result of streaming.
+// Messages is the full conversation history (allMessages).
+// Usage is the total token usage summed across all steps.
+//
+// Note: Both fields are also available per-step via OnStepFinish callback.
+// StreamResult serves as a convenience return for callers that don't use
+// the callback or want a final summary after Stream() returns.
 type StreamResult struct {
 	Messages []Message
 	Usage    Usage
@@ -73,6 +80,12 @@ type StreamResult struct {
 // Stream executes the agent with streaming callbacks
 func (a *Agent) Stream(ctx context.Context, messages []Message, callbacks StreamCallbacks) (*StreamResult, error) {
 	var (
+		// allMessages accumulates the full conversation history across all steps.
+		// Initialized from the input messages, then extended each step with
+		// [assistantMsg] or [assistantMsg, toolResultMsg]. Passed to
+		// Provider.StreamMessages() on every iteration so the model sees
+		// the entire context. Also passed to OnStepFinish so the session
+		// layer receives the complete history (replaces, not appends).
 		allMessages = make([]Message, len(messages))
 		totalUsage  Usage
 		step        int
@@ -112,7 +125,10 @@ func (a *Agent) Stream(ctx context.Context, messages []Message, callbacks Stream
 			return nil, fmt.Errorf("provider stream failed: %w", err)
 		}
 
-		// Process events
+		// Process streaming events into step-level results.
+		// stepMessages: [assistant-msg] from provider's StepCompleteEvent.
+		// stepUsage: token usage, also from StepCompleteEvent.
+		// toolCalls: accumulated ToolCallEvent parts (empty for text-only).
 		stepMessages, stepUsage, toolCalls, err := a.processStreamEvents(events, callbacks)
 		if err != nil {
 			if !errors.Is(err, ErrResponseTruncated) {
@@ -126,16 +142,17 @@ func (a *Agent) Stream(ctx context.Context, messages []Message, callbacks Stream
 
 		// Truncation or no tool calls: finalize the step and stop
 		if truncErr != nil || len(toolCalls) == 0 {
+			allMessages = append(allMessages, stepMessages...)
 			if callbacks.OnStepFinish != nil {
-				if cbErr := callbacks.OnStepFinish(stepMessages, stepUsage); cbErr != nil {
+				if cbErr := callbacks.OnStepFinish(allMessages, stepUsage); cbErr != nil {
 					return nil, fmt.Errorf("OnStepFinish callback failed: %w", cbErr)
 				}
 			}
-			allMessages = append(allMessages, stepMessages...)
 			break
 		}
 
-		// Execute tools and continue the loop
+		// Execute tools, append results to allMessages, and fire OnStepFinish
+		// with the full updated history so the session can replace its state.
 		allMessages, err = a.executeToolStep(ctx, stepMessages, toolCalls, stepUsage, callbacks, allMessages)
 		if err != nil {
 			return nil, err
@@ -175,8 +192,9 @@ func (a *Agent) toolDefinitions() []ToolDefinition {
 	return defs
 }
 
-// executeToolStep runs tool calls, appends assistant + tool result messages,
-// and fires the OnStepFinish callback.
+// executeToolStep runs tool calls, appends assistant + tool result messages to
+// allMessages, then fires OnStepFinish(allMessages, stepUsage) so the callback
+// receives the full updated conversation history.
 func (a *Agent) executeToolStep(ctx context.Context, stepMessages []Message, toolCalls []ToolCallPart, stepUsage Usage, callbacks StreamCallbacks, allMessages []Message) ([]Message, error) {
 	toolResults := a.executeTools(ctx, toolCalls, callbacks)
 	toolResultMsg := Message{Role: RoleTool, Content: toolResults}
@@ -185,14 +203,11 @@ func (a *Agent) executeToolStep(ctx context.Context, stepMessages []Message, too
 		stepMessages = []Message{{Role: RoleAssistant, Content: toolCallsToContent(toolCalls)}}
 	}
 
-	allMessages = append(allMessages, stepMessages...)
+	allMessages = append(allMessages, stepMessages...) // stepMessages is always [assistantMsg], so stepMessages... == stepMessages[0]
 	allMessages = append(allMessages, toolResultMsg)
 
 	if callbacks.OnStepFinish != nil {
-		stepWithResults := make([]Message, len(stepMessages), len(stepMessages)+1)
-		copy(stepWithResults, stepMessages)
-		stepWithResults = append(stepWithResults, toolResultMsg)
-		if err := callbacks.OnStepFinish(stepWithResults, stepUsage); err != nil {
+		if err := callbacks.OnStepFinish(allMessages, stepUsage); err != nil {
 			return nil, fmt.Errorf("OnStepFinish callback failed: %w", err)
 		}
 	}
@@ -200,7 +215,10 @@ func (a *Agent) executeToolStep(ctx context.Context, stepMessages []Message, too
 	return allMessages, nil
 }
 
-// processStreamEvents handles streaming events from the provider
+// processStreamEvents iterates streaming events from the provider and returns
+// step-level results: [assistant-msg] from StepCompleteEvent (all content parts
+// accumulated), token usage, and toolCalls from ToolCallEvent events.
+// Returns ErrResponseTruncated if stop_reason is "max_tokens" or "length".
 func (a *Agent) processStreamEvents(events iter.Seq2[StreamEvent, error], callbacks StreamCallbacks) ([]Message, Usage, []ToolCallPart, error) {
 	var (
 		stepMessages []Message
@@ -243,6 +261,11 @@ func (a *Agent) processStreamEvents(events iter.Seq2[StreamEvent, error], callba
 			}
 
 		case StepCompleteEvent:
+			// Final provider event. e.Messages[0] has all content
+			// (text, reasoning, tool calls) accumulated into one assistant msg.
+			// The ToolCallParts here are HISTORY for the next API call.
+			// Tool EXECUTION happens later in executeToolStep, driven by
+			// the toolCalls slice collected from ToolCallEvent above.
 			stepMessages = e.Messages
 			stepUsage = e.Usage
 			if e.StopReason == "max_tokens" || e.StopReason == "length" {

@@ -157,7 +157,16 @@ type ToolCallEvent struct {
 
 func (ToolCallEvent) isStreamEvent() {}
 
-// StepCompleteEvent represents completion of an agentic step
+// StepCompleteEvent represents completion of an agentic step.
+// The provider emits this as the final event after accumulating all streaming
+// deltas. Messages always contains a single assistant Message with role
+// RoleAssistant, containing all content parts (text, reasoning, tool calls)
+// built incrementally during streaming.
+//
+// Messages is []Message (not Message) for API consistency:
+// the agent loop extends this slice with tool result messages before
+// passing it to OnStepFinish, so callbacks receive either
+// [assistantMsg] or [assistantMsg, toolResultMsg] — both []Message.
 type StepCompleteEvent struct {
 	Messages   []Message
 	Usage      Usage

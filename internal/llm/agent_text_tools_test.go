@@ -58,12 +58,12 @@ func TestAgentPreservesTextWithToolCalls(t *testing.T) {
 	}
 
 	firstStep := allStepMessages[0]
-	// First step should have assistant message (with text + tool call) and tool result message
-	if len(firstStep) != 2 {
-		t.Fatalf("Expected 2 messages in first step (assistant + tool result), got %d", len(firstStep))
+	// allStepMessages[0] is allMessages (full history): [userMsg, assistantMsg, toolResultMsg]
+	if len(firstStep) != 3 {
+		t.Fatalf("Expected 3 messages in first step (user + assistant + tool result), got %d", len(firstStep))
 	}
 
-	assistantMsg := firstStep[0]
+	assistantMsg := firstStep[1]
 	if assistantMsg.Role != RoleAssistant {
 		t.Fatalf("Expected assistant message, got %s", assistantMsg.Role)
 	}
