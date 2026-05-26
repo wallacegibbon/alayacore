@@ -3,13 +3,10 @@ package terminal
 // Session state cache: status, models, and queue items written by the session
 // goroutine and read by the Bubble Tea goroutine for display updates.
 //
-// All access is protected by the embedded sync.Mutex so the two goroutines
-// never race. The locking order is:
-//
-//	outputWriter.mu → sessionState.mu    (session goroutine in handleSystemTag)
-//	WindowBuffer.mu  → sessionState.mu    (Bubble Tea goroutine in snapshots)
-//
-// See output.go for the full lock ordering design.
+// All access is protected by the embedded sync.Mutex. The two goroutines
+// never hold this lock simultaneously with WindowBuffer.mu — snapshot
+// methods and system-tag updates are exclusive paths. See output.go for
+// the full lock ordering design.
 
 import (
 	"sync"

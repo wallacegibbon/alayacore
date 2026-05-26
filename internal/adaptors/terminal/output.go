@@ -7,19 +7,26 @@ package terminal
 // expect it to work - the outer styling will not wrap the inner styled segments.
 // Always render segments separately, then join them.
 
-// LOCK ORDERING DESIGN:
+// LOCK ORDERING:
 //
-// outputWriter.mu protects only the raw TLV buffer and the
-// processBuffer() → writeColored() → windowBuffer call chain.
+// Three mutexes exist, but they are NEVER nested across goroutines:
 //
-// The sessionState embedded in outputWriter has its own mutex protecting
-// status/model/queue fields. Lock ordering across goroutines:
+//   outputWriter.mu  — protects the raw TLV buffer and processBuffer() call chain
+//   WindowBuffer.mu  — protects window data (windows slice, line heights)
+//   sessionState.mu  — protects status/model/queue snapshot fields
 //
-//   outputWriter.mu → sessionState.mu      (session goroutine)
-//   WindowBuffer.mu  → sessionState.mu      (Bubble Tea goroutine)
+// Session goroutine call paths (inside outputWriter.mu):
+//   outputWriter.mu → WindowBuffer.mu      (content tags, exclusive with sessionState)
+//   outputWriter.mu → sessionState.mu      (system data tags, exclusive with WindowBuffer)
 //
-// No path holds both outputWriter.mu and WindowBuffer.mu simultaneously
-// with sessionState.mu, so no deadlock is possible.
+// Bubble Tea goroutine call paths:
+//   WindowBuffer.mu  (via display update, tick — never nested with sessionState)
+//   sessionState.mu  (via snapshot methods — never nested with WindowBuffer)
+//
+// WindowBuffer.mu and sessionState.mu are NEVER held simultaneously — they
+// are acquired and released in separate, sequential calls. No deadlock is
+// possible since each goroutine only nests one additional lock under its
+// "root" lock (or no nesting at all for the Bubble Tea goroutine).
 
 import (
 	"encoding/binary"
