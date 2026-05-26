@@ -405,16 +405,3 @@ func (ms *ModelSelector) updateFilteredModels() {
 	ms.ScrollIdx = 0
 	ms.ClampSelection(len(ms.filteredModels))
 }
-
-// Bubble Tea interface (unused — routing goes through Terminal)
-func (ms *ModelSelector) Init() tea.Cmd { return nil }
-
-func (ms *ModelSelector) Update(_ tea.Msg) (tea.Model, tea.Cmd) {
-	if ms.State == FilteredListClosed {
-		return ms, nil
-	}
-	return ms, nil
-}
-
-// Ensure compile-time check
-var _ tea.Model = (*ModelSelector)(nil)

@@ -417,15 +417,3 @@ func (hw *HelpWindow) renderItem(item HelpItem, selected bool) string {
 func (hw *HelpWindow) RenderOverlay(baseContent string, screenWidth, screenHeight int) string {
 	return hw.FilteredListCore.RenderOverlay(baseContent, hw.View().Content, screenWidth, screenHeight)
 }
-
-// Bubble Tea interface (unused — routing goes through Terminal)
-func (hw *HelpWindow) Init() tea.Cmd { return nil }
-
-func (hw *HelpWindow) Update(_ tea.Msg) (tea.Model, tea.Cmd) {
-	if hw.State == FilteredListClosed {
-		return hw, nil
-	}
-	return hw, nil
-}
-
-var _ tea.Model = (*HelpWindow)(nil)
