@@ -14,7 +14,7 @@ func TestFoldIndicator(t *testing.T) {
 	wb.AppendToolCall("tool123", "test_tool", longContent)
 
 	// Set to folded mode
-	wb.Windows[0].Folded = true
+	wb.WindowAt(0).Folded = true
 
 	// Render the window
 	rendered := wb.GetAll(-1)

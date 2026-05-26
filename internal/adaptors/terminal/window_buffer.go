@@ -23,7 +23,7 @@ import (
 // lock ordering inversions. See output.go for details.
 type WindowBuffer struct {
 	mu          sync.Mutex
-	Windows     []*Window // public for tests
+	windows     []*Window
 	idIndex     map[string]int
 	width       int
 	styles      *Styles
@@ -50,7 +50,7 @@ const (
 // NewWindowBuffer creates a new window buffer with given width and styles.
 func NewWindowBuffer(width int, styles *Styles) *WindowBuffer {
 	return &WindowBuffer{
-		Windows:     []*Window{},
+		windows:     []*Window{},
 		idIndex:     make(map[string]int),
 		width:       width,
 		styles:      styles,
@@ -68,7 +68,7 @@ func (wb *WindowBuffer) SetWidth(width int) {
 	if wb.width != width {
 		wb.width = width
 		// Invalidate all windows
-		for _, w := range wb.Windows {
+		for _, w := range wb.windows {
 			w.Invalidate()
 		}
 		wb.dirty = true
@@ -91,7 +91,7 @@ func (wb *WindowBuffer) SetStyles(styles *Styles) {
 	wb.borderStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(styles.ColorDim).Padding(0, 1)
 	wb.cursorStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(styles.BorderCursor).Padding(0, 1)
 	// Invalidate all windows to pick up new styles
-	for _, w := range wb.Windows {
+	for _, w := range wb.windows {
 		w.styles = styles // Update window's styles reference
 		w.Invalidate()
 	}
@@ -107,7 +107,7 @@ func (wb *WindowBuffer) AppendOrUpdate(id string, tag string, content string) {
 	innerWidth := max(0, wb.width-BorderInnerPadding)
 
 	if idx, ok := wb.idIndex[id]; ok {
-		w := wb.Windows[idx]
+		w := wb.windows[idx]
 		// Separator between call and result for content-heavy tool windows.
 		if w.ToolName == "write_file" || w.ToolName == "edit_file" {
 			w.AppendContent("\n"+toolResultSentinel+"\n", innerWidth)
@@ -137,9 +137,9 @@ func (wb *WindowBuffer) AppendOrUpdate(id string, tag string, content string) {
 	if !w.IsToolWindow() {
 		w.Visible = hasVisibleContent(content)
 	}
-	wb.Windows = append(wb.Windows, w)
-	wb.idIndex[id] = len(wb.Windows) - 1
-	wb.markDirty(len(wb.Windows) - 1)
+	wb.windows = append(wb.windows, w)
+	wb.idIndex[id] = len(wb.windows) - 1
+	wb.markDirty(len(wb.windows) - 1)
 }
 
 // AppendToolCall adds a tool call window with tool name.
@@ -150,7 +150,7 @@ func (wb *WindowBuffer) AppendToolCall(id string, toolName string, content strin
 	defer wb.mu.Unlock()
 
 	if idx, ok := wb.idIndex[id]; ok {
-		w := wb.Windows[idx]
+		w := wb.windows[idx]
 		// Replace content — the window was pre-created by a ToolCallStart event;
 		// now we have the full tool call content.
 		w.ReplaceContent(content)
@@ -167,9 +167,9 @@ func (wb *WindowBuffer) AppendToolCall(id string, toolName string, content strin
 		Visible:  true, // Tool windows are always visible
 		styles:   wb.styles,
 	}
-	wb.Windows = append(wb.Windows, w)
-	wb.idIndex[id] = len(wb.Windows) - 1
-	wb.markDirty(len(wb.Windows) - 1)
+	wb.windows = append(wb.windows, w)
+	wb.idIndex[id] = len(wb.windows) - 1
+	wb.markDirty(len(wb.windows) - 1)
 }
 
 // markDirty marks that line heights need rebuilding.
@@ -199,7 +199,7 @@ func (wb *WindowBuffer) markDirty(idx int) {
 func (wb *WindowBuffer) Clear() {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
-	wb.Windows = nil
+	wb.windows = nil
 	wb.idIndex = make(map[string]int)
 	wb.lineHeights = nil
 	wb.totalLines = 0
@@ -211,7 +211,32 @@ func (wb *WindowBuffer) Clear() {
 func (wb *WindowBuffer) GetWindowCount() int {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
-	return len(wb.Windows)
+	return len(wb.windows)
+}
+
+// WindowCount returns the number of windows (alias for GetWindowCount).
+func (wb *WindowBuffer) WindowCount() int {
+	return wb.GetWindowCount()
+}
+
+// WindowAt returns the window at the given index, or nil if out of bounds.
+func (wb *WindowBuffer) WindowAt(index int) *Window {
+	wb.mu.Lock()
+	defer wb.mu.Unlock()
+	if index < 0 || index >= len(wb.windows) {
+		return nil
+	}
+	return wb.windows[index]
+}
+
+// AllWindows returns a copy of the windows slice for snapshotting.
+// The returned slice contains the same *Window pointers (no deep copy).
+func (wb *WindowBuffer) AllWindows() []*Window {
+	wb.mu.Lock()
+	defer wb.mu.Unlock()
+	result := make([]*Window, len(wb.windows))
+	copy(result, wb.windows)
+	return result
 }
 
 // GetVisibleWindowCount returns the number of visible windows.
@@ -219,7 +244,7 @@ func (wb *WindowBuffer) GetVisibleWindowCount() int {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 	count := 0
-	for _, w := range wb.Windows {
+	for _, w := range wb.windows {
 		if w.Visible {
 			count++
 		}
@@ -231,10 +256,10 @@ func (wb *WindowBuffer) GetVisibleWindowCount() int {
 func (wb *WindowBuffer) GetWindow(index int) *Window {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
-	if index < 0 || index >= len(wb.Windows) {
+	if index < 0 || index >= len(wb.windows) {
 		return nil
 	}
-	return wb.Windows[index]
+	return wb.windows[index]
 }
 
 // ToggleFold toggles the fold state of a window.
@@ -242,10 +267,10 @@ func (wb *WindowBuffer) ToggleFold(windowIndex int) bool {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 
-	if windowIndex < 0 || windowIndex >= len(wb.Windows) {
+	if windowIndex < 0 || windowIndex >= len(wb.windows) {
 		return false
 	}
-	wb.Windows[windowIndex].Folded = !wb.Windows[windowIndex].Folded
+	wb.windows[windowIndex].Folded = !wb.windows[windowIndex].Folded
 	wb.markDirty(windowIndex)
 	return true
 }
@@ -256,11 +281,11 @@ func (wb *WindowBuffer) GetWindowContent(windowIndex int) string {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 
-	if windowIndex < 0 || windowIndex >= len(wb.Windows) {
+	if windowIndex < 0 || windowIndex >= len(wb.windows) {
 		return ""
 	}
 
-	return wb.Windows[windowIndex].Content
+	return wb.windows[windowIndex].Content
 }
 
 // UpdateToolStatus updates the status indicator for a tool window.
@@ -269,7 +294,7 @@ func (wb *WindowBuffer) UpdateToolStatus(toolCallID string, status ToolStatus) {
 	defer wb.mu.Unlock()
 
 	if idx, ok := wb.idIndex[toolCallID]; ok {
-		w := wb.Windows[idx]
+		w := wb.windows[idx]
 		w.Status = status
 		w.Invalidate()
 		if status == ToolStatusSuccess || status == ToolStatusError {
@@ -288,18 +313,18 @@ func (wb *WindowBuffer) UpdateToolStatus(toolCallID string, status ToolStatus) {
 // ensureLineHeights rebuilds line heights if dirty.
 // Supports incremental update when only one window changed.
 func (wb *WindowBuffer) ensureLineHeights() {
-	if !wb.dirty && len(wb.lineHeights) == len(wb.Windows) {
+	if !wb.dirty && len(wb.lineHeights) == len(wb.windows) {
 		return
 	}
 
 	// Extend lineHeights slice if needed
-	for len(wb.lineHeights) < len(wb.Windows) {
+	for len(wb.lineHeights) < len(wb.windows) {
 		wb.lineHeights = append(wb.lineHeights, 0)
 	}
 
 	// Incremental update: only re-render the dirty window
-	if wb.dirtyIndex >= 0 && wb.dirtyIndex < len(wb.Windows) {
-		w := wb.Windows[wb.dirtyIndex]
+	if wb.dirtyIndex >= 0 && wb.dirtyIndex < len(wb.windows) {
+		w := wb.windows[wb.dirtyIndex]
 		// Only render and count lines for visible windows
 		if w.Visible {
 			w.Render(wb.width, false, wb.styles, wb.borderStyle, wb.cursorStyle)
@@ -316,7 +341,7 @@ func (wb *WindowBuffer) ensureLineHeights() {
 	} else {
 		// Full rebuild (dirtyIndex == dirtyFullRebuild or first init)
 		wb.totalLines = 0
-		for i, w := range wb.Windows {
+		for i, w := range wb.windows {
 			// Only render and count lines for visible windows
 			if w.Visible {
 				w.Render(wb.width, false, wb.styles, wb.borderStyle, wb.cursorStyle)
@@ -393,7 +418,7 @@ func (wb *WindowBuffer) ForEachVisible(start int, fn func(i int, w *Window) bool
 	defer wb.mu.Unlock()
 	wb.ensureLineHeights()
 
-	for i, w := range wb.Windows {
+	for i, w := range wb.windows {
 		if i >= start && w.Visible && !fn(i, w) {
 			return false
 		}
@@ -408,15 +433,15 @@ func (wb *WindowBuffer) ForEachVisibleBackward(start int, fn func(i int, w *Wind
 	defer wb.mu.Unlock()
 	wb.ensureLineHeights()
 
-	if start >= len(wb.Windows) {
-		start = len(wb.Windows) - 1
+	if start >= len(wb.windows) {
+		start = len(wb.windows) - 1
 	}
 	if start < 0 {
 		return true
 	}
 
 	for i := start; i >= 0; i-- {
-		if wb.Windows[i].Visible && !fn(i, wb.Windows[i]) {
+		if wb.windows[i].Visible && !fn(i, wb.windows[i]) {
 			return false
 		}
 	}
@@ -435,7 +460,7 @@ func (wb *WindowBuffer) ForEachVisibleRanged(fn func(i int, startLine, endLine i
 	wb.ensureLineHeights()
 
 	pos := 0
-	for i, w := range wb.Windows {
+	for i, w := range wb.windows {
 		end := pos + wb.lineHeights[i]
 		if w.Visible && !fn(i, pos, end) {
 			return false
@@ -462,9 +487,9 @@ func (wb *WindowBuffer) ForEachVisibleBackwardRanged(fn func(i int, startLine, e
 
 	// Pass 2: walk backward, deriving start/end from total
 	pos := total
-	for i := len(wb.Windows) - 1; i >= 0; i-- {
+	for i := len(wb.windows) - 1; i >= 0; i-- {
 		pos -= wb.lineHeights[i]
-		if wb.Windows[i].Visible && !fn(i, pos, pos+wb.lineHeights[i]) {
+		if wb.windows[i].Visible && !fn(i, pos, pos+wb.lineHeights[i]) {
 			return false
 		}
 	}
@@ -475,7 +500,7 @@ func (wb *WindowBuffer) ForEachVisibleBackwardRanged(fn func(i int, startLine, e
 func (wb *WindowBuffer) FirstVisibleIndex() int {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
-	for i, w := range wb.Windows {
+	for i, w := range wb.windows {
 		if w.Visible {
 			return i
 		}
@@ -487,8 +512,8 @@ func (wb *WindowBuffer) FirstVisibleIndex() int {
 func (wb *WindowBuffer) LastVisibleIndex() int {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
-	for i := len(wb.Windows) - 1; i >= 0; i-- {
-		if wb.Windows[i].Visible {
+	for i := len(wb.windows) - 1; i >= 0; i-- {
+		if wb.windows[i].Visible {
 			return i
 		}
 	}
@@ -501,7 +526,7 @@ func (wb *WindowBuffer) LastVisibleIndex() int {
 func (wb *WindowBuffer) NearestVisibleIndex(index int) int {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
-	n := len(wb.Windows)
+	n := len(wb.windows)
 	if n == 0 {
 		return -1
 	}
@@ -514,12 +539,12 @@ func (wb *WindowBuffer) NearestVisibleIndex(index int) int {
 	}
 	// Search forward first, then backward
 	for i := index; i < n; i++ {
-		if wb.Windows[i].Visible {
+		if wb.windows[i].Visible {
 			return i
 		}
 	}
 	for i := index - 1; i >= 0; i-- {
-		if wb.Windows[i].Visible {
+		if wb.windows[i].Visible {
 			return i
 		}
 	}
@@ -543,7 +568,7 @@ func (wb *WindowBuffer) GetAll(cursorIndex int) string {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 
-	if len(wb.Windows) == 0 {
+	if len(wb.windows) == 0 {
 		return ""
 	}
 
@@ -576,13 +601,13 @@ func (wb *WindowBuffer) renderVirtual(cursorIndex int) string {
 	// Add extra buffer windows
 	bufferWindows := 5
 	startWindow = max(0, startWindow-bufferWindows)
-	endWindow = min(len(wb.Windows)-1, endWindow+bufferWindows)
+	endWindow = min(len(wb.windows)-1, endWindow+bufferWindows)
 
 	var sb strings.Builder
 	firstWritten := false
-	for i := range wb.Windows {
+	for i := range wb.windows {
 		// Skip non-visible windows entirely
-		if !wb.Windows[i].Visible {
+		if !wb.windows[i].Visible {
 			continue
 		}
 
@@ -592,7 +617,7 @@ func (wb *WindowBuffer) renderVirtual(cursorIndex int) string {
 
 		if i >= startWindow && i <= endWindow {
 			// Render actual content
-			sb.WriteString(wb.Windows[i].Render(wb.width, cursorIndex == i, wb.styles, wb.borderStyle, wb.cursorStyle))
+			sb.WriteString(wb.windows[i].Render(wb.width, cursorIndex == i, wb.styles, wb.borderStyle, wb.cursorStyle))
 		} else {
 			// Render placeholder (blank lines)
 			for j := 0; j < wb.lineHeights[i]; j++ {
@@ -611,7 +636,7 @@ func (wb *WindowBuffer) renderVirtual(cursorIndex int) string {
 func (wb *WindowBuffer) renderAll(cursorIndex int) string {
 	var sb strings.Builder
 	firstWritten := false
-	for i, w := range wb.Windows {
+	for i, w := range wb.windows {
 		// Skip non-visible windows entirely
 		if !w.Visible {
 			continue
@@ -635,7 +660,7 @@ func (wb *WindowBuffer) findWindowAtLine(line int) int {
 		}
 		current += h
 	}
-	return len(wb.Windows) - 1
+	return len(wb.windows) - 1
 }
 
 // RenderWindowContent renders the content of a window (for testing).

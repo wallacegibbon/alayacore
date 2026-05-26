@@ -87,7 +87,7 @@ func TestWindowRenderCaching(t *testing.T) {
 
 	// Add content
 	wb.AppendOrUpdate("test", "assistant", "Hello world")
-	w := wb.Windows[0]
+	w := wb.WindowAt(0)
 
 	// First render - should populate cache
 	styles := DefaultStyles()
@@ -115,7 +115,7 @@ func TestWindowRenderCacheInvalidation(t *testing.T) {
 
 	// Add content and render
 	wb.AppendOrUpdate("test", "assistant", "Hello")
-	w := wb.Windows[0]
+	w := wb.WindowAt(0)
 
 	styles := DefaultStyles()
 	borderStyle := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(styles.ColorDim).Padding(0, 1)

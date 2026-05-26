@@ -287,7 +287,7 @@ func BenchmarkStreamingUpdateWithoutIncremental(b *testing.B) {
 		// Force full re-wrap by invalidating wrappedLines BEFORE append
 		wb.mu.Lock()
 		if idx, ok := wb.idIndex[streamID]; ok {
-			wb.Windows[idx].cache.wrappedLines = nil
+			wb.WindowAt(idx).cache.wrappedLines = nil
 		}
 		wb.mu.Unlock()
 
@@ -381,7 +381,7 @@ func BenchmarkStreamingDebug(_ *testing.B) {
 	wb.AppendOrUpdate(streamID, "TA", strings.Repeat("Line ", 10))
 	_ = wb.GetTotalLines()
 
-	w := wb.Windows[0]
+	w := wb.WindowAt(0)
 	fmt.Printf("Initial: wrappedLines=%d, Content=%d, cache.contentLen=%d\n",
 		len(w.cache.wrappedLines), len(w.Content), w.cache.contentLen)
 
@@ -428,7 +428,7 @@ func BenchmarkSingleWindowStreamingDebug(b *testing.B) {
 	_ = wb.GetTotalLines()
 
 	// Check initial state
-	w := wb.Windows[0]
+	w := wb.WindowAt(0)
 	fmt.Printf("Initial: wrappedLines=%d, content=%q, cache.valid=%v\n",
 		len(w.cache.wrappedLines), w.Content, w.cache.valid)
 
@@ -467,7 +467,7 @@ func BenchmarkLongContentStreaming(b *testing.B) {
 	wb.AppendOrUpdate(streamID, "TA", strings.Repeat("This is a line that will wrap. ", 10))
 	_ = wb.GetTotalLines()
 
-	w := wb.Windows[0]
+	w := wb.WindowAt(0)
 	fmt.Printf("Initial: wrappedLines=%d, contentLen=%d, styles=%v\n",
 		len(w.cache.wrappedLines), len(w.Content), w.styles != nil)
 

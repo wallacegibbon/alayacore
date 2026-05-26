@@ -344,7 +344,7 @@ func TestVeryLongContentStreaming(t *testing.T) {
 
 	t.Logf("\n=== Very Long Content Streaming Profile ===")
 	t.Logf("Windows: 51 (50 history + 1 streaming)")
-	t.Logf("Streaming window content: ~%d chars", len(wb.Windows[50].Content))
+	t.Logf("Streaming window content: ~%d chars", len(wb.WindowAt(50).Content))
 	t.Logf("Average render time: %v", avgTime)
 	t.Logf("Min render time: %v", minTime)
 	t.Logf("Max render time: %v", maxTime)

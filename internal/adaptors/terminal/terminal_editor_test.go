@@ -528,7 +528,7 @@ func TestWindowBufferDeltaRouting(t *testing.T) {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
 	// Check window count
-	windows := out.windowBuffer.Windows
+	windows := out.windowBuffer.AllWindows()
 	if len(windows) != 2 {
 		t.Errorf("Expected 2 windows, got %d", len(windows))
 	}
@@ -607,7 +607,7 @@ func TestWindowBufferNonDeltaMessages(t *testing.T) {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
 	// Check that two separate windows were created
-	windows := out.windowBuffer.Windows
+	windows := out.windowBuffer.AllWindows()
 	if len(windows) != 2 {
 		t.Errorf("Expected 2 windows for non-delta messages, got %d", len(windows))
 	}
@@ -632,7 +632,7 @@ func TestWindowBufferEdgeCases(t *testing.T) {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
 	// Should create a new window with generated ID
-	windows := out.windowBuffer.Windows
+	windows := out.windowBuffer.AllWindows()
 	if len(windows) != 1 {
 		t.Errorf("Expected 1 window, got %d", len(windows))
 	}
@@ -650,7 +650,7 @@ func TestWindowBufferEdgeCases(t *testing.T) {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
 	// Should have three windows total
-	windows = out.windowBuffer.Windows
+	windows = out.windowBuffer.AllWindows()
 	if len(windows) != 3 {
 		t.Errorf("Expected 3 windows, got %d", len(windows))
 	}

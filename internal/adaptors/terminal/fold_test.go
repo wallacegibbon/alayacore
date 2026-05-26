@@ -18,7 +18,7 @@ func TestSpaceKeyTogglesFold(t *testing.T) {
 	terminal.display.SetWindowCursor(0)
 
 	// Verify window is not folded initially
-	windows := terminal.out.WindowBuffer().Windows
+	windows := terminal.out.WindowBuffer().AllWindows()
 	if len(windows) == 0 {
 		t.Fatal("No windows created")
 	}
@@ -102,7 +102,7 @@ func TestSpaceKeyDoesNothingWithNoWindow(t *testing.T) {
 	}
 
 	// No windows should be created
-	windows := terminal.out.WindowBuffer().Windows
+	windows := terminal.out.WindowBuffer().AllWindows()
 	if len(windows) != 0 {
 		t.Errorf("Expected no windows, got %d", len(windows))
 	}
