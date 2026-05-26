@@ -378,20 +378,6 @@ func (wb *WindowBuffer) GetWindowLineRange(windowIndex int) (start, end int) {
 	return start, start + wb.lineHeights[windowIndex]
 }
 
-// GetWindowStartLine returns the starting line number for a window.
-// Deprecated: use GetWindowLineRange instead.
-func (wb *WindowBuffer) GetWindowStartLine(windowIndex int) int {
-	start, _ := wb.GetWindowLineRange(windowIndex)
-	return start
-}
-
-// GetWindowEndLine returns the ending line number for a window.
-// Deprecated: use GetWindowLineRange instead.
-func (wb *WindowBuffer) GetWindowEndLine(windowIndex int) int {
-	_, end := wb.GetWindowLineRange(windowIndex)
-	return end
-}
-
 // GetTotalLines returns total lines across all windows.
 func (wb *WindowBuffer) GetTotalLines() int {
 	wb.mu.Lock()

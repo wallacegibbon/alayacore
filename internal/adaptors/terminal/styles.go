@@ -176,8 +176,8 @@ func NewStyles(theme *Theme) *Styles {
 	}
 }
 
-// DefaultStyles returns the default styling configuration
-// Deprecated: Use NewStyles with a Theme instead
+// DefaultStyles returns the default styling configuration.
+// This is a convenience wrapper around NewStyles(DefaultTheme()).
 func DefaultStyles() *Styles {
 	return NewStyles(DefaultTheme())
 }

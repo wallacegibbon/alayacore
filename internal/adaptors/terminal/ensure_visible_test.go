@@ -388,7 +388,7 @@ func TestScrollCursorToTop_PositionsWindowAtTop(t *testing.T) {
 	display.updateContent()
 
 	// Verify the window is visible but NOT necessarily at the top
-	startLine := wb.GetWindowStartLine(8)
+	startLine, _ := wb.GetWindowLineRange(8)
 	viewportTop := display.viewport.YOffset()
 	t.Logf("Before ScrollCursorToTop: startLine=%d, viewportTop=%d", startLine, viewportTop)
 
