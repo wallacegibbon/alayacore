@@ -406,7 +406,7 @@ func (s *Session) handleInputMsg(msg inputMsg) {
 		cmd := msg.text
 		// Immediate commands are handled directly; deferred commands
 		// go through the task queue.
-		if isCommandImmediate(cmd) {
+		if IsImmediate(cmd) {
 			s.handleCommand(context.Background(), cmd)
 		} else {
 			s.submitDeferredCommand(cmd)
@@ -414,20 +414,4 @@ func (s *Session) handleInputMsg(msg inputMsg) {
 	} else {
 		s.submitTask(UserPrompt{Text: msg.text})
 	}
-}
-
-// isCommandImmediate returns true if the command should be handled immediately
-// without queuing. Immediate commands are those that control task execution
-// (cancel, continue) or query/modify session state (model_load, taskqueue operations).
-func isCommandImmediate(cmd string) bool {
-	// Extract the command name (first word) for commands that accept arguments.
-	name := cmd
-	if idx := strings.IndexByte(cmd, ' '); idx >= 0 {
-		name = cmd[:idx]
-	}
-	switch name {
-	case commandNameCancel, commandNameCancelAll, commandNameModelLoad, commandNameTaskQueueGetAll, commandNameTaskQueueEdit, commandNameReason, commandNameSave:
-		return true
-	}
-	return strings.HasPrefix(cmd, commandNameTaskQueueDel+" ") || strings.HasPrefix(cmd, commandNameModelSet+" ") || strings.HasPrefix(cmd, commandNameThemeSet+" ")
 }

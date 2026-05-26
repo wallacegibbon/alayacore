@@ -23,29 +23,47 @@ const (
 	commandNameThemeSet        = "theme_set"
 )
 
-// Command describes a user-facing colon-command.  This is a pure metadata
-// type — actual dispatch lives in Session.dispatchCommand.
+// CommandHandler is a function that handles a colon-command.
+// The session, context, and parsed arguments are passed in.
+// Unused parameters can be ignored by the handler.
+type CommandHandler func(s *Session, ctx context.Context, args []string)
+
+// Command describes a user-facing colon-command with its handler and metadata.
 type Command struct {
-	Name        string // Command name (without colon)
-	Description string // Short description for help
-	Usage       string // Usage example (e.g. "<id>")
+	Name        string         // Command name (without colon)
+	Description string         // Short description for help
+	Usage       string         // Usage example (e.g. "<id>")
+	Immediate   bool           // True if handled immediately (not queued)
+	Handler     CommandHandler // The handler function
 }
 
 // commandDefs is the single source of truth for all colon-commands.
 // Order here determines the order used by LookupCommand iteration.
 var commandDefs = []Command{
-	{commandNameSummarize, "Summarize the conversation to reduce context", ""},
-	{commandNameCancel, "Cancel the current task", ""},
-	{commandNameCancelAll, "Cancel current task and clear the task queue", ""},
-	{commandNameContinue, "Resume after an error; without args retries the prompt, with 'skip' skips it", "[skip]"},
-	{commandNameSave, "Save the current session", "[filename]"},
-	{commandNameModelSet, "Switch to a different model", "<id>"},
-	{commandNameModelLoad, "Reload models from configuration file", ""},
-	{commandNameTaskQueueGetAll, "List all queued tasks", ""},
-	{commandNameTaskQueueDel, "Delete a queued task", "<queue_id>"},
-	{commandNameTaskQueueEdit, "Edit a queued task's content", "<queue_id> <new_content>"},
-	{commandNameReason, "Set reasoning level (0=off, 1=normal, 2=max)", "[0|1|2]"},
-	{commandNameThemeSet, "Set the active theme", "<name>"},
+	{commandNameSummarize, "Summarize the conversation to reduce context", "", false,
+		func(s *Session, ctx context.Context, _ []string) { s.summarize(ctx) }},
+	{commandNameCancel, "Cancel the current task", "", true,
+		func(s *Session, _ context.Context, _ []string) { s.cancelTask() }},
+	{commandNameCancelAll, "Cancel current task and clear the task queue", "", true,
+		func(s *Session, _ context.Context, _ []string) { s.cancelAllTasks() }},
+	{commandNameContinue, "Resume after an error; without args retries the prompt, with 'skip' skips it", "[skip]", false,
+		func(s *Session, ctx context.Context, args []string) { s.handleContinue(ctx, args) }},
+	{commandNameSave, "Save the current session", "[filename]", true,
+		func(s *Session, _ context.Context, args []string) { s.saveSession(args) }},
+	{commandNameModelSet, "Switch to a different model", "<id>", true,
+		func(s *Session, _ context.Context, args []string) { s.handleModelSet(args) }},
+	{commandNameModelLoad, "Reload models from configuration file", "", true,
+		func(s *Session, _ context.Context, _ []string) { s.handleModelLoad() }},
+	{commandNameTaskQueueGetAll, "List all queued tasks", "", true,
+		func(s *Session, _ context.Context, _ []string) { s.handleTaskQueueGetAll() }},
+	{commandNameTaskQueueDel, "Delete a queued task", "<queue_id>", true,
+		func(s *Session, _ context.Context, args []string) { s.handleTaskQueueDel(args) }},
+	{commandNameTaskQueueEdit, "Edit a queued task's content", "<queue_id> <new_content>", true,
+		func(s *Session, _ context.Context, args []string) { s.handleTaskQueueEdit(args) }},
+	{commandNameReason, "Set reasoning level (0=off, 1=normal, 2=max)", "[0|1|2]", true,
+		func(s *Session, _ context.Context, args []string) { s.handleReason(args) }},
+	{commandNameThemeSet, "Set the active theme", "<name>", true,
+		func(s *Session, _ context.Context, args []string) { s.handleThemeSet(args) }},
 }
 
 // LookupCommand returns the command metadata for name, or (nil, false).
@@ -58,7 +76,20 @@ func LookupCommand(name string) (*Command, bool) {
 	return nil, false
 }
 
-// DispatchCommand dispatches a colon-command to the appropriate Session method.
+// IsImmediate reports whether the given command string should be handled
+// immediately without queuing. Returns false for unknown commands.
+func IsImmediate(cmd string) bool {
+	name := cmd
+	if idx := strings.IndexByte(cmd, ' '); idx >= 0 {
+		name = cmd[:idx]
+	}
+	if c, ok := LookupCommand(name); ok {
+		return c.Immediate
+	}
+	return false
+}
+
+// DispatchCommand dispatches a colon-command to its registered handler.
 // Returns true if the command was recognized (even if execution failed).
 func (s *Session) dispatchCommand(ctx context.Context, cmd string) bool {
 	parts := strings.Fields(cmd)
@@ -70,37 +101,11 @@ func (s *Session) dispatchCommand(ctx context.Context, cmd string) bool {
 	commandName := parts[0]
 	args := parts[1:]
 
-	if _, ok := LookupCommand(commandName); !ok {
+	c, ok := LookupCommand(commandName)
+	if !ok {
 		return false
 	}
 
-	// Dispatch to the handler methods.
-	switch commandName {
-	case commandNameSummarize:
-		s.summarize(ctx)
-	case commandNameCancel:
-		s.cancelTask()
-	case commandNameCancelAll:
-		s.cancelAllTasks()
-	case commandNameContinue:
-		s.handleContinue(ctx, args)
-	case commandNameSave:
-		s.saveSession(args)
-	case commandNameModelSet:
-		s.handleModelSet(args)
-	case commandNameModelLoad:
-		s.handleModelLoad()
-	case commandNameTaskQueueGetAll:
-		s.handleTaskQueueGetAll()
-	case commandNameTaskQueueDel:
-		s.handleTaskQueueDel(args)
-	case commandNameTaskQueueEdit:
-		s.handleTaskQueueEdit(args)
-	case commandNameReason:
-		s.handleReason(args)
-	case commandNameThemeSet:
-		s.handleThemeSet(args)
-	}
-
+	c.Handler(s, ctx, args)
 	return true
 }
