@@ -76,7 +76,7 @@ func (s *Session) run() {
 			s.handleInputMsg(msg)
 
 		case ev := <-s.stateCh:
-			s.handleTaskEvent(ev, &runMessages)
+			s.handleTaskEvent(ev)
 
 		case <-s.taskDone:
 			s.handleTaskDone(&runMessages)
@@ -130,17 +130,15 @@ func (s *Session) tryStartNextTask(runMessages *[]llm.Message) bool {
 }
 
 // handleTaskDone processes a task completion signal from the task goroutine.
-// runMessages is already kept in sync during the task via StepFinishEvent.
-// The taskResult channel serves as a final safety net for error/cancel cases
-// where the last OnStepFinish might not have been called.
+// Reads the final message state from taskResult (set by the defer in runTask)
+// and auto-saves if configured.
 func (s *Session) handleTaskDone(runMessages *[]llm.Message) {
 	// Mark the task as finished so the next queue item can start.
 	s.inProgress = false
 
-	// Sync runMessages back from taskResult as a safety net.
-	// During normal operation, StepFinishEvent keeps runMessages current,
-	// but in cancel/error paths the final messages may only be in
-	// the task goroutine's copy.
+	// Read the final message state returned by the task goroutine.
+	// This is the sole handoff point for messages — StepFinishEvent
+	// carries only token counts during execution.
 	select {
 	case result := <-s.taskResult:
 		if len(result) > 0 {
@@ -167,7 +165,7 @@ func (s *Session) drainUntilTaskDone(runMessages *[]llm.Message) {
 	for {
 		select {
 		case ev := <-s.stateCh:
-			s.handleTaskEvent(ev, runMessages)
+			s.handleTaskEvent(ev)
 		case <-s.taskDone:
 			s.handleTaskDone(runMessages)
 			return
@@ -181,27 +179,17 @@ func (s *Session) drainUntilTaskDone(runMessages *[]llm.Message) {
 
 // handleTaskEvent processes a state change event from the task goroutine.
 // Only called from the run() goroutine.
-func (s *Session) handleTaskEvent(ev TaskEvent, runMessages *[]llm.Message) {
+func (s *Session) handleTaskEvent(ev TaskEvent) {
 	switch e := ev.(type) {
 	case StepStartEvent:
 		s.currentStep.Store(int64(e.Step))
 
 	case StepFinishEvent:
-		if len(e.Messages) > 0 {
-			*runMessages = e.Messages // allMessages from agent — full history
-		}
 		s.TotalSpent.InputTokens += e.InputTokens
 		s.TotalSpent.OutputTokens += e.OutputTokens
 		newContext := e.InputTokens + e.CacheReadTokens + e.CacheCreationTokens
 		if newContext > 0 {
 			s.ContextTokens.Store(newContext)
-		}
-
-	case SaveRequestEvent:
-		if s.SessionFile != "" {
-			if err := s.saveSessionToFileWith(*runMessages, s.SessionFile); err != nil {
-				s.writeNotifyf("Auto-save failed: %v", err)
-			}
 		}
 	}
 }

@@ -139,18 +139,6 @@ func (s *Session) runTask(item QueueItem) {
 	if ctx.Err() == context.Canceled {
 		s.appendCancelMessage()
 	}
-
-	s.autoSaveIfEnabled()
-}
-
-// autoSaveIfEnabled saves the session to file if a session file is set.
-// Called from the task goroutine. Sends a save request to run() which
-// has the authoritative copy of messages (kept current via StepFinishEvent).
-func (s *Session) autoSaveIfEnabled() {
-	if s.SessionFile == "" {
-		return
-	}
-	s.sendEvent(SaveRequestEvent{})
 }
 
 // cancelMessage is inserted into the conversation history and displayed in the

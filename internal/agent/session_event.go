@@ -10,8 +10,6 @@ package agent
 // This keeps all cross-goroutine communication explicit and auditable
 // — the entire package uses channels and atomics for synchronization.
 
-import "github.com/alayacore/alayacore/internal/llm"
-
 // TaskEvent is a state mutation sent from the task goroutine to run().
 // Each concrete type carries only its own fields — no shared struct.
 type TaskEvent interface {
@@ -26,10 +24,9 @@ type StepStartEvent struct {
 func (StepStartEvent) taskEvent() {}
 
 // StepFinishEvent signals that an agent step has completed.
-// Carries the full message history (allMessages) from the agent,
-// allowing the main loop to update its authoritative copy.
+// Carries only token usage metadata. The final message state is
+// returned separately via taskResult on task completion.
 type StepFinishEvent struct {
-	Messages            []llm.Message
 	InputTokens         int64
 	OutputTokens        int64
 	CacheReadTokens     int64
@@ -37,11 +34,6 @@ type StepFinishEvent struct {
 }
 
 func (StepFinishEvent) taskEvent() {}
-
-// SaveRequestEvent signals that the session should be auto-saved.
-type SaveRequestEvent struct{}
-
-func (SaveRequestEvent) taskEvent() {}
 
 // sendEvent sends a task event to the run() goroutine.
 // Non-blocking if the channel buffer is full — the event is dropped.
