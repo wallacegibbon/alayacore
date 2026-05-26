@@ -14,6 +14,16 @@ type Job struct{}
 // Close is a no-op on Unix.
 func (j *Job) Close() error { return nil }
 
+// AssignJob is a no-op on Unix.  Process groups are managed via
+// SetDetachFlags (setsid) and SignalProcessGroup (SIGINT) with
+// exec.Cmd.WaitDelay for the follow-up SIGKILL.
+func AssignJob(_ *os.Process) *Job {
+	return nil
+}
+
+// ClearJob is a no-op on Unix.
+func ClearJob() {}
+
 // SignalProcessGroup sends SIGINT to the process group and returns
 // immediately. The caller should follow up with a stronger signal
 // (e.g. SIGKILL) after a grace period if the process hasn't exited.
