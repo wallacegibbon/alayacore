@@ -41,8 +41,7 @@ func ParseKeyValue(content string, target any) {
 // values that could not be converted to the target field type. This helps surface
 // typos like context_limit: abc (which would otherwise silently default to 0).
 func ParseKeyValueWithWarnings(content string, target any) []ParseWarning {
-	_, warnings := parseConfig(content, target, false, true)
-	return warnings
+	return parseConfig(content, target, false, true)
 }
 
 // ParseKeyValueBlocks parses multiple config blocks separated by "---"
@@ -52,14 +51,13 @@ func ParseKeyValueBlocks(content string) []string {
 }
 
 // parseConfig is the unified internal implementation.
-// collectUnknown: return keys that don't match any struct field tag.
 // collectWarnings: return ParseWarning for values that fail type conversion.
 //
 //nolint:gocyclo // Multiple validation branches required for config parsing
-func parseConfig(content string, target any, skipHyphens bool, collectWarnings bool) ([]string, []ParseWarning) {
+func parseConfig(content string, target any, skipHyphens bool, collectWarnings bool) []ParseWarning {
 	v := reflect.ValueOf(target)
 	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Struct {
-		return nil, nil
+		return nil
 	}
 	v = v.Elem()
 	t := v.Type()
@@ -74,7 +72,6 @@ func parseConfig(content string, target any, skipHyphens bool, collectWarnings b
 		}
 	}
 
-	var unknownKeys []string
 	var warnings []ParseWarning
 
 	// Parse lines
@@ -101,7 +98,6 @@ func parseConfig(content string, target any, skipHyphens bool, collectWarnings b
 		// Look up field by tag
 		fieldIdx, ok := tagToField[key]
 		if !ok {
-			unknownKeys = append(unknownKeys, key)
 			continue
 		}
 
@@ -115,7 +111,7 @@ func parseConfig(content string, target any, skipHyphens bool, collectWarnings b
 		}
 	}
 
-	return unknownKeys, warnings
+	return warnings
 }
 
 // setFieldValueWithWarning is like setFieldValue but returns a ParseWarning

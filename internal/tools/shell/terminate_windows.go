@@ -213,7 +213,6 @@ func killProcessTree(pid int) bool {
 	err := cmd.Run()
 	return err == nil
 }
-}
 
 // ExitCodeFromError extracts the exit code from a cmd.Wait error.
 // Returns 0 for nil, the ExitError exit code, or -1 for unrecognized errors.
