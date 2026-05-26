@@ -36,7 +36,7 @@ func (s *Session) run() {
 	// The task goroutine has its own working copy (s.Messages). At task
 	// start, runMessages is copied to s.Messages. During task execution,
 	// OnStepFinish sends the agent's allMessages (full history) via
-	// eventStepFinish, which replaces runMessages entirely.
+	// StepFinishEvent, which replaces runMessages entirely.
 	// Between tasks, runMessages is the source of truth.
 	//
 	// When restoring from a session (RestoreFromSession), s.Messages
@@ -178,39 +178,27 @@ func (s *Session) drainUntilTaskDone(runMessages *[]llm.Message) {
 
 // handleTaskEvent processes a state change event from the task goroutine.
 // Only called from the run() goroutine.
-func (s *Session) handleTaskEvent(ev taskEvent, runMessages *[]llm.Message) {
-	switch ev.typ {
-	case eventStepStart:
-		s.currentStep.Store(int64(ev.step))
+func (s *Session) handleTaskEvent(ev TaskEvent, runMessages *[]llm.Message) {
+	switch e := ev.(type) {
+	case StepStartEvent:
+		s.currentStep.Store(int64(e.Step))
 
-	case eventStepFinish:
-		if len(ev.messages) > 0 {
-			*runMessages = ev.messages // allMessages from agent — full history
+	case StepFinishEvent:
+		if len(e.Messages) > 0 {
+			*runMessages = e.Messages // allMessages from agent — full history
 		}
-		s.TotalSpent.InputTokens += ev.inputTokens
-		s.TotalSpent.OutputTokens += ev.outputTokens
-		newContext := ev.inputTokens + ev.cacheReadTokens + ev.cacheCreationTokens
+		s.TotalSpent.InputTokens += e.InputTokens
+		s.TotalSpent.OutputTokens += e.OutputTokens
+		newContext := e.InputTokens + e.CacheReadTokens + e.CacheCreationTokens
 		if newContext > 0 {
 			s.ContextTokens.Store(newContext)
 		}
 
-	case eventCleanMessages:
-		*runMessages = cleanIncompleteToolCalls(*runMessages)
-
-	case eventSetPaused:
-		s.pausedOnError.Store(ev.paused)
-
-	case eventSaveRequest:
+	case SaveRequestEvent:
 		if s.SessionFile != "" {
 			if err := s.saveSessionToFileWith(*runMessages, s.SessionFile); err != nil {
 				s.writeNotifyf("Auto-save failed: %v", err)
 			}
-		}
-
-	case eventSyncReason:
-		s.reasoningLevel.Store(int64(ev.reasoningLevel))
-		if p := s.provider.Load(); p != nil {
-			(*p).SetReasoningLevel(ev.reasoningLevel)
 		}
 	}
 }

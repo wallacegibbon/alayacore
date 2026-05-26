@@ -68,9 +68,8 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) (int
 			stepCount = step
 
 			// Send step start event to run().
-			s.sendEvent(taskEvent{
-				typ:  eventStepStart,
-				step: step,
+			s.sendEvent(StepStartEvent{
+				Step: step,
 			})
 
 			// Sync reasoning level if it was changed during task execution.
@@ -92,13 +91,12 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) (int
 			}
 
 			// Send event to run() so it updates runMessages and totals.
-			s.sendEvent(taskEvent{
-				typ:                 eventStepFinish,
-				messages:            messages,
-				inputTokens:         usage.InputTokens,
-				outputTokens:        usage.OutputTokens,
-				cacheReadTokens:     usage.CacheReadTokens,
-				cacheCreationTokens: usage.CacheCreationTokens,
+			s.sendEvent(StepFinishEvent{
+				Messages:            messages,
+				InputTokens:         usage.InputTokens,
+				OutputTokens:        usage.OutputTokens,
+				CacheReadTokens:     usage.CacheReadTokens,
+				CacheCreationTokens: usage.CacheCreationTokens,
 			})
 
 			outputTokens += usage.OutputTokens

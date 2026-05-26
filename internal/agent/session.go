@@ -26,7 +26,7 @@ package agent
 //
 // Related files:
 //   - session_types.go — type definitions (Task, SystemInfo, SessionConfig, etc.)
-//   - session_event.go — taskEvent types for actor model communication
+//   - session_event.go — TaskEvent types for actor model communication
 //   - session_model.go — model management, provider creation, reasoning level
 //   - session_task.go  — input processing, prompt execution, agent loop
 //   - session_io.go    — command handling, summarize, save
@@ -72,7 +72,7 @@ type Session struct {
 	nextQueueID  uint64 // goroutine-local (run() goroutine)
 
 	// stateCh carries state mutations from the task goroutine to run().
-	stateCh chan taskEvent
+	stateCh chan TaskEvent
 
 	// taskCancelCh is a buffered channel (capacity 1) used by inputPump to
 	// signal cancellation of the currently running task. The task goroutine
@@ -143,7 +143,7 @@ func NewSession(cfg SessionConfig) *Session {
 		SkillsManager:  cfg.SkillsMgr,
 		SessionConfig:  cfg,
 		taskQueue:      make([]QueueItem, 0),
-		stateCh:        make(chan taskEvent, 64),
+		stateCh:        make(chan TaskEvent, 64),
 		taskCancelCh:   make(chan struct{}, 1),
 		taskDone:       make(chan struct{}, 1),
 		infoUpdateCh:   make(chan struct{}, 1),
@@ -170,7 +170,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 		SkillsManager:  cfg.SkillsMgr,
 		SessionConfig:  cfg,
 		taskQueue:      make([]QueueItem, 0),
-		stateCh:        make(chan taskEvent, 64),
+		stateCh:        make(chan TaskEvent, 64),
 		taskCancelCh:   make(chan struct{}, 1),
 		taskDone:       make(chan struct{}, 1),
 		infoUpdateCh:   make(chan struct{}, 1),

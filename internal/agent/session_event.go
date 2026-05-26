@@ -6,51 +6,44 @@ package agent
 // task goroutine and the run() goroutine.
 //
 // The task goroutine sends state mutations as typed events on stateCh.
-// The run() goroutine processes them in order in its main select loop.
+// The run() goroutine processes them by type-switching in its main loop.
 // This keeps all cross-goroutine communication explicit and auditable
 // — the entire package uses channels and atomics for synchronization.
 
 import "github.com/alayacore/alayacore/internal/llm"
 
-// eventType classifies a taskEvent.
-type eventType int
-
-const (
-	eventStepStart eventType = iota
-	eventStepFinish
-	eventCleanMessages
-	eventSetPaused
-	eventSaveRequest
-	eventTaskDone
-	eventSyncReason
-)
-
-// taskEvent carries a state mutation from the task goroutine to run().
-type taskEvent struct {
-	typ eventType
-
-	// eventStepStart
-	step int
-
-	// eventStepFinish
-	messages            []llm.Message
-	inputTokens         int64
-	outputTokens        int64
-	cacheReadTokens     int64
-	cacheCreationTokens int64
-
-	// eventSetPaused
-	paused bool
-
-	// eventSaveRequest (payload not needed — uses s.Messages)
-
-	// eventSyncReason
-	reasoningLevel int
+// TaskEvent is a state mutation sent from the task goroutine to run().
+// Each concrete type carries only its own fields — no shared struct.
+type TaskEvent interface {
+	taskEvent()
 }
+
+// StepStartEvent signals that a new agent step has started.
+type StepStartEvent struct {
+	Step int
+}
+
+func (StepStartEvent) taskEvent() {}
+
+// StepFinishEvent signals that an agent step has completed.
+type StepFinishEvent struct {
+	Messages            []llm.Message
+	InputTokens         int64
+	OutputTokens        int64
+	CacheReadTokens     int64
+	CacheCreationTokens int64
+}
+
+func (StepFinishEvent) taskEvent() {}
+
+// SaveRequestEvent signals that the session should be auto-saved.
+type SaveRequestEvent struct{}
+
+func (SaveRequestEvent) taskEvent() {}
 
 // sendEvent sends a task event to the run() goroutine.
 // Non-blocking if the channel buffer is full — the event is dropped.
-func (s *Session) sendEvent(ev taskEvent) {
+func (s *Session) sendEvent(ev TaskEvent) {
 	select {
 	case s.stateCh <- ev:
 	default:

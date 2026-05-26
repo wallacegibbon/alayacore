@@ -141,7 +141,7 @@ func (s *Session) autoSaveIfEnabled() {
 	if s.SessionFile == "" {
 		return
 	}
-	s.sendEvent(taskEvent{typ: eventSaveRequest})
+	s.sendEvent(SaveRequestEvent{})
 }
 
 // cancelMessage is inserted into the conversation history and displayed in the
