@@ -59,6 +59,7 @@ If you connect directly to the Anthropic API and want prompt caching, place a pr
 | [Skills System](docs/skills.md) | Agent Skills specification, directory structure, SKILL.md format |
 | [Architecture](docs/architecture.md) | Layered architecture, TLV protocol, data flow, design decisions |
 | [Step Messages](docs/step-messages.md) | Message structure within an agentic step (assistant + tool results) |
+| [Providers](docs/providers.md) | Provider-specific gotchas (tool call chunking, null args, reasoning mode) |
 
 ## License
 

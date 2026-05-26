@@ -58,56 +58,15 @@ The last step's value is always the most accurate because it includes all prior 
 
 ### Anthropic Protocol
 
-Reports usage across multiple SSE events (`message_start`, `message_delta`, `message_stop`). The provider's `extractAndSetUsage` merges partial chunks:
+Reports usage across multiple SSE events (`message_start`, `message_delta`, `message_stop`). The provider merges partial values: `InputTokens` and cache tokens come from `message_start`, `OutputTokens` from `message_delta`. If one event omits a field, the value from a prior event survives.
 
-| Event | Fields Present |
-|-------|---------------|
-| `message_start` | `input_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens` |
-| `message_delta` | `output_tokens` |
-| `message_stop` | (final usage, if any) |
-
-`InputTokens` = non-cached portion only. Cache tokens are separate.
-
-**Usage extraction is a merge, not a single-shot read.** The Anthropic provider's `anthropicStreamState.extractUsage` accumulates values from individual SSE events using typed struct fields:
-
-```go
-if msg.Usage.InputTokens > 0 {
-    s.usage.InputTokens = msg.Usage.InputTokens
-}
-if msg.Usage.CacheReadTokens > 0 {
-    s.usage.CacheReadTokens = msg.Usage.CacheReadTokens
-}
-if msg.Usage.CacheCreationTokens > 0 {
-    s.usage.CacheCreationTokens = msg.Usage.CacheCreationTokens
-}
-```
-
-This makes the Anthropic path inherently resilient to missing usage data — if one event omits a field, the value from a prior event survives.
-
-In practice, the Anthropic spec guarantees that `message_start` always includes a `usage` object with `input_tokens`, so usage is rarely missing entirely. However, Anthropic-compatible servers (e.g. llama.cpp exposing `/v1/messages`) may not fully implement the spec. The `newContext > 0` guard in `handleTaskEvent` provides a safety net for these cases.
+`InputTokens` = non-cached portion only. Cache tokens (`CacheReadTokens`, `CacheCreationTokens`) are separate and added together in `handleTaskEvent` for the true context size.
 
 ### OpenAI Protocol
 
-Reports usage in a **single SSE chunk** with `prompt_tokens` and `completion_tokens`:
+Reports usage in a **single SSE chunk** with `prompt_tokens` (full context, cache already included) and `completion_tokens`. No separate cache fields.
 
-| Field | Meaning |
-|-------|---------|
-| `prompt_tokens` | Full context size (all messages sent) |
-| `completion_tokens` | Output tokens generated |
-
-`prompt_tokens` already includes any cached tokens — no separate cache fields.
-
-**This is a single point of failure.** Unlike the Anthropic path, usage is set in one shot:
-
-```go
-if streamResp.Usage.PromptTokens > 0 || streamResp.Usage.CompletionTokens > 0 {
-    state.setUsage(...)
-}
-```
-
-If the provider never sends a chunk containing `"usage"`, `state.usage` stays at its Go zero value (`{InputTokens: 0, OutputTokens: 0, ...}`). The provider is not returning `{"usage": {"prompt_tokens": 0}}` — it simply omits the `usage` field from the SSE chunk entirely, and Go's `json.Unmarshal` initializes absent fields to their zero values.
-
-This is why the ContextTokens-reset-to-zero bug is specific to OpenAI-compatible providers. Some providers (e.g. GLM-5.1) intermittently omit the usage chunk, causing `handleTaskEvent` to receive all zeros. The `newContext > 0` guard prevents the last known good value from being overwritten.
+**This is a single point of failure.** If the provider never sends a chunk containing `"usage"`, the parsed `Usage` struct stays at all zeros. Some providers (e.g. GLM-5.1) intermittently omit the usage chunk. The `newContext > 0` guard in `handleTaskEvent` prevents resetting `ContextTokens` to 0.
 
 ## Model Switching and Token Count Changes
 

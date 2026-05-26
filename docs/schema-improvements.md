@@ -35,54 +35,7 @@ func executeWriteFile(_ context.Context, args WriteFileInput) (llm.ToolResultOut
 
 ## Before vs After
 
-### Before (70+ lines with manual schema)
-
-```go
-func NewWriteFileTool() llm.Tool {
-	schema := json.RawMessage(`{
-		"type": "object",
-		"properties": {
-			"path": {
-				"type": "string",
-				"description": "The path of the file to write"
-			},
-			"content": {
-				"type": "string",
-				"description": "The content to write to the file"
-			}
-		},
-		"required": ["path", "content"]
-	}`)
-
-	return llm.NewTool("write_file", "...").
-		WithSchema(schema).
-		WithExecute(func(_ context.Context, input json.RawMessage) (llm.ToolResultOutput, error) {
-			var args WriteFileInput
-			if err := json.Unmarshal(input, &args); err != nil {
-				return llm.NewTextErrorResponse("failed to parse input: " + err.Error()), nil
-			}
-
-			if args.Path == "" {
-				return llm.NewTextErrorResponse("path is required"), nil
-			}
-
-			if args.Content == "" {
-				return llm.NewTextErrorResponse("content is required"), nil
-			}
-
-			if err := os.WriteFile(args.Path, []byte(args.Content), 0600); err != nil {
-				return llm.NewTextErrorResponse(err.Error()), nil
-			}
-
-			return llm.NewTextResponse("File written successfully"), nil
-		}).
-		Build()
-}
-```
-
-### After (30 lines — 57% reduction)
-
-See the Pattern Overview above.
+The old approach required writing raw JSON schemas and manual `json.Unmarshal` in every tool function. The new approach uses struct tags and `TypedExecute` to eliminate both. See the Pattern Overview above for the current style — the tool definition is ~30 lines instead of 70+, with compile-time type safety and no manual JSON handling.
 
 ## Schema Tag Syntax
 
