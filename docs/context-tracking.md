@@ -16,39 +16,38 @@ Provider API response
   → Provider extracts usage (InputTokens, CacheReadTokens, CacheCreationTokens)
     → StepCompleteEvent carries Usage
       → Agent.Stream calls OnStepFinish callback with stepUsage
-        → Session.trackUsage(stepUsage)
-          → ContextTokens = InputTokens + CacheReadTokens + CacheCreationTokens (only if non-zero)
+        → Session.sendEvent(eventStepFinish{usage})
+          → handleTaskEvent(eventStepFinish) in run() goroutine
+            → TotalSpent accumulates (InputTokens +=, OutputTokens +=)
+            → ContextTokens = InputTokens + CacheReadTokens + CacheCreationTokens (overwrite, only if non-zero)
 ```
 
-## The `trackUsage` Function
+Context tracking is handled by the `handleTaskEvent` method in `session_loop.go`, which processes `eventStepFinish` events from the task goroutine:
 
 ```go
-func (s *Session) trackUsage(usage llm.Usage) {
-	s.mu.Lock()
-	s.TotalSpent.InputTokens += usage.InputTokens
-	s.TotalSpent.OutputTokens += usage.OutputTokens
-	// Only overwrite ContextTokens if the provider reported a non-zero value.
-	// OpenAI-compatible APIs (e.g. GLM-5.1) occasionally omit the usage chunk
-	// or return all zeros, which would incorrectly reset ContextTokens to 0.
-	newContext := usage.InputTokens + usage.CacheReadTokens + usage.CacheCreationTokens
-	if newContext > 0 {
-		s.ContextTokens = newContext
-	}
-	s.mu.Unlock()
-	s.sendSystemInfo()
-}
+case eventStepFinish:
+    if len(ev.messages) > 0 {
+        *runMessages = ev.messages // allMessages from agent — full history
+    }
+    s.TotalSpent.InputTokens += ev.inputTokens
+    s.TotalSpent.OutputTokens += ev.outputTokens
+    newContext := ev.inputTokens + ev.cacheReadTokens + ev.cacheCreationTokens
+    if newContext > 0 {
+        s.ContextTokens.Store(newContext)
+    }
 ```
 
 Key design decisions:
 
-- **Overwrite (`=`), not accumulate (`+=`).** Each API call's `InputTokens` already represents the *entire conversation history* sent in that request. Accumulating would double-count.
+- **Overwrite (`Store`), not accumulate (`Add`).** Each API call's `InputTokens` already represents the *entire conversation history* sent in that request. Accumulating would double-count.
 - **Guard against zero reports.** Some OpenAI-compatible providers (e.g. GLM-5.1) may omit the `usage` field from SSE chunks entirely — they simply never send a chunk containing `"usage": {"prompt_tokens": N, ...}`. Go's `json.Unmarshal` leaves absent fields at their zero values, so the parsed `Usage` struct arrives as all zeros. Without the guard, this would reset `ContextTokens` to 0, breaking auto-summarization and the status bar display. The `if newContext > 0` check preserves the last known good value.
 - **Only the last step's value matters.** For multi-step tool call loops, each step re-sends the full history (plus new messages). The last step has the most complete count.
+- **Cross-goroutine communication.** The task goroutine sends usage via typed events on `stateCh`; the `run()` goroutine owns the authoritative copy. `ContextTokens` is an `atomic.Int64` for lock-free reads by the task goroutine (used in `shouldAutoSummarize`).
 - **Cache tokens are additive.** Anthropic reports `InputTokens` as the non-cached portion; `CacheReadTokens` and `CacheCreationTokens` are separate. The sum gives the true context size.
 
 ## Multi-Step Tool Calls
 
-When the agent loop runs multiple steps (tool call → tool result → next step), `trackUsage` is called once per step via `OnStepFinish`. Each call overwrites `ContextTokens` with that step's full-context measurement:
+When the agent loop runs multiple steps (tool call → tool result → next step), `handleTaskEvent` is called once per step via `eventStepFinish`. Each call overwrites `ContextTokens` with that step's full-context measurement:
 
 ```
 Step 1 (tool call):     InputTokens=500, CacheRead=8000 → ContextTokens = 8500
@@ -71,18 +70,23 @@ Reports usage across multiple SSE events (`message_start`, `message_delta`, `mes
 
 `InputTokens` = non-cached portion only. Cache tokens are separate.
 
-**Usage extraction is a merge, not a single-shot read.** `extractAndSetUsage` preserves values from earlier events and only overwrites fields that are present in the current chunk:
+**Usage extraction is a merge, not a single-shot read.** The Anthropic provider's `anthropicStreamState.extractUsage` accumulates values from individual SSE events using typed struct fields:
 
 ```go
-inputTokens := current.InputTokens         // keep previous value
-if v, ok := usage["input_tokens"].(float64); ok {
-    inputTokens = int64(v)                  // overwrite only if present
+if msg.Usage.InputTokens > 0 {
+    s.usage.InputTokens = msg.Usage.InputTokens
+}
+if msg.Usage.CacheReadTokens > 0 {
+    s.usage.CacheReadTokens = msg.Usage.CacheReadTokens
+}
+if msg.Usage.CacheCreationTokens > 0 {
+    s.usage.CacheCreationTokens = msg.Usage.CacheCreationTokens
 }
 ```
 
 This makes the Anthropic path inherently resilient to missing usage data — if one event omits a field, the value from a prior event survives.
 
-In practice, the Anthropic spec guarantees that `message_start` always includes a `usage` object with `input_tokens`, so usage is rarely missing entirely. However, Anthropic-compatible servers (e.g. llama.cpp exposing `/v1/messages`) may not fully implement the spec. The `newContext > 0` guard in `trackUsage` provides a safety net for these cases.
+In practice, the Anthropic spec guarantees that `message_start` always includes a `usage` object with `input_tokens`, so usage is rarely missing entirely. However, Anthropic-compatible servers (e.g. llama.cpp exposing `/v1/messages`) may not fully implement the spec. The `newContext > 0` guard in `handleTaskEvent` provides a safety net for these cases.
 
 ### OpenAI Protocol
 
@@ -105,7 +109,7 @@ if streamResp.Usage.PromptTokens > 0 || streamResp.Usage.CompletionTokens > 0 {
 
 If the provider never sends a chunk containing `"usage"`, `state.usage` stays at its Go zero value (`{InputTokens: 0, OutputTokens: 0, ...}`). The provider is not returning `{"usage": {"prompt_tokens": 0}}` — it simply omits the `usage` field from the SSE chunk entirely, and Go's `json.Unmarshal` initializes absent fields to their zero values.
 
-This is why the ContextTokens-reset-to-zero bug is specific to OpenAI-compatible providers. Some providers (e.g. GLM-5.1) intermittently omit the usage chunk, causing `trackUsage` to receive all zeros. The `newContext > 0` guard in `trackUsage` prevents the last known good value from being overwritten.
+This is why the ContextTokens-reset-to-zero bug is specific to OpenAI-compatible providers. Some providers (e.g. GLM-5.1) intermittently omit the usage chunk, causing `handleTaskEvent` to receive all zeros. The `newContext > 0` guard prevents the last known good value from being overwritten.
 
 ## Model Switching and Token Count Changes
 

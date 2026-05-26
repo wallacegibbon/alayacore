@@ -15,36 +15,39 @@ methods, and the adaptor never calls session methods during normal operation.
 
 ## Exception: Theme Persistence
 
-Theme is a terminal-only UI concern. The terminal adaptor reads and writes
-the active theme name directly via `RuntimeManager`:
+Theme is a terminal-only UI concern. The session persists the active theme
+name via `RuntimeManager`, and communicates it to the terminal adaptor through
+the TLV protocol as part of `SystemInfo.ActiveTheme` (sent via `TagSystemData`):
 
-```go
-// Read — opening theme selector
-m.runtimeMgr.GetActiveTheme()
-
-// Write — user selects a theme
-m.runtimeMgr.SetActiveTheme(selectedTheme.Name)
+```
+User selects theme → :theme_set command → Session →
+  RuntimeManager.SetActiveTheme()          ← persists to runtime.conf
+  sendSystemInfo() with ActiveTheme set    ← sent to adaptor via TLV
+    → Terminal reads ActiveTheme from StatusSnapshot
 ```
 
-This is intentionally **not** part of the TLV protocol because:
+This is intentionally **not** a direct adaptor-to-RuntimeManager call because:
 
 1. Only the terminal adaptor uses themes. The plainio adaptor has no visual
    rendering and would ignore theme data entirely.
 2. Theme is persistent config (written to `runtime.conf`), not transient
-   session state. Routing it through TLV would add protocol complexity for
-   no benefit.
-3. The `RuntimeManager` is already a narrow, read/write-only config store.
-   The terminal holds a direct reference to it — no full `Session` coupling.
+   session state. Routing it through the session's TLV output ensures a
+   single authority over runtime config.
+3. The `RuntimeManager` stays inside the Session, where it belongs — the
+   adaptor never holds a reference to it.
+
+On startup, the terminal adaptor reads the initial theme from the first
+`TagSystemData` message sent by `Session.sendSystemInfo()` during session
+initialization. If no theme is set (first run), it defaults to `"theme-dark"`.
 
 ## Adaptor Bootstrap
 
-The `adaptor.go` `Run()` function does access `Session` fields during
-startup (before the Terminal is created):
+The `StartSession()` function in `app/session.go` handles shared initialization
+for all adaptors:
 
-- `session.InitError()` — fatal initialization check
+- `session.InitError()` — fatal initialization check (--model flag validation)
 - `session.ModelManager.GetLoadErrors()` — print config warnings
 - `session.HasModels()` — abort if no models configured
-- `session.GetRuntimeManager().GetActiveTheme()` — load initial theme
 
-This is setup code, not runtime coupling. Once the Bubbletea program starts,
+This is setup code, not runtime coupling. Once the Bubble Tea program starts,
 the Terminal struct only interacts with the session via TLV.

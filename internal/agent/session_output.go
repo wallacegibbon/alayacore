@@ -103,10 +103,6 @@ func (s *Session) requestSystemInfo() {
 }
 
 func (s *Session) sendSystemInfo() {
-	s.sendSystemInfoInternal(nil)
-}
-
-func (s *Session) sendSystemInfoInternal(activeModelConfig *ModelConfig) {
 	if s.Output == nil {
 		return
 	}
@@ -120,9 +116,7 @@ func (s *Session) sendSystemInfoInternal(activeModelConfig *ModelConfig) {
 	if s.ModelManager != nil {
 		models = s.ModelManager.GetModels()
 		activeID = s.ModelManager.GetActiveID()
-		if activeModelConfig != nil {
-			activeModelName = activeModelConfig.Name
-		} else if activeModel := s.ModelManager.GetActive(); activeModel != nil {
+		if activeModel := s.ModelManager.GetActive(); activeModel != nil {
 			activeModelName = activeModel.Name
 		}
 		modelConfigPath = s.ModelManager.GetFilePath()
@@ -150,21 +144,20 @@ func (s *Session) sendSystemInfoInternal(activeModelConfig *ModelConfig) {
 	}
 
 	info := SystemInfo{
-		ContextTokens:     s.ContextTokens.Load(),
-		ContextLimit:      s.ContextLimit,
-		TotalTokens:       s.TotalSpent.InputTokens + s.TotalSpent.OutputTokens,
-		QueueItems:        queueItems,
-		InProgress:        s.inProgress,
-		CurrentStep:       int(s.currentStep.Load()),
-		MaxSteps:          s.MaxSteps,
-		TaskError:         s.pausedOnError.Load(),
-		Models:            models,
-		ActiveModelID:     activeID,
-		ActiveModelConfig: activeModelConfig,
-		ActiveModelName:   activeModelName,
-		HasModels:         hasModels,
-		ModelConfigPath:   modelConfigPath,
-		ReasoningLevel:    int(s.reasoningLevel.Load()),
+		ContextTokens:   s.ContextTokens.Load(),
+		ContextLimit:    s.ContextLimit,
+		TotalTokens:     s.TotalSpent.InputTokens + s.TotalSpent.OutputTokens,
+		QueueItems:      queueItems,
+		InProgress:      s.inProgress,
+		CurrentStep:     int(s.currentStep.Load()),
+		MaxSteps:        s.MaxSteps,
+		TaskError:       s.pausedOnError.Load(),
+		Models:          models,
+		ActiveModelID:   activeID,
+		ActiveModelName: activeModelName,
+		HasModels:       hasModels,
+		ModelConfigPath: modelConfigPath,
+		ReasoningLevel:  int(s.reasoningLevel.Load()),
 	}
 
 	if s.RuntimeManager != nil {

@@ -113,8 +113,8 @@ Without pausing, a network outage would cause every queued prompt to fail in seq
 ### How it works
 
 1. `handleUserPrompt` (or `resendPrompt` / `summarize`) detects the error from `processPrompt`
-2. Sets `pausedOnError = true` on the session
-3. `waitForNextTask` blocks — it won't dequeue the next task while `pausedOnError` is true
+2. Sets `pausedOnError = true` on the session via `atomic.Bool.Store()`
+3. `tryStartNextTask` in the main loop checks `s.pausedOnError.Load()` — when true, it skips dequeuing non-command tasks, effectively blocking the queue
 4. Remaining queued tasks stay in the queue (visible via Ctrl+Q)
 5. The user can now:
    - `:continue` — resend the failed prompt (or `:continue skip` to skip it and resume the queue)
@@ -126,10 +126,12 @@ Without pausing, a network outage would cause every queued prompt to fail in seq
 ### Implementation
 
 `internal/agent/session.go`:
-- `pausedOnError` field on `Session`
-- `waitForNextTask` checks `s.pausedOnError` in its loop condition
+- `pausedOnError` field on `Session` (atomic.Bool)
+
+`internal/agent/session_loop.go`:
+- `tryStartNextTask()` checks `s.pausedOnError.Load()` — when true and the front task is a user prompt (not a command), returns false without dequeuing
 - `submitDeferredCommand` guards: rejects if `inProgress && !pausedOnError`, then calls `enqueueTask`
-- `submitTask` clears `pausedOnError` when the queue was empty (before `enqueueTask` signals, so `taskRunner` sees consistent state)
+- `submitTask` clears `pausedOnError` when the queue was empty (before `enqueueTask` signals, so task runner sees consistent state)
 
 `internal/agent/session_io.go`:
 - `handleUserPrompt`, `resendPrompt`, and `summarize` set `pausedOnError = true` on error

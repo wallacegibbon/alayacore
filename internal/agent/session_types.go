@@ -54,22 +54,21 @@ type QueueItemInfo struct {
 
 // SystemInfo holds session state for clients.
 type SystemInfo struct {
-	ContextTokens     int64           `json:"context"`
-	ContextLimit      int64           `json:"context_limit"`
-	TotalTokens       int64           `json:"total"`
-	QueueItems        []QueueItemInfo `json:"queue_items,omitempty"`
-	InProgress        bool            `json:"in_progress"`
-	CurrentStep       int             `json:"current_step,omitempty"`
-	MaxSteps          int             `json:"max_steps,omitempty"`
-	TaskError         bool            `json:"task_error,omitempty"`
-	Models            []ModelInfo     `json:"models,omitempty"`
-	ActiveModelID     int             `json:"active_model_id,omitempty"`
-	ActiveModelConfig *ModelConfig    `json:"active_model_config,omitempty"`
-	ActiveModelName   string          `json:"active_model_name,omitempty"`
-	HasModels         bool            `json:"has_models"`
-	ModelConfigPath   string          `json:"model_config_path,omitempty"`
-	ReasoningLevel    int             `json:"reasoning_level"`
-	ActiveTheme       string          `json:"active_theme,omitempty"`
+	ContextTokens   int64           `json:"context"`
+	ContextLimit    int64           `json:"context_limit"`
+	TotalTokens     int64           `json:"total"`
+	QueueItems      []QueueItemInfo `json:"queue_items,omitempty"`
+	InProgress      bool            `json:"in_progress"`
+	CurrentStep     int             `json:"current_step,omitempty"`
+	MaxSteps        int             `json:"max_steps,omitempty"`
+	TaskError       bool            `json:"task_error,omitempty"`
+	Models          []ModelInfo     `json:"models,omitempty"`
+	ActiveModelID   int             `json:"active_model_id,omitempty"`
+	ActiveModelName string          `json:"active_model_name,omitempty"`
+	HasModels       bool            `json:"has_models"`
+	ModelConfigPath string          `json:"model_config_path,omitempty"`
+	ReasoningLevel  int             `json:"reasoning_level"`
+	ActiveTheme     string          `json:"active_theme,omitempty"`
 }
 
 // SessionMeta is the frontmatter metadata.

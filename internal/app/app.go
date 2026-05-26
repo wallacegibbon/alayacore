@@ -24,7 +24,6 @@ const systemPromptSkills = `Check <available_skills> below; read the <location> 
 // Config holds the common app configuration
 type Config struct {
 	Cfg               *config.Settings
-	Provider          llm.Provider
 	SkillsMgr         *skills.Manager
 	AgentTools        []llm.Tool
 	SystemPrompt      string // Default system prompt (always present)
@@ -77,7 +76,6 @@ func Setup(cfg *config.Settings) (*Config, error) {
 
 	return &Config{
 		Cfg:               cfg,
-		Provider:          nil, // Provider will be created when model is set
 		SkillsMgr:         skillsManager,
 		AgentTools:        agentTools,
 		SystemPrompt:      systemPrompt,
