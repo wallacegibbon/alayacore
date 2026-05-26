@@ -36,7 +36,7 @@ func NewRuntimeManager(runtimePath, _ string) *RuntimeManager {
 
 	// Load if path is set
 	if rm.path != "" {
-		_ = rm.Load() // best-effort load on init
+		_ = rm.Load() //nolint:errcheck // best-effort load on init
 	}
 
 	return rm

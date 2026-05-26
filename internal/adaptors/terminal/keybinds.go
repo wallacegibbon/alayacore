@@ -343,18 +343,18 @@ type DisplayKeyHandler func(*Terminal) tea.Cmd
 // All display keys are listed in a single map; handlers that don't need
 // to return a command simply return nil.
 var displayKeyHandlers = map[string]DisplayKeyHandler{
-	keyJ: func(m *Terminal) tea.Cmd { moveWindowCursorDown(m); return nil },
-	keyDown: func(m *Terminal) tea.Cmd { moveWindowCursorDown(m); return nil },
-	keyK: func(m *Terminal) tea.Cmd { moveWindowCursorUp(m); return nil },
-	keyUp: func(m *Terminal) tea.Cmd { moveWindowCursorUp(m); return nil },
-	keyCtrlD: func(m *Terminal) tea.Cmd { scrollDownHalf(m); return nil },
-	keyPgDown: func(m *Terminal) tea.Cmd { scrollDownHalf(m); return nil },
-	keyCtrlU: func(m *Terminal) tea.Cmd { scrollUpHalf(m); return nil },
-	keyPgUp: func(m *Terminal) tea.Cmd { scrollUpHalf(m); return nil },
-	keyJCapital: func(m *Terminal) tea.Cmd { scrollDownLine(m); return nil },
+	keyJ:         func(m *Terminal) tea.Cmd { moveWindowCursorDown(m); return nil },
+	keyDown:      func(m *Terminal) tea.Cmd { moveWindowCursorDown(m); return nil },
+	keyK:         func(m *Terminal) tea.Cmd { moveWindowCursorUp(m); return nil },
+	keyUp:        func(m *Terminal) tea.Cmd { moveWindowCursorUp(m); return nil },
+	keyCtrlD:     func(m *Terminal) tea.Cmd { scrollDownHalf(m); return nil },
+	keyPgDown:    func(m *Terminal) tea.Cmd { scrollDownHalf(m); return nil },
+	keyCtrlU:     func(m *Terminal) tea.Cmd { scrollUpHalf(m); return nil },
+	keyPgUp:      func(m *Terminal) tea.Cmd { scrollUpHalf(m); return nil },
+	keyJCapital:  func(m *Terminal) tea.Cmd { scrollDownLine(m); return nil },
 	keyShiftDown: func(m *Terminal) tea.Cmd { scrollDownLine(m); return nil },
-	keyKCapital: func(m *Terminal) tea.Cmd { scrollUpLine(m); return nil },
-	keyShiftUp: func(m *Terminal) tea.Cmd { scrollUpLine(m); return nil },
+	keyKCapital:  func(m *Terminal) tea.Cmd { scrollUpLine(m); return nil },
+	keyShiftUp:   func(m *Terminal) tea.Cmd { scrollUpLine(m); return nil },
 	keyH: func(m *Terminal) tea.Cmd {
 		if m.display.MoveWindowCursorToTop() {
 			m.display.EnsureCursorVisible()
@@ -376,10 +376,10 @@ var displayKeyHandlers = map[string]DisplayKeyHandler{
 		}
 		return nil
 	},
-	keyG: func(m *Terminal) tea.Cmd { gotoBottom(m); return nil },
-	keyEnd: func(m *Terminal) tea.Cmd { gotoBottom(m); return nil },
+	keyG:      func(m *Terminal) tea.Cmd { gotoBottom(m); return nil },
+	keyEnd:    func(m *Terminal) tea.Cmd { gotoBottom(m); return nil },
 	keyGSmall: func(m *Terminal) tea.Cmd { gotoTop(m); return nil },
-	keyHome: func(m *Terminal) tea.Cmd { gotoTop(m); return nil },
+	keyHome:   func(m *Terminal) tea.Cmd { gotoTop(m); return nil },
 	keyColon: func(m *Terminal) tea.Cmd {
 		m.focusInput()
 		m.input.SetValue(keyColon)

@@ -37,6 +37,7 @@ func (s *Session) writeNotifyf(format string, args ...any) {
 }
 
 // writeTLVStr writes a string TLV frame and flushes. Best effort — errors are ignored.
+//
 //nolint:errcheck
 func (s *Session) writeTLVStr(tag string, msg string) {
 	if s.Output == nil {
@@ -47,6 +48,7 @@ func (s *Session) writeTLVStr(tag string, msg string) {
 }
 
 // writeTLVJSON marshals a value to JSON and writes it as a TLV frame. Best effort.
+//
 //nolint:errcheck
 func (s *Session) writeTLVJSON(tag string, v any) {
 	if s.Output == nil {

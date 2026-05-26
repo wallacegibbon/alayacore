@@ -193,7 +193,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 	// If the model was removed from config since the session was saved,
 	// fall back to whatever initModelManager already set.
 	if data.ActiveModel != "" {
-		_ = s.ModelManager.SetActiveByName(data.ActiveModel) // best-effort restore, fall back to initModelManager default
+		_ = s.ModelManager.SetActiveByName(data.ActiveModel) //nolint:errcheck // best-effort restore, fall back to initModelManager default
 	}
 
 	// --model CLI flag takes highest priority: override whatever was resolved above.
@@ -209,7 +209,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 
 	// Send TLV chunks directly to output (avoids reconstruction)
 	for _, chunk := range data.TLVChunks {
-		_ = stream.WriteTLV(s.Output, chunk.Tag, chunk.Value)
+		_ = stream.WriteTLV(s.Output, chunk.Tag, chunk.Value) //nolint:errcheck // best-effort write to adaptor
 	}
 	if len(data.TLVChunks) > 0 {
 		s.Output.Flush()

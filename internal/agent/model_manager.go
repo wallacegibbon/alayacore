@@ -96,7 +96,7 @@ func NewModelManager(configPath string) *ModelManager {
 		nextID:   1, // IDs start from 1; 0 is reserved as "no model"
 	}
 	if configPath != "" {
-		_ = mm.LoadFromFile(configPath) // best-effort load on init
+		_ = mm.LoadFromFile(configPath) //nolint:errcheck // best-effort load on init
 	}
 	return mm
 }

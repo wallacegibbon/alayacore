@@ -34,12 +34,12 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) (int
 
 	_, err := s.agent.Load().Stream(ctx, history, llm.StreamCallbacks{
 		OnTextDelta: func(delta string) error {
-			_ = stream.WriteTLV(s.Output, stream.TagTextAssistant, stream.WrapDelta(assembleID(stream.SuffixText), delta))
+			_ = stream.WriteTLV(s.Output, stream.TagTextAssistant, stream.WrapDelta(assembleID(stream.SuffixText), delta)) //nolint:errcheck // best-effort write to adaptor
 			s.Output.Flush()
 			return nil
 		},
 		OnReasoningDelta: func(delta string) error {
-			_ = stream.WriteTLV(s.Output, stream.TagTextReasoning, stream.WrapDelta(assembleID(stream.SuffixReasoning), delta))
+			_ = stream.WriteTLV(s.Output, stream.TagTextReasoning, stream.WrapDelta(assembleID(stream.SuffixReasoning), delta)) //nolint:errcheck // best-effort write to adaptor
 			s.Output.Flush()
 			return nil
 		},
