@@ -21,7 +21,7 @@ package agent
 //     msgCh (inputMsg channel)  — inputPump → run()
 //     stateCh (taskEvent)        — task → run()
 //     taskCancelCh               — inputPump → task (cancellation)
-//     taskDone                   — task → run() (completion signal)
+//     taskResult                 — task → run (messages + completion signal)
 //     infoUpdateCh               — task → run() (system-info refresh)
 //
 // Related files:
@@ -76,17 +76,14 @@ type Session struct {
 
 	// taskResult carries the final message state from the task goroutine
 	// back to run() on completion. Buffered (capacity 1).
+	// The main loop selects on this channel to detect task completion
+	// and retrieve the final messages — no separate taskDone signal needed.
 	taskResult chan []llm.Message
 
 	// taskCancelCh is a buffered channel (capacity 1) used by inputPump to
 	// signal cancellation of the currently running task. The task goroutine
 	// listens on this channel and cancels its context when a signal arrives.
 	taskCancelCh chan struct{}
-
-	// taskDone is a buffered channel (capacity 1) that the task goroutine
-	// sends on when it completes. The main loop receives on this to know
-	// when to start the next task.
-	taskDone chan struct{}
 
 	// infoUpdateCh is a buffered channel (capacity 1) used by the task
 	// goroutine to request a system-info update from the run() goroutine.
@@ -150,7 +147,6 @@ func NewSession(cfg SessionConfig) *Session {
 		stateCh:        make(chan TaskEvent, 64),
 		taskResult:     make(chan []llm.Message, 1),
 		taskCancelCh:   make(chan struct{}, 1),
-		taskDone:       make(chan struct{}, 1),
 		infoUpdateCh:   make(chan struct{}, 1),
 		sessionCtx:     sessionCtx,
 		sessionCancel:  sessionCancel,
@@ -178,7 +174,6 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 		stateCh:        make(chan TaskEvent, 64),
 		taskResult:     make(chan []llm.Message, 1),
 		taskCancelCh:   make(chan struct{}, 1),
-		taskDone:       make(chan struct{}, 1),
 		infoUpdateCh:   make(chan struct{}, 1),
 		sessionCtx:     sessionCtx,
 		sessionCancel:  sessionCancel,

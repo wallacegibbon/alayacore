@@ -76,8 +76,8 @@ func (s *Session) run() {
 		case ev := <-s.stateCh:
 			s.handleTaskEvent(ev)
 
-		case <-s.taskDone:
-			s.handleTaskDone()
+		case result := <-s.taskResult:
+			s.handleTaskDone(result)
 
 		case <-s.infoUpdateCh:
 			s.sendSystemInfo()
@@ -130,20 +130,14 @@ func (s *Session) tryStartNextTask() bool {
 }
 
 // handleTaskDone processes a task completion signal from the task goroutine.
-// Reads the final message state from taskResult and updates s.Messages.
-func (s *Session) handleTaskDone() {
+// result is the final message state returned by the task goroutine.
+func (s *Session) handleTaskDone(result []llm.Message) {
 	// Mark the task as finished so the next queue item can start.
 	s.inProgress = false
 
-	// Read the final message state returned by the task goroutine.
-	// This is the sole handoff point — the task goroutine never writes
-	// to s.Messages directly.
-	select {
-	case result := <-s.taskResult:
-		if len(result) > 0 {
-			s.Messages = result
-		}
-	default:
+	// Update s.Messages with the final message state from the task goroutine.
+	if len(result) > 0 {
+		s.Messages = result
 	}
 
 	// Auto-save if configured
@@ -165,8 +159,8 @@ func (s *Session) drainUntilTaskDone() {
 		select {
 		case ev := <-s.stateCh:
 			s.handleTaskEvent(ev)
-		case <-s.taskDone:
-			s.handleTaskDone()
+		case result := <-s.taskResult:
+			s.handleTaskDone(result)
 			return
 		case <-s.infoUpdateCh:
 			s.sendSystemInfo()
