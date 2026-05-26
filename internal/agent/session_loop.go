@@ -194,11 +194,6 @@ func (s *Session) handleTaskEvent(ev taskEvent, runMessages *[]llm.Message) {
 			s.ContextTokens.Store(newContext)
 		}
 
-	case eventAppendMessages:
-		if len(ev.appendMsgs) > 0 {
-			*runMessages = append(*runMessages, ev.appendMsgs...)
-		}
-
 	case eventCleanMessages:
 		*runMessages = cleanIncompleteToolCalls(*runMessages)
 

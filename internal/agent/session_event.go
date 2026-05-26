@@ -18,7 +18,6 @@ type eventType int
 const (
 	eventStepStart eventType = iota
 	eventStepFinish
-	eventAppendMessages // generic message append (cancel message, etc.)
 	eventCleanMessages
 	eventSetPaused
 	eventSaveRequest
@@ -39,9 +38,6 @@ type taskEvent struct {
 	outputTokens        int64
 	cacheReadTokens     int64
 	cacheCreationTokens int64
-
-	// eventAppendMessages
-	appendMsgs []llm.Message
 
 	// eventSetPaused
 	paused bool
