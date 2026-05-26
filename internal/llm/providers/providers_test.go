@@ -628,11 +628,7 @@ func TestAnthropicReasoningStreaming(t *testing.T) {
 	}
 
 	// Check message content includes both reasoning and text
-	if len(stepComplete.Messages) == 0 {
-		t.Fatal("Expected at least one message")
-	}
-
-	msg := stepComplete.Messages[0]
+	msg := stepComplete.Message
 	if len(msg.Content) != 2 {
 		t.Fatalf("Expected 2 content parts, got %d", len(msg.Content))
 	}
@@ -742,7 +738,7 @@ func TestAnthropicThinkingSignature(t *testing.T) {
 	}
 
 	// Verify the new thinking block also has the signature
-	msg := stepComplete.Messages[0]
+	msg := stepComplete.Message
 	for _, part := range msg.Content {
 		if rp, ok := part.(llm.ReasoningPart); ok {
 			if rp.Signature != testSignature {
@@ -1294,11 +1290,8 @@ func TestOpenAIWithReasoning(t *testing.T) {
 	if stepComplete == nil {
 		t.Fatal("Expected StepCompleteEvent")
 	}
-	if len(stepComplete.Messages) != 1 {
-		t.Fatalf("Expected 1 message, got %d", len(stepComplete.Messages))
-	}
 
-	msg := stepComplete.Messages[0]
+	msg := stepComplete.Message
 	if len(msg.Content) < 2 {
 		t.Fatalf("Expected at least 2 content parts (reasoning + text), got %d", len(msg.Content))
 	}

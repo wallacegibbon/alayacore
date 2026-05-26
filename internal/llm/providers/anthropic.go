@@ -465,7 +465,7 @@ func (p *AnthropicProvider) handleEvent(eventType, data string, yield func(llm.S
 		}
 		p.mergeUsage(event.Usage, state)
 		yield(llm.StepCompleteEvent{
-			Messages:   []llm.Message{state.getMessage()},
+			Message:    state.getMessage(),
 			Usage:      state.getUsage(),
 			StopReason: state.stopReason,
 		}, nil)

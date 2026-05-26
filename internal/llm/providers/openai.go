@@ -298,7 +298,7 @@ func (p *OpenAIProvider) parseStream(reader io.Reader) iter.Seq2[llm.StreamEvent
 		}
 
 		yield(llm.StepCompleteEvent{
-			Messages:   []llm.Message{state.getMessage()},
+			Message:    state.getMessage(),
 			Usage:      state.getUsage(),
 			StopReason: state.getStopReason(),
 		}, nil)

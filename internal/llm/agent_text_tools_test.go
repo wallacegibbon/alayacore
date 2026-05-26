@@ -143,11 +143,9 @@ func (m *mockProviderWithTextAndTools) StreamMessages(_ context.Context, _ []Mes
 		}
 
 		yield(StepCompleteEvent{
-			Messages: []Message{
-				{
-					Role:    RoleAssistant,
-					Content: content,
-				},
+			Message: Message{
+				Role:    RoleAssistant,
+				Content: content,
 			},
 			Usage: Usage{InputTokens: 10, OutputTokens: 20},
 		}, nil)

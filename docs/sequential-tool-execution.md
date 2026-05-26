@@ -4,7 +4,7 @@ AlayaCore executes tool calls **sequentially** — one at a time, in order — e
 
 ## How It Works
 
-When the LLM returns multiple `tool_use` blocks in one response, the agent's `executeTools()` method processes them one by one in a `for` loop. All results are collected into a single tool result message and sent back to the LLM together. This is correct behavior — both Anthropic and OpenAI APIs expect all tool results for a step in a single response.
+When the LLM returns multiple `tool_use` blocks in one response, the agent's `executeTools()` method processes them one by one via `executeTool()`. All results are collected into a single tool result message and sent back to the LLM together. This is correct behavior — both Anthropic and OpenAI APIs expect all tool results for a step in a single response.
 
 See `internal/llm/agent.go` → `executeTools()`.
 

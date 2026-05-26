@@ -24,16 +24,14 @@ func (m *mockProviderAlwaysToolCalls) StreamMessages(_ context.Context, _ []Mess
 			Input:      []byte(`{}`),
 		}, nil)
 		yield(StepCompleteEvent{
-			Messages: []Message{
-				{
-					Role: RoleAssistant,
-					Content: []ContentPart{
-						ToolCallPart{
-							Type:       ContentPartToolUse,
-							ToolCallID: "call_1",
-							ToolName:   "repeat",
-							Input:      []byte(`{}`),
-						},
+			Message: Message{
+				Role: RoleAssistant,
+				Content: []ContentPart{
+					ToolCallPart{
+						Type:       ContentPartToolUse,
+						ToolCallID: "call_1",
+						ToolName:   "repeat",
+						Input:      []byte(`{}`),
 					},
 				},
 			},
@@ -129,11 +127,9 @@ func (m *mockProviderTruncated) StreamMessages(_ context.Context, _ []Message, _
 	return func(yield func(StreamEvent, error) bool) {
 		yield(TextDeltaEvent{Delta: "Partial response..."}, nil)
 		yield(StepCompleteEvent{
-			Messages: []Message{
-				{
-					Role:    RoleAssistant,
-					Content: []ContentPart{TextPart{Type: "text", Text: "Partial response..."}},
-				},
+			Message: Message{
+				Role:    RoleAssistant,
+				Content: []ContentPart{TextPart{Type: "text", Text: "Partial response..."}},
 			},
 			Usage:      Usage{InputTokens: 10, OutputTokens: 5},
 			StopReason: m.stopReason,

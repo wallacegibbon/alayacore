@@ -73,11 +73,7 @@ func TestTextWithToolCalls(t *testing.T) {
 		t.Fatal("No StepCompleteEvent received")
 	}
 
-	if len(stepComplete.Messages) == 0 {
-		t.Fatal("StepCompleteEvent has no messages")
-	}
-
-	msg := stepComplete.Messages[0]
+	msg := stepComplete.Message
 	t.Logf("Message role: %s", msg.Role)
 	t.Logf("Message content parts: %d", len(msg.Content))
 

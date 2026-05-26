@@ -90,10 +90,10 @@ The agent detects truncation in `processStreamEvents` and returns `ErrResponseTr
 ```go
 // In processStreamEvents:
 case StepCompleteEvent:
-    stepMessages = e.Messages
+    stepMessage = e.Message
     stepUsage = e.Usage
     if e.StopReason == "max_tokens" || e.StopReason == "length" {
-        return stepMessages, stepUsage, nil, ErrResponseTruncated
+        return stepMessage, stepUsage, ErrResponseTruncated
     }
 ```
 
