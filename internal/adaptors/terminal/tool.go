@@ -156,14 +156,14 @@ func prepareContent(s string) string {
 	return s
 }
 
-// expandTabs converts tabs to spaces, treating tabs as 8-space width.
+// expandTabs converts tabs to spaces, treating tabs as TabWidth-space width.
 func expandTabs(s string) string {
 	var result strings.Builder
 	col := 0
 	for _, r := range s {
 		switch r {
 		case '\t':
-			next := ((col / 8) + 1) * 8
+			next := ((col / TabWidth) + 1) * TabWidth
 			spaces := next - col
 			result.WriteString(strings.Repeat(" ", spaces))
 			col = next

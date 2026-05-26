@@ -104,7 +104,7 @@ func (wb *WindowBuffer) AppendOrUpdate(id string, tag string, content string) {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 
-	innerWidth := max(0, wb.width-4)
+	innerWidth := max(0, wb.width-BorderInnerPadding)
 
 	if idx, ok := wb.idIndex[id]; ok {
 		w := wb.Windows[idx]

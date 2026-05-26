@@ -1,7 +1,7 @@
 package agent
 
 // Session auto-summarization: automatically triggers :summarize when
-// context usage exceeds 65% of the configured limit.
+// context usage exceeds AutoSummarizeThreshold (65%) of the configured limit.
 //
 // Extracted from session_task.go to separate concerns.
 
@@ -9,6 +9,16 @@ import (
 	"context"
 
 	"github.com/alayacore/alayacore/internal/llm"
+)
+
+// Auto-summarization threshold constants.
+const (
+	// AutoSummarizeThreshold is the context usage percentage at which
+	// auto-summarization is triggered (65% of context limit).
+	AutoSummarizeThreshold = 65
+
+	// AutoSummarizePctBase is the base for percentage calculations (100%).
+	AutoSummarizePctBase = 100
 )
 
 // ============================================================================
@@ -43,15 +53,15 @@ func (s *Session) handleUserPrompt(ctx context.Context, prompt string) {
 }
 
 // shouldAutoSummarize returns true when auto-summarization is enabled and
-// the current context tokens exceed 65% of the configured limit.
+// the current context tokens exceed AutoSummarizeThreshold of the configured limit.
 func (s *Session) shouldAutoSummarize() bool {
 	return s.AutoSummarize && s.ContextLimit > 0 && s.ContextTokens.Load() > 0 &&
-		s.ContextTokens.Load() >= s.ContextLimit*65/100
+		s.ContextTokens.Load() >= s.ContextLimit*AutoSummarizeThreshold/AutoSummarizePctBase
 }
 
 // doAutoSummarize logs a notification and triggers summarization.
 func (s *Session) doAutoSummarize(ctx context.Context) {
-	usage := float64(s.ContextTokens.Load()) * 100 / float64(s.ContextLimit)
+	usage := float64(s.ContextTokens.Load()) * AutoSummarizePctBase / float64(s.ContextLimit)
 	s.writeNotifyf("Context usage at %d/%d tokens (%.0f%%). Auto-summarizing...",
 		s.ContextTokens.Load(), s.ContextLimit, usage)
 	s.summarize(ctx)

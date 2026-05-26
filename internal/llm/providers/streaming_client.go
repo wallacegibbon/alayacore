@@ -94,6 +94,16 @@ func (b *baseProvider) doRequest(req *http.Request) (io.ReadCloser, error) {
 //   - Data-only SSE: lines with "data: <payload>", one per event (OpenAI format).
 //
 // The scanner emits one sseLine per complete event.
+
+// SSE scanner buffer size constants.
+const (
+	// sseScannerInitBuf is the initial buffer size for the SSE scanner.
+	sseScannerInitBuf = 64 * 1024 // 64KB
+
+	// sseScannerMaxBuf is the maximum token size the SSE scanner can handle.
+	sseScannerMaxBuf = 1024 * 1024 // 1MB
+)
+
 type sseScanner struct {
 	scanner *bufio.Scanner
 
@@ -106,8 +116,8 @@ type sseScanner struct {
 // newSSEScanner creates an SSE scanner over the given reader.
 func newSSEScanner(reader io.Reader) *sseScanner {
 	scanner := bufio.NewScanner(reader)
-	buf := make([]byte, 0, 64*1024)
-	scanner.Buffer(buf, 1024*1024)
+	buf := make([]byte, 0, sseScannerInitBuf)
+	scanner.Buffer(buf, sseScannerMaxBuf)
 	return &sseScanner{scanner: scanner}
 }
 

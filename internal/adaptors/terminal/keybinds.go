@@ -127,7 +127,7 @@ func (m *Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 
 			// Return a command that will apply the theme after a delay
 			// This allows the cursor to update immediately
-			return m, tea.Tick(150*time.Millisecond, func(_ time.Time) tea.Msg {
+			return m, tea.Tick(ThemePreviewDebounce, func(_ time.Time) tea.Msg {
 				return themePreviewMsg{theme: theme, id: id}
 			})
 		}

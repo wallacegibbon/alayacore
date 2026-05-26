@@ -129,7 +129,7 @@ func (s *Styles) RenderBorderedBox(content string, width int, borderColor color.
 		BorderForeground(borderColor).
 		Padding(0, 1)
 
-	innerStyle := s.Input.Width(max(0, width-4))
+	innerStyle := s.Input.Width(max(0, width-BorderInnerPadding))
 	if len(height) > 0 {
 		innerStyle = innerStyle.Height(height[0])
 	}

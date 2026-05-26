@@ -134,7 +134,7 @@ func (w *Window) Render(width int, isCursor bool, styles *Styles, borderStyle, c
 
 // rebuildCache renders the window content and updates the cache
 func (w *Window) rebuildCache(width int, styles *Styles, borderStyle lipgloss.Style) {
-	innerWidth := max(0, width-4)
+	innerWidth := max(0, width-BorderInnerPadding)
 
 	parts := strings.SplitN(w.Content, toolResultSentinel, 2)
 
@@ -186,7 +186,7 @@ func (w *Window) renderGenericContent(innerWidth int, styles *Styles, content st
 
 	// FAST PATH: Use cached wrapped lines if width matches
 	// This avoids re-styling and re-wrapping the entire content
-	if len(w.cache.wrappedLines) > 0 && w.cache.width-4 == innerWidth && innerWidth > 0 {
+	if len(w.cache.wrappedLines) > 0 && w.cache.width-BorderInnerPadding == innerWidth && innerWidth > 0 {
 		return strings.Join(w.cache.wrappedLines, "\n")
 	}
 
