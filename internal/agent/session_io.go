@@ -5,7 +5,7 @@ package agent
 // These methods are called from either the run() goroutine (for immediate
 // commands) or the task goroutine (for deferred commands). The task
 // goroutine sends state mutations via stateCh, and the run() goroutine
-// owns taskQueue and runMessages directly.
+// owns taskQueue and s.Messages directly.
 
 import (
 	"context"

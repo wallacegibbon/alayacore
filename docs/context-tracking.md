@@ -22,22 +22,20 @@ Provider API response
             → ContextTokens = InputTokens + CacheReadTokens + CacheCreationTokens (overwrite, only if non-zero)
 ```
 
-Context tracking is handled by the `handleTaskEvent` method in `session_loop.go`, which processes `eventStepFinish` events from the task goroutine:
+Context tracking is handled by the `handleTaskEvent` method in `session_loop.go`, which processes `StepFinishEvent` events from the task goroutine:
 
 ```go
-case eventStepFinish:
-    if len(ev.messages) > 0 {
-        *runMessages = ev.messages // allMessages from agent — full history
-    }
-    s.TotalSpent.InputTokens += ev.inputTokens
-    s.TotalSpent.OutputTokens += ev.outputTokens
-    newContext := ev.inputTokens + ev.cacheReadTokens + ev.cacheCreationTokens
+case StepFinishEvent:
+    s.TotalSpent.InputTokens += e.InputTokens
+    s.TotalSpent.OutputTokens += e.OutputTokens
+    newContext := e.InputTokens + e.CacheReadTokens + e.CacheCreationTokens
     if newContext > 0 {
         s.ContextTokens.Store(newContext)
     }
 ```
 
-Key design decisions:
+Note: `StepFinishEvent` carries only token usage metadata. The final message
+state is returned separately via `taskResult` on task completion.
 
 - **Overwrite (`Store`), not accumulate (`Add`).** Each API call's `InputTokens` already represents the *entire conversation history* sent in that request. Accumulating would double-count.
 - **Guard against zero reports.** Some OpenAI-compatible providers (e.g. GLM-5.1) may omit the `usage` field from SSE chunks entirely — they simply never send a chunk containing `"usage": {"prompt_tokens": N, ...}`. Go's `json.Unmarshal` leaves absent fields at their zero values, so the parsed `Usage` struct arrives as all zeros. Without the guard, this would reset `ContextTokens` to 0, breaking auto-summarization and the status bar display. The `if newContext > 0` check preserves the last known good value.

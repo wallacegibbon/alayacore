@@ -32,7 +32,7 @@ import (
 // The loop processes three kinds of events:
 //   - Input messages from the user (via inputPump → msgCh)
 //   - Task state changes (via task goroutine → stateCh)
-//   - Task completion signals (via taskDone)
+//   - Task completion signals (via taskResult)
 //   - System info refresh requests (via infoUpdateCh)
 func (s *Session) run() {
 	defer close(s.runDone)

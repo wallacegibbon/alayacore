@@ -171,27 +171,34 @@ The agent accumulates all steps into `allMessages` internally, and:
    The session already has the data via OnStepFinish, so the return value
    is available but not required.
 
-3. **Between tasks**: `runMessages` (the `run()` goroutine's copy) is kept in
-   sync via `eventStepFinish` events. `handleTaskDone` syncs `s.Messages` back
-   to `runMessages` as a safety net.
+3. **Between tasks**: `s.Messages` (owned by the `run()` goroutine) is the
+   single source of truth. On task completion, `taskResult` channel returns
+   the final messages and `handleTaskDone` replaces `s.Messages`.
 
 ```
-Session (s.Messages)
+run() goroutine (s.Messages)
   │
-  ├── processPrompt(ctx, s.Messages)
-  │     └── agent.Stream(ctx, s.Messages, callbacks)
-  │           │
-  │           │ allMessages = copy(s.Messages)
-  │           │ for each step:
-  │           │   allMessages += [step results]
-  │           │   OnStepFinish(allMessages, usage)
-  │           │     │
-  │           │     ├── s.Messages = allMessages     ← replace
-  │           │     └── event ──► runMessages = allMessages ← replace
-  │           │
-  │           └── return StreamResult{Messages: allMessages}
+  ├── tryStartNextTask()
+  │     taskMessages = copy(s.Messages)
+  │     go runTask(item, taskMessages)
   │
-  └── handleTaskDone: saveSessionToFile(runMessages)
+  │     task goroutine (taskMessages — local copy)
+  │     └── handleUserPrompt / runTaskCommand
+  │           └── processPrompt(ctx, taskMessages)
+  │                 └── agent.Stream(ctx, taskMessages, callbacks)
+  │                       │
+  │                       │ allMessages = copy(taskMessages)
+  │                       │ for each step:
+  │                       │   allMessages += [step results]
+  │                       │   OnStepFinish(allMessages, usage)
+  │                       │     │
+  │                       │     └── capture processResult = allMessages
+  │                       │
+  │                       └── return (processResult, outputTokens, err)
+  │
+  └── handleTaskDone(result)
+        s.Messages = result  ← single handoff point
+        saveSessionToFile(s.Messages)
 ```
 
 ## StreamResult — the final summary

@@ -74,7 +74,7 @@ The session uses three goroutines for concurrent operation:
 |-----------|--------|------|
 | **Main loop** (`run()`) | `Session.Start()` | Owns all mutable state, manages the task queue, processes commands |
 | **Input pump** (`inputPump()`) | launched by `run()` | Reads TLV frames from the input stream, sends parsed messages to the main loop |
-| **Task worker** (`runTask()`) | spawned by `run()` per task | Executes a single task (LLM streaming + tool calls), signals completion via `taskDone` |
+| **Task worker** (`runTask()`) | spawned by `run()` per task | Executes a single task (LLM streaming + tool calls), returns final messages via `taskResult` |
 
 **Cross-goroutine communication:**
 
@@ -82,8 +82,8 @@ The session uses three goroutines for concurrent operation:
 |-----------|------|----|---------|
 | `msgCh` (buffered, cap 100) | inputPump | run() | Parsed user input messages |
 | `taskCancelCh` (buffered, cap 1) | inputPump | task worker | Cancel the running task |
-| `taskDone` (buffered, cap 1) | task worker | run() | Signal task completion |
-| `stateCh` (buffered, cap 64) | task worker | run() | Step progress, messages, token counts, paused state |
+| `taskResult` (buffered, cap 1) | task worker | run() | Return final messages and signal task completion |
+| `stateCh` (buffered, cap 64) | task worker | run() | Step progress, token counts, paused state |
 | `infoUpdateCh` (buffered, cap 1) | task worker | run() | Request system-info broadcast |
 | `atomic.Pointer[Agent]` | both | — | Lock-free agent pointer for task goroutine |
 | `atomic.Pointer[llm.Provider]` | both | — | Lock-free provider pointer for task goroutine |
@@ -108,14 +108,14 @@ stdin EOF ──▶ inputPump closes msgCh ──▶ run() detects closed channe
                                           │                │
                               drainUntilTaskDone()      return
                                    │
-                            wait for taskDone
+                            wait for taskResult
                             + process state events
                                    │
                                 return
 
 **State ownership:**
 - The `run()` goroutine is the sole owner of session state. It reads/writes `taskQueue`, `inProgress`, `pausedOnError`, `reasoningLevel`, `reasoningDirty`, and all command-handling logic. ModelManager and RuntimeManager are also accessed only from `run()`.
-- The task goroutine communicates state changes via typed events on `stateCh` (step progress, new messages, token counts) and reads atomic fields (`agent`, `provider`, `ContextTokens`, `currentStep`, `reasoningLevel`, `reasoningDirty`, `pausedOnError`) for lock-free access.
+- The task goroutine communicates state changes via typed events on `stateCh` (step progress, token counts) and reads atomic fields (`agent`, `provider`, `ContextTokens`, `currentStep`, `reasoningLevel`, `reasoningDirty`, `pausedOnError`) for lock-free access. The final message state is returned via `taskResult` on completion.
 - The input pump goroutine has NO access to session state except `taskCancelCh` (for `:cancel` commands).
 - `sendSystemInfo` runs only in the `run()` goroutine; the task goroutine requests updates via `infoUpdateCh`.
 
