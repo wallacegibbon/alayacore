@@ -94,12 +94,6 @@ type Session struct {
 	runDone       chan struct{}      // closed when run() exits
 }
 
-// WaitDone blocks until run() has finished processing all queued tasks
-// and exited. This should be called after closing the input.
-func (s *Session) WaitDone() {
-	<-s.runDone
-}
-
 // Done returns a channel that is closed when run() has exited.
 func (s *Session) Done() <-chan struct{} {
 	return s.runDone

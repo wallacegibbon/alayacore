@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"image/color"
 	"os"
-	"path/filepath"
 
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/lipgloss/v2"
@@ -70,36 +69,6 @@ func LoadTheme(path string) (*Theme, error) {
 	theme := DefaultTheme()
 	config.ParseKeyValue(string(data), theme)
 	return theme, nil
-}
-
-// LoadThemeFromPaths tries to load a theme from multiple paths in priority order
-// Returns the first successfully loaded theme, or the default theme if none found
-func LoadThemeFromPaths(explicitPath string, wc *WarningCollector) *Theme {
-	// Try explicit path first (highest priority)
-	if explicitPath != "" {
-		theme, err := LoadTheme(explicitPath)
-		if err == nil {
-			return theme
-		}
-		// If explicit path was given but failed, buffer warning but continue
-		AddWarningf(wc, "Warning: failed to load theme from %s: %v", explicitPath, err)
-	}
-
-	// Try default user theme path
-	homeDir, err := os.UserHomeDir()
-	if err == nil {
-		defaultPath := filepath.Join(homeDir, ".alayacore", "theme.conf")
-		if _, err := os.Stat(defaultPath); err == nil {
-			theme, err := LoadTheme(defaultPath)
-			if err == nil {
-				return theme
-			}
-			AddWarningf(wc, "Warning: failed to load theme from %s: %v", defaultPath, err)
-		}
-	}
-
-	// Fallback to default theme
-	return DefaultTheme()
 }
 
 // ============================================================================

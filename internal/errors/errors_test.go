@@ -37,7 +37,7 @@ func TestSessionError(t *testing.T) {
 }
 
 func TestNewSessionError(t *testing.T) {
-	err := NewSessionError("save", errors.New("disk full"))
+	err := NewSessionErrorf("save", "disk full")
 	if err.Op != "save" {
 		t.Errorf("Op = %q, want %q", err.Op, "save")
 	}

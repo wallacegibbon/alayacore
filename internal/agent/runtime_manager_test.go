@@ -55,12 +55,6 @@ func TestRuntimeManagerDefaultPath(t *testing.T) {
 	if resolved != expectedPath {
 		t.Errorf("Expected resolved path %s, got: %s", expectedPath, resolved)
 	}
-
-	// Verify the constructor uses the path as-is.
-	rm := NewRuntimeManager(expectedPath, "")
-	if rm.GetPath() != expectedPath {
-		t.Errorf("Expected path %s, got: %s", expectedPath, rm.GetPath())
-	}
 }
 
 func TestParseRuntimeConfig(t *testing.T) {

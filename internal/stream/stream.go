@@ -112,20 +112,6 @@ func WriteTLV(output Output, tag string, value string) error {
 	return err
 }
 
-// ParseTLV parses a TLV frame from raw bytes (as emitted by ChanInput).
-// Format: [2-byte tag][4-byte length][value]
-func ParseTLV(data []byte) (tag string, value string) {
-	if len(data) < 6 {
-		return "", ""
-	}
-	tag = string(data[0:2])
-	length := binary.BigEndian.Uint32(data[2:6])
-	if int(length) > len(data)-6 {
-		return "", ""
-	}
-	return tag, string(data[6 : 6+length])
-}
-
 // ReadTLV reads a single TLV-framed message from input.
 // It blocks until a full frame has been read or an error occurs.
 func ReadTLV(input Input) (string, string, error) {
@@ -166,24 +152,6 @@ type Output interface {
 	Write(p []byte) (n int, err error)
 	WriteString(s string) (n int, err error)
 	Flush() error
-}
-
-// ReadCloser combines Input with io.Closer.
-type ReadCloser struct {
-	Input
-}
-
-func (rc *ReadCloser) Close() error {
-	return nil
-}
-
-// WriteCloser combines Output with io.Closer.
-type WriteCloser struct {
-	Output
-}
-
-func (wc *WriteCloser) Close() error {
-	return nil
 }
 
 // NopInput is an Input that always returns EOF.

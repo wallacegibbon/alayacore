@@ -77,11 +77,6 @@ func (rm *RuntimeManager) save() error {
 	return os.WriteFile(rm.path, []byte(content), 0600)
 }
 
-// Save writes the runtime config to file (public wrapper).
-func (rm *RuntimeManager) Save() error {
-	return rm.save()
-}
-
 // parseRuntimeConfig parses the key-value runtime config format
 func parseRuntimeConfig(content string) RuntimeConfig {
 	var cfg RuntimeConfig
@@ -124,9 +119,4 @@ func (rm *RuntimeManager) GetActiveTheme() string {
 func (rm *RuntimeManager) SetActiveTheme(name string) error {
 	rm.config.ActiveTheme = name
 	return rm.save()
-}
-
-// GetPath returns the runtime config file path
-func (rm *RuntimeManager) GetPath() string {
-	return rm.path
 }

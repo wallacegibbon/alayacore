@@ -28,7 +28,7 @@ func TestQueueItemUniqueIDs(t *testing.T) {
 	session.submitTask(task3)
 
 	// Get queue items
-	items := session.GetQueueItems()
+	items := session.taskQueue
 
 	if len(items) != 3 {
 		t.Errorf("Expected 3 queue items, got %d", len(items))
@@ -73,7 +73,7 @@ func TestDeleteQueueItem(t *testing.T) {
 	}
 
 	// Verify deletion
-	items := session.GetQueueItems()
+	items := session.taskQueue
 	if len(items) != 2 {
 		t.Errorf("Expected 2 items after deletion, got %d", len(items))
 	}
@@ -109,7 +109,7 @@ func TestQueueItemTypes(t *testing.T) {
 	session.submitTask(promptTask)
 	session.submitTask(commandTask)
 
-	items := session.GetQueueItems()
+	items := session.taskQueue
 
 	// Verify task types are preserved
 	if len(items) != 2 {
@@ -140,7 +140,7 @@ func TestQueueTimestamps(t *testing.T) {
 	session.submitTask(UserPrompt{Text: "test"})
 	after := time.Now()
 
-	items := session.GetQueueItems()
+	items := session.taskQueue
 
 	if len(items) != 1 {
 		t.Fatalf("Expected 1 item, got %d", len(items))
@@ -266,7 +266,7 @@ func TestPausedOnError(t *testing.T) {
 	}
 
 	// Queue should contain the submitted task
-	items := session.GetQueueItems()
+	items := session.taskQueue
 	if len(items) != 1 {
 		t.Errorf("Expected 1 item after submit, got %d", len(items))
 	}
@@ -288,7 +288,7 @@ func TestSubmitTaskFront(t *testing.T) {
 	// Submit at front (simulates a deferred command like :continue)
 	session.enqueueTask(CommandPrompt{Command: commandNameContinue}, true)
 
-	items := session.GetQueueItems()
+	items := session.taskQueue
 	if len(items) != 3 {
 		t.Fatalf("Expected 3 items, got %d", len(items))
 	}
@@ -347,7 +347,7 @@ func TestCommandCanRunWhilePaused(t *testing.T) {
 	// In the single-goroutine design, submitDeferredCommand always places
 	// the command at the front, and the run() goroutine checks pausedOnError
 	// before running non-command tasks. The command runs regardless.
-	items := session.GetQueueItems()
+	items := session.taskQueue
 	if len(items) != 2 {
 		t.Fatalf("Expected 2 items, got %d", len(items))
 	}
@@ -394,7 +394,7 @@ func TestCommandBehindUserPromptWhilePaused(t *testing.T) {
 	// Now add a command to the front (like :continue does)
 	session.enqueueTask(CommandPrompt{Command: commandNameContinue}, true)
 
-	items := session.GetQueueItems()
+	items := session.taskQueue
 	if len(items) != 3 {
 		t.Fatalf("Expected 3 items, got %d", len(items))
 	}

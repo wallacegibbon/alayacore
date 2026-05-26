@@ -30,7 +30,7 @@ func (w ParseWarning) String() string {
 // Lines starting with # are comments. Empty lines are ignored.
 // Multiple configs can be separated by "---" on its own line.
 //
-// Unknown keys are silently ignored.  Use ParseKeyValueStrict to detect them.
+// Unknown keys are silently ignored.
 // Parse errors (e.g. non-numeric value for an int field) are also silently ignored.
 // Use ParseKeyValueWithWarnings to collect them.
 func ParseKeyValue(content string, target any) {
@@ -43,13 +43,6 @@ func ParseKeyValue(content string, target any) {
 func ParseKeyValueWithWarnings(content string, target any) []ParseWarning {
 	_, warnings := parseConfig(content, target, false, true)
 	return warnings
-}
-
-// ParseKeyValueStrict is like ParseKeyValue but returns any keys in content
-// that did not match a struct field tag.  Callers can log or error on these.
-func ParseKeyValueStrict(content string, target any) []string {
-	unknown, _ := parseConfig(content, target, true, false)
-	return unknown
 }
 
 // ParseKeyValueBlocks parses multiple config blocks separated by "---"

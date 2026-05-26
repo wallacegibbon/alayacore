@@ -118,16 +118,6 @@ type Terminal struct {
 	themePreviewID int // ID of the current pending theme preview
 }
 
-// NewTerminal creates a new Terminal model with all components initialized.
-func NewTerminal(
-	out OutputWriter,
-	inputStream *stream.ChanInput,
-	appCfg *app.Config,
-	initialWidth, initialHeight int,
-) *Terminal {
-	return NewTerminalWithTheme(out, inputStream, appCfg, initialWidth, initialHeight, DefaultTheme(), nil)
-}
-
 // NewTerminalWithTheme creates a new Terminal model with a custom theme.
 func NewTerminalWithTheme(
 	out OutputWriter,

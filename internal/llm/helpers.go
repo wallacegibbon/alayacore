@@ -5,44 +5,12 @@ import (
 	"encoding/json"
 )
 
-// NewSystemMessage creates a system message
-func NewSystemMessage(text string) Message {
-	return Message{
-		Role: RoleSystem,
-		Content: []ContentPart{
-			TextPart{Type: ContentPartText, Text: text},
-		},
-	}
-}
-
 // NewUserMessage creates a user message
 func NewUserMessage(text string) Message {
 	return Message{
 		Role: RoleUser,
 		Content: []ContentPart{
 			TextPart{Type: ContentPartText, Text: text},
-		},
-	}
-}
-
-// NewAssistantMessage creates an assistant message
-func NewAssistantMessage(parts []ContentPart) Message {
-	return Message{
-		Role:    RoleAssistant,
-		Content: parts,
-	}
-}
-
-// NewToolResultMessage creates a tool result message
-func NewToolResultMessage(toolCallID string, output ToolResultOutput) Message {
-	return Message{
-		Role: RoleTool,
-		Content: []ContentPart{
-			ToolResultPart{
-				Type:       ContentPartToolResult,
-				ToolCallID: toolCallID,
-				Output:     output,
-			},
 		},
 	}
 }

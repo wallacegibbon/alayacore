@@ -79,24 +79,6 @@ func TestLoadThemeInvalidPath(t *testing.T) {
 	}
 }
 
-func TestLoadThemeFromPaths(t *testing.T) {
-	// Set HOME to a temp directory to isolate from user's config
-	tmpDir := t.TempDir()
-	t.Setenv("HOME", tmpDir)
-
-	// Test with nonexistent explicit path (should fallback to default)
-	theme := LoadThemeFromPaths("/nonexistent/theme.conf", nil)
-	if theme.Primary != "#89d4fa" {
-		t.Errorf("Expected default theme, got Primary %s", theme.Primary)
-	}
-
-	// Test with empty path (should use default)
-	theme = LoadThemeFromPaths("", nil)
-	if theme.Primary != "#89d4fa" {
-		t.Errorf("Expected default theme, got Primary %s", theme.Primary)
-	}
-}
-
 func TestNewStylesWithTheme(t *testing.T) {
 	theme := &Theme{
 		Primary:   "#custom1",

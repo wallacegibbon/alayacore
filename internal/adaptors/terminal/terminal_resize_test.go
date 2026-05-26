@@ -14,7 +14,7 @@ func TestTerminalResizeCursorValidation(t *testing.T) {
 	// Create a terminal with initial size
 	output := NewTerminalOutput(DefaultStyles())
 	input := stream.NewChanInput(10)
-	terminal := NewTerminal(output, input, nil, 80, 24)
+	terminal := NewTerminalWithTheme(output, input, nil, 80, 24, DefaultTheme(), nil)
 
 	// Add some windows to the buffer
 	output.windowBuffer.AppendOrUpdate("window-1", stream.TagTextAssistant, "Content 1")
@@ -51,7 +51,7 @@ func TestTerminalResizeCursorValidation(t *testing.T) {
 func TestTerminalResizeClampsCursor(t *testing.T) {
 	output := NewTerminalOutput(DefaultStyles())
 	input := stream.NewChanInput(10)
-	terminal := NewTerminal(output, input, nil, 80, 24)
+	terminal := NewTerminalWithTheme(output, input, nil, 80, 24, DefaultTheme(), nil)
 
 	// Add windows
 	output.windowBuffer.AppendOrUpdate("window-1", stream.TagTextAssistant, "Short")
@@ -90,7 +90,7 @@ func TestTerminalResizeUpdatesDisplayContent(t *testing.T) {
 	// Create a terminal with initial size
 	output := NewTerminalOutput(DefaultStyles())
 	input := stream.NewChanInput(10)
-	terminal := NewTerminal(output, input, nil, 80, 24)
+	terminal := NewTerminalWithTheme(output, input, nil, 80, 24, DefaultTheme(), nil)
 
 	// Add content that will wrap differently at different widths
 	longContent := "This is a long line of text that will wrap differently depending on the terminal width"

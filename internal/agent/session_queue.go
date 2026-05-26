@@ -163,13 +163,6 @@ func (s *Session) appendCancelMessage() {
 // Queue Accessors (called from run() goroutine only)
 // ============================================================================
 
-// GetQueueItems returns all queued items
-func (s *Session) GetQueueItems() []QueueItem {
-	items := make([]QueueItem, len(s.taskQueue))
-	copy(items, s.taskQueue)
-	return items
-}
-
 // DeleteQueueItem removes a queue item by ID
 func (s *Session) DeleteQueueItem(queueID string) bool {
 	for i, item := range s.taskQueue {

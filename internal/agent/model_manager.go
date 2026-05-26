@@ -326,35 +326,6 @@ func (mm *ModelManager) GetActiveID() int {
 	return mm.activeID
 }
 
-// DeleteModel removes a model by ID from runtime list (does NOT persist to file)
-func (mm *ModelManager) DeleteModel(id int) error {
-	for i, m := range mm.models {
-		if m.ID == id {
-			mm.models = append(mm.models[:i], mm.models[i+1:]...)
-			if mm.activeID == id {
-				mm.activeID = 0
-				if len(mm.models) > 0 {
-					mm.activeID = mm.models[0].ID
-				}
-			}
-			return nil
-		}
-	}
-	return domainerrors.Wrapf(domainerrors.OpModelSet, domainerrors.ErrModelNotFound, "model not found: %d", id)
-}
-
-// UpdateModel updates a model by ID in runtime list (does NOT persist to file)
-func (mm *ModelManager) UpdateModel(id int, m ModelConfig) error {
-	m.ID = id // Preserve the ID
-	for i, existing := range mm.models {
-		if existing.ID == id {
-			mm.models[i] = m
-			return nil
-		}
-	}
-	return domainerrors.Wrapf("model_set", domainerrors.ErrModelNotFound, "model not found: %d", id)
-}
-
 // GetFilePath returns the current file path
 func (mm *ModelManager) GetFilePath() string {
 	return mm.filePath

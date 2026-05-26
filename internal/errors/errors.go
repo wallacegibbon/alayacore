@@ -101,11 +101,6 @@ func (e *SessionError) ErrorKind() ErrorKind {
 	return e.Kind
 }
 
-// NewSessionError creates a new SessionError with the given operation and error.
-func NewSessionError(op string, err error) *SessionError {
-	return &SessionError{Op: op, Err: err, Kind: inferKind(op)}
-}
-
 // NewSessionErrorf creates a new SessionError with a formatted error message.
 func NewSessionErrorf(op, format string, args ...any) *SessionError {
 	return &SessionError{Op: op, Err: fmt.Errorf(format, args...), Kind: inferKind(op)}

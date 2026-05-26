@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"sync"
 	"syscall"
-	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -204,37 +203,6 @@ func SignalProcessGroup(process *os.Process) error {
 	return process.Kill()
 }
 
-// TerminateProcessGroup kills the process tree on Windows.
-//
-// It first tries the Job Object (kills the entire tree, including
-// grandchildren).  If the Job is unavailable (e.g. nested job restriction
-// on pre-Win8), it falls back to taskkill /F /T.
-//
-// The done channel receives the result of cmd.Wait() and is used to
-// detect when the process has actually exited.
-// Returns the exit code from the killed process.
-func TerminateProcessGroup(process *os.Process, done <-chan error) int {
-	// Try Job Object first (fast, kernel-level, covers entire tree).
-	if job := loadJob(); job != nil {
-		if err := job.Terminate(); err == nil {
-			waitErr := waitWithTimeout(done, 3*time.Second)
-			return ExitCodeFromError(waitErr)
-		}
-		// Job termination failed; fall through to taskkill.
-	}
-
-	// Fallback: taskkill /F /T kills the process tree.
-	if killProcessTree(process.Pid) {
-		waitErr := waitWithTimeout(done, 3*time.Second)
-		return ExitCodeFromError(waitErr)
-	}
-
-	// Last resort: kill only the direct child.
-	_ = process.Kill()
-	waitErr := <-done
-	return ExitCodeFromError(waitErr)
-}
-
 // killProcessTree runs "taskkill /F /T /PID <pid>" to kill an entire
 // process tree.  Returns true if taskkill reported success.
 func killProcessTree(pid int) bool {
@@ -245,19 +213,6 @@ func killProcessTree(pid int) bool {
 	err := cmd.Run()
 	return err == nil
 }
-
-// waitWithTimeout waits for the process to exit (via done) or for the
-// timeout to elapse.  If the timeout fires, it falls back to Kill.
-// Returns the error from cmd.Wait().
-func waitWithTimeout(done <-chan error, timeout time.Duration) error {
-	select {
-	case waitErr := <-done:
-		return waitErr
-	case <-time.After(timeout):
-		// Process didn't exit in time; leave it to KILL_ON_JOB_CLOSE
-		// or the caller's WaitDelay to clean up.
-		return <-done
-	}
 }
 
 // ExitCodeFromError extracts the exit code from a cmd.Wait error.

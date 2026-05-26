@@ -58,11 +58,6 @@ func LookupCommand(name string) (*Command, bool) {
 	return nil, false
 }
 
-// ListCommands returns all registered command metadata.
-func ListCommands() []Command {
-	return commandDefs
-}
-
 // DispatchCommand dispatches a colon-command to the appropriate Session method.
 // Returns true if the command was recognized (even if execution failed).
 func (s *Session) dispatchCommand(ctx context.Context, cmd string) bool {
