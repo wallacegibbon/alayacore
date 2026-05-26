@@ -691,9 +691,10 @@ func anthropicConvertMessages(messages []llm.Message, reasoningLevel int) []anth
 				}
 			}
 			if !hasThinking {
+				emptyStr := ""
 				apiMsg.Content = append([]anthropicContentBlock{{
 					Type:     anthropicBlockTypeThinking,
-					Thinking: ptrTo(""),
+					Thinking: &emptyStr,
 				}}, apiMsg.Content...)
 			}
 		}
@@ -702,6 +703,3 @@ func anthropicConvertMessages(messages []llm.Message, reasoningLevel int) []anth
 	}
 	return apiMessages
 }
-
-// ptrTo returns a pointer to the given string value.
-func ptrTo(s string) *string { return &s }
