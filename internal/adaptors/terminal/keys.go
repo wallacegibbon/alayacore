@@ -47,6 +47,8 @@ const (
 	// Shift+Letter
 	keyShiftDown = "shift+down"
 	keyShiftUp   = "shift+up"
+	keyJCapital  = "J"
+	keyKCapital  = "K"
 
 	// Ctrl combinations
 	keyCtrlC = "ctrl+c"
