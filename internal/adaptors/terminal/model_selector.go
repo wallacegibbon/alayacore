@@ -223,7 +223,7 @@ func (ms *ModelSelector) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 func (ms *ModelSelector) handleListKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	key := msg.String()
 
-	if key == "tab" {
+	if key == keyTab {
 		ms.HandleTabKey()
 		return nil
 	}
@@ -236,23 +236,23 @@ func (ms *ModelSelector) handleListKeyMsg(msg tea.KeyMsg) tea.Cmd {
 }
 
 func (ms *ModelSelector) handleSearchInputKey(msg tea.KeyMsg, key string) tea.Cmd {
-	if key == "esc" {
+	if key == keyEsc {
 		ms.State = FilteredListClosed
 		return nil
 	}
 
-	if key == "ctrl+c" {
+	if key == keyCtrlC {
 		ms.HandleFilterCtrlC()
 		ms.updateFilteredModels()
 		ms.ClampSelection(len(ms.filteredModels))
 		return nil
 	}
 
-	if key == "ctrl+u" || key == "ctrl+d" {
+	if key == keyCtrlU || key == keyCtrlD {
 		return nil
 	}
 
-	if key == "enter" && len(ms.filteredModels) > 0 {
+	if key == keyEnter && len(ms.filteredModels) > 0 {
 		ms.SelectedIdx = 0
 		ms.activeModel = &ms.filteredModels[0]
 		ms.modelJustSelected = true
@@ -274,25 +274,25 @@ func (ms *ModelSelector) handleSearchInputKey(msg tea.KeyMsg, key string) tea.Cm
 
 func (ms *ModelSelector) handleListNavigationKey(key string) tea.Cmd {
 	switch key {
-	case "up", "k":
+	case keyUp, keyK:
 		if ms.SelectedIdx > 0 {
 			ms.SelectedIdx--
 		}
-	case "down", "j":
+	case keyDown, keyJ:
 		if ms.SelectedIdx < len(ms.filteredModels)-1 {
 			ms.SelectedIdx++
 		}
-	case "enter":
+	case keyEnter:
 		if len(ms.filteredModels) > 0 && ms.SelectedIdx >= 0 {
 			ms.activeModel = &ms.filteredModels[ms.SelectedIdx]
 			ms.modelJustSelected = true
 			ms.State = FilteredListClosed
 		}
-	case "e":
+	case keyE:
 		ms.openModelFile = true
-	case "r":
+	case keyR:
 		ms.reloadModels = true
-	case "esc", "q":
+	case keyEsc, keyQ:
 		ms.State = FilteredListClosed
 	}
 	return nil

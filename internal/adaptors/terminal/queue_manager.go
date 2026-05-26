@@ -62,29 +62,29 @@ func (qm *QueueManager) GetSelectedItem() *QueueItem {
 // HandleKeyMsg processes keyboard input and returns a tea.Cmd
 func (qm *QueueManager) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	switch msg.String() {
-	case "q", "esc", "ctrl+c":
+	case keyQ, keyEsc, keyCtrlC:
 		qm.State = ScrollableListClosed
 		return nil
 
-	case "j", "down":
+	case keyJ, keyDown:
 		if len(qm.items) > 0 && qm.SelectedIdx < len(qm.items)-1 {
 			qm.SelectedIdx++
 			qm.updateScrollForHeight(SelectorListRows)
 		}
 		return nil
 
-	case "k", "up":
+	case keyK, keyUp:
 		if qm.SelectedIdx > 0 {
 			qm.SelectedIdx--
 			qm.updateScrollForHeight(SelectorListRows)
 		}
 		return nil
 
-	case "d":
+	case keyD:
 		// Delete is handled by parent
 		return nil
 
-	case "e":
+	case keyE:
 		// Edit is handled by parent
 		return nil
 	}

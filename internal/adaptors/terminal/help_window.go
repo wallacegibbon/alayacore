@@ -189,7 +189,7 @@ func (hw *HelpWindow) filteredLen() int {
 func (hw *HelpWindow) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	key := msg.String()
 
-	if key == "tab" {
+	if key == keyTab {
 		hw.HandleTabKey()
 		return nil
 	}
@@ -203,19 +203,19 @@ func (hw *HelpWindow) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 
 // handleFilterInputKey handles keys when the filter input is focused.
 func (hw *HelpWindow) handleFilterInputKey(msg tea.KeyMsg, key string) tea.Cmd {
-	if key == "esc" {
+	if key == keyEsc {
 		hw.State = FilteredListClosed
 		return nil
 	}
 
-	if key == "ctrl+c" {
+	if key == keyCtrlC {
 		hw.HandleFilterCtrlC()
 		hw.updateFilteredItems()
 		hw.clampSelection()
 		return nil
 	}
 
-	if key == "ctrl+u" || key == "ctrl+d" {
+	if key == keyCtrlU || key == keyCtrlD {
 		return nil
 	}
 
@@ -234,11 +234,11 @@ func (hw *HelpWindow) handleFilterInputKey(msg tea.KeyMsg, key string) tea.Cmd {
 // handleListKey handles keys when the list is focused.
 func (hw *HelpWindow) handleListKey(key string) tea.Cmd {
 	switch key {
-	case "q", "esc", "ctrl+c":
+	case keyQ, keyEsc, keyCtrlC:
 		hw.State = FilteredListClosed
 		return nil
 
-	case "enter":
+	case keyEnter:
 		if hw.SelectedIdx >= 0 && hw.SelectedIdx < hw.filteredLen() {
 			item := hw.filteredItems[hw.SelectedIdx]
 			if !item.IsSection && item.Type == HelpItemCommand {
@@ -248,11 +248,11 @@ func (hw *HelpWindow) handleListKey(key string) tea.Cmd {
 		}
 		return nil
 
-	case "j", "down":
+	case keyJ, keyDown:
 		hw.moveDown()
 		return nil
 
-	case "k", "up":
+	case keyK, keyUp:
 		hw.moveUp()
 		return nil
 	}

@@ -23,7 +23,7 @@ import (
 // handleKeyMsg routes keyboard input to the appropriate handler.
 func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Ctrl+Z works from any context, including overlays
-	if msg.String() == "ctrl+z" {
+	if msg.String() == keyCtrlZ {
 		return m, tea.Suspend
 	}
 
@@ -53,13 +53,13 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	// 5. Tab toggles focus between display and input
-	if msg.String() == "tab" {
+	if msg.String() == keyTab {
 		m.toggleFocus()
 		return m, nil
 	}
 
 	// 6. Display-specific keys when display is focused
-	if m.focusedWindow == "display" {
+	if m.focusedWindow == focusDisplay {
 		if cmd, handled := m.handleDisplayKeys(msg); handled {
 			return m, cmd
 		}
@@ -77,7 +77,7 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // handleThemeSelectorKeys handles input when theme selector is open.
 func (m *Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Check if it's a reload request
-	if msg.String() == "r" && m.themeManager != nil {
+	if msg.String() == keyR && m.themeManager != nil {
 		m.themeManager.ReloadThemes()
 		m.themeSelector.Open(m.themeManager.GetThemes(), m.activeTheme)
 		return m, nil
@@ -118,7 +118,7 @@ func (m *Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	if previewTheme != nil {
 		// For navigation keys, delay theme application to keep cursor responsive
 		key := msg.String()
-		if key == "j" || key == "k" || key == "up" || key == "down" {
+		if key == keyJ || key == keyK || key == keyUp || key == keyDown {
 			// Increment the ID to invalidate any pending preview
 			m.themePreviewID++
 			// Capture the current ID to check if this preview is still valid
@@ -182,7 +182,7 @@ func (m *Terminal) handleModelSelectorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 // handleQueueManagerKeys handles input when queue manager is open.
 func (m *Terminal) handleQueueManagerKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Handle 'd' key for delete
-	if msg.String() == "d" {
+	if msg.String() == keyD {
 		selectedItem := m.queueManager.GetSelectedItem()
 		if selectedItem != nil {
 			// Send delete command to session
@@ -194,7 +194,7 @@ func (m *Terminal) handleQueueManagerKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	// Handle 'e' key for edit in external editor
-	if msg.String() == "e" {
+	if msg.String() == keyE {
 		selectedItem := m.queueManager.GetSelectedItem()
 		if selectedItem != nil {
 			return m, m.editor.OpenForQueue(selectedItem.Content, selectedItem.QueueID)
@@ -243,7 +243,7 @@ func (m *Terminal) handleConfirmDialog(msg tea.KeyMsg) (tea.Cmd, bool) {
 	key := msg.String()
 
 	switch key {
-	case "y", "Y":
+	case keyY, keyYCapital:
 		kind := m.confirmDialog
 		fromCmd := m.confirmFromCommand
 		m.confirmDialog = confirmNone
@@ -267,7 +267,7 @@ func (m *Terminal) handleConfirmDialog(msg tea.KeyMsg) (tea.Cmd, bool) {
 			return m.submitCommand("cancel_all", fromCmd), true
 		}
 
-	case "n", "N", "esc", "ctrl+c":
+	case keyN, keyNCapital, keyEsc, keyCtrlC:
 		if m.confirmFromCommand {
 			m.input.SetValue("")
 		}
@@ -339,59 +339,59 @@ func gotoTop(m *Terminal) {
 // displayKeyMap maps display key strings to their handler functions.
 // Handlers that don't need to return a tea.Cmd use this map.
 var displayKeyMap = map[string]func(*Terminal){
-	"j":          moveWindowCursorDown,
-	"down":       moveWindowCursorDown,
-	"k":          moveWindowCursorUp,
-	"up":         moveWindowCursorUp,
-	"ctrl+d":     scrollDownHalf,
-	"pgdown":     scrollDownHalf,
-	"ctrl+u":     scrollUpHalf,
-	"pgup":       scrollUpHalf,
-	"J":          scrollDownLine,
-	"shift+down": scrollDownLine,
-	"K":          scrollUpLine,
-	"shift+up":   scrollUpLine,
-	"H": func(m *Terminal) {
+	keyJ:        moveWindowCursorDown,
+	keyDown:     moveWindowCursorDown,
+	keyK:        moveWindowCursorUp,
+	keyUp:       moveWindowCursorUp,
+	keyCtrlD:    scrollDownHalf,
+	keyPgDown:   scrollDownHalf,
+	keyCtrlU:    scrollUpHalf,
+	keyPgUp:     scrollUpHalf,
+	"J":         scrollDownLine,
+	keyShiftDown: scrollDownLine,
+	"K":         scrollUpLine,
+	keyShiftUp:  scrollUpLine,
+	keyH: func(m *Terminal) {
 		if m.display.MoveWindowCursorToTop() {
 			m.display.EnsureCursorVisible()
 			m.display.updateContent()
 		}
 	},
-	"L": func(m *Terminal) {
+	keyL: func(m *Terminal) {
 		if m.display.MoveWindowCursorToBottom() {
 			m.display.EnsureCursorVisible()
 			m.display.updateContent()
 		}
 	},
-	"M": func(m *Terminal) {
+	keyM: func(m *Terminal) {
 		if m.display.MoveWindowCursorToCenter() {
 			m.display.EnsureCursorVisible()
 			m.display.updateContent()
 		}
 	},
-	"G":    gotoBottom,
-	"end":  gotoBottom,
-	"g":    gotoTop,
-	"home": gotoTop,
-	":": func(m *Terminal) {
+	keyG:    gotoBottom,
+	keyEnd:  gotoBottom,
+	keyGSmall: gotoTop,
+	keyHome: gotoTop,
+	keyColon: func(m *Terminal) {
 		m.focusInput()
-		m.input.SetValue(":")
+		m.input.SetValue(keyColon)
 		m.input.CursorEnd()
 		m.display.updateContent()
 	},
-	"space": func(m *Terminal) {
+	keySpace: func(m *Terminal) {
 		if m.display.ToggleWindowFold() {
 			m.display.EnsureCursorVisible()
 			m.display.updateContent()
 		}
 	},
-	"f": func(m *Terminal) {
+	keyF: func(m *Terminal) {
 		if m.display.MoveWindowCursorToNextUserPrompt() {
 			m.display.ScrollCursorToTop()
 			m.display.updateContent()
 		}
 	},
-	"b": func(m *Terminal) {
+	keyB: func(m *Terminal) {
 		if m.display.MoveWindowCursorToPrevUserPrompt() {
 			m.display.ScrollCursorToTop()
 			m.display.updateContent()
@@ -402,7 +402,7 @@ var displayKeyMap = map[string]func(*Terminal){
 // displayKeyCmdMap maps display keys that need to return a tea.Cmd.
 // Only keys that trigger follow-up commands are listed here.
 var displayKeyCmdMap = map[string]func(*Terminal) tea.Cmd{
-	"e": func(m *Terminal) tea.Cmd {
+	keyE: func(m *Terminal) tea.Cmd {
 		content := m.display.GetCursorWindowContent()
 		if content != "" {
 			m.display.MarkUserScrolled()
@@ -438,31 +438,31 @@ func (m *Terminal) handleDisplayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 // handleGlobalKeys handles global keyboard shortcuts.
 func (m *Terminal) handleGlobalKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 	switch msg.String() {
-	case "ctrl+g":
+	case keyCtrlG:
 		m.confirmDialog = confirmCancel
 		m.confirmFromCommand = false
 		return nil, true
 
-	case "ctrl+s":
+	case keyCtrlS:
 		return m.submitCommand("save", false), true
 
-	case "ctrl+l":
+	case keyCtrlL:
 		m.openModelSelector()
 		return nil, true
 
-	case "ctrl+p":
+	case keyCtrlP:
 		m.openThemeSelector()
 		return nil, true
 
-	case "ctrl+q":
+	case keyCtrlQ:
 		m.openQueueManager()
 		return nil, true
 
-	case "ctrl+h", "f1":
+	case keyCtrlH, keyF1:
 		m.openHelpWindow()
 		return nil, true
 
-	case "enter":
+	case keyEnter:
 		return m.handleSubmit(), true
 	}
 
@@ -474,9 +474,9 @@ func (m *Terminal) handleInputKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Input-only global shortcuts
 	if m.focusedWindow == focusInput {
 		switch msg.String() {
-		case "ctrl+o":
+		case keyCtrlO:
 			return m, m.OpenEditor()
-		case "ctrl+c":
+		case keyCtrlC:
 			m.input.SetValue("")
 			m.input.editorContent = ""
 			return m, nil
@@ -485,7 +485,7 @@ func (m *Terminal) handleInputKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// Block keys that would modify input content unexpectedly
 	switch msg.String() {
-	case "ctrl+u", "ctrl+d":
+	case keyCtrlU, keyCtrlD:
 		// Swallow to prevent textinput's default clear-line / delete-char
 		return m, nil
 	}
@@ -530,34 +530,34 @@ func (m *Terminal) handleSubmit() tea.Cmd {
 // handleCommand processes a command string (without the ":" prefix).
 func (m *Terminal) handleCommand(command string) tea.Cmd {
 	// Quit command
-	if command == "quit" || command == "q" {
+	if command == cmdQuit || command == cmdQShort {
 		m.confirmDialog = confirmQuit
 		m.confirmFromCommand = true
 		return nil
 	}
 
 	// Cancel command
-	if command == "cancel" {
+	if command == cmdCancel {
 		m.confirmDialog = confirmCancel
 		m.confirmFromCommand = true
 		return nil
 	}
 
 	// Cancel all command
-	if command == "cancel_all" {
+	if command == cmdCancelAll {
 		m.confirmDialog = confirmCancelAll
 		m.confirmFromCommand = true
 		return nil
 	}
 
 	// Suspend command - suspends the process (like Ctrl+Z)
-	if command == "suspend" {
+	if command == cmdSuspend {
 		m.input.SetValue("")
 		return tea.Suspend
 	}
 
 	// Help command - opens help window locally, not sent to session
-	if command == "help" {
+	if command == cmdHelp {
 		m.input.SetValue("")
 		m.openHelpWindow()
 		return nil

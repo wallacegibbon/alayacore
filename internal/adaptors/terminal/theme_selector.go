@@ -125,19 +125,19 @@ func (ts *ThemeSelector) HandleKeyMsg(msg tea.KeyMsg, themeManager *ThemeManager
 	var previewTheme *Theme
 
 	switch key {
-	case "up", "k":
+	case keyUp, keyK:
 		if ts.SelectedIdx > 0 {
 			ts.SelectedIdx--
 			ts.EnsureVisible()
 			previewTheme = ts.getPreviewTheme(themeManager)
 		}
-	case "down", "j":
+	case keyDown, keyJ:
 		if ts.SelectedIdx < len(ts.themes)-1 {
 			ts.SelectedIdx++
 			ts.EnsureVisible()
 			previewTheme = ts.getPreviewTheme(themeManager)
 		}
-	case "enter":
+	case keyEnter:
 		if len(ts.themes) > 0 && ts.SelectedIdx >= 0 {
 			ts.themeJustSelected = true
 			ts.State = ScrollableListClosed
@@ -145,9 +145,9 @@ func (ts *ThemeSelector) HandleKeyMsg(msg tea.KeyMsg, themeManager *ThemeManager
 			ts.previewTheme = nil
 			return previewTheme, true
 		}
-	case "r":
+	case keyR:
 		return nil, false // Parent handles reload
-	case "esc", "q":
+	case keyEsc, keyQ:
 		ts.Close()
 		return nil, true
 	}
