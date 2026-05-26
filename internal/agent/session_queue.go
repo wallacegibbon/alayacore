@@ -17,6 +17,8 @@ import (
 
 	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/stream"
+
+	domainerrors "github.com/alayacore/alayacore/internal/errors"
 )
 
 // ============================================================================
@@ -150,8 +152,7 @@ func (s *Session) runTaskCommand(ctx context.Context, messages []llm.Message, cm
 	case commandNameContinue:
 		return s.handleContinue(ctx, messages, parts[1:])
 	default:
-		// Unknown deferred command — shouldn't happen since only registered
-		// deferred commands reach the task goroutine.
+		s.writeError(domainerrors.NewSessionErrorf("command", "unknown cmd <%s>", parts[0]).Error())
 		return messages
 	}
 }
