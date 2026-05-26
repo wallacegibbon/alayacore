@@ -85,14 +85,15 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) (int
 		},
 		OnStepFinish: func(messages []llm.Message, usage llm.Usage) error {
 			// messages is allMessages (full history) from the agent.
-			// Replace s.Messages directly — no append needed.
+			// Update s.Messages (task goroutine's working copy).
+			// The final message state is returned to run() via taskResult
+			// when the task completes, not through StepFinishEvent.
 			if len(messages) > 0 {
 				s.Messages = messages
 			}
 
-			// Send event to run() so it updates runMessages and totals.
+			// Send event to run() so it updates token totals.
 			s.sendEvent(StepFinishEvent{
-				Messages:            messages,
 				InputTokens:         usage.InputTokens,
 				OutputTokens:        usage.OutputTokens,
 				CacheReadTokens:     usage.CacheReadTokens,

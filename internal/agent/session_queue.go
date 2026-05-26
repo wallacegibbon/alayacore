@@ -102,8 +102,17 @@ func (s *Session) runTask(item QueueItem) {
 
 	defer cancel()
 	defer func() {
-		// Signal the main loop that this task has completed.
+		// Return the final message state to run() so it can replace
+		// runMessages with the task goroutine's final state.
 		// Non-blocking send — the channel is buffered (capacity 1).
+		finalMessages := make([]llm.Message, len(s.Messages))
+		copy(finalMessages, s.Messages)
+		select {
+		case s.taskResult <- finalMessages:
+		default:
+		}
+
+		// Signal the main loop that this task has completed.
 		select {
 		case s.taskDone <- struct{}{}:
 		default:

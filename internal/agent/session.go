@@ -74,6 +74,10 @@ type Session struct {
 	// stateCh carries state mutations from the task goroutine to run().
 	stateCh chan TaskEvent
 
+	// taskResult carries the final message state from the task goroutine
+	// back to run() on completion. Buffered (capacity 1).
+	taskResult chan []llm.Message
+
 	// taskCancelCh is a buffered channel (capacity 1) used by inputPump to
 	// signal cancellation of the currently running task. The task goroutine
 	// listens on this channel and cancels its context when a signal arrives.
@@ -144,6 +148,7 @@ func NewSession(cfg SessionConfig) *Session {
 		SessionConfig:  cfg,
 		taskQueue:      make([]QueueItem, 0),
 		stateCh:        make(chan TaskEvent, 64),
+		taskResult:     make(chan []llm.Message, 1),
 		taskCancelCh:   make(chan struct{}, 1),
 		taskDone:       make(chan struct{}, 1),
 		infoUpdateCh:   make(chan struct{}, 1),
@@ -171,6 +176,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 		SessionConfig:  cfg,
 		taskQueue:      make([]QueueItem, 0),
 		stateCh:        make(chan TaskEvent, 64),
+		taskResult:     make(chan []llm.Message, 1),
 		taskCancelCh:   make(chan struct{}, 1),
 		taskDone:       make(chan struct{}, 1),
 		infoUpdateCh:   make(chan struct{}, 1),
