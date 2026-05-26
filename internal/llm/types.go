@@ -110,7 +110,11 @@ type ToolDefinition struct {
 	Schema      json.RawMessage `json:"schema"`
 }
 
-// Usage tracks token usage
+// Usage tracks token usage.
+// For Anthropic: InputTokens excludes cached tokens (per their API docs:
+// "input_tokens: Number of input tokens which were not read from or
+// used to create a cache"). Sum all three fields for total context.
+// For OpenAI-compatible APIs: Cache* fields are always 0.
 type Usage struct {
 	CacheCreationTokens int64 `json:"cache_creation_input_tokens,omitempty"`
 	CacheReadTokens     int64 `json:"cache_read_input_tokens,omitempty"`
