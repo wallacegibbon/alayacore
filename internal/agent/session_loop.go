@@ -130,20 +130,23 @@ func (s *Session) tryStartNextTask(runMessages *[]llm.Message) bool {
 }
 
 // handleTaskDone processes a task completion signal from the task goroutine.
-// It reads the final message state from taskResult, marks the task as
-// finished, and auto-saves if configured.
+// runMessages is already kept in sync during the task via StepFinishEvent.
+// The taskResult channel serves as a final safety net for error/cancel cases
+// where the last OnStepFinish might not have been called.
 func (s *Session) handleTaskDone(runMessages *[]llm.Message) {
 	// Mark the task as finished so the next queue item can start.
 	s.inProgress = false
 
-	// Read the final message state returned by the task goroutine.
+	// Sync runMessages back from taskResult as a safety net.
+	// During normal operation, StepFinishEvent keeps runMessages current,
+	// but in cancel/error paths the final messages may only be in
+	// the task goroutine's copy.
 	select {
 	case result := <-s.taskResult:
 		if len(result) > 0 {
 			*runMessages = result
 		}
 	default:
-		// No result available (shouldn't happen, but be defensive)
 	}
 
 	// Auto-save if configured (uses runMessages which is now up-to-date)
@@ -184,6 +187,9 @@ func (s *Session) handleTaskEvent(ev TaskEvent, runMessages *[]llm.Message) {
 		s.currentStep.Store(int64(e.Step))
 
 	case StepFinishEvent:
+		if len(e.Messages) > 0 {
+			*runMessages = e.Messages // allMessages from agent — full history
+		}
 		s.TotalSpent.InputTokens += e.InputTokens
 		s.TotalSpent.OutputTokens += e.OutputTokens
 		newContext := e.InputTokens + e.CacheReadTokens + e.CacheCreationTokens

@@ -145,7 +145,7 @@ func (s *Session) runTask(item QueueItem) {
 
 // autoSaveIfEnabled saves the session to file if a session file is set.
 // Called from the task goroutine. Sends a save request to run() which
-// has the authoritative copy of messages.
+// has the authoritative copy of messages (kept current via StepFinishEvent).
 func (s *Session) autoSaveIfEnabled() {
 	if s.SessionFile == "" {
 		return
