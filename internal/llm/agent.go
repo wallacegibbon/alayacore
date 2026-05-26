@@ -140,22 +140,13 @@ func (a *Agent) Stream(ctx context.Context, messages []Message, callbacks Stream
 		totalUsage.InputTokens += stepUsage.InputTokens
 		totalUsage.OutputTokens += stepUsage.OutputTokens
 
-		// Truncation or no tool calls: finalize the step and stop
-		if truncErr != nil || len(toolCalls) == 0 {
-			allMessages = append(allMessages, stepMessages...)
-			if callbacks.OnStepFinish != nil {
-				if cbErr := callbacks.OnStepFinish(allMessages, stepUsage); cbErr != nil {
-					return nil, fmt.Errorf("OnStepFinish callback failed: %w", cbErr)
-				}
-			}
-			break
-		}
-
-		// Execute tools, append results to allMessages, and fire OnStepFinish
-		// with the full updated history so the session can replace its state.
-		allMessages, err = a.executeToolStep(ctx, stepMessages, toolCalls, stepUsage, callbacks, allMessages)
+		var taskDone bool
+		allMessages, taskDone, err = a.finalizeStep(ctx, stepMessages, toolCalls, stepUsage, truncErr, callbacks, allMessages)
 		if err != nil {
 			return nil, err
+		}
+		if taskDone {
+			break
 		}
 	}
 
@@ -192,27 +183,26 @@ func (a *Agent) toolDefinitions() []ToolDefinition {
 	return defs
 }
 
-// executeToolStep runs tool calls, appends assistant + tool result messages to
-// allMessages, then fires OnStepFinish(allMessages, stepUsage) so the callback
-// receives the full updated conversation history.
-func (a *Agent) executeToolStep(ctx context.Context, stepMessages []Message, toolCalls []ToolCallPart, stepUsage Usage, callbacks StreamCallbacks, allMessages []Message) ([]Message, error) {
-	toolResults := a.executeTools(ctx, toolCalls, callbacks)
-	toolResultMsg := Message{Role: RoleTool, Content: toolResults}
-
-	if len(stepMessages) == 0 {
+// finalizeStep appends the assistant message, executes tools if any, fires
+// OnStepFinish, and returns whether the task is done (text-only or truncation).
+func (a *Agent) finalizeStep(ctx context.Context, stepMessages []Message, toolCalls []ToolCallPart, stepUsage Usage, truncErr error, callbacks StreamCallbacks, allMessages []Message) ([]Message, bool, error) {
+	if len(stepMessages) == 0 && len(toolCalls) > 0 {
 		stepMessages = []Message{{Role: RoleAssistant, Content: toolCallsToContent(toolCalls)}}
 	}
 
-	allMessages = append(allMessages, stepMessages...) // stepMessages is always [assistantMsg], so stepMessages... == stepMessages[0]
-	allMessages = append(allMessages, toolResultMsg)
+	// stepMessages has only 1 element, so stepMessages... works the same as stepMessages[0].
+	allMessages = append(allMessages, stepMessages...)
 
-	if callbacks.OnStepFinish != nil {
-		if err := callbacks.OnStepFinish(allMessages, stepUsage); err != nil {
-			return nil, fmt.Errorf("OnStepFinish callback failed: %w", err)
-		}
+	if len(toolCalls) > 0 && truncErr == nil {
+		toolResults := a.executeTools(ctx, toolCalls, callbacks)
+		allMessages = append(allMessages, Message{Role: RoleTool, Content: toolResults})
 	}
 
-	return allMessages, nil
+	if err := fireOnStepFinish(callbacks, allMessages, stepUsage); err != nil {
+		return nil, false, err
+	}
+
+	return allMessages, truncErr != nil || len(toolCalls) == 0, nil
 }
 
 // processStreamEvents iterates streaming events from the provider and returns
@@ -264,7 +254,7 @@ func (a *Agent) processStreamEvents(events iter.Seq2[StreamEvent, error], callba
 			// Final provider event. e.Messages[0] has all content
 			// (text, reasoning, tool calls) accumulated into one assistant msg.
 			// The ToolCallParts here are HISTORY for the next API call.
-			// Tool EXECUTION happens later in executeToolStep, driven by
+			// Tool EXECUTION happens after Stream() appends stepMessages, driven by
 			// the toolCalls slice collected from ToolCallEvent above.
 			stepMessages = e.Messages
 			stepUsage = e.Usage
@@ -292,6 +282,16 @@ func fireOnReasoningDelta(callbacks StreamCallbacks, e ReasoningDeltaEvent) erro
 	if callbacks.OnReasoningDelta != nil {
 		if err := callbacks.OnReasoningDelta(e.Delta); err != nil {
 			return fmt.Errorf("OnReasoningDelta callback failed: %w", err)
+		}
+	}
+	return nil
+}
+
+// fireOnStepFinish invokes the OnStepFinish callback if set.
+func fireOnStepFinish(callbacks StreamCallbacks, messages []Message, usage Usage) error {
+	if callbacks.OnStepFinish != nil {
+		if err := callbacks.OnStepFinish(messages, usage); err != nil {
+			return fmt.Errorf("OnStepFinish callback failed: %w", err)
 		}
 	}
 	return nil
