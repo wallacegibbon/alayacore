@@ -17,9 +17,9 @@ func TestTerminalResizeCursorValidation(t *testing.T) {
 	terminal := NewTerminalWithTheme(output, input, nil, 80, 24, DefaultTheme(), nil)
 
 	// Add some windows to the buffer
-	output.windowBuffer.AppendOrUpdate("window-1", stream.TagTextAssistant, "Content 1")
-	output.windowBuffer.AppendOrUpdate("window-2", stream.TagTextAssistant, "Content 2")
-	output.windowBuffer.AppendOrUpdate("window-3", stream.TagTextAssistant, "Content 3")
+	output.windowBuffer.AppendOrUpdate(stream.TagTextAssistant, "window-1", "Content 1")
+	output.windowBuffer.AppendOrUpdate(stream.TagTextAssistant, "window-2", "Content 2")
+	output.windowBuffer.AppendOrUpdate(stream.TagTextAssistant, "window-3", "Content 3")
 
 	// Set cursor to the middle window
 	terminal.display.SetWindowCursor(1)
@@ -54,8 +54,8 @@ func TestTerminalResizeClampsCursor(t *testing.T) {
 	terminal := NewTerminalWithTheme(output, input, nil, 80, 24, DefaultTheme(), nil)
 
 	// Add windows
-	output.windowBuffer.AppendOrUpdate("window-1", stream.TagTextAssistant, "Short")
-	output.windowBuffer.AppendOrUpdate("window-2", stream.TagTextAssistant, "Content")
+	output.windowBuffer.AppendOrUpdate(stream.TagTextAssistant, "window-1", "Short")
+	output.windowBuffer.AppendOrUpdate(stream.TagTextAssistant, "window-2", "Content")
 
 	// Manually set cursor to an invalid value (simulating a bug scenario)
 	terminal.display.windowCursor = 10
@@ -94,7 +94,7 @@ func TestTerminalResizeUpdatesDisplayContent(t *testing.T) {
 
 	// Add content that will wrap differently at different widths
 	longContent := "This is a long line of text that will wrap differently depending on the terminal width"
-	output.windowBuffer.AppendOrUpdate("window-1", stream.TagTextAssistant, longContent)
+	output.windowBuffer.AppendOrUpdate(stream.TagTextAssistant, "window-1", longContent)
 
 	// Get the initial view
 	terminal.display.updateContent()

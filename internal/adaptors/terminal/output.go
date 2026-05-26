@@ -83,14 +83,14 @@ func (to *outputWriter) AppendError(format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	id := to.generateWindowID()
 	styles := to.styles.Load()
-	to.windowBuffer.AppendOrUpdate(id, stream.TagSystemError, styles.Error.Render(msg))
+	to.windowBuffer.AppendOrUpdate(stream.TagSystemError, id, styles.Error.Render(msg))
 }
 
 // WriteNotify writes a notification message to the display
 func (to *outputWriter) WriteNotify(msg string) {
 	id := to.generateWindowID()
 	styles := to.styles.Load()
-	to.windowBuffer.AppendOrUpdate(id, stream.TagSystemNotify, styles.System.Render(msg))
+	to.windowBuffer.AppendOrUpdate(stream.TagSystemNotify, id, styles.System.Render(msg))
 	to.triggerUpdateForTag(stream.TagSystemNotify)
 }
 
@@ -126,7 +126,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 			content = value
 		}
 		// Pass raw content - styling is applied during render
-		to.windowBuffer.AppendOrUpdate(id, tag, content)
+		to.windowBuffer.AppendOrUpdate(tag, id, content)
 
 	// Function call (JSON: id, name, input)
 	case stream.TagFunctionCall:
@@ -147,7 +147,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 			return
 		}
 		// Pass raw output - styling is applied during render
-		to.windowBuffer.AppendOrUpdate(tr.ID, tag, tr.Output)
+		to.windowBuffer.AppendOrUpdate(tag, tr.ID, tr.Output)
 
 	// Function output status indicator
 	case stream.TagFunctionState:
@@ -162,12 +162,12 @@ func (to *outputWriter) writeColored(tag string, value string) {
 	case stream.TagSystemError:
 		id := to.generateWindowID()
 		// Pass raw value - styling is applied during render
-		to.windowBuffer.AppendOrUpdate(id, tag, value)
+		to.windowBuffer.AppendOrUpdate(tag, id, value)
 
 	case stream.TagSystemNotify:
 		id := to.generateWindowID()
 		// Pass raw value - styling is applied during render
-		to.windowBuffer.AppendOrUpdate(id, tag, value)
+		to.windowBuffer.AppendOrUpdate(tag, id, value)
 
 	case stream.TagSystemData:
 		to.handleSystemTag(value)
@@ -177,11 +177,11 @@ func (to *outputWriter) writeColored(tag string, value string) {
 	case stream.TagTextUser:
 		id := to.generateWindowID()
 		// Pass raw value - styling is applied during render
-		to.windowBuffer.AppendOrUpdate(id, tag, value)
+		to.windowBuffer.AppendOrUpdate(tag, id, value)
 
 	default:
 		id := to.generateWindowID()
-		to.windowBuffer.AppendOrUpdate(id, tag, value)
+		to.windowBuffer.AppendOrUpdate(tag, id, value)
 	}
 }
 

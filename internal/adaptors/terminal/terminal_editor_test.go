@@ -565,7 +565,7 @@ func TestWindowBufferDeltaRouting(t *testing.T) {
 func TestWindowBufferRendering(t *testing.T) {
 	wb := NewWindowBuffer(30, DefaultStyles())
 	// Add a window with some content
-	wb.AppendOrUpdate("test1", stream.TagTextAssistant, "Hello world")
+	wb.AppendOrUpdate(stream.TagTextAssistant, "test1", "Hello world")
 	// Get rendered output
 	rendered := wb.GetAll(-1)
 	// Check that border characters appear (rounded border)
@@ -579,7 +579,7 @@ func TestWindowBufferRendering(t *testing.T) {
 	}
 	// Check width constraint: count lines? Not needed.
 	// Add another window and ensure ordering
-	wb.AppendOrUpdate("test2", stream.TagTextReasoning, "Reasoning content")
+	wb.AppendOrUpdate(stream.TagTextReasoning, "test2", "Reasoning content")
 	rendered2 := wb.GetAll(-1)
 	// Should have two windows separated by newline
 	// Count border top lines? Simpler: ensure both contents appear
@@ -670,7 +670,7 @@ func TestWindowBufferWidth(t *testing.T) {
 	// Test that window width matches expected total width
 	const totalWidth = 50
 	wb := NewWindowBuffer(totalWidth, DefaultStyles())
-	wb.AppendOrUpdate("test", stream.TagTextAssistant, "Hello")
+	wb.AppendOrUpdate(stream.TagTextAssistant, "test", "Hello")
 	rendered := wb.GetAll(-1)
 	// Find first line (top border)
 	lines := strings.Split(rendered, "\n")
@@ -707,7 +707,7 @@ func TestWindowBufferWidthMatchesInput(t *testing.T) {
 			// Window buffer width should be same as input total width
 			wb := NewWindowBuffer(inputTotalWidth, DefaultStyles())
 			// Create a window
-			wb.AppendOrUpdate("test", stream.TagTextAssistant, "Content")
+			wb.AppendOrUpdate(stream.TagTextAssistant, "test", "Content")
 			rendered := wb.GetAll(-1)
 			// Extract top border line
 			lines := strings.Split(rendered, "\n")
@@ -732,7 +732,7 @@ func TestEKeyOpensDisplayWindowInEditor(t *testing.T) {
 	terminal.focusDisplay()
 
 	// Add a window with content
-	terminal.out.WindowBuffer().AppendOrUpdate("test1", stream.TagTextAssistant, "Hello from display")
+	terminal.out.WindowBuffer().AppendOrUpdate(stream.TagTextAssistant, "test1", "Hello from display")
 
 	// Set cursor to first window
 	terminal.display.SetWindowCursor(0)
@@ -779,7 +779,7 @@ func TestEKeyDoesNothingInInputWindow(t *testing.T) {
 	terminal.focusInput()
 
 	// Add a window with content
-	terminal.out.WindowBuffer().AppendOrUpdate("test1", stream.TagTextAssistant, "Hello from display")
+	terminal.out.WindowBuffer().AppendOrUpdate(stream.TagTextAssistant, "test1", "Hello from display")
 
 	// Press 'e' key while in input window (should be passed to input, not open editor)
 	msg := tea.KeyPressMsg(tea.Key{Code: 'e'})
@@ -882,7 +882,7 @@ func TestGetWindowContentDiff(t *testing.T) {
 
 func TestGetWindowContentRegular(t *testing.T) {
 	wb := NewWindowBuffer(80, DefaultStyles())
-	wb.AppendOrUpdate("test-id", stream.TagTextAssistant, "Hello world")
+	wb.AppendOrUpdate(stream.TagTextAssistant, "test-id", "Hello world")
 
 	content := wb.GetWindowContent(0)
 	if content != "Hello world" {

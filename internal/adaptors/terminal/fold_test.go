@@ -12,7 +12,7 @@ func TestSpaceKeyTogglesFold(t *testing.T) {
 	terminal.focusDisplay()
 
 	// Add a window with content that can be folded
-	terminal.out.WindowBuffer().AppendOrUpdate("test1", stream.TagTextAssistant, "Hello world")
+	terminal.out.WindowBuffer().AppendOrUpdate(stream.TagTextAssistant, "test1", "Hello world")
 
 	// Set cursor to first window
 	terminal.display.SetWindowCursor(0)
@@ -60,7 +60,7 @@ func TestSpaceKeyDoesNothingInInputWindow(t *testing.T) {
 	terminal.focusInput()
 
 	// Add a window with content
-	terminal.out.WindowBuffer().AppendOrUpdate("test1", stream.TagTextAssistant, "Hello world")
+	terminal.out.WindowBuffer().AppendOrUpdate(stream.TagTextAssistant, "test1", "Hello world")
 
 	// Press Space key while in input window
 	msg := tea.KeyPressMsg(tea.Key{Code: ' '})

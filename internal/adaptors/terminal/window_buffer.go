@@ -100,13 +100,23 @@ func (wb *WindowBuffer) SetStyles(styles *Styles) {
 }
 
 // AppendOrUpdate adds content to an existing window or creates a new one.
-func (wb *WindowBuffer) AppendOrUpdate(id string, tag string, content string) {
+func (wb *WindowBuffer) AppendOrUpdate(tag string, id string, content string) {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 
 	innerWidth := max(0, wb.width-BorderInnerPadding)
 
-	if idx, ok := wb.idIndex[id]; ok {
+	// Use tag+id as the window key for TA/TR deltas so text and reasoning
+	// from the same step get separate windows. Don't use for FC/FR/FS —
+	// they share the same tool call window: FC creates it (AppendToolCall),
+	// FR appends output, FS updates status. All three must agree on one
+	// key, so they use just the tool call ID.
+	key := id
+	if tag == stream.TagTextAssistant || tag == stream.TagTextReasoning {
+		key = tag + id
+	}
+
+	if idx, ok := wb.idIndex[key]; ok {
 		w := wb.windows[idx]
 		// Separator between call and result for content-heavy tool windows.
 		if w.ToolName == "write_file" || w.ToolName == "edit_file" {
@@ -138,7 +148,7 @@ func (wb *WindowBuffer) AppendOrUpdate(id string, tag string, content string) {
 		w.Visible = hasVisibleContent(content)
 	}
 	wb.windows = append(wb.windows, w)
-	wb.idIndex[id] = len(wb.windows) - 1
+	wb.idIndex[key] = len(wb.windows) - 1
 	wb.markDirty(len(wb.windows) - 1)
 }
 

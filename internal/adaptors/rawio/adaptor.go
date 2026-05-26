@@ -29,10 +29,7 @@ func NewAdaptor(cfg *app.Config) *Adaptor {
 }
 
 // Start runs the rawio adaptor. It blocks until the session finishes.
-// Returns the exit code: 0 for graceful exit, 1 for errors.
-//
-// rawio is a pure pipe: stdin bytes flow to the session, session TLV
-// bytes flow to stdout. No frame inspection, no error interception.
+// Returns 1 only on startup failure (config errors, no models).
 // The controlling process reads stdout and handles TLV itself.
 func (a *Adaptor) Start() int {
 	input := stream.NewChanInput(100)

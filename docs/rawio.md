@@ -21,20 +21,28 @@ See [TLV Protocol](adaptor-architecture.md#tlv-protocol) for full details.
 
 ## Input
 
-- Stdin must contain valid TLV-encoded messages (2-byte tag, 4-byte
-  length, value bytes).
-- Each frame is read and forwarded to the session.
-- **Ctrl-D** (EOF): closes stdin, waits for queued tasks to finish,
-  exits with code `0`.
-- **Ctrl-C** (SIGINT): closes stdin, waits for the current task to finish,
-  exits with code `130` (128+SIGINT).
-- Errors during the session cause the process to exit with code `1`.
+- Raw bytes from stdin are piped directly to the session. The session's
+  `io.ReadFull` handles TLV frame boundary detection internally.
+- **Ctrl-D** (EOF): closes stdin, the session finishes queued tasks, and
+  the process exits with code `0`.
+- **Ctrl-C** (SIGINT): closes stdin. The current task finishes before
+  exit. A second Ctrl-C forces immediate exit.
 
 ## Output
 
 - All TLV-encoded messages from the session are written directly to
   stdout with no formatting, interpretation, or filtering.
+- The controlling process is responsible for parsing TLV frames from
+  stdout and handling any SE (system error) tags itself.
 - Stderr is reserved for error messages, logging, and diagnostics.
+
+## Errors
+
+Rawio does not inspect or interpret TLV frames. If the session encounters
+an error, it emits an SE (TagSystemError) frame on stdout — the
+controlling process detects and handles it. The adaptor itself always
+exits with code `0` (or `1` on startup failure, e.g. no models
+configured).
 
 ## Example
 

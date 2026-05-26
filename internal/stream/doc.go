@@ -41,7 +41,9 @@
 //
 // Stream ID format for TA/TR:
 //
-//	"<promptID>-<step>-<suffix>" where suffix is "t" or "r"
+//	"<promptID>|<step>"
+//
+// The adaptor disambiguates text vs reasoning by using tag+id as the window key.
 //
 // Key Types:
 //

@@ -67,16 +67,16 @@ func TestUnwrapDelta_InvalidInput(t *testing.T) {
 }
 
 func TestNewStreamID(t *testing.T) {
-	got := NewStreamID(0, 1, SuffixText)
-	want := "0-1-t"
+	got := NewStreamID(0, 1)
+	want := "0|1"
 	if got != want {
-		t.Errorf("NewStreamID(0, 1, SuffixText) = %q, want %q", got, want)
+		t.Errorf("NewStreamID(0, 1) = %q, want %q", got, want)
 	}
 }
 
 func TestRoundTrip(t *testing.T) {
 	// Simulate the full session → adaptor round trip
-	id := NewStreamID(3, 5, SuffixReasoning)
+	id := NewStreamID(3, 5)
 	delta := "some thinking content"
 	wrapped := WrapDelta(id, delta)
 

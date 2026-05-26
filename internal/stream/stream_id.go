@@ -18,19 +18,12 @@ import (
 //
 // The id string itself follows the convention:
 //
-//	"<promptID>-<step>-<suffix>"
-
-// Suffix constants for StreamID construction.
-const (
-	SuffixText      = "t" // Assistant text delta  (TagTextAssistant)
-	SuffixReasoning = "r" // Reasoning delta       (TagTextReasoning)
-)
+//	"<promptID>-<step>"
 
 // NewStreamID constructs a stream ID string from components.
-func NewStreamID(promptID uint64, step int, suffix string) string {
-	return strconv.FormatUint(promptID, 10) + "-" +
-		strconv.FormatInt(int64(step), 10) + "-" +
-		suffix
+func NewStreamID(promptID uint64, step int) string {
+	return strconv.FormatUint(promptID, 10) + "|" +
+		strconv.FormatInt(int64(step), 10)
 }
 
 // WrapDelta prepends the NUL-delimited stream ID prefix to content.

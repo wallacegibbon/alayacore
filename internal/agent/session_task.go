@@ -28,21 +28,17 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 	var stepCount int
 	var outputTokens int64
 
-	assembleID := func(id string) string {
-		return stream.NewStreamID(promptID, stepCount, id)
-	}
-
 	// processResult captures the final message state from the agent.
 	// It is set by OnStepFinish and returned to the caller.
 	var processResult []llm.Message
 
 	_, err := s.agent.Load().Stream(ctx, history, llm.StreamCallbacks{
 		OnTextDelta: func(delta string) error {
-			_ = stream.WriteOutputTLV(s.Output, stream.TagTextAssistant, stream.WrapDelta(assembleID(stream.SuffixText), delta)) //nolint:errcheck // best-effort write to adaptor
+			_ = stream.WriteOutputTLV(s.Output, stream.TagTextAssistant, stream.WrapDelta(stream.NewStreamID(promptID, stepCount), delta)) //nolint:errcheck // best-effort write to adaptor
 			return nil
 		},
 		OnReasoningDelta: func(delta string) error {
-			_ = stream.WriteOutputTLV(s.Output, stream.TagTextReasoning, stream.WrapDelta(assembleID(stream.SuffixReasoning), delta)) //nolint:errcheck // best-effort write to adaptor
+			_ = stream.WriteOutputTLV(s.Output, stream.TagTextReasoning, stream.WrapDelta(stream.NewStreamID(promptID, stepCount), delta)) //nolint:errcheck // best-effort write to adaptor
 			return nil
 		},
 		OnToolCallStart: func(toolCallID, toolName string) error {

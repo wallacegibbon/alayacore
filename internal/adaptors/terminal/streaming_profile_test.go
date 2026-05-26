@@ -17,7 +17,7 @@ func TestStreamingProfile(t *testing.T) {
 	for i := 0; i < 20; i++ {
 		id := fmt.Sprintf("msg%d", i)
 		content := strings.Repeat("Historical message content.\n", 3)
-		wb.AppendOrUpdate(id, "TA", content)
+		wb.AppendOrUpdate("TA", id, content)
 	}
 
 	// Set up viewport
@@ -29,7 +29,7 @@ func TestStreamingProfile(t *testing.T) {
 
 	// Create streaming window
 	streamID := "stream"
-	wb.AppendOrUpdate(streamID, "TA", "")
+	wb.AppendOrUpdate("TA", streamID, "")
 	dm.updateContent()
 
 	// Profile streaming
@@ -43,7 +43,7 @@ func TestStreamingProfile(t *testing.T) {
 		start := time.Now()
 
 		// Simulate delta
-		wb.AppendOrUpdate(streamID, "TA", fmt.Sprintf(" word%d", i))
+		wb.AppendOrUpdate("TA", streamID, fmt.Sprintf(" word%d", i))
 
 		// This is what handleTick does
 		dm.updateContent()
@@ -89,7 +89,7 @@ func TestStreamingProfileLongContent(t *testing.T) {
 	for i := 0; i < 20; i++ {
 		id := fmt.Sprintf("msg%d", i)
 		content := strings.Repeat("Historical message content.\n", 3)
-		wb.AppendOrUpdate(id, "TA", content)
+		wb.AppendOrUpdate("TA", id, content)
 	}
 
 	wb.SetViewportPosition(0, 30)
@@ -100,7 +100,7 @@ func TestStreamingProfileLongContent(t *testing.T) {
 
 	// Start with long content
 	streamID := "stream"
-	wb.AppendOrUpdate(streamID, "TA", strings.Repeat("This is a line that will wrap. ", 20))
+	wb.AppendOrUpdate("TA", streamID, strings.Repeat("This is a line that will wrap. ", 20))
 	dm.updateContent()
 
 	// Profile 50 updates with growing content
@@ -109,7 +109,7 @@ func TestStreamingProfileLongContent(t *testing.T) {
 
 	for i := 0; i < 50; i++ {
 		start := time.Now()
-		wb.AppendOrUpdate(streamID, "TA", " more streaming text here")
+		wb.AppendOrUpdate("TA", streamID, " more streaming text here")
 		dm.updateContent()
 		elapsed := time.Since(start)
 		totalTime += elapsed
@@ -144,7 +144,7 @@ func TestCursorMovementProfile(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		id := fmt.Sprintf("msg%d", i)
 		content := strings.Repeat("Window content line.\n", 5)
-		wb.AppendOrUpdate(id, "TA", content)
+		wb.AppendOrUpdate("TA", id, content)
 	}
 
 	wb.SetViewportPosition(0, 30)
@@ -199,7 +199,7 @@ func TestUpdateContentSkipRate(t *testing.T) {
 	styles := NewStyles(DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
-	wb.AppendOrUpdate("msg0", "TA", "Content")
+	wb.AppendOrUpdate("TA", "msg0", "Content")
 	dm := NewDisplayModel(wb, styles)
 	dm.SetHeight(30)
 	dm.SetWidth(80)
@@ -235,7 +235,7 @@ func TestRealisticStreamingWithTiming(t *testing.T) {
 
 	// Conversation history
 	for i := 0; i < 10; i++ {
-		wb.AppendOrUpdate(fmt.Sprintf("msg%d", i), "TA", "Previous message content.\n")
+		wb.AppendOrUpdate("TA", fmt.Sprintf("msg%d", i), "Previous message content.\n")
 	}
 
 	wb.SetViewportPosition(0, 30)
@@ -245,7 +245,7 @@ func TestRealisticStreamingWithTiming(t *testing.T) {
 	dm.SetDisplayFocused(true)
 
 	streamID := "stream"
-	wb.AppendOrUpdate(streamID, "TA", "")
+	wb.AppendOrUpdate("TA", streamID, "")
 	dm.updateContent()
 
 	// Simulate realistic word-by-word streaming at 50ms intervals
@@ -257,7 +257,7 @@ func TestRealisticStreamingWithTiming(t *testing.T) {
 
 	for i, word := range words {
 		// Simulate data arrival (not measured)
-		wb.AppendOrUpdate(streamID, "TA", " "+word)
+		wb.AppendOrUpdate("TA", streamID, " "+word)
 
 		// Measure render time
 		start := time.Now()
@@ -301,7 +301,7 @@ func TestVeryLongContentStreaming(t *testing.T) {
 
 	// Large conversation history
 	for i := 0; i < 50; i++ {
-		wb.AppendOrUpdate(fmt.Sprintf("msg%d", i), "TA", strings.Repeat("Previous message content.\n", 5))
+		wb.AppendOrUpdate("TA", fmt.Sprintf("msg%d", i), strings.Repeat("Previous message content.\n", 5))
 	}
 
 	wb.SetViewportPosition(0, 30)
@@ -312,7 +312,7 @@ func TestVeryLongContentStreaming(t *testing.T) {
 
 	streamID := "stream"
 	// Start with already long content
-	wb.AppendOrUpdate(streamID, "TA", strings.Repeat("Initial content line that is reasonably long. ", 20))
+	wb.AppendOrUpdate("TA", streamID, strings.Repeat("Initial content line that is reasonably long. ", 20))
 	dm.updateContent()
 
 	// Simulate streaming more content
@@ -320,7 +320,7 @@ func TestVeryLongContentStreaming(t *testing.T) {
 	times := []time.Duration{}
 
 	for i := 0; i < 50; i++ {
-		wb.AppendOrUpdate(streamID, "TA", fmt.Sprintf(" Additional sentence number %d here.", i))
+		wb.AppendOrUpdate("TA", streamID, fmt.Sprintf(" Additional sentence number %d here.", i))
 
 		start := time.Now()
 		dm.updateContent()
@@ -366,7 +366,7 @@ func TestWorstCaseStreaming(t *testing.T) {
 
 	// Conversation history
 	for i := 0; i < 10; i++ {
-		wb.AppendOrUpdate(fmt.Sprintf("msg%d", i), "TA", "Previous message content.\n")
+		wb.AppendOrUpdate("TA", fmt.Sprintf("msg%d", i), "Previous message content.\n")
 	}
 
 	wb.SetViewportPosition(0, 30)
@@ -376,7 +376,7 @@ func TestWorstCaseStreaming(t *testing.T) {
 	dm.SetDisplayFocused(true)
 
 	streamID := "stream"
-	wb.AppendOrUpdate(streamID, "TA", "")
+	wb.AppendOrUpdate("TA", streamID, "")
 	dm.updateContent()
 
 	// Worst case: 1000 updates as fast as possible
@@ -388,7 +388,7 @@ func TestWorstCaseStreaming(t *testing.T) {
 	start := time.Now()
 	for i := 0; i < updates; i++ {
 		renderStart := time.Now()
-		wb.AppendOrUpdate(streamID, "TA", fmt.Sprintf(" w%d", i))
+		wb.AppendOrUpdate("TA", streamID, fmt.Sprintf(" w%d", i))
 		dm.updateContent()
 		renderTime := time.Since(renderStart)
 		totalRenderTime += renderTime

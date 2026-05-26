@@ -77,7 +77,9 @@ NUL bytes (`\x00`) are used as delimiters because they can never appear in norma
 
 Stream ID format:
 
-- **TA, TR** — `<promptID>-<step>-<suffix>` where suffix is `t` (text) or `r` (reasoning). Example: `\x000-1-t\x00Hello world`
+- **TA, TR** — `<promptID>|<step>`. Example: `\x000|1\x00Hello world`
+
+The adaptor uses `tag + streamID` as the window key, so text and reasoning from the same step get separate windows.
 
 FS (function state) uses JSON instead of the delta format, consistent with FC and FR.
 
@@ -103,7 +105,7 @@ FS (function state) uses JSON instead of the delta format, consistent with FC an
 3. Session reads TLV, creates UserPrompt task
 4. Session processes prompt through the agent loop
 5. Agent calls read_file tool → Session emits: TLV(FS, {"id":"tool123","status":"pending"}) → TLV(FS, {"id":"tool123","status":"success"})
-6. Agent generates response → Session emits: TLV(TA, "\x000-0-t\x00Here's what main.go does...")
+6. Agent generates response → Session emits: TLV(TA, "\x000|0\x00Here's what main.go does...")
 7. Terminal adaptor parses TLV, renders styled content in windows
 ```
 

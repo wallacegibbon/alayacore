@@ -86,7 +86,7 @@ func TestWindowRenderCaching(t *testing.T) {
 	wb := NewWindowBuffer(80, DefaultStyles())
 
 	// Add content
-	wb.AppendOrUpdate("test", "assistant", "Hello world")
+	wb.AppendOrUpdate("assistant", "test", "Hello world")
 	w := wb.WindowAt(0)
 
 	// First render - should populate cache
@@ -114,7 +114,7 @@ func TestWindowRenderCacheInvalidation(t *testing.T) {
 	wb := NewWindowBuffer(80, DefaultStyles())
 
 	// Add content and render
-	wb.AppendOrUpdate("test", "assistant", "Hello")
+	wb.AppendOrUpdate("assistant", "test", "Hello")
 	w := wb.WindowAt(0)
 
 	styles := DefaultStyles()
