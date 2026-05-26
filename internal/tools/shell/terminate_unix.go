@@ -18,9 +18,9 @@ func (j *Job) Close() error { return nil }
 // immediately. The caller should follow up with a stronger signal
 // (e.g. SIGKILL) after a grace period if the process hasn't exited.
 //
-// This is a non-blocking alternative to TerminateProcessGroup, useful
-// when the framework handles the wait-and-kill cycle (e.g. via
-// exec.Cmd.Cancel + WaitDelay).
+// The wait-and-kill cycle is handled by exec.Cmd.Cancel + WaitDelay:
+// SignalProcessGroup sends the initial graceful signal, and Go kills
+// the process after WaitDelay if it hasn't exited.
 func SignalProcessGroup(process *os.Process) error {
 	pid := process.Pid
 	return syscall.Kill(-pid, syscall.SIGINT)

@@ -23,7 +23,8 @@ func OpenDevNull() (*os.File, error) {
 }
 
 // AssignJob is a no-op on Unix.  Process groups are managed via
-// SetDetachFlags (setsid) and TerminateProcessGroup (SIGINT/SIGKILL).
+// SetDetachFlags (setsid) and SignalProcessGroup (SIGINT) with
+// exec.Cmd.WaitDelay for the follow-up SIGKILL.
 func AssignJob(_ *os.Process) *Job {
 	return nil
 }

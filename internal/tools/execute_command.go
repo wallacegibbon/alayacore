@@ -84,14 +84,18 @@ func executeCommand(ctx context.Context, args executeCommandInput) (llm.ToolResu
 	// Custom cancellation: send SIGINT to the process group (Unix) or
 	// terminate the Job Object (Windows) instead of the default SIGKILL.
 	// This gives the process a chance to clean up (flush buffers, kill
-	// subprocesses, etc.). The framework will follow up with a stronger
-	// signal after WaitDelay if the process hasn't exited.
+	// subprocesses, etc.).
 	cmd.Cancel = func() error {
 		if cmd.Process == nil {
 			return nil
 		}
 		return shell.SignalProcessGroup(cmd.Process)
 	}
+	// WaitDelay only matters on Unix: after Cancel sends SIGINT (graceful),
+	// Go waits this long before sending SIGKILL (forced).  On Windows,
+	// SignalProcessGroup goes straight to TerminateJobObject / taskkill /F
+	// (forced kill, no grace period), so the process is already dead when
+	// WaitDelay starts — it's effectively a no-op.
 	cmd.WaitDelay = 2 * time.Second
 
 	if err := cmd.Start(); err != nil {

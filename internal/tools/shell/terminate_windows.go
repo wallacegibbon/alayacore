@@ -141,7 +141,7 @@ var currentJob struct {
 // AssignJob creates a Job Object and assigns the process to it.
 // Returns the Job for the caller to close after cmd.Wait() returns.
 // Returns nil if the Job Object cannot be created (e.g. nested job
-// restriction) — the caller should still proceed, as TerminateProcessGroup
+// restriction) — the caller should still proceed, as SignalProcessGroup
 // will fall back to taskkill.
 func AssignJob(process *os.Process) *Job {
 	job, err := NewJob()
@@ -182,9 +182,9 @@ func loadJob() *Job {
 // process is eventually cleaned up (e.g. via exec.Cmd.WaitDelay + the
 // Job Object's KILL_ON_JOB_CLOSE flag).
 //
-// This is a non-blocking alternative to TerminateProcessGroup, useful
-// when the framework handles the wait-and-kill cycle (e.g. via
-// exec.Cmd.Cancel + WaitDelay).
+// The wait-and-kill cycle is handled by exec.Cmd.Cancel + WaitDelay:
+// SignalProcessGroup triggers the initial termination, and Go kills
+// the process after WaitDelay if it hasn't exited.
 func SignalProcessGroup(process *os.Process) error {
 	// Try Job Object first (fast, kernel-level, covers entire tree).
 	if job := loadJob(); job != nil {
