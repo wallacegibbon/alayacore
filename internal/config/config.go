@@ -94,6 +94,7 @@ type Settings struct {
 	// Core
 	ShowVersion   bool
 	PlainIO       bool
+	RawIO         bool
 	DebugAPI      bool
 	ModelConfig   string
 	RuntimeConfig string
@@ -129,6 +130,7 @@ func Parse() *Settings {
 	// Core
 	showVersion := flag.Bool("version", false, "Show version information")
 	plainIO := flag.Bool("plainio", false, "Use plain stdin/stdout mode instead of terminal UI")
+	rawIO := flag.Bool("rawio", false, "Use raw TLV stdin/stdout mode instead of terminal UI (pipe TLV frames directly)")
 	debugAPI := flag.Bool("debug-api", false, "Write raw API requests and responses to log file")
 	modelConfig := flag.String("model-config", defaultModelConfig, "Model config file `path`")
 	runtimeConfig := flag.String("runtime-config", defaultRuntimeConfig, "Runtime config file `path`")
@@ -162,6 +164,7 @@ func Parse() *Settings {
 	s := &Settings{
 		ShowVersion:   *showVersion,
 		PlainIO:       *plainIO,
+		RawIO:         *rawIO,
 		DebugAPI:      *debugAPI,
 		ModelConfig:   *modelConfig,
 		RuntimeConfig: *runtimeConfig,

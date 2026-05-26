@@ -169,7 +169,6 @@ func (s *Session) appendCancelMessage(messages []llm.Message) []llm.Message {
 	// Also push to the output so the cancel message appears live in the UI,
 	// matching the behavior on session restore where TLV chunks are replayed.
 	s.writeTLVStr(stream.TagTextAssistant, cancelMessage)
-	s.Output.Flush()
 	return messages
 }
 

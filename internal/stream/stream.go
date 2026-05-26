@@ -67,17 +67,11 @@ func (i *ChanInput) Read(p []byte) (n int, err error) {
 	return n, nil
 }
 
-// Channel returns the underlying byte channel for non-blocking reads.
-// Each message is a complete TLV-encoded frame (6-byte header + value).
-// The channel is closed when the input is closed.
-func (i *ChanInput) Channel() <-chan []byte {
-	return i.ch
-}
-
-// Emit sends data to the input channel.
-func (i *ChanInput) Emit(data []byte) error {
-	i.ch <- data
-	return nil
+// Write implements io.Writer. It sends data to the input channel, where it
+// will be read by the session via Read. Safe for concurrent use.
+func (i *ChanInput) Write(p []byte) (int, error) {
+	i.ch <- p
+	return len(p), nil
 }
 
 // EncodeTLV creates a TLV-encoded byte slice.
@@ -101,13 +95,14 @@ func EncodeTLV(tag string, value string) []byte {
 
 const maxMessageSize = 1<<31 - 1 // Max int32 to fit in uint32
 
-// EmitTLV writes a TLV-encoded message to the input.
-func (i *ChanInput) EmitTLV(tag string, value string) error {
-	return i.Emit(EncodeTLV(tag, value))
+// WriteTLV writes a TLV-encoded message to the input.
+func (i *ChanInput) WriteTLV(tag string, value string) error {
+	_, err := i.Write(EncodeTLV(tag, value))
+	return err
 }
 
-// WriteTLV writes a TLV message to the output.
-func WriteTLV(output Output, tag string, value string) error {
+// WriteOutputTLV writes a TLV message to the output.
+func WriteOutputTLV(output Output, tag string, value string) error {
 	_, err := output.Write(EncodeTLV(tag, value))
 	return err
 }
@@ -146,12 +141,10 @@ type Input interface {
 //   - taskRunner  (via processPrompt callbacks, writeTLVStr, etc.)
 //   - readFromInput (via immediate command handlers)
 //
-// Both goroutines may call Write/WriteString/Flush concurrently.
+// Both goroutines may call Write concurrently.
 // Use a mutex or equivalent synchronization internally.
 type Output interface {
 	Write(p []byte) (n int, err error)
-	WriteString(s string) (n int, err error)
-	Flush() error
 }
 
 // NopInput is an Input that always returns EOF.
@@ -166,14 +159,6 @@ type NopOutput struct{}
 
 func (n *NopOutput) Write(p []byte) (int, error) {
 	return len(p), nil
-}
-
-func (n *NopOutput) WriteString(s string) (int, error) {
-	return len(s), nil
-}
-
-func (n *NopOutput) Flush() error {
-	return nil
 }
 
 // ToolCallData represents a tool call (FC tag payload).

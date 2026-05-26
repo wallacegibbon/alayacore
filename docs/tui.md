@@ -64,7 +64,7 @@ Commands are split into two categories:
 | `:continue [skip]` | Resend the last prompt, or skip it with `skip` and resume the queue |
 | `:summarize` | Summarize conversation to reduce token usage ⚠️ **Replaces entire conversation history with a single summary message** — see [context-tracking.md](context-tracking.md) |
 
-Note: `:quit` / `:q`, `:help`, and `:suspend` are handled directly by each adaptor (terminal shows a confirmation dialog for quit, opens help window for help, suspends the process for suspend; plainio exits immediately for quit and help, and does not support suspend) and never reaches the session command dispatch.
+Note: `:quit` / `:q`, `:help`, and `:suspend` are handled directly by each adaptor (terminal shows a confirmation dialog for quit, opens help window for help, suspends the process for suspend; plainio exits immediately for quit and help, and does not support suspend; rawio passes all commands through to the session since it doesn't interpret frame payloads) and never reaches the session command dispatch.
 
 ## Window Container
 

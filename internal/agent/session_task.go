@@ -38,23 +38,19 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 
 	_, err := s.agent.Load().Stream(ctx, history, llm.StreamCallbacks{
 		OnTextDelta: func(delta string) error {
-			_ = stream.WriteTLV(s.Output, stream.TagTextAssistant, stream.WrapDelta(assembleID(stream.SuffixText), delta)) //nolint:errcheck // best-effort write to adaptor
-			s.Output.Flush()
+			_ = stream.WriteOutputTLV(s.Output, stream.TagTextAssistant, stream.WrapDelta(assembleID(stream.SuffixText), delta)) //nolint:errcheck // best-effort write to adaptor
 			return nil
 		},
 		OnReasoningDelta: func(delta string) error {
-			_ = stream.WriteTLV(s.Output, stream.TagTextReasoning, stream.WrapDelta(assembleID(stream.SuffixReasoning), delta)) //nolint:errcheck // best-effort write to adaptor
-			s.Output.Flush()
+			_ = stream.WriteOutputTLV(s.Output, stream.TagTextReasoning, stream.WrapDelta(assembleID(stream.SuffixReasoning), delta)) //nolint:errcheck // best-effort write to adaptor
 			return nil
 		},
 		OnToolCallStart: func(toolCallID, toolName string) error {
 			s.writeToolCallStart(toolName, toolCallID)
-			s.Output.Flush()
 			return nil
 		},
 		OnToolCall: func(toolCallID, toolName string, input json.RawMessage) error {
 			s.writeToolCall(toolName, string(input), toolCallID)
-			s.Output.Flush()
 			return nil
 		},
 		OnToolResult: func(toolCallID string, output llm.ToolResultOutput) error {
@@ -109,8 +105,6 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 			return nil
 		},
 	})
-
-	s.Output.Flush()
 
 	if err != nil {
 		return processResult, 0, err

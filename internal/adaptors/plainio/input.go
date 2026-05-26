@@ -25,7 +25,7 @@ func readPrompts(input *stream.ChanInput, reader io.Reader) error {
 					prompt.WriteString(line)
 					text := strings.TrimRight(prompt.String(), "\r\n")
 					if text != "" {
-						_ = input.EmitTLV(stream.TagTextUser, text) //nolint:errcheck // best effort on EOF
+						_ = input.WriteTLV(stream.TagTextUser, text) //nolint:errcheck // best effort on EOF
 					}
 				}
 				return nil
@@ -56,7 +56,7 @@ func readPrompts(input *stream.ChanInput, reader io.Reader) error {
 			return nil
 		}
 
-		if err := input.EmitTLV(stream.TagTextUser, text); err != nil {
+		if err := input.WriteTLV(stream.TagTextUser, text); err != nil {
 			return err
 		}
 	}

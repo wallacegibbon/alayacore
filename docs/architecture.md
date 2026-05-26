@@ -13,7 +13,7 @@ The entry point wires together all components:
    - Skills manager (loads skill metadata from `--skill` directories)
    - Tools (`read_file`, `edit_file`, `write_file`, `execute_command`, and conditionally `search_content`)
    - System prompt (default + skills section/fragment when configured + current working directory)
-3. **Adaptor creation** — Starts either the terminal or PlainIO adaptor
+3. **Adaptor creation** — Starts the terminal, PlainIO, or RawIO adaptor
 
 ### Session Layer (`internal/agent/`)
 
@@ -55,25 +55,23 @@ The session uses three goroutines for concurrent operation:
 **Lifecycle — drain on EOF:**
 
 When the input stream reaches EOF (e.g. a piped `echo` command closes stdin),
-the inputPump closes `msgCh` and exits. If a task is still in progress, `run()`
-does not return immediately — it enters `drainUntilTaskDone()`, which processes
-state events and the task completion signal before letting the session exit.
-This ensures that all output (prompt echo, assistant response, tool results) is
-flushed before the process terminates.
+the inputPump closes `msgCh` and exits. If a task is still running, `run()`
+enters `drainUntilTaskDone()` to process state events and the task completion
+signal. After the current task finishes, any remaining queued tasks are
+processed one by one before the session exits. This ensures that all output
+(prompt echo, assistant response, tool results) is flushed and no queued
+prompts are abandoned.
 
 ```
 stdin EOF ──▶ inputPump closes msgCh ──▶ run() detects closed channel
                                                 │
-                                           [task running?]
-                                           /              \
-                                         yes              no
-                                          │                │
-                              drainUntilTaskDone()      return
-                                   │
-                            wait for taskResult
-                            + process state events
-                                   │
-                                return
+                                    ┌───────────┴───────────┐
+                                    │  drain running task   │
+                                    │  + queued tasks       │
+                                    │  (loop until empty)   │
+                                    └───────────┬───────────┘
+                                                │
+                                             return
 ```
 
 **State ownership:**

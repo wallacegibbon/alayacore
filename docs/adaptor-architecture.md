@@ -23,6 +23,10 @@ The adaptor layer handles user interaction and translates between user actions a
 
 Plain stdin/stdout mode, activated with `--plainio`. Shows assistant text, reasoning, and tool call headers. Suppresses tool result content. Reads prompts from stdin (one per line, backslash continuation for multi-line prompts).
 
+### RawIO Adaptor (`internal/adaptors/rawio/`)
+
+Raw TLV stdin/stdout mode, activated with `--rawio`. Reads and writes raw TLV-encoded frames directly, with no text parsing or formatting. Designed for parent programs that speak the TLV protocol to control AlayaCore programmatically.
+
 ### File Naming Convention
 
 Files in the adaptor packages are named from the **session's perspective**:
@@ -30,11 +34,11 @@ Files in the adaptor packages are named from the **session's perspective**:
 - **`input.go`** — builds the **input to the session**. Reads user data (keystrokes, stdin lines) and feeds it into the session's input channel via TLV-encoded messages.
 - **`output.go`** — handles the **output from the session**. Receives TLV messages from the session and renders them to the user (TUI windows, stdout).
 
+The rawio adaptor is an exception — it's a single `adaptor.go` since both directions are trivial one-liners (`io.Copy` in, `os.Stdout.Write` out).
+
 ```
 User IO ──▶ input.go ──▶ input channel ──▶ Session ──▶ output.go ──▶ User IO
 ```
-
-Both adaptors follow this convention. Each provides its own implementation of how user IO maps to and from the session's TLV channels.
 
 ## Communication Pattern
 
@@ -49,7 +53,7 @@ This is the **only** runtime channel. The session never calls adaptor methods, a
 
 ### Theme Persistence
 
-The session persists the active theme via `RuntimeManager` and communicates it to the terminal adaptor through TLV as part of `SystemInfo.ActiveTheme`. The plainio adaptor ignores it since it has no visual rendering. On startup, the terminal reads the initial theme from the first `TagSystemData` message (defaulting to `"theme-dark"`).
+The session persists the active theme via `RuntimeManager` and communicates it to the terminal adaptor through TLV as part of `SystemInfo.ActiveTheme`. The plainio and rawio adaptors ignore it since they have no visual rendering. On startup, the terminal reads the initial theme from the first `TagSystemData` message (defaulting to `"theme-dark"`).
 
 ## TLV Protocol
 
@@ -116,7 +120,7 @@ main.go → config.Parse() → Settings
         ├── tools.RGAvailable() → conditionally register search_content tool
         └── Build system prompt (with SEARCH section if rg available)
                 ↓
-        terminal.NewAdaptor(appConfig)  or  plainio.NewAdaptor(appConfig)
+        terminal.NewAdaptor(appConfig)  or  plainio.NewAdaptor(appConfig)  or  rawio.NewAdaptor(appConfig)
                 ↓
         Session created with tools and system prompt
 ```

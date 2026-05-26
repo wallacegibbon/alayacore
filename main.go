@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/alayacore/alayacore/internal/adaptors/plainio"
+	"github.com/alayacore/alayacore/internal/adaptors/rawio"
 	"github.com/alayacore/alayacore/internal/adaptors/terminal"
 	"github.com/alayacore/alayacore/internal/app"
 	"github.com/alayacore/alayacore/internal/config"
@@ -25,9 +26,12 @@ func main() {
 	}
 
 	var adaptor app.Adaptor
-	if cfg.PlainIO {
+	switch {
+	case cfg.RawIO:
+		adaptor = rawio.NewAdaptor(appCfg)
+	case cfg.PlainIO:
 		adaptor = plainio.NewAdaptor(appCfg)
-	} else {
+	default:
 		adaptor = terminal.NewAdaptor(appCfg)
 	}
 	os.Exit(adaptor.Start())

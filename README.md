@@ -38,6 +38,7 @@ On first run, AlayaCore auto-creates a default model config at `~/.alayacore/mod
 - **Any LLM provider** — OpenAI, Anthropic, DeepSeek, Qwen, Ollama, LM Studio. Multiple models in one config, switch at runtime.
 - **Streaming TUI** — Real-time output with virtual scrolling, foldable windows, and vim-like keybindings.
 - **Plain IO mode** — `--plainio` for scripting and piping. No TUI, just stdin/stdout.
+- **Raw IO mode** — `--rawio` for programmatic control. Raw TLV frames on stdin/stdout.
 - **Session persistence** — Save and resume conversations automatically when `--session` is specified.
 - **Skills system** — Extend the agent with instruction packages following the [Agent Skills](https://agentskills.io) spec.
 - **Themes** — Customizable color schemes with live switching.
@@ -56,6 +57,7 @@ If you connect directly to the Anthropic API and want prompt caching, place a pr
 | [Configuration](docs/configuration.md) | Model config, runtime config, and themes |
 | [Terminal UI](docs/tui.md) | Keybindings, commands, windows, task queue |
 | [Plain IO Mode](docs/plainio.md) | stdin/stdout for scripts and pipes |
+| [Raw IO Mode](docs/rawio.md) | raw TLV frames on stdin/stdout for programmatic control |
 | [Skills System](docs/skills.md) | Agent Skills specification, directory structure, SKILL.md format |
 | [Architecture](docs/architecture.md) | Layered architecture, TLV protocol, data flow, design decisions |
 | [Step Messages](docs/step-messages.md) | Message structure within an agentic step (assistant + tool results) |

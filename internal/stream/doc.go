@@ -1,5 +1,5 @@
 // Package stream provides the minimal IO abstraction and TLV encoding
-// used between adaptors (terminal/plainio) and the core session.
+// used between adaptors (terminal/plainio/rawio) and the core session.
 //
 // The stream package defines a simple Input/Output pair plus helpers
 // for reading/writing framed Tag-Length-Value (TLV) messages.
@@ -39,15 +39,15 @@
 // normal UTF-8 text, making the split unambiguous. See WrapDelta and
 // UnwrapDelta in stream_id.go.
 //
-// Stream ID formats differ by tag:
-//   - TA, TR: "<promptID>-<step>-<suffix>" where suffix is "t" or "r"
-//   - FS: free-form tool call ID assigned by the LLM provider
+// Stream ID format for TA/TR:
+//
+//	"<promptID>-<step>-<suffix>" where suffix is "t" or "r"
 //
 // Key Types:
 //
 //   - ChanInput: Input implementation using a channel of TLV messages
 //   - Input: Interface for reading bytes
-//   - Output: Interface for writing bytes with Flush
+//   - Output: Interface for writing bytes
 //
 // Usage:
 //
@@ -55,11 +55,11 @@
 //	input := stream.NewChanInput(10)
 //
 //	// Emit a TLV message
-//	input.EmitTLV(stream.TagTextUser, "Hello, AI!")
+//	input.WriteTLV(stream.TagTextUser, "Hello, AI!")
 //
 //	// Read TLV from session
 //	tag, value, err := stream.ReadTLV(input)
 //
 //	// Write TLV to output
-//	stream.WriteTLV(output, stream.TagTextAssistant, "Hello, human!")
+//	stream.WriteOutputTLV(output, stream.TagTextAssistant, "Hello, human!")
 package stream

@@ -63,10 +63,9 @@ func (s *Session) run() {
 		select {
 		case msg, ok := <-msgCh:
 			if !ok {
-				// Input is closed (EOF on stdin). If a task is still running,
-				// keep processing events until it completes so that output
-				// (prompt echo, assistant response) is flushed before exit.
-				if s.inProgress {
+				// Input is closed (EOF on stdin). Drain the currently
+				// running task, then process any remaining queued tasks.
+				for s.inProgress || s.tryStartNextTask() {
 					s.drainUntilTaskDone()
 				}
 				return

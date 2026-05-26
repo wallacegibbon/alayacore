@@ -22,15 +22,6 @@ func (m *MockOutput) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-func (m *MockOutput) WriteString(s string) (int, error) {
-	m.Messages = append(m.Messages, s)
-	return len(s), nil
-}
-
-func (m *MockOutput) Flush() error {
-	return nil
-}
-
 func TestSaveAndLoadSession(t *testing.T) {
 	tmpDir := t.TempDir()
 	sessionPath := filepath.Join(tmpDir, "test-session.md")
@@ -121,14 +112,6 @@ func (m *mockOutput) Write(p []byte) (n int, err error) {
 	m.writeCount++
 	m.data = append(m.data, p...)
 	return len(p), nil
-}
-
-func (m *mockOutput) WriteString(s string) (int, error) {
-	return m.Write([]byte(s))
-}
-
-func (m *mockOutput) Flush() error {
-	return nil
 }
 
 func TestSaveAndLoadSession_WithMessages(t *testing.T) {
@@ -555,7 +538,7 @@ func TestDisplayMessagesWithToolCalls(t *testing.T) {
 	// Create mock output and send TLV chunks
 	mockOutput := &mockOutput{}
 	for _, chunk := range loadedData.TLVChunks {
-		_ = stream.WriteTLV(mockOutput, chunk.Tag, chunk.Value) //nolint:errcheck // test only
+		_ = stream.WriteOutputTLV(mockOutput, chunk.Tag, chunk.Value) //nolint:errcheck // test only
 	}
 
 	// Verify that output was written

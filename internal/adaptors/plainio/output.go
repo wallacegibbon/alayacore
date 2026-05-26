@@ -52,14 +52,6 @@ func (o *stdoutOutput) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-func (o *stdoutOutput) WriteString(s string) (int, error) {
-	return o.Write([]byte(s))
-}
-
-func (o *stdoutOutput) Flush() error {
-	return nil
-}
-
 // ErrorChannel returns a channel that is closed when an SE (system error)
 // tag is received. It can be used in a select to react to errors without
 // a dedicated goroutine.

@@ -75,15 +75,18 @@ func TestChanInput(t *testing.T) {
 	t.Run("emit and read", func(t *testing.T) {
 		input := NewChanInput(10)
 
-		// Emit a message
-		err := input.Emit([]byte("test message"))
+		// Write a message
+		n, err := input.Write([]byte("test message"))
 		if err != nil {
-			t.Fatalf("Emit() error = %v", err)
+			t.Fatalf("Write() error = %v", err)
+		}
+		if n != len("test message") {
+			t.Fatalf("Write() n = %d, want %d", n, len("test message"))
 		}
 
 		// Read the message
 		buf := make([]byte, 100)
-		n, err := input.Read(buf)
+		n, err = input.Read(buf)
 		if err != nil {
 			t.Fatalf("Read() error = %v", err)
 		}
@@ -96,7 +99,7 @@ func TestChanInput(t *testing.T) {
 		input := NewChanInput(10)
 
 		// Emit TLV message
-		err := input.EmitTLV(TagTextUser, "Hello")
+		err := input.WriteTLV(TagTextUser, "Hello")
 		if err != nil {
 			t.Fatalf("EmitTLV() error = %v", err)
 		}
@@ -145,7 +148,7 @@ func TestChanInput(t *testing.T) {
 
 		// Emit all messages
 		for _, msg := range messages {
-			err := input.EmitTLV(msg.tag, msg.value)
+			err := input.WriteTLV(msg.tag, msg.value)
 			if err != nil {
 				t.Fatalf("EmitTLV() error = %v", err)
 			}
@@ -165,14 +168,14 @@ func TestChanInput(t *testing.T) {
 	})
 }
 
-func TestWriteTLV(t *testing.T) {
+func TestWriteOutputTLV(t *testing.T) {
 	t.Run("write to buffer", func(t *testing.T) {
 		buf := &bytes.Buffer{}
 		output := &bufferOutput{buf}
 
-		err := WriteTLV(output, TagTextUser, "test message")
+		err := WriteOutputTLV(output, TagTextUser, "test message")
 		if err != nil {
-			t.Fatalf("WriteTLV() error = %v", err)
+			t.Fatalf("WriteOutputTLV() error = %v", err)
 		}
 
 		// Verify the written data
@@ -207,8 +210,4 @@ func (r *byteReader) Read(p []byte) (n int, err error) {
 // bufferOutput wraps a bytes.Buffer to implement Output
 type bufferOutput struct {
 	*bytes.Buffer
-}
-
-func (b *bufferOutput) Flush() error {
-	return nil
 }
