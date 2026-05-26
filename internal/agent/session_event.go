@@ -35,6 +35,16 @@ type StepFinishEvent struct {
 
 func (StepFinishEvent) taskEvent() {}
 
+// SetContextTokensEvent sets ContextTokens on the run() goroutine without
+// affecting TotalSpent counters. Used by summarize() to correct the value
+// after the StepFinishEvent from processPrompt overwrites it with the
+// full old-context token count.
+type SetContextTokensEvent struct {
+	Tokens int64
+}
+
+func (SetContextTokensEvent) taskEvent() {}
+
 // sendEvent sends a task event to the run() goroutine.
 // Non-blocking if the channel buffer is full — the event is dropped.
 func (s *Session) sendEvent(ev TaskEvent) {

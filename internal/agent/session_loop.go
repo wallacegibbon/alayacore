@@ -180,11 +180,23 @@ func (s *Session) handleTaskEvent(ev TaskEvent) {
 		s.TotalSpent.InputTokens += e.InputTokens
 		s.TotalSpent.OutputTokens += e.OutputTokens
 		// Anthropic's input_tokens excludes cached tokens; sum all
-		// three fields for total context. OpenAI-compatible APIs
-		// have Cache* = 0, so this collapses to just InputTokens.
-		newContext := e.InputTokens + e.CacheReadTokens + e.CacheCreationTokens
+		// four fields for total context. OpenAI-compatible APIs
+		// have Cache* = 0, so this collapses to InputTokens+OutputTokens.
+		//
+		// OutputTokens is included because ContextLimit represents the
+		// model's total context window (input+output combined), and the
+		// latest assistant response is part of the conversation that
+		// will be sent in the next request.
+		newContext := e.InputTokens + e.OutputTokens + e.CacheReadTokens + e.CacheCreationTokens
 		if newContext > 0 {
 			s.ContextTokens.Store(newContext)
+		}
+
+	case SetContextTokensEvent:
+		// Sets ContextTokens without affecting TotalSpent counters.
+		// Used by summarize() to correct the value after summarization.
+		if e.Tokens > 0 {
+			s.ContextTokens.Store(e.Tokens)
 		}
 	}
 }

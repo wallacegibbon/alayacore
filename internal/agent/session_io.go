@@ -139,8 +139,13 @@ Rules:
 		}
 	}
 	result = []llm.Message{lastAssistantMsg}
+	// Both events are sent from this same goroutine sequentially
+	// (StepFinishEvent during processPrompt, then this correction).
+	// The FIFO channel guarantees the run() goroutine processes
+	// this correction after the StepFinishEvent, so ContextTokens
+	// ends up at the summary size. Does not affect TotalSpent.
 	if outputTokens > 0 {
-		s.ContextTokens.Store(outputTokens)
+		s.sendEvent(SetContextTokensEvent{Tokens: outputTokens})
 	}
 
 	s.writeNotify("Summarized conversation")

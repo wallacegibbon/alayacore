@@ -4,7 +4,7 @@ How AlayaCore tracks conversation context size across LLM API calls and provider
 
 ## Overview
 
-`ContextTokens` in `Session` tracks the current conversation's context size (input tokens) as reported by the LLM provider. It is used for:
+`ContextTokens` in `Session` tracks the current conversation's total context size (input + output + cache) as reported by the LLM provider. It is used for:
 
 - Displaying context usage in the status bar (e.g. `2.1K/128K 1.7%`)
 - Triggering auto-summarization when context exceeds 65% of `context_limit`
@@ -13,13 +13,14 @@ How AlayaCore tracks conversation context size across LLM API calls and provider
 
 ```
 Provider API response
-  → Provider extracts usage (InputTokens, CacheReadTokens, CacheCreationTokens)
-    → StepCompleteEvent carries Usage
-      → Agent.Stream calls OnStepFinish callback with stepUsage
-        → Session.sendEvent(eventStepFinish{usage})
-          → handleTaskEvent(eventStepFinish) in run() goroutine
-            → TotalSpent accumulates (InputTokens +=, OutputTokens +=)
-            → ContextTokens = InputTokens + CacheReadTokens + CacheCreationTokens (overwrite, only if non-zero)
+  → Provider extracts usage (InputTokens, OutputTokens, CacheReadTokens, CacheCreationTokens)
+    → Provider emits StreamEvent{Usage: ...}
+      → Agent.processStreamEvents merges partial usage into stepUsage
+        → Agent fires OnStepFinish(messages, stepUsage) callback
+          → Session.sendEvent(StepFinishEvent{...})
+            → handleTaskEvent in run() goroutine
+              → TotalSpent accumulates (InputTokens +=, OutputTokens +=)
+              → ContextTokens = InputTokens + OutputTokens + CacheReadTokens + CacheCreationTokens (overwrite, only if non-zero)
 ```
 
 Context tracking is handled by the `handleTaskEvent` method in `session_loop.go`, which processes `StepFinishEvent` events from the task goroutine:
@@ -28,7 +29,7 @@ Context tracking is handled by the `handleTaskEvent` method in `session_loop.go`
 case StepFinishEvent:
     s.TotalSpent.InputTokens += e.InputTokens
     s.TotalSpent.OutputTokens += e.OutputTokens
-    newContext := e.InputTokens + e.CacheReadTokens + e.CacheCreationTokens
+    newContext := e.InputTokens + e.OutputTokens + e.CacheReadTokens + e.CacheCreationTokens
     if newContext > 0 {
         s.ContextTokens.Store(newContext)
     }
@@ -37,7 +38,7 @@ case StepFinishEvent:
 Note: `StepFinishEvent` carries only token usage metadata. The final message
 state is returned separately via `taskResult` on task completion.
 
-- **Overwrite (`Store`), not accumulate (`Add`).** Each API call's `InputTokens` already represents the *entire conversation history* sent in that request. Accumulating would double-count.
+- **Overwrite (`Store`), not accumulate (`Add`).** Each API call's `InputTokens` already represents the *entire conversation history* sent in that request. Accumulating would double-count. `OutputTokens` is included because the model's `ContextLimit` is a combined input+output window, and the latest output is part of the conversation that will be sent in the next request.
 - **Guard against zero reports.** Some OpenAI-compatible providers (e.g. GLM-5.1) may omit the `usage` field from SSE chunks entirely — they simply never send a chunk containing `"usage": {"prompt_tokens": N, ...}`. Go's `json.Unmarshal` leaves absent fields at their zero values, so the parsed `Usage` struct arrives as all zeros. Without the guard, this would reset `ContextTokens` to 0, breaking auto-summarization and the status bar display. The `if newContext > 0` check preserves the last known good value.
 - **Only the last step's value matters.** For multi-step tool call loops, each step re-sends the full history (plus new messages). The last step has the most complete count.
 - **Cross-goroutine communication.** The task goroutine sends usage via typed events on `stateCh`; the `run()` goroutine owns the authoritative copy. `ContextTokens` is an `atomic.Int64` for lock-free reads by the task goroutine (used in `shouldAutoSummarize`).
@@ -45,14 +46,14 @@ state is returned separately via `taskResult` on task completion.
 
 ## Multi-Step Tool Calls
 
-When the agent loop runs multiple steps (tool call → tool result → next step), `handleTaskEvent` is called once per step via `eventStepFinish`. Each call overwrites `ContextTokens` with that step's full-context measurement:
+When the agent loop runs multiple steps (tool call → tool result → next step), `handleTaskEvent` is called once per step via `StepFinishEvent`. Each call overwrites `ContextTokens` with that step's full-context measurement (input + output + cache):
 
 ```
-Step 1 (tool call):     InputTokens=500, CacheRead=8000 → ContextTokens = 8500
-Step 2 (tool response): InputTokens=900, CacheRead=8000 → ContextTokens = 8900  ← final, correct value
+Step 1 (tool call):     InputTokens=500, OutputTokens=100, CacheRead=8000 → ContextTokens = 8600
+Step 2 (tool response): InputTokens=900, OutputTokens=200, CacheRead=8000 → ContextTokens = 9100  ← final, correct value
 ```
 
-The last step's value is always the most accurate because it includes all prior tool results.
+The last step's value is always the most accurate because it includes all prior tool results and the latest output.
 
 ## Provider Differences
 
@@ -60,7 +61,7 @@ The last step's value is always the most accurate because it includes all prior 
 
 Reports usage across multiple SSE events (`message_start`, `message_delta`, `message_stop`). The provider merges partial values: `InputTokens` and cache tokens come from `message_start`, `OutputTokens` from `message_delta`. If one event omits a field, the value from a prior event survives.
 
-`InputTokens` = non-cached portion only. Cache tokens (`CacheReadTokens`, `CacheCreationTokens`) are separate and added together in `handleTaskEvent` for the true context size.
+`InputTokens` = non-cached portion only. Cache tokens (`CacheReadTokens`, `CacheCreationTokens`) are separate and added together with `OutputTokens` in `handleTaskEvent` for the true context size.
 
 ### OpenAI Protocol
 
@@ -74,15 +75,17 @@ When switching models (e.g. Anthropic → OpenAI), the reported context size may
 
 ### Example
 
-| Step | Provider | ContextTokens | API Reported |
+| Step | Provider | ContextTokens | API Reported (input, output, cache) |
 |------|----------|--------------|-------------|
-| Prompt 1, Step 1 (tool) | Anthropic/llama.cpp | 1149 | input=4, cache_read=1145 |
-| Prompt 1, Step 2 (answer) | Anthropic/llama.cpp | 2118 | input=973, cache_read=1145 |
+| Prompt 1, Step 1 (tool) | Anthropic/llama.cpp | 1199 | input=4, output=50, cache_read=1145 |
+| Prompt 1, Step 2 (answer) | Anthropic/llama.cpp | 2218 | input=973, output=100, cache_read=1145 |
 | Model switch | → OpenAI/glm-5.1 | *(unchanged)* | — |
-| Prompt 2, Step 1 (tool) | OpenAI/glm-5.1 | 2073 | prompt_tokens=2073 |
-| Prompt 2, Step 2 (answer) | OpenAI/glm-5.1 | 2317 | prompt_tokens=2317 |
+| Prompt 2, Step 1 (tool) | OpenAI/glm-5.1 | 2123 | prompt_tokens=2073, completion_tokens=50 |
+| Prompt 2, Step 2 (answer) | OpenAI/glm-5.1 | 2417 | prompt_tokens=2317, completion_tokens=100 |
 
-The apparent "drop" from 2118 to 2073 after model switch is the difference in tokenization between the two models. The full conversation was sent correctly.
+The apparent "drop" from 2218 to 2123 after model switch is the difference in tokenization between the two models. The full conversation was sent correctly.
+
+Note that `ContextTokens` now includes `OutputTokens`, so the values differ from the earlier documentation version where only input+cache were tracked.
 
 ## Manual Summarization (`:summarize`)
 
@@ -98,7 +101,15 @@ The `:summarize` command is a **deferred command** — it runs in a task gorouti
    - **Next** — Ordered actions to resume
 2. Calls the LLM to generate the summary
 3. **Replaces the entire conversation history** with just the last assistant response (the summary)
-4. Resets `ContextTokens` to the summary's output token count
+4. Resets `ContextTokens` to the summary's output token count via `SetContextTokensEvent` (a dedicated event that avoids double-counting in `TotalSpent` and corrects the value after the `StepFinishEvent` from `processPrompt` has been processed)
+
+### ⚠️ Event ordering
+
+During summarization, two task events are sent to the `run()` goroutine:
+1. `StepFinishEvent` from `processPrompt` — sets `ContextTokens` to the full old-context token count
+2. `SetContextTokensEvent` from `summarize` — corrects `ContextTokens` to the summary size
+
+Both are sent by the same goroutine sequentially, and the FIFO channel guarantees the correction is processed last, so `ContextTokens` ends up at the correct value.
 
 ### ⚠️ Important caveats
 
@@ -115,6 +126,7 @@ The `:summarize` command is a **deferred command** — it runs in a task gorouti
 ## Related
 
 - `shouldAutoSummarize()` — triggers when `ContextTokens >= ContextLimit * 65%` (only when `--auto-summarize` is enabled)
-- `summarize()` — appends the summary prompt to Messages, calls `processPrompt`, then replaces conversation history with the summary and resets `ContextTokens` to the summary's output token count
+- `summarize()` — appends the summary prompt to Messages, calls `processPrompt`, then replaces conversation history with the summary and resets `ContextTokens` to the summary's output token count via `SetContextTokensEvent`
+- `SetContextTokensEvent` — a dedicated task event that sets `ContextTokens` without affecting `TotalSpent` counters, used to correct the value after summarization
 - `applyModelContextLimit()` — sets `ContextLimit` from the active model's config
 - `SessionMeta.ContextTokens` — persisted to session file frontmatter so the status bar shows the correct context usage immediately after loading a session
