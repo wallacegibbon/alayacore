@@ -29,7 +29,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           REPO="${{ github.repository }}"
-          KEEP="${{ github.event.inputs.keep || 10 }}"
+          KEEP="${{ inputs.keep || 10 }}"
 
           echo "Keeping latest $KEEP releases for $REPO"
 
