@@ -6,6 +6,7 @@ import (
 )
 
 // StreamID identifies a delta stream across multiple TLV frames.
+// Used by TA and TR (delta messages). FS uses JSON instead.
 //
 // Wire format within a TLV value:
 //
@@ -18,9 +19,6 @@ import (
 // The id string itself follows the convention:
 //
 //	"<promptID>-<step>-<suffix>"
-//
-// where suffix is one of the Suffix* constants below, or a free-form tool
-// call ID for TagFunctionState messages.
 
 // Suffix constants for StreamID construction.
 const (

@@ -151,12 +151,12 @@ func (to *outputWriter) writeColored(tag string, value string) {
 
 	// Function output status indicator
 	case stream.TagFunctionState:
-		id, content, ok := stream.UnwrapDelta(value)
-		if !ok {
+		var ts stream.ToolStateData
+		if err := json.Unmarshal([]byte(value), &ts); err != nil {
 			return
 		}
 		// Update the tool window with status indicator
-		to.windowBuffer.UpdateToolStatus(id, ParseToolStatus(content))
+		to.windowBuffer.UpdateToolStatus(ts.ID, ParseToolStatus(ts.Status))
 
 	// System tags
 	case stream.TagSystemError:

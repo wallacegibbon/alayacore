@@ -174,6 +174,12 @@ type ToolResultData struct {
 	Output string `json:"output"`
 }
 
+// ToolStateData represents a tool state indicator (FS tag payload).
+type ToolStateData struct {
+	ID     string `json:"id"`
+	Status string `json:"status"`
+}
+
 // ReasoningData represents reasoning/thinking content with optional signature.
 // Used for persistence when Anthropic's thinking block includes a signature.
 // Text is the thinking content; Signature is Anthropic-specific and only

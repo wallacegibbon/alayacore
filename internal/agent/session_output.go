@@ -86,7 +86,10 @@ func (s *Session) writeToolOutput(toolCallID string, output string) {
 }
 
 func (s *Session) writeToolResult(toolCallID string, status string) {
-	s.writeTLVStr(stream.TagFunctionState, stream.WrapDelta(toolCallID, status))
+	s.writeTLVJSON(stream.TagFunctionState, stream.ToolStateData{
+		ID:     toolCallID,
+		Status: status,
+	})
 }
 
 // ============================================================================

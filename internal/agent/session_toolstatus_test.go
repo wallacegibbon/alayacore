@@ -2,6 +2,7 @@ package agent
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"testing"
 
 	"github.com/alayacore/alayacore/internal/llm"
@@ -24,9 +25,12 @@ func TestWriteToolResult(t *testing.T) {
 		t.Errorf("Expected tag %s, got %s", stream.TagFunctionState, tag)
 	}
 
-	expectedValue := stream.WrapDelta("tool123", "success")
-	if value != expectedValue {
-		t.Errorf("Expected value %q, got %q", expectedValue, value)
+	var got stream.ToolStateData
+	if err := json.Unmarshal([]byte(value), &got); err != nil {
+		t.Fatalf("Failed to parse FS JSON: %v", err)
+	}
+	if got.ID != "tool123" || got.Status != "success" {
+		t.Errorf("Expected {tool123, success}, got {%s, %s}", got.ID, got.Status)
 	}
 
 	// Test error case
@@ -38,9 +42,11 @@ func TestWriteToolResult(t *testing.T) {
 		t.Errorf("Expected tag %s, got %s", stream.TagFunctionState, tag)
 	}
 
-	expectedValue = stream.WrapDelta("tool456", "error")
-	if value != expectedValue {
-		t.Errorf("Expected value %q, got %q", expectedValue, value)
+	if err := json.Unmarshal([]byte(value), &got); err != nil {
+		t.Fatalf("Failed to parse FS JSON: %v", err)
+	}
+	if got.ID != "tool456" || got.Status != "error" {
+		t.Errorf("Expected {tool456, error}, got {%s, %s}", got.ID, got.Status)
 	}
 
 	// Test pending case
@@ -52,9 +58,11 @@ func TestWriteToolResult(t *testing.T) {
 		t.Errorf("Expected tag %s, got %s", stream.TagFunctionState, tag)
 	}
 
-	expectedValue = stream.WrapDelta("tool789", "pending")
-	if value != expectedValue {
-		t.Errorf("Expected value %q, got %q", expectedValue, value)
+	if err := json.Unmarshal([]byte(value), &got); err != nil {
+		t.Fatalf("Failed to parse FS JSON: %v", err)
+	}
+	if got.ID != "tool789" || got.Status != "pending" {
+		t.Errorf("Expected {tool789, pending}, got {%s, %s}", got.ID, got.Status)
 	}
 }
 
@@ -105,9 +113,12 @@ func TestOnToolResultCallback(t *testing.T) {
 		t.Errorf("Expected tag %s, got %s", stream.TagFunctionState, tag)
 	}
 
-	expectedValue := stream.WrapDelta("call1", "success")
-	if value != expectedValue {
-		t.Errorf("Expected value %q, got %q", expectedValue, value)
+	var got stream.ToolStateData
+	if err := json.Unmarshal([]byte(value), &got); err != nil {
+		t.Fatalf("Failed to parse FS JSON: %v", err)
+	}
+	if got.ID != "call1" || got.Status != "success" {
+		t.Errorf("Expected {call1, success}, got {%s, %s}", got.ID, got.Status)
 	}
 
 	// Test error result
@@ -122,9 +133,11 @@ func TestOnToolResultCallback(t *testing.T) {
 		t.Errorf("Expected tag %s, got %s", stream.TagFunctionState, tag)
 	}
 
-	expectedValue = stream.WrapDelta("call2", "error")
-	if value != expectedValue {
-		t.Errorf("Expected value %q, got %q", expectedValue, value)
+	if err := json.Unmarshal([]byte(value), &got); err != nil {
+		t.Fatalf("Failed to parse FS JSON: %v", err)
+	}
+	if got.ID != "call2" || got.Status != "error" {
+		t.Errorf("Expected {call2, error}, got {%s, %s}", got.ID, got.Status)
 	}
 }
 
@@ -153,7 +166,6 @@ func TestWriteToolCallWithPending(t *testing.T) {
 	}
 
 	// Parse second message (pending status)
-	// The mockOutput concatenates all writes, so we need to parse from the right position
 	data := output.data
 	// Find the second TLV message
 	if len(data) > 6 {
@@ -171,9 +183,12 @@ func TestWriteToolCallWithPending(t *testing.T) {
 			length2 := int(binary.BigEndian.Uint32(data[offset+2 : offset+6]))
 			if len(data) >= offset+6+length2 {
 				value2 := string(data[offset+6 : offset+6+length2])
-				expectedValue2 := stream.WrapDelta("tool123", "pending")
-				if value2 != expectedValue2 {
-					t.Errorf("Expected pending value %q, got %q", expectedValue2, value2)
+				var got stream.ToolStateData
+				if err := json.Unmarshal([]byte(value2), &got); err != nil {
+					t.Fatalf("Failed to parse FS JSON: %v", err)
+				}
+				if got.ID != "tool123" || got.Status != "pending" {
+					t.Errorf("Expected {tool123, pending}, got {%s, %s}", got.ID, got.Status)
 				}
 			}
 		}

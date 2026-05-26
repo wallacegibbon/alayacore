@@ -222,7 +222,7 @@ correct base directory for the current session.
 
 ## Design Decisions
 
-1. **TLV Protocol** — Simple binary protocol for clean separation between adaptors and session. Both the TUI and plain-IO mode share all session/agent logic.
+1. **TLV Protocol** — Simple binary protocol for clean separation between adaptors and session. The TUI, plain-IO, and raw-IO modes all share the same session/agent logic.
 2. **Task Queue** — Deferred task processing with cancellation support. Queued tasks execute sequentially.
 3. **Virtual Scrolling** — Only visible windows are rendered. See [virtual-rendering-performance.md](virtual-rendering-performance.md).
 4. **Typed Tools** — `TypedExecute[T]` wrapper for type-safe tool implementations with auto-generated schemas. See [schema-improvements.md](schema-improvements.md).

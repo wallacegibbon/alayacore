@@ -67,7 +67,7 @@ Communication between adaptors and session uses a simple Tag-Length-Value (TLV) 
 
 ### Delta Messages
 
-TA, TR, and FS are **delta messages** — they arrive piece-by-piece during streaming and carry a NUL-delimited stream ID in the value:
+TA and TR are **delta messages** — they arrive piece-by-piece during streaming and carry a NUL-delimited stream ID in the value:
 
 ```
 \x00<stream-id>\x00<content>
@@ -75,10 +75,11 @@ TA, TR, and FS are **delta messages** — they arrive piece-by-piece during stre
 
 NUL bytes (`\x00`) are used as delimiters because they can never appear in normal UTF-8 text, making the split unambiguous even if the LLM generates content that looks like a stream ID.
 
-Stream ID formats differ by tag:
+Stream ID format:
 
 - **TA, TR** — `<promptID>-<step>-<suffix>` where suffix is `t` (text) or `r` (reasoning). Example: `\x000-1-t\x00Hello world`
-- **FS** — free-form tool call ID assigned by the LLM provider (e.g. `call_abc123`). Example: `\x00call_abc123\x00pending`
+
+FS (function state) uses JSON instead of the delta format, consistent with FC and FR.
 
 ### Tags
 
@@ -87,9 +88,9 @@ Stream ID formats differ by tag:
 | `TagTextUser` | TU | Input | User text input |
 | `TagTextAssistant` | TA | Output | Assistant text output |
 | `TagTextReasoning` | TR | Output | Reasoning/thinking content |
-| `TagFunctionCall` | FC | Output | Function call for persistence |
-| `TagFunctionResult` | FR | Output | Function result for persistence |
-| `TagFunctionState` | FS | Output | Function state indicator (pending/success/error) |
+| `TagFunctionCall` | FC | Output | Function call (JSON: id, name, input) |
+| `TagFunctionResult` | FR | Output | Function result (JSON: id, output) |
+| `TagFunctionState` | FS | Output | Function state indicator (JSON: id, status) |
 | `TagSystemError` | SE | Output | System error messages |
 | `TagSystemNotify` | SN | Output | System notifications |
 | `TagSystemData` | SD | Output | System data (JSON) |
@@ -101,7 +102,7 @@ Stream ID formats differ by tag:
 2. Terminal adaptor emits: TLV(TU, "read main.go")
 3. Session reads TLV, creates UserPrompt task
 4. Session processes prompt through the agent loop
-5. Agent calls read_file tool → Session emits: TLV(FS, "\x00tool123\x00pending") → TLV(FS, "\x00tool123\x00success")
+5. Agent calls read_file tool → Session emits: TLV(FS, {"id":"tool123","status":"pending"}) → TLV(FS, {"id":"tool123","status":"success"})
 6. Agent generates response → Session emits: TLV(TA, "\x000-0-t\x00Here's what main.go does...")
 7. Terminal adaptor parses TLV, renders styled content in windows
 ```
@@ -152,7 +153,7 @@ Agent.Stream() receives tool_call event
   → OnToolCallStart callback → TLV(FC, placeholder) → UI shows tool window immediately
     → OnToolCall callback → TLV(FC, full input) → UI replaces placeholder content
       → Agent executes tool: tool.Execute(ctx, input)
-        → OnToolResult callback → TLV(FS, "\x00<id>\x00success") → UI updates indicator
+        → OnToolResult callback → TLV(FS, {"id":"<id>","status":"success"}) → UI updates indicator
           → Tool result added to messages
             → Agent continues to next step (if under max_steps)
 ```

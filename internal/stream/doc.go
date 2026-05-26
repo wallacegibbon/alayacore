@@ -15,23 +15,23 @@
 //	  - TagTextReasoning (TR): Reasoning/thinking content
 //	  - TagFunctionCall (FC): Function call (JSON: id, name, input)
 //	  - TagFunctionResult (FR): Function result (JSON: id, output)
-//	  - TagFunctionState (FS): Function state indicator (pending/success/error)
+//	  - TagFunctionState (FS): Function state indicator (JSON: id, status)
 //	  - TagSystemError (SE): System error messages
 //	  - TagSystemNotify (SN): System notifications
 //	  - TagSystemData (SD): System data (JSON)
 //
 // State Indicators:
 //
-// The TagFunctionState tag is used to display state indicators for tool calls:
-//   - "pending": Tool is currently executing (• dimmed filled dot)
-//   - "success": Tool executed successfully (• green filled dot)
-//   - "error": Tool execution failed (• red filled dot)
-//   - default: Tool from loaded session with no status (· dimmed hollow dot)
+// The TagFunctionState tag carries a JSON payload with the tool call ID and
+// status, used by the terminal to display live status indicators:
+//   - `{"id":"tool123","status":"pending"}` — Tool is currently executing
+//   - `{"id":"tool123","status":"success"}` — Tool executed successfully
+//   - `{"id":"tool123","status":"error"}` — Tool execution failed
 //
 // Delta Messages:
 //
-// TA, TR, and FS are delta messages that arrive piece-by-piece during
-// streaming. Their TLV values use NUL-delimited stream IDs:
+// TA and TR are delta messages that arrive piece-by-piece during streaming.
+// Their TLV values use NUL-delimited stream IDs:
 //
 //	\x00<stream-id>\x00<content>
 //
