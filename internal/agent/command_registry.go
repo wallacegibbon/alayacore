@@ -40,14 +40,10 @@ type Command struct {
 // commandDefs is the single source of truth for all colon-commands.
 // Order here determines the order used by LookupCommand iteration.
 var commandDefs = []Command{
-	{commandNameSummarize, "Summarize the conversation to reduce context", "", false,
-		nil},
 	{commandNameCancel, "Cancel the current task", "", true,
 		func(s *Session, _ context.Context, _ []string) { s.cancelTask() }},
 	{commandNameCancelAll, "Cancel current task and clear the task queue", "", true,
 		func(s *Session, _ context.Context, _ []string) { s.cancelAllTasks() }},
-	{commandNameContinue, "Resume after an error; without args retries the prompt, with 'skip' skips it", "[skip]", false,
-		nil},
 	{commandNameSave, "Save the current session", "[filename]", true,
 		func(s *Session, _ context.Context, args []string) { s.saveSession(args) }},
 	{commandNameModelSet, "Switch to a different model", "<id>", true,
