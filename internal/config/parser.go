@@ -34,14 +34,14 @@ func (w ParseWarning) String() string {
 // Parse errors (e.g. non-numeric value for an int field) are also silently ignored.
 // Use ParseKeyValueWithWarnings to collect them.
 func ParseKeyValue(content string, target any) {
-	parseConfig(content, target, false, false)
+	parseConfig(content, target)
 }
 
 // ParseKeyValueWithWarnings is like ParseKeyValue but also returns warnings for
 // values that could not be converted to the target field type. This helps surface
 // typos like context_limit: abc (which would otherwise silently default to 0).
 func ParseKeyValueWithWarnings(content string, target any) []ParseWarning {
-	return parseConfig(content, target, false, true)
+	return parseConfig(content, target)
 }
 
 // ParseKeyValueBlocks parses multiple config blocks separated by "---"
@@ -51,10 +51,8 @@ func ParseKeyValueBlocks(content string) []string {
 }
 
 // parseConfig is the unified internal implementation.
-// collectWarnings: return ParseWarning for values that fail type conversion.
-//
-//nolint:gocyclo // Multiple validation branches required for config parsing
-func parseConfig(content string, target any, skipHyphens bool, collectWarnings bool) []ParseWarning {
+// Always collects warnings for values that fail type conversion.
+func parseConfig(content string, target any) []ParseWarning {
 	v := reflect.ValueOf(target)
 	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Struct {
 		return nil
@@ -81,11 +79,6 @@ func parseConfig(content string, target any, skipHyphens bool, collectWarnings b
 			continue
 		}
 
-		// Skip "---" separator lines
-		if skipHyphens && line == "---" {
-			continue
-		}
-
 		key, value, found := strings.Cut(line, ":")
 		if !found {
 			continue
@@ -101,97 +94,81 @@ func parseConfig(content string, target any, skipHyphens bool, collectWarnings b
 			continue
 		}
 
-		field := v.Field(fieldIdx)
-		if collectWarnings {
-			if w := setFieldValueWithWarning(field, value, key); w != nil {
-				warnings = append(warnings, *w)
-			}
-		} else {
-			setFieldValue(field, value)
+		if w := setField(fieldIdx, v, value, key); w != nil {
+			warnings = append(warnings, *w)
 		}
 	}
 
 	return warnings
 }
 
-// setFieldValueWithWarning is like setFieldValue but returns a ParseWarning
-// when the value cannot be converted to the target type.
-// Empty values are treated as "unset" and never produce warnings.
-func setFieldValueWithWarning(field reflect.Value, value string, key string) *ParseWarning {
-	// Empty values for numeric fields are not warnings — they simply mean
-	// the field was not set, and the zero value is correct.
+// setField sets a struct field from a string value.
+// Returns a ParseWarning if the value cannot be converted.
+// Empty values are silently treated as "unset".
+//
+//nolint:gocyclo // Type switch over all supported field kinds requires many cases
+func setField(fieldIdx int, v reflect.Value, value, key string) *ParseWarning {
 	if value == "" {
 		return nil
 	}
 
+	field := v.Field(fieldIdx)
+
+	// time.Time
 	if field.Type() == reflect.TypeOf(time.Time{}) {
-		if _, err := time.Parse(time.RFC3339, value); err != nil {
+		t, err := time.Parse(time.RFC3339, value)
+		if err != nil {
 			return &ParseWarning{Key: key, Value: value, Err: "expected RFC3339 timestamp"}
 		}
-		setFieldValue(field, value)
+		field.Set(reflect.ValueOf(t))
+		return nil
+	}
+
+	// time.Duration (int64 kind)
+	if field.Type() == reflect.TypeOf(time.Duration(0)) {
+		d, err := time.ParseDuration(value)
+		if err != nil {
+			return &ParseWarning{Key: key, Value: value, Err: "invalid duration"}
+		}
+		field.SetInt(int64(d))
 		return nil
 	}
 
 	switch field.Kind() {
 	case reflect.String:
 		field.SetString(value)
-		return nil
+
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return warnIntField(field, value, key)
+		i, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return &ParseWarning{Key: key, Value: value, Err: "invalid integer"}
+		}
+		field.SetInt(i)
+
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return warnUintField(field, value, key)
+		u, err := strconv.ParseUint(value, 10, 64)
+		if err != nil {
+			return &ParseWarning{Key: key, Value: value, Err: "invalid unsigned integer"}
+		}
+		field.SetUint(u)
+
 	case reflect.Bool:
-		return warnBoolField(field, value, key)
+		field.SetBool(parseBool(value))
+		if !isValidBool(value) {
+			return &ParseWarning{Key: key, Value: value, Err: "invalid boolean (expected true/false/yes/no/on/off/1/0)"}
+		}
+
 	case reflect.Float32, reflect.Float64:
-		return warnFloatField(field, value, key)
+		f, err := strconv.ParseFloat(value, 64)
+		if err != nil {
+			return &ParseWarning{Key: key, Value: value, Err: "invalid float"}
+		}
+		field.SetFloat(f)
+
 	case reflect.Slice:
 		setSliceField(field, value)
-		return nil
 	}
 
-	return nil
-}
-
-//nolint:gocyclo // Each numeric type is a separate case, no meaningful reduction
-func warnIntField(field reflect.Value, value string, key string) *ParseWarning {
-	if field.Type() == reflect.TypeOf(time.Duration(0)) {
-		if _, err := time.ParseDuration(value); err != nil {
-			return &ParseWarning{Key: key, Value: value, Err: "invalid duration"}
-		}
-		setFieldValue(field, value)
-		return nil
-	}
-	if _, err := strconv.ParseInt(value, 10, 64); err != nil {
-		return &ParseWarning{Key: key, Value: value, Err: "invalid integer"}
-	}
-	setFieldValue(field, value)
-	return nil
-}
-
-func warnUintField(field reflect.Value, value string, key string) *ParseWarning {
-	if _, err := strconv.ParseUint(value, 10, 64); err != nil {
-		return &ParseWarning{Key: key, Value: value, Err: "invalid unsigned integer"}
-	}
-	setFieldValue(field, value)
-	return nil
-}
-
-func warnBoolField(field reflect.Value, value string, key string) *ParseWarning {
-	setBoolField(field, value)
-	lv := strings.ToLower(value)
-	switch lv {
-	case "true", "1", "yes", "on", "false", "0", "no", "off", "":
-		return nil
-	default:
-		return &ParseWarning{Key: key, Value: value, Err: "invalid boolean (expected true/false/yes/no/on/off/1/0)"}
-	}
-}
-
-func warnFloatField(field reflect.Value, value string, key string) *ParseWarning {
-	if _, err := strconv.ParseFloat(value, 64); err != nil {
-		return &ParseWarning{Key: key, Value: value, Err: "invalid float"}
-	}
-	setFieldValue(field, value)
 	return nil
 }
 
@@ -243,65 +220,6 @@ func unescapeQuoted(s string) string {
 	return b.String()
 }
 
-// setFieldValue sets a struct field value from a string
-//
-//nolint:gocyclo // Complex type switch required for reflection-based field setting
-func setFieldValue(field reflect.Value, value string) {
-	// Handle time.Time specially
-	if field.Type() == reflect.TypeOf(time.Time{}) {
-		if t, err := time.Parse(time.RFC3339, value); err == nil {
-			field.Set(reflect.ValueOf(t))
-		}
-		return
-	}
-
-	switch field.Kind() {
-	case reflect.String:
-		field.SetString(value)
-
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		setIntField(field, value)
-
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		if u, err := strconv.ParseUint(value, 10, 64); err == nil {
-			field.SetUint(u)
-		}
-
-	case reflect.Bool:
-		setBoolField(field, value)
-
-	case reflect.Float32, reflect.Float64:
-		if f, err := strconv.ParseFloat(value, 64); err == nil {
-			field.SetFloat(f)
-		}
-
-	case reflect.Slice:
-		setSliceField(field, value)
-	}
-}
-
-func setIntField(field reflect.Value, value string) {
-	// Handle time.Duration specially
-	if field.Type() == reflect.TypeOf(time.Duration(0)) {
-		if d, err := time.ParseDuration(value); err == nil {
-			field.SetInt(int64(d))
-		}
-		return
-	}
-	if i, err := strconv.ParseInt(value, 10, 64); err == nil {
-		field.SetInt(i)
-	}
-}
-
-func setBoolField(field reflect.Value, value string) {
-	switch strings.ToLower(value) {
-	case "true", "1", "yes", "on":
-		field.SetBool(true)
-	case "false", "0", "no", "off", "":
-		field.SetBool(false)
-	}
-}
-
 func setSliceField(field reflect.Value, value string) {
 	// Handle []string with comma-separated values
 	if field.Type().Elem().Kind() == reflect.String {
@@ -311,5 +229,26 @@ func setSliceField(field reflect.Value, value string) {
 			slice.Index(i).SetString(strings.TrimSpace(part))
 		}
 		field.Set(slice)
+	}
+}
+
+// parseBool converts a boolean string to its bool value.
+// Returns false for unrecognized strings.
+func parseBool(s string) bool {
+	switch strings.ToLower(s) {
+	case "true", "1", "yes", "on":
+		return true
+	default:
+		return false
+	}
+}
+
+// isValidBool returns true if the string is a recognized boolean value.
+func isValidBool(s string) bool {
+	switch strings.ToLower(s) {
+	case "true", "1", "yes", "on", "false", "0", "no", "off", "":
+		return true
+	default:
+		return false
 	}
 }
