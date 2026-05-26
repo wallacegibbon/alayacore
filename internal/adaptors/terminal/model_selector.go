@@ -370,7 +370,7 @@ func (ms *ModelSelector) View() tea.View {
 	if ms.State == FilteredListClosed {
 		return tea.NewView("")
 	}
-	return tea.NewView(lipgloss.NewStyle().Padding(1, 2).Render(ms.renderList()))
+	return tea.NewView(ms.renderList())
 }
 
 // RenderOverlay renders the model selector as an overlay on top of base content.

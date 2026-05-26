@@ -10,7 +10,6 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 )
 
 // ThemeSelector manages theme selection UI.
@@ -111,7 +110,7 @@ func (ts *ThemeSelector) View() tea.View {
 	if ts.State == ScrollableListClosed {
 		return tea.NewView("")
 	}
-	return tea.NewView(lipgloss.NewStyle().Padding(1, 2).Render(ts.renderList()))
+	return tea.NewView(ts.renderList())
 }
 
 // --- Key Handling ---
@@ -211,7 +210,7 @@ func (ts *ThemeSelector) renderList() string {
 
 // RenderOverlay renders the theme selector as an overlay on top of base content.
 func (ts *ThemeSelector) RenderOverlay(baseContent string, screenWidth, screenHeight int) string {
-	return ts.ScrollableListCore.RenderOverlay(baseContent, ts.renderList(), screenWidth, screenHeight)
+	return ts.ScrollableListCore.RenderOverlay(baseContent, ts.View().Content, screenWidth, screenHeight)
 }
 
 var _ tea.Model = (*ThemeSelector)(nil)

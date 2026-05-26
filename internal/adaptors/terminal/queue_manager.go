@@ -94,9 +94,9 @@ func (qm *QueueManager) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 
 // --- Rendering ---
 
-func (qm *QueueManager) View() string {
+func (qm *QueueManager) View() tea.View {
 	if qm.State == ScrollableListClosed {
-		return ""
+		return tea.NewView("")
 	}
 
 	listHeight := SelectorListRows // content rows inside border
@@ -130,7 +130,7 @@ func (qm *QueueManager) View() string {
 	borderedBox := qm.Styles.RenderBorderedBox(content, qm.Width, borderColor, listHeight)
 
 	helpText := qm.Styles.System.Render("j/k: navigate │ d: delete │ e: edit │ q/esc: close")
-	return borderedBox + "\n" + helpText
+	return tea.NewView(borderedBox + "\n" + helpText)
 }
 
 func (qm *QueueManager) updateScrollForHeight(height int) {
@@ -171,5 +171,5 @@ func (qm *QueueManager) renderItem(item QueueItem, selected bool) string {
 
 // RenderOverlay renders the queue manager as an overlay on top of base content
 func (qm *QueueManager) RenderOverlay(baseContent string, screenWidth, screenHeight int) string {
-	return qm.ScrollableListCore.RenderOverlay(baseContent, qm.View(), screenWidth, screenHeight)
+	return qm.ScrollableListCore.RenderOverlay(baseContent, qm.View().Content, screenWidth, screenHeight)
 }
