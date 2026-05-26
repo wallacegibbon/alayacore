@@ -4,6 +4,10 @@ package debug
 // requests and responses to a rotating local log file (or stderr as a
 // fallback). It is only used when the CLI enables --debug-api or when
 // providers are created with debug turned on.
+//
+// Each Transport carries its own io.Writer, so there is no global state.
+// Tests and callers that need different output destinations can create
+// independent Transports with separate writers.
 
 import (
 	"bytes"
@@ -11,7 +15,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -19,24 +22,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"golang.org/x/net/proxy"
 )
-
-var (
-	debugWriter io.Writer
-	initOnce    sync.Once
-)
-
-func Enable() {
-	initOnce.Do(func() {
-		debugWriter = newDebugWriter()
-		// Keep the standard library logger consistent with our chosen writer.
-		log.SetOutput(debugWriter)
-	})
-}
 
 // newDebugWriter picks a log destination:
 //   - prefer a new file named alayacore-debug-api-N.log next to the binary;
@@ -74,27 +63,26 @@ func newDebugWriter() io.Writer {
 	return os.Stderr
 }
 
-func writef(format string, args ...any) {
-	if debugWriter != nil {
-		fmt.Fprintf(debugWriter, format, args...)
-	}
-}
-
 // Transport wraps an http.RoundTripper and logs requests and responses
+// to its Writer. Each Transport has its own independent writer — no
+// global state is shared.
 type Transport struct {
 	Transport http.RoundTripper
+	Writer    io.Writer // where debug output is written
 }
 
 // debugReader wraps an io.Reader to log each chunk of data as it's read
 type debugReader struct {
 	reader    io.Reader
+	writer    io.Writer
 	buf       []byte
 	firstRead bool
 }
 
-func newDebugReader(r io.Reader) *debugReader {
+func newDebugReader(r io.Reader, w io.Writer) *debugReader {
 	return &debugReader{
 		reader:    r,
+		writer:    w,
 		buf:       make([]byte, 0, 4096),
 		firstRead: true,
 	}
@@ -112,15 +100,15 @@ func (dr *debugReader) processContentBlock(block any) {
 		name, _ := blockMap["name"].(string)           //nolint:errcheck // debug logging
 		input, _ := blockMap["input"].(map[string]any) //nolint:errcheck // debug logging
 		inputJSON, _ := json.Marshal(input)            //nolint:errcheck // debug logging
-		writef("{ \"content\": { type: \"tool_use\", name: %q, input: %s } }\n", name, inputJSON)
+		fmt.Fprintf(dr.writer, "{ \"content\": { type: \"tool_use\", name: %q, input: %s } }\n", name, inputJSON)
 	case "thinking":
 		thinking, _ := blockMap["thinking"].(string) //nolint:errcheck // debug logging
 		if len(thinking) > 0 && dr.firstRead {
-			writef("<<< Response Stream\n")
-			writef("Chunks:\n")
+			fmt.Fprintf(dr.writer, "<<< Response Stream\n")
+			fmt.Fprintf(dr.writer, "Chunks:\n")
 			dr.firstRead = false
 		}
-		writef("{ \"content\": { type: \"thinking\", ... } }\n")
+		fmt.Fprintf(dr.writer, "{ \"content\": { type: \"thinking\", ... } }\n")
 	}
 }
 
@@ -141,18 +129,18 @@ func (dr *debugReader) processJSONLine(jsonStr string) {
 	// Full format for final chunks or other cases
 	formatted, _ := json.MarshalIndent(jsonData, "", "  ") //nolint:errcheck // debug logging
 	if dr.firstRead {
-		writef("<<< Response Stream\n")
-		writef("Chunks:\n")
+		fmt.Fprintf(dr.writer, "<<< Response Stream\n")
+		fmt.Fprintf(dr.writer, "Chunks:\n")
 		dr.firstRead = false
 	}
-	writef("%s\n", formatted)
+	fmt.Fprintf(dr.writer, "%s\n", formatted)
 }
 
 // ensureHeaderWritten writes the stream header if not already written
 func (dr *debugReader) ensureHeaderWritten() {
 	if dr.firstRead {
-		writef("<<< Response Stream\n")
-		writef("Chunks:\n")
+		fmt.Fprintf(dr.writer, "<<< Response Stream\n")
+		fmt.Fprintf(dr.writer, "Chunks:\n")
 		dr.firstRead = false
 	}
 }
@@ -184,7 +172,7 @@ func (dr *debugReader) Read(p []byte) (n int, err error) {
 			} else if jsonStr != "[DONE]" {
 				// Not JSON and not [DONE], print raw line
 				dr.ensureHeaderWritten()
-				writef("%s\n", line)
+				fmt.Fprintf(dr.writer, "%s\n", line)
 			}
 		}
 	}
@@ -194,6 +182,7 @@ func (dr *debugReader) Read(p []byte) (n int, err error) {
 
 // RoundTrip implements the http.RoundTripper interface
 func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
+	w := t.Writer
 	var requestBody []byte
 	var isStreaming bool
 
@@ -212,25 +201,25 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 			}
 
 			formattedBody, _ = json.MarshalIndent(formattedBody, "", "  ") //nolint:errcheck // debug logging
-			writef(">>> Request\n")
-			writef("%s %s %s\n", req.Method, req.URL.Path, req.URL.RawQuery)
-			writef("Headers:\n")
+			fmt.Fprintf(w, ">>> Request\n")
+			fmt.Fprintf(w, "%s %s %s\n", req.Method, req.URL.Path, req.URL.RawQuery)
+			fmt.Fprintf(w, "Headers:\n")
 			for k, v := range req.Header {
 				if k == "Authorization" {
-					writef("  %s: ***\n", k)
+					fmt.Fprintf(w, "  %s: ***\n", k)
 				} else {
-					writef("  %s: %v\n", k, v)
+					fmt.Fprintf(w, "  %s: %v\n", k, v)
 				}
 			}
-			writef("Body:\n")
-			writef("%s\n", formattedBody)
+			fmt.Fprintf(w, "Body:\n")
+			fmt.Fprintf(w, "%s\n", formattedBody)
 		} else {
-			writef(">>> Request\n")
-			writef("%s %s\n", req.Method, req.URL)
-			writef("Body:\n")
-			writef("%s\n", string(requestBody))
+			fmt.Fprintf(w, ">>> Request\n")
+			fmt.Fprintf(w, "%s %s\n", req.Method, req.URL)
+			fmt.Fprintf(w, "Body:\n")
+			fmt.Fprintf(w, "%s\n", string(requestBody))
 		}
-		writef("--------------------------------------------------\n")
+		fmt.Fprintf(w, "--------------------------------------------------\n")
 	}
 
 	start := time.Now()
@@ -238,27 +227,27 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	// Perform the request
 	resp, err := t.Transport.RoundTrip(req)
 	if err != nil {
-		writef("<<< Request failed after %v: %v\n", time.Since(start), err)
+		fmt.Fprintf(w, "<<< Request failed after %v: %v\n", time.Since(start), err)
 		return nil, err
 	}
 
 	// Log response
-	writef("<<< Response\n")
-	writef("%s %s\n", resp.Proto, resp.Status)
-	writef("Headers:\n")
+	fmt.Fprintf(w, "<<< Response\n")
+	fmt.Fprintf(w, "%s %s\n", resp.Proto, resp.Status)
+	fmt.Fprintf(w, "Headers:\n")
 	for k, v := range resp.Header {
-		writef("  %s: %v\n", k, v)
+		fmt.Fprintf(w, "  %s: %v\n", k, v)
 	}
 
 	// Check response content type to confirm streaming
 	contentType := resp.Header.Get("Content-Type")
 	if isStreaming && strings.Contains(contentType, "text/event-stream") {
-		writef("Body:\n")
+		fmt.Fprintf(w, "Body:\n")
 		resp.Body = struct {
 			io.Reader
 			io.Closer
 		}{
-			Reader: newDebugReader(resp.Body),
+			Reader: newDebugReader(resp.Body, w),
 			Closer: resp.Body,
 		}
 	} else {
@@ -268,32 +257,33 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		var formattedBody any
 		if err := json.Unmarshal(responseBody, &formattedBody); err == nil {
 			formattedBody, _ = json.MarshalIndent(formattedBody, "", "  ") //nolint:errcheck // debug logging
-			writef("Body:\n")
-			writef("%s\n", formattedBody)
+			fmt.Fprintf(w, "Body:\n")
+			fmt.Fprintf(w, "%s\n", formattedBody)
 		} else {
 			dump, _ := httputil.DumpResponse(resp, false) //nolint:errcheck // debug logging
-			writef("Body:\n")
-			writef("%s\n", dump)
+			fmt.Fprintf(w, "Body:\n")
+			fmt.Fprintf(w, "%s\n", dump)
 		}
-		writef("--------------------------------------------------\n")
-		writef("Time: %v\n", time.Since(start))
+		fmt.Fprintf(w, "--------------------------------------------------\n")
+		fmt.Fprintf(w, "Time: %v\n", time.Since(start))
 	}
 
 	return resp, nil
 }
 
-// NewHTTPClient creates a new HTTP client with debug logging enabled
+// NewHTTPClient creates a new HTTP client with debug logging enabled.
+// Each call creates its own independent log file.
 func NewHTTPClient() *http.Client {
-	Enable()
 	return &http.Client{
 		Transport: &Transport{
 			Transport: http.DefaultTransport,
+			Writer:    newDebugWriter(),
 		},
 	}
 }
 
-// NewHTTPClientWithProxy creates an HTTP client with proxy support
-// Supports HTTP, HTTPS, and SOCKS5 proxies
+// NewHTTPClientWithProxy creates an HTTP client with proxy support.
+// Supports HTTP, HTTPS, and SOCKS5 proxies.
 func NewHTTPClientWithProxy(proxyURL string) (*http.Client, error) {
 	proxyParsed, err := url.Parse(proxyURL)
 	if err != nil {
@@ -330,17 +320,18 @@ func NewHTTPClientWithProxy(proxyURL string) (*http.Client, error) {
 	}, nil
 }
 
-// NewHTTPClientWithProxyAndDebug creates an HTTP client with both proxy and debug logging
+// NewHTTPClientWithProxyAndDebug creates an HTTP client with both proxy and debug logging.
+// Each call creates its own independent log file.
 func NewHTTPClientWithProxyAndDebug(proxyURL string) (*http.Client, error) {
 	client, err := NewHTTPClientWithProxy(proxyURL)
 	if err != nil {
 		return nil, err
 	}
 
-	Enable()
 	// Wrap the transport with debug logging
 	client.Transport = &Transport{
 		Transport: client.Transport,
+		Writer:    newDebugWriter(),
 	}
 
 	return client, nil
