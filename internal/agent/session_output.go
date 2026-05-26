@@ -37,21 +37,23 @@ func (s *Session) writeNotifyf(format string, args ...any) {
 }
 
 // writeTLVStr writes a string TLV frame and flushes. Best effort — errors are ignored.
+//nolint:errcheck
 func (s *Session) writeTLVStr(tag string, msg string) {
 	if s.Output == nil {
 		return
 	}
-	_ = stream.WriteTLV(s.Output, tag, msg) //nolint:errcheck // best-effort write to adaptor
+	_ = stream.WriteTLV(s.Output, tag, msg)
 	s.Output.Flush()
 }
 
 // writeTLVJSON marshals a value to JSON and writes it as a TLV frame. Best effort.
+//nolint:errcheck
 func (s *Session) writeTLVJSON(tag string, v any) {
 	if s.Output == nil {
 		return
 	}
-	data, _ := json.Marshal(v)                       //nolint:errcheck // best-effort marshal, value is always serializable
-	_ = stream.WriteTLV(s.Output, tag, string(data)) //nolint:errcheck // best-effort write to adaptor
+	data, _ := json.Marshal(v)
+	_ = stream.WriteTLV(s.Output, tag, string(data))
 	s.Output.Flush()
 }
 

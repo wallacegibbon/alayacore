@@ -155,7 +155,7 @@ func (s *Session) appendCancelMessage() {
 	})
 	// Also push to the output so the cancel message appears live in the UI,
 	// matching the behavior on session restore where TLV chunks are replayed.
-	_ = stream.WriteTLV(s.Output, stream.TagTextAssistant, cancelMessage) //nolint:errcheck // best-effort write to adaptor
+	s.writeTLVStr(stream.TagTextAssistant, cancelMessage)
 	s.Output.Flush()
 }
 

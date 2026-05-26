@@ -206,8 +206,7 @@ func (s *Session) handleModelSet(args []string) {
 	}
 
 	if s.RuntimeManager != nil {
-		//nolint:errcheck // Best effort save, errors ignored
-		_ = s.RuntimeManager.SetActiveModel(model.Name)
+		_ = s.RuntimeManager.SetActiveModel(model.Name) // best-effort save, errors ignored
 	}
 
 	if err := s.SwitchModel(model); err != nil {
@@ -300,8 +299,7 @@ func (s *Session) handleThemeSet(args []string) {
 		return
 	}
 	if s.RuntimeManager != nil {
-		//nolint:errcheck // Best effort save, errors ignored
-		_ = s.RuntimeManager.SetActiveTheme(args[0])
+		_ = s.RuntimeManager.SetActiveTheme(args[0]) // best-effort save, errors ignored
 	}
 	s.writeNotifyf("Theme set to: %s", args[0])
 	s.sendSystemInfo()

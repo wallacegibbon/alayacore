@@ -34,13 +34,11 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) (int
 
 	_, err := s.agent.Load().Stream(ctx, history, llm.StreamCallbacks{
 		OnTextDelta: func(delta string) error {
-			//nolint:errcheck // Best effort write, errors ignored
 			_ = stream.WriteTLV(s.Output, stream.TagTextAssistant, stream.WrapDelta(assembleID(stream.SuffixText), delta))
 			s.Output.Flush()
 			return nil
 		},
 		OnReasoningDelta: func(delta string) error {
-			//nolint:errcheck // Best effort write, errors ignored
 			_ = stream.WriteTLV(s.Output, stream.TagTextReasoning, stream.WrapDelta(assembleID(stream.SuffixReasoning), delta))
 			s.Output.Flush()
 			return nil
