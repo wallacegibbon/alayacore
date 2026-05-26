@@ -26,30 +26,33 @@ const (
 // ============================================================================
 
 // handleUserPrompt processes a user prompt through the agent loop.
-func (s *Session) handleUserPrompt(ctx context.Context, prompt string) {
+// Takes the current messages and returns the updated messages after processing.
+func (s *Session) handleUserPrompt(ctx context.Context, messages []llm.Message, prompt string) []llm.Message {
 	if s.shouldAutoSummarize() {
-		s.doAutoSummarize(ctx)
+		messages = s.doAutoSummarize(ctx, messages)
 	}
 
-	if len(s.Messages) > 0 && s.Messages[len(s.Messages)-1].Role == llm.RoleUser {
-		s.Messages[len(s.Messages)-1].Content = append(
-			s.Messages[len(s.Messages)-1].Content,
+	if len(messages) > 0 && messages[len(messages)-1].Role == llm.RoleUser {
+		messages[len(messages)-1].Content = append(
+			messages[len(messages)-1].Content,
 			llm.TextPart{Type: "text", Text: prompt},
 		)
 	} else {
-		s.Messages = append(s.Messages, llm.NewUserMessage(prompt))
+		messages = append(messages, llm.NewUserMessage(prompt))
 	}
 
-	_, err := s.processPrompt(ctx, s.Messages)
+	result, _, err := s.processPrompt(ctx, messages)
 
-	s.Messages = cleanIncompleteToolCalls(s.Messages)
+	result = cleanIncompleteToolCalls(result)
 
 	if err != nil {
 		s.writeError(err.Error())
 		s.pausedOnError.Store(true)
 		s.requestSystemInfo()
-		return
+		return result
 	}
+
+	return result
 }
 
 // shouldAutoSummarize returns true when auto-summarization is enabled and
@@ -60,9 +63,9 @@ func (s *Session) shouldAutoSummarize() bool {
 }
 
 // doAutoSummarize logs a notification and triggers summarization.
-func (s *Session) doAutoSummarize(ctx context.Context) {
+func (s *Session) doAutoSummarize(ctx context.Context, messages []llm.Message) []llm.Message {
 	usage := float64(s.ContextTokens.Load()) * AutoSummarizePctBase / float64(s.ContextLimit)
 	s.writeNotifyf("Context usage at %d/%d tokens (%.0f%%). Auto-summarizing...",
 		s.ContextTokens.Load(), s.ContextLimit, usage)
-	s.summarize(ctx)
+	return s.summarize(ctx, messages)
 }

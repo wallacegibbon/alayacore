@@ -19,7 +19,7 @@ import (
 // Prompt Processing
 // ============================================================================
 
-func (s *Session) processPrompt(ctx context.Context, history []llm.Message) (int64, error) {
+func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]llm.Message, int64, error) {
 	// nextPromptID is goroutine-local (only accessed from the task goroutine),
 	// so it's updated outside the mutex.
 	s.nextPromptID++
@@ -31,6 +31,10 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) (int
 	assembleID := func(id string) string {
 		return stream.NewStreamID(promptID, stepCount, id)
 	}
+
+	// processResult captures the final message state from the agent.
+	// It is set by OnStepFinish and returned to the caller.
+	var processResult []llm.Message
 
 	_, err := s.agent.Load().Stream(ctx, history, llm.StreamCallbacks{
 		OnTextDelta: func(delta string) error {
@@ -85,12 +89,11 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) (int
 		},
 		OnStepFinish: func(messages []llm.Message, usage llm.Usage) error {
 			// messages is allMessages (full history) from the agent.
-			// Update s.Messages (task goroutine's working copy) so
-			// cancel/error paths have the latest state. The final
-			// message state is returned to run() via taskResult
-			// when the task completes.
+			// Capture the final state so we can return it to the caller.
+			// The task goroutine's caller owns the authoritative copy;
+			// we never write to s.Messages here.
 			if len(messages) > 0 {
-				s.Messages = messages
+				processResult = messages
 			}
 
 			// Send event to run() so it updates token totals.
@@ -110,10 +113,10 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) (int
 	s.Output.Flush()
 
 	if err != nil {
-		return 0, err
+		return processResult, 0, err
 	}
 
-	return outputTokens, nil
+	return processResult, outputTokens, nil
 }
 
 // cleanIncompleteToolCalls removes incomplete tool calls from messages.

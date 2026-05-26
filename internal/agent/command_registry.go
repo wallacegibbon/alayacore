@@ -41,13 +41,13 @@ type Command struct {
 // Order here determines the order used by LookupCommand iteration.
 var commandDefs = []Command{
 	{commandNameSummarize, "Summarize the conversation to reduce context", "", false,
-		func(s *Session, ctx context.Context, _ []string) { s.summarize(ctx) }},
+		nil},
 	{commandNameCancel, "Cancel the current task", "", true,
 		func(s *Session, _ context.Context, _ []string) { s.cancelTask() }},
 	{commandNameCancelAll, "Cancel current task and clear the task queue", "", true,
 		func(s *Session, _ context.Context, _ []string) { s.cancelAllTasks() }},
 	{commandNameContinue, "Resume after an error; without args retries the prompt, with 'skip' skips it", "[skip]", false,
-		func(s *Session, ctx context.Context, args []string) { s.handleContinue(ctx, args) }},
+		nil},
 	{commandNameSave, "Save the current session", "[filename]", true,
 		func(s *Session, _ context.Context, args []string) { s.saveSession(args) }},
 	{commandNameModelSet, "Switch to a different model", "<id>", true,
@@ -102,7 +102,7 @@ func (s *Session) dispatchCommand(ctx context.Context, cmd string) bool {
 	args := parts[1:]
 
 	c, ok := LookupCommand(commandName)
-	if !ok {
+	if !ok || c.Handler == nil {
 		return false
 	}
 

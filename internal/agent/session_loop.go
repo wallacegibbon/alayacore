@@ -20,8 +20,14 @@ import (
 // ============================================================================
 
 // run is the main loop that owns input processing, task queue management,
-// and the authoritative copy of session state (runMessages, taskQueue,
+// and the authoritative copy of session state (s.Messages, taskQueue,
 // totals, etc.). It runs in a single goroutine (started by Start()).
+//
+// s.Messages is the single source of truth for the conversation history,
+// owned entirely by the run() goroutine. When a task starts, a snapshot
+// of s.Messages is passed to the task goroutine as its local working copy.
+// The task goroutine never writes to s.Messages directly — it returns the
+// final state via taskResult channel on completion.
 //
 // The loop processes three kinds of events:
 //   - Input messages from the user (via inputPump → msgCh)
@@ -32,19 +38,11 @@ func (s *Session) run() {
 	defer close(s.runDone)
 	defer s.sessionCancel()
 
-	// runMessages is the run() goroutine's copy of the conversation history.
-	// The task goroutine has its own working copy (s.Messages). At task
-	// start, runMessages is copied to s.Messages. During task execution,
-	// OnStepFinish sends the agent's allMessages (full history) via
-	// StepFinishEvent, which replaces runMessages entirely.
-	// Between tasks, runMessages is the source of truth.
-	//
+	// Initialize s.Messages if nil (fresh session).
 	// When restoring from a session (RestoreFromSession), s.Messages
-	// already contains the loaded history — initialize runMessages from
-	// it so the loaded messages are not lost on the first task.
-	runMessages := s.Messages
-	if runMessages == nil {
-		runMessages = make([]llm.Message, 0)
+	// already contains the loaded history.
+	if s.Messages == nil {
+		s.Messages = make([]llm.Message, 0)
 	}
 
 	// Start the I/O pump goroutine — it reads TLV from the input and
@@ -59,7 +57,7 @@ func (s *Session) run() {
 			return
 		}
 
-		s.tryStartNextTask(&runMessages)
+		s.tryStartNextTask()
 
 		// Wait for new input, task events, task completion, or info requests
 		select {
@@ -69,7 +67,7 @@ func (s *Session) run() {
 				// keep processing events until it completes so that output
 				// (prompt echo, assistant response) is flushed before exit.
 				if s.inProgress {
-					s.drainUntilTaskDone(&runMessages)
+					s.drainUntilTaskDone()
 				}
 				return
 			}
@@ -79,7 +77,7 @@ func (s *Session) run() {
 			s.handleTaskEvent(ev)
 
 		case <-s.taskDone:
-			s.handleTaskDone(&runMessages)
+			s.handleTaskDone()
 
 		case <-s.infoUpdateCh:
 			s.sendSystemInfo()
@@ -94,7 +92,7 @@ func (s *Session) run() {
 // and launches it if so. When paused on error, only command tasks are
 // allowed to run — user prompts must wait for explicit recovery via :continue.
 // Returns true if a task was started.
-func (s *Session) tryStartNextTask(runMessages *[]llm.Message) bool {
+func (s *Session) tryStartNextTask() bool {
 	if len(s.taskQueue) == 0 || s.inProgress || s.sessionCtx.Err() != nil {
 		return false
 	}
@@ -121,35 +119,36 @@ func (s *Session) tryStartNextTask(runMessages *[]llm.Message) bool {
 		return false
 	}
 
-	// Copy runMessages to s.Messages as the task goroutine's working copy.
-	s.Messages = make([]llm.Message, len(*runMessages))
-	copy(s.Messages, *runMessages)
+	// Create a snapshot of s.Messages for the task goroutine.
+	// The task goroutine owns this copy and returns the final state
+	// via taskResult when done.
+	taskMessages := make([]llm.Message, len(s.Messages))
+	copy(taskMessages, s.Messages)
 
-	go s.runTask(item)
+	go s.runTask(item, taskMessages)
 	return true
 }
 
 // handleTaskDone processes a task completion signal from the task goroutine.
-// Reads the final message state from taskResult (set by the defer in runTask)
-// and auto-saves if configured.
-func (s *Session) handleTaskDone(runMessages *[]llm.Message) {
+// Reads the final message state from taskResult and updates s.Messages.
+func (s *Session) handleTaskDone() {
 	// Mark the task as finished so the next queue item can start.
 	s.inProgress = false
 
 	// Read the final message state returned by the task goroutine.
-	// This is the sole handoff point for messages — StepFinishEvent
-	// carries only token counts during execution.
+	// This is the sole handoff point — the task goroutine never writes
+	// to s.Messages directly.
 	select {
 	case result := <-s.taskResult:
 		if len(result) > 0 {
-			*runMessages = result
+			s.Messages = result
 		}
 	default:
 	}
 
-	// Auto-save if configured (uses runMessages which is now up-to-date)
+	// Auto-save if configured
 	if s.SessionFile != "" {
-		if err := s.saveSessionToFileWith(*runMessages, s.SessionFile); err != nil {
+		if err := s.saveSessionToFileWith(s.Messages, s.SessionFile); err != nil {
 			s.writeNotifyf("Auto-save failed: %v", err)
 		}
 	}
@@ -161,13 +160,13 @@ func (s *Session) handleTaskDone(runMessages *[]llm.Message) {
 // currently running task finishes. Called when input is closed but a task is
 // still in progress, ensuring final output (prompt echo, assistant response)
 // is flushed before the session exits.
-func (s *Session) drainUntilTaskDone(runMessages *[]llm.Message) {
+func (s *Session) drainUntilTaskDone() {
 	for {
 		select {
 		case ev := <-s.stateCh:
 			s.handleTaskEvent(ev)
 		case <-s.taskDone:
-			s.handleTaskDone(runMessages)
+			s.handleTaskDone()
 			return
 		case <-s.infoUpdateCh:
 			s.sendSystemInfo()

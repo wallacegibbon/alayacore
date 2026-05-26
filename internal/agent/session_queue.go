@@ -12,6 +12,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/alayacore/alayacore/internal/llm"
@@ -81,13 +82,15 @@ func (s *Session) enqueueTask(task Task, front bool) {
 // ============================================================================
 
 // runTask executes a single task in its own goroutine. It is called from
-// run() via "go s.runTask(item)". On completion it sends on taskDone so
-// the main loop can start the next task.
+// run() via "go s.runTask(item, taskMessages)". On completion it sends
+// taskMessages on taskResult so the main loop can update s.Messages.
 //
 // The task goroutine receives a snapshot of messages at task start. All
 // state mutations during execution (step progress, new messages, token
-// counts) are sent to run() via stateCh.
-func (s *Session) runTask(item QueueItem) {
+// counts) are sent to run() via stateCh. The task goroutine never writes
+// to s.Messages directly — it operates on its local taskMessages copy
+// and returns the final state via taskResult.
+func (s *Session) runTask(item QueueItem, taskMessages []llm.Message) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Start a goroutine to forward cancellation signals from inputPump
@@ -103,12 +106,10 @@ func (s *Session) runTask(item QueueItem) {
 	defer cancel()
 	defer func() {
 		// Return the final message state to run() so it can replace
-		// runMessages with the task goroutine's final state.
+		// s.Messages with the task goroutine's final state.
 		// Non-blocking send — the channel is buffered (capacity 1).
-		finalMessages := make([]llm.Message, len(s.Messages))
-		copy(finalMessages, s.Messages)
 		select {
-		case s.taskResult <- finalMessages:
+		case s.taskResult <- taskMessages:
 		default:
 		}
 
@@ -131,13 +132,33 @@ func (s *Session) runTask(item QueueItem) {
 
 	switch t := item.Task.(type) {
 	case UserPrompt:
-		s.handleUserPrompt(ctx, t.Text)
+		taskMessages = s.handleUserPrompt(ctx, taskMessages, t.Text)
 	case CommandPrompt:
-		s.handleCommand(ctx, t.Command)
+		taskMessages = s.runTaskCommand(ctx, taskMessages, t.Command)
 	}
 
 	if ctx.Err() == context.Canceled {
-		s.appendCancelMessage()
+		taskMessages = s.appendCancelMessage(taskMessages)
+	}
+}
+
+// runTaskCommand handles a deferred command in the task goroutine.
+// Unlike immediate commands (handled by handleCommand in run()'s goroutine),
+// deferred commands operate on the task's local message copy and return it.
+func (s *Session) runTaskCommand(ctx context.Context, messages []llm.Message, cmd string) []llm.Message {
+	parts := strings.Fields(cmd)
+	if len(parts) == 0 {
+		return messages
+	}
+	switch parts[0] {
+	case commandNameSummarize:
+		return s.summarize(ctx, messages)
+	case commandNameContinue:
+		return s.handleContinue(ctx, messages, parts[1:])
+	default:
+		// Unknown deferred command — shouldn't happen since only registered
+		// deferred commands reach the task goroutine.
+		return messages
 	}
 }
 
@@ -145,8 +166,8 @@ func (s *Session) runTask(item QueueItem) {
 // message window when a task is canceled by the user.
 const cancelMessage = "The user canceled."
 
-func (s *Session) appendCancelMessage() {
-	s.Messages = append(s.Messages, llm.Message{
+func (s *Session) appendCancelMessage(messages []llm.Message) []llm.Message {
+	messages = append(messages, llm.Message{
 		Role:    llm.RoleAssistant,
 		Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: cancelMessage}},
 	})
@@ -154,6 +175,7 @@ func (s *Session) appendCancelMessage() {
 	// matching the behavior on session restore where TLV chunks are replayed.
 	s.writeTLVStr(stream.TagTextAssistant, cancelMessage)
 	s.Output.Flush()
+	return messages
 }
 
 // ============================================================================

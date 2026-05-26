@@ -78,33 +78,33 @@ func (s *Session) cancelAllTasks() {
 	s.sendSystemInfo()
 }
 
-func (s *Session) handleContinue(ctx context.Context, args []string) {
+func (s *Session) handleContinue(ctx context.Context, messages []llm.Message, args []string) []llm.Message {
 	// Validate arguments before doing anything.
 	if len(args) > 0 && args[0] != "skip" {
 		s.writeError("usage: :continue [skip]")
-		return
+		return messages
 	}
 
 	s.pausedOnError.Store(false)
 
 	// With no arguments, resend the last prompt.
 	if len(args) == 0 {
-		s.resendPrompt(ctx)
-		return
+		return s.resendPrompt(ctx, messages)
 	}
 
 	// "skip" — skip the failed prompt and resume the remaining queue.
 	qLen := len(s.taskQueue)
 	if qLen == 0 {
 		s.writeNotify("Queue is empty")
-		return
+		return messages
 	}
 
 	s.writeNotify("Resuming queue...")
 	s.requestSystemInfo()
+	return messages
 }
 
-func (s *Session) summarize(ctx context.Context) {
+func (s *Session) summarize(ctx context.Context, messages []llm.Message) []llm.Message {
 	prompt := `Summarize the conversation for continuation. The resuming instance has no prior context.
 
 Provide:
@@ -119,32 +119,33 @@ Rules:
 - Include error messages verbatim
 - Skip completed exploration; only preserve findings that affect next steps`
 
-	s.Messages = append(s.Messages, llm.NewUserMessage(prompt))
-	beforeCount := len(s.Messages)
+	messages = append(messages, llm.NewUserMessage(prompt))
+	beforeCount := len(messages)
 
 	s.writeNotify("Summarizing conversation...")
 
-	outputTokens, err := s.processPrompt(ctx, s.Messages)
+	result, outputTokens, err := s.processPrompt(ctx, messages)
 	if err != nil {
 		s.writeError(err.Error())
 		s.pausedOnError.Store(true)
 		s.requestSystemInfo()
-		return
+		return result
 	}
 
 	var lastAssistantMsg llm.Message
-	for i := beforeCount; i < len(s.Messages); i++ {
-		if s.Messages[i].Role == llm.RoleAssistant {
-			lastAssistantMsg = s.Messages[i]
+	for i := beforeCount; i < len(result); i++ {
+		if result[i].Role == llm.RoleAssistant {
+			lastAssistantMsg = result[i]
 		}
 	}
-	s.Messages = []llm.Message{lastAssistantMsg}
+	result = []llm.Message{lastAssistantMsg}
 	if outputTokens > 0 {
 		s.ContextTokens.Store(outputTokens)
 	}
 
 	s.writeNotify("Summarized conversation")
 	s.requestSystemInfo()
+	return result
 }
 
 func (s *Session) saveSession(args []string) {
@@ -317,19 +318,19 @@ func (s *Session) handleThemeSet(args []string) {
 //  3. Latest message is an assistant message → the API partially succeeded
 //     or was canceled. A "Please continue." user message is appended so the
 //     model picks up where it left off.
-func (s *Session) resendPrompt(ctx context.Context) {
-	if len(s.Messages) == 0 {
+func (s *Session) resendPrompt(ctx context.Context, messages []llm.Message) []llm.Message {
+	if len(messages) == 0 {
 		s.writeError("No messages to resend")
-		return
+		return messages
 	}
 
-	msgCount := len(s.Messages)
-	lastMsg := s.Messages[msgCount-1]
+	msgCount := len(messages)
+	lastMsg := messages[msgCount-1]
 	if lastMsg.Role == llm.RoleAssistant {
 		// The last message is an assistant response (partial success,
 		// cancel, or error mid-stream). Append a continuation prompt so the
 		// model resumes naturally.
-		s.Messages = append(s.Messages, llm.NewUserMessage("Please continue."))
+		messages = append(messages, llm.NewUserMessage("Please continue."))
 		// Echo the inserted message to the adaptor so it is visible.
 		s.signalPromptStart("Please continue.")
 	} else {
@@ -339,17 +340,18 @@ func (s *Session) resendPrompt(ctx context.Context) {
 		s.writeNotify("Resending...")
 	}
 
-	_, err := s.processPrompt(ctx, s.Messages)
+	result, _, err := s.processPrompt(ctx, messages)
 
-	s.Messages = cleanIncompleteToolCalls(s.Messages)
+	result = cleanIncompleteToolCalls(result)
 	if err != nil {
 		s.writeError(err.Error())
 		s.pausedOnError.Store(true)
 		s.requestSystemInfo()
-		return
+		return result
 	}
 
 	s.requestSystemInfo()
+	return result
 }
 
 // ============================================================================
