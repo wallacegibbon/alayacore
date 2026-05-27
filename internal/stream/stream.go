@@ -2,7 +2,7 @@ package stream
 
 // Package stream defines the minimal IO abstraction and TLV encoding
 // used between adaptors (terminal/plainio) and the core session.
-// It intentionally stays small: SliceReadWriter plus helpers for
+// It intentionally stays small: SliceBuffer plus helpers for
 // reading/writing framed Tag-Length-Value messages over io.Reader/io.Writer.
 
 import (
@@ -25,26 +25,26 @@ const (
 	TagSystemData   = "SD" // Complex data JSON (queue status, model info, etc.)
 )
 
-// SliceReadWriter is an io.ReadWriter that bridges slice-at-a-time writes
+// SliceBuffer is an io.ReadWriteCloser that bridges slice-at-a-time writes
 // with byte-at-a-time reads. Write sends each slice atomically via a
 // channel; Read uses an internal buffer to reassemble slices into a
 // byte stream so callers like io.ReadFull get continuous byte access
 // without losing slice boundaries.
-type SliceReadWriter struct {
+type SliceBuffer struct {
 	ch        chan []byte
 	buf       []byte
 	closeOnce sync.Once
 }
 
-// NewSliceReadWriter creates a SliceReadWriter with the given channel buffer size.
-func NewSliceReadWriter(bufferSize int) *SliceReadWriter {
-	return &SliceReadWriter{ch: make(chan []byte, bufferSize)}
+// NewSliceBuffer creates a SliceBuffer with the given channel buffer size.
+func NewSliceBuffer(bufferSize int) *SliceBuffer {
+	return &SliceBuffer{ch: make(chan []byte, bufferSize)}
 }
 
 // Close closes the input channel, causing Read to return EOF.
 // It is safe to call Close multiple times.
-func (rw *SliceReadWriter) Close() error {
-	rw.closeOnce.Do(func() { close(rw.ch) })
+func (b *SliceBuffer) Close() error {
+	b.closeOnce.Do(func() { close(b.ch) })
 	return nil
 }
 
@@ -53,28 +53,28 @@ func (rw *SliceReadWriter) Close() error {
 // Writes arrive as atomic slices via the channel; Read copies as much as
 // fits into p and buffers the rest so callers like io.ReadFull see a
 // continuous byte stream.
-func (rw *SliceReadWriter) Read(p []byte) (n int, err error) {
-	if len(rw.buf) > 0 {
-		n = copy(p, rw.buf)
-		rw.buf = rw.buf[n:]
+func (b *SliceBuffer) Read(p []byte) (n int, err error) {
+	if len(b.buf) > 0 {
+		n = copy(p, b.buf)
+		b.buf = b.buf[n:]
 		return n, nil
 	}
 
-	msg, ok := <-rw.ch
+	msg, ok := <-b.ch
 	if !ok {
 		return 0, io.EOF
 	}
 
-	rw.buf = msg
-	n = copy(p, rw.buf)
-	rw.buf = rw.buf[n:]
+	b.buf = msg
+	n = copy(p, b.buf)
+	b.buf = b.buf[n:]
 	return n, nil
 }
 
 // Write implements io.Writer. Each call sends p as a single atomic slice
 // to the channel. Safe for concurrent use.
-func (rw *SliceReadWriter) Write(p []byte) (int, error) {
-	rw.ch <- p
+func (b *SliceBuffer) Write(p []byte) (int, error) {
+	b.ch <- p
 	return len(p), nil
 }
 

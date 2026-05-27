@@ -68,7 +68,7 @@
 //
 // Usage:
 //
-//	input := stream.NewSliceReadWriter(10)
+//	input := stream.NewSliceBuffer(10)
 //	output := &bufferOutput{}
 //	cfg := agent.SessionConfig{Input: input, Output: output, ...}
 //	session := agent.NewSession(cfg)

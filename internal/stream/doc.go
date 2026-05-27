@@ -4,7 +4,7 @@
 // The stream package provides helpers for reading/writing framed
 // Tag-Length-Value (TLV) messages over io.Reader and io.Writer.
 //
-// The core type SliceReadWriter bridges slice-oriented writes
+// The core type SliceBuffer bridges slice-oriented writes
 // (each Write call sends an atomic slice) with byte-oriented reads
 // (Read buffers slices into a continuous byte stream).
 //
@@ -52,7 +52,7 @@
 // Usage:
 //
 //	// Create input channel
-//	input := stream.NewSliceReadWriter(10)
+//	input := stream.NewSliceBuffer(10)
 //
 //	// Emit a TLV message
 //	stream.WriteTLV(input, stream.TagTextUser, "Hello, AI!")

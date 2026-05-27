@@ -13,7 +13,7 @@ import (
 func TestTerminalResizeCursorValidation(t *testing.T) {
 	// Create a terminal with initial size
 	output := NewTerminalOutput(DefaultStyles())
-	input := stream.NewSliceReadWriter(10)
+	input := stream.NewSliceBuffer(10)
 	terminal := NewTerminalWithTheme(output, input, nil, 80, 24, DefaultTheme(), nil)
 
 	// Add some windows to the buffer
@@ -50,7 +50,7 @@ func TestTerminalResizeCursorValidation(t *testing.T) {
 // change height during resize.
 func TestTerminalResizeClampsCursor(t *testing.T) {
 	output := NewTerminalOutput(DefaultStyles())
-	input := stream.NewSliceReadWriter(10)
+	input := stream.NewSliceBuffer(10)
 	terminal := NewTerminalWithTheme(output, input, nil, 80, 24, DefaultTheme(), nil)
 
 	// Add windows
@@ -89,7 +89,7 @@ func TestTerminalResizeClampsCursor(t *testing.T) {
 func TestTerminalResizeUpdatesDisplayContent(t *testing.T) {
 	// Create a terminal with initial size
 	output := NewTerminalOutput(DefaultStyles())
-	input := stream.NewSliceReadWriter(10)
+	input := stream.NewSliceBuffer(10)
 	terminal := NewTerminalWithTheme(output, input, nil, 80, 24, DefaultTheme(), nil)
 
 	// Add content that will wrap differently at different widths

@@ -71,9 +71,9 @@ func TestEncodeTLV(t *testing.T) {
 	}
 }
 
-func TestSliceReadWriter(t *testing.T) {
+func TestSliceBuffer(t *testing.T) {
 	t.Run("emit and read", func(t *testing.T) {
-		input := NewSliceReadWriter(10)
+		input := NewSliceBuffer(10)
 
 		// Write a message
 		n, err := input.Write([]byte("test message"))
@@ -96,7 +96,7 @@ func TestSliceReadWriter(t *testing.T) {
 	})
 
 	t.Run("emit TLV", func(t *testing.T) {
-		input := NewSliceReadWriter(10)
+		input := NewSliceBuffer(10)
 
 		// Emit TLV message
 		err := WriteTLV(input, TagTextUser, "Hello")
@@ -118,7 +118,7 @@ func TestSliceReadWriter(t *testing.T) {
 	})
 
 	t.Run("close returns EOF", func(t *testing.T) {
-		input := NewSliceReadWriter(10)
+		input := NewSliceBuffer(10)
 
 		// Close the input
 		err := input.Close()
@@ -135,7 +135,7 @@ func TestSliceReadWriter(t *testing.T) {
 	})
 
 	t.Run("multiple messages", func(t *testing.T) {
-		input := NewSliceReadWriter(10)
+		input := NewSliceBuffer(10)
 
 		messages := []struct {
 			tag   string

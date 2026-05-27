@@ -164,7 +164,7 @@ Agent.Stream() receives tool_call event
 
 The `StartSession()` function in `app/session.go` handles shared initialization for all adaptors:
 
-- Creates the input pipe internally (`SliceReadWriter`), returning the write end (`io.WriteCloser`) to the adaptor so it can feed TLV messages to the session
+- Creates the input pipe internally (`SliceBuffer`), returning the write end (`io.WriteCloser`) to the adaptor so it can feed TLV messages to the session
 - `session.InitError()` — fatal initialization check (--model flag validation)
 - `session.ModelManager.GetLoadErrors()` — print config warnings
 - `session.HasModels()` — abort if no models configured

@@ -29,7 +29,7 @@ import (
 //
 // Returns nil, nil, and an error if the session cannot be used.
 func StartSession(cfg *Config, output io.Writer) (*agentpkg.Session, io.WriteCloser, error) {
-	input := stream.NewSliceReadWriter(100)
+	input := stream.NewSliceBuffer(100)
 
 	session, _ := agentpkg.LoadOrNewSession(agentpkg.SessionConfig{
 		Input:               input,
