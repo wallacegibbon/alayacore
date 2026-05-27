@@ -32,7 +32,7 @@ func NewAdaptor(cfg *app.Config) *Adaptor {
 // Returns 1 only on startup failure (config errors, no models).
 // The controlling process reads stdout and handles TLV itself.
 func (a *Adaptor) Start() int {
-	input := stream.NewChanInput(100)
+	input := stream.NewSliceReadWriter(100)
 
 	session, err := app.StartSession(a.Config, input, os.Stdout)
 	if err != nil {

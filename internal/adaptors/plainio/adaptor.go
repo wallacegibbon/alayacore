@@ -35,7 +35,7 @@ func NewAdaptor(cfg *app.Config) *Adaptor {
 // (SE tag), the remaining input is discarded and the process exits
 // with code 1 — queued tasks are NOT executed.
 func (a *Adaptor) Start() int {
-	input := stream.NewChanInput(100)
+	input := stream.NewSliceReadWriter(100)
 	output := newStdoutOutput()
 
 	// Load session

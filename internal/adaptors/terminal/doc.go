@@ -20,7 +20,7 @@
 //	  - QueueManager: Modal for managing the task queue
 //
 // Communication with the session layer uses TLV (Tag-Length-Value) protocol:
-//   - Input: ChanInput receives TLV messages from user actions
+//   - Input: SliceReadWriter receives TLV messages from user actions
 //   - Output: OutputWriter parses TLV and renders styled content
 //
 // Key Files:

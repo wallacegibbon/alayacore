@@ -34,7 +34,7 @@ func (a *Adaptor) Start() int {
 	// Create theme manager
 	themeManager := NewThemeManager(a.Config.Cfg.ThemesFolder)
 
-	inputStream := stream.NewChanInput(10)
+	inputStream := stream.NewSliceReadWriter(10)
 	terminalOutput := NewTerminalOutput(NewStyles(DefaultTheme()))
 
 	// Get terminal size before loading session (so session loads with correct dimensions)

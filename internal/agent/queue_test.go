@@ -13,7 +13,7 @@ func TestQueueItemUniqueIDs(t *testing.T) {
 	session := &Session{
 		taskQueue: make([]QueueItem, 0),
 		SessionConfig: SessionConfig{
-			Input:  &stream.ChanInput{},
+			Input:  &stream.SliceReadWriter{},
 			Output: &MockOutput{},
 		},
 	}
@@ -56,7 +56,7 @@ func TestDeleteQueueItem(t *testing.T) {
 	session := &Session{
 		taskQueue: make([]QueueItem, 0),
 		SessionConfig: SessionConfig{
-			Input:  &stream.ChanInput{},
+			Input:  &stream.SliceReadWriter{},
 			Output: &MockOutput{},
 		},
 	}
@@ -97,7 +97,7 @@ func TestQueueItemTypes(t *testing.T) {
 	session := &Session{
 		taskQueue: make([]QueueItem, 0),
 		SessionConfig: SessionConfig{
-			Input:  &stream.ChanInput{},
+			Input:  &stream.SliceReadWriter{},
 			Output: &MockOutput{},
 		},
 	}
@@ -131,7 +131,7 @@ func TestQueueTimestamps(t *testing.T) {
 	session := &Session{
 		taskQueue: make([]QueueItem, 0),
 		SessionConfig: SessionConfig{
-			Input:  &stream.ChanInput{},
+			Input:  &stream.SliceReadWriter{},
 			Output: &MockOutput{},
 		},
 	}
@@ -198,7 +198,7 @@ func TestCancelAllTasks(t *testing.T) {
 				taskCancelCh: make(chan struct{}, 1),
 				runDone:      make(chan struct{}),
 				SessionConfig: SessionConfig{
-					Input:  &stream.ChanInput{},
+					Input:  &stream.SliceReadWriter{},
 					Output: output,
 				},
 			}
@@ -245,7 +245,7 @@ func TestPausedOnError(t *testing.T) {
 	session := &Session{
 		taskQueue: make([]QueueItem, 0),
 		SessionConfig: SessionConfig{
-			Input:  &stream.ChanInput{},
+			Input:  &stream.SliceReadWriter{},
 			Output: &MockOutput{},
 		},
 	}
@@ -276,7 +276,7 @@ func TestSubmitTaskFront(t *testing.T) {
 	session := &Session{
 		taskQueue: make([]QueueItem, 0),
 		SessionConfig: SessionConfig{
-			Input:  &stream.ChanInput{},
+			Input:  &stream.SliceReadWriter{},
 			Output: &MockOutput{},
 		},
 	}
@@ -329,7 +329,7 @@ func TestCommandCanRunWhilePaused(t *testing.T) {
 	session := &Session{
 		taskQueue: make([]QueueItem, 0),
 		SessionConfig: SessionConfig{
-			Input:  &stream.ChanInput{},
+			Input:  &stream.SliceReadWriter{},
 			Output: &MockOutput{},
 		},
 	}
@@ -376,7 +376,7 @@ func TestCommandBehindUserPromptWhilePaused(t *testing.T) {
 	session := &Session{
 		taskQueue: make([]QueueItem, 0),
 		SessionConfig: SessionConfig{
-			Input:  &stream.ChanInput{},
+			Input:  &stream.SliceReadWriter{},
 			Output: &MockOutput{},
 		},
 	}
@@ -409,7 +409,7 @@ func TestSubmitTaskDoesNotClearPauseWhenQueueNotEmpty(t *testing.T) {
 	session := &Session{
 		taskQueue: make([]QueueItem, 0),
 		SessionConfig: SessionConfig{
-			Input:  &stream.ChanInput{},
+			Input:  &stream.SliceReadWriter{},
 			Output: &MockOutput{},
 		},
 	}

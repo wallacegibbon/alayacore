@@ -85,7 +85,7 @@ const (
 type Terminal struct {
 	// Core components
 	out         OutputWriter
-	streamInput *stream.ChanInput
+	streamInput *stream.SliceReadWriter
 	appConfig   *app.Config
 	editor      *Editor
 
@@ -120,7 +120,7 @@ type Terminal struct {
 // NewTerminalWithTheme creates a new Terminal model with a custom theme.
 func NewTerminalWithTheme(
 	out OutputWriter,
-	inputStream *stream.ChanInput,
+	inputStream *stream.SliceReadWriter,
 	appCfg *app.Config,
 	initialWidth, initialHeight int,
 	theme *Theme,

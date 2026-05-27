@@ -2,8 +2,8 @@ package stream
 
 // Package stream defines the minimal IO abstraction and TLV encoding
 // used between adaptors (terminal/plainio) and the core session.
-// It intentionally stays small: ChanInput plus helpers for reading/writing
-// framed Tag-Length-Value messages over standard io.Reader/io.Writer.
+// It intentionally stays small: SliceReadWriter plus helpers for
+// reading/writing framed Tag-Length-Value messages over io.Reader/io.Writer.
 
 import (
 	"encoding/binary"
@@ -11,61 +11,49 @@ import (
 	"sync"
 )
 
-// Message tags for TLV protocol (2-byte tags).
 const (
-	// Text content tags
 	TagTextUser      = "TU" // User text input
 	TagTextAssistant = "TA" // Assistant text output
 	TagTextReasoning = "TR" // Reasoning/thinking content
 
-	// Function/tool tags
-	TagFunctionCall   = "FC" // Function call (JSON: id, name, input) - for both display and persistence
-	TagFunctionResult = "FR" // Function result (JSON: id, output) - for both display and persistence
-	TagFunctionState  = "FS" // Function state indicator (pending/success/error)
+	TagFunctionCall   = "FC" // JSON: id, name, input (display + persistence)
+	TagFunctionResult = "FR" // JSON: id, output      (display + persistence)
+	TagFunctionState  = "FS" // JSON: id, status      (pending/success/error)
 
-	// System tags
-	TagSystemError  = "SE" // System error messages
-	TagSystemNotify = "SN" // System notification messages (simple string)
-	TagSystemData   = "SD" // System data messages (complex data, queue status, model info, etc.)
+	TagSystemError  = "SE" // Error message string
+	TagSystemNotify = "SN" // Notification message string
+	TagSystemData   = "SD" // Complex data JSON (queue status, model info, etc.)
 )
 
-// ChanInput implements io.Reader using a channel of raw TLV-encoded messages.
-type ChanInput struct {
+// SliceReadWriter is an io.ReadWriter that bridges slice-at-a-time writes
+// with byte-at-a-time reads. Write sends each slice atomically via a
+// channel; Read uses an internal buffer to reassemble slices into a
+// byte stream so callers like io.ReadFull get continuous byte access
+// without losing slice boundaries.
+type SliceReadWriter struct {
 	ch        chan []byte
 	buf       []byte
 	closeOnce sync.Once
 }
 
-// NewChanInput creates a ChanInput with the given buffer size.
-func NewChanInput(bufferSize int) *ChanInput {
-	return &ChanInput{ch: make(chan []byte, bufferSize)}
+// NewSliceReadWriter creates a SliceReadWriter with the given channel buffer size.
+func NewSliceReadWriter(bufferSize int) *SliceReadWriter {
+	return &SliceReadWriter{ch: make(chan []byte, bufferSize)}
 }
 
 // Close closes the input channel, causing Read to return EOF.
 // It is safe to call Close multiple times.
-func (i *ChanInput) Close() error {
+func (i *SliceReadWriter) Close() error {
 	i.closeOnce.Do(func() { close(i.ch) })
 	return nil
 }
 
-// Read implements io.Reader. Returns io.EOF when the channel is closed.
+// Read implements io.Reader.
 //
-// The buffer (i.buf) bridges two data models:
-//   - ChanInput.Write sends chunks of bytes atomically into the channel
-//     (a "slice stream" — each receive gives one complete chunk from a
-//     single Write call).
-//   - Callers like ReadTLV use io.ReadFull, which reads byte-by-byte in
-//     arbitrary-sized chunks (a "byte stream" — 6 bytes for header, then N
-//     bytes for value).
-//
-// Without the buffer, a single channel receive could produce a 500-byte
-// chunk, but the caller might only ask for 6 bytes. The remaining 494
-// bytes would be lost — corrupting the next read with the tail of the
-// previous chunk.
-//
-// The buffer saves the unused portion and returns it on subsequent calls,
-// only receiving from the channel when the buffer is fully drained.
-func (i *ChanInput) Read(p []byte) (n int, err error) {
+// Writes arrive as atomic slices via the channel; Read copies as much as
+// fits into p and buffers the rest so callers like io.ReadFull see a
+// continuous byte stream.
+func (i *SliceReadWriter) Read(p []byte) (n int, err error) {
 	if len(i.buf) > 0 {
 		n = copy(p, i.buf)
 		i.buf = i.buf[n:]
@@ -83,13 +71,9 @@ func (i *ChanInput) Read(p []byte) (n int, err error) {
 	return n, nil
 }
 
-// Write implements io.Writer. It sends data to the input channel as an
-// atomic slice. Data is typically a TLV-encoded frame (produced by
-// EncodeTLV / WriteTLV), but no framing is enforced — any bytes are
-// accepted and delivered atomically to Read.
-//
-// Safe for concurrent use — the channel handles synchronization.
-func (i *ChanInput) Write(p []byte) (int, error) {
+// Write implements io.Writer. Each call sends p as a single atomic slice
+// to the channel. Safe for concurrent use.
+func (i *SliceReadWriter) Write(p []byte) (int, error) {
 	i.ch <- p
 	return len(p), nil
 }
@@ -115,18 +99,17 @@ func EncodeTLV(tag string, value string) []byte {
 
 const maxMessageSize = 1<<31 - 1 // Max int32 to fit in uint32
 
-// WriteTLV writes a TLV-encoded message to the input.
-func (i *ChanInput) WriteTLV(tag string, value string) error {
+// WriteTLV encodes a TLV message and writes it to this input stream.
+func (i *SliceReadWriter) WriteTLV(tag string, value string) error {
 	_, err := i.Write(EncodeTLV(tag, value))
 	return err
 }
 
-// WriteOutputTLV writes a TLV message to the output.
+// WriteOutputTLV writes a TLV message to the output stream.
 //
-// IMPORTANT: Implementations of io.Writer passed to this function MUST be
-// safe for concurrent use. The session calls WriteOutputTLV from two
-// goroutines — taskRunner and readFromInput — so the underlying writer
-// needs a mutex or equivalent synchronization internally.
+// IMPORTANT: The io.Writer must be safe for concurrent use. The session
+// calls WriteOutputTLV from two goroutines — taskRunner and readFromInput
+// — so the underlying writer needs a mutex or equivalent synchronization.
 func WriteOutputTLV(output io.Writer, tag string, value string) error {
 	_, err := output.Write(EncodeTLV(tag, value))
 	return err
@@ -161,33 +144,33 @@ func (n *NopInput) Read(_ []byte) (int, error) {
 	return 0, io.EOF
 }
 
-// NopOutput is a Writer that discards all output.
+// NopOutput is a Writer that discards all data.
 type NopOutput struct{}
 
 func (n *NopOutput) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// ToolCallData represents a tool call (FC tag payload).
+// ToolCallData is the JSON payload for TagFunctionCall.
 type ToolCallData struct {
 	ID    string `json:"id"`
 	Name  string `json:"name"`
 	Input string `json:"input"`
 }
 
-// ToolResultData represents a tool result (FR tag payload).
+// ToolResultData is the JSON payload for TagFunctionResult.
 type ToolResultData struct {
 	ID     string `json:"id"`
 	Output string `json:"output"`
 }
 
-// ToolStateData represents a tool state indicator (FS tag payload).
+// ToolStateData is the JSON payload for TagFunctionState.
 type ToolStateData struct {
 	ID     string `json:"id"`
 	Status string `json:"status"`
 }
 
-// ReasoningData represents reasoning/thinking content with optional signature.
+// ReasoningData is the JSON payload for TagTextReasoning delta values.
 // Used for persistence when Anthropic's thinking block includes a signature.
 // Text is the thinking content; Signature is Anthropic-specific and only
 // present on thinking blocks.

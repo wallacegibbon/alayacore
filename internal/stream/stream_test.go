@@ -71,9 +71,9 @@ func TestEncodeTLV(t *testing.T) {
 	}
 }
 
-func TestChanInput(t *testing.T) {
+func TestSliceReadWriter(t *testing.T) {
 	t.Run("emit and read", func(t *testing.T) {
-		input := NewChanInput(10)
+		input := NewSliceReadWriter(10)
 
 		// Write a message
 		n, err := input.Write([]byte("test message"))
@@ -96,7 +96,7 @@ func TestChanInput(t *testing.T) {
 	})
 
 	t.Run("emit TLV", func(t *testing.T) {
-		input := NewChanInput(10)
+		input := NewSliceReadWriter(10)
 
 		// Emit TLV message
 		err := input.WriteTLV(TagTextUser, "Hello")
@@ -118,7 +118,7 @@ func TestChanInput(t *testing.T) {
 	})
 
 	t.Run("close returns EOF", func(t *testing.T) {
-		input := NewChanInput(10)
+		input := NewSliceReadWriter(10)
 
 		// Close the input
 		err := input.Close()
@@ -135,7 +135,7 @@ func TestChanInput(t *testing.T) {
 	})
 
 	t.Run("multiple messages", func(t *testing.T) {
-		input := NewChanInput(10)
+		input := NewSliceReadWriter(10)
 
 		messages := []struct {
 			tag   string

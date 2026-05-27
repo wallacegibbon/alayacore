@@ -45,7 +45,7 @@ User IO ──▶ input.go ──▶ input channel ──▶ Session ──▶ o
 All adaptors communicate with the session through the TLV stream protocol:
 
 ```
-Adaptor → Session:  streamInput (ChanInput)  — user text, commands
+Adaptor → Session:  streamInput (SliceReadWriter)  — user text, commands
 Session → Adaptor:  Output (io.Writer)       — TLV-encoded events
 ```
 

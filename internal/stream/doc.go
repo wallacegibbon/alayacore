@@ -2,7 +2,11 @@
 // used between adaptors (terminal/plainio/rawio) and the core session.
 //
 // The stream package provides helpers for reading/writing framed
-// Tag-Length-Value (TLV) messages over standard io.Reader and io.Writer.
+// Tag-Length-Value (TLV) messages over io.Reader and io.Writer.
+//
+// The core type SliceReadWriter bridges slice-oriented writes
+// (each Write call sends an atomic slice) with byte-oriented reads
+// (Read buffers slices into a continuous byte stream).
 //
 // TLV Protocol:
 //
@@ -45,14 +49,10 @@
 //
 // The adaptor disambiguates text vs reasoning by using tag+id as the window key.
 //
-// Key Types:
-//
-//   - ChanInput: io.Reader implementation using a channel of TLV messages
-//
 // Usage:
 //
 //	// Create input channel
-//	input := stream.NewChanInput(10)
+//	input := stream.NewSliceReadWriter(10)
 //
 //	// Emit a TLV message
 //	input.WriteTLV(stream.TagTextUser, "Hello, AI!")
