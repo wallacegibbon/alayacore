@@ -51,7 +51,7 @@ Commands are split into two categories:
 | `:save [filename]` | Save session. Uses `--session` path if no filename given. |
 | `:model_set <id>` | Switch to a model by numeric ID |
 | `:model_load` | Reload model configs from the config file |
-| `:theme_set <name>` | Set the active theme |
+| `:theme_set <name>` | Switch to a different theme (applied visually via session broadcast) |
 | `:reason [0\|1\|2]` | Set reasoning level (0=off, 1=normal, 2=max). Default: 1 |
 | `:suspend` | Suspend the process (Ctrl+Z) |
 | `:taskqueue_get_all` | List all queued tasks (used by queue manager UI) |

@@ -60,7 +60,7 @@ func (a *Adaptor) Start() int {
 	terminalOutput.SetStyles(styles)
 
 	// Create terminal with initial window size, theme, and theme manager
-	t := NewTerminalWithTheme(terminalOutput, inputWriter, a.Config, initialWidth, initialHeight, theme, themeManager)
+	t := NewTerminalWithTheme(terminalOutput, inputWriter, a.Config, initialWidth, initialHeight, theme, themeManager, activeThemeName)
 
 	// Create and run the program.
 	// Bubbletea automatically opens the real TTY when stdin is piped

@@ -8,7 +8,7 @@ import (
 )
 
 func TestSpaceKeyTogglesFold(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, DefaultTheme(), nil)
+	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, DefaultTheme(), nil, "theme-dark")
 	terminal.focusDisplay()
 
 	// Add a window with content that can be folded
@@ -56,7 +56,7 @@ func TestSpaceKeyTogglesFold(t *testing.T) {
 }
 
 func TestSpaceKeyDoesNothingInInputWindow(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, DefaultTheme(), nil)
+	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, DefaultTheme(), nil, "theme-dark")
 	terminal.focusInput()
 
 	// Add a window with content
@@ -81,7 +81,7 @@ func TestSpaceKeyDoesNothingInInputWindow(t *testing.T) {
 }
 
 func TestSpaceKeyDoesNothingWithNoWindow(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, DefaultTheme(), nil)
+	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, DefaultTheme(), nil, "theme-dark")
 	terminal.focusDisplay()
 
 	// No windows in buffer

@@ -299,7 +299,8 @@ func (s *Session) handleReason(args []string) {
 	s.SetReasoningLevel(level)
 }
 
-// handleThemeSet sets the active theme and persists it to runtime config.
+// handleThemeSet sets the active theme, persists it to runtime config,
+// and sends updated SystemInfo via SD so the terminal applies it visually.
 func (s *Session) handleThemeSet(args []string) {
 	if len(args) == 0 {
 		s.writeError("usage: :theme_set <name>")

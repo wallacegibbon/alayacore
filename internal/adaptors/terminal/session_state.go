@@ -41,7 +41,9 @@ type sessionState struct {
 	// Queue items — set by handleSystemTag, cleared by GetQueueItems
 	pendingQueueItems []QueueItem
 
-	// Theme
+	// Theme — active theme name broadcast by the session via SD (TagSystemData).
+	// The terminal reads this in updateStatus() and applies the theme visually
+	// when it detects a change from the previously applied theme.
 	activeTheme string
 }
 

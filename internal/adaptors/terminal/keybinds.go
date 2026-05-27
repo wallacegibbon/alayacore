@@ -93,12 +93,11 @@ func (m *Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 
 	// Check if theme was selected (Enter key)
 	if m.themeSelector.ConsumeThemeSelected() {
-		if previewTheme != nil {
-			m.applyTheme(previewTheme)
-		}
 		selectedTheme := m.themeSelector.GetSelectedTheme()
 		if selectedTheme != nil {
 			// Send theme_set command to session via TLV
+			// The session will persist the theme and the terminal will apply
+			// it visually when it receives the updated SystemInfo (via SD tag).
 			m.emitCommand(":theme_set " + selectedTheme.Name)
 		}
 		m.restoreFocus()

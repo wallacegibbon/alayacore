@@ -113,12 +113,14 @@ type Terminal struct {
 	styles             *Styles
 	hasFocus           bool   // tracks whether the terminal has application focus
 	activeTheme        string // cached from system info updates
+	appliedTheme       string // last theme name that was visually applied (for detecting session-driven changes)
 
 	// Theme preview debouncing
 	themePreviewID int // ID of the current pending theme preview
 }
 
 // NewTerminalWithTheme creates a new Terminal model with a custom theme.
+// themeName is the name of the initial theme (used for tracking session-driven theme changes).
 func NewTerminalWithTheme(
 	out OutputWriter,
 	inputWriter io.WriteCloser,
@@ -126,6 +128,7 @@ func NewTerminalWithTheme(
 	initialWidth, initialHeight int,
 	theme *Theme,
 	themeManager *ThemeManager,
+	themeName string,
 ) *Terminal {
 	styles := NewStyles(theme)
 
@@ -148,6 +151,8 @@ func NewTerminalWithTheme(
 		styles:        styles,
 		focusedWindow: "input",
 		hasFocus:      true,
+		activeTheme:   themeName,
+		appliedTheme:  themeName,
 	}
 
 	// Initialize component widths
@@ -416,7 +421,23 @@ func (m *Terminal) updateStatus() {
 
 	m.statusText = status
 	m.inProgress = snap.InProgress
+
+	m.syncThemeFromSession(snap.ActiveTheme)
 	m.activeTheme = snap.ActiveTheme
+}
+
+// syncThemeFromSession checks if the session has reported a different active
+// theme (via SD/TagSystemData) and applies it visually if so.
+// This is the convergence point for both :theme_set and theme selector confirm.
+func (m *Terminal) syncThemeFromSession(sessionTheme string) {
+	if m.appliedTheme == sessionTheme || sessionTheme == "" {
+		return
+	}
+	if m.themeManager != nil {
+		theme := m.themeManager.LoadTheme(sessionTheme)
+		m.applyTheme(theme)
+	}
+	m.appliedTheme = sessionTheme
 }
 
 // View renders the complete terminal UI.
