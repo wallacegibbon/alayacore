@@ -153,7 +153,12 @@ Rules:
 		}
 	}
 	lastAssistantMsg.Content = filtered
-	result = []llm.Message{lastAssistantMsg}
+	// Anthropic requires the first message to be from the user, so prepend
+	// a minimal user message before the summary assistant message.
+	result = []llm.Message{
+		llm.NewUserMessage("Conversation summary"),
+		lastAssistantMsg,
+	}
 	// Both events are sent from this same goroutine sequentially
 	// (StepFinishEvent during processPrompt, then this correction).
 	// The FIFO channel guarantees the run() goroutine processes
