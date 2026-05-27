@@ -76,6 +76,7 @@ func buildHelpItems() []HelpItem {
 		{Key: ":summarize", Description: "Summarize conversation", Type: HelpItemCommand},
 		{Key: ":reason", Description: "Set reasoning level (0/1/2)", Type: HelpItemCommand},
 		{Key: ":save", Description: "Save session", Type: HelpItemCommand},
+		{Key: ":theme_set", Description: "Switch theme by name", Type: HelpItemCommand},
 		{Key: ":quit", Description: "Exit application", Type: HelpItemCommand},
 		{Key: ":model_set", Description: "Switch model by ID", Type: HelpItemCommand},
 		{Key: ":model_load", Description: "Reload model config", Type: HelpItemCommand},
