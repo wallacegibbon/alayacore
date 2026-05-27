@@ -4,11 +4,11 @@ package agent
 // Kept separate for readability — no logic, just data structures.
 
 import (
+	"io"
 	"time"
 
 	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/skills"
-	"github.com/alayacore/alayacore/internal/stream"
 )
 
 // Task represents a unit of work for the session.
@@ -97,8 +97,8 @@ type TLVChunk struct {
 // This avoids passing 16+ positional parameters to NewSession / RestoreFromSession.
 type SessionConfig struct {
 	// IO — required, provided by the adaptor.
-	Input  stream.Input
-	Output stream.Output
+	Input  io.Reader
+	Output io.Writer
 
 	// Files — paths to configuration and session files. Empty means default / none.
 	SessionFile       string

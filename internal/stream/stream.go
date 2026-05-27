@@ -2,8 +2,8 @@ package stream
 
 // Package stream defines the minimal IO abstraction and TLV encoding
 // used between adaptors (terminal/plainio) and the core session.
-// It intentionally stays small: a simple Input/Output pair plus helpers
-// for reading/writing framed Tag-Length-Value messages.
+// It intentionally stays small: ChanInput plus helpers for reading/writing
+// framed Tag-Length-Value messages over standard io.Reader/io.Writer.
 
 import (
 	"encoding/binary"
@@ -29,7 +29,7 @@ const (
 	TagSystemData   = "SD" // System data messages (complex data, queue status, model info, etc.)
 )
 
-// ChanInput implements Input using a channel of raw TLV-encoded messages.
+// ChanInput implements io.Reader using a channel of raw TLV-encoded messages.
 type ChanInput struct {
 	ch        chan []byte
 	buf       []byte
@@ -48,7 +48,23 @@ func (i *ChanInput) Close() error {
 	return nil
 }
 
-// Read implements Input. Returns io.EOF when the channel is closed.
+// Read implements io.Reader. Returns io.EOF when the channel is closed.
+//
+// The buffer (i.buf) bridges two data models:
+//   - ChanInput.Write sends chunks of bytes atomically into the channel
+//     (a "slice stream" — each receive gives one complete chunk from a
+//     single Write call).
+//   - Callers like ReadTLV use io.ReadFull, which reads byte-by-byte in
+//     arbitrary-sized chunks (a "byte stream" — 6 bytes for header, then N
+//     bytes for value).
+//
+// Without the buffer, a single channel receive could produce a 500-byte
+// chunk, but the caller might only ask for 6 bytes. The remaining 494
+// bytes would be lost — corrupting the next read with the tail of the
+// previous chunk.
+//
+// The buffer saves the unused portion and returns it on subsequent calls,
+// only receiving from the channel when the buffer is fully drained.
 func (i *ChanInput) Read(p []byte) (n int, err error) {
 	if len(i.buf) > 0 {
 		n = copy(p, i.buf)
@@ -67,8 +83,12 @@ func (i *ChanInput) Read(p []byte) (n int, err error) {
 	return n, nil
 }
 
-// Write implements io.Writer. It sends data to the input channel, where it
-// will be read by the session via Read. Safe for concurrent use.
+// Write implements io.Writer. It sends data to the input channel as an
+// atomic slice. Data is typically a TLV-encoded frame (produced by
+// EncodeTLV / WriteTLV), but no framing is enforced — any bytes are
+// accepted and delivered atomically to Read.
+//
+// Safe for concurrent use — the channel handles synchronization.
 func (i *ChanInput) Write(p []byte) (int, error) {
 	i.ch <- p
 	return len(p), nil
@@ -102,14 +122,19 @@ func (i *ChanInput) WriteTLV(tag string, value string) error {
 }
 
 // WriteOutputTLV writes a TLV message to the output.
-func WriteOutputTLV(output Output, tag string, value string) error {
+//
+// IMPORTANT: Implementations of io.Writer passed to this function MUST be
+// safe for concurrent use. The session calls WriteOutputTLV from two
+// goroutines — taskRunner and readFromInput — so the underlying writer
+// needs a mutex or equivalent synchronization internally.
+func WriteOutputTLV(output io.Writer, tag string, value string) error {
 	_, err := output.Write(EncodeTLV(tag, value))
 	return err
 }
 
 // ReadTLV reads a single TLV-framed message from input.
 // It blocks until a full frame has been read or an error occurs.
-func ReadTLV(input Input) (string, string, error) {
+func ReadTLV(input io.Reader) (string, string, error) {
 	header := make([]byte, 6)
 	if _, err := io.ReadFull(input, header); err != nil {
 		return "", "", err
@@ -129,32 +154,14 @@ func ReadTLV(input Input) (string, string, error) {
 	return tag, string(valueBuf), nil
 }
 
-// Input defines the input interface for the agent processor.
-type Input interface {
-	Read(p []byte) (n int, err error)
-}
-
-// Output defines the output interface for the agent processor.
-//
-// IMPORTANT: Implementations MUST be safe for concurrent use.
-// The session writes to Output from two goroutines:
-//   - taskRunner  (via processPrompt callbacks, writeTLVStr, etc.)
-//   - readFromInput (via immediate command handlers)
-//
-// Both goroutines may call Write concurrently.
-// Use a mutex or equivalent synchronization internally.
-type Output interface {
-	Write(p []byte) (n int, err error)
-}
-
-// NopInput is an Input that always returns EOF.
+// NopInput is a Reader that always returns EOF.
 type NopInput struct{}
 
 func (n *NopInput) Read(_ []byte) (int, error) {
 	return 0, io.EOF
 }
 
-// NopOutput is an Output that discards all output.
+// NopOutput is a Writer that discards all output.
 type NopOutput struct{}
 
 func (n *NopOutput) Write(p []byte) (int, error) {

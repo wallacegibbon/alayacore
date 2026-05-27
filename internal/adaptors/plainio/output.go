@@ -19,7 +19,7 @@ type systemInfo struct {
 	InProgress bool `json:"in_progress"`
 }
 
-// stdoutOutput implements stream.Output.
+// stdoutOutput implements io.Writer.
 // It parses TLV messages and prints human-readable text to stdout.
 //
 // Concurrency: the session writes from two goroutines (task and run),

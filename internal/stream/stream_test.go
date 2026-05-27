@@ -192,7 +192,7 @@ func TestWriteOutputTLV(t *testing.T) {
 	})
 }
 
-// byteReader wraps a byte slice to implement Input
+// byteReader wraps a byte slice to implement io.Reader
 type byteReader struct {
 	data []byte
 	pos  int
@@ -207,7 +207,7 @@ func (r *byteReader) Read(p []byte) (n int, err error) {
 	return n, nil
 }
 
-// bufferOutput wraps a bytes.Buffer to implement Output
+// bufferOutput wraps a bytes.Buffer to implement io.Writer
 type bufferOutput struct {
 	*bytes.Buffer
 }

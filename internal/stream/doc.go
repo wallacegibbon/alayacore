@@ -1,8 +1,8 @@
 // Package stream provides the minimal IO abstraction and TLV encoding
 // used between adaptors (terminal/plainio/rawio) and the core session.
 //
-// The stream package defines a simple Input/Output pair plus helpers
-// for reading/writing framed Tag-Length-Value (TLV) messages.
+// The stream package provides helpers for reading/writing framed
+// Tag-Length-Value (TLV) messages over standard io.Reader and io.Writer.
 //
 // TLV Protocol:
 //
@@ -47,9 +47,7 @@
 //
 // Key Types:
 //
-//   - ChanInput: Input implementation using a channel of TLV messages
-//   - Input: Interface for reading bytes
-//   - Output: Interface for writing bytes
+//   - ChanInput: io.Reader implementation using a channel of TLV messages
 //
 // Usage:
 //
@@ -59,9 +57,9 @@
 //	// Emit a TLV message
 //	input.WriteTLV(stream.TagTextUser, "Hello, AI!")
 //
-//	// Read TLV from session
+//	// Read TLV from input (io.Reader)
 //	tag, value, err := stream.ReadTLV(input)
 //
-//	// Write TLV to output
+//	// Write TLV to output (io.Writer)
 //	stream.WriteOutputTLV(output, stream.TagTextAssistant, "Hello, human!")
 package stream

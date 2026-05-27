@@ -7,6 +7,7 @@ package app
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	agentpkg "github.com/alayacore/alayacore/internal/agent"
@@ -24,7 +25,7 @@ import (
 //   - session.Start()
 //
 // Returns nil and an error string if the session cannot be used.
-func StartSession(cfg *Config, input *stream.ChanInput, output stream.Output) (*agentpkg.Session, error) {
+func StartSession(cfg *Config, input *stream.ChanInput, output io.Writer) (*agentpkg.Session, error) {
 	session, _ := agentpkg.LoadOrNewSession(agentpkg.SessionConfig{
 		Input:               input,
 		Output:              output,
