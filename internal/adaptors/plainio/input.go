@@ -12,7 +12,7 @@ import (
 // readPrompts reads lines from stdin and emits them as TLV messages.
 // Lines ending with `\` are continued on the next line (backslash-escaped newline).
 // Returns nil on EOF (Ctrl-D) or an error.
-func readPrompts(input *stream.SliceReadWriter, reader io.Reader) error {
+func readPrompts(input io.Writer, reader io.Reader) error {
 	scanner := bufio.NewReader(reader)
 	var prompt strings.Builder
 
@@ -63,6 +63,6 @@ func readPrompts(input *stream.SliceReadWriter, reader io.Reader) error {
 }
 
 // readPromptsFromStdin is a convenience wrapper that reads from os.Stdin.
-func readPromptsFromStdin(input *stream.SliceReadWriter) error {
+func readPromptsFromStdin(input io.Writer) error {
 	return readPrompts(input, os.Stdin)
 }

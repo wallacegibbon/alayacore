@@ -45,8 +45,8 @@ User IO ──▶ input.go ──▶ input channel ──▶ Session ──▶ o
 All adaptors communicate with the session through the TLV stream protocol:
 
 ```
-Adaptor → Session:  streamInput (SliceReadWriter)  — user text, commands
-Session → Adaptor:  Output (io.Writer)       — TLV-encoded events
+Adaptor → Session:  inputWriter (io.WriteCloser)  — user text, commands (TLV)
+Session → Adaptor:  output (io.Writer)            — TLV-encoded events
 ```
 
 This is the **only** runtime channel. The session never calls adaptor methods, and the adaptor never calls session methods during normal operation.
@@ -164,6 +164,7 @@ Agent.Stream() receives tool_call event
 
 The `StartSession()` function in `app/session.go` handles shared initialization for all adaptors:
 
+- Creates the input pipe internally (`SliceReadWriter`), returning the write end (`io.WriteCloser`) to the adaptor so it can feed TLV messages to the session
 - `session.InitError()` — fatal initialization check (--model flag validation)
 - `session.ModelManager.GetLoadErrors()` — print config warnings
 - `session.HasModels()` — abort if no models configured

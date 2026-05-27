@@ -20,7 +20,7 @@
 //	  - QueueManager: Modal for managing the task queue
 //
 // Communication with the session layer uses TLV (Tag-Length-Value) protocol:
-//   - Input: SliceReadWriter receives TLV messages from user actions
+//   - Input: io.WriteCloser sends TLV messages to the session
 //   - Output: OutputWriter parses TLV and renders styled content
 //
 // Key Files:

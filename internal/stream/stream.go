@@ -43,8 +43,8 @@ func NewSliceReadWriter(bufferSize int) *SliceReadWriter {
 
 // Close closes the input channel, causing Read to return EOF.
 // It is safe to call Close multiple times.
-func (i *SliceReadWriter) Close() error {
-	i.closeOnce.Do(func() { close(i.ch) })
+func (rw *SliceReadWriter) Close() error {
+	rw.closeOnce.Do(func() { close(rw.ch) })
 	return nil
 }
 
@@ -53,28 +53,28 @@ func (i *SliceReadWriter) Close() error {
 // Writes arrive as atomic slices via the channel; Read copies as much as
 // fits into p and buffers the rest so callers like io.ReadFull see a
 // continuous byte stream.
-func (i *SliceReadWriter) Read(p []byte) (n int, err error) {
-	if len(i.buf) > 0 {
-		n = copy(p, i.buf)
-		i.buf = i.buf[n:]
+func (rw *SliceReadWriter) Read(p []byte) (n int, err error) {
+	if len(rw.buf) > 0 {
+		n = copy(p, rw.buf)
+		rw.buf = rw.buf[n:]
 		return n, nil
 	}
 
-	msg, ok := <-i.ch
+	msg, ok := <-rw.ch
 	if !ok {
 		return 0, io.EOF
 	}
 
-	i.buf = msg
-	n = copy(p, i.buf)
-	i.buf = i.buf[n:]
+	rw.buf = msg
+	n = copy(p, rw.buf)
+	rw.buf = rw.buf[n:]
 	return n, nil
 }
 
 // Write implements io.Writer. Each call sends p as a single atomic slice
 // to the channel. Safe for concurrent use.
-func (i *SliceReadWriter) Write(p []byte) (int, error) {
-	i.ch <- p
+func (rw *SliceReadWriter) Write(p []byte) (int, error) {
+	rw.ch <- p
 	return len(p), nil
 }
 

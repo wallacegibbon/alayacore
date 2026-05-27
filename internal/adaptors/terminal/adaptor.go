@@ -11,7 +11,6 @@ import (
 	"golang.org/x/term"
 
 	"github.com/alayacore/alayacore/internal/app"
-	"github.com/alayacore/alayacore/internal/stream"
 )
 
 // Compile-time check: Adaptor satisfies app.Adaptor.
@@ -34,7 +33,6 @@ func (a *Adaptor) Start() int {
 	// Create theme manager
 	themeManager := NewThemeManager(a.Config.Cfg.ThemesFolder)
 
-	inputStream := stream.NewSliceReadWriter(10)
 	terminalOutput := NewTerminalOutput(NewStyles(DefaultTheme()))
 
 	// Get terminal size before loading session (so session loads with correct dimensions)
@@ -42,7 +40,7 @@ func (a *Adaptor) Start() int {
 	terminalOutput.SetWindowWidth(initialWidth)
 
 	// Load session synchronously before starting the UI
-	_, err := app.StartSession(a.Config, inputStream, terminalOutput)
+	_, inputWriter, err := app.StartSession(a.Config, terminalOutput)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return 1
@@ -62,7 +60,7 @@ func (a *Adaptor) Start() int {
 	terminalOutput.SetStyles(styles)
 
 	// Create terminal with initial window size, theme, and theme manager
-	t := NewTerminalWithTheme(terminalOutput, inputStream, a.Config, initialWidth, initialHeight, theme, themeManager)
+	t := NewTerminalWithTheme(terminalOutput, inputWriter, a.Config, initialWidth, initialHeight, theme, themeManager)
 
 	// Create and run the program.
 	// Bubbletea automatically opens the real TTY when stdin is piped

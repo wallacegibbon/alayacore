@@ -9,6 +9,7 @@ package terminal
 
 import (
 	"fmt"
+	"io"
 	"math"
 	"strings"
 	"time"
@@ -85,7 +86,7 @@ const (
 type Terminal struct {
 	// Core components
 	out         OutputWriter
-	streamInput *stream.SliceReadWriter
+	streamInput io.WriteCloser
 	appConfig   *app.Config
 	editor      *Editor
 
@@ -120,7 +121,7 @@ type Terminal struct {
 // NewTerminalWithTheme creates a new Terminal model with a custom theme.
 func NewTerminalWithTheme(
 	out OutputWriter,
-	inputStream *stream.SliceReadWriter,
+	inputWriter io.WriteCloser,
 	appCfg *app.Config,
 	initialWidth, initialHeight int,
 	theme *Theme,
@@ -132,7 +133,7 @@ func NewTerminalWithTheme(
 
 	m := &Terminal{
 		out:           out,
-		streamInput:   inputStream,
+		streamInput:   inputWriter,
 		appConfig:     appCfg,
 		editor:        editor,
 		display:       NewDisplayModel(out.WindowBuffer(), styles),

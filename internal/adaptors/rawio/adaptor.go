@@ -12,7 +12,6 @@ import (
 	"syscall"
 
 	"github.com/alayacore/alayacore/internal/app"
-	"github.com/alayacore/alayacore/internal/stream"
 )
 
 // Compile-time check: Adaptor satisfies app.Adaptor.
@@ -32,9 +31,7 @@ func NewAdaptor(cfg *app.Config) *Adaptor {
 // Returns 1 only on startup failure (config errors, no models).
 // The controlling process reads stdout and handles TLV itself.
 func (a *Adaptor) Start() int {
-	input := stream.NewSliceReadWriter(100)
-
-	session, err := app.StartSession(a.Config, input, os.Stdout)
+	session, inputWriter, err := app.StartSession(a.Config, os.Stdout)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return 1
@@ -46,15 +43,15 @@ func (a *Adaptor) Start() int {
 
 	// Pipe stdin to the session.
 	go func() {
-		_, _ = io.Copy(input, os.Stdin) //nolint:errcheck // stdin EOF is normal termination
-		input.Close()
+		_, _ = io.Copy(inputWriter, os.Stdin) //nolint:errcheck // stdin EOF is normal termination
+		inputWriter.Close()
 	}()
 
 	// Wait for either EOF (stdin closed → task finishes) or SIGINT.
 	select {
 	case <-session.Done():
 	case <-sigCh:
-		input.Close()
+		inputWriter.Close()
 		// Give the session a moment to finish; second SIGINT exits immediately.
 		select {
 		case <-session.Done():

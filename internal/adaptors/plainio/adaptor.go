@@ -11,7 +11,6 @@ import (
 	"syscall"
 
 	"github.com/alayacore/alayacore/internal/app"
-	"github.com/alayacore/alayacore/internal/stream"
 )
 
 // Compile-time check: Adaptor satisfies app.Adaptor.
@@ -35,11 +34,10 @@ func NewAdaptor(cfg *app.Config) *Adaptor {
 // (SE tag), the remaining input is discarded and the process exits
 // with code 1 — queued tasks are NOT executed.
 func (a *Adaptor) Start() int {
-	input := stream.NewSliceReadWriter(100)
 	output := newStdoutOutput()
 
 	// Load session
-	session, err := app.StartSession(a.Config, input, output)
+	session, inputWriter, err := app.StartSession(a.Config, output)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return 1
@@ -53,14 +51,14 @@ func (a *Adaptor) Start() int {
 
 	// Read stdin and emit TLV messages.
 	go func() {
-		if err := readPromptsFromStdin(input); err != nil {
+		if err := readPromptsFromStdin(inputWriter); err != nil {
 			select {
 			case exitCh <- 1:
 			default:
 			}
 			return
 		}
-		input.Close()
+		inputWriter.Close()
 		select {
 		case exitCh <- 0:
 		default:
@@ -75,10 +73,10 @@ func (a *Adaptor) Start() int {
 	case code = <-exitCh:
 	case <-output.ErrorChannel():
 		code = 1
-		input.Close()
+		inputWriter.Close()
 	case <-sigCh:
 		code = 128 + int(syscall.SIGINT)
-		input.Close()
+		inputWriter.Close()
 	}
 
 	// Let the current task finish, but a second Ctrl-C forces immediate exit.

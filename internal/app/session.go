@@ -17,6 +17,9 @@ import (
 // StartSession loads (or creates) a session, validates it, and starts the
 // session goroutine. On success the returned session is ready to use.
 //
+// It creates the input pipe internally, returning the write end as
+// inputWriter so the adaptor can feed TLV messages to the session.
+//
 // It handles:
 //   - LoadOrNewSession
 //   - InitError check (--model flag validation)
@@ -24,8 +27,10 @@ import (
 //   - HasModels check (no usable models → fatal)
 //   - session.Start()
 //
-// Returns nil and an error string if the session cannot be used.
-func StartSession(cfg *Config, input *stream.SliceReadWriter, output io.Writer) (*agentpkg.Session, error) {
+// Returns nil, nil, and an error if the session cannot be used.
+func StartSession(cfg *Config, output io.Writer) (*agentpkg.Session, io.WriteCloser, error) {
+	input := stream.NewSliceReadWriter(100)
+
 	session, _ := agentpkg.LoadOrNewSession(agentpkg.SessionConfig{
 		Input:               input,
 		Output:              output,
@@ -45,7 +50,7 @@ func StartSession(cfg *Config, input *stream.SliceReadWriter, output io.Writer) 
 
 	// --model CLI flag: fail immediately if the named model doesn't exist.
 	if err := session.InitError(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Display config validation messages (unknown protocol_type, missing fields, etc.)
@@ -59,11 +64,11 @@ func StartSession(cfg *Config, input *stream.SliceReadWriter, output io.Writer) 
 
 	// Check if we have any models available.
 	if !session.HasModels() {
-		return nil, fmt.Errorf("%s", agentpkg.NoModelsErrorMessage(session.ModelConfigPath(), session.ModelManager.HasRejected()))
+		return nil, nil, fmt.Errorf("%s", agentpkg.NoModelsErrorMessage(session.ModelConfigPath(), session.ModelManager.HasRejected()))
 	}
 
 	// Start the session's run() goroutine.
 	session.Start()
 
-	return session, nil
+	return session, input, nil
 }
