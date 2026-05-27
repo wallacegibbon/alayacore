@@ -100,7 +100,7 @@ The `:summarize` command is a **deferred command** — it runs in a task gorouti
    - **Blocked** — Unresolved errors, failing tests, open questions
    - **Next** — Ordered actions to resume
 2. Calls the LLM to generate the summary
-3. **Replaces the entire conversation history** with just the last assistant response (the summary)
+3. **Replaces the entire conversation history** with the summary (a "Continue" user message followed by the assistant's summary response)
 4. Resets `ContextTokens` to the summary's output token count via `SetContextTokensEvent` (a dedicated event that avoids double-counting in `TotalSpent` and corrects the value after the `StepFinishEvent` from `processPrompt` has been processed)
 
 ### ⚠️ Event ordering
