@@ -154,9 +154,9 @@ Rules:
 	}
 	lastAssistantMsg.Content = filtered
 	// Anthropic requires the first message to be from the user, so prepend
-	// a minimal user message before the summary assistant message.
+	// a "Continue" user message before the summary assistant message.
 	result = []llm.Message{
-		llm.NewUserMessage("Conversation summary"),
+		llm.NewUserMessage("Continue"),
 		lastAssistantMsg,
 	}
 	// Both events are sent from this same goroutine sequentially
@@ -354,7 +354,7 @@ func (s *Session) handleThemeSet(args []string) {
 //     are functionally equivalent to a user turn, so the LLM can respond
 //     directly without an additional user message.
 //  3. Latest message is an assistant message → the API partially succeeded
-//     or was canceled. A "Please continue." user message is appended so the
+//     or was canceled. A "Continue" user message is appended so the
 //     model picks up where it left off.
 func (s *Session) resendPrompt(ctx context.Context, messages []llm.Message) []llm.Message {
 	if len(messages) == 0 {
@@ -368,9 +368,9 @@ func (s *Session) resendPrompt(ctx context.Context, messages []llm.Message) []ll
 		// The last message is an assistant response (partial success,
 		// cancel, or error mid-stream). Append a continuation prompt so the
 		// model resumes naturally.
-		messages = append(messages, llm.NewUserMessage("Please continue."))
+		messages = append(messages, llm.NewUserMessage("Continue"))
 		// Echo the inserted message to the adaptor so it is visible.
-		s.signalPromptStart("Please continue.")
+		s.signalPromptStart("Continue")
 	} else {
 		// If the last message is RoleUser or RoleTool, the conversation
 		// history is already at a valid point for the LLM to respond — just
