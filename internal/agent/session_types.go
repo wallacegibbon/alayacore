@@ -103,6 +103,7 @@ type SessionConfig struct {
 	SessionFile       string
 	ModelConfigPath   string
 	RuntimeConfigPath string
+	ThemesFolder      string
 
 	// Agent behavior
 	BaseTools         []llm.Tool

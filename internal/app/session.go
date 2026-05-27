@@ -37,6 +37,7 @@ func StartSession(cfg *Config, output io.Writer) (*agentpkg.Session, io.WriteClo
 		SessionFile:         cfg.Cfg.Session,
 		ModelConfigPath:     cfg.Cfg.ModelConfig,
 		RuntimeConfigPath:   cfg.Cfg.RuntimeConfig,
+		ThemesFolder:        cfg.Cfg.ThemesFolder,
 		BaseTools:           cfg.AgentTools,
 		SystemPrompt:        cfg.SystemPrompt,
 		ExtraSystemPrompt:   cfg.ExtraSystemPrompt,

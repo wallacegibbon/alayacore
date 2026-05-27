@@ -10,6 +10,8 @@ package agent
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -306,10 +308,21 @@ func (s *Session) handleThemeSet(args []string) {
 		s.writeError("usage: :theme_set <name>")
 		return
 	}
-	if s.RuntimeManager != nil {
-		_ = s.RuntimeManager.SetActiveTheme(args[0]) //nolint:errcheck // best-effort save, errors ignored
+	name := args[0]
+
+	// Validate that the theme file exists in the themes folder.
+	if s.ThemesFolder != "" {
+		themePath := filepath.Join(s.ThemesFolder, name+".conf")
+		if _, err := os.Stat(themePath); os.IsNotExist(err) {
+			s.writeError(fmt.Sprintf("Theme %q not found at %s", name, themePath))
+			return
+		}
 	}
-	s.writeNotifyf("Theme set to: %s", args[0])
+
+	if s.RuntimeManager != nil {
+		_ = s.RuntimeManager.SetActiveTheme(name) //nolint:errcheck // best-effort save, errors ignored
+	}
+	s.writeNotifyf("Theme set to: %s", name)
 	s.sendSystemInfo()
 }
 
