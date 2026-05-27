@@ -159,7 +159,7 @@ func (s *Session) runTaskCommand(ctx context.Context, messages []llm.Message, cm
 
 // cancelMessage is inserted into the conversation history and displayed in the
 // message window when a task is canceled by the user.
-const cancelMessage = "The user canceled."
+const cancelMessage = "Canceled"
 
 func (s *Session) appendCancelMessage(messages []llm.Message) []llm.Message {
 	messages = append(messages, llm.Message{
