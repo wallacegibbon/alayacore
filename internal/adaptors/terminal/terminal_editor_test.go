@@ -513,17 +513,17 @@ func TestCtrlUDoesNothingInInput(t *testing.T) {
 func TestWindowBufferDeltaRouting(t *testing.T) {
 	out := NewTerminalOutput(DefaultStyles())
 	// Write assistant text delta with stream ID
-	err := stream.WriteOutputTLV(out, stream.TagTextAssistant, stream.WrapDelta("stream1", "Hello"))
+	err := stream.WriteTLV(out, stream.TagTextAssistant, stream.WrapDelta("stream1", "Hello"))
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
 	// Write another delta with same stream ID
-	err = stream.WriteOutputTLV(out, stream.TagTextAssistant, stream.WrapDelta("stream1", " world"))
+	err = stream.WriteTLV(out, stream.TagTextAssistant, stream.WrapDelta("stream1", " world"))
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
 	// Write different stream ID
-	err = stream.WriteOutputTLV(out, stream.TagTextAssistant, stream.WrapDelta("stream2", "Another"))
+	err = stream.WriteTLV(out, stream.TagTextAssistant, stream.WrapDelta("stream2", "Another"))
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
@@ -597,12 +597,12 @@ func TestWindowBufferRendering(t *testing.T) {
 func TestWindowBufferNonDeltaMessages(t *testing.T) {
 	out := NewTerminalOutput(DefaultStyles())
 	// Write a non-delta message (TagSystemError)
-	err := stream.WriteOutputTLV(out, stream.TagSystemError, "Something went wrong")
+	err := stream.WriteTLV(out, stream.TagSystemError, "Something went wrong")
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
 	// Write another non-delta (TagSystemNotify)
-	err = stream.WriteOutputTLV(out, stream.TagSystemNotify, "Notification")
+	err = stream.WriteTLV(out, stream.TagSystemNotify, "Notification")
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
@@ -627,7 +627,7 @@ func TestWindowBufferNonDeltaMessages(t *testing.T) {
 func TestWindowBufferEdgeCases(t *testing.T) {
 	out := NewTerminalOutput(DefaultStyles())
 	// Delta message without valid NUL-delimited stream ID (plain text)
-	err := stream.WriteOutputTLV(out, stream.TagTextAssistant, "plain text without stream ID")
+	err := stream.WriteTLV(out, stream.TagTextAssistant, "plain text without stream ID")
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
@@ -641,11 +641,11 @@ func TestWindowBufferEdgeCases(t *testing.T) {
 		t.Errorf("Expected generated window ID, got %s", windows[0].ID)
 	}
 	// Mixed delta and non-delta messages
-	err = stream.WriteOutputTLV(out, stream.TagTextAssistant, stream.WrapDelta("stream2", "Delta"))
+	err = stream.WriteTLV(out, stream.TagTextAssistant, stream.WrapDelta("stream2", "Delta"))
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
-	err = stream.WriteOutputTLV(out, stream.TagSystemError, "Error")
+	err = stream.WriteTLV(out, stream.TagSystemError, "Error")
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}

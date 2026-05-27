@@ -55,11 +55,11 @@
 //	input := stream.NewSliceReadWriter(10)
 //
 //	// Emit a TLV message
-//	input.WriteTLV(stream.TagTextUser, "Hello, AI!")
+//	stream.WriteTLV(input, stream.TagTextUser, "Hello, AI!")
 //
 //	// Read TLV from input (io.Reader)
 //	tag, value, err := stream.ReadTLV(input)
 //
-//	// Write TLV to output (io.Writer)
-//	stream.WriteOutputTLV(output, stream.TagTextAssistant, "Hello, human!")
+//	// Write TLV to output
+//	stream.WriteTLV(output, stream.TagTextAssistant, "Hello, human!")
 package stream

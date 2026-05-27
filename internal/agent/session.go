@@ -204,7 +204,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 
 	// Send TLV chunks directly to output (avoids reconstruction)
 	for _, chunk := range data.TLVChunks {
-		_ = stream.WriteOutputTLV(s.Output, chunk.Tag, chunk.Value) //nolint:errcheck // best-effort write to adaptor
+		_ = stream.WriteTLV(s.Output, chunk.Tag, chunk.Value) //nolint:errcheck // best-effort write to adaptor
 	}
 	return s
 }

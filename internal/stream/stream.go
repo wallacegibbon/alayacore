@@ -99,18 +99,8 @@ func EncodeTLV(tag string, value string) []byte {
 
 const maxMessageSize = 1<<31 - 1 // Max int32 to fit in uint32
 
-// WriteTLV encodes a TLV message and writes it to this input stream.
-func (i *SliceReadWriter) WriteTLV(tag string, value string) error {
-	_, err := i.Write(EncodeTLV(tag, value))
-	return err
-}
-
-// WriteOutputTLV writes a TLV message to the output stream.
-//
-// IMPORTANT: The io.Writer must be safe for concurrent use. The session
-// calls WriteOutputTLV from two goroutines — taskRunner and readFromInput
-// — so the underlying writer needs a mutex or equivalent synchronization.
-func WriteOutputTLV(output io.Writer, tag string, value string) error {
+// WriteTLV writes a TLV-encoded message to the writer.
+func WriteTLV(output io.Writer, tag string, value string) error {
 	_, err := output.Write(EncodeTLV(tag, value))
 	return err
 }

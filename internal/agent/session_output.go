@@ -43,7 +43,7 @@ func (s *Session) writeTLVStr(tag string, msg string) {
 	if s.Output == nil {
 		return
 	}
-	_ = stream.WriteOutputTLV(s.Output, tag, msg) //nolint:errcheck // best-effort write to adaptor
+	_ = stream.WriteTLV(s.Output, tag, msg) //nolint:errcheck // best-effort write to adaptor
 }
 
 // writeTLVJSON marshals a value to JSON and writes it as a TLV frame. Best effort.
@@ -54,7 +54,7 @@ func (s *Session) writeTLVJSON(tag string, v any) {
 		return
 	}
 	data, _ := json.Marshal(v)
-	_ = stream.WriteOutputTLV(s.Output, tag, string(data)) //nolint:errcheck // best-effort write to adaptor
+	_ = stream.WriteTLV(s.Output, tag, string(data)) //nolint:errcheck // best-effort write to adaptor
 }
 
 func (s *Session) writeToolCall(toolName, input, id string) {

@@ -99,7 +99,7 @@ func TestSliceReadWriter(t *testing.T) {
 		input := NewSliceReadWriter(10)
 
 		// Emit TLV message
-		err := input.WriteTLV(TagTextUser, "Hello")
+		err := WriteTLV(input, TagTextUser, "Hello")
 		if err != nil {
 			t.Fatalf("EmitTLV() error = %v", err)
 		}
@@ -148,7 +148,7 @@ func TestSliceReadWriter(t *testing.T) {
 
 		// Emit all messages
 		for _, msg := range messages {
-			err := input.WriteTLV(msg.tag, msg.value)
+			err := WriteTLV(input, msg.tag, msg.value)
 			if err != nil {
 				t.Fatalf("EmitTLV() error = %v", err)
 			}
@@ -168,14 +168,14 @@ func TestSliceReadWriter(t *testing.T) {
 	})
 }
 
-func TestWriteOutputTLV(t *testing.T) {
+func TestWriteTLV(t *testing.T) {
 	t.Run("write to buffer", func(t *testing.T) {
 		buf := &bytes.Buffer{}
 		output := &bufferOutput{buf}
 
-		err := WriteOutputTLV(output, TagTextUser, "test message")
+		err := WriteTLV(output, TagTextUser, "test message")
 		if err != nil {
-			t.Fatalf("WriteOutputTLV() error = %v", err)
+			t.Fatalf("error = %v", err)
 		}
 
 		// Verify the written data

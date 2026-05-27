@@ -34,11 +34,11 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 
 	_, err := s.agent.Load().Stream(ctx, history, llm.StreamCallbacks{
 		OnTextDelta: func(delta string) error {
-			_ = stream.WriteOutputTLV(s.Output, stream.TagTextAssistant, stream.WrapDelta(stream.NewStreamID(promptID, stepCount), delta)) //nolint:errcheck // best-effort write to adaptor
+			_ = stream.WriteTLV(s.Output, stream.TagTextAssistant, stream.WrapDelta(stream.NewStreamID(promptID, stepCount), delta)) //nolint:errcheck // best-effort write to adaptor
 			return nil
 		},
 		OnReasoningDelta: func(delta string) error {
-			_ = stream.WriteOutputTLV(s.Output, stream.TagTextReasoning, stream.WrapDelta(stream.NewStreamID(promptID, stepCount), delta)) //nolint:errcheck // best-effort write to adaptor
+			_ = stream.WriteTLV(s.Output, stream.TagTextReasoning, stream.WrapDelta(stream.NewStreamID(promptID, stepCount), delta)) //nolint:errcheck // best-effort write to adaptor
 			return nil
 		},
 		OnToolCallStart: func(toolCallID, toolName string) error {
