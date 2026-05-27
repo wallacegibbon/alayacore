@@ -1,11 +1,10 @@
 package agent
 
-// Session task execution: processing prompts through the agent loop
-// and cleaning incomplete tool calls.
+// Session task execution: processing prompts through the agent loop,
+// auto-summarization, and cleaning incomplete tool calls.
 //
 // The main event loop lives in session_loop.go.
 // I/O (input pump, command dispatch) lives in session_io.go.
-// Auto-summarization lives in session_summarize.go.
 
 import (
 	"context"
@@ -14,6 +13,72 @@ import (
 	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/stream"
 )
+
+// Auto-summarization threshold constants.
+const (
+	// AutoSummarizeThreshold is the context usage percentage at which
+	// auto-summarization is triggered (65% of context limit).
+	AutoSummarizeThreshold = 65
+
+	// AutoSummarizePctBase is the base for percentage calculations (100%).
+	AutoSummarizePctBase = 100
+)
+
+// ============================================================================
+// User Prompt
+// ============================================================================
+
+// handleUserPrompt processes a user prompt through the agent loop.
+// Takes the current messages and returns the updated messages after processing.
+func (s *Session) handleUserPrompt(ctx context.Context, messages []llm.Message, prompt string) []llm.Message {
+	if s.shouldAutoSummarize() {
+		messages = s.doAutoSummarize(ctx, messages)
+	}
+
+	if len(messages) > 0 && messages[len(messages)-1].Role == llm.RoleUser {
+		messages[len(messages)-1].Content = append(
+			messages[len(messages)-1].Content,
+			llm.TextPart{Type: "text", Text: prompt},
+		)
+	} else {
+		messages = append(messages, llm.NewUserMessage(prompt))
+	}
+
+	result, _, err := s.processPrompt(ctx, messages)
+
+	result = cleanIncompleteToolCalls(result)
+
+	if err != nil {
+		s.writeError(err.Error())
+		s.pausedOnError.Store(true)
+		s.requestSystemInfo()
+		// When cancel or error occurs before OnStepFinish sets processResult,
+		// result is nil/empty and the user prompt would be lost on save.
+		// Fall back to messages (which has the user prompt appended above)
+		// so the TU is preserved in the session file alongside the cancel TA.
+		if len(result) == 0 {
+			return messages
+		}
+		return result
+	}
+
+	return result
+}
+
+// shouldAutoSummarize returns true when auto-summarization is enabled and
+// the current context tokens exceed AutoSummarizeThreshold of the configured limit.
+func (s *Session) shouldAutoSummarize() bool {
+	return s.AutoSummarize && s.ContextLimit > 0 && s.ContextTokens.Load() > 0 &&
+		s.ContextTokens.Load() >= s.ContextLimit*AutoSummarizeThreshold/AutoSummarizePctBase
+}
+
+// doAutoSummarize logs a notification and triggers summarization.
+func (s *Session) doAutoSummarize(ctx context.Context, messages []llm.Message) []llm.Message {
+	usage := float64(s.ContextTokens.Load()) * AutoSummarizePctBase / float64(s.ContextLimit)
+	s.writeNotifyf("Context usage at %d/%d tokens (%.0f%%). Auto-summarizing...",
+		s.ContextTokens.Load(), s.ContextLimit, usage)
+	return s.summarize(ctx, messages)
+}
 
 // ============================================================================
 // Prompt Processing

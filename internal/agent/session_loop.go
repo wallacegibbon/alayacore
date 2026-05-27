@@ -6,10 +6,9 @@ package agent
 // the input pump, the task goroutine, and system info requests.
 //
 // Extracted from session_task.go to separate concerns:
-//   - session_task.go:        prompt processing, agent loop
+//   - session_task.go:        prompt processing, agent loop, auto-summarization
 //   - session_loop.go:        event loop, task queue management
 //   - session_io.go:          input pump, command dispatch
-//   - session_summarize.go:   auto-summarization
 
 import (
 	"github.com/alayacore/alayacore/internal/llm"
