@@ -56,7 +56,7 @@ type OutputWriter interface {
 	GetQueueItems() []QueueItem
 
 	// Output methods
-	AppendError(format string, args ...any)
+	WriteError(format string, args ...any)
 	WriteNotify(msg string)
 
 	// Update signaling

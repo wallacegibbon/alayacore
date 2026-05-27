@@ -195,7 +195,7 @@ func (e *Editor) createTempFile() (string, error) {
 func (m *Terminal) handleEditorStart(msg editorStartMsg) (tea.Model, tea.Cmd) {
 	tmpFileName, err := m.editor.createTempFile()
 	if err != nil {
-		m.out.AppendError("Failed to create temp file: %v", err)
+		m.out.WriteError("Failed to create temp file: %v", err)
 		return m, nil
 	}
 

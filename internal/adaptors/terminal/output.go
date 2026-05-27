@@ -78,8 +78,8 @@ func (to *outputWriter) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-// AppendError adds an error message to the display buffer with error styling
-func (to *outputWriter) AppendError(format string, args ...any) {
+// WriteError adds an error message to the display buffer with error styling
+func (to *outputWriter) WriteError(format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	id := to.generateWindowID()
 	styles := to.styles.Load()

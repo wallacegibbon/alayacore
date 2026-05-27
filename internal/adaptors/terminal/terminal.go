@@ -168,7 +168,7 @@ func (m *Terminal) Init() tea.Cmd {
 	if m.themeManager != nil {
 		if warnings := m.themeManager.GetWarnings(); len(warnings) > 0 {
 			for _, w := range warnings {
-				m.out.AppendError("%s", w.Message)
+				m.out.WriteError("%s", w.Message)
 			}
 		}
 	}
@@ -297,7 +297,7 @@ func (m *Terminal) handleTick() (tea.Model, tea.Cmd) {
 //   - EditorActionReloadConfig:  reload configuration after file edit
 func (m *Terminal) handleEditorFinished(msg EditorFinishedMsg) (tea.Model, tea.Cmd) {
 	if msg.Err != nil {
-		m.out.AppendError("Editor error: %v", msg.Err)
+		m.out.WriteError("Editor error: %v", msg.Err)
 		return m, nil
 	}
 
