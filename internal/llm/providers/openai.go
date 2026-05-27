@@ -361,6 +361,10 @@ func (s *openAIStreamState) getToolCalls() []llm.ToolCallPart {
 	return s.toolCalls
 }
 
+// getMessage assembles a domain Message from the three parallel OpenAI stream accumulators.
+// OpenAI delivers reasoning, text, and tool calls as separate flat delta fields.
+// This function merges them into a single domain Message with a unified ContentPart array,
+// matching the Anthropic-inspired content block model used by the rest of the codebase.
 func (s *openAIStreamState) getMessage() llm.Message {
 	content := make([]llm.ContentPart, 0, 2+len(s.toolCalls))
 	if s.reasoningBuilder.Len() > 0 {

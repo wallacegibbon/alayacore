@@ -2,6 +2,8 @@
 
 Non-obvious patterns when working with LLM provider implementations.
 
+> **See also: [data-mapping.md](data-mapping.md)** for how OpenAI/Anthropic wire formats map to the domain types in `llm/types.go`, with traced examples of `reasoning_content`, `tool_calls`, and mixed messages.
+
 ## OpenAI tool call chunking
 
 Tool arguments arrive in chunks across multiple delta events:

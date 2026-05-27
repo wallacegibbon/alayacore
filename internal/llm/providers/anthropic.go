@@ -408,6 +408,11 @@ func (s *anthropicStreamState) setUsage(inputTokens, outputTokens, cacheReadToke
 	})
 }
 
+// getMessage wraps the accumulated contentParts into a domain Message.
+// Unlike OpenAI's parallel accumulators (reasoningBuilder + textBuilder + toolCallArgs),
+// Anthropic's block lifecycle model delivers content serially — each block starts, streams,
+// and finishes before the next begins. finishBlock() already converted each block to the
+// correct ContentPart type, so this function is a trivial wrapper.
 func (s *anthropicStreamState) getMessage() llm.Message {
 	return llm.Message{
 		Role:    llm.RoleAssistant,
