@@ -140,6 +140,19 @@ Rules:
 			lastAssistantMsg = result[i]
 		}
 	}
+	// Strip reasoning/thinking content from the summary message — it's
+	// internal model deliberation, not summary content. Keeping only text
+	// and tool calls saves tokens and avoids confusing the model on resume.
+	filtered := make([]llm.ContentPart, 0, len(lastAssistantMsg.Content))
+	for _, part := range lastAssistantMsg.Content {
+		switch part.(type) {
+		case llm.ReasoningPart:
+			continue // drop thinking blocks
+		default:
+			filtered = append(filtered, part)
+		}
+	}
+	lastAssistantMsg.Content = filtered
 	result = []llm.Message{lastAssistantMsg}
 	// Both events are sent from this same goroutine sequentially
 	// (StepFinishEvent during processPrompt, then this correction).
