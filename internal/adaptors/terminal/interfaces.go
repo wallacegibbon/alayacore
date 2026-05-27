@@ -30,7 +30,6 @@ type ModelSnapshot struct {
 	Models     []agentpkg.ModelInfo
 	ActiveID   int
 	ActiveName string
-	HasModels  bool
 	ConfigPath string
 }
 

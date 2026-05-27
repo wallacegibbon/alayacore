@@ -90,6 +90,12 @@ type Session struct {
 	// This centralizes all sendSystemInfo calls in one place.
 	infoUpdateCh chan struct{}
 
+	// modelsChanged is set to true when model data changes (switch, reload).
+	// sendSystemInfo() checks this flag to decide whether to include model
+	// fields in the SD JSON, avoiding redundant serialization of potentially
+	// large model payloads on every status update.
+	modelsChanged bool
+
 	sessionCtx    context.Context    // canceled when input is exhausted
 	sessionCancel context.CancelFunc // idempotent cancel
 	runDone       chan struct{}      // closed when run() exits
@@ -155,6 +161,7 @@ func NewSession(cfg SessionConfig) *Session {
 	s.reasoningLevel.Store(int64(config.DefaultReasoningLevel))
 	s.initModelManager()
 	s.applyModelOverride()
+	s.modelsChanged = true
 	s.sendSystemInfo()
 	return s
 }
@@ -200,6 +207,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 		s.applyModelContextLimit(model)
 	}
 
+	s.modelsChanged = true
 	s.sendSystemInfo()
 
 	// Send TLV chunks directly to output (avoids reconstruction)

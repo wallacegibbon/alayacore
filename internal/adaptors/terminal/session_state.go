@@ -36,7 +36,6 @@ type sessionState struct {
 	models          []agentpkg.ModelInfo
 	activeModelID   int
 	activeModelName string
-	hasModels       bool
 	modelConfigPath string
 
 	// Queue items — set by handleSystemTag, cleared by GetQueueItems
@@ -83,11 +82,12 @@ func (s *sessionState) updateStepTracking(info agentpkg.SystemInfo) {
 // updateModelState updates cached model-related fields from SystemInfo.
 // Caller must hold s.mu.
 func (s *sessionState) updateModelState(info agentpkg.SystemInfo) {
-	s.models = info.Models
-	s.activeModelID = info.ActiveModelID
-	s.hasModels = info.HasModels
-	s.modelConfigPath = info.ModelConfigPath
-	s.activeModelName = info.ActiveModelName
+	if info.Models != nil {
+		s.models = info.Models
+		s.activeModelID = info.ActiveModelID
+		s.modelConfigPath = info.ModelConfigPath
+		s.activeModelName = info.ActiveModelName
+	}
 }
 
 // updateQueueItems converts and stores the queue items from SystemInfo.
@@ -134,7 +134,6 @@ func (s *sessionState) snapshotModels() ModelSnapshot {
 	defer s.mu.Unlock()
 	snap := ModelSnapshot{
 		ActiveID:   s.activeModelID,
-		HasModels:  s.hasModels,
 		ConfigPath: s.modelConfigPath,
 		ActiveName: s.activeModelName,
 	}

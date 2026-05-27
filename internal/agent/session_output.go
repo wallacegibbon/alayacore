@@ -112,20 +112,22 @@ func (s *Session) sendSystemInfo() {
 		return
 	}
 
+	// Only include model data when it has changed since the last broadcast.
+	// Models are large (all configured models with metadata) and change
+	// infrequently — skipping them on every status update saves bandwidth.
 	var models []ModelInfo
 	var activeID int
 	var activeModelName string
 	var modelConfigPath string
-	var hasModels bool
 
-	if s.ModelManager != nil {
+	if s.modelsChanged && s.ModelManager != nil {
 		models = s.ModelManager.GetModels()
 		activeID = s.ModelManager.GetActiveID()
 		if activeModel := s.ModelManager.GetActive(); activeModel != nil {
 			activeModelName = activeModel.Name
 		}
 		modelConfigPath = s.ModelManager.GetFilePath()
-		hasModels = s.ModelManager.HasModels()
+		s.modelsChanged = false
 	}
 
 	// taskQueue is owned by run() goroutine (or single-threaded during construction).
@@ -160,7 +162,6 @@ func (s *Session) sendSystemInfo() {
 		Models:          models,
 		ActiveModelID:   activeID,
 		ActiveModelName: activeModelName,
-		HasModels:       hasModels,
 		ModelConfigPath: modelConfigPath,
 		ReasoningLevel:  int(s.reasoningLevel.Load()),
 	}

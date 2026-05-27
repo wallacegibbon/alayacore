@@ -65,7 +65,6 @@ type SystemInfo struct {
 	Models          []ModelInfo     `json:"models,omitempty"`
 	ActiveModelID   int             `json:"active_model_id,omitempty"`
 	ActiveModelName string          `json:"active_model_name,omitempty"`
-	HasModels       bool            `json:"has_models"`
 	ModelConfigPath string          `json:"model_config_path,omitempty"`
 	ReasoningLevel  int             `json:"reasoning_level"`
 	ActiveTheme     string          `json:"active_theme,omitempty"`
