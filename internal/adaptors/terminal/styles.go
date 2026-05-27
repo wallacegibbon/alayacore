@@ -1,75 +1,16 @@
 package terminal
 
 // Theme and styling for the terminal UI.
-// This file defines the color palette (Theme) and derived styles (Styles).
+// The Theme struct, DefaultTheme(), and LoadTheme() now live in
+// internal/theme — this file only keeps lipgloss-specific style derivation.
 
 import (
-	"fmt"
 	"image/color"
-	"os"
 
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/lipgloss/v2"
-	"github.com/alayacore/alayacore/internal/config"
+	"github.com/alayacore/alayacore/internal/theme"
 )
-
-// ============================================================================
-// Theme - Color Palette
-// ============================================================================
-
-// Theme holds all color values for the terminal UI
-type Theme struct {
-	// Core palette
-	Primary   string `config:"primary"`   // Primary/accent color for highlights and focused borders
-	Dim       string `config:"dim"`       // Dimmed color for unfocused borders and blurred text
-	Muted     string `config:"muted"`     // Muted color for placeholder and secondary text
-	Text      string `config:"text"`      // Primary text color
-	Warning   string `config:"warning"`   // Warning color (yellow/orange)
-	Error     string `config:"error"`     // Error color (red)
-	Success   string `config:"success"`   // Success color (green)
-	Selection string `config:"selection"` // Selection/cursor border highlight color
-	Cursor    string `config:"cursor"`    // Text input cursor color
-
-	// Diff colors
-	Added   string `config:"added"`   // Added lines in diff (green)
-	Removed string `config:"removed"` // Removed lines in diff (red)
-
-	// Fold indicator character (repeated to form the fold splitter row)
-	FoldIndicator string `config:"fold_indicator"`
-}
-
-// DefaultTheme returns the default theme (Catppuccin Mocha)
-func DefaultTheme() *Theme {
-	return &Theme{
-		Primary:   "#89d4fa",
-		Dim:       "#313244",
-		Muted:     "#6c7086",
-		Text:      "#cdd6f4",
-		Warning:   "#f9e2af",
-		Error:     "#f38ba8",
-		Success:   "#a6e3a1",
-		Selection: "#fab387",
-		Cursor:    "#cdd6f4",
-		Added:     "#a6e3a1",
-		Removed:   "#f38ba8",
-
-		FoldIndicator: "⁝",
-	}
-}
-
-// LoadTheme loads a theme from a configuration file
-// Returns the loaded theme or an error if the file cannot be read or parsed
-func LoadTheme(path string) (*Theme, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open theme file: %w", err)
-	}
-
-	// Start with defaults, then override with config values
-	theme := DefaultTheme()
-	config.ParseKeyValue(string(data), theme)
-	return theme, nil
-}
 
 // ============================================================================
 // Styles - Derived Lipgloss Styles
@@ -138,48 +79,47 @@ func (s *Styles) RenderBorderedBox(content string, width int, borderColor color.
 }
 
 // NewStyles creates a Styles instance from a Theme
-func NewStyles(theme *Theme) *Styles {
+func NewStyles(t *theme.Theme) *Styles {
 	baseStyle := lipgloss.NewStyle()
 	return &Styles{
 		// Output text styles
-		Text:        baseStyle.Foreground(lipgloss.Color(theme.Text)).Bold(true),
-		UserInput:   baseStyle.Foreground(lipgloss.Color(theme.Primary)).Bold(true),
-		Tool:        baseStyle.Foreground(lipgloss.Color(theme.Warning)),
-		ToolContent: baseStyle.Foreground(lipgloss.Color(theme.Muted)),
-		Reasoning:   baseStyle.Foreground(lipgloss.Color(theme.Muted)).Italic(true),
-		Error:       baseStyle.Foreground(lipgloss.Color(theme.Error)),
-		System:      baseStyle.Foreground(lipgloss.Color(theme.Muted)),
-		Prompt:      baseStyle.Foreground(lipgloss.Color(theme.Primary)).Bold(true),
-		DiffRemove:  baseStyle.Foreground(lipgloss.Color(theme.Removed)),
-		DiffAdd:     baseStyle.Foreground(lipgloss.Color(theme.Added)),
+		Text:        baseStyle.Foreground(lipgloss.Color(t.Text)).Bold(true),
+		UserInput:   baseStyle.Foreground(lipgloss.Color(t.Primary)).Bold(true),
+		Tool:        baseStyle.Foreground(lipgloss.Color(t.Warning)),
+		ToolContent: baseStyle.Foreground(lipgloss.Color(t.Muted)),
+		Reasoning:   baseStyle.Foreground(lipgloss.Color(t.Muted)).Italic(true),
+		Error:       baseStyle.Foreground(lipgloss.Color(t.Error)),
+		System:      baseStyle.Foreground(lipgloss.Color(t.Muted)),
+		Prompt:      baseStyle.Foreground(lipgloss.Color(t.Primary)).Bold(true),
+		DiffRemove:  baseStyle.Foreground(lipgloss.Color(t.Removed)),
+		DiffAdd:     baseStyle.Foreground(lipgloss.Color(t.Added)),
 
 		// Display styles
 		Input:       baseStyle,
-		Status:      baseStyle.Foreground(lipgloss.Color(theme.Dim)),
-		Separator:   baseStyle.Foreground(lipgloss.Color(theme.Dim)),
-		Confirm:     baseStyle.Foreground(lipgloss.Color(theme.Error)).Bold(true),
+		Status:      baseStyle.Foreground(lipgloss.Color(t.Dim)),
+		Separator:   baseStyle.Foreground(lipgloss.Color(t.Dim)),
+		Confirm:     baseStyle.Foreground(lipgloss.Color(t.Error)).Bold(true),
 		InputBorder: baseStyle.Border(lipgloss.RoundedBorder()),
 
 		// Component-specific colors
-		BorderFocused: lipgloss.Color(theme.Primary),
-		BorderBlurred: lipgloss.Color(theme.Dim),
-		BorderCursor:  lipgloss.Color(theme.Selection),
+		BorderFocused: lipgloss.Color(t.Primary),
+		BorderBlurred: lipgloss.Color(t.Dim),
+		BorderCursor:  lipgloss.Color(t.Selection),
 
-		ColorAccent:  lipgloss.Color(theme.Primary),
-		ColorDim:     lipgloss.Color(theme.Dim),
-		ColorMuted:   lipgloss.Color(theme.Muted),
-		ColorError:   lipgloss.Color(theme.Error),
-		ColorSuccess: lipgloss.Color(theme.Success),
-		CursorColor:  lipgloss.Color(theme.Cursor),
+		ColorAccent:  lipgloss.Color(t.Primary),
+		ColorDim:     lipgloss.Color(t.Dim),
+		ColorMuted:   lipgloss.Color(t.Muted),
+		ColorError:   lipgloss.Color(t.Error),
+		ColorSuccess: lipgloss.Color(t.Success),
+		CursorColor:  lipgloss.Color(t.Cursor),
 
-		FoldIndicator: theme.FoldIndicator,
+		FoldIndicator: t.FoldIndicator,
 	}
 }
 
 // DefaultStyles returns the default styling configuration.
-// This is a convenience wrapper around NewStyles(DefaultTheme()).
 func DefaultStyles() *Styles {
-	return NewStyles(DefaultTheme())
+	return NewStyles(theme.DefaultTheme())
 }
 
 // ApplyTextInputStyles applies focused or blurred styles to a textinput.Model.

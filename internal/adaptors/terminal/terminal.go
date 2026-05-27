@@ -19,6 +19,7 @@ import (
 	"github.com/alayacore/alayacore/internal/app"
 	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/stream"
+	"github.com/alayacore/alayacore/internal/theme"
 )
 
 // emitCommand sends a user-level command to the session via TLV.
@@ -126,7 +127,7 @@ func NewTerminalWithTheme(
 	inputWriter io.WriteCloser,
 	appCfg *app.Config,
 	initialWidth, initialHeight int,
-	theme *Theme,
+	theme *theme.Theme,
 	themeManager *ThemeManager,
 	themeName string,
 ) *Terminal {
@@ -626,7 +627,7 @@ func (m *Terminal) openHelpWindow() {
 }
 
 // applyTheme applies a new theme to all UI components.
-func (m *Terminal) applyTheme(theme *Theme) {
+func (m *Terminal) applyTheme(theme *theme.Theme) {
 	m.styles = NewStyles(theme)
 	m.out.SetStyles(m.styles)
 	m.display.SetStyles(m.styles)

@@ -10,6 +10,8 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/alayacore/alayacore/internal/theme"
 )
 
 // ============================================================================
@@ -139,7 +141,7 @@ func (m *Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 
 // themePreviewMsg is sent when a theme preview should be applied
 type themePreviewMsg struct {
-	theme *Theme
+	theme *theme.Theme
 	id    int // ID to check if this preview is still current
 }
 

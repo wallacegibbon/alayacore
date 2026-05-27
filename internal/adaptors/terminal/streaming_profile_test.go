@@ -5,12 +5,14 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/alayacore/alayacore/internal/theme"
 )
 
 // TestStreamingProfile profiles realistic streaming behavior
 // Run with: go test -run TestStreamingProfile -v
 func TestStreamingProfile(t *testing.T) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
 	// Create 20 windows (conversation history)
@@ -82,7 +84,7 @@ func TestStreamingProfile(t *testing.T) {
 
 // TestStreamingProfileLongContent profiles with longer content
 func TestStreamingProfileLongContent(t *testing.T) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
 	// Create 20 windows
@@ -137,7 +139,7 @@ func TestStreamingProfileLongContent(t *testing.T) {
 
 // TestCursorMovementProfile profiles cursor movement performance
 func TestCursorMovementProfile(t *testing.T) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
 	// Create 100 windows
@@ -196,7 +198,7 @@ func TestCursorMovementProfile(t *testing.T) {
 
 // TestUpdateContentSkipRate measures how often updateContent skips due to unchanged content
 func TestUpdateContentSkipRate(t *testing.T) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
 	wb.AppendOrUpdate("TA", "msg0", "Content")
@@ -230,7 +232,7 @@ func TestUpdateContentSkipRate(t *testing.T) {
 
 // TestRealisticStreamingWithTiming simulates actual streaming with timing
 func TestRealisticStreamingWithTiming(t *testing.T) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
 	// Conversation history
@@ -296,7 +298,7 @@ func TestRealisticStreamingWithTiming(t *testing.T) {
 
 // TestVeryLongContentStreaming profiles streaming with very long content
 func TestVeryLongContentStreaming(t *testing.T) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
 	// Large conversation history
@@ -361,7 +363,7 @@ func TestVeryLongContentStreaming(t *testing.T) {
 
 // TestWorstCaseStreaming tests extremely fast streaming (faster than real LLM)
 func TestWorstCaseStreaming(t *testing.T) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
 	// Conversation history

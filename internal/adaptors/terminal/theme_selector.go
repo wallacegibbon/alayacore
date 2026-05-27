@@ -10,6 +10,8 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/alayacore/alayacore/internal/theme"
 )
 
 // ThemeSelector manages theme selection UI.
@@ -18,7 +20,7 @@ type ThemeSelector struct {
 	themes []ThemeInfo
 
 	// Preview state
-	previewTheme     *Theme
+	previewTheme     *theme.Theme
 	previewTimer     *time.Timer
 	previewThemeName string
 
@@ -79,7 +81,7 @@ func (ts *ThemeSelector) GetSelectedTheme() *ThemeInfo {
 	return &ts.themes[ts.SelectedIdx]
 }
 
-func (ts *ThemeSelector) GetPreviewTheme() *Theme {
+func (ts *ThemeSelector) GetPreviewTheme() *theme.Theme {
 	return ts.previewTheme
 }
 
@@ -115,13 +117,13 @@ func (ts *ThemeSelector) View() tea.View {
 
 // --- Key Handling ---
 
-func (ts *ThemeSelector) HandleKeyMsg(msg tea.KeyMsg, themeManager *ThemeManager) (*Theme, bool) {
+func (ts *ThemeSelector) HandleKeyMsg(msg tea.KeyMsg, themeManager *ThemeManager) (*theme.Theme, bool) {
 	if ts.State == ScrollableListClosed {
 		return nil, false
 	}
 
 	key := msg.String()
-	var previewTheme *Theme
+	var previewTheme *theme.Theme
 
 	switch key {
 	case keyUp, keyK:
@@ -154,7 +156,7 @@ func (ts *ThemeSelector) HandleKeyMsg(msg tea.KeyMsg, themeManager *ThemeManager
 	return previewTheme, true
 }
 
-func (ts *ThemeSelector) getPreviewTheme(themeManager *ThemeManager) *Theme {
+func (ts *ThemeSelector) getPreviewTheme(themeManager *ThemeManager) *theme.Theme {
 	if themeManager == nil {
 		return nil
 	}

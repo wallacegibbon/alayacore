@@ -11,6 +11,7 @@ import (
 	"golang.org/x/term"
 
 	"github.com/alayacore/alayacore/internal/app"
+	"github.com/alayacore/alayacore/internal/theme"
 )
 
 // Compile-time check: Adaptor satisfies app.Adaptor.
@@ -33,7 +34,7 @@ func (a *Adaptor) Start() int {
 	// Create theme manager
 	themeManager := NewThemeManager(a.Config.Cfg.ThemesFolder)
 
-	terminalOutput := NewTerminalOutput(NewStyles(DefaultTheme()))
+	terminalOutput := NewTerminalOutput(NewStyles(theme.DefaultTheme()))
 
 	// Get terminal size before loading session (so session loads with correct dimensions)
 	initialWidth, initialHeight := getTerminalSize()

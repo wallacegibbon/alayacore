@@ -1,4 +1,4 @@
-package terminal
+package theme
 
 import (
 	"os"
@@ -6,25 +6,20 @@ import (
 	"testing"
 )
 
-func TestThemeManagerCreatesDefaultThemes(t *testing.T) {
-	// Create a temporary directory for testing
+func TestManagerCreatesDefaultThemes(t *testing.T) {
 	testDir := t.TempDir()
 	themesDir := filepath.Join(testDir, "themes")
 
-	// Verify themes directory doesn't exist initially
 	if _, err := os.Stat(themesDir); !os.IsNotExist(err) {
 		t.Fatalf("Themes directory should not exist initially")
 	}
 
-	// Create theme manager - this should create the themes folder
-	tm := NewThemeManager(themesDir)
+	tm := NewManager(themesDir)
 
-	// Verify themes folder was created
 	if _, err := os.Stat(themesDir); os.IsNotExist(err) {
 		t.Errorf("Themes folder was not created")
 	}
 
-	// Verify default themes were created
 	darkPath := filepath.Join(themesDir, "theme-dark.conf")
 	lightPath := filepath.Join(themesDir, "theme-light.conf")
 	redpandaPath := filepath.Join(themesDir, "theme-redpanda.conf")
@@ -32,65 +27,53 @@ func TestThemeManagerCreatesDefaultThemes(t *testing.T) {
 	if _, err := os.Stat(darkPath); os.IsNotExist(err) {
 		t.Errorf("theme-dark.conf was not created")
 	}
-
 	if _, err := os.Stat(lightPath); os.IsNotExist(err) {
 		t.Errorf("theme-light.conf was not created")
 	}
-
 	if _, err := os.Stat(redpandaPath); os.IsNotExist(err) {
 		t.Errorf("theme-redpanda.conf was not created")
 	}
 
-	// Verify themes are loaded
 	themes := tm.GetThemes()
 	if len(themes) != 3 {
 		t.Errorf("Expected 3 themes, got %d", len(themes))
 	}
 
-	// Verify we can load the themes
-	theme := tm.LoadTheme("theme-dark")
-	if theme == nil {
+	th := tm.LoadTheme("theme-dark")
+	if th == nil {
 		t.Fatalf("Failed to load theme-dark")
-		return
 	}
-	if theme.Primary != "#89d4fa" {
-		t.Errorf("Expected theme-dark primary color #89d4fa, got %s", theme.Primary)
+	if th.Primary != "#89d4fa" {
+		t.Errorf("Expected theme-dark primary color #89d4fa, got %s", th.Primary)
 	}
 
 	rpTheme := tm.LoadTheme("theme-redpanda")
 	if rpTheme == nil {
 		t.Fatalf("Failed to load theme-redpanda")
-		return
 	}
 	if rpTheme.Primary != "#e24328" {
 		t.Errorf("Expected theme-redpanda primary color #e24328, got %s", rpTheme.Primary)
 	}
 }
 
-func TestThemeManagerUsesExistingFolder(t *testing.T) {
-	// Create a temporary directory with existing themes
+func TestManagerUsesExistingFolder(t *testing.T) {
 	testDir := t.TempDir()
 	themesDir := filepath.Join(testDir, "themes")
 
-	// Pre-create the themes folder
 	if err := os.MkdirAll(themesDir, 0755); err != nil {
 		t.Fatalf("Failed to create themes directory: %v", err)
 	}
 
-	// Create a custom theme
 	customTheme := `# Custom theme
-base: #000000
-text: #ffffff
+primary: #ff0000
 `
 	customPath := filepath.Join(themesDir, "custom.conf")
 	if err := os.WriteFile(customPath, []byte(customTheme), 0644); err != nil {
 		t.Fatalf("Failed to create custom theme: %v", err)
 	}
 
-	// Create theme manager - should not overwrite existing themes
-	tm := NewThemeManager(themesDir)
+	tm := NewManager(themesDir)
 
-	// Verify default themes were NOT created (folder already existed)
 	darkPath := filepath.Join(themesDir, "theme-dark.conf")
 	lightPath := filepath.Join(themesDir, "theme-light.conf")
 	redpandaPath := filepath.Join(themesDir, "theme-redpanda.conf")
@@ -98,16 +81,13 @@ text: #ffffff
 	if _, err := os.Stat(darkPath); !os.IsNotExist(err) {
 		t.Errorf("theme-dark.conf should not be created when folder exists")
 	}
-
 	if _, err := os.Stat(lightPath); !os.IsNotExist(err) {
 		t.Errorf("theme-light.conf should not be created when folder exists")
 	}
-
 	if _, err := os.Stat(redpandaPath); !os.IsNotExist(err) {
 		t.Errorf("theme-redpanda.conf should not be created when folder exists")
 	}
 
-	// Verify custom theme is loaded
 	themes := tm.GetThemes()
 	if len(themes) != 1 {
 		t.Errorf("Expected 1 theme, got %d", len(themes))

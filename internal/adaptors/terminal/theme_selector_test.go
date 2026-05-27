@@ -4,11 +4,12 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/alayacore/alayacore/internal/theme"
 )
 
 func TestThemeSelectorCancelRestoresOriginalTheme(t *testing.T) {
 	// Create a theme selector with some themes
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	ts := NewThemeSelector(styles)
 
 	themes := []ThemeInfo{
@@ -54,7 +55,7 @@ func TestThemeSelectorCancelRestoresOriginalTheme(t *testing.T) {
 
 func TestThemeSelectorEnterSavesTheme(t *testing.T) {
 	// Create a theme selector
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	ts := NewThemeSelector(styles)
 
 	themes := []ThemeInfo{

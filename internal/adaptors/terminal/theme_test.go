@@ -1,86 +1,13 @@
 package terminal
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
+
+	"github.com/alayacore/alayacore/internal/theme"
 )
 
-func TestDefaultTheme(t *testing.T) {
-	theme := DefaultTheme()
-	if theme.Primary != "#89d4fa" {
-		t.Errorf("Expected Primary #89d4fa, got %s", theme.Primary)
-	}
-}
-
-func TestLoadTheme(t *testing.T) {
-	// Create a temporary theme file
-	tmpDir := t.TempDir()
-	themePath := filepath.Join(tmpDir, "test-theme.conf")
-	content := `# Test theme
-primary: #ffffff
-error: #ff0000
-`
-	if err := os.WriteFile(themePath, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create test theme file: %v", err)
-	}
-
-	theme, err := LoadTheme(themePath)
-	if err != nil {
-		t.Fatalf("LoadTheme failed: %v", err)
-	}
-
-	// Check that custom values were loaded
-	if theme.Primary != "#ffffff" {
-		t.Errorf("Expected Primary #ffffff, got %s", theme.Primary)
-	}
-	if theme.Error != "#ff0000" {
-		t.Errorf("Expected Error #ff0000, got %s", theme.Error)
-	}
-
-	// Check that other values retain defaults
-	if theme.Warning != "#f9e2af" {
-		t.Errorf("Expected Warning #f9e2af (default), got %s", theme.Warning)
-	}
-}
-
-func TestLoadThemeWithUnknownFields(t *testing.T) {
-	// Verify that unknown fields are simply ignored
-	tmpDir := t.TempDir()
-	themePath := filepath.Join(tmpDir, "unknown-fields.conf")
-	content := `# Theme with unknown field names (ignored)
-unknown_field: #111111
-another_unknown: #222222
-primary: #333333
-`
-	if err := os.WriteFile(themePath, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create test theme file: %v", err)
-	}
-
-	theme, err := LoadTheme(themePath)
-	if err != nil {
-		t.Fatalf("LoadTheme failed: %v", err)
-	}
-
-	// Unknown fields are ignored, known fields work
-	if theme.Primary != "#333333" {
-		t.Errorf("Expected Primary #333333, got %s", theme.Primary)
-	}
-	// Muted should be default since it's not specified
-	if theme.Muted != "#6c7086" {
-		t.Errorf("Expected Muted #6c7086 (default), got %s", theme.Muted)
-	}
-}
-
-func TestLoadThemeInvalidPath(t *testing.T) {
-	_, err := LoadTheme("/nonexistent/path/theme.conf")
-	if err == nil {
-		t.Error("Expected error for nonexistent file, got nil")
-	}
-}
-
 func TestNewStylesWithTheme(t *testing.T) {
-	theme := &Theme{
+	customTheme := &theme.Theme{
 		Primary:   "#custom1",
 		Dim:       "#custom2",
 		Muted:     "#custom3",
@@ -92,18 +19,15 @@ func TestNewStylesWithTheme(t *testing.T) {
 		Cursor:    "#custom9",
 	}
 
-	styles := NewStyles(theme)
+	styles := NewStyles(customTheme)
 	if styles == nil {
 		t.Fatal("NewStyles returned nil")
 		return
 	}
 
-	// Verify that styles are created (we can't easily test the actual color values
-	// without extracting them from lipgloss.Style, but we can verify it doesn't crash)
 	_ = styles.Text.Render("test")
 	_ = styles.Error.Render("test")
 
-	// Verify color fields are accessible
 	_ = styles.ColorAccent
 	_ = styles.ColorDim
 	_ = styles.ColorError

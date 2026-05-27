@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"charm.land/lipgloss/v2"
+
+	"github.com/alayacore/alayacore/internal/theme"
 )
 
 // BenchmarkWindowBufferDelta benchmarks the performance of delta updates.
@@ -15,7 +17,7 @@ import (
 // Note: The content grows on each iteration, so word-wrapping cost increases.
 // This measures the worst-case scenario where the last window keeps growing.
 func BenchmarkWindowBufferDelta(b *testing.B) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
 	// Create 100 windows (simulating a long conversation)
@@ -44,7 +46,7 @@ func BenchmarkWindowBufferDelta(b *testing.B) {
 // BenchmarkWindowBufferDeltaNewWindow tests updating a NEW window each time.
 // This measures the cost of rendering one window without the growing content issue.
 func BenchmarkWindowBufferDeltaNewWindow(b *testing.B) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
 	// Create 100 initial windows
@@ -71,7 +73,7 @@ func BenchmarkWindowBufferDeltaNewWindow(b *testing.B) {
 // BenchmarkWindowBufferDeltaSingleWindow benchmarks delta updates with only one window.
 // This should be fast regardless of the optimization.
 func BenchmarkWindowBufferDeltaSingleWindow(b *testing.B) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
 	// Single window
@@ -90,7 +92,7 @@ func BenchmarkWindowBufferDeltaSingleWindow(b *testing.B) {
 // BenchmarkWindowBufferGetWindowLineRange benchmarks the GetWindowLineRange function.
 // This has O(n) behavior that could be optimized with a prefix sum array.
 func BenchmarkWindowBufferGetWindowLineRange(b *testing.B) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
 	// Create 100 windows
@@ -112,7 +114,7 @@ func BenchmarkWindowBufferGetWindowLineRange(b *testing.B) {
 
 // BenchmarkWindowBufferGetAll benchmarks the GetAll function with virtual rendering.
 func BenchmarkWindowBufferGetAll(b *testing.B) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
 	// Create 100 windows
@@ -134,7 +136,7 @@ func BenchmarkWindowBufferGetAll(b *testing.B) {
 
 // BenchmarkWindowBufferDeltaWithGetAll benchmarks the full update cycle including GetAll.
 func BenchmarkWindowBufferDeltaWithGetAll(b *testing.B) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
 	// Create 100 windows (simulating a long conversation)
@@ -165,7 +167,7 @@ func BenchmarkWindowBufferDeltaWithGetAll(b *testing.B) {
 // BenchmarkVirtualRenderingCursorMovement benchmarks cursor movement with virtual rendering.
 // This tests the EnsureCursorVisible + updateContent path.
 func BenchmarkVirtualRenderingCursorMovement(b *testing.B) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
 	// Create 100 windows
@@ -198,7 +200,7 @@ func BenchmarkVirtualRenderingCursorMovement(b *testing.B) {
 
 // BenchmarkVirtualRenderingCursorMovementSingle tests a single cursor move (more realistic)
 func BenchmarkVirtualRenderingCursorMovementSingle(b *testing.B) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
 	// Create 100 windows
@@ -229,7 +231,7 @@ func BenchmarkVirtualRenderingCursorMovementSingle(b *testing.B) {
 
 // BenchmarkStreamingUpdateWithIncremental uses the incremental path properly
 func BenchmarkStreamingUpdateWithIncremental(b *testing.B) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
 	// Create 50 existing windows (conversation history)
@@ -262,7 +264,7 @@ func BenchmarkStreamingUpdateWithIncremental(b *testing.B) {
 
 // BenchmarkStreamingUpdateWithoutIncremental forces full re-wrap
 func BenchmarkStreamingUpdateWithoutIncremental(b *testing.B) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
 	// Create 50 existing windows
@@ -299,7 +301,7 @@ func BenchmarkStreamingUpdateWithoutIncremental(b *testing.B) {
 
 // BenchmarkStreamingSmallDelta tests with small streaming deltas
 func BenchmarkStreamingSmallDelta(b *testing.B) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
 	// Create 20 existing windows
@@ -325,7 +327,7 @@ func BenchmarkStreamingSmallDelta(b *testing.B) {
 
 // BenchmarkJustAppendUpdate isolates the AppendOrUpdate cost
 func BenchmarkJustAppendUpdate(b *testing.B) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
 	// Create 20 existing windows
@@ -346,7 +348,7 @@ func BenchmarkJustAppendUpdate(b *testing.B) {
 
 // BenchmarkJustEnsureLineHeights isolates the ensureLineHeights cost
 func BenchmarkJustEnsureLineHeights(b *testing.B) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
 	// Create 20 existing windows
@@ -374,7 +376,7 @@ func BenchmarkJustEnsureLineHeights(b *testing.B) {
 
 // BenchmarkStreamingDebug shows why streaming is slow
 func BenchmarkStreamingDebug(_ *testing.B) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
 	streamID := "stream"
@@ -404,7 +406,7 @@ func BenchmarkStreamingDebug(_ *testing.B) {
 
 // BenchmarkSingleWindowStreaming tests streaming with just one window
 func BenchmarkSingleWindowStreaming(b *testing.B) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
 	streamID := "stream"
@@ -420,7 +422,7 @@ func BenchmarkSingleWindowStreaming(b *testing.B) {
 
 // BenchmarkSingleWindowStreamingDebug prints debug info
 func BenchmarkSingleWindowStreamingDebug(b *testing.B) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
 	streamID := "stream"
@@ -459,7 +461,7 @@ func BenchmarkSingleWindowStreamingDebug(b *testing.B) {
 
 // BenchmarkLongContentStreaming tests with longer content to trigger wrapping
 func BenchmarkLongContentStreaming(b *testing.B) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
 	streamID := "stream"
@@ -480,7 +482,7 @@ func BenchmarkLongContentStreaming(b *testing.B) {
 
 // BenchmarkDirectAppend tests AppendContent directly
 func BenchmarkDirectAppend(b *testing.B) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	w := &Window{
 		ID:      "test",
 		Tag:     "TA",
@@ -516,7 +518,7 @@ func BenchmarkDirectAppendNoStyles(b *testing.B) {
 		styles:  nil, // No styles!
 	}
 
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	w.Render(80, false, styles,
 		lipgloss.NewStyle().Border(lipgloss.RoundedBorder()),
 		lipgloss.NewStyle())
@@ -534,7 +536,7 @@ func BenchmarkDirectAppendNoStyles(b *testing.B) {
 
 // BenchmarkDirectAppendDebug shows what's happening
 func BenchmarkDirectAppendDebug(_ *testing.B) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	w := &Window{
 		ID:      "test",
 		Tag:     "TA",
@@ -570,7 +572,7 @@ func BenchmarkDirectAppendDebug(_ *testing.B) {
 
 // BenchmarkRenderAfterAppend tests render after append (should use fast path)
 func BenchmarkRenderAfterAppend(b *testing.B) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	w := &Window{
 		ID:      "test",
 		Tag:     "TA",
@@ -601,7 +603,7 @@ func BenchmarkRenderAfterAppend(b *testing.B) {
 
 // BenchmarkFullRebuildAfterAppend tests full rebuild (when wrappedLines is nil)
 func BenchmarkFullRebuildAfterAppend(b *testing.B) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	w := &Window{
 		ID:      "test",
 		Tag:     "TA",
@@ -631,7 +633,7 @@ func BenchmarkFullRebuildAfterAppend(b *testing.B) {
 // BenchmarkStreamingUpdateWithVirtualRendering shows virtual rendering benefit
 // This test shows virtual rendering helping when viewport is NOT at the bottom
 func BenchmarkStreamingUpdateWithVirtualRendering(b *testing.B) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
 	// Create 100 windows - user is viewing the middle
@@ -656,7 +658,7 @@ func BenchmarkStreamingUpdateWithVirtualRendering(b *testing.B) {
 
 // BenchmarkStreamingUpdateWithoutVirtualRendering shows cost without virtual rendering
 func BenchmarkStreamingUpdateWithoutVirtualRendering(b *testing.B) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
 	// Create 100 windows - user is viewing the middle
@@ -680,7 +682,7 @@ func BenchmarkStreamingUpdateWithoutVirtualRendering(b *testing.B) {
 
 // BenchmarkGetAllOnly isolates the GetAll cost
 func BenchmarkGetAllWithVirtual(b *testing.B) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
 	// Create 100 windows
@@ -701,7 +703,7 @@ func BenchmarkGetAllWithVirtual(b *testing.B) {
 }
 
 func BenchmarkGetAllWithoutVirtual(b *testing.B) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
 	// Create 100 windows
@@ -752,7 +754,7 @@ func BenchmarkGetAllWithoutVirtual(b *testing.B) {
 //   - updateContent() skips unchanged content efficiently
 //   - Virtual rendering provides 3.5x speedup
 func BenchmarkWindowBufferResize(b *testing.B) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -777,7 +779,7 @@ func BenchmarkWindowBufferResize(b *testing.B) {
 
 // BenchmarkVirtualRenderingScroll benchmarks scrolling with virtual rendering.
 func BenchmarkVirtualRenderingScroll(b *testing.B) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
 	// Create 100 windows
@@ -812,7 +814,7 @@ func BenchmarkVirtualRenderingScroll(b *testing.B) {
 
 // BenchmarkGetWindowLineRangeCached benchmarks GetWindowLineRange when lineHeights are already cached.
 func BenchmarkGetWindowLineRangeCached(b *testing.B) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
 	// Create 100 windows
@@ -835,7 +837,7 @@ func BenchmarkGetWindowLineRangeCached(b *testing.B) {
 
 // BenchmarkEnsureLineHeightsIncremental vs full rebuild
 func BenchmarkEnsureLineHeightsIncremental(b *testing.B) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -859,7 +861,7 @@ func BenchmarkEnsureLineHeightsIncremental(b *testing.B) {
 }
 
 func BenchmarkEnsureLineHeightsFullRebuild(b *testing.B) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -880,7 +882,7 @@ func BenchmarkEnsureLineHeightsFullRebuild(b *testing.B) {
 
 // BenchmarkIncrementalWrapping vs full wrapping
 func BenchmarkIncrementalWrappingPath(b *testing.B) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -901,7 +903,7 @@ func BenchmarkIncrementalWrappingPath(b *testing.B) {
 }
 
 func BenchmarkFullWrappingPath(b *testing.B) {
-	styles := NewStyles(DefaultTheme())
+	styles := NewStyles(theme.DefaultTheme())
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

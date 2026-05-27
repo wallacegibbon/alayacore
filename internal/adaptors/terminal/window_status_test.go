@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/alayacore/alayacore/internal/stream"
+	"github.com/alayacore/alayacore/internal/theme"
 )
 
 func TestUpdateToolStatus(t *testing.T) {
@@ -121,7 +122,7 @@ func contains(s, substr string) bool {
 func TestOutputWriterToolCallStartThenFull(t *testing.T) {
 	// End-to-end test: write TagFunctionCall TLVs through the actual
 	// outputWriter pipeline (Write → processBuffer → writeColored → AppendToolCall).
-	out := NewTerminalOutput(NewStyles(DefaultTheme()))
+	out := NewTerminalOutput(NewStyles(theme.DefaultTheme()))
 	out.SetWindowWidth(80)
 
 	makeTLV := func(id, name, input string) []byte {

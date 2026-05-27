@@ -5,10 +5,11 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/alayacore/alayacore/internal/stream"
+	"github.com/alayacore/alayacore/internal/theme"
 )
 
 func TestQuitCommandRequiresConfirm(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, DefaultTheme(), nil, "theme-dark")
+	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
 	terminal.input.SetValue(":q")
 
 	// Press Enter to submit the command
@@ -38,7 +39,7 @@ func TestQuitCommandRequiresConfirm(t *testing.T) {
 }
 
 func TestQuitCommandCanceledClearsInput(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, DefaultTheme(), nil, "theme-dark")
+	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
 	terminal.input.SetValue(":q")
 
 	// Press Enter to submit the command
@@ -67,7 +68,7 @@ func TestQuitCommandCanceledClearsInput(t *testing.T) {
 }
 
 func TestQuitCommandEscapeCancels(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, DefaultTheme(), nil, "theme-dark")
+	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
 	terminal.input.SetValue(":q")
 
 	// Press Enter to submit the command
@@ -96,7 +97,7 @@ func TestQuitCommandEscapeCancels(t *testing.T) {
 }
 
 func TestQuitCommandConfirmed(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, DefaultTheme(), nil, "theme-dark")
+	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
 	terminal.input.SetValue(":q")
 
 	// Press Enter to submit the command
@@ -129,7 +130,7 @@ func TestQuitCommandConfirmed(t *testing.T) {
 }
 
 func TestFullQuitCommandRequiresConfirm(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, DefaultTheme(), nil, "theme-dark")
+	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
 	terminal.input.SetValue(":quit")
 
 	// Press Enter to submit the command
