@@ -116,7 +116,7 @@ func (s *Session) sendSystemInfo() {
 		QueueItems:   len(s.taskQueue),
 	})
 
-	// Send active model info (always)
+	// Send active model info (always — small payload)
 	var activeID int
 	var activeModelName string
 	if s.ModelManager != nil {
@@ -139,11 +139,15 @@ func (s *Session) sendSystemInfo() {
 		s.modelsChanged = false
 	}
 
-	// Send theme
-	if s.RuntimeManager != nil {
+	// Send theme only when changed
+	if s.themeChanged && s.RuntimeManager != nil {
 		_ = stream.WriteSystemMsg(s.Output, ThemeMsg{Name: s.RuntimeManager.GetActiveTheme()}) //nolint:errcheck
+		s.themeChanged = false
 	}
 
-	// Send reasoning level
-	_ = stream.WriteSystemMsg(s.Output, ReasoningMsg{Level: int(s.reasoningLevel.Load())}) //nolint:errcheck
+	// Send reasoning level only when changed
+	if s.reasoningChanged {
+		_ = stream.WriteSystemMsg(s.Output, ReasoningMsg{Level: int(s.reasoningLevel.Load())}) //nolint:errcheck
+		s.reasoningChanged = false
+	}
 }

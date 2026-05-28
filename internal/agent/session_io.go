@@ -341,6 +341,7 @@ func (s *Session) handleThemeSet(args []string) {
 		_ = s.RuntimeManager.SetActiveTheme(name) //nolint:errcheck // best-effort save, errors ignored
 	}
 	s.writeNotifyf("Theme set to: %s", name)
+	s.themeChanged = true
 	s.sendSystemInfo()
 }
 

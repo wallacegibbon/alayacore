@@ -97,6 +97,11 @@ type Session struct {
 	// large model payloads on every status update.
 	modelsChanged bool
 
+	// Dirty flags for per-message throttling in sendSystemInfo.
+	// Set true when the corresponding value changes, cleared after sending.
+	themeChanged     bool
+	reasoningChanged bool
+
 	sessionCtx    context.Context    // canceled when input is exhausted
 	sessionCancel context.CancelFunc // idempotent cancel
 	runDone       chan struct{}      // closed when run() exits
@@ -167,6 +172,8 @@ func NewSession(cfg SessionConfig) *Session {
 	s.initModelManager()
 	s.applyModelOverride()
 	s.modelsChanged = true
+	s.themeChanged = true
+	s.reasoningChanged = true
 	s.sendSystemInfo()
 	return s
 }
@@ -213,6 +220,8 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 	}
 
 	s.modelsChanged = true
+	s.themeChanged = true
+	s.reasoningChanged = true
 	s.sendSystemInfo()
 
 	// Send TLV chunks directly to output (avoids reconstruction)
