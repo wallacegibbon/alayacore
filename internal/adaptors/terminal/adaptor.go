@@ -47,7 +47,7 @@ func (a *Adaptor) Start() int {
 		return 1
 	}
 
-	// The session's first sendSystemInfo() has already been written to
+	// The session's first sendSystemInfo("all") has already been written to
 	// terminalOutput synchronously during StartSession. Read the active theme
 	// from the cached session state (default to default theme if not set).
 	activeThemeName := terminalOutput.SnapshotStatus().ActiveTheme
