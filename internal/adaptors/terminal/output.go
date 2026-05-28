@@ -17,7 +17,7 @@ package terminal
 //
 // Session goroutine call paths (inside outputWriter.mu):
 //   outputWriter.mu → WindowBuffer.mu      (content tags, exclusive with sessionState)
-//   outputWriter.mu → sessionState.mu      (system data tags, exclusive with WindowBuffer)
+//   outputWriter.mu → sessionState.mu      (TagSystemMsg, exclusive with WindowBuffer)
 //
 // Bubble Tea goroutine call paths:
 //   WindowBuffer.mu  (via display update, tick — never nested with sessionState)
@@ -83,15 +83,15 @@ func (to *outputWriter) WriteError(format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	id := to.generateWindowID()
 	styles := to.styles.Load()
-	to.windowBuffer.AppendOrUpdate(stream.TagSystemError, id, styles.Error.Render(msg))
+	to.windowBuffer.AppendOrUpdate("SE", id, styles.Error.Render(msg))
 }
 
 // WriteNotify writes a notification message to the display
 func (to *outputWriter) WriteNotify(msg string) {
 	id := to.generateWindowID()
 	styles := to.styles.Load()
-	to.windowBuffer.AppendOrUpdate(stream.TagSystemNotify, id, styles.System.Render(msg))
-	to.triggerUpdateForTag(stream.TagSystemNotify)
+	to.windowBuffer.AppendOrUpdate("SN", id, styles.System.Render(msg))
+	to.triggerUpdateForTag("SN")
 }
 
 // processBuffer parses TLV-encoded data from the buffer
@@ -156,18 +156,8 @@ func (to *outputWriter) writeColored(tag string, value string) {
 		to.windowBuffer.HandleFunctionResult(tr.ID, tr.Output, tr.Status)
 
 	// System tags
-	case stream.TagSystemError:
-		id := to.generateWindowID()
-		// Pass raw value - styling is applied during render
-		to.windowBuffer.AppendOrUpdate(tag, id, value)
-
-	case stream.TagSystemNotify:
-		id := to.generateWindowID()
-		// Pass raw value - styling is applied during render
-		to.windowBuffer.AppendOrUpdate(tag, id, value)
-
-	case stream.TagSystemData:
-		to.handleSystemTag(value)
+	case stream.TagSystemMsg:
+		to.handleSystemMsg(value)
 		return
 
 	// User text tag
@@ -188,22 +178,121 @@ func (to *outputWriter) triggerUpdateForTag(tag string) {
 	// Text content tags
 	case stream.TagAssistantT, stream.TagAssistantR, stream.TagUserT,
 		stream.TagAssistantF,
-		// System tags
-		stream.TagSystemError, stream.TagSystemNotify, stream.TagSystemData:
+		// System messages
+		stream.TagSystemMsg:
 		to.dirty.Store(true)
 	}
 }
 
-// handleSystemTag processes system information tags.
+// handleSystemMsg processes a TagSystemMsg frame.
 // Called from processBuffer which holds outputWriter.mu.
-// Delegates to sessionState for thread-safe field updates.
-func (to *outputWriter) handleSystemTag(value string) {
-	var info agentpkg.SystemInfo
-	if err := json.Unmarshal([]byte(value), &info); err != nil {
+func (to *outputWriter) handleSystemMsg(value string) {
+	var env struct {
+		Type string          `json:"type"`
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(value), &env); err != nil {
 		return
 	}
-	to.status.updateFromSystemInfo(info)
+	switch env.Type {
+	case "error":
+		to.handleSystemError(env.Data)
+	case "notify":
+		to.handleSystemNotify(env.Data)
+	case "task":
+		to.handleSystemTask(env.Data)
+	case "model":
+		to.handleSystemModel(env.Data)
+	case "model_list":
+		to.handleSystemModelList(env.Data)
+	case "theme":
+		to.handleSystemTheme(env.Data)
+	case "reasoning":
+		to.handleSystemReasoning(env.Data)
+	}
 	to.dirty.Store(true)
+}
+
+func (to *outputWriter) handleSystemError(data json.RawMessage) {
+	var m struct {
+		Text string `json:"text"`
+	}
+	if json.Unmarshal(data, &m) != nil {
+		return
+	}
+	id := to.generateWindowID()
+	styles := to.styles.Load()
+	to.windowBuffer.AppendOrUpdate("SE", id, styles.Error.Render(m.Text))
+}
+
+func (to *outputWriter) handleSystemNotify(data json.RawMessage) {
+	var m struct {
+		Text string `json:"text"`
+	}
+	if json.Unmarshal(data, &m) != nil {
+		return
+	}
+	id := to.generateWindowID()
+	styles := to.styles.Load()
+	to.windowBuffer.AppendOrUpdate("SN", id, styles.System.Render(m.Text))
+}
+
+func (to *outputWriter) handleSystemTask(data json.RawMessage) {
+	var m struct {
+		InProgress   bool  `json:"in_progress"`
+		CurrentStep  int   `json:"current_step"`
+		MaxSteps     int   `json:"max_steps"`
+		Context      int64 `json:"context"`
+		ContextLimit int64 `json:"context_limit"`
+		TaskError    bool  `json:"task_error"`
+		QueueItems   int   `json:"queue_items"`
+	}
+	if json.Unmarshal(data, &m) != nil {
+		return
+	}
+	to.status.updateTask(m.InProgress, m.CurrentStep, m.MaxSteps, m.Context, m.ContextLimit, m.TaskError, m.QueueItems)
+}
+
+func (to *outputWriter) handleSystemModel(data json.RawMessage) {
+	var m struct {
+		ActiveID   int    `json:"active_id"`
+		ActiveName string `json:"active_name"`
+	}
+	if json.Unmarshal(data, &m) != nil {
+		return
+	}
+	to.status.updateModel(m.ActiveID, m.ActiveName)
+}
+
+func (to *outputWriter) handleSystemModelList(data json.RawMessage) {
+	var m struct {
+		Models          []agentpkg.ModelInfo `json:"models"`
+		ModelConfigPath string               `json:"model_config_path"`
+	}
+	if json.Unmarshal(data, &m) != nil {
+		return
+	}
+	to.status.updateModelList(m.Models, m.ModelConfigPath)
+}
+
+func (to *outputWriter) handleSystemTheme(data json.RawMessage) {
+	var m struct {
+		Name string `json:"name"`
+	}
+	if json.Unmarshal(data, &m) != nil {
+		return
+	}
+	to.status.updateTheme(m.Name)
+}
+
+func (to *outputWriter) handleSystemReasoning(data json.RawMessage) {
+	var m struct {
+		Level int `json:"level"`
+	}
+	if json.Unmarshal(data, &m) != nil {
+		return
+	}
+	to.status.updateReasoning(m.Level)
 }
 
 // SnapshotStatus returns a consistent point-in-time view of session status.

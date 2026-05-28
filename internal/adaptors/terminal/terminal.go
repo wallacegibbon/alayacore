@@ -428,7 +428,7 @@ func (m *Terminal) updateStatus() {
 }
 
 // syncThemeFromSession checks if the session has reported a different active
-// theme (via SD/TagSystemData) and applies it visually if so.
+// theme and applies it visually if so.
 // This is the convergence point for both :theme_set and theme selector confirm.
 func (m *Terminal) syncThemeFromSession(sessionTheme string) {
 	if m.appliedTheme == sessionTheme || sessionTheme == "" {

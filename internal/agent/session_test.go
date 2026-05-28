@@ -430,12 +430,12 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 	session.ModelManager.models = append(session.ModelManager.models, testModel)
 
 	// Test 1: model_set should work when no task is running
-	session.handleModelSet([]string{"test-model-1"})
+	session.handleModelSet([]string{"1"})
 
 	// Check that the model was switched (no error should be in output)
 	foundError := false
 	for _, msg := range output.Messages {
-		if strings.Contains(msg, "error") || strings.Contains(msg, "Error") {
+		if strings.Contains(msg, `"type":"error"`) {
 			foundError = true
 			break
 		}
@@ -447,12 +447,12 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 	// Test 2: model_set should fail when task is running
 	output.Messages = nil // Clear previous messages
 	session.inProgress = true
-	session.handleModelSet([]string{"test-model-1"})
+	session.handleModelSet([]string{"1"})
 
 	// Check that the model was NOT switched (error should be in output)
 	foundError = false
 	for _, msg := range output.Messages {
-		if strings.Contains(msg, "Cannot switch model while a task is running") {
+		if strings.Contains(msg, `"type":"error"`) {
 			foundError = true
 			break
 		}
@@ -464,12 +464,12 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 	// Test 3: model_set should work again after task completes
 	output.Messages = nil // Clear previous messages
 	session.inProgress = false
-	session.handleModelSet([]string{"test-model-1"})
+	session.handleModelSet([]string{"1"})
 
 	// Check that the model was switched (no error should be in output)
 	foundError = false
 	for _, msg := range output.Messages {
-		if strings.Contains(msg, "error") || strings.Contains(msg, "Error") {
+		if strings.Contains(msg, `"type":"error"`) {
 			foundError = true
 			break
 		}

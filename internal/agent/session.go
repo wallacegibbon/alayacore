@@ -25,7 +25,7 @@ package agent
 //     infoUpdateCh               — task → run() (system-info refresh)
 //
 // Related files:
-//   - session_types.go — type definitions (Task, SystemInfo, SessionConfig, etc.)
+//   - session_types.go — type definitions (Task, SessionConfig, etc.)
 //   - session_event.go — TaskEvent types for actor model communication
 //   - session_model.go — model management, provider creation, reasoning level
 //   - session_task.go  — input processing, prompt execution, agent loop
@@ -93,7 +93,7 @@ type Session struct {
 
 	// modelsChanged is set to true when model data changes (switch, reload).
 	// sendSystemInfo() checks this flag to decide whether to include model
-	// fields in the SD JSON, avoiding redundant serialization of potentially
+	// fields in the TagSystemMsg, avoiding redundant serialization of potentially
 	// large model payloads on every status update.
 	modelsChanged bool
 

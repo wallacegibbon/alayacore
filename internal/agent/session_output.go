@@ -11,7 +11,6 @@ package agent
 import (
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/alayacore/alayacore/internal/stream"
 )
@@ -25,11 +24,11 @@ func (s *Session) signalPromptStart(prompt string) {
 }
 
 func (s *Session) writeError(msg string) {
-	s.writeTLVStr(stream.TagSystemError, msg)
+	_ = stream.WriteSystemMsg(s.Output, stream.ErrorMsg{Text: msg}) //nolint:errcheck
 }
 
 func (s *Session) writeNotify(msg string) {
-	s.writeTLVStr(stream.TagSystemNotify, msg)
+	_ = stream.WriteSystemMsg(s.Output, stream.NotifyMsg{Text: msg}) //nolint:errcheck
 }
 
 func (s *Session) writeNotifyf(format string, args ...any) {
@@ -105,63 +104,46 @@ func (s *Session) sendSystemInfo() {
 		return
 	}
 
-	// Only include model data when it has changed since the last broadcast.
-	// Models are large (all configured models with metadata) and change
-	// infrequently — skipping them on every status update saves bandwidth.
-	var models []ModelInfo
+	// Send task progress
+	_ = stream.WriteSystemMsg(s.Output, TaskMsg{ //nolint:errcheck
+		InProgress:   s.inProgress,
+		CurrentStep:  int(s.currentStep.Load()),
+		MaxSteps:     s.MaxSteps,
+		Context:      s.ContextTokens.Load(),
+		ContextLimit: s.ContextLimit,
+		TotalTokens:  s.TotalSpent.InputTokens + s.TotalSpent.OutputTokens,
+		TaskError:    s.pausedOnError.Load(),
+		QueueItems:   len(s.taskQueue),
+	})
+
+	// Send active model info (always)
 	var activeID int
 	var activeModelName string
-	var modelConfigPath string
-
-	if s.modelsChanged && s.ModelManager != nil {
-		models = s.ModelManager.GetModels()
+	if s.ModelManager != nil {
 		activeID = s.ModelManager.GetActiveID()
 		if activeModel := s.ModelManager.GetActive(); activeModel != nil {
 			activeModelName = activeModel.Name
 		}
-		modelConfigPath = s.ModelManager.GetFilePath()
+	}
+	_ = stream.WriteSystemMsg(s.Output, ModelMsg{ //nolint:errcheck
+		ActiveModelID:   activeID,
+		ActiveModelName: activeModelName,
+	})
+
+	// Send full model list only when changed
+	if s.modelsChanged && s.ModelManager != nil {
+		_ = stream.WriteSystemMsg(s.Output, ModelListMsg{ //nolint:errcheck
+			Models:          s.ModelManager.GetModels(),
+			ModelConfigPath: s.ModelManager.GetFilePath(),
+		})
 		s.modelsChanged = false
 	}
 
-	// taskQueue is owned by run() goroutine (or single-threaded during construction).
-	queueItems := make([]QueueItemInfo, len(s.taskQueue))
-	for i, item := range s.taskQueue {
-		var itemType, content string
-		switch t := item.Task.(type) {
-		case UserPrompt:
-			itemType = "prompt"
-			content = t.Text
-		case CommandPrompt:
-			itemType = "command"
-			content = t.Command
-		}
-		queueItems[i] = QueueItemInfo{
-			QueueID:   item.QueueID,
-			Type:      itemType,
-			Content:   content,
-			CreatedAt: item.CreatedAt.Format(time.RFC3339),
-		}
-	}
-
-	info := SystemInfo{
-		ContextTokens:   s.ContextTokens.Load(),
-		ContextLimit:    s.ContextLimit,
-		TotalTokens:     s.TotalSpent.InputTokens + s.TotalSpent.OutputTokens,
-		QueueItems:      queueItems,
-		InProgress:      s.inProgress,
-		CurrentStep:     int(s.currentStep.Load()),
-		MaxSteps:        s.MaxSteps,
-		TaskError:       s.pausedOnError.Load(),
-		Models:          models,
-		ActiveModelID:   activeID,
-		ActiveModelName: activeModelName,
-		ModelConfigPath: modelConfigPath,
-		ReasoningLevel:  int(s.reasoningLevel.Load()),
-	}
-
+	// Send theme
 	if s.RuntimeManager != nil {
-		info.ActiveTheme = s.RuntimeManager.GetActiveTheme()
+		_ = stream.WriteSystemMsg(s.Output, ThemeMsg{Name: s.RuntimeManager.GetActiveTheme()}) //nolint:errcheck
 	}
 
-	s.writeTLVJSON(stream.TagSystemData, info)
+	// Send reasoning level
+	_ = stream.WriteSystemMsg(s.Output, ReasoningMsg{Level: int(s.reasoningLevel.Load())}) //nolint:errcheck
 }

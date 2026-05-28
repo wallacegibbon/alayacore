@@ -7,6 +7,7 @@ package stream
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"io"
 	"sync"
 )
@@ -18,9 +19,7 @@ const (
 	TagUserT      = "UT" // User text input
 	TagUserF      = "UF" // JSON: id, output, status (function result)
 
-	TagSystemError  = "SE" // Error message string
-	TagSystemNotify = "SN" // Notification message string
-	TagSystemData   = "SD" // Complex data JSON (queue status, model info, etc.)
+	TagSystemMsg = "SM" // System message JSON: {"type":"...","data":{...}}
 )
 
 // SliceBuffer is an io.ReadWriteCloser that bridges slice-at-a-time writes
@@ -167,3 +166,46 @@ type ReasoningData struct {
 	Text      string `json:"text"`
 	Signature string `json:"signature,omitempty"`
 }
+
+// ============================================================================
+// TagSystemMsg (SM) — typed system messages
+// Wire format: {"type":"...","data":{...}}
+// ============================================================================
+
+// SystemMsg is implemented by all TagSystemMsg payloads.
+type SystemMsg interface {
+	SystemMsgType() string
+}
+
+// systemMsgEnvelope is the wire format for TagSystemMsg.
+type systemMsgEnvelope struct {
+	Type string          `json:"type"`
+	Data json.RawMessage `json:"data"`
+}
+
+// WriteSystemMsg marshals msg as a TagSystemMsg TLV frame.
+func WriteSystemMsg(w io.Writer, msg SystemMsg) error {
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	env, err := json.Marshal(systemMsgEnvelope{Type: msg.SystemMsgType(), Data: data})
+	if err != nil {
+		return err
+	}
+	return WriteTLV(w, TagSystemMsg, string(env))
+}
+
+// ErrorMsg is a system error message (type "error").
+type ErrorMsg struct {
+	Text string `json:"text"`
+}
+
+func (ErrorMsg) SystemMsgType() string { return "error" }
+
+// NotifyMsg is a system notification (type "notify").
+type NotifyMsg struct {
+	Text string `json:"text"`
+}
+
+func (NotifyMsg) SystemMsgType() string { return "notify" }

@@ -114,7 +114,7 @@ func TestWindow_PreservesLipglossColors(t *testing.T) {
 		},
 		{
 			name:            "system error gets styled",
-			tag:             stream.TagSystemError,
+			tag:             "SE",
 			content:         "Error occurred",
 			shouldHaveColor: true,
 		},

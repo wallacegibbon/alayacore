@@ -19,9 +19,7 @@
 //	  - TagAssistantR (AR): Reasoning/thinking content
 //	  - TagAssistantF (AF): Function lifecycle (JSON: id, type, name, input)
 //	  - TagUserF (UF): Function result (JSON: id, output, status)
-//	  - TagSystemError (SE): System error messages
-//	  - TagSystemNotify (SN): System notifications
-//	  - TagSystemData (SD): System data (JSON)
+//	  - TagSystemMsg (SM): System message (JSON: {"type":"...","data":{...}})
 //
 // Function Lifecycle:
 //

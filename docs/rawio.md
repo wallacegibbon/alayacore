@@ -33,13 +33,13 @@ See [TLV Protocol](adaptor-architecture.md#tlv-protocol) for full details.
 - All TLV-encoded messages from the session are written directly to
   stdout with no formatting, interpretation, or filtering.
 - The controlling process is responsible for parsing TLV frames from
-  stdout and handling any SE (system error) tags itself.
+  stdout and handling any TagSystemMsg with type "error" itself.
 - Stderr is reserved for error messages, logging, and diagnostics.
 
 ## Errors
 
 Rawio does not inspect or interpret TLV frames. If the session encounters
-an error, it emits an SE (TagSystemError) frame on stdout — the
+an error, it emits a TagSystemMsg with type "error" on stdout — the
 controlling process detects and handles it. The adaptor itself always
 exits with code `0` (or `1` on startup failure, e.g. no models
 configured).

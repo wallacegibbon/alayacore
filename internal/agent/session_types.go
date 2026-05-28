@@ -52,23 +52,54 @@ type QueueItemInfo struct {
 	CreatedAt string `json:"created_at"`
 }
 
-// SystemInfo holds session state for clients.
-type SystemInfo struct {
-	ContextTokens   int64           `json:"context"`
-	ContextLimit    int64           `json:"context_limit"`
-	TotalTokens     int64           `json:"total"`
-	QueueItems      []QueueItemInfo `json:"queue_items,omitempty"`
-	InProgress      bool            `json:"in_progress"`
-	CurrentStep     int             `json:"current_step,omitempty"`
-	MaxSteps        int             `json:"max_steps,omitempty"`
-	TaskError       bool            `json:"task_error,omitempty"`
-	Models          []ModelInfo     `json:"models,omitempty"`
-	ActiveModelID   int             `json:"active_model_id,omitempty"`
-	ActiveModelName string          `json:"active_model_name,omitempty"`
-	ModelConfigPath string          `json:"model_config_path,omitempty"`
-	ReasoningLevel  int             `json:"reasoning_level"`
-	ActiveTheme     string          `json:"active_theme,omitempty"`
+// ============================================================================
+// TagSystemMsg (SM) payload types
+// ============================================================================
+
+// TaskMsg carries task progress info (type "task").
+type TaskMsg struct {
+	InProgress   bool  `json:"in_progress"`
+	CurrentStep  int   `json:"current_step,omitempty"`
+	MaxSteps     int   `json:"max_steps,omitempty"`
+	Context      int64 `json:"context"`
+	ContextLimit int64 `json:"context_limit"`
+	TotalTokens  int64 `json:"total"`
+	TaskError    bool  `json:"task_error,omitempty"`
+	QueueItems   int   `json:"queue_items,omitempty"`
 }
+
+func (TaskMsg) SystemMsgType() string { return "task" }
+
+// ModelMsg carries active model info (type "model").
+type ModelMsg struct {
+	ActiveModelID   int    `json:"active_id"`
+	ActiveModelName string `json:"active_name"`
+}
+
+func (ModelMsg) SystemMsgType() string { return "model" }
+
+// ModelListMsg carries the full model list (type "model_list").
+// Only sent when models change.
+type ModelListMsg struct {
+	Models          []ModelInfo `json:"models"`
+	ModelConfigPath string      `json:"model_config_path,omitempty"`
+}
+
+func (ModelListMsg) SystemMsgType() string { return "model_list" }
+
+// ThemeMsg carries the active theme name (type "theme").
+type ThemeMsg struct {
+	Name string `json:"name"`
+}
+
+func (ThemeMsg) SystemMsgType() string { return "theme" }
+
+// ReasoningMsg carries the reasoning level (type "reasoning").
+type ReasoningMsg struct {
+	Level int `json:"level"`
+}
+
+func (ReasoningMsg) SystemMsgType() string { return "reasoning" }
 
 // SessionFileFormatVersion is the current version of the session file format.
 // Increment when making backward-incompatible changes to the session file structure.

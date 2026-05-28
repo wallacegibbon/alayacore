@@ -53,13 +53,13 @@ This is the **only** runtime channel. The session never calls adaptor methods, a
 
 ### Theme Persistence
 
-The session persists the active theme via `RuntimeManager` and communicates it to the terminal adaptor through TLV as part of `SystemInfo.ActiveTheme` (SD tag). The plainio and rawio adaptors ignore it since they have no visual rendering. On startup, the terminal reads the initial theme from the first `TagSystemData` message (defaulting to `"theme-dark"`).
+The session persists the active theme via `RuntimeManager` and communicates it to the terminal adaptor through TLV as a `TagSystemMsg` with type `"theme"`. The plainio and rawio adaptors ignore it since they have no visual rendering. On startup, the terminal reads the initial theme from the first `"theme"` message (defaulting to `"theme-dark"`).
 
 Theme changes flow through the session to keep a single source of truth:
 
 1. `:theme_set <name>` (typed by user) or theme selector confirm both send the command to the session
-2. Session persists the theme name via `RuntimeManager.SetActiveTheme()` and broadcasts the updated `SystemInfo` via an `SD` (TagSystemData) TLV message
-3. The terminal detects the `ActiveTheme` change in `updateStatus()` and calls `applyTheme()` to load the theme file and update all UI component styles
+2. Session persists the theme name via `RuntimeManager.SetActiveTheme()` and broadcasts the updated theme via a `TagSystemMsg` TLV message (`{"type":"theme","data":{"name":"..."}}`)
+3. The terminal detects the theme change in `updateStatus()` and calls `applyTheme()` to load the theme file and update all UI component styles
 
 This ensures both paths converge: the theme selector's live preview still applies themes directly for responsiveness, but the final commit always goes through the session.
 
@@ -100,9 +100,7 @@ AF and UF use JSON (not the delta format), since tool events are discrete, not s
 | `TagAssistantF` | AF | Function lifecycle: start/call (JSON) — pending inferred from lifecycle |
 | `TagUserT` | UT | User text input |
 | `TagUserF` | UF | Function result with status (JSON) |
-| `TagSystemError` | SE | System error messages |
-| `TagSystemNotify` | SN | System notifications |
-| `TagSystemData` | SD | System data (JSON) |
+| `TagSystemMsg` | SM | System message (JSON: {"type":"...","data":{...}}) |
 
 ### Function Lifecycle (AF + UF)
 

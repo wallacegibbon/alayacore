@@ -31,7 +31,7 @@ func NewAdaptor(cfg *app.Config) *Adaptor {
 // for Ctrl-C.
 //
 // plainio processes prompts one at a time. If a task produces an error
-// (SE tag), the remaining input is discarded and the process exits
+// (TagSystemMsg with type "error"), the remaining input is discarded and the process exits
 // with code 1 — queued tasks are NOT executed.
 func (a *Adaptor) Start() int {
 	output := newStdoutOutput()

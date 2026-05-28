@@ -1,11 +1,8 @@
 package terminal
 
 import (
-	"encoding/json"
 	"fmt"
 	"testing"
-
-	agentpkg "github.com/alayacore/alayacore/internal/agent"
 )
 
 func TestStatusBarShowsLastMaxStepsOnError(t *testing.T) {
@@ -13,22 +10,10 @@ func TestStatusBarShowsLastMaxStepsOnError(t *testing.T) {
 	out := NewTerminalOutput(DefaultStyles())
 
 	// Simulate task in progress with max steps = 50, current step = 2
-	systemInfoInProgress := agentpkg.SystemInfo{
-		InProgress:  true,
-		MaxSteps:    50,
-		CurrentStep: 2,
-	}
-	data := marshalSystemInfoForTerminalTest(t, systemInfoInProgress)
-	out.handleSystemTag(string(data))
+	out.handleSystemMsg(`{"type":"task","data":{"in_progress":true,"current_step":2,"max_steps":50,"context":0,"context_limit":0,"task_error":false,"queue_items":0}}`)
 
 	// Simulate task ending with error
-	systemInfoCompleted := agentpkg.SystemInfo{
-		InProgress: false,
-		MaxSteps:   50,
-		TaskError:  true,
-	}
-	data = marshalSystemInfoForTerminalTest(t, systemInfoCompleted)
-	out.handleSystemTag(string(data))
+	out.handleSystemMsg(`{"type":"task","data":{"in_progress":false,"current_step":50,"max_steps":50,"context":0,"context_limit":0,"task_error":true,"queue_items":0}}`)
 
 	// Create terminal with the output writer
 	styles := DefaultStyles()
@@ -60,13 +45,7 @@ func TestStatusBarShowsCurrentStepsDuringProgress(t *testing.T) {
 	out := NewTerminalOutput(DefaultStyles())
 
 	// Simulate task in progress
-	systemInfoInProgress := agentpkg.SystemInfo{
-		InProgress:  true,
-		MaxSteps:    20,
-		CurrentStep: 7,
-	}
-	data := marshalSystemInfoForTerminalTest(t, systemInfoInProgress)
-	out.handleSystemTag(string(data))
+	out.handleSystemMsg(`{"type":"task","data":{"in_progress":true,"current_step":7,"max_steps":20,"context":0,"context_limit":0,"task_error":false,"queue_items":0}}`)
 
 	// Create terminal with the output writer
 	styles := DefaultStyles()
@@ -91,16 +70,6 @@ func TestStatusBarShowsCurrentStepsDuringProgress(t *testing.T) {
 	if !containsSubstring(plain, expectedSubstring) {
 		t.Errorf("Expected status to contain %q, got %q", expectedSubstring, plain)
 	}
-}
-
-// Helper function to marshal SystemInfo to JSON
-func marshalSystemInfoForTerminalTest(t *testing.T, info agentpkg.SystemInfo) []byte {
-	t.Helper()
-	data, err := json.Marshal(info)
-	if err != nil {
-		t.Fatalf("Failed to marshal SystemInfo: %v", err)
-	}
-	return data
 }
 
 // Helper function to check if a string contains a substring

@@ -10,7 +10,6 @@ package terminal
 
 import (
 	"sync"
-	"time"
 
 	agentpkg "github.com/alayacore/alayacore/internal/agent"
 )
@@ -41,74 +40,71 @@ type sessionState struct {
 	// Queue items — set by handleSystemTag, cleared by GetQueueItems
 	pendingQueueItems []QueueItem
 
-	// Theme — active theme name broadcast by the session via SD (TagSystemData).
+	// Theme — active theme name broadcast by the session via TagSystemMsg.
 	// The terminal reads this in updateStatus() and applies the theme visually
 	// when it detects a change from the previously applied theme.
 	activeTheme string
 }
 
-// updateFromSystemInfo atomically updates all fields from a SystemInfo message.
-func (s *sessionState) updateFromSystemInfo(info agentpkg.SystemInfo) {
+// updateTask atomically updates task progress fields.
+func (s *sessionState) updateTask(inProgress bool, currentStep, maxSteps int, context, contextLimit int64, taskError bool, queueCount int) {
 	s.mu.Lock()
-	s.updateStepTracking(info)
-	s.updateModelState(info)
-	s.updateQueueItems(info)
-	s.currentStep = info.CurrentStep
-	s.maxSteps = info.MaxSteps
-	s.reasoningLevel = info.ReasoningLevel
-	s.activeTheme = info.ActiveTheme
-	s.mu.Unlock()
-}
-
-// updateStepTracking handles the step-info bookkeeping around task transitions.
-// Caller must hold s.mu.
-func (s *sessionState) updateStepTracking(info agentpkg.SystemInfo) {
 	// Save step info when task completes (transition from in-progress to done)
-	if s.inProgress && !info.InProgress && s.maxSteps > 0 {
+	if s.inProgress && !inProgress && s.maxSteps > 0 {
 		s.lastCurrentStep = s.currentStep
 		s.lastMaxSteps = s.maxSteps
-		s.lastTaskError = info.TaskError
+		s.lastTaskError = taskError
 	}
 	// Reset last step info when new task starts (transition from not-in-progress to in-progress)
-	if !s.inProgress && info.InProgress {
+	if !s.inProgress && inProgress {
 		s.lastCurrentStep = 0
 		s.lastMaxSteps = 0
 		s.lastTaskError = false
 	}
-	s.inProgress = info.InProgress
-	s.queueCount = len(info.QueueItems)
-	s.contextTokens = info.ContextTokens
-	s.contextLimit = info.ContextLimit
+	s.inProgress = inProgress
+	s.currentStep = currentStep
+	s.maxSteps = maxSteps
+	s.contextTokens = context
+	s.contextLimit = contextLimit
+	s.queueCount = queueCount
+	s.mu.Unlock()
 }
 
-// updateModelState updates cached model-related fields from SystemInfo.
-// Caller must hold s.mu.
-func (s *sessionState) updateModelState(info agentpkg.SystemInfo) {
-	if info.Models != nil {
-		s.models = info.Models
-		s.activeModelID = info.ActiveModelID
-		s.modelConfigPath = info.ModelConfigPath
-		s.activeModelName = info.ActiveModelName
-	}
+// updateModel atomically updates active model info.
+func (s *sessionState) updateModel(activeID int, activeName string) {
+	s.mu.Lock()
+	s.activeModelID = activeID
+	s.activeModelName = activeName
+	s.mu.Unlock()
 }
 
-// updateQueueItems converts and stores the queue items from SystemInfo.
-// Caller must hold s.mu.
-func (s *sessionState) updateQueueItems(info agentpkg.SystemInfo) {
-	items := make([]QueueItem, len(info.QueueItems))
-	for i, item := range info.QueueItems {
-		createdAt, err := time.Parse(time.RFC3339, item.CreatedAt)
-		if err != nil {
-			createdAt = time.Now()
-		}
-		items[i] = QueueItem{
-			QueueID:   item.QueueID,
-			Type:      item.Type,
-			Content:   item.Content,
-			CreatedAt: createdAt,
+// updateModelList atomically replaces the full model list.
+func (s *sessionState) updateModelList(models []agentpkg.ModelInfo, configPath string) {
+	s.mu.Lock()
+	s.models = models
+	s.modelConfigPath = configPath
+	// Also sync active name if models list provides it
+	for _, m := range models {
+		if m.ID == s.activeModelID {
+			s.activeModelName = m.Name
+			break
 		}
 	}
-	s.pendingQueueItems = items
+	s.mu.Unlock()
+}
+
+// updateTheme atomically updates the active theme.
+func (s *sessionState) updateTheme(name string) {
+	s.mu.Lock()
+	s.activeTheme = name
+	s.mu.Unlock()
+}
+
+// updateReasoning atomically updates the reasoning level.
+func (s *sessionState) updateReasoning(level int) {
+	s.mu.Lock()
+	s.reasoningLevel = level
+	s.mu.Unlock()
 }
 
 // snapshotStatus returns a consistent point-in-time view of session status.

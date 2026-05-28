@@ -14,11 +14,6 @@ import (
 	"github.com/alayacore/alayacore/internal/tools"
 )
 
-// systemInfo mirrors the SystemInfo JSON from the agent package.
-type systemInfo struct {
-	InProgress bool `json:"in_progress"`
-}
-
 // stdoutOutput implements io.Writer.
 // It parses TLV messages and prints human-readable text to stdout.
 //
@@ -59,7 +54,7 @@ func (o *stdoutOutput) ErrorChannel() <-chan struct{} {
 	return o.errorCh
 }
 
-// HasError returns true if any SE tag was ever received.
+// HasError returns true if any TagSystemMsg with type "error" was ever received.
 func (o *stdoutOutput) HasError() bool {
 	return o.hasError.Load()
 }
@@ -91,17 +86,8 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 		o.emitSeparator(tag)
 		fmt.Fprintf(o.writer, "> %s", value)
 
-	case stream.TagSystemError:
-		o.emitSeparator(tag)
-		fmt.Fprintf(o.writer, "[error: %s]", value)
-		o.hasError.Store(true)
-		if o.errorClosed.CompareAndSwap(false, true) {
-			close(o.errorCh)
-		}
-
-	case stream.TagSystemNotify:
-		o.emitSeparator(tag)
-		fmt.Fprintf(o.writer, "[%s]", value)
+	case stream.TagSystemMsg:
+		o.handleSystemMsg(value)
 
 	case stream.TagAssistantF:
 		if o.lastTag != "" {
@@ -117,9 +103,6 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 
 	case stream.TagUserF:
 		// Suppress tool result content in plainio; do not update lastTag.
-
-	case stream.TagSystemData:
-		o.handleSystemData(value)
 
 	default:
 		o.emitSeparator(tag)
@@ -255,16 +238,48 @@ func formatSearchContent(input string) string {
 	return fmt.Sprintf("[search_content: %s]", strings.Join(parts, ", "))
 }
 
-// handleSystemData detects task completion transitions and prints a trailing newline.
-func (o *stdoutOutput) handleSystemData(value string) {
-	var info systemInfo
-	if err := json.Unmarshal([]byte(value), &info); err != nil {
+// handleSystemMsg processes a TagSystemMsg frame.
+// It detects task completion transitions and prints a trailing newline.
+func (o *stdoutOutput) handleSystemMsg(value string) {
+	var env struct {
+		Type string          `json:"type"`
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(value), &env); err != nil {
 		return
 	}
-	if o.inProgress.Load() && !info.InProgress {
-		fmt.Fprintln(o.writer)
-		o.lastTag = ""
-		o.lastStreamID = ""
+	switch env.Type {
+	case "error":
+		var m struct {
+			Text string `json:"text"`
+		}
+		if json.Unmarshal(env.Data, &m) == nil {
+			o.emitSeparator("")
+			fmt.Fprintf(o.writer, "[error: %s]", m.Text)
+			o.hasError.Store(true)
+			if o.errorClosed.CompareAndSwap(false, true) {
+				close(o.errorCh)
+			}
+		}
+	case "notify":
+		var m struct {
+			Text string `json:"text"`
+		}
+		if json.Unmarshal(env.Data, &m) == nil {
+			o.emitSeparator("")
+			fmt.Fprintf(o.writer, "[%s]", m.Text)
+		}
+	case "task":
+		var m struct {
+			InProgress bool `json:"in_progress"`
+		}
+		if json.Unmarshal(env.Data, &m) == nil {
+			if o.inProgress.Load() && !m.InProgress {
+				fmt.Fprintln(o.writer)
+				o.lastTag = ""
+				o.lastStreamID = ""
+			}
+			o.inProgress.Store(m.InProgress)
+		}
 	}
-	o.inProgress.Store(info.InProgress)
 }
