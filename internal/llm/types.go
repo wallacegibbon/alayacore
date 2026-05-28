@@ -19,7 +19,26 @@ const (
 	RoleSystem    MessageRole = "system"
 	RoleUser      MessageRole = "user"
 	RoleAssistant MessageRole = "assistant"
-	RoleTool      MessageRole = "tool"
+
+	// RoleTool marks a message containing tool (function) results.
+	//
+	// It exists because OpenAI's wire format requires each tool result to be a
+	// separate message with its own tool_call_id:
+	//
+	//   {"role": "tool", "tool_call_id": "call_abc", "content": "result1"}
+	//   {"role": "tool", "tool_call_id": "call_def", "content": "result2"}
+	//
+	// The OpenAI converter (openai.go) uses RoleTool as an early-exit gate:
+	// it detects these messages by role, explodes their content parts into N
+	// individual wire messages, and skips the normal content conversion.
+	//
+	// Anthropic handles tool results differently — they are collapsed into a
+	// single "user" message whose content blocks carry the per-result data.
+	// The Anthropic converter (anthropic.go) maps RoleTool → "user" on the wire.
+	//
+	// Without a dedicated role, every message would need content-type sniffing
+	// to decide whether to split (OpenAI) or collapse (Anthropic).
+	RoleTool MessageRole = "tool"
 )
 
 // ContentPart represents a part of message content
