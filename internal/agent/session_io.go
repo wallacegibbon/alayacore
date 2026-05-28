@@ -77,7 +77,7 @@ func (s *Session) cancelAllTasks() {
 	// Clear paused-on-error state so the queue can resume if needed
 	s.pausedOnError.Store(false)
 
-	s.sendSystemInfo()
+	s.sendSystemInfo("task")
 }
 
 func (s *Session) handleContinue(ctx context.Context, messages []llm.Message, args []string) []llm.Message {
@@ -269,12 +269,12 @@ func (s *Session) handleModelLoad() {
 
 	s.initModelManager()
 	s.modelsChanged = true
-	s.sendSystemInfo()
+	s.sendSystemInfo("model")
 	s.writeNotify("Models reloaded from configuration file")
 }
 
 func (s *Session) handleTaskQueueGetAll() {
-	s.sendSystemInfo()
+	s.sendSystemInfo("task")
 }
 
 func (s *Session) handleTaskQueueDel(args []string) {
@@ -285,7 +285,7 @@ func (s *Session) handleTaskQueueDel(args []string) {
 
 	queueID := args[0]
 	if s.DeleteQueueItem(queueID) {
-		s.sendSystemInfo()
+		s.sendSystemInfo("task")
 	} else {
 		s.writeError(domainerrors.Wrapf("taskqueue_del", domainerrors.ErrQueueItemNotFound, "queue item %s not found", queueID).Error())
 	}
@@ -300,7 +300,7 @@ func (s *Session) handleTaskQueueEdit(args []string) {
 	queueID := args[0]
 	newContent := strings.Join(args[1:], " ")
 	if s.UpdateQueueItem(queueID, newContent) {
-		s.sendSystemInfo()
+		s.sendSystemInfo("task")
 	} else {
 		s.writeError(domainerrors.Wrapf("taskqueue_edit", domainerrors.ErrQueueItemNotFound, "queue item %s not found", queueID).Error())
 	}
@@ -341,8 +341,7 @@ func (s *Session) handleThemeSet(args []string) {
 		_ = s.RuntimeManager.SetActiveTheme(name) //nolint:errcheck // best-effort save, errors ignored
 	}
 	s.writeNotifyf("Theme set to: %s", name)
-	s.themeChanged = true
-	s.sendSystemInfo()
+	s.sendSystemInfo("theme")
 }
 
 // resendPrompt resends the conversation history to the LLM.

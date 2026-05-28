@@ -76,7 +76,7 @@ func (s *Session) enqueueTask(task Task, front bool) {
 		s.taskQueue = append(s.taskQueue, item)
 	}
 
-	s.sendSystemInfo()
+	s.sendSystemInfo("task")
 }
 
 // ============================================================================

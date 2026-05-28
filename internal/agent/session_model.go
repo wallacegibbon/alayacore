@@ -26,7 +26,7 @@ func (s *Session) SwitchModel(modelConfig *ModelConfig) error {
 	}
 	s.applyModelContextLimit(modelConfig)
 	s.modelsChanged = true
-	s.sendSystemInfo()
+	s.sendSystemInfo("model")
 	return nil
 }
 
@@ -152,7 +152,6 @@ func (s *Session) applyModelContextLimit(model *ModelConfig) {
 // See config.ReasoningLevelOff, config.ReasoningLevelNormal, config.ReasoningLevelMax.
 func (s *Session) SetReasoningLevel(level int) {
 	s.reasoningLevel.Store(int64(level))
-	s.reasoningChanged = true
 	if s.inProgress {
 		// Defer provider sync to next step boundary
 		s.reasoningDirty.Store(true)
@@ -161,7 +160,7 @@ func (s *Session) SetReasoningLevel(level int) {
 			(*p).SetReasoningLevel(level)
 		}
 	}
-	s.sendSystemInfo()
+	s.sendSystemInfo("reasoning")
 }
 
 func createProviderFromConfig(config *ModelConfig, debugAPI bool, proxyURL string) (llm.Provider, error) {

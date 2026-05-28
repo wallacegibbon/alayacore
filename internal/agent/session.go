@@ -88,19 +88,14 @@ type Session struct {
 
 	// infoUpdateCh is a buffered channel (capacity 1) used by the task
 	// goroutine to request a system-info update from the run() goroutine.
+	// The value ("task", "model", "theme", "reasoning", "all") tells the
+	// run goroutine which messages to send, avoiding redundant broadcasts.
 	// This centralizes all sendSystemInfo calls in one place.
-	infoUpdateCh chan struct{}
+	infoUpdateCh chan string
 
 	// modelsChanged is set to true when model data changes (switch, reload).
-	// sendSystemInfo() checks this flag to decide whether to include model
-	// fields in the TagSystemMsg, avoiding redundant serialization of potentially
-	// large model payloads on every status update.
+	// Cleared after the model list is sent to the adaptor.
 	modelsChanged bool
-
-	// Dirty flags for per-message throttling in sendSystemInfo.
-	// Set true when the corresponding value changes, cleared after sending.
-	themeChanged     bool
-	reasoningChanged bool
 
 	sessionCtx    context.Context    // canceled when input is exhausted
 	sessionCancel context.CancelFunc // idempotent cancel
@@ -163,7 +158,7 @@ func NewSession(cfg SessionConfig) *Session {
 		stateCh:        make(chan TaskEvent, 64),
 		taskResult:     make(chan []llm.Message, 1),
 		taskCancelCh:   make(chan struct{}, 1),
-		infoUpdateCh:   make(chan struct{}, 1),
+		infoUpdateCh:   make(chan string, 1),
 		sessionCtx:     sessionCtx,
 		sessionCancel:  sessionCancel,
 		runDone:        make(chan struct{}),
@@ -172,9 +167,7 @@ func NewSession(cfg SessionConfig) *Session {
 	s.initModelManager()
 	s.applyModelOverride()
 	s.modelsChanged = true
-	s.themeChanged = true
-	s.reasoningChanged = true
-	s.sendSystemInfo()
+	s.sendSystemInfo("all")
 	return s
 }
 
@@ -193,7 +186,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 		stateCh:        make(chan TaskEvent, 64),
 		taskResult:     make(chan []llm.Message, 1),
 		taskCancelCh:   make(chan struct{}, 1),
-		infoUpdateCh:   make(chan struct{}, 1),
+		infoUpdateCh:   make(chan string, 1),
 		sessionCtx:     sessionCtx,
 		sessionCancel:  sessionCancel,
 		runDone:        make(chan struct{}),
@@ -220,9 +213,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 	}
 
 	s.modelsChanged = true
-	s.themeChanged = true
-	s.reasoningChanged = true
-	s.sendSystemInfo()
+	s.sendSystemInfo("all")
 
 	// Send TLV chunks directly to output (avoids reconstruction)
 	for _, chunk := range data.TLVChunks {

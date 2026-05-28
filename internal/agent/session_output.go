@@ -88,23 +88,40 @@ func (s *Session) writeToolOutput(toolCallID string, output string, status strin
 // System Info Broadcasting
 // ============================================================================
 
-// requestSystemInfo signals the run() goroutine to broadcast system info.
+// requestSystemInfo signals the run() goroutine to broadcast task info.
 // Non-blocking — if a signal is already pending, this is a no-op.
 // Called from the task goroutine whenever state changes that should be
 // reflected in the UI (step boundaries, errors, etc.).
 func (s *Session) requestSystemInfo() {
 	select {
-	case s.infoUpdateCh <- struct{}{}:
+	case s.infoUpdateCh <- "task":
 	default:
 	}
 }
 
-func (s *Session) sendSystemInfo() {
+func (s *Session) sendSystemInfo(kind string) {
 	if s.Output == nil {
 		return
 	}
 
-	// Send task progress
+	switch kind {
+	case "all":
+		s.sendTaskMsg()
+		s.sendModelMsgs()
+		s.sendThemeMsg()
+		s.sendReasoningMsg()
+	case "task":
+		s.sendTaskMsg()
+	case "model":
+		s.sendModelMsgs()
+	case "theme":
+		s.sendThemeMsg()
+	case "reasoning":
+		s.sendReasoningMsg()
+	}
+}
+
+func (s *Session) sendTaskMsg() {
 	_ = stream.WriteSystemMsg(s.Output, TaskMsg{ //nolint:errcheck
 		InProgress:   s.inProgress,
 		CurrentStep:  int(s.currentStep.Load()),
@@ -115,8 +132,9 @@ func (s *Session) sendSystemInfo() {
 		TaskError:    s.pausedOnError.Load(),
 		QueueItems:   len(s.taskQueue),
 	})
+}
 
-	// Send active model + full model list only when changed
+func (s *Session) sendModelMsgs() {
 	if s.modelsChanged && s.ModelManager != nil {
 		activeID := s.ModelManager.GetActiveID()
 		activeName := ""
@@ -133,16 +151,14 @@ func (s *Session) sendSystemInfo() {
 		})
 		s.modelsChanged = false
 	}
+}
 
-	// Send theme only when changed
-	if s.themeChanged && s.RuntimeManager != nil {
+func (s *Session) sendThemeMsg() {
+	if s.RuntimeManager != nil {
 		_ = stream.WriteSystemMsg(s.Output, ThemeMsg{Name: s.RuntimeManager.GetActiveTheme()}) //nolint:errcheck
-		s.themeChanged = false
 	}
+}
 
-	// Send reasoning level only when changed
-	if s.reasoningChanged {
-		_ = stream.WriteSystemMsg(s.Output, ReasoningMsg{Level: int(s.reasoningLevel.Load())}) //nolint:errcheck
-		s.reasoningChanged = false
-	}
+func (s *Session) sendReasoningMsg() {
+	_ = stream.WriteSystemMsg(s.Output, ReasoningMsg{Level: int(s.reasoningLevel.Load())}) //nolint:errcheck
 }

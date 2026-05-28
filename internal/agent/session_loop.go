@@ -77,8 +77,8 @@ func (s *Session) run() {
 		case result := <-s.taskResult:
 			s.handleTaskDone(result)
 
-		case <-s.infoUpdateCh:
-			s.sendSystemInfo()
+		case kind := <-s.infoUpdateCh:
+			s.sendSystemInfo(kind)
 
 		case <-s.sessionCtx.Done():
 			return
@@ -145,7 +145,7 @@ func (s *Session) handleTaskDone(result []llm.Message) {
 		}
 	}
 
-	s.sendSystemInfo()
+	s.sendSystemInfo("task")
 }
 
 // drainUntilTaskDone processes task events and completion signals until the
@@ -160,8 +160,8 @@ func (s *Session) drainUntilTaskDone() {
 		case result := <-s.taskResult:
 			s.handleTaskDone(result)
 			return
-		case <-s.infoUpdateCh:
-			s.sendSystemInfo()
+		case kind := <-s.infoUpdateCh:
+			s.sendSystemInfo(kind)
 		case <-s.sessionCtx.Done():
 			return
 		}
