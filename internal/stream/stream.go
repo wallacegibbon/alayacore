@@ -146,11 +146,10 @@ func (n *NopOutput) Write(p []byte) (int, error) {
 //	"start" — tool name known, input placeholder
 //	"call"  — full tool input available
 type FunctionData struct {
-	ID     string `json:"id"`
-	Type   string `json:"type"`
-	Name   string `json:"name,omitempty"`
-	Input  string `json:"input,omitempty"`
-	Status string `json:"status,omitempty"`
+	ID    string `json:"id"`
+	Type  string `json:"type"`
+	Name  string `json:"name,omitempty"`
+	Input string `json:"input,omitempty"`
 }
 
 // ToolResultData is the JSON payload for TagFunctionResult (UF).

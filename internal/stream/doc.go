@@ -17,7 +17,7 @@
 //	  - TagTextUser (UT): User text input
 //	  - TagTextAssistant (AT): Assistant text output
 //	  - TagTextReasoning (AR): Reasoning/thinking content
-//	  - TagFunction (AF): Function lifecycle (JSON: id, type, name, input, status)
+//	  - TagFunction (AF): Function lifecycle (JSON: id, type, name, input)
 //	  - TagFunctionResult (UF): Function result (JSON: id, output, status)
 //	  - TagSystemError (SE): System error messages
 //	  - TagSystemNotify (SN): System notifications
