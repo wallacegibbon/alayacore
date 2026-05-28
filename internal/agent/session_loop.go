@@ -113,7 +113,7 @@ func (s *Session) tryStartNextTask() bool {
 	if errMsg := s.ensureAgentInitialized(); errMsg != "" {
 		s.writeError(errMsg)
 		s.inProgress = false
-		s.requestSystemInfo()
+		s.sendSystemInfo("task")
 		return false
 	}
 

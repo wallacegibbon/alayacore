@@ -77,7 +77,7 @@ func (s *Session) cancelAllTasks() {
 	// Clear paused-on-error state so the queue can resume if needed
 	s.pausedOnError.Store(false)
 
-	s.sendSystemInfo("task")
+	s.requestSystemInfo()
 }
 
 func (s *Session) handleContinue(ctx context.Context, messages []llm.Message, args []string) []llm.Message {

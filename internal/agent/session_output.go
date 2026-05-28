@@ -99,6 +99,10 @@ func (s *Session) requestSystemInfo() {
 	}
 }
 
+// sendSystemInfo sends one or more TagSystemMsg frames to the adaptor.
+// kind selects which messages to send: "task", "model", "theme",
+// "reasoning", or "all".
+// Must only be called from the run() goroutine.
 func (s *Session) sendSystemInfo(kind string) {
 	if s.Output == nil {
 		return
