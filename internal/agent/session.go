@@ -93,10 +93,6 @@ type Session struct {
 	// This centralizes all sendSystemInfo calls in one place.
 	infoUpdateCh chan string
 
-	// modelsChanged is set to true when model data changes (switch, reload).
-	// Cleared after the model list is sent to the adaptor.
-	modelsChanged bool
-
 	sessionCtx    context.Context    // canceled when input is exhausted
 	sessionCancel context.CancelFunc // idempotent cancel
 	runDone       chan struct{}      // closed when run() exits
@@ -166,7 +162,6 @@ func NewSession(cfg SessionConfig) *Session {
 	s.reasoningLevel.Store(int64(config.DefaultReasoningLevel))
 	s.initModelManager()
 	s.applyModelOverride()
-	s.modelsChanged = true
 	s.sendSystemInfo("all")
 	return s
 }
@@ -212,7 +207,6 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 		s.applyModelContextLimit(model)
 	}
 
-	s.modelsChanged = true
 	s.sendSystemInfo("all")
 
 	// Send TLV chunks directly to output (avoids reconstruction)

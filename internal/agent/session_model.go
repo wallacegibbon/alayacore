@@ -25,7 +25,6 @@ func (s *Session) SwitchModel(modelConfig *ModelConfig) error {
 		return err
 	}
 	s.applyModelContextLimit(modelConfig)
-	s.modelsChanged = true
 	s.sendSystemInfo("model")
 	return nil
 }

@@ -135,22 +135,22 @@ func (s *Session) sendTaskMsg() {
 }
 
 func (s *Session) sendModelMsgs() {
-	if s.modelsChanged && s.ModelManager != nil {
-		activeID := s.ModelManager.GetActiveID()
-		activeName := ""
-		if activeModel := s.ModelManager.GetActive(); activeModel != nil {
-			activeName = activeModel.Name
-		}
-		_ = stream.WriteSystemMsg(s.Output, ModelMsg{ //nolint:errcheck
-			ActiveModelID:   activeID,
-			ActiveModelName: activeName,
-		})
-		_ = stream.WriteSystemMsg(s.Output, ModelListMsg{ //nolint:errcheck
-			Models:          s.ModelManager.GetModels(),
-			ModelConfigPath: s.ModelManager.GetFilePath(),
-		})
-		s.modelsChanged = false
+	if s.ModelManager == nil {
+		return
 	}
+	activeID := s.ModelManager.GetActiveID()
+	activeName := ""
+	if activeModel := s.ModelManager.GetActive(); activeModel != nil {
+		activeName = activeModel.Name
+	}
+	_ = stream.WriteSystemMsg(s.Output, ModelMsg{ //nolint:errcheck
+		ActiveModelID:   activeID,
+		ActiveModelName: activeName,
+	})
+	_ = stream.WriteSystemMsg(s.Output, ModelListMsg{ //nolint:errcheck
+		Models:          s.ModelManager.GetModels(),
+		ModelConfigPath: s.ModelManager.GetFilePath(),
+	})
 }
 
 func (s *Session) sendThemeMsg() {
