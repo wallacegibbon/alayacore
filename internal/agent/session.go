@@ -128,7 +128,8 @@ func (s *Session) ModelConfigPath() string {
 // ============================================================================
 
 // LoadOrNewSession loads a session from file or creates a new one.
-// Returns an error if the session file exists but has an incompatible version.
+// Returns an error if the session file exists but has an incompatible version
+// (version must match SessionFileFormatVersion exactly).
 // The returned session is ready to use but NOT yet started —
 // call Start() to begin processing input.
 func LoadOrNewSession(cfg SessionConfig) (*Session, string, error) {
@@ -136,7 +137,7 @@ func LoadOrNewSession(cfg SessionConfig) (*Session, string, error) {
 	if cfg.SessionFile != "" {
 		if data, err := LoadSession(cfg.SessionFile); err == nil {
 			return RestoreFromSession(cfg, data), cfg.SessionFile, nil
-		} else if errors.Is(err, ErrSessionVersionTooLow) {
+		} else if errors.Is(err, ErrSessionVersionMismatch) {
 			return nil, "", err
 		}
 	}

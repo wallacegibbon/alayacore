@@ -17,9 +17,9 @@ import (
 	"github.com/alayacore/alayacore/internal/stream"
 )
 
-// ErrSessionVersionTooLow is returned when a session file has a version
-// lower than SessionFileFormatVersion and cannot be loaded.
-var ErrSessionVersionTooLow = errors.New("session file version is too old and cannot be loaded")
+// ErrSessionVersionMismatch is returned when a session file has a version
+// that does not match SessionFileFormatVersion and cannot be loaded.
+var ErrSessionVersionMismatch = errors.New("session file version mismatch")
 
 // ============================================================================
 // Load/Save
@@ -174,15 +174,15 @@ func parseFrontmatter(content string) (frontmatter, body string, err error) {
 }
 
 // parseSessionMeta parses key-value pairs from frontmatter into SessionMeta using struct tags.
-// Returns an error if the session file version is missing or too low.
+// Returns an error if the session file version does not match SessionFileFormatVersion.
 func parseSessionMeta(frontmatter string) (SessionMeta, error) {
 	var meta SessionMeta
 	config.ParseKeyValue(frontmatter, &meta)
 
-	// Check session file format version.
-	if meta.Version < SessionFileFormatVersion {
-		return meta, fmt.Errorf("%w: got version %d, need version >= %d",
-			ErrSessionVersionTooLow, meta.Version, SessionFileFormatVersion)
+	// Check session file format version — must match exactly.
+	if meta.Version != SessionFileFormatVersion {
+		return meta, fmt.Errorf("%w: got %d, expected %d",
+			ErrSessionVersionMismatch, meta.Version, SessionFileFormatVersion)
 	}
 
 	// Default reasoning_level to 1 (normal) when the key is absent from the

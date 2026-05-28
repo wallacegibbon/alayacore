@@ -820,9 +820,9 @@ func TestLoadSessionInvalidReasoningLevel(t *testing.T) {
 	}
 }
 
-// TestLoadSessionVersionTooLow verifies that a session file with a missing or
-// too-low version is rejected with ErrSessionVersionTooLow.
-func TestLoadSessionVersionTooLow(t *testing.T) {
+// TestLoadSessionVersionMismatch verifies that a session file with a missing or
+// non-matching version is rejected with ErrSessionVersionMismatch.
+func TestLoadSessionVersionMismatch(t *testing.T) {
 	tests := []struct {
 		name    string
 		raw     string
@@ -831,12 +831,12 @@ func TestLoadSessionVersionTooLow(t *testing.T) {
 		{
 			name:    "missing version",
 			raw:     "---\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\n---\n",
-			wantErr: ErrSessionVersionTooLow,
+			wantErr: ErrSessionVersionMismatch,
 		},
 		{
 			name:    "version zero",
 			raw:     "---\nversion: 0\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\n---\n",
-			wantErr: ErrSessionVersionTooLow,
+			wantErr: ErrSessionVersionMismatch,
 		},
 	}
 
@@ -868,9 +868,9 @@ func TestLoadSessionVersionValid(t *testing.T) {
 	}
 }
 
-// TestLoadOrNewSessionVersionTooLow verifies that LoadOrNewSession returns an
-// error when the session file has an incompatible version.
-func TestLoadOrNewSessionVersionTooLow(t *testing.T) {
+// TestLoadOrNewSessionVersionMismatch verifies that LoadOrNewSession returns an
+// error when the session file has a non-matching version.
+func TestLoadOrNewSessionVersionMismatch(t *testing.T) {
 	tmpDir := t.TempDir()
 	sessionPath := filepath.Join(tmpDir, "old-session.md")
 
@@ -887,7 +887,7 @@ func TestLoadOrNewSessionVersionTooLow(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for old session file, got nil")
 	}
-	if !errors.Is(err, ErrSessionVersionTooLow) {
-		t.Errorf("expected ErrSessionVersionTooLow, got %v", err)
+	if !errors.Is(err, ErrSessionVersionMismatch) {
+		t.Errorf("expected ErrSessionVersionMismatch, got %v", err)
 	}
 }
