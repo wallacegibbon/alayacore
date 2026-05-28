@@ -152,7 +152,7 @@ func handleCommandCancellation(stdout, stderr *bytes.Buffer, exitCode int) llm.T
 	output := formatCommandOutput(stdout, stderr, exitCode)
 
 	if len(output) > maxCommandOutput {
-		return handleLargeCommandOutput(output, exitCode, nil)
+		return handleLargeCommandOutput(output, exitCode, fmt.Errorf("canceled"))
 	}
 
 	if output != "" {
@@ -165,7 +165,7 @@ func handleCommandTimeout(stdout, stderr *bytes.Buffer, exitCode int) llm.ToolRe
 	output := formatCommandOutput(stdout, stderr, exitCode)
 
 	if len(output) > maxCommandOutput {
-		return handleLargeCommandOutput(output, exitCode, nil)
+		return handleLargeCommandOutput(output, exitCode, fmt.Errorf("timed out"))
 	}
 
 	if output != "" {
