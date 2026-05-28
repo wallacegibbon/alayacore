@@ -116,22 +116,17 @@ func (s *Session) sendSystemInfo() {
 		QueueItems:   len(s.taskQueue),
 	})
 
-	// Send active model info (always — small payload)
-	var activeID int
-	var activeModelName string
-	if s.ModelManager != nil {
-		activeID = s.ModelManager.GetActiveID()
-		if activeModel := s.ModelManager.GetActive(); activeModel != nil {
-			activeModelName = activeModel.Name
-		}
-	}
-	_ = stream.WriteSystemMsg(s.Output, ModelMsg{ //nolint:errcheck
-		ActiveModelID:   activeID,
-		ActiveModelName: activeModelName,
-	})
-
-	// Send full model list only when changed
+	// Send active model + full model list only when changed
 	if s.modelsChanged && s.ModelManager != nil {
+		activeID := s.ModelManager.GetActiveID()
+		activeName := ""
+		if activeModel := s.ModelManager.GetActive(); activeModel != nil {
+			activeName = activeModel.Name
+		}
+		_ = stream.WriteSystemMsg(s.Output, ModelMsg{ //nolint:errcheck
+			ActiveModelID:   activeID,
+			ActiveModelName: activeName,
+		})
 		_ = stream.WriteSystemMsg(s.Output, ModelListMsg{ //nolint:errcheck
 			Models:          s.ModelManager.GetModels(),
 			ModelConfigPath: s.ModelManager.GetFilePath(),
