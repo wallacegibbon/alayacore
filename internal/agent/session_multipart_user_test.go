@@ -80,9 +80,9 @@ func TestConsecutiveUserChunksGrouped(t *testing.T) {
 
 	// Build TLV body with two UT chunks followed by one AT chunk
 	var body string
-	body += string(stream.EncodeTLV(stream.TagTextUser, "Hello"))
-	body += string(stream.EncodeTLV(stream.TagTextUser, " world"))
-	body += string(stream.EncodeTLV(stream.TagTextAssistant, "Hi there"))
+	body += string(stream.EncodeTLV(stream.TagUserT, "Hello"))
+	body += string(stream.EncodeTLV(stream.TagUserT, " world"))
+	body += string(stream.EncodeTLV(stream.TagAssistantT, "Hi there"))
 
 	loaded, err := parseSessionMarkdown(append(raw, body...))
 	if err != nil {

@@ -25,7 +25,7 @@ func TestWindowBuffer(t *testing.T) {
 
 	t.Run("append creates new window", func(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
-		wb.AppendOrUpdate(stream.TagTextAssistant, "window-1", "Hello")
+		wb.AppendOrUpdate(stream.TagAssistantT, "window-1", "Hello")
 
 		if wb.WindowCount() != 1 {
 			t.Fatalf("len(Windows) = %d, want 1", wb.WindowCount())
@@ -37,8 +37,8 @@ func TestWindowBuffer(t *testing.T) {
 
 	t.Run("update appends to existing window", func(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
-		wb.AppendOrUpdate(stream.TagTextAssistant, "window-1", "Hello")
-		wb.AppendOrUpdate(stream.TagTextAssistant, "window-1", " World")
+		wb.AppendOrUpdate(stream.TagAssistantT, "window-1", "Hello")
+		wb.AppendOrUpdate(stream.TagAssistantT, "window-1", " World")
 
 		if wb.WindowCount() != 1 {
 			t.Fatalf("len(Windows) = %d, want 1", wb.WindowCount())
@@ -53,9 +53,9 @@ func TestWindowBuffer(t *testing.T) {
 
 	t.Run("multiple windows", func(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
-		wb.AppendOrUpdate(stream.TagTextAssistant, "window-1", "First")
-		wb.AppendOrUpdate(stream.TagTextAssistant, "window-2", "Second")
-		wb.AppendOrUpdate(stream.TagTextAssistant, "window-3", "Third")
+		wb.AppendOrUpdate(stream.TagAssistantT, "window-1", "First")
+		wb.AppendOrUpdate(stream.TagAssistantT, "window-2", "Second")
+		wb.AppendOrUpdate(stream.TagAssistantT, "window-3", "Third")
 
 		if wb.WindowCount() != 3 {
 			t.Fatalf("len(Windows) = %d, want 3", wb.WindowCount())
@@ -68,12 +68,12 @@ func TestWindowBuffer(t *testing.T) {
 			t.Errorf("GetWindowCount() = %d, want 0", wb.GetWindowCount())
 		}
 
-		wb.AppendOrUpdate(stream.TagTextAssistant, "window-1", "First")
+		wb.AppendOrUpdate(stream.TagAssistantT, "window-1", "First")
 		if wb.GetWindowCount() != 1 {
 			t.Errorf("GetWindowCount() = %d, want 1", wb.GetWindowCount())
 		}
 
-		wb.AppendOrUpdate(stream.TagTextAssistant, "window-2", "Second")
+		wb.AppendOrUpdate(stream.TagAssistantT, "window-2", "Second")
 		if wb.GetWindowCount() != 2 {
 			t.Errorf("GetWindowCount() = %d, want 2", wb.GetWindowCount())
 		}
@@ -89,7 +89,7 @@ func TestWindowBuffer(t *testing.T) {
 
 	t.Run("get all returns content", func(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
-		wb.AppendOrUpdate(stream.TagTextAssistant, "window-1", "Hello")
+		wb.AppendOrUpdate(stream.TagAssistantT, "window-1", "Hello")
 		content := wb.GetAll(-1)
 		if content == "" {
 			t.Error("GetAll() should not be empty")
@@ -100,8 +100,8 @@ func TestWindowBuffer(t *testing.T) {
 		// DeleteWindow is not exposed on WindowBuffer
 		// This test verifies the buffer structure is correct
 		wb := NewWindowBuffer(80, DefaultStyles())
-		wb.AppendOrUpdate(stream.TagTextAssistant, "window-1", "First")
-		wb.AppendOrUpdate(stream.TagTextAssistant, "window-2", "Second")
+		wb.AppendOrUpdate(stream.TagAssistantT, "window-1", "First")
+		wb.AppendOrUpdate(stream.TagAssistantT, "window-2", "Second")
 
 		if wb.WindowCount() != 2 {
 			t.Fatalf("len(Windows) = %d, want 2", wb.WindowCount())
@@ -118,7 +118,7 @@ func TestWindowBufferViewport(t *testing.T) {
 
 	t.Run("get total lines virtual", func(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
-		wb.AppendOrUpdate(stream.TagTextAssistant, "window-1", strings.Repeat("line\n", 10))
+		wb.AppendOrUpdate(stream.TagAssistantT, "window-1", strings.Repeat("line\n", 10))
 		// Should return total lines
 		lines := wb.GetTotalLines()
 		if lines <= 0 {
@@ -302,10 +302,10 @@ func TestWindowBufferDiff(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
 
 		// Create windows for different tag types
-		wb.AppendOrUpdate(stream.TagTextUser, "user-1", "User message")
-		wb.AppendOrUpdate(stream.TagTextAssistant, "assistant-1", "Assistant message")
+		wb.AppendOrUpdate(stream.TagUserT, "user-1", "User message")
+		wb.AppendOrUpdate(stream.TagAssistantT, "assistant-1", "Assistant message")
 		wb.HandleFunctionEvent(stream.FunctionData{ID: "tool-1", Type: "call", Name: "test_tool", Input: "Tool output"})
-		wb.AppendOrUpdate(stream.TagTextReasoning, "reasoning-1", "Reasoning content")
+		wb.AppendOrUpdate(stream.TagAssistantR, "reasoning-1", "Reasoning content")
 
 		// User and Assistant should NOT be folded (show full content)
 		if wb.WindowAt(0).Folded {
@@ -341,7 +341,7 @@ func TestWindowBufferVisibility(t *testing.T) {
 
 	t.Run("delta window with content is visible", func(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
-		wb.AppendOrUpdate(stream.TagTextAssistant, "delta-1", "Hello")
+		wb.AppendOrUpdate(stream.TagAssistantT, "delta-1", "Hello")
 
 		if wb.WindowCount() != 1 {
 			t.Fatalf("len(Windows) = %d, want 1", wb.WindowCount())
@@ -353,7 +353,7 @@ func TestWindowBufferVisibility(t *testing.T) {
 
 	t.Run("delta window with only whitespace is not visible", func(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
-		wb.AppendOrUpdate(stream.TagTextAssistant, "delta-1", "   \n\t  ")
+		wb.AppendOrUpdate(stream.TagAssistantT, "delta-1", "   \n\t  ")
 
 		if wb.WindowCount() != 1 {
 			t.Fatalf("len(Windows) = %d, want 1", wb.WindowCount())
@@ -365,7 +365,7 @@ func TestWindowBufferVisibility(t *testing.T) {
 
 	t.Run("delta window with empty content is not visible", func(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
-		wb.AppendOrUpdate(stream.TagTextAssistant, "delta-1", "")
+		wb.AppendOrUpdate(stream.TagAssistantT, "delta-1", "")
 
 		if wb.WindowCount() != 1 {
 			t.Fatalf("len(Windows) = %d, want 1", wb.WindowCount())
@@ -379,13 +379,13 @@ func TestWindowBufferVisibility(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
 
 		// Start with whitespace-only content
-		wb.AppendOrUpdate(stream.TagTextAssistant, "delta-1", "\n\n")
+		wb.AppendOrUpdate(stream.TagAssistantT, "delta-1", "\n\n")
 		if wb.WindowAt(0).Visible {
 			t.Error("Delta window with only newlines should NOT be visible initially")
 		}
 
 		// Add actual content
-		wb.AppendOrUpdate(stream.TagTextAssistant, "delta-1", "Hello")
+		wb.AppendOrUpdate(stream.TagAssistantT, "delta-1", "Hello")
 		if !wb.WindowAt(0).Visible {
 			t.Error("Delta window should become visible when non-whitespace content is added")
 		}
@@ -395,19 +395,19 @@ func TestWindowBufferVisibility(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
 
 		// Start with whitespace
-		wb.AppendOrUpdate(stream.TagTextAssistant, "delta-1", "  \n  ")
+		wb.AppendOrUpdate(stream.TagAssistantT, "delta-1", "  \n  ")
 		if wb.WindowAt(0).Visible {
 			t.Error("Delta window with only whitespace should NOT be visible")
 		}
 
 		// Add more whitespace - still not visible
-		wb.AppendOrUpdate(stream.TagTextAssistant, "delta-1", "\t")
+		wb.AppendOrUpdate(stream.TagAssistantT, "delta-1", "\t")
 		if wb.WindowAt(0).Visible {
 			t.Error("Delta window should still not be visible with only whitespace")
 		}
 
 		// Add actual content
-		wb.AppendOrUpdate(stream.TagTextAssistant, "delta-1", "World")
+		wb.AppendOrUpdate(stream.TagAssistantT, "delta-1", "World")
 		if !wb.WindowAt(0).Visible {
 			t.Error("Delta window should be visible after adding non-whitespace")
 		}
@@ -423,10 +423,10 @@ func TestWindowBufferVisibility(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
 
 		// Create visible and non-visible windows
-		wb.AppendOrUpdate(stream.TagTextAssistant, "delta-1", "\n\n")  // Not visible
-		wb.AppendOrUpdate(stream.TagTextAssistant, "delta-2", "Hello") // Visible
-		wb.AppendOrUpdate(stream.TagTextAssistant, "delta-3", "  ")    // Not visible
-		wb.AppendOrUpdate(stream.TagTextAssistant, "delta-4", "World") // Visible
+		wb.AppendOrUpdate(stream.TagAssistantT, "delta-1", "\n\n")  // Not visible
+		wb.AppendOrUpdate(stream.TagAssistantT, "delta-2", "Hello") // Visible
+		wb.AppendOrUpdate(stream.TagAssistantT, "delta-3", "  ")    // Not visible
+		wb.AppendOrUpdate(stream.TagAssistantT, "delta-4", "World") // Visible
 
 		rendered := wb.GetAll(-1)
 
@@ -449,8 +449,8 @@ func TestWindowBufferVisibility(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
 
 		// Create visible and non-visible windows
-		wb.AppendOrUpdate(stream.TagTextAssistant, "delta-1", "Hello\nWorld") // Visible, 2 lines
-		wb.AppendOrUpdate(stream.TagTextAssistant, "delta-2", "\n\n\n")       // Not visible
+		wb.AppendOrUpdate(stream.TagAssistantT, "delta-1", "Hello\nWorld") // Visible, 2 lines
+		wb.AppendOrUpdate(stream.TagAssistantT, "delta-2", "\n\n\n")       // Not visible
 
 		lines := wb.GetTotalLines()
 		// Only delta-1 contributes to total lines (plus border = ~4 lines)
@@ -467,7 +467,7 @@ func TestWindowBufferVisibility(t *testing.T) {
 
 	t.Run("user message windows follow same visibility rules", func(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
-		wb.AppendOrUpdate(stream.TagTextUser, "user-1", "  ") // whitespace only
+		wb.AppendOrUpdate(stream.TagUserT, "user-1", "  ") // whitespace only
 
 		// User messages are delta windows (not tool windows), so they follow the same visibility rules
 		if wb.WindowAt(0).Visible {
@@ -475,7 +475,7 @@ func TestWindowBufferVisibility(t *testing.T) {
 		}
 
 		// But should become visible when actual content is added
-		wb.AppendOrUpdate(stream.TagTextUser, "user-1", "Hello")
+		wb.AppendOrUpdate(stream.TagUserT, "user-1", "Hello")
 		if !wb.WindowAt(0).Visible {
 			t.Error("User message window should be visible when it has non-whitespace content")
 		}

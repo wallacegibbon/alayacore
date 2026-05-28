@@ -109,7 +109,7 @@ func contains(s, substr string) bool {
 }
 
 func TestOutputWriterToolCallStartThenFull(t *testing.T) {
-	// End-to-end test: write TagFunction TLVs through the actual
+	// End-to-end test: write TagAssistantF TLVs through the actual
 	// outputWriter pipeline (Write → processBuffer → writeColored → HandleFunctionEvent).
 	out := NewTerminalOutput(NewStyles(theme.DefaultTheme()))
 	out.SetWindowWidth(80)
@@ -121,7 +121,7 @@ func TestOutputWriterToolCallStartThenFull(t *testing.T) {
 			Name:  name,
 			Input: input,
 		})
-		return stream.EncodeTLV(stream.TagFunction, string(fd))
+		return stream.EncodeTLV(stream.TagAssistantF, string(fd))
 	}
 
 	// 1. Simulate ToolCallStart: type "start" with placeholder JSON input

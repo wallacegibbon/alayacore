@@ -44,8 +44,8 @@
 // Communication Protocol:
 //
 //	Adaptors communicate with Session via TLV (Tag-Length-Value) streams:
-//	  - Input: TagTextUser for prompts and commands
-//	  - Output: TagTextAssistant, TagTextReasoning, TagFunction, etc.
+//	  - Input: TagUserT for prompts and commands
+//	  - Output: TagAssistantT, TagAssistantR, TagAssistantF, etc.
 //
 // Key Components:
 //

@@ -285,16 +285,16 @@ func (w *Window) styleContent(content string, styles *Styles) string {
 
 	// Apply styling based on tag
 	switch w.Tag {
-	case stream.TagFunction:
+	case stream.TagAssistantF:
 		prefix := w.Status.Indicator(styles)
 		return prefix + ColorizeTool(content, styles)
-	case stream.TagFunctionResult:
+	case stream.TagUserF:
 		return styleMultiline(content, styles.Text)
-	case stream.TagTextAssistant:
+	case stream.TagAssistantT:
 		return styleMultiline(content, styles.Text)
-	case stream.TagTextReasoning:
+	case stream.TagAssistantR:
 		return styleMultiline(content, styles.Reasoning)
-	case stream.TagTextUser:
+	case stream.TagUserT:
 		return styles.Prompt.Render("> ") + styles.UserInput.Render(content)
 	case stream.TagSystemError:
 		return styleMultiline(content, styles.Error)

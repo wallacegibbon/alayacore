@@ -81,9 +81,9 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 		for _, part := range msg.Content {
 			switch p := part.(type) {
 			case llm.TextPart:
-				tag := stream.TagTextUser
+				tag := stream.TagUserT
 				if msg.Role == llm.RoleAssistant {
-					tag = stream.TagTextAssistant
+					tag = stream.TagAssistantT
 				}
 				writeTLV(&binaryBuf, tag, p.Text)
 
@@ -98,9 +98,9 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 					if err != nil {
 						return nil, fmt.Errorf("failed to marshal reasoning: %w", err)
 					}
-					writeTLV(&binaryBuf, stream.TagTextReasoning, string(jsonData))
+					writeTLV(&binaryBuf, stream.TagAssistantR, string(jsonData))
 				} else {
-					writeTLV(&binaryBuf, stream.TagTextReasoning, p.Text)
+					writeTLV(&binaryBuf, stream.TagAssistantR, p.Text)
 				}
 
 			case llm.ToolCallPart:
@@ -114,7 +114,7 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 				if err != nil {
 					return nil, fmt.Errorf("failed to marshal tool call: %w", err)
 				}
-				writeTLV(&binaryBuf, stream.TagFunction, string(jsonData))
+				writeTLV(&binaryBuf, stream.TagAssistantF, string(jsonData))
 
 			case llm.ToolResultPart:
 				status := "success" //nolint:goconst // pre-existing, used across agent pkg
@@ -130,7 +130,7 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 				if err != nil {
 					return nil, fmt.Errorf("failed to marshal tool result: %w", err)
 				}
-				writeTLV(&binaryBuf, stream.TagFunctionResult, string(jsonData))
+				writeTLV(&binaryBuf, stream.TagUserF, string(jsonData))
 			}
 		}
 	}
@@ -287,19 +287,19 @@ func parseMessagesTLV(body string) ([]llm.Message, []TLVChunk, error) {
 		var msgRole llm.MessageRole
 
 		switch tag {
-		case stream.TagTextUser:
+		case stream.TagUserT:
 			msgRole = llm.RoleUser
 			msgPart = llm.TextPart{Type: "text", Text: string(content)}
 
-		case stream.TagTextAssistant:
+		case stream.TagAssistantT:
 			// Do NOT force newMessage: an assistant message may start with
-			// TagTextReasoning or TagFunction; the text part belongs in
+			// TagAssistantR or TagAssistantF; the text part belongs in
 			// the same message.  A new message is still created when
 			// currentMsg is nil or the role doesn't match.
 			msgRole = llm.RoleAssistant
 			msgPart = llm.TextPart{Type: "text", Text: string(content)}
 
-		case stream.TagTextReasoning:
+		case stream.TagAssistantR:
 			msgRole = llm.RoleAssistant
 			// Try JSON format first (with signature), fall back to plain text
 			var rd stream.ReasoningData
@@ -313,8 +313,8 @@ func parseMessagesTLV(body string) ([]llm.Message, []TLVChunk, error) {
 				msgPart = llm.ReasoningPart{Type: llm.ContentPartReasoning, Text: string(content)}
 			}
 
-		case stream.TagFunction:
-			// TagFunction (AF) is the current format.
+		case stream.TagAssistantF:
+			// TagAssistantF (AF) is the current format.
 			msgRole = llm.RoleAssistant
 			var fd stream.FunctionData
 			if err := json.Unmarshal(content, &fd); err != nil {
@@ -331,7 +331,7 @@ func parseMessagesTLV(body string) ([]llm.Message, []TLVChunk, error) {
 				Input:      json.RawMessage(fd.Input),
 			}
 
-		case stream.TagFunctionResult:
+		case stream.TagUserF:
 			msgRole = llm.RoleTool
 			var tr stream.ToolResultData
 			if err := json.Unmarshal(content, &tr); err != nil {

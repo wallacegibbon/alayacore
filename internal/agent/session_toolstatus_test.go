@@ -21,8 +21,8 @@ func TestWriteToolOutput(t *testing.T) {
 
 	// Parse the written data to extract TLV
 	tag, value := parseTLVFromBytes(output.data)
-	if tag != stream.TagFunctionResult {
-		t.Errorf("Expected tag %s, got %s", stream.TagFunctionResult, tag)
+	if tag != stream.TagUserF {
+		t.Errorf("Expected tag %s, got %s", stream.TagUserF, tag)
 	}
 
 	var got stream.ToolResultData
@@ -38,8 +38,8 @@ func TestWriteToolOutput(t *testing.T) {
 	session.writeToolOutput("tool456", "error message", "failed")
 
 	tag, value = parseTLVFromBytes(output.data)
-	if tag != stream.TagFunctionResult {
-		t.Errorf("Expected tag %s, got %s", stream.TagFunctionResult, tag)
+	if tag != stream.TagUserF {
+		t.Errorf("Expected tag %s, got %s", stream.TagUserF, tag)
 	}
 
 	if err := json.Unmarshal([]byte(value), &got); err != nil {
@@ -97,8 +97,8 @@ func TestOnToolResultCallback(t *testing.T) {
 
 	// Check that TLV was sent
 	tag, value := parseTLVFromBytes(output.data)
-	if tag != stream.TagFunctionResult {
-		t.Errorf("Expected tag %s, got %s", stream.TagFunctionResult, tag)
+	if tag != stream.TagUserF {
+		t.Errorf("Expected tag %s, got %s", stream.TagUserF, tag)
 	}
 
 	var got stream.ToolResultData
@@ -117,8 +117,8 @@ func TestOnToolResultCallback(t *testing.T) {
 	}
 
 	tag, value = parseTLVFromBytes(output.data)
-	if tag != stream.TagFunctionResult {
-		t.Errorf("Expected tag %s, got %s", stream.TagFunctionResult, tag)
+	if tag != stream.TagUserF {
+		t.Errorf("Expected tag %s, got %s", stream.TagUserF, tag)
 	}
 
 	if err := json.Unmarshal([]byte(value), &got); err != nil {
@@ -143,8 +143,8 @@ func TestWriteToolCallWithPending(t *testing.T) {
 
 	// Parse the message (tool call display)
 	tag1, value1 := parseTLVFromBytes(output.data)
-	if tag1 != stream.TagFunction {
-		t.Errorf("Expected tag %s, got %s", stream.TagFunction, tag1)
+	if tag1 != stream.TagAssistantF {
+		t.Errorf("Expected tag %s, got %s", stream.TagAssistantF, tag1)
 	}
 
 	// The tool call should be JSON with id, type, name, input

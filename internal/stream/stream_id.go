@@ -18,7 +18,7 @@ import (
 //
 // The id string itself follows the convention:
 //
-//	"<promptID>-<step>"
+//	"<promptID>|<step>"
 
 // NewStreamID constructs a stream ID string from components.
 func NewStreamID(promptID uint64, step int) string {

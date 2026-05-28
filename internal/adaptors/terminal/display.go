@@ -504,7 +504,7 @@ func (m *DisplayModel) findClosestVisibleWindow(viewportTop, viewportBottom, vie
 }
 
 // MoveWindowCursorToNextUserPrompt moves the window cursor forward (down) to
-// the next visible window whose tag is TagTextUser ("UT"). Returns false if
+// the next visible window whose tag is TagUserT ("UT"). Returns false if
 // no such window exists below the current cursor.
 func (m *DisplayModel) MoveWindowCursorToNextUserPrompt() bool {
 	if m.windowBuffer.GetWindowCount() == 0 {
@@ -513,7 +513,7 @@ func (m *DisplayModel) MoveWindowCursorToNextUserPrompt() bool {
 
 	found := false
 	m.windowBuffer.ForEachVisible(m.windowCursor+1, func(i int, w *Window) bool {
-		if w.Tag == stream.TagTextUser {
+		if w.Tag == stream.TagUserT {
 			m.setCursor(i)
 			found = true
 			return false
@@ -525,7 +525,7 @@ func (m *DisplayModel) MoveWindowCursorToNextUserPrompt() bool {
 }
 
 // MoveWindowCursorToPrevUserPrompt moves the window cursor backward (up) to
-// the previous visible window whose tag is TagTextUser ("UT"). Returns false
+// the previous visible window whose tag is TagUserT ("UT"). Returns false
 // if no such window exists above the current cursor.
 func (m *DisplayModel) MoveWindowCursorToPrevUserPrompt() bool {
 	if m.windowBuffer.GetWindowCount() == 0 {
@@ -534,7 +534,7 @@ func (m *DisplayModel) MoveWindowCursorToPrevUserPrompt() bool {
 
 	found := false
 	m.windowBuffer.ForEachVisibleBackward(m.windowCursor-1, func(i int, w *Window) bool {
-		if w.Tag == stream.TagTextUser {
+		if w.Tag == stream.TagUserT {
 			m.setCursor(i)
 			found = true
 			return false

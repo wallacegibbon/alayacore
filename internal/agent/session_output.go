@@ -21,7 +21,7 @@ import (
 // ============================================================================
 
 func (s *Session) signalPromptStart(prompt string) {
-	s.writeTLVStr(stream.TagTextUser, prompt)
+	s.writeTLVStr(stream.TagUserT, prompt)
 }
 
 func (s *Session) writeError(msg string) {
@@ -58,7 +58,7 @@ func (s *Session) writeTLVJSON(tag string, v any) {
 }
 
 func (s *Session) writeToolCall(toolName, input, id string) {
-	s.writeTLVJSON(stream.TagFunction, stream.FunctionData{
+	s.writeTLVJSON(stream.TagAssistantF, stream.FunctionData{
 		ID:    id,
 		Type:  "call",
 		Name:  toolName,
@@ -70,7 +70,7 @@ func (s *Session) writeToolCall(toolName, input, id string) {
 // The full input is written later by writeToolCall when all
 // arguments have been received.
 func (s *Session) writeToolCallStart(toolName, id string) {
-	s.writeTLVJSON(stream.TagFunction, stream.FunctionData{
+	s.writeTLVJSON(stream.TagAssistantF, stream.FunctionData{
 		ID:   id,
 		Type: "start",
 		Name: toolName,
@@ -78,7 +78,7 @@ func (s *Session) writeToolCallStart(toolName, id string) {
 }
 
 func (s *Session) writeToolOutput(toolCallID string, output string, status string) {
-	s.writeTLVJSON(stream.TagFunctionResult, stream.ToolResultData{
+	s.writeTLVJSON(stream.TagUserF, stream.ToolResultData{
 		ID:     toolCallID,
 		Output: output,
 		Status: status,

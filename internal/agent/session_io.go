@@ -413,7 +413,7 @@ func (s *Session) inputPump(msgCh chan<- inputMsg) {
 			close(msgCh)
 			return
 		}
-		if tag != stream.TagTextUser {
+		if tag != stream.TagUserT {
 			s.writeError(domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag, "invalid input tag: %s", tag).Error())
 			continue
 		}

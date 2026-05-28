@@ -17,34 +17,34 @@ func TestEncodeTLV(t *testing.T) {
 	}{
 		{
 			name:    "simple message",
-			tag:     TagTextUser,
+			tag:     TagUserT,
 			value:   "Hello, World!",
 			wantLen: 6 + 13, // 6 header + 13 value
-			wantTag: TagTextUser,
+			wantTag: TagUserT,
 			wantVal: "Hello, World!",
 		},
 		{
 			name:    "empty value",
-			tag:     TagTextAssistant,
+			tag:     TagAssistantT,
 			value:   "",
 			wantLen: 6, // just header
-			wantTag: TagTextAssistant,
+			wantTag: TagAssistantT,
 			wantVal: "",
 		},
 		{
 			name:    "unicode value",
-			tag:     TagTextUser,
+			tag:     TagUserT,
 			value:   "你好世界 🌍",
 			wantLen: 6 + len("你好世界 🌍"), // 6 header + actual byte length
-			wantTag: TagTextUser,
+			wantTag: TagUserT,
 			wantVal: "你好世界 🌍",
 		},
 		{
 			name:    "long message",
-			tag:     TagTextReasoning,
+			tag:     TagAssistantR,
 			value:   string(make([]byte, 1000)),
 			wantLen: 6 + 1000,
-			wantTag: TagTextReasoning,
+			wantTag: TagAssistantR,
 			wantVal: string(make([]byte, 1000)),
 		},
 	}
@@ -99,7 +99,7 @@ func TestSliceBuffer(t *testing.T) {
 		input := NewSliceBuffer(10)
 
 		// Emit TLV message
-		err := WriteTLV(input, TagTextUser, "Hello")
+		err := WriteTLV(input, TagUserT, "Hello")
 		if err != nil {
 			t.Fatalf("EmitTLV() error = %v", err)
 		}
@@ -109,8 +109,8 @@ func TestSliceBuffer(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ReadTLV() error = %v", err)
 		}
-		if tag != TagTextUser {
-			t.Errorf("ReadTLV() tag = %q, want %q", tag, TagTextUser)
+		if tag != TagUserT {
+			t.Errorf("ReadTLV() tag = %q, want %q", tag, TagUserT)
 		}
 		if value != "Hello" {
 			t.Errorf("ReadTLV() value = %q, want %q", value, "Hello")
@@ -141,9 +141,9 @@ func TestSliceBuffer(t *testing.T) {
 			tag   string
 			value string
 		}{
-			{TagTextUser, "first"},
-			{TagTextAssistant, "second"},
-			{TagTextReasoning, "third"},
+			{TagUserT, "first"},
+			{TagAssistantT, "second"},
+			{TagAssistantR, "third"},
 		}
 
 		// Emit all messages
@@ -173,7 +173,7 @@ func TestWriteTLV(t *testing.T) {
 		buf := &bytes.Buffer{}
 		output := &bufferOutput{buf}
 
-		err := WriteTLV(output, TagTextUser, "test message")
+		err := WriteTLV(output, TagUserT, "test message")
 		if err != nil {
 			t.Fatalf("error = %v", err)
 		}
@@ -183,8 +183,8 @@ func TestWriteTLV(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ReadTLV() error = %v", err)
 		}
-		if tag != TagTextUser {
-			t.Errorf("tag = %q, want %q", tag, TagTextUser)
+		if tag != TagUserT {
+			t.Errorf("tag = %q, want %q", tag, TagUserT)
 		}
 		if value != "test message" {
 			t.Errorf("value = %q, want %q", value, "test message")

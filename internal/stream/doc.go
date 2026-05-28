@@ -14,22 +14,22 @@
 //	  [2-byte tag][4-byte length (big-endian)][value bytes]
 //
 //	Tag values are 2-character strings:
-//	  - TagTextUser (UT): User text input
-//	  - TagTextAssistant (AT): Assistant text output
-//	  - TagTextReasoning (AR): Reasoning/thinking content
-//	  - TagFunction (AF): Function lifecycle (JSON: id, type, name, input)
-//	  - TagFunctionResult (UF): Function result (JSON: id, output, status)
+//	  - TagUserT (UT): User text input
+//	  - TagAssistantT (AT): Assistant text output
+//	  - TagAssistantR (AR): Reasoning/thinking content
+//	  - TagAssistantF (AF): Function lifecycle (JSON: id, type, name, input)
+//	  - TagUserF (UF): Function result (JSON: id, output, status)
 //	  - TagSystemError (SE): System error messages
 //	  - TagSystemNotify (SN): System notifications
 //	  - TagSystemData (SD): System data (JSON)
 //
 // Function Lifecycle:
 //
-// The TagFunction tag (AF) carries a JSON payload with a type discriminator:
+// The TagAssistantF tag (AF) carries a JSON payload with a type discriminator:
 //   - `{"id":"tool123","type":"start","name":"read_file"}` — tool name known
 //   - `{"id":"tool123","type":"call","name":"read_file","input":"..."}` — full input
 //
-// TagFunctionResult (UF) carries the final output and status:
+// TagUserF (UF) carries the final output and status:
 //   - `{"id":"tool123","output":"...","status":"success"}` — execution succeeded
 //   - `{"id":"tool123","output":"...","status":"failed"}` — execution failed
 //
@@ -59,11 +59,11 @@
 //	input := stream.NewSliceBuffer(10)
 //
 //	// Emit a TLV message
-//	stream.WriteTLV(input, stream.TagTextUser, "Hello, AI!")
+//	stream.WriteTLV(input, stream.TagUserT, "Hello, AI!")
 //
 //	// Read TLV from input (io.Reader)
 //	tag, value, err := stream.ReadTLV(input)
 //
 //	// Write TLV to output
-//	stream.WriteTLV(output, stream.TagTextAssistant, "Hello, human!")
+//	stream.WriteTLV(output, stream.TagAssistantT, "Hello, human!")
 package stream

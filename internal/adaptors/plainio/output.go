@@ -84,10 +84,10 @@ func (o *stdoutOutput) printMessage(tag string, value string) {
 
 func (o *stdoutOutput) handleTag(tag, value string) {
 	switch tag {
-	case stream.TagTextAssistant, stream.TagTextReasoning:
+	case stream.TagAssistantT, stream.TagAssistantR:
 		o.handleTextDelta(tag, value)
 
-	case stream.TagTextUser:
+	case stream.TagUserT:
 		o.emitSeparator(tag)
 		fmt.Fprintf(o.writer, "> %s", value)
 
@@ -103,7 +103,7 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 		o.emitSeparator(tag)
 		fmt.Fprintf(o.writer, "[%s]", value)
 
-	case stream.TagFunction:
+	case stream.TagAssistantF:
 		if o.lastTag != "" {
 			fmt.Fprintln(o.writer)
 		}
@@ -115,7 +115,7 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 		}
 		fmt.Fprintf(o.writer, "%s", formatToolCall(fd.Name, fd.Input))
 
-	case stream.TagFunctionResult:
+	case stream.TagUserF:
 		// Suppress tool result content in plainio; do not update lastTag.
 
 	case stream.TagSystemData:
@@ -137,7 +137,7 @@ func (o *stdoutOutput) handleTextDelta(tag, value string) {
 	streamKey := tag + id
 	// When id is "" (replayed from session file, no NUL prefix),
 	// we just track it as-is — no stream transition to detect.
-	if o.lastTag != "" && (o.lastTag != stream.TagTextAssistant && o.lastTag != stream.TagTextReasoning) {
+	if o.lastTag != "" && (o.lastTag != stream.TagAssistantT && o.lastTag != stream.TagAssistantR) {
 		// Transitioning from a different tag group → separator
 		fmt.Fprintln(o.writer)
 	} else if o.lastStreamID != "" && streamKey != o.lastStreamID {

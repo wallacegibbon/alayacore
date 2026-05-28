@@ -117,7 +117,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 	switch tag {
 	// Text content tags — may carry NUL-delimited stream ID for live deltas,
 	// or plain text when replayed from a saved session file.
-	case stream.TagTextAssistant, stream.TagTextReasoning:
+	case stream.TagAssistantT, stream.TagAssistantR:
 		id, content, ok := stream.UnwrapDelta(value)
 		if !ok {
 			// No stream ID (e.g. replayed from session file) — each message
@@ -129,7 +129,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 		to.windowBuffer.AppendOrUpdate(tag, id, content)
 
 	// Function lifecycle (JSON: id, type, name, input, status)
-	case stream.TagFunction:
+	case stream.TagAssistantF:
 		var fd stream.FunctionData
 		if err := json.Unmarshal([]byte(value), &fd); err != nil {
 			return
@@ -148,7 +148,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 		to.windowBuffer.HandleFunctionEvent(fd)
 
 	// Function result (JSON: id, output, status)
-	case stream.TagFunctionResult:
+	case stream.TagUserF:
 		var tr stream.ToolResultData
 		if err := json.Unmarshal([]byte(value), &tr); err != nil {
 			return
@@ -171,7 +171,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 		return
 
 	// User text tag
-	case stream.TagTextUser:
+	case stream.TagUserT:
 		id := to.generateWindowID()
 		// Pass raw value - styling is applied during render
 		to.windowBuffer.AppendOrUpdate(tag, id, value)
@@ -186,8 +186,8 @@ func (to *outputWriter) writeColored(tag string, value string) {
 func (to *outputWriter) triggerUpdateForTag(tag string) {
 	switch tag {
 	// Text content tags
-	case stream.TagTextAssistant, stream.TagTextReasoning, stream.TagTextUser,
-		stream.TagFunction,
+	case stream.TagAssistantT, stream.TagAssistantR, stream.TagUserT,
+		stream.TagAssistantF,
 		// System tags
 		stream.TagSystemError, stream.TagSystemNotify, stream.TagSystemData:
 		to.dirty.Store(true)

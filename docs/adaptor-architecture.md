@@ -93,16 +93,16 @@ AF and UF use JSON (not the delta format), since tool events are discrete, not s
 
 ### Tags
 
-| Tag | Code | Direction | Description |
-|-----|------|-----------|-------------|
-| `TagTextUser` | UT | Input | User text input |
-| `TagTextAssistant` | AT | Output | Assistant text output |
-| `TagTextReasoning` | AR | Output | Reasoning/thinking content |
-| `TagFunction` | AF | Output | Function lifecycle: start/call (JSON) — pending inferred from lifecycle |
-| `TagFunctionResult` | UF | Output | Function result with status (JSON) |
-| `TagSystemError` | SE | Output | System error messages |
-| `TagSystemNotify` | SN | Output | System notifications |
-| `TagSystemData` | SD | Output | System data (JSON) |
+| Tag | Code | Description |
+|-----|------|-------------|
+| `TagAssistantR` | AR | Reasoning/thinking content |
+| `TagAssistantT` | AT | Assistant text output |
+| `TagAssistantF` | AF | Function lifecycle: start/call (JSON) — pending inferred from lifecycle |
+| `TagUserT` | UT | User text input |
+| `TagUserF` | UF | Function result with status (JSON) |
+| `TagSystemError` | SE | System error messages |
+| `TagSystemNotify` | SN | System notifications |
+| `TagSystemData` | SD | System data (JSON) |
 
 ### Function Lifecycle (AF + UF)
 

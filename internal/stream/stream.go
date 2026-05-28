@@ -12,12 +12,11 @@ import (
 )
 
 const (
-	TagTextUser      = "UT" // User text input
-	TagTextAssistant = "AT" // Assistant text output
-	TagTextReasoning = "AR" // Reasoning/thinking content
-
-	TagFunction       = "AF" // JSON: id, type, name, input, status (function lifecycle)
-	TagFunctionResult = "UF" // JSON: id, output, status            (function result)
+	TagAssistantR = "AR" // Reasoning/thinking content
+	TagAssistantT = "AT" // Assistant text output
+	TagAssistantF = "AF" // JSON: id, type, name, input, status (function arguments)
+	TagUserT      = "UT" // User text input
+	TagUserF      = "UF" // JSON: id, output, status (function result)
 
 	TagSystemError  = "SE" // Error message string
 	TagSystemNotify = "SN" // Notification message string
@@ -140,7 +139,7 @@ func (n *NopOutput) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// FunctionData is the JSON payload for TagFunction (AF).
+// FunctionData is the JSON payload for TagAssistantF (AF).
 // Type discriminator:
 //
 //	"start" — tool name known, input placeholder
@@ -152,7 +151,7 @@ type FunctionData struct {
 	Input string `json:"input,omitempty"`
 }
 
-// ToolResultData is the JSON payload for TagFunctionResult (UF).
+// ToolResultData is the JSON payload for TagUserF (UF).
 // Status is set to "success" or "failed" when the tool completes.
 type ToolResultData struct {
 	ID     string `json:"id"`
@@ -160,7 +159,7 @@ type ToolResultData struct {
 	Status string `json:"status,omitempty"`
 }
 
-// ReasoningData is the JSON payload for TagTextReasoning delta values.
+// ReasoningData is the JSON payload for TagAssistantR delta values.
 // Used for persistence when Anthropic's thinking block includes a signature.
 // Text is the thinking content; Signature is Anthropic-specific and only
 // present on thinking blocks.

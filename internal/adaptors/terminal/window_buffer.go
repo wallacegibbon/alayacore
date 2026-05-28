@@ -111,7 +111,7 @@ func (wb *WindowBuffer) AppendOrUpdate(tag string, id string, content string) {
 	// Use tag+id as the window key for AT/AR deltas so text and reasoning
 	// from the same step get separate windows.
 	key := id
-	if tag == stream.TagTextAssistant || tag == stream.TagTextReasoning {
+	if tag == stream.TagAssistantT || tag == stream.TagAssistantR {
 		key = tag + id
 	}
 
@@ -127,7 +127,7 @@ func (wb *WindowBuffer) AppendOrUpdate(tag string, id string, content string) {
 	}
 
 	// Create new window
-	folded := tag != stream.TagTextUser && tag != stream.TagTextAssistant
+	folded := tag != stream.TagUserT && tag != stream.TagAssistantT
 	w := &Window{
 		ID:      id,
 		Tag:     tag,
@@ -141,7 +141,7 @@ func (wb *WindowBuffer) AppendOrUpdate(tag string, id string, content string) {
 	wb.markDirty(len(wb.windows) - 1)
 }
 
-// HandleFunctionEvent processes a TagFunction (AF) frame.
+// HandleFunctionEvent processes a TagAssistantF (AF) frame.
 // Type "start" sets ToolName (and ToolInput if not yet set),
 // type "call" sets ToolName+ToolInput.
 // Status defaults to "pending" when a tool window is created —
@@ -179,7 +179,7 @@ func (wb *WindowBuffer) HandleFunctionEvent(data stream.FunctionData) {
 	// update it to success/error when it arrives.
 	w := &Window{
 		ID:        data.ID,
-		Tag:       stream.TagFunction,
+		Tag:       stream.TagAssistantF,
 		ToolName:  data.Name,
 		ToolInput: data.Input,
 		Folded:    true,
@@ -192,7 +192,7 @@ func (wb *WindowBuffer) HandleFunctionEvent(data stream.FunctionData) {
 	wb.markDirty(len(wb.windows) - 1)
 }
 
-// HandleFunctionResult processes a TagFunctionResult (UF) frame.
+// HandleFunctionResult processes a TagUserF (UF) frame.
 // Sets ToolOutput and updates Status from the result.
 func (wb *WindowBuffer) HandleFunctionResult(id, output, status string) {
 	wb.mu.Lock()
@@ -213,7 +213,7 @@ func (wb *WindowBuffer) HandleFunctionResult(id, output, status string) {
 	// No prior AF window (e.g. replayed from session file) — create one.
 	w := &Window{
 		ID:         id,
-		Tag:        stream.TagFunctionResult,
+		Tag:        stream.TagUserF,
 		ToolOutput: output,
 		Status:     ParseToolStatus(status),
 		Folded:     true,
