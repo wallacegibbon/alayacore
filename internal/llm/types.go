@@ -89,13 +89,13 @@ type ToolResultOutputText struct {
 
 func (ToolResultOutputText) isToolResultOutput() {}
 
-// ToolResultOutputError represents error output
-type ToolResultOutputError struct {
-	Type  string `json:"type"`
-	Error string `json:"error"`
+// ToolResultOutputFailed represents a failed tool execution result.
+type ToolResultOutputFailed struct {
+	Type   string `json:"type"`
+	Reason string `json:"reason"`
 }
 
-func (ToolResultOutputError) isToolResultOutput() {}
+func (ToolResultOutputFailed) isToolResultOutput() {}
 
 // Message represents a single message in the conversation
 type Message struct {

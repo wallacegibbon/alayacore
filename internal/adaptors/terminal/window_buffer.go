@@ -100,6 +100,8 @@ func (wb *WindowBuffer) SetStyles(styles *Styles) {
 }
 
 // AppendOrUpdate adds content to an existing window or creates a new one.
+// Used for text content (TU, TA, TR, SE, SN) and replayed FR sessions.
+// Tool windows use HandleFunctionEvent and HandleFunctionResult instead.
 func (wb *WindowBuffer) AppendOrUpdate(tag string, id string, content string) {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
@@ -107,10 +109,7 @@ func (wb *WindowBuffer) AppendOrUpdate(tag string, id string, content string) {
 	innerWidth := max(0, wb.width-BorderInnerPadding)
 
 	// Use tag+id as the window key for TA/TR deltas so text and reasoning
-	// from the same step get separate windows. Don't use for FC/FR/FS —
-	// they share the same tool call window: FC creates it (AppendToolCall),
-	// FR appends output, FS updates status. All three must agree on one
-	// key, so they use just the tool call ID.
+	// from the same step get separate windows.
 	key := id
 	if tag == stream.TagTextAssistant || tag == stream.TagTextReasoning {
 		key = tag + id
@@ -118,15 +117,9 @@ func (wb *WindowBuffer) AppendOrUpdate(tag string, id string, content string) {
 
 	if idx, ok := wb.idIndex[key]; ok {
 		w := wb.windows[idx]
-		// Separator between call and result for content-heavy tool windows.
-		if w.ToolName == "write_file" || w.ToolName == "edit_file" {
-			w.AppendContent("\n"+toolResultSentinel+"\n", innerWidth)
-		}
 		w.AppendContent(content, innerWidth)
 		// Update visibility for delta windows when new content arrives
-		// Only need to check the delta (not accumulated content) since if Visible=false,
-		// we know all previous content was whitespace
-		if !w.IsToolWindow() && !w.Visible && hasVisibleContent(content) {
+		if !w.Visible && hasVisibleContent(content) {
 			w.Visible = true
 		}
 		wb.markDirty(idx)
@@ -140,42 +133,92 @@ func (wb *WindowBuffer) AppendOrUpdate(tag string, id string, content string) {
 		Tag:     tag,
 		Content: content,
 		Folded:  folded,
-		Visible: true, // Will be updated below for delta windows
+		Visible: hasVisibleContent(content),
 		styles:  wb.styles,
-	}
-	// Tool windows are always visible; delta windows only when has visible content
-	if !w.IsToolWindow() {
-		w.Visible = hasVisibleContent(content)
 	}
 	wb.windows = append(wb.windows, w)
 	wb.idIndex[key] = len(wb.windows) - 1
 	wb.markDirty(len(wb.windows) - 1)
 }
 
-// AppendToolCall adds a tool call window with tool name.
-// If a window with the same ID already exists (e.g. from a ToolCallStart event),
-// its content is replaced with the full content.
-func (wb *WindowBuffer) AppendToolCall(id string, toolName string, content string) {
+// HandleFunctionEvent processes a TagFunction (FD) frame.
+// Type "start" sets ToolName (and ToolInput if not yet set),
+// type "call" sets ToolName+ToolInput.
+// Status defaults to "pending" when a tool window is created —
+// the final status arrives via HandleFunctionResult (FR).
+func (wb *WindowBuffer) HandleFunctionEvent(data stream.FunctionData) {
+	wb.mu.Lock()
+	defer wb.mu.Unlock()
+
+	if idx, ok := wb.idIndex[data.ID]; ok {
+		w := wb.windows[idx]
+		switch data.Type {
+		case "start":
+			w.ToolName = data.Name
+			if w.ToolInput == "" {
+				w.ToolInput = data.Input
+			}
+			if w.Status == ToolStatusNone {
+				w.Status = ToolStatusPending
+			}
+		case "call":
+			if data.Name != "" {
+				w.ToolName = data.Name
+			}
+			w.ToolInput = data.Input
+			if w.Status == ToolStatusNone {
+				w.Status = ToolStatusPending
+			}
+		}
+		w.Invalidate()
+		wb.markDirty(idx)
+		return
+	}
+
+	// Create new window. Status defaults to pending — the result will
+	// update it to success/error when it arrives.
+	w := &Window{
+		ID:        data.ID,
+		Tag:       stream.TagFunction,
+		ToolName:  data.Name,
+		ToolInput: data.Input,
+		Folded:    true,
+		Visible:   true,
+		Status:    ToolStatusPending,
+		styles:    wb.styles,
+	}
+	wb.windows = append(wb.windows, w)
+	wb.idIndex[data.ID] = len(wb.windows) - 1
+	wb.markDirty(len(wb.windows) - 1)
+}
+
+// HandleFunctionResult processes a TagFunctionResult (FR) frame.
+// Sets ToolOutput and updates Status from the result.
+func (wb *WindowBuffer) HandleFunctionResult(id, output, status string) {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 
 	if idx, ok := wb.idIndex[id]; ok {
 		w := wb.windows[idx]
-		// Replace content — the window was pre-created by a ToolCallStart event;
-		// now we have the full tool call content.
-		w.ReplaceContent(content)
+		w.ToolOutput = output
+		w.Status = ParseToolStatus(status)
+		if status == "success" && w.ToolName == "write_file" {
+			w.Folded = true
+		}
+		w.Invalidate()
 		wb.markDirty(idx)
 		return
 	}
 
+	// No prior FD window (e.g. replayed from session file) — create one.
 	w := &Window{
-		ID:       id,
-		Tag:      stream.TagFunctionCall,
-		ToolName: toolName,
-		Content:  content,
-		Folded:   true,
-		Visible:  true, // Tool windows are always visible
-		styles:   wb.styles,
+		ID:         id,
+		Tag:        stream.TagFunctionResult,
+		ToolOutput: output,
+		Status:     ParseToolStatus(status),
+		Folded:     true,
+		Visible:    true,
+		styles:     wb.styles,
 	}
 	wb.windows = append(wb.windows, w)
 	wb.idIndex[id] = len(wb.windows) - 1
@@ -286,6 +329,7 @@ func (wb *WindowBuffer) ToggleFold(windowIndex int) bool {
 }
 
 // GetWindowContent returns the raw content of a window by index.
+// For tool windows, returns tool input + tool output combined.
 // Returns empty string if index is out of bounds.
 func (wb *WindowBuffer) GetWindowContent(windowIndex int) string {
 	wb.mu.Lock()
@@ -295,25 +339,14 @@ func (wb *WindowBuffer) GetWindowContent(windowIndex int) string {
 		return ""
 	}
 
-	return wb.windows[windowIndex].Content
-}
-
-// UpdateToolStatus updates the status indicator for a tool window.
-func (wb *WindowBuffer) UpdateToolStatus(toolCallID string, status ToolStatus) {
-	wb.mu.Lock()
-	defer wb.mu.Unlock()
-
-	if idx, ok := wb.idIndex[toolCallID]; ok {
-		w := wb.windows[idx]
-		w.Status = status
-		w.Invalidate()
-		if status == ToolStatusSuccess || status == ToolStatusError {
-			if w.ToolName == "write_file" {
-				w.Folded = true
-			}
+	w := wb.windows[windowIndex]
+	if w.IsToolWindow() {
+		if w.ToolOutput != "" {
+			return w.ToolInput + "\n" + w.ToolOutput
 		}
-		wb.markDirty(idx)
+		return w.ToolInput
 	}
+	return w.Content
 }
 
 // ============================================================================
@@ -661,5 +694,8 @@ func (wb *WindowBuffer) findWindowAtLine(line int) int {
 
 // RenderWindowContent renders the content of a window (for testing).
 func (wb *WindowBuffer) RenderWindowContent(w *Window, innerWidth int) string {
+	if w.IsToolWindow() {
+		return w.renderGenericContent(innerWidth, wb.styles, w.ToolInput)
+	}
 	return w.renderGenericContent(innerWidth, wb.styles, w.Content)
 }

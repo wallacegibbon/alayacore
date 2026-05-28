@@ -668,8 +668,8 @@ func anthropicConvertMessages(messages []llm.Message, reasoningLevel int) []anth
 				switch out := v.Output.(type) {
 				case llm.ToolResultOutputText:
 					content = out.Text
-				case llm.ToolResultOutputError:
-					content = out.Error
+				case llm.ToolResultOutputFailed:
+					content = out.Reason
 					apiMsg.Content = append(apiMsg.Content, anthropicContentBlock{
 						Type:      anthropicBlockTypeToolResult,
 						ToolUseID: v.ToolCallID,

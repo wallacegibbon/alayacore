@@ -115,14 +115,13 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 			return nil
 		},
 		OnToolResult: func(toolCallID string, output llm.ToolResultOutput) error {
-			status := "success" //nolint:goconst // pre-existing lint, used in writeToolResult
+			status := "success" //nolint:goconst // pre-existing lint, used in writeToolOutput
 			if textOutput, ok := output.(llm.ToolResultOutputText); ok {
-				s.writeToolOutput(toolCallID, textOutput.Text)
-			} else if errOutput, ok := output.(llm.ToolResultOutputError); ok {
-				status = "error" //nolint:goconst // pre-existing lint, used in writeToolResult
-				s.writeToolOutput(toolCallID, errOutput.Error)
+				s.writeToolOutput(toolCallID, textOutput.Text, status)
+			} else if errOutput, ok := output.(llm.ToolResultOutputFailed); ok {
+				status = "failed"
+				s.writeToolOutput(toolCallID, errOutput.Reason, status)
 			}
-			s.writeToolResult(toolCallID, status)
 			return nil
 		},
 		OnStepStart: func(step int) error {

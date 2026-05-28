@@ -15,19 +15,19 @@ func NewUserMessage(text string) Message {
 	}
 }
 
-// NewTextResponse creates a text tool response
-func NewTextResponse(text string) ToolResultOutput {
+// NewToolResultOutputText creates a ToolResultOutputText with the given text.
+func NewToolResultOutputText(text string) ToolResultOutput {
 	return ToolResultOutputText{
 		Type: ContentPartText,
 		Text: text,
 	}
 }
 
-// NewTextErrorResponse creates an error tool response
-func NewTextErrorResponse(errMsg string) ToolResultOutput {
-	return ToolResultOutputError{
-		Type:  "error",
-		Error: errMsg,
+// NewToolResultOutputFailed creates a ToolResultOutputFailed reporting tool failure.
+func NewToolResultOutputFailed(reason string) ToolResultOutput {
+	return ToolResultOutputFailed{
+		Type:   "error",
+		Reason: reason,
 	}
 }
 

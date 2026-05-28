@@ -33,12 +33,12 @@ func NewReadFileTool() llm.Tool {
 func executeReadFile(ctx context.Context, args ReadFileInput) (llm.ToolResultOutput, error) {
 	info, err := os.Stat(args.Path)
 	if err != nil {
-		return llm.NewTextErrorResponse(err.Error()), nil
+		return llm.NewToolResultOutputFailed(err.Error()), nil
 	}
 
 	// Validate line range parameters
 	if valErr := validateLineRange(args.StartLine, args.EndLine); valErr != nil {
-		return llm.NewTextErrorResponse(valErr.Error()), nil
+		return llm.NewToolResultOutputFailed(valErr.Error()), nil
 	}
 
 	// Full file read case
@@ -49,24 +49,24 @@ func executeReadFile(ctx context.Context, args ReadFileInput) (llm.ToolResultOut
 		var content []byte
 		content, err = os.ReadFile(args.Path)
 		if err != nil {
-			return llm.NewTextErrorResponse(err.Error()), nil
+			return llm.NewToolResultOutputFailed(err.Error()), nil
 		}
-		return llm.NewTextResponse(string(content)), nil
+		return llm.NewToolResultOutputText(string(content)), nil
 	}
 
 	// Line range case: stream from file to avoid loading entire file into memory
 	file, err := os.Open(args.Path)
 	if err != nil {
-		return llm.NewTextErrorResponse(err.Error()), nil
+		return llm.NewToolResultOutputFailed(err.Error()), nil
 	}
 	defer file.Close()
 
 	lines, err := readLinesRange(ctx, file, args.StartLine, args.EndLine)
 	if err != nil {
-		return llm.NewTextErrorResponse(err.Error()), nil
+		return llm.NewToolResultOutputFailed(err.Error()), nil
 	}
 
-	return llm.NewTextResponse(strings.Join(lines, "\n")), nil
+	return llm.NewToolResultOutputText(strings.Join(lines, "\n")), nil
 }
 
 // readLargeFileTruncated reads a large file up to maxFullReadSize and returns
@@ -74,7 +74,7 @@ func executeReadFile(ctx context.Context, args ReadFileInput) (llm.ToolResultOut
 func readLargeFileTruncated(path string, totalSize int64) (llm.ToolResultOutput, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return llm.NewTextErrorResponse(err.Error()), nil
+		return llm.NewToolResultOutputFailed(err.Error()), nil
 	}
 	defer file.Close()
 
@@ -86,12 +86,12 @@ func readLargeFileTruncated(path string, totalSize int64) (llm.ToolResultOutput,
 		totalLines++
 	}
 	if err := scanner.Err(); err != nil {
-		return llm.NewTextErrorResponse(err.Error()), nil
+		return llm.NewToolResultOutputFailed(err.Error()), nil
 	}
 
 	// Reset file position for second pass
 	if _, err := file.Seek(0, 0); err != nil {
-		return llm.NewTextErrorResponse(err.Error()), nil
+		return llm.NewToolResultOutputFailed(err.Error()), nil
 	}
 
 	// Second pass: read lines up to maxFullReadSize
@@ -113,7 +113,7 @@ func readLargeFileTruncated(path string, totalSize int64) (llm.ToolResultOutput,
 		bytesRead += lineBytes
 	}
 	if err := scanner.Err(); err != nil {
-		return llm.NewTextErrorResponse(err.Error()), nil
+		return llm.NewToolResultOutputFailed(err.Error()), nil
 	}
 
 	shownLines := len(lines)
@@ -124,7 +124,7 @@ func readLargeFileTruncated(path string, totalSize int64) (llm.ToolResultOutput,
 		float64(bytesRead)/1024, float64(totalSize)/1024,
 	)
 
-	return llm.NewTextResponse(header + "\n" + content), nil
+	return llm.NewToolResultOutputText(header + "\n" + content), nil
 }
 
 func validateLineRange(startLine, endLine int) error {

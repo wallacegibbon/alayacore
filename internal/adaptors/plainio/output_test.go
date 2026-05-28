@@ -128,7 +128,7 @@ func TestToolCallResetsStreamPrefix(t *testing.T) {
 	// Stream some text
 	msg1 := encodeTLV(stream.TagTextAssistant, stream.WrapDelta("0-1-t", "hello"))
 	// Then a tool call (resets prefix)
-	msg2 := encodeTLV(stream.TagFunctionCall, `{"id":"1","name":"read_file","input":"{}"}`)
+	msg2 := encodeTLV(stream.TagFunction, `{"id":"1","type":"call","name":"read_file","input":"{}"}`)
 	// Then more text with different prefix — should NOT get extra newline since tool call reset it
 	msg3 := encodeTLV(stream.TagTextAssistant, stream.WrapDelta("0-3-t", "result"))
 

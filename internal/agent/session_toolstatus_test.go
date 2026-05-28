@@ -9,7 +9,7 @@ import (
 	"github.com/alayacore/alayacore/internal/stream"
 )
 
-func TestWriteToolResult(t *testing.T) {
+func TestWriteToolOutput(t *testing.T) {
 	// Create a mock output to capture TLV messages
 	output := &mockOutput{}
 	session := &Session{
@@ -17,52 +17,36 @@ func TestWriteToolResult(t *testing.T) {
 	}
 
 	// Test success case
-	session.writeToolResult("tool123", "success")
+	session.writeToolOutput("tool123", "output text", "success")
 
 	// Parse the written data to extract TLV
 	tag, value := parseTLVFromBytes(output.data)
-	if tag != stream.TagFunctionState {
-		t.Errorf("Expected tag %s, got %s", stream.TagFunctionState, tag)
+	if tag != stream.TagFunctionResult {
+		t.Errorf("Expected tag %s, got %s", stream.TagFunctionResult, tag)
 	}
 
-	var got stream.ToolStateData
+	var got stream.ToolResultData
 	if err := json.Unmarshal([]byte(value), &got); err != nil {
-		t.Fatalf("Failed to parse FS JSON: %v", err)
+		t.Fatalf("Failed to parse FR JSON: %v", err)
 	}
-	if got.ID != "tool123" || got.Status != "success" {
-		t.Errorf("Expected {tool123, success}, got {%s, %s}", got.ID, got.Status)
+	if got.ID != "tool123" || got.Output != "output text" || got.Status != "success" {
+		t.Errorf("Expected {tool123, output text, success}, got {%s, %s, %s}", got.ID, got.Output, got.Status)
 	}
 
 	// Test error case
 	output.data = nil
-	session.writeToolResult("tool456", "error")
+	session.writeToolOutput("tool456", "error message", "failed")
 
 	tag, value = parseTLVFromBytes(output.data)
-	if tag != stream.TagFunctionState {
-		t.Errorf("Expected tag %s, got %s", stream.TagFunctionState, tag)
+	if tag != stream.TagFunctionResult {
+		t.Errorf("Expected tag %s, got %s", stream.TagFunctionResult, tag)
 	}
 
 	if err := json.Unmarshal([]byte(value), &got); err != nil {
-		t.Fatalf("Failed to parse FS JSON: %v", err)
+		t.Fatalf("Failed to parse FR JSON: %v", err)
 	}
-	if got.ID != "tool456" || got.Status != "error" {
-		t.Errorf("Expected {tool456, error}, got {%s, %s}", got.ID, got.Status)
-	}
-
-	// Test pending case
-	output.data = nil
-	session.writeToolResult("tool789", "pending")
-
-	tag, value = parseTLVFromBytes(output.data)
-	if tag != stream.TagFunctionState {
-		t.Errorf("Expected tag %s, got %s", stream.TagFunctionState, tag)
-	}
-
-	if err := json.Unmarshal([]byte(value), &got); err != nil {
-		t.Fatalf("Failed to parse FS JSON: %v", err)
-	}
-	if got.ID != "tool789" || got.Status != "pending" {
-		t.Errorf("Expected {tool789, pending}, got {%s, %s}", got.ID, got.Status)
+	if got.ID != "tool456" || got.Output != "error message" || got.Status != "failed" {
+		t.Errorf("Expected {tool456, error message, failed}, got {%s, %s, %s}", got.ID, got.Output, got.Status)
 	}
 }
 
@@ -86,12 +70,16 @@ func TestOnToolResultCallback(t *testing.T) {
 			}},
 		})
 
-		// Send tool result status indicator to adaptor
+		// Send tool result with status to adaptor
 		status := "success"
-		if _, ok := toolResult.(llm.ToolResultOutputError); ok {
-			status = "error"
+		if _, ok := toolResult.(llm.ToolResultOutputFailed); ok {
+			status = "failed"
 		}
-		session.writeToolResult(toolCallID, status)
+		if textOutput, ok := toolResult.(llm.ToolResultOutputText); ok {
+			session.writeToolOutput(toolCallID, textOutput.Text, status)
+		} else if errOutput, ok := toolResult.(llm.ToolResultOutputFailed); ok {
+			session.writeToolOutput(toolCallID, errOutput.Reason, status)
+		}
 
 		return nil
 	}
@@ -109,13 +97,13 @@ func TestOnToolResultCallback(t *testing.T) {
 
 	// Check that TLV was sent
 	tag, value := parseTLVFromBytes(output.data)
-	if tag != stream.TagFunctionState {
-		t.Errorf("Expected tag %s, got %s", stream.TagFunctionState, tag)
+	if tag != stream.TagFunctionResult {
+		t.Errorf("Expected tag %s, got %s", stream.TagFunctionResult, tag)
 	}
 
-	var got stream.ToolStateData
+	var got stream.ToolResultData
 	if err := json.Unmarshal([]byte(value), &got); err != nil {
-		t.Fatalf("Failed to parse FS JSON: %v", err)
+		t.Fatalf("Failed to parse FR JSON: %v", err)
 	}
 	if got.ID != "call1" || got.Status != "success" {
 		t.Errorf("Expected {call1, success}, got {%s, %s}", got.ID, got.Status)
@@ -123,21 +111,21 @@ func TestOnToolResultCallback(t *testing.T) {
 
 	// Test error result
 	output.data = nil
-	err = callback("call2", llm.ToolResultOutputError{Type: "error", Error: "something failed"})
+	err = callback("call2", llm.ToolResultOutputFailed{Type: "error", Reason: "something failed"})
 	if err != nil {
 		t.Fatalf("Callback returned error: %v", err)
 	}
 
 	tag, value = parseTLVFromBytes(output.data)
-	if tag != stream.TagFunctionState {
-		t.Errorf("Expected tag %s, got %s", stream.TagFunctionState, tag)
+	if tag != stream.TagFunctionResult {
+		t.Errorf("Expected tag %s, got %s", stream.TagFunctionResult, tag)
 	}
 
 	if err := json.Unmarshal([]byte(value), &got); err != nil {
-		t.Fatalf("Failed to parse FS JSON: %v", err)
+		t.Fatalf("Failed to parse FR JSON: %v", err)
 	}
-	if got.ID != "call2" || got.Status != "error" {
-		t.Errorf("Expected {call2, error}, got {%s, %s}", got.ID, got.Status)
+	if got.ID != "call2" || got.Status != "failed" {
+		t.Errorf("Expected {call2, failed}, got {%s, %s}", got.ID, got.Status)
 	}
 }
 
@@ -150,48 +138,28 @@ func TestWriteToolCallWithPending(t *testing.T) {
 
 	session.writeToolCall("execute_command", `{"command":"ls"}`, "tool123")
 
-	// Should have written two TLV messages:
-	// 1. TagFunctionCall with tool call JSON (creates window)
-	// 2. TagFunctionState with pending status (updates window)
+	// Should have written one TLV message: FD with type "call"
+	// Status "pending" is inferred by the terminal from window creation.
 
-	// Parse first message (tool call display)
+	// Parse the message (tool call display)
 	tag1, value1 := parseTLVFromBytes(output.data)
-	if tag1 != stream.TagFunctionCall {
-		t.Errorf("Expected first tag %s, got %s", stream.TagFunctionCall, tag1)
+	if tag1 != stream.TagFunction {
+		t.Errorf("Expected tag %s, got %s", stream.TagFunction, tag1)
 	}
 
-	// The tool call should be JSON with id, name, input
-	if value1 == "" {
-		t.Error("Expected non-empty tool call value")
+	// The tool call should be JSON with id, type, name, input
+	var fd1 stream.FunctionData
+	if err := json.Unmarshal([]byte(value1), &fd1); err != nil {
+		t.Fatalf("Failed to parse FD JSON: %v", err)
 	}
-
-	// Parse second message (pending status)
-	data := output.data
-	// Find the second TLV message
-	if len(data) > 6 {
-		// First message length
-		length1 := int(binary.BigEndian.Uint32(data[2:6]))
-		// Skip to second message
-		if len(data) >= 12+length1 {
-			offset := 6 + length1
-			tag2 := string(data[offset : offset+2])
-			if tag2 != stream.TagFunctionState {
-				t.Errorf("Expected second tag %s, got %s", stream.TagFunctionState, tag2)
-			}
-
-			// Parse second message value
-			length2 := int(binary.BigEndian.Uint32(data[offset+2 : offset+6]))
-			if len(data) >= offset+6+length2 {
-				value2 := string(data[offset+6 : offset+6+length2])
-				var got stream.ToolStateData
-				if err := json.Unmarshal([]byte(value2), &got); err != nil {
-					t.Fatalf("Failed to parse FS JSON: %v", err)
-				}
-				if got.ID != "tool123" || got.Status != "pending" {
-					t.Errorf("Expected {tool123, pending}, got {%s, %s}", got.ID, got.Status)
-				}
-			}
-		}
+	if fd1.Type != "call" || fd1.Name != "execute_command" {
+		t.Errorf("Expected type=call, name=execute_command, got type=%s, name=%s", fd1.Type, fd1.Name)
+	}
+	if fd1.ID != "tool123" {
+		t.Errorf("Expected id=tool123, got %s", fd1.ID)
+	}
+	if fd1.Input != `{"command":"ls"}` {
+		t.Errorf("Expected input with command=ls, got %s", fd1.Input)
 	}
 }
 

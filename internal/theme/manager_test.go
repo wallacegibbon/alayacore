@@ -42,16 +42,14 @@ func TestManagerCreatesDefaultThemes(t *testing.T) {
 	th := tm.LoadTheme("theme-dark")
 	if th == nil {
 		t.Fatalf("Failed to load theme-dark")
-	}
-	if th.Primary != "#89d4fa" {
+	} else if th.Primary != "#89d4fa" {
 		t.Errorf("Expected theme-dark primary color #89d4fa, got %s", th.Primary)
 	}
 
 	rpTheme := tm.LoadTheme("theme-redpanda")
 	if rpTheme == nil {
 		t.Fatalf("Failed to load theme-redpanda")
-	}
-	if rpTheme.Primary != "#e24328" {
+	} else if rpTheme.Primary != "#e24328" {
 		t.Errorf("Expected theme-redpanda primary color #e24328, got %s", rpTheme.Primary)
 	}
 }

@@ -58,36 +58,29 @@ func (s *Session) writeTLVJSON(tag string, v any) {
 }
 
 func (s *Session) writeToolCall(toolName, input, id string) {
-	s.writeTLVJSON(stream.TagFunctionCall, stream.ToolCallData{
+	s.writeTLVJSON(stream.TagFunction, stream.FunctionData{
 		ID:    id,
+		Type:  "call",
 		Name:  toolName,
 		Input: input,
 	})
-	s.writeToolResult(id, "pending")
 }
 
-// writeToolCallStart writes a placeholder tool call window using an empty JSON
-// object as input. The full content is written later by writeToolCall when all
+// writeToolCallStart writes a placeholder tool call window.
+// The full input is written later by writeToolCall when all
 // arguments have been received.
 func (s *Session) writeToolCallStart(toolName, id string) {
-	s.writeTLVJSON(stream.TagFunctionCall, stream.ToolCallData{
-		ID:    id,
-		Name:  toolName,
-		Input: "{}",
+	s.writeTLVJSON(stream.TagFunction, stream.FunctionData{
+		ID:   id,
+		Type: "start",
+		Name: toolName,
 	})
-	s.writeToolResult(id, "pending")
 }
 
-func (s *Session) writeToolOutput(toolCallID string, output string) {
+func (s *Session) writeToolOutput(toolCallID string, output string, status string) {
 	s.writeTLVJSON(stream.TagFunctionResult, stream.ToolResultData{
 		ID:     toolCallID,
 		Output: output,
-	})
-}
-
-func (s *Session) writeToolResult(toolCallID string, status string) {
-	s.writeTLVJSON(stream.TagFunctionState, stream.ToolStateData{
-		ID:     toolCallID,
 		Status: status,
 	})
 }

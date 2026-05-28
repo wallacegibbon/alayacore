@@ -91,12 +91,12 @@ func TestSearchContentEmptyPattern(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	errOut, ok := result.(llm.ToolResultOutputError)
+	errOut, ok := result.(llm.ToolResultOutputFailed)
 	if !ok {
 		t.Fatalf("expected error output, got %T", result)
 	}
-	if errOut.Error != "pattern is required" {
-		t.Errorf("expected 'pattern is required', got %q", errOut.Error)
+	if errOut.Reason != "pattern is required" {
+		t.Errorf("expected 'pattern is required', got %q", errOut.Reason)
 	}
 }
 

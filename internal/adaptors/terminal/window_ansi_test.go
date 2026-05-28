@@ -38,7 +38,7 @@ func TestWindow_WithANSIContent(t *testing.T) {
 		},
 		{
 			name:     "tool call with ANSI in command",
-			tag:      stream.TagFunctionCall,
+			tag:      stream.TagFunction,
 			content:  "execute_command: echo \x1b[31mtest\x1b[0m",
 			expected: "· execute_command: echo test", // Note: includes status indicator
 		},
@@ -90,7 +90,7 @@ func TestWindow_PreservesLipglossColors(t *testing.T) {
 	}{
 		{
 			name:            "tool call gets styled",
-			tag:             stream.TagFunctionCall,
+			tag:             stream.TagFunction,
 			content:         "execute_command: echo test",
 			shouldHaveColor: true,
 		},

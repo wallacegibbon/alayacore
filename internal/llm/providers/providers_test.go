@@ -1842,7 +1842,7 @@ func TestAnthropicToolResultError(t *testing.T) {
 		{Role: llm.RoleTool, Content: []llm.ContentPart{llm.ToolResultPart{
 			Type:       "tool_result",
 			ToolCallID: "tool-123",
-			Output:     llm.ToolResultOutputError{Type: "error", Error: "Something went wrong"},
+			Output:     llm.ToolResultOutputFailed{Type: "error", Reason: "Something went wrong"},
 		}}},
 	}
 

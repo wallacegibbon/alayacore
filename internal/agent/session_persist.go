@@ -98,21 +98,27 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 				}
 
 			case llm.ToolCallPart:
-				tc := stream.ToolCallData{
+				fd := stream.FunctionData{
 					ID:    p.ToolCallID,
+					Type:  "call",
 					Name:  p.ToolName,
 					Input: string(p.Input),
 				}
-				jsonData, err := json.Marshal(tc)
+				jsonData, err := json.Marshal(fd)
 				if err != nil {
 					return nil, fmt.Errorf("failed to marshal tool call: %w", err)
 				}
-				writeTLV(&binaryBuf, stream.TagFunctionCall, string(jsonData))
+				writeTLV(&binaryBuf, stream.TagFunction, string(jsonData))
 
 			case llm.ToolResultPart:
+				status := "success" //nolint:goconst // pre-existing, used across agent pkg
+				if _, ok := p.Output.(llm.ToolResultOutputFailed); ok {
+					status = "failed" //nolint:goconst // pre-existing, used across agent pkg
+				}
 				tr := stream.ToolResultData{
 					ID:     p.ToolCallID,
 					Output: formatToolResultOutput(p.Output),
+					Status: status,
 				}
 				jsonData, err := json.Marshal(tr)
 				if err != nil {
@@ -269,7 +275,7 @@ func parseMessagesTLV(body string) ([]llm.Message, []TLVChunk, error) {
 
 		case stream.TagTextAssistant:
 			// Do NOT force newMessage: an assistant message may start with
-			// TagTextReasoning or TagFunctionCall; the text part belongs in
+			// TagTextReasoning or TagFunction; the text part belongs in
 			// the same message.  A new message is still created when
 			// currentMsg is nil or the role doesn't match.
 			msgRole = llm.RoleAssistant
@@ -289,17 +295,23 @@ func parseMessagesTLV(body string) ([]llm.Message, []TLVChunk, error) {
 				msgPart = llm.ReasoningPart{Type: llm.ContentPartReasoning, Text: string(content)}
 			}
 
-		case stream.TagFunctionCall:
+		case stream.TagFunction, stream.TagFunctionCall:
+			// TagFunction (FD) is the current format, TagFunctionCall (FC)
+			// is the legacy format kept for loading older session files.
 			msgRole = llm.RoleAssistant
-			var tc stream.ToolCallData
-			if err := json.Unmarshal(content, &tc); err != nil {
-				return nil, nil, fmt.Errorf("failed to parse tool call: %w", err)
+			var fd stream.FunctionData
+			if err := json.Unmarshal(content, &fd); err != nil {
+				return nil, nil, fmt.Errorf("failed to parse function data: %w", err)
+			}
+			if fd.Name == "" {
+				// Legacy FC format or malformed — skip
+				continue
 			}
 			msgPart = llm.ToolCallPart{
 				Type:       "tool_use",
-				ToolCallID: tc.ID,
-				ToolName:   tc.Name,
-				Input:      json.RawMessage(tc.Input),
+				ToolCallID: fd.ID,
+				ToolName:   fd.Name,
+				Input:      json.RawMessage(fd.Input),
 			}
 
 		case stream.TagFunctionResult:
@@ -308,10 +320,16 @@ func parseMessagesTLV(body string) ([]llm.Message, []TLVChunk, error) {
 			if err := json.Unmarshal(content, &tr); err != nil {
 				return nil, nil, fmt.Errorf("failed to parse tool result: %w", err)
 			}
+			var output llm.ToolResultOutput
+			if tr.Status == "failed" {
+				output = llm.ToolResultOutputFailed{Type: "error", Reason: tr.Output}
+			} else {
+				output = llm.ToolResultOutputText{Type: "text", Text: tr.Output}
+			}
 			msgPart = llm.ToolResultPart{
 				Type:       "tool_result",
 				ToolCallID: tr.ID,
-				Output:     llm.ToolResultOutputText{Type: "text", Text: tr.Output},
+				Output:     output,
 			}
 
 		default:
@@ -343,8 +361,8 @@ func formatToolResultOutput(output llm.ToolResultOutput) string {
 	if text, ok := output.(llm.ToolResultOutputText); ok {
 		return text.Text
 	}
-	if e, ok := output.(llm.ToolResultOutputError); ok {
-		return e.Error
+	if e, ok := output.(llm.ToolResultOutputFailed); ok {
+		return e.Reason
 	}
 	return fmt.Sprintf("%v", output)
 }

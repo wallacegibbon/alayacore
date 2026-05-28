@@ -89,7 +89,7 @@ Stream ID format:
 
 The adaptor uses `tag + streamID` as the window key, so text and reasoning from the same step get separate windows.
 
-FS (function state) uses JSON instead of the delta format, consistent with FC and FR.
+FD and FR use JSON (not the delta format), since tool events are discrete, not streaming.
 
 ### Tags
 
@@ -98,12 +98,25 @@ FS (function state) uses JSON instead of the delta format, consistent with FC an
 | `TagTextUser` | TU | Input | User text input |
 | `TagTextAssistant` | TA | Output | Assistant text output |
 | `TagTextReasoning` | TR | Output | Reasoning/thinking content |
-| `TagFunctionCall` | FC | Output | Function call (JSON: id, name, input) |
-| `TagFunctionResult` | FR | Output | Function result (JSON: id, output) |
-| `TagFunctionState` | FS | Output | Function state indicator (JSON: id, status) |
+| `TagFunction` | FD | Output | Function lifecycle: start/call (JSON) — pending inferred from lifecycle |
+| `TagFunctionResult` | FR | Output | Function result with status (JSON) |
 | `TagSystemError` | SE | Output | System error messages |
 | `TagSystemNotify` | SN | Output | System notifications |
 | `TagSystemData` | SD | Output | System data (JSON) |
+
+### Function Lifecycle (FD + FR)
+
+Tool execution uses two tags with a `type` discriminator:
+
+**FD** carries the function lifecycle:
+- `{"id":"tool123","type":"start","name":"read_file"}` — tool name known
+- `{"id":"tool123","type":"call","name":"read_file","input":"..."}` — full input received
+
+**FR** carries the final result with status:
+- `{"id":"tool123","output":"...","status":"success"}` — execution succeeded
+- `{"id":"tool123","output":"...","status":"failed"}` — execution failed
+
+The terminal infers "pending" status from the absence of a result (no FR received for a tool call), so no explicit state frame is needed for the initial pending state. Each FD type targets its own field on the tool data model (name, input, status), so ordering between "start" and "call" frames is always safe.
 
 ### Example Flow
 
@@ -112,7 +125,12 @@ FS (function state) uses JSON instead of the delta format, consistent with FC an
 2. Terminal adaptor emits: TLV(TU, "read main.go")
 3. Session reads TLV, creates UserPrompt task
 4. Session processes prompt through the agent loop
-5. Agent calls read_file tool → Session emits: TLV(FS, {"id":"tool123","status":"pending"}) → TLV(FS, {"id":"tool123","status":"success"})
+5. Agent calls read_file tool:
+   → Session emits: TLV(FD, {"id":"tool123","type":"start","name":"read_file"})
+   → Session emits: TLV(FD, {"id":"tool123","type":"call","name":"read_file","input":"{\"path\":\"main.go\"}"})
+   → Tool executes → Session emits: TLV(FR, {"id":"tool123","output":"...","status":"success"})
+6. Agent calls execute_command → execution canceled:
+   → Session emits: TLV(FR, {"id":"tool123","output":"Canceled (exit 130)","status":"failed"})
 6. Agent generates response → Session emits: TLV(TA, "\x000|0\x00Here's what main.go does...")
 7. Terminal adaptor parses TLV, renders styled content in windows
 ```
@@ -149,7 +167,7 @@ User types prompt
               → handleUserPrompt()
                 → processPrompt()
                   → Agent.Stream()
-                    → Callbacks emit TLV(TA), TLV(TR), TLV(FS), etc.
+                    → Callbacks emit TLV(TA), TLV(TR), TLV(FD), TLV(FR), etc.
                       → OutputWriter parses TLV
                         → WindowBuffer.AppendOrUpdate()
                           → DisplayModel.View()
@@ -160,10 +178,10 @@ User types prompt
 
 ```
 Agent.Stream() receives tool_call event
-  → OnToolCallStart callback → TLV(FC, placeholder) → UI shows tool window immediately
-    → OnToolCall callback → TLV(FC, full input) → UI replaces placeholder content
+  → OnToolCallStart callback → TLV(FD, {"id":"<id>","type":"start","name":"<tool>"}) → UI shows tool name immediately
+    → OnToolCall callback → TLV(FD, {"id":"<id>","type":"call","name":"<tool>","input":"..."}) → UI fills in arguments
       → Agent executes tool: tool.Execute(ctx, input)
-        → OnToolResult callback → TLV(FS, {"id":"<id>","status":"success"}) → UI updates indicator
+        → OnToolResult callback → TLV(FR, {"id":"<id>","output":"...","status":"success"}) → UI shows output and indicator
           → Tool result added to messages
             → Agent continues to next step (if under max_steps)
 ```

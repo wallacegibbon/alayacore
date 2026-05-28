@@ -103,19 +103,20 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 		o.emitSeparator(tag)
 		fmt.Fprintf(o.writer, "[%s]", value)
 
-	case stream.TagFunctionCall:
+	case stream.TagFunction:
 		if o.lastTag != "" {
 			fmt.Fprintln(o.writer)
 		}
 		o.lastTag = tag
 		o.lastStreamID = ""
-		o.printFunctionCall(value)
+		var fd stream.FunctionData
+		if err := json.Unmarshal([]byte(value), &fd); err != nil {
+			return
+		}
+		fmt.Fprintf(o.writer, "%s", formatToolCall(fd.Name, fd.Input))
 
 	case stream.TagFunctionResult:
-		// Suppress tool result content; do not update lastTag.
-
-	case stream.TagFunctionState:
-		// Skip state indicators for plainio
+		// Suppress tool result content in plainio; do not update lastTag.
 
 	case stream.TagSystemData:
 		o.handleSystemData(value)
@@ -156,18 +157,6 @@ func (o *stdoutOutput) emitSeparator(tag string) {
 	}
 	o.lastTag = tag
 	o.lastStreamID = ""
-}
-
-func (o *stdoutOutput) printFunctionCall(value string) {
-	var tc struct {
-		ID    string `json:"id"`
-		Name  string `json:"name"`
-		Input string `json:"input"`
-	}
-	if err := json.Unmarshal([]byte(value), &tc); err != nil {
-		return
-	}
-	fmt.Fprintf(o.writer, "%s", formatToolCall(tc.Name, tc.Input))
 }
 
 // formatToolCall formats a tool call header for display (name + key args, no content).

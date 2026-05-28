@@ -849,7 +849,7 @@ func TestDisplayEditorFinishedWithError(t *testing.T) {
 func TestGetWindowContentWriteFile(t *testing.T) {
 	wb := NewWindowBuffer(80, DefaultStyles())
 	content := "write_file: /path/to/file.txt\nline1\nline2\nline3"
-	wb.AppendToolCall("test-id", "write_file", content)
+	wb.HandleFunctionEvent(stream.FunctionData{ID: "test-id", Type: "call", Name: "write_file", Input: content})
 
 	result := wb.GetWindowContent(0)
 	if result != content {
@@ -861,7 +861,7 @@ func TestGetWindowContentDiff(t *testing.T) {
 	wb := NewWindowBuffer(80, DefaultStyles())
 	// Simulate formatted diff content (what parseDiffFromFormatted produces)
 	content := "edit_file: /path/to/file.txt\n- old line 1\n+ new line 1\n  same line\n"
-	wb.AppendToolCall("test-id", "edit_file", content)
+	wb.HandleFunctionEvent(stream.FunctionData{ID: "test-id", Type: "call", Name: "edit_file", Input: content})
 
 	result := wb.GetWindowContent(0)
 

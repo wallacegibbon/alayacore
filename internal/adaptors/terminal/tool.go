@@ -42,7 +42,7 @@ func ParseToolStatus(status string) ToolStatus {
 	switch status {
 	case "success":
 		return ToolStatusSuccess
-	case "error":
+	case "failed":
 		return ToolStatusError
 	case "pending":
 		return ToolStatusPending

@@ -14,7 +14,7 @@ func TypedExecute[T any](fn TypedExecuteFunc[T]) func(context.Context, json.RawM
 	return func(ctx context.Context, input json.RawMessage) (ToolResultOutput, error) {
 		var args T
 		if err := json.Unmarshal(input, &args); err != nil {
-			return NewTextErrorResponse("failed to parse input: " + err.Error()), nil
+			return NewToolResultOutputFailed("failed to parse input: " + err.Error()), nil
 		}
 		return fn(ctx, args)
 	}

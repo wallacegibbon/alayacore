@@ -49,9 +49,9 @@ func TestFullIntegration(t *testing.T) {
 		WithExecute(func(_ context.Context, input json.RawMessage) (llm.ToolResultOutput, error) {
 			var params EchoInput
 			if unmarshalErr := json.Unmarshal(input, &params); unmarshalErr != nil {
-				return llm.NewTextErrorResponse("invalid input"), nil
+				return llm.NewToolResultOutputFailed("invalid input"), nil
 			}
-			return llm.NewTextResponse(fmt.Sprintf("Echo: %s", params.Message)), nil
+			return llm.NewToolResultOutputText(fmt.Sprintf("Echo: %s", params.Message)), nil
 		}).
 		Build()
 

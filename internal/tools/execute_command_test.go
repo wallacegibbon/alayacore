@@ -34,11 +34,11 @@ func TestExecuteCommandExitError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	errOut, ok := result.(llm.ToolResultOutputError)
+	errOut, ok := result.(llm.ToolResultOutputFailed)
 	if !ok {
 		t.Fatalf("expected error output, got %T", result)
 	}
-	if errOut.Error == "" {
+	if errOut.Reason == "" {
 		t.Error("expected non-empty error output")
 	}
 }
@@ -61,12 +61,12 @@ func TestExecuteCommandCancellation(t *testing.T) {
 
 	select {
 	case result := <-done:
-		errOut, ok := result.(llm.ToolResultOutputError)
+		errOut, ok := result.(llm.ToolResultOutputFailed)
 		if !ok {
 			t.Fatalf("expected error output, got %T", result)
 		}
-		if !strings.HasPrefix(errOut.Error, "Canceled") {
-			t.Errorf("expected message to start with 'Canceled', got %q", errOut.Error)
+		if !strings.HasPrefix(errOut.Reason, "Canceled") {
+			t.Errorf("expected message to start with 'Canceled', got %q", errOut.Reason)
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("command was not canceled within timeout")
@@ -98,14 +98,14 @@ func TestExecuteCommandTimeout(t *testing.T) {
 
 	select {
 	case result := <-done:
-		errOut, ok := result.(llm.ToolResultOutputError)
+		errOut, ok := result.(llm.ToolResultOutputFailed)
 		if !ok {
 			t.Fatalf("expected error output, got %T", result)
 		}
-		if !strings.HasPrefix(errOut.Error, "Canceled") && !strings.HasPrefix(errOut.Error, "Timed out") {
+		if !strings.HasPrefix(errOut.Reason, "Canceled") && !strings.HasPrefix(errOut.Reason, "Timed out") {
 			// Either is acceptable depending on whether the parent context
 			// or the internal timeout fires first
-			t.Errorf("expected message to start with 'Canceled' or 'Timed out', got %q", errOut.Error)
+			t.Errorf("expected message to start with 'Canceled' or 'Timed out', got %q", errOut.Reason)
 		}
 	case <-time.After(10 * time.Second):
 		t.Fatal("command was not terminated within timeout")
@@ -164,7 +164,7 @@ func TestHandleCommandCompletion(t *testing.T) {
 			result := handleCommandCompletion(tt.execErr, stdout, stderr)
 
 			if tt.wantError {
-				if _, ok := result.(llm.ToolResultOutputError); !ok {
+				if _, ok := result.(llm.ToolResultOutputFailed); !ok {
 					t.Error("expected error output")
 				}
 			} else {

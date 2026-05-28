@@ -69,7 +69,7 @@ func executeCommand(ctx context.Context, args executeCommandInput) (llm.ToolResu
 	// Close stdin so commands that read stdin see EOF immediately.
 	devNull, err := shell.OpenDevNull()
 	if err != nil {
-		return llm.NewTextErrorResponse("failed to open null device: " + err.Error()), nil
+		return llm.NewToolResultOutputFailed("failed to open null device: " + err.Error()), nil
 	}
 	defer devNull.Close()
 	cmd.Stdin = devNull
@@ -99,7 +99,7 @@ func executeCommand(ctx context.Context, args executeCommandInput) (llm.ToolResu
 	cmd.WaitDelay = 2 * time.Second
 
 	if err := cmd.Start(); err != nil {
-		return llm.NewTextErrorResponse("failed to start command: " + err.Error()), nil
+		return llm.NewToolResultOutputFailed("failed to start command: " + err.Error()), nil
 	}
 
 	// Assign the child process to a Job Object (Windows) so that the
@@ -156,9 +156,9 @@ func handleCommandCancellation(stdout, stderr *bytes.Buffer, exitCode int) llm.T
 	}
 
 	if output != "" {
-		return llm.NewTextErrorResponse(fmt.Sprintf("Canceled (exit %d)\n%s", exitCode, output))
+		return llm.NewToolResultOutputFailed(fmt.Sprintf("Canceled (exit %d)\n%s", exitCode, output))
 	}
-	return llm.NewTextErrorResponse(fmt.Sprintf("Canceled (exit %d)", exitCode))
+	return llm.NewToolResultOutputFailed(fmt.Sprintf("Canceled (exit %d)", exitCode))
 }
 
 func handleCommandTimeout(stdout, stderr *bytes.Buffer, exitCode int) llm.ToolResultOutput {
@@ -169,9 +169,9 @@ func handleCommandTimeout(stdout, stderr *bytes.Buffer, exitCode int) llm.ToolRe
 	}
 
 	if output != "" {
-		return llm.NewTextErrorResponse(fmt.Sprintf("Timed out (exit %d)\n%s", exitCode, output))
+		return llm.NewToolResultOutputFailed(fmt.Sprintf("Timed out (exit %d)\n%s", exitCode, output))
 	}
-	return llm.NewTextErrorResponse(fmt.Sprintf("Timed out (exit %d)", exitCode))
+	return llm.NewToolResultOutputFailed(fmt.Sprintf("Timed out (exit %d)", exitCode))
 }
 
 func handleCommandCompletion(execErr error, stdout, stderr *bytes.Buffer) llm.ToolResultOutput {
@@ -187,15 +187,15 @@ func handleCommandCompletion(execErr error, stdout, stderr *bytes.Buffer) llm.To
 	// Small output: return as-is
 	if execErr != nil {
 		if exitCode != 0 {
-			return llm.NewTextErrorResponse(fmt.Sprintf("Exit Code: %d\n%s", exitCode, output))
+			return llm.NewToolResultOutputFailed(fmt.Sprintf("Exit Code: %d\n%s", exitCode, output))
 		}
 		if _, ok := execErr.(*exec.ExitError); ok {
-			return llm.NewTextErrorResponse(output)
+			return llm.NewToolResultOutputFailed(output)
 		}
-		return llm.NewTextErrorResponse(execErr.Error())
+		return llm.NewToolResultOutputFailed(execErr.Error())
 	}
 
-	return llm.NewTextResponse(output)
+	return llm.NewToolResultOutputText(output)
 }
 
 // handleLargeCommandOutput saves full output to a temp file and returns
@@ -204,7 +204,7 @@ func handleLargeCommandOutput(output string, exitCode int, execErr error) llm.To
 	// Save full output to temp file
 	filePath, err := saveToTmpFile(output, "cmd-*.txt")
 	if err != nil {
-		return llm.NewTextErrorResponse(fmt.Sprintf("failed to save large output to temp file: %v", err))
+		return llm.NewToolResultOutputFailed(fmt.Sprintf("failed to save large output to temp file: %v", err))
 	}
 
 	// Count total lines
@@ -222,9 +222,9 @@ func handleLargeCommandOutput(output string, exitCode int, execErr error) llm.To
 	)
 
 	if execErr != nil {
-		return llm.NewTextErrorResponse(msg)
+		return llm.NewToolResultOutputFailed(msg)
 	}
-	return llm.NewTextResponse(msg)
+	return llm.NewToolResultOutputText(msg)
 }
 
 // countLines counts the number of lines in a string.

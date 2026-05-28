@@ -71,7 +71,7 @@ func handleSearchContentResult(execErr error, stdout, stderr *bytes.Buffer, maxL
 		// rg exits with code 1 when no matches found — that's not an error for us
 		if exitErr, ok := execErr.(*exec.ExitError); ok {
 			if exitErr.ExitCode() == 1 && stderr.Len() == 0 {
-				return llm.NewTextResponse("No matches found")
+				return llm.NewToolResultOutputText("No matches found")
 			}
 		}
 		// Real error (bad regex, permission denied, etc.)
@@ -79,7 +79,7 @@ func handleSearchContentResult(execErr error, stdout, stderr *bytes.Buffer, maxL
 		if stderr.Len() > 0 {
 			errMsg = stderr.String()
 		}
-		return llm.NewTextErrorResponse(errMsg)
+		return llm.NewToolResultOutputFailed(errMsg)
 	}
 
 	// Use default if maxLines not specified
@@ -89,7 +89,7 @@ func handleSearchContentResult(execErr error, stdout, stderr *bytes.Buffer, maxL
 
 	output := stdout.String()
 	if output == "" {
-		return llm.NewTextResponse("No matches found")
+		return llm.NewToolResultOutputText("No matches found")
 	}
 
 	// Count total lines in output
@@ -100,7 +100,7 @@ func handleSearchContentResult(execErr error, stdout, stderr *bytes.Buffer, maxL
 		return handleLargeSearchResult(output, totalLines)
 	}
 
-	return llm.NewTextResponse(output)
+	return llm.NewToolResultOutputText(output)
 }
 
 // handleLargeSearchResult saves full search output to a temp file and returns
@@ -109,10 +109,10 @@ func handleLargeSearchResult(output string, totalLines int) llm.ToolResultOutput
 	// Save full output to temp file
 	filePath, err := saveToTmpFile(output, "search-*.txt")
 	if err != nil {
-		return llm.NewTextErrorResponse(fmt.Sprintf("failed to save large search results to temp file: %v", err))
+		return llm.NewToolResultOutputFailed(fmt.Sprintf("failed to save large search results to temp file: %v", err))
 	}
 
-	return llm.NewTextResponse(fmt.Sprintf(
+	return llm.NewToolResultOutputText(fmt.Sprintf(
 		"Search found %d matching lines. Results saved to: %s\nUse read_file to access specific matches.",
 		totalLines, filePath,
 	))
@@ -120,12 +120,12 @@ func handleLargeSearchResult(output string, totalLines int) llm.ToolResultOutput
 
 func executeSearchContent(ctx context.Context, args SearchContentInput) (llm.ToolResultOutput, error) {
 	if args.Pattern == "" {
-		return llm.NewTextErrorResponse("pattern is required"), nil
+		return llm.NewToolResultOutputFailed("pattern is required"), nil
 	}
 
 	rgPath, err := exec.LookPath("rg")
 	if err != nil {
-		return llm.NewTextErrorResponse("ripgrep (rg) is not available on this system"), nil
+		return llm.NewToolResultOutputFailed("ripgrep (rg) is not available on this system"), nil
 	}
 
 	rgArgs := buildSearchContentArgs(args)
@@ -146,7 +146,7 @@ func executeSearchContent(ctx context.Context, args SearchContentInput) (llm.Too
 	if err := cmd.Run(); err != nil {
 		// If the context was canceled, report cancellation
 		if ctx.Err() != nil {
-			return llm.NewTextErrorResponse("Canceled"), nil
+			return llm.NewToolResultOutputFailed("Canceled"), nil
 		}
 		return handleSearchContentResult(err, &stdout, &stderr, args.MaxLines), nil
 	}

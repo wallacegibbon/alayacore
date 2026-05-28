@@ -16,9 +16,11 @@ const (
 	TagTextAssistant = "TA" // Assistant text output
 	TagTextReasoning = "TR" // Reasoning/thinking content
 
-	TagFunctionCall   = "FC" // JSON: id, name, input (display + persistence)
-	TagFunctionResult = "FR" // JSON: id, output      (display + persistence)
-	TagFunctionState  = "FS" // JSON: id, status      (pending/success/error)
+	TagFunction       = "FD" // JSON: id, type, name, input, status (function lifecycle)
+	TagFunctionResult = "FR" // JSON: id, output, status            (function result)
+
+	// Legacy tags kept for loading older session files.
+	TagFunctionCall = "FC"
 
 	TagSystemError  = "SE" // Error message string
 	TagSystemNotify = "SN" // Notification message string
@@ -141,23 +143,25 @@ func (n *NopOutput) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// ToolCallData is the JSON payload for TagFunctionCall.
-type ToolCallData struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Input string `json:"input"`
+// FunctionData is the JSON payload for TagFunction (FD).
+// Type discriminator:
+//
+//	"start" — tool name known, input placeholder
+//	"call"  — full tool input available
+type FunctionData struct {
+	ID     string `json:"id"`
+	Type   string `json:"type"`
+	Name   string `json:"name,omitempty"`
+	Input  string `json:"input,omitempty"`
+	Status string `json:"status,omitempty"`
 }
 
-// ToolResultData is the JSON payload for TagFunctionResult.
+// ToolResultData is the JSON payload for TagFunctionResult (FR).
+// Status is set to "success" or "failed" when the tool completes.
 type ToolResultData struct {
 	ID     string `json:"id"`
 	Output string `json:"output"`
-}
-
-// ToolStateData is the JSON payload for TagFunctionState.
-type ToolStateData struct {
-	ID     string `json:"id"`
-	Status string `json:"status"`
+	Status string `json:"status,omitempty"`
 }
 
 // ReasoningData is the JSON payload for TagTextReasoning delta values.

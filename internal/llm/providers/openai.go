@@ -529,8 +529,8 @@ func openaiConvertToolResults(content []llm.ContentPart) []openAIMessage {
 		switch out := tr.Output.(type) {
 		case llm.ToolResultOutputText:
 			apiMsg.Content = out.Text
-		case llm.ToolResultOutputError:
-			apiMsg.Content = out.Error
+		case llm.ToolResultOutputFailed:
+			apiMsg.Content = out.Reason
 		}
 		results = append(results, apiMsg)
 	}

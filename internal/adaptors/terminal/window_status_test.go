@@ -8,40 +8,37 @@ import (
 	"github.com/alayacore/alayacore/internal/theme"
 )
 
-func TestUpdateToolStatus(t *testing.T) {
+func TestHandleFunctionEvent(t *testing.T) {
 	wb := NewWindowBuffer(80, DefaultStyles())
 
-	// Create a tool window
-	wb.AppendToolCall("tool123", "execute_command", "execute_command: git status")
+	// Send a "call" type event (creates the window)
+	wb.HandleFunctionEvent(stream.FunctionData{
+		ID:    "tool123",
+		Type:  "call",
+		Name:  "execute_command",
+		Input: "execute_command: git status",
+	})
 
 	// Verify window was created
 	if wb.GetWindowCount() != 1 {
 		t.Fatalf("Expected 1 window, got %d", wb.GetWindowCount())
 	}
 
-	// Initially no status
-	if wb.GetWindow(0).Status != ToolStatusNone {
-		t.Errorf("Expected ToolStatusNone, got %v", wb.GetWindow(0).Status)
-	}
-
-	// Update with pending status
-	wb.UpdateToolStatus("tool123", ToolStatusPending)
-
-	// Check status was updated
+	// Status defaults to pending (inferred from window creation)
 	if wb.GetWindow(0).Status != ToolStatusPending {
 		t.Errorf("Expected ToolStatusPending, got %v", wb.GetWindow(0).Status)
 	}
 
-	// Update with success status
-	wb.UpdateToolStatus("tool123", ToolStatusSuccess)
+	// Send a result
+	wb.HandleFunctionResult("tool123", "output text", "success")
 
 	// Check status was updated
 	if wb.GetWindow(0).Status != ToolStatusSuccess {
 		t.Errorf("Expected ToolStatusSuccess, got %v", wb.GetWindow(0).Status)
 	}
 
-	// Update with error status
-	wb.UpdateToolStatus("tool123", ToolStatusError)
+	// Send a result with error
+	wb.HandleFunctionResult("tool123", "error output", "failed")
 
 	// Check status was updated
 	if wb.GetWindow(0).Status != ToolStatusError {
@@ -49,41 +46,33 @@ func TestUpdateToolStatus(t *testing.T) {
 	}
 
 	// Try to update non-existent window (should not crash)
-	wb.UpdateToolStatus("nonexistent", ToolStatusSuccess)
+	wb.HandleFunctionResult("nonexistent", "output", "success")
 }
 
 func TestRenderWindowContentWithStatus(t *testing.T) {
 	wb := NewWindowBuffer(80, DefaultStyles())
 
 	// Create a tool window
-	wb.AppendToolCall("tool123", "execute_command", "execute_command: git status")
+	wb.HandleFunctionEvent(stream.FunctionData{
+		ID:    "tool123",
+		Type:  "call",
+		Name:  "execute_command",
+		Input: "execute_command: git status",
+	})
 
-	// Test rendering without status (default for loaded sessions)
+	// Test rendering with pending status (default on creation)
 	w := wb.GetWindow(0)
 	content := wb.RenderWindowContent(w, 76)
 	if content == "" {
 		t.Error("Expected non-empty content")
 	}
-	// Should contain dimmed hollow dot (·) as default for tool windows without status
-	if !contains(content, "·") {
-		t.Errorf("Expected content to contain hollow dot (·), got: %s", content)
-	}
-
-	// Update with pending status
-	wb.UpdateToolStatus("tool123", ToolStatusPending)
-
-	// Test rendering with pending status
-	content = wb.RenderWindowContent(w, 76)
-	if content == "" {
-		t.Error("Expected non-empty content")
-	}
-	// Should contain dimmed filled dot (•)
+	// Should contain dimmed filled dot (•) for pending status
 	if !contains(content, "•") {
 		t.Errorf("Expected content to contain filled dot (•), got: %s", content)
 	}
 
-	// Update with success status
-	wb.UpdateToolStatus("tool123", ToolStatusSuccess)
+	// Send result with success
+	wb.HandleFunctionResult("tool123", "output", "success")
 
 	// Test rendering with success status
 	content = wb.RenderWindowContent(w, 76)
@@ -95,8 +84,8 @@ func TestRenderWindowContentWithStatus(t *testing.T) {
 		t.Errorf("Expected content to contain filled dot (•), got: %s", content)
 	}
 
-	// Update with error status
-	wb.UpdateToolStatus("tool123", ToolStatusError)
+	// Send result with error
+	wb.HandleFunctionResult("tool123", "error output", "failed")
 
 	// Test rendering with error status
 	content = wb.RenderWindowContent(w, 76)
@@ -120,18 +109,23 @@ func contains(s, substr string) bool {
 }
 
 func TestOutputWriterToolCallStartThenFull(t *testing.T) {
-	// End-to-end test: write TagFunctionCall TLVs through the actual
-	// outputWriter pipeline (Write → processBuffer → writeColored → AppendToolCall).
+	// End-to-end test: write TagFunction TLVs through the actual
+	// outputWriter pipeline (Write → processBuffer → writeColored → HandleFunctionEvent).
 	out := NewTerminalOutput(NewStyles(theme.DefaultTheme()))
 	out.SetWindowWidth(80)
 
-	makeTLV := func(id, name, input string) []byte {
-		tc, _ := json.Marshal(stream.ToolCallData{ID: id, Name: name, Input: input})
-		return stream.EncodeTLV(stream.TagFunctionCall, string(tc))
+	makeFD := func(id, typ, name, input string) []byte {
+		fd, _ := json.Marshal(stream.FunctionData{
+			ID:    id,
+			Type:  typ,
+			Name:  name,
+			Input: input,
+		})
+		return stream.EncodeTLV(stream.TagFunction, string(fd))
 	}
 
-	// 1. Simulate ToolCallStart: placeholder with "{}" input
-	_, err := out.Write(makeTLV("call-abc", "write_file", "{}"))
+	// 1. Simulate ToolCallStart: type "start" with placeholder JSON input
+	_, err := out.Write(makeFD("call-abc", "start", "write_file", "{}"))
 	if err != nil {
 		t.Fatalf("Write failed: %v", err)
 	}
@@ -144,13 +138,9 @@ func TestOutputWriterToolCallStartThenFull(t *testing.T) {
 	if w.ToolName != "write_file" {
 		t.Errorf("Expected tool name 'write_file', got %q", w.ToolName)
 	}
-	// The placeholder should show "write_file: " (empty path, no content)
-	if w.Content == "" {
-		t.Error("Expected non-empty placeholder content")
-	}
 
-	// 2. Simulate ToolCallComplete: full input replaces placeholder
-	_, err = out.Write(makeTLV("call-abc", "write_file", `{"path":"/tmp/f.txt","content":"hello world"}`))
+	// 2. Simulate ToolCallComplete: type "call" with full JSON input
+	_, err = out.Write(makeFD("call-abc", "call", "write_file", `{"path":"/tmp/f.txt","content":"hello world"}`))
 	if err != nil {
 		t.Fatalf("Write failed: %v", err)
 	}
@@ -159,7 +149,7 @@ func TestOutputWriterToolCallStartThenFull(t *testing.T) {
 		t.Fatalf("Expected still 1 window, got %d", wb.GetWindowCount())
 	}
 	w = wb.GetWindow(0)
-	if w.Content != "write_file: /tmp/f.txt\nhello world" {
-		t.Errorf("Expected full content, got %q", w.Content)
+	if w.ToolInput != "write_file: /tmp/f.txt\nhello world" {
+		t.Errorf("Expected full input, got %q", w.ToolInput)
 	}
 }

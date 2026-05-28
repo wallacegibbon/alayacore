@@ -128,35 +128,32 @@ func (to *outputWriter) writeColored(tag string, value string) {
 		// Pass raw content - styling is applied during render
 		to.windowBuffer.AppendOrUpdate(tag, id, content)
 
-	// Function call (JSON: id, name, input)
-	case stream.TagFunctionCall:
-		var tc stream.ToolCallData
-		if err := json.Unmarshal([]byte(value), &tc); err != nil {
+	// Function lifecycle (JSON: id, type, name, input, status)
+	case stream.TagFunction:
+		var fd stream.FunctionData
+		if err := json.Unmarshal([]byte(value), &fd); err != nil {
 			return
 		}
-		handler := GetHandler(tc.Name)
-		formatted := handler.FormatCall(json.RawMessage(tc.Input), to.styles.Load())
+		// Format the call input for display. For "start", format "{}" as a
+		// placeholder so the tool name appears immediately. Safe because
+		// HandleFunctionEvent only sets ToolInput for "start" when it's
+		// empty — real arguments from a prior "call" are never overwritten.
+		if fd.Type == "call" {
+			handler := GetHandler(fd.Name)
+			fd.Input = handler.FormatCall(json.RawMessage(fd.Input), to.styles.Load())
+		} else if fd.Type == "start" {
+			handler := GetHandler(fd.Name)
+			fd.Input = handler.FormatCall(json.RawMessage("{}"), to.styles.Load())
+		}
+		to.windowBuffer.HandleFunctionEvent(fd)
 
-		// Pass formatted but unstyled content - styling is applied during render
-		to.windowBuffer.AppendToolCall(tc.ID, tc.Name, formatted)
-
-	// Function result (JSON: id, output)
+	// Function result (JSON: id, output, status)
 	case stream.TagFunctionResult:
 		var tr stream.ToolResultData
 		if err := json.Unmarshal([]byte(value), &tr); err != nil {
 			return
 		}
-		// Pass raw output - styling is applied during render
-		to.windowBuffer.AppendOrUpdate(tag, tr.ID, tr.Output)
-
-	// Function output status indicator
-	case stream.TagFunctionState:
-		var ts stream.ToolStateData
-		if err := json.Unmarshal([]byte(value), &ts); err != nil {
-			return
-		}
-		// Update the tool window with status indicator
-		to.windowBuffer.UpdateToolStatus(ts.ID, ParseToolStatus(ts.Status))
+		to.windowBuffer.HandleFunctionResult(tr.ID, tr.Output, tr.Status)
 
 	// System tags
 	case stream.TagSystemError:
@@ -190,7 +187,7 @@ func (to *outputWriter) triggerUpdateForTag(tag string) {
 	switch tag {
 	// Text content tags
 	case stream.TagTextAssistant, stream.TagTextReasoning, stream.TagTextUser,
-		stream.TagFunctionCall,
+		stream.TagFunction,
 		// System tags
 		stream.TagSystemError, stream.TagSystemNotify, stream.TagSystemData:
 		to.dirty.Store(true)

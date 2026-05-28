@@ -312,7 +312,7 @@ func TestAgentToolLoopRealAPI(t *testing.T) {
 				Message string `json:"message"`
 			}
 			if unmarshalErr := json.Unmarshal(input, &params); unmarshalErr != nil {
-				return llm.ToolResultOutputError{Type: "error", Error: "invalid input"}, nil
+				return llm.ToolResultOutputFailed{Type: "error", Reason: "invalid input"}, nil
 			}
 			return llm.ToolResultOutputText{Type: "text", Text: "Echo: " + params.Message}, nil
 		},
@@ -513,7 +513,7 @@ func TestAgentSequentialQueriesWithTools(t *testing.T) {
 				Message string `json:"message"`
 			}
 			if unmarshalErr := json.Unmarshal(input, &params); unmarshalErr != nil {
-				return llm.ToolResultOutputError{Type: "error", Error: "invalid input"}, nil
+				return llm.ToolResultOutputFailed{Type: "error", Reason: "invalid input"}, nil
 			}
 			return llm.ToolResultOutputText{Type: "text", Text: "Echo: " + params.Message}, nil
 		},
@@ -638,7 +638,7 @@ func TestOpenAICompatSequentialQueriesWithTools(t *testing.T) {
 				Message string `json:"message"`
 			}
 			if unmarshalErr := json.Unmarshal(input, &params); unmarshalErr != nil {
-				return llm.ToolResultOutputError{Type: "error", Error: "invalid input"}, nil
+				return llm.ToolResultOutputFailed{Type: "error", Reason: "invalid input"}, nil
 			}
 			return llm.ToolResultOutputText{Type: "text", Text: "Echo: " + params.Message}, nil
 		},

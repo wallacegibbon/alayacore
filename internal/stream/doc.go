@@ -17,20 +17,24 @@
 //	  - TagTextUser (TU): User text input
 //	  - TagTextAssistant (TA): Assistant text output
 //	  - TagTextReasoning (TR): Reasoning/thinking content
-//	  - TagFunctionCall (FC): Function call (JSON: id, name, input)
-//	  - TagFunctionResult (FR): Function result (JSON: id, output)
-//	  - TagFunctionState (FS): Function state indicator (JSON: id, status)
+//	  - TagFunction (FD): Function lifecycle (JSON: id, type, name, input, status)
+//	  - TagFunctionResult (FR): Function result (JSON: id, output, status)
 //	  - TagSystemError (SE): System error messages
 //	  - TagSystemNotify (SN): System notifications
 //	  - TagSystemData (SD): System data (JSON)
 //
-// State Indicators:
+// Function Lifecycle:
 //
-// The TagFunctionState tag carries a JSON payload with the tool call ID and
-// status, used by the terminal to display live status indicators:
-//   - `{"id":"tool123","status":"pending"}` — Tool is currently executing
-//   - `{"id":"tool123","status":"success"}` — Tool executed successfully
-//   - `{"id":"tool123","status":"error"}` — Tool execution failed
+// The TagFunction tag (FD) carries a JSON payload with a type discriminator:
+//   - `{"id":"tool123","type":"start","name":"read_file"}` — tool name known
+//   - `{"id":"tool123","type":"call","name":"read_file","input":"..."}` — full input
+//
+// TagFunctionResult (FR) carries the final output and status:
+//   - `{"id":"tool123","output":"...","status":"success"}` — execution succeeded
+//   - `{"id":"tool123","output":"...","status":"failed"}` — execution failed
+//
+// The terminal infers "pending" while waiting for a result (no FR received).
+// The FD "state" type was removed — the final status arrives via FR.
 //
 // Delta Messages:
 //

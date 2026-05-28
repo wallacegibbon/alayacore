@@ -191,8 +191,8 @@ func TestEditFileTool(t *testing.T) {
 				// Check for error response
 				var errMsg string
 				switch r := resp.(type) {
-				case llm.ToolResultOutputError:
-					errMsg = r.Error
+				case llm.ToolResultOutputFailed:
+					errMsg = r.Reason
 				default:
 					t.Errorf("expected error response, got %T", resp)
 					return

@@ -280,18 +280,18 @@ func (a *Agent) executeTool(ctx context.Context, tc ToolCallPart, callbacks Stre
 		return ToolResultPart{
 			Type:       ContentPartToolResult,
 			ToolCallID: tc.ToolCallID,
-			Output: ToolResultOutputError{
-				Type:  "error",
-				Error: fmt.Sprintf("unknown tool: %s", tc.ToolName),
+			Output: ToolResultOutputFailed{
+				Type:   "error",
+				Reason: fmt.Sprintf("unknown tool: %s", tc.ToolName),
 			},
 		}
 	}
 
 	output, err := tool.Execute(ctx, tc.Input)
 	if err != nil {
-		output = ToolResultOutputError{
-			Type:  "error",
-			Error: err.Error(),
+		output = ToolResultOutputFailed{
+			Type:   "error",
+			Reason: err.Error(),
 		}
 	}
 

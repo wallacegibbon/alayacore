@@ -26,14 +26,14 @@ func NewWriteFileTool() llm.Tool {
 
 func executeWriteFile(_ context.Context, args WriteFileInput) (llm.ToolResultOutput, error) {
 	if args.Path == "" {
-		return llm.NewTextErrorResponse("path is required"), nil
+		return llm.NewToolResultOutputFailed("path is required"), nil
 	}
 	if args.Content == "" {
-		return llm.NewTextErrorResponse("content is required"), nil
+		return llm.NewToolResultOutputFailed("content is required"), nil
 	}
 
 	if err := os.WriteFile(args.Path, []byte(args.Content), 0600); err != nil {
-		return llm.NewTextErrorResponse(err.Error()), nil
+		return llm.NewToolResultOutputFailed(err.Error()), nil
 	}
-	return llm.NewTextResponse("File written successfully"), nil
+	return llm.NewToolResultOutputText("File written successfully"), nil
 }

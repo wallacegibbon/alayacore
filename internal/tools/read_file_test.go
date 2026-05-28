@@ -118,13 +118,13 @@ func TestReadFileWithLineRange(t *testing.T) {
 			}
 
 			if tt.wantError {
-				errResp, ok := result.(llm.ToolResultOutputError)
+				errResp, ok := result.(llm.ToolResultOutputFailed)
 				if !ok {
 					t.Errorf("expected error response, got %T", result)
 					return
 				}
-				if !strings.Contains(errResp.Error, tt.errorMsg) {
-					t.Errorf("expected error containing %q, got %q", tt.errorMsg, errResp.Error)
+				if !strings.Contains(errResp.Reason, tt.errorMsg) {
+					t.Errorf("expected error containing %q, got %q", tt.errorMsg, errResp.Reason)
 				}
 				return
 			}
@@ -212,8 +212,8 @@ func TestReadFileLargeWithLineRange(t *testing.T) {
 
 	textResp, ok := result.(llm.ToolResultOutputText)
 	if !ok {
-		errResp, _ := result.(llm.ToolResultOutputError)
-		t.Errorf("expected text response, got error: %q", errResp.Error)
+		errResp, _ := result.(llm.ToolResultOutputFailed)
+		t.Errorf("expected text response, got error: %q", errResp.Reason)
 		return
 	}
 	if textResp.Text != "first line" {
@@ -252,7 +252,7 @@ func TestReadFileNotFound(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, ok := result.(llm.ToolResultOutputError)
+	_, ok := result.(llm.ToolResultOutputFailed)
 	if !ok {
 		t.Errorf("expected error response, got %T", result)
 	}
@@ -318,19 +318,19 @@ func TestReadFileBinary(t *testing.T) {
 			}
 
 			if tt.expectError {
-				errResp, ok := result.(llm.ToolResultOutputError)
+				errResp, ok := result.(llm.ToolResultOutputFailed)
 				if !ok {
 					t.Errorf("expected error response, got %T", result)
 					return
 				}
-				if errResp.Error == "" {
+				if errResp.Reason == "" {
 					t.Errorf("expected non-empty error message, got empty")
 				}
 			} else {
 				textResp, ok := result.(llm.ToolResultOutputText)
 				if !ok {
-					errResp, _ := result.(llm.ToolResultOutputError)
-					t.Errorf("expected text response for text file, got error: %q", errResp.Error)
+					errResp, _ := result.(llm.ToolResultOutputFailed)
+					t.Errorf("expected text response for text file, got error: %q", errResp.Reason)
 					return
 				}
 				// For empty file, just check we got empty content

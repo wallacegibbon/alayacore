@@ -91,8 +91,8 @@ func TestEditFileStreamingMemory(t *testing.T) {
 	}
 
 	// Check if result is an error
-	if errResult, ok := result.(llm.ToolResultOutputError); ok {
-		t.Fatalf("Edit failed: %s", errResult.Error)
+	if errResult, ok := result.(llm.ToolResultOutputFailed); ok {
+		t.Fatalf("Edit failed: %s", errResult.Reason)
 	}
 
 	// Verify the replacement
@@ -213,15 +213,15 @@ func TestEditFileStreamingEdgeCases(t *testing.T) {
 
 			// Check result
 			if tt.shouldError {
-				errResult, ok := result.(llm.ToolResultOutputError)
+				errResult, ok := result.(llm.ToolResultOutputFailed)
 				if !ok {
 					t.Errorf("Expected error result, got: %v", result)
-				} else if tt.errorMsg != "" && !contains([]byte(errResult.Error), []byte(tt.errorMsg)) {
-					t.Errorf("Error message should contain %q, got: %q", tt.errorMsg, errResult.Error)
+				} else if tt.errorMsg != "" && !contains([]byte(errResult.Reason), []byte(tt.errorMsg)) {
+					t.Errorf("Error message should contain %q, got: %q", tt.errorMsg, errResult.Reason)
 				}
 			} else {
-				if errResult, ok := result.(llm.ToolResultOutputError); ok {
-					t.Errorf("Expected success, got error: %s", errResult.Error)
+				if errResult, ok := result.(llm.ToolResultOutputFailed); ok {
+					t.Errorf("Expected success, got error: %s", errResult.Reason)
 				}
 
 				// Verify file content
