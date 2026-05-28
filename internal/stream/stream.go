@@ -12,15 +12,12 @@ import (
 )
 
 const (
-	TagTextUser      = "TU" // User text input
-	TagTextAssistant = "TA" // Assistant text output
-	TagTextReasoning = "TR" // Reasoning/thinking content
+	TagTextUser      = "UT" // User text input
+	TagTextAssistant = "AT" // Assistant text output
+	TagTextReasoning = "AR" // Reasoning/thinking content
 
-	TagFunction       = "FD" // JSON: id, type, name, input, status (function lifecycle)
-	TagFunctionResult = "FR" // JSON: id, output, status            (function result)
-
-	// Legacy tags kept for loading older session files.
-	TagFunctionCall = "FC"
+	TagFunction       = "AF" // JSON: id, type, name, input, status (function lifecycle)
+	TagFunctionResult = "UF" // JSON: id, output, status            (function result)
 
 	TagSystemError  = "SE" // Error message string
 	TagSystemNotify = "SN" // Notification message string
@@ -143,7 +140,7 @@ func (n *NopOutput) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// FunctionData is the JSON payload for TagFunction (FD).
+// FunctionData is the JSON payload for TagFunction (AF).
 // Type discriminator:
 //
 //	"start" — tool name known, input placeholder
@@ -156,7 +153,7 @@ type FunctionData struct {
 	Status string `json:"status,omitempty"`
 }
 
-// ToolResultData is the JSON payload for TagFunctionResult (FR).
+// ToolResultData is the JSON payload for TagFunctionResult (UF).
 // Status is set to "success" or "failed" when the tool completes.
 type ToolResultData struct {
 	ID     string `json:"id"`

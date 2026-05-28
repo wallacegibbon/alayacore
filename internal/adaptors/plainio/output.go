@@ -127,7 +127,7 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 	}
 }
 
-// handleTextDelta handles TA (assistant text) and TR (reasoning text) tags.
+// handleTextDelta handles AT (assistant text) and AR (reasoning text) tags.
 // It prints a separator when transitioning between different tag groups or
 // stream IDs, then prints the content delta.
 func (o *stdoutOutput) handleTextDelta(tag, value string) {

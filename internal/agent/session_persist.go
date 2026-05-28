@@ -295,16 +295,15 @@ func parseMessagesTLV(body string) ([]llm.Message, []TLVChunk, error) {
 				msgPart = llm.ReasoningPart{Type: llm.ContentPartReasoning, Text: string(content)}
 			}
 
-		case stream.TagFunction, stream.TagFunctionCall:
-			// TagFunction (FD) is the current format, TagFunctionCall (FC)
-			// is the legacy format kept for loading older session files.
+		case stream.TagFunction:
+			// TagFunction (AF) is the current format.
 			msgRole = llm.RoleAssistant
 			var fd stream.FunctionData
 			if err := json.Unmarshal(content, &fd); err != nil {
 				return nil, nil, fmt.Errorf("failed to parse function data: %w", err)
 			}
 			if fd.Name == "" {
-				// Legacy FC format or malformed — skip
+				// Malformed data — skip
 				continue
 			}
 			msgPart = llm.ToolCallPart{

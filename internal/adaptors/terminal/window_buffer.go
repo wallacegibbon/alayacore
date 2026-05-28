@@ -108,7 +108,7 @@ func (wb *WindowBuffer) AppendOrUpdate(tag string, id string, content string) {
 
 	innerWidth := max(0, wb.width-BorderInnerPadding)
 
-	// Use tag+id as the window key for TA/TR deltas so text and reasoning
+	// Use tag+id as the window key for AT/AR deltas so text and reasoning
 	// from the same step get separate windows.
 	key := id
 	if tag == stream.TagTextAssistant || tag == stream.TagTextReasoning {
@@ -141,11 +141,11 @@ func (wb *WindowBuffer) AppendOrUpdate(tag string, id string, content string) {
 	wb.markDirty(len(wb.windows) - 1)
 }
 
-// HandleFunctionEvent processes a TagFunction (FD) frame.
+// HandleFunctionEvent processes a TagFunction (AF) frame.
 // Type "start" sets ToolName (and ToolInput if not yet set),
 // type "call" sets ToolName+ToolInput.
 // Status defaults to "pending" when a tool window is created —
-// the final status arrives via HandleFunctionResult (FR).
+// the final status arrives via HandleFunctionResult (UF).
 func (wb *WindowBuffer) HandleFunctionEvent(data stream.FunctionData) {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
@@ -192,7 +192,7 @@ func (wb *WindowBuffer) HandleFunctionEvent(data stream.FunctionData) {
 	wb.markDirty(len(wb.windows) - 1)
 }
 
-// HandleFunctionResult processes a TagFunctionResult (FR) frame.
+// HandleFunctionResult processes a TagFunctionResult (UF) frame.
 // Sets ToolOutput and updates Status from the result.
 func (wb *WindowBuffer) HandleFunctionResult(id, output, status string) {
 	wb.mu.Lock()

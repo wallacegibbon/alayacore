@@ -14,31 +14,31 @@
 //	  [2-byte tag][4-byte length (big-endian)][value bytes]
 //
 //	Tag values are 2-character strings:
-//	  - TagTextUser (TU): User text input
-//	  - TagTextAssistant (TA): Assistant text output
-//	  - TagTextReasoning (TR): Reasoning/thinking content
-//	  - TagFunction (FD): Function lifecycle (JSON: id, type, name, input, status)
-//	  - TagFunctionResult (FR): Function result (JSON: id, output, status)
+//	  - TagTextUser (UT): User text input
+//	  - TagTextAssistant (AT): Assistant text output
+//	  - TagTextReasoning (AR): Reasoning/thinking content
+//	  - TagFunction (AF): Function lifecycle (JSON: id, type, name, input, status)
+//	  - TagFunctionResult (UF): Function result (JSON: id, output, status)
 //	  - TagSystemError (SE): System error messages
 //	  - TagSystemNotify (SN): System notifications
 //	  - TagSystemData (SD): System data (JSON)
 //
 // Function Lifecycle:
 //
-// The TagFunction tag (FD) carries a JSON payload with a type discriminator:
+// The TagFunction tag (AF) carries a JSON payload with a type discriminator:
 //   - `{"id":"tool123","type":"start","name":"read_file"}` — tool name known
 //   - `{"id":"tool123","type":"call","name":"read_file","input":"..."}` — full input
 //
-// TagFunctionResult (FR) carries the final output and status:
+// TagFunctionResult (UF) carries the final output and status:
 //   - `{"id":"tool123","output":"...","status":"success"}` — execution succeeded
 //   - `{"id":"tool123","output":"...","status":"failed"}` — execution failed
 //
-// The terminal infers "pending" while waiting for a result (no FR received).
-// The FD "state" type was removed — the final status arrives via FR.
+// The terminal infers "pending" while waiting for a result (no UF received).
+// The AF "state" type was removed — the final status arrives via UF.
 //
 // Delta Messages:
 //
-// TA and TR are delta messages that arrive piece-by-piece during streaming.
+// AT and AR are delta messages that arrive piece-by-piece during streaming.
 // Their TLV values use NUL-delimited stream IDs:
 //
 //	\x00<stream-id>\x00<content>
@@ -47,7 +47,7 @@
 // normal UTF-8 text, making the split unambiguous. See WrapDelta and
 // UnwrapDelta in stream_id.go.
 //
-// Stream ID format for TA/TR:
+// Stream ID format for AT/AR:
 //
 //	"<promptID>|<step>"
 //
