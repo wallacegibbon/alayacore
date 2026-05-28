@@ -55,7 +55,7 @@ func (s *Session) handleUserPrompt(ctx context.Context, messages []llm.Message, 
 		// When cancel or error occurs before OnStepFinish sets processResult,
 		// result is nil/empty and the user prompt would be lost on save.
 		// Fall back to messages (which has the user prompt appended above)
-		// so the TU is preserved in the session file alongside the cancel TA.
+		// so the UT is preserved in the session file alongside the cancel AT.
 		if len(result) == 0 {
 			return messages
 		}

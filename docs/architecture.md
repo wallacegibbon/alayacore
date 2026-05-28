@@ -234,5 +234,3 @@ correct base directory for the current session.
 8. **Reasoning Mode** — Provider-specific thinking fields added to API requests. Three levels: 0=off, 1=normal, 2=max. Toggled via `:reason [0|1|2]`.
 9. **Concurrent Task Execution** — Each task runs in its own goroutine so the main loop stays responsive during LLM streaming. Communication via typed channels and atomic fields.
 
-See [gotchas.md](gotchas.md) for non-obvious patterns that have caused bugs.
-

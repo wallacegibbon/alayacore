@@ -10,7 +10,7 @@ import (
 
 // TestMultiPartUserMessageRoundtrip verifies that a single user message with
 // multiple TextParts roundtrips correctly through save/load. Previously, each
-// TU chunk forced a new message, splitting multi-part user messages.
+// UT chunk forced a new message, splitting multi-part user messages.
 func TestMultiPartUserMessageRoundtrip(t *testing.T) {
 	tmpDir := t.TempDir()
 	sessionPath := filepath.Join(tmpDir, "multipart-user.md")
@@ -70,15 +70,15 @@ func TestMultiPartUserMessageRoundtrip(t *testing.T) {
 	}
 }
 
-// TestConsecutiveUserChunksGrouped verifies that consecutive TU chunks in a
+// TestConsecutiveUserChunksGrouped verifies that consecutive UT chunks in a
 // session file are grouped into a single user message (not split).
 func TestConsecutiveUserChunksGrouped(t *testing.T) {
-	// Manually construct a session body with two consecutive TU chunks.
+	// Manually construct a session body with two consecutive UT chunks.
 	// This simulates what formatSessionMarkdown produces for a multi-part
 	// user message.
 	raw := []byte("---\nversion: 1\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\n---\n")
 
-	// Build TLV body with two TU chunks followed by one TA chunk
+	// Build TLV body with two UT chunks followed by one AT chunk
 	var body string
 	body += string(stream.EncodeTLV(stream.TagTextUser, "Hello"))
 	body += string(stream.EncodeTLV(stream.TagTextUser, " world"))

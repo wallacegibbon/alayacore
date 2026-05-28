@@ -6,7 +6,7 @@ import (
 )
 
 // StreamID identifies a delta stream across multiple TLV frames.
-// Used by TA and TR (delta messages). FS uses JSON instead.
+// Used by AT and AR (delta messages). AF uses JSON instead.
 //
 // Wire format within a TLV value:
 //

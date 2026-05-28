@@ -47,8 +47,8 @@ configured).
 ## Example
 
 ```sh
-# Send 2 TU (TagTextUser) frames to AlayaCore
-printf 'TU\x00\x00\x00\x05helloTU\x00\x00\x00\x06my os?' | alayacore --rawio
+# Send 2 UT (TagTextUser) frames to AlayaCore
+printf 'UT\x00\x00\x00\x05helloUT\x00\x00\x00\x06my os?' | alayacore --rawio
 ```
 
 ## Use Cases

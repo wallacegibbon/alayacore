@@ -54,13 +54,13 @@ import (
 //
 // For tool windows (ToolName != ""), content is split into ToolInput
 // (the tool call arguments) and ToolOutput (the execution result).
-// For text windows (TA/TR/TU/SE/SN), Content holds the full text.
+// For text windows (AT/AR/UT/SE/SN), Content holds the full text.
 type Window struct {
 	ID         string     // stream ID or generated unique ID
 	Tag        string     // TLV tag that created this window
-	ToolName   string     // tool name (for FD/FR tags)
-	ToolInput  string     // tool call input (formatted, for FD windows)
-	ToolOutput string     // tool execution output (for FR windows)
+	ToolName   string     // tool name (for AF/UF tags)
+	ToolInput  string     // tool call input (formatted, for AF windows)
+	ToolOutput string     // tool execution output (for UF windows)
 	Content    string     // accumulated content (raw, unstyled) for non-tool windows
 	Folded     bool       // true if window is in folded (collapsed) mode
 	Status     ToolStatus // status indicator for tool windows

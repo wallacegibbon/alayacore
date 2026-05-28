@@ -100,7 +100,7 @@ func (wb *WindowBuffer) SetStyles(styles *Styles) {
 }
 
 // AppendOrUpdate adds content to an existing window or creates a new one.
-// Used for text content (TU, TA, TR, SE, SN) and replayed FR sessions.
+// Used for text content (UT, AT, AR, SE, SN) and replayed UF sessions.
 // Tool windows use HandleFunctionEvent and HandleFunctionResult instead.
 func (wb *WindowBuffer) AppendOrUpdate(tag string, id string, content string) {
 	wb.mu.Lock()
@@ -210,7 +210,7 @@ func (wb *WindowBuffer) HandleFunctionResult(id, output, status string) {
 		return
 	}
 
-	// No prior FD window (e.g. replayed from session file) — create one.
+	// No prior AF window (e.g. replayed from session file) — create one.
 	w := &Window{
 		ID:         id,
 		Tag:        stream.TagFunctionResult,

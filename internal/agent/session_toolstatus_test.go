@@ -27,7 +27,7 @@ func TestWriteToolOutput(t *testing.T) {
 
 	var got stream.ToolResultData
 	if err := json.Unmarshal([]byte(value), &got); err != nil {
-		t.Fatalf("Failed to parse FR JSON: %v", err)
+		t.Fatalf("Failed to parse UF JSON: %v", err)
 	}
 	if got.ID != "tool123" || got.Output != "output text" || got.Status != "success" {
 		t.Errorf("Expected {tool123, output text, success}, got {%s, %s, %s}", got.ID, got.Output, got.Status)
@@ -43,7 +43,7 @@ func TestWriteToolOutput(t *testing.T) {
 	}
 
 	if err := json.Unmarshal([]byte(value), &got); err != nil {
-		t.Fatalf("Failed to parse FR JSON: %v", err)
+		t.Fatalf("Failed to parse UF JSON: %v", err)
 	}
 	if got.ID != "tool456" || got.Output != "error message" || got.Status != "failed" {
 		t.Errorf("Expected {tool456, error message, failed}, got {%s, %s, %s}", got.ID, got.Output, got.Status)
@@ -103,7 +103,7 @@ func TestOnToolResultCallback(t *testing.T) {
 
 	var got stream.ToolResultData
 	if err := json.Unmarshal([]byte(value), &got); err != nil {
-		t.Fatalf("Failed to parse FR JSON: %v", err)
+		t.Fatalf("Failed to parse UF JSON: %v", err)
 	}
 	if got.ID != "call1" || got.Status != "success" {
 		t.Errorf("Expected {call1, success}, got {%s, %s}", got.ID, got.Status)
@@ -122,7 +122,7 @@ func TestOnToolResultCallback(t *testing.T) {
 	}
 
 	if err := json.Unmarshal([]byte(value), &got); err != nil {
-		t.Fatalf("Failed to parse FR JSON: %v", err)
+		t.Fatalf("Failed to parse UF JSON: %v", err)
 	}
 	if got.ID != "call2" || got.Status != "failed" {
 		t.Errorf("Expected {call2, failed}, got {%s, %s}", got.ID, got.Status)
@@ -138,7 +138,7 @@ func TestWriteToolCallWithPending(t *testing.T) {
 
 	session.writeToolCall("execute_command", `{"command":"ls"}`, "tool123")
 
-	// Should have written one TLV message: FD with type "call"
+	// Should have written one TLV message: AF with type "call"
 	// Status "pending" is inferred by the terminal from window creation.
 
 	// Parse the message (tool call display)
@@ -150,7 +150,7 @@ func TestWriteToolCallWithPending(t *testing.T) {
 	// The tool call should be JSON with id, type, name, input
 	var fd1 stream.FunctionData
 	if err := json.Unmarshal([]byte(value1), &fd1); err != nil {
-		t.Fatalf("Failed to parse FD JSON: %v", err)
+		t.Fatalf("Failed to parse AF JSON: %v", err)
 	}
 	if fd1.Type != "call" || fd1.Name != "execute_command" {
 		t.Errorf("Expected type=call, name=execute_command, got type=%s, name=%s", fd1.Type, fd1.Name)

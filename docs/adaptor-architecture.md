@@ -75,7 +75,7 @@ Communication between adaptors and session uses a simple Tag-Length-Value (TLV) 
 
 ### Delta Messages
 
-TA and TR are **delta messages** — they arrive piece-by-piece during streaming and carry a NUL-delimited stream ID in the value:
+AT and AR are **delta messages** — they arrive piece-by-piece during streaming and carry a NUL-delimited stream ID in the value:
 
 ```
 \x00<stream-id>\x00<content>
@@ -85,53 +85,53 @@ NUL bytes (`\x00`) are used as delimiters because they can never appear in norma
 
 Stream ID format:
 
-- **TA, TR** — `<promptID>|<step>`. Example: `\x000|1\x00Hello world`
+- **AT, AR** — `<promptID>|<step>`. Example: `\x000|1\x00Hello world`
 
 The adaptor uses `tag + streamID` as the window key, so text and reasoning from the same step get separate windows.
 
-FD and FR use JSON (not the delta format), since tool events are discrete, not streaming.
+AF and UF use JSON (not the delta format), since tool events are discrete, not streaming.
 
 ### Tags
 
 | Tag | Code | Direction | Description |
 |-----|------|-----------|-------------|
-| `TagTextUser` | TU | Input | User text input |
-| `TagTextAssistant` | TA | Output | Assistant text output |
-| `TagTextReasoning` | TR | Output | Reasoning/thinking content |
-| `TagFunction` | FD | Output | Function lifecycle: start/call (JSON) — pending inferred from lifecycle |
-| `TagFunctionResult` | FR | Output | Function result with status (JSON) |
+| `TagTextUser` | UT | Input | User text input |
+| `TagTextAssistant` | AT | Output | Assistant text output |
+| `TagTextReasoning` | AR | Output | Reasoning/thinking content |
+| `TagFunction` | AF | Output | Function lifecycle: start/call (JSON) — pending inferred from lifecycle |
+| `TagFunctionResult` | UF | Output | Function result with status (JSON) |
 | `TagSystemError` | SE | Output | System error messages |
 | `TagSystemNotify` | SN | Output | System notifications |
 | `TagSystemData` | SD | Output | System data (JSON) |
 
-### Function Lifecycle (FD + FR)
+### Function Lifecycle (AF + UF)
 
 Tool execution uses two tags with a `type` discriminator:
 
-**FD** carries the function lifecycle:
+**AF** carries the function lifecycle:
 - `{"id":"tool123","type":"start","name":"read_file"}` — tool name known
 - `{"id":"tool123","type":"call","name":"read_file","input":"..."}` — full input received
 
-**FR** carries the final result with status:
+**UF** carries the final result with status:
 - `{"id":"tool123","output":"...","status":"success"}` — execution succeeded
 - `{"id":"tool123","output":"...","status":"failed"}` — execution failed
 
-The terminal infers "pending" status from the absence of a result (no FR received for a tool call), so no explicit state frame is needed for the initial pending state. Each FD type targets its own field on the tool data model (name, input, status), so ordering between "start" and "call" frames is always safe.
+The terminal infers "pending" status from the absence of a result (no UF received for a tool call), so no explicit state frame is needed for the initial pending state. Each AF type targets its own field on the tool data model (name, input, status), so ordering between "start" and "call" frames is always safe.
 
 ### Example Flow
 
 ```
 1. User types "read main.go" in terminal
-2. Terminal adaptor emits: TLV(TU, "read main.go")
+2. Terminal adaptor emits: TLV(UT, "read main.go")
 3. Session reads TLV, creates UserPrompt task
 4. Session processes prompt through the agent loop
 5. Agent calls read_file tool:
-   → Session emits: TLV(FD, {"id":"tool123","type":"start","name":"read_file"})
-   → Session emits: TLV(FD, {"id":"tool123","type":"call","name":"read_file","input":"{\"path\":\"main.go\"}"})
-   → Tool executes → Session emits: TLV(FR, {"id":"tool123","output":"...","status":"success"})
+   → Session emits: TLV(AF, {"id":"tool123","type":"start","name":"read_file"})
+   → Session emits: TLV(AF, {"id":"tool123","type":"call","name":"read_file","input":"{\"path\":\"main.go\"}"})
+   → Tool executes → Session emits: TLV(UF, {"id":"tool123","output":"...","status":"success"})
 6. Agent calls execute_command → execution canceled:
-   → Session emits: TLV(FR, {"id":"tool123","output":"Canceled (exit 130)","status":"failed"})
-6. Agent generates response → Session emits: TLV(TA, "\x000|0\x00Here's what main.go does...")
+   → Session emits: TLV(UF, {"id":"tool123","output":"Canceled (exit 130)","status":"failed"})
+6. Agent generates response → Session emits: TLV(AT, "\x000|0\x00Here's what main.go does...")
 7. Terminal adaptor parses TLV, renders styled content in windows
 ```
 
@@ -159,7 +159,7 @@ main.go → config.Parse() → Settings
 ```
 User types prompt
   → InputModel captures input
-    → Emit TLV(TU, prompt)
+    → Emit TLV(UT, prompt)
       → inputPump reads TLV
         → submitTask(UserPrompt)
           → Task Queue
@@ -167,7 +167,7 @@ User types prompt
               → handleUserPrompt()
                 → processPrompt()
                   → Agent.Stream()
-                    → Callbacks emit TLV(TA), TLV(TR), TLV(FD), TLV(FR), etc.
+                    → Callbacks emit TLV(AT), TLV(AR), TLV(AF), TLV(UF), etc.
                       → OutputWriter parses TLV
                         → WindowBuffer.AppendOrUpdate()
                           → DisplayModel.View()
@@ -178,10 +178,10 @@ User types prompt
 
 ```
 Agent.Stream() receives tool_call event
-  → OnToolCallStart callback → TLV(FD, {"id":"<id>","type":"start","name":"<tool>"}) → UI shows tool name immediately
-    → OnToolCall callback → TLV(FD, {"id":"<id>","type":"call","name":"<tool>","input":"..."}) → UI fills in arguments
+  → OnToolCallStart callback → TLV(AF, {"id":"<id>","type":"start","name":"<tool>"}) → UI shows tool name immediately
+    → OnToolCall callback → TLV(AF, {"id":"<id>","type":"call","name":"<tool>","input":"..."}) → UI fills in arguments
       → Agent executes tool: tool.Execute(ctx, input)
-        → OnToolResult callback → TLV(FR, {"id":"<id>","output":"...","status":"success"}) → UI shows output and indicator
+        → OnToolResult callback → TLV(UF, {"id":"<id>","output":"...","status":"success"}) → UI shows output and indicator
           → Tool result added to messages
             → Agent continues to next step (if under max_steps)
 ```
