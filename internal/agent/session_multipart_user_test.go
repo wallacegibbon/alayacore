@@ -76,7 +76,7 @@ func TestConsecutiveUserChunksGrouped(t *testing.T) {
 	// Manually construct a session body with two consecutive TU chunks.
 	// This simulates what formatSessionMarkdown produces for a multi-part
 	// user message.
-	raw := []byte("---\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\n---\n")
+	raw := []byte("---\nversion: 1\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\n---\n")
 
 	// Build TLV body with two TU chunks followed by one TA chunk
 	var body string

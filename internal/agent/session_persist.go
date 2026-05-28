@@ -5,6 +5,7 @@ package agent
 import (
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -15,6 +16,10 @@ import (
 	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/stream"
 )
+
+// ErrSessionVersionTooLow is returned when a session file has a version
+// lower than SessionFileFormatVersion and cannot be loaded.
+var ErrSessionVersionTooLow = errors.New("session file version is too old and cannot be loaded")
 
 // ============================================================================
 // Load/Save
@@ -36,6 +41,7 @@ func (s *Session) saveSessionToFile(path string) error {
 func (s *Session) saveSessionToFileWith(messages []llm.Message, path string) error {
 	data := SessionData{
 		SessionMeta: SessionMeta{
+			Version:        SessionFileFormatVersion,
 			CreatedAt:      s.CreatedAt,
 			UpdatedAt:      time.Now(),
 			ReasoningLevel: int(s.reasoningLevel.Load()),
@@ -168,9 +174,16 @@ func parseFrontmatter(content string) (frontmatter, body string, err error) {
 }
 
 // parseSessionMeta parses key-value pairs from frontmatter into SessionMeta using struct tags.
-func parseSessionMeta(frontmatter string) SessionMeta {
+// Returns an error if the session file version is missing or too low.
+func parseSessionMeta(frontmatter string) (SessionMeta, error) {
 	var meta SessionMeta
 	config.ParseKeyValue(frontmatter, &meta)
+
+	// Check session file format version.
+	if meta.Version < SessionFileFormatVersion {
+		return meta, fmt.Errorf("%w: got version %d, need version >= %d",
+			ErrSessionVersionTooLow, meta.Version, SessionFileFormatVersion)
+	}
 
 	// Default reasoning_level to 1 (normal) when the key is absent from the
 	// frontmatter.  config.ParseKeyValue leaves the field at its zero value
@@ -186,7 +199,7 @@ func parseSessionMeta(frontmatter string) SessionMeta {
 		meta.ReasoningLevel = config.DefaultReasoningLevel
 	}
 
-	return meta
+	return meta, nil
 }
 
 func parseSessionMarkdown(data []byte) (*SessionData, error) {
@@ -195,8 +208,13 @@ func parseSessionMarkdown(data []byte) (*SessionData, error) {
 		return nil, err
 	}
 
+	meta, err := parseSessionMeta(frontmatter)
+	if err != nil {
+		return nil, err
+	}
+
 	sd := &SessionData{
-		SessionMeta: parseSessionMeta(frontmatter),
+		SessionMeta: meta,
 	}
 
 	if len(body) > 0 {

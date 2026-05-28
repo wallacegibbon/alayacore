@@ -70,6 +70,10 @@ type SystemInfo struct {
 	ActiveTheme     string          `json:"active_theme,omitempty"`
 }
 
+// SessionFileFormatVersion is the current version of the session file format.
+// Increment when making backward-incompatible changes to the session file structure.
+const SessionFileFormatVersion = 1
+
 // SessionMeta is the frontmatter metadata.
 type SessionMeta struct {
 	CreatedAt      time.Time `config:"created_at"`
@@ -77,6 +81,7 @@ type SessionMeta struct {
 	ReasoningLevel int       `config:"reasoning_level"`
 	ActiveModel    string    `config:"active_model,omitempty"`
 	ContextTokens  int64     `config:"context_tokens,omitempty"`
+	Version        int       `config:"version,omitempty"`
 }
 
 // SessionData is the persisted form of a Session.

@@ -54,6 +54,7 @@ func TestFormatRuntimeConfig_RoundTrip(t *testing.T) {
 
 func TestFormatFrontmatter_RoundTrip(t *testing.T) {
 	meta := SessionMeta{
+		Version:        SessionFileFormatVersion,
 		ActiveModel:    `model "name" \\ thing`,
 		ReasoningLevel: 1,
 		ContextTokens:  12345,
@@ -68,7 +69,10 @@ func TestFormatFrontmatter_RoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse frontmatter: %v", err)
 	}
-	parsed := parseSessionMeta(fm)
+	parsed, err := parseSessionMeta(fm)
+	if err != nil {
+		t.Fatalf("parseSessionMeta failed: %v", err)
+	}
 
 	if parsed.ActiveModel != meta.ActiveModel {
 		t.Errorf("ActiveModel round-trip failed: got %q, want %q", parsed.ActiveModel, meta.ActiveModel)
@@ -122,6 +126,7 @@ func TestRuntimeManager_NewlineInModel_RoundTrip(t *testing.T) {
 // Verify formatFrontmatter doesn't produce broken output for special chars
 func TestFormatFrontmatter_NoBrokenOutput(t *testing.T) {
 	meta := SessionMeta{
+		Version:        SessionFileFormatVersion,
 		ActiveModel:    "has\nnewlines",
 		ReasoningLevel: 1,
 	}

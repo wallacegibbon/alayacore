@@ -31,7 +31,7 @@ import (
 func StartSession(cfg *Config, output io.Writer) (*agentpkg.Session, io.WriteCloser, error) {
 	input := stream.NewSliceBuffer(100)
 
-	session, _ := agentpkg.LoadOrNewSession(agentpkg.SessionConfig{
+	session, _, err := agentpkg.LoadOrNewSession(agentpkg.SessionConfig{
 		Input:               input,
 		Output:              output,
 		SessionFile:         cfg.Cfg.Session,
@@ -48,6 +48,9 @@ func StartSession(cfg *Config, output io.Writer) (*agentpkg.Session, io.WriteClo
 		SkillsMgr:           cfg.SkillsMgr,
 		OverrideActiveModel: cfg.Cfg.ModelName,
 	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to load session: %w", err)
+	}
 
 	// --model CLI flag: fail immediately if the named model doesn't exist.
 	if err := session.InitError(); err != nil {

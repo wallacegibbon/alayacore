@@ -35,6 +35,7 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"sync/atomic"
 	"time"
 
@@ -127,16 +128,19 @@ func (s *Session) ModelConfigPath() string {
 // ============================================================================
 
 // LoadOrNewSession loads a session from file or creates a new one.
+// Returns an error if the session file exists but has an incompatible version.
 // The returned session is ready to use but NOT yet started —
 // call Start() to begin processing input.
-func LoadOrNewSession(cfg SessionConfig) (*Session, string) {
+func LoadOrNewSession(cfg SessionConfig) (*Session, string, error) {
 	cfg.SessionFile = config.ExpandPath(cfg.SessionFile)
 	if cfg.SessionFile != "" {
 		if data, err := LoadSession(cfg.SessionFile); err == nil {
-			return RestoreFromSession(cfg, data), cfg.SessionFile
+			return RestoreFromSession(cfg, data), cfg.SessionFile, nil
+		} else if errors.Is(err, ErrSessionVersionTooLow) {
+			return nil, "", err
 		}
 	}
-	return NewSession(cfg), cfg.SessionFile
+	return NewSession(cfg), cfg.SessionFile, nil
 }
 
 // NewSession creates a fresh session. Does NOT start goroutines —

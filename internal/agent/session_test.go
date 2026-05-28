@@ -2,6 +2,7 @@ package agent
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -69,12 +70,15 @@ func TestLoadOrNewSession(t *testing.T) {
 	systemPrompt := "test system prompt"
 
 	// Test creating a new session without specifying session file
-	session, sessionFile := LoadOrNewSession(SessionConfig{
+	session, sessionFile, err := LoadOrNewSession(SessionConfig{
 		BaseTools:    baseTools,
 		SystemPrompt: systemPrompt,
 		Input:        &stream.NopInput{},
 		Output:       &stream.NopOutput{},
 	})
+	if err != nil {
+		t.Fatalf("LoadOrNewSession returned error: %v", err)
+	}
 	if session == nil {
 		t.Fatal("LoadOrNewSession returned nil session")
 		return
@@ -514,6 +518,7 @@ func TestDisplayMessagesWithToolCalls(t *testing.T) {
 			},
 		},
 		SessionMeta: SessionMeta{
+			Version:   SessionFileFormatVersion,
 			UpdatedAt: time.Now(),
 		},
 	}
@@ -756,7 +761,8 @@ func TestTLVFormatRecursionProtection(t *testing.T) {
 // to 1 (normal) rather than 0 (off).
 func TestLoadSessionMissingReasoningLevel(t *testing.T) {
 	// Frontmatter without reasoning_level, mimicking an older session file.
-	raw := []byte("---\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\n---\n")
+	// Must include version: 1 for the version check to pass.
+	raw := []byte("---\nversion: 1\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\n---\n")
 
 	data, err := parseSessionMarkdown(raw)
 	if err != nil {
@@ -768,7 +774,7 @@ func TestLoadSessionMissingReasoningLevel(t *testing.T) {
 	}
 
 	// Also verify that an explicit reasoning_level: 0 is preserved.
-	raw2 := []byte("---\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\nreasoning_level: 0\n---\n")
+	raw2 := []byte("---\nversion: 1\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\nreasoning_level: 0\n---\n")
 
 	data2, err := parseSessionMarkdown(raw2)
 	if err != nil {
@@ -800,7 +806,7 @@ func TestLoadSessionInvalidReasoningLevel(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			raw := []byte("---\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\n" + tt.value + "\n---\n")
+			raw := []byte("---\nversion: 1\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\n" + tt.value + "\n---\n")
 
 			data, err := parseSessionMarkdown(raw)
 			if err != nil {
@@ -811,5 +817,77 @@ func TestLoadSessionInvalidReasoningLevel(t *testing.T) {
 				t.Errorf("reasoning_level=%s: expected %d, got %d", tt.value, tt.want, data.ReasoningLevel)
 			}
 		})
+	}
+}
+
+// TestLoadSessionVersionTooLow verifies that a session file with a missing or
+// too-low version is rejected with ErrSessionVersionTooLow.
+func TestLoadSessionVersionTooLow(t *testing.T) {
+	tests := []struct {
+		name    string
+		raw     string
+		wantErr error
+	}{
+		{
+			name:    "missing version",
+			raw:     "---\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\n---\n",
+			wantErr: ErrSessionVersionTooLow,
+		},
+		{
+			name:    "version zero",
+			raw:     "---\nversion: 0\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\n---\n",
+			wantErr: ErrSessionVersionTooLow,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := parseSessionMarkdown([]byte(tt.raw))
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("expected %v, got %v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+// TestLoadSessionVersionValid verifies that a session file with a valid version
+// loads successfully.
+func TestLoadSessionVersionValid(t *testing.T) {
+	raw := []byte("---\nversion: 1\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\n---\n")
+
+	data, err := parseSessionMarkdown(raw)
+	if err != nil {
+		t.Fatalf("parseSessionMarkdown failed: %v", err)
+	}
+
+	if data.Version != 1 {
+		t.Errorf("expected Version=1, got %d", data.Version)
+	}
+}
+
+// TestLoadOrNewSessionVersionTooLow verifies that LoadOrNewSession returns an
+// error when the session file has an incompatible version.
+func TestLoadOrNewSessionVersionTooLow(t *testing.T) {
+	tmpDir := t.TempDir()
+	sessionPath := filepath.Join(tmpDir, "old-session.md")
+
+	// Write a session file with missing version
+	if err := os.WriteFile(sessionPath, []byte("---\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\n---\n"), 0600); err != nil {
+		t.Fatalf("failed to write session file: %v", err)
+	}
+
+	_, _, err := LoadOrNewSession(SessionConfig{
+		SessionFile: sessionPath,
+		Input:       &stream.NopInput{},
+		Output:      &stream.NopOutput{},
+	})
+	if err == nil {
+		t.Fatal("expected error for old session file, got nil")
+	}
+	if !errors.Is(err, ErrSessionVersionTooLow) {
+		t.Errorf("expected ErrSessionVersionTooLow, got %v", err)
 	}
 }
