@@ -11,7 +11,6 @@ package agent
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -115,14 +114,15 @@ func (s *Session) sendSystemInfo(kind string) {
 	switch kind {
 	case "all":
 		s.sendTaskMsg()
-		s.sendModelMsgs()
+		s.sendModelListMsg()
+		s.sendModelMsg()
 		s.sendThemeListMsg()
 		s.sendThemeMsg()
 		s.sendReasoningMsg()
 	case "task":
 		s.sendTaskMsg()
 	case "model":
-		s.sendModelMsgs()
+		s.sendModelMsg()
 	case "theme":
 		s.sendThemeMsg()
 	case "reasoning":
@@ -141,7 +141,7 @@ func (s *Session) sendTaskMsg() {
 	})
 }
 
-func (s *Session) sendModelMsgs() {
+func (s *Session) sendModelMsg() {
 	if s.ModelManager == nil {
 		return
 	}
@@ -155,6 +155,14 @@ func (s *Session) sendModelMsgs() {
 		ActiveModelName: activeName,
 		ContextLimit:    s.ContextLimit,
 	})
+}
+
+// sendModelListMsg sends the full model list.
+// Called once on startup so adaptors can populate the model selector.
+func (s *Session) sendModelListMsg() {
+	if s.ModelManager == nil {
+		return
+	}
 	_ = stream.WriteSystemMsg(s.Output, ModelListMsg{ //nolint:errcheck
 		Models:          s.ModelManager.GetModels(),
 		ModelConfigPath: s.ModelManager.GetFilePath(),
@@ -170,33 +178,32 @@ func (s *Session) sendThemeMsg() {
 }
 
 // sendThemeListMsg sends the full list of available themes with content.
+// loadThemeFromFile loads a theme file and returns a ThemeInfo.
+// Returns zero ThemeInfo and false if the file cannot be loaded.
+func loadThemeFromFile(path string) (ThemeInfo, bool) {
+	name := strings.TrimSuffix(filepath.Base(path), ".conf")
+	t, err := theme.LoadTheme(path)
+	if err != nil {
+		return ThemeInfo{}, false
+	}
+	return ThemeInfo{Name: name, Theme: t}, true
+}
+
+// sendThemeListMsg sends the full list of available themes with content.
 // Called once on startup so adaptors can cache theme data.
 func (s *Session) sendThemeListMsg() {
 	if s.ThemesFolder == "" {
 		return
 	}
-	entries, err := os.ReadDir(s.ThemesFolder)
+	confs, err := filepath.Glob(filepath.Join(s.ThemesFolder, "*.conf"))
 	if err != nil {
 		return
 	}
-	// Count .conf files to pre-allocate.
-	n := 0
-	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".conf") {
-			n++
+	infos := make([]ThemeInfo, 0, len(confs))
+	for _, path := range confs {
+		if info, ok := loadThemeFromFile(path); ok {
+			infos = append(infos, info)
 		}
-	}
-	infos := make([]ThemeInfo, 0, n)
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".conf") {
-			continue
-		}
-		name := strings.TrimSuffix(entry.Name(), ".conf")
-		t, err := theme.LoadTheme(filepath.Join(s.ThemesFolder, entry.Name()))
-		if err != nil {
-			continue
-		}
-		infos = append(infos, ThemeInfo{Name: name, Theme: t})
 	}
 	if len(infos) > 0 {
 		_ = stream.WriteSystemMsg(s.Output, ThemeListMsg{Themes: infos}) //nolint:errcheck

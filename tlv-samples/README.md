@@ -52,20 +52,20 @@ A tool call (AF) without a matching UF is still in progress. Each `.bin` sample 
 ## Example: Text Prompt Flow
 
 ```
-Adaptor writes → stdin:          UT "Read the file main.go"
-Session writes → stdout:         AF {"id":"t1","type":"start","name":"read_file"}
-                                 AF {"id":"t1","type":"call","name":"read_file","input":"{\"path\":\"main.go\"}"}
-                                 UF {"id":"t1","output":"package main...","status":"success"}
-                                 AT \x00 0|1 \x00 Here's what main.go does...
-                                 SM {"type":"task","data":{"in_progress":false,"context":0,"queue_items":[]}}
+Adaptor writes → stdin:        UT "Read the file main.go"
+Session writes → stdout:       AF {"id":"t1","type":"start","name":"read_file"}
+                               AF {"id":"t1","type":"call","name":"read_file","input":"{\"path\":\"main.go\"}"}
+                               UF {"id":"t1","output":"package main...","status":"success"}
+                               AT \x00 0|1 \x00 Here's what main.go does...
+                               SM {"type":"task","data":{"in_progress":false,"context":0,"queue_items":[]}}
 ```
 
 ## Example: Image Prompt Flow
 
 ```
-Adaptor writes → stdin:          UI data:image/jpeg;base64,...
-                                 UI data:image/png;base64,...
-                                 UT "What's in these images?"
+Adaptor writes → stdin:        UI data:image/jpeg;base64,...
+                               UI data:image/png;base64,...
+                               UT "What's in these images?"
 ```
 
 UI frames must precede the UT frame they belong to.
@@ -133,14 +133,14 @@ at-delta-new-step.bin          AT \x00 0|2 \x00 Next step (new stream)
 at-plain.bin                   AT "plain text without stream id"
 ar-delta.bin                   AR \x00 0|1 \x00 thinking...
 ui-image.bin                   UI data:image/jpeg;base64,...
-sm-model.bin                  SM {"type":"model","data":{"active_id":4,"active_name":"DeepSeek / DeepSeek-V4 Flash","context_limit":1000000}}
-sm-model-list.bin             SM {"type":"model_list","data":{"models":[{"id":0,"name":"Anthropic / Claude Haiku 4",...},{"id":4,"name":"DeepSeek / DeepSeek-V4 Flash",...}],"model_config_path":"..."}}
-sm-theme-list.bin             SM {"type":"theme_list","data":{"themes":[{"name":"theme-dark",...},{"name":"theme-light",...}]}}
+sm-model-list.bin              SM {"type":"model_list","data":{"models":[{"id":0,"name":"Anthropic / Claude Haiku 4",...},{"id":4,"name":"DeepSeek / DeepSeek-V4 Flash",...}],"model_config_path":"..."}}
+sm-model.bin                   SM {"type":"model","data":{"active_id":4,"active_name":"DeepSeek / DeepSeek-V4 Flash","context_limit":1000000}}
+sm-theme-list.bin              SM {"type":"theme_list","data":{"themes":[{"name":"theme-dark",...},{"name":"theme-light",...}]}}
+sm-theme.bin                   SM {"type":"theme","data":{"name":"theme-dark"}}
+sm-reasoning.bin               SM {"type":"reasoning","data":{"level":2}}
 sm-task-start.bin              SM {"type":"task","data":{"in_progress":true,"context":0,"queue_items":[]}}
 sm-task-queued.bin             SM {"type":"task","data":{"in_progress":true,"context":0,"queue_items":[{"queue_id":"Q1","type":"prompt","content":"Read the file main.go","created_at":"..."},{"queue_id":"Q2","type":"command","content":":continue","created_at":"..."}]}}
 sm-task-end.bin                SM {"type":"task","data":{"in_progress":false,"context":0,"queue_items":[]}}
-sm-theme.bin                   SM {"type":"theme","data":{"name":"theme-dark"}}
-sm-reasoning.bin               SM {"type":"reasoning","data":{"level":2}}
 sm-error.bin                   SM {"type":"error","data":{"text":"something broke"}}
 sm-notify.bin                  SM {"type":"notify","data":{"text":"all good"}}
 ```

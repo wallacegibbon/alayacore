@@ -19,7 +19,6 @@ Provider API response
         → Agent fires OnStepFinish(messages, stepUsage) callback
           → Session.sendEvent(StepFinishEvent{...})
             → handleTaskEvent in run() goroutine
-              → TotalSpent accumulates (InputTokens +=, OutputTokens +=)
               → ContextTokens = InputTokens + OutputTokens + CacheReadTokens + CacheCreationTokens (overwrite, only if non-zero)
 ```
 
@@ -27,8 +26,6 @@ Context tracking is handled by the `handleTaskEvent` method in `session_loop.go`
 
 ```go
 case StepFinishEvent:
-    s.TotalSpent.InputTokens += e.InputTokens
-    s.TotalSpent.OutputTokens += e.OutputTokens
     newContext := e.InputTokens + e.OutputTokens + e.CacheReadTokens + e.CacheCreationTokens
     if newContext > 0 {
         s.ContextTokens.Store(newContext)
@@ -101,7 +98,7 @@ The `:summarize` command is a **deferred command** — it runs in a task gorouti
    - **Next** — Ordered actions to resume
 2. Calls the LLM to generate the summary
 3. **Replaces the entire conversation history** with the summary (a "Continue" user message followed by the assistant's summary response)
-4. Resets `ContextTokens` to the summary's output token count via `SetContextTokensEvent` (a dedicated event that avoids double-counting in `TotalSpent` and corrects the value after the `StepFinishEvent` from `processPrompt` has been processed)
+4. Resets `ContextTokens` to the summary's output token count via `SetContextTokensEvent` (a dedicated event that corrects the value after the `StepFinishEvent` from `processPrompt` has been processed)
 
 ### ⚠️ Event ordering
 
@@ -127,6 +124,6 @@ Both are sent by the same goroutine sequentially, and the FIFO channel guarantee
 
 - `shouldAutoSummarize()` — triggers when `ContextTokens >= ContextLimit * 65%` (only when `--auto-summarize` is enabled)
 - `summarize()` — appends the summary prompt to Messages, calls `processPrompt`, then replaces conversation history with the summary and resets `ContextTokens` to the summary's output token count via `SetContextTokensEvent`
-- `SetContextTokensEvent` — a dedicated task event that sets `ContextTokens` without affecting `TotalSpent` counters, used to correct the value after summarization
+- `SetContextTokensEvent` — a dedicated task event that sets `ContextTokens` to the correct value after summarization, overriding the stale value from the preceding `StepFinishEvent`
 - `applyModelContextLimit()` — sets `ContextLimit` from the active model's config
 - `SessionMeta.ContextTokens` — persisted to session file frontmatter so the status bar shows the correct context usage immediately after loading a session
