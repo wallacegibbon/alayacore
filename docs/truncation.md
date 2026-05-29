@@ -1,4 +1,4 @@
-# Tool Output Handling
+# Tool Output Truncation
 
 How AlayaCore handles large outputs from tools to stay within context budgets.
 

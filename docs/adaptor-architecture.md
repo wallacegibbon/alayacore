@@ -65,89 +65,9 @@ This ensures both paths converge: the theme selector's live preview still applie
 
 ## TLV Protocol
 
-Communication between adaptors and session uses a simple Tag-Length-Value (TLV) binary protocol.
-
-### Message Format
-
-```
-[2-byte tag][4-byte length (big-endian)][value bytes]
-```
-
-### Delta Messages
-
-AT and AR are **delta messages** — they arrive piece-by-piece during streaming and carry a NUL-delimited stream ID in the value:
-
-```
-\x00<stream-id>\x00<content>
-```
-
-NUL bytes (`\x00`) are used as delimiters because they can never appear in normal UTF-8 text, making the split unambiguous even if the LLM generates content that looks like a stream ID.
-
-Stream ID format:
-
-- **AT, AR** — `<promptID>|<step>`. Example: `\x000|1\x00Hello world`
-
-The adaptor uses `tag + streamID` as the window key, so text and reasoning from the same step get separate windows.
-
-AF and UF use JSON (not the delta format), since tool events are discrete, not streaming.
-
-### Tags
-
-| Tag | Code | Description |
-|-----|------|-------------|
-| `TagAssistantR` | AR | Reasoning/thinking content |
-| `TagAssistantT` | AT | Assistant text output |
-| `TagAssistantF` | AF | Function lifecycle: start/call (JSON) — pending inferred from lifecycle |
-| `TagUserI` | UI | User image (DataURI: data:image/...;base64,...) |
-| `TagUserT` | UT | User text input |
-| `TagUserF` | UF | Function result with status (JSON) |
-| `TagSystemMsg` | SM | System message (JSON: {"type":"...","data":{...}}) |
-
-### Function Lifecycle (AF + UF)
-
-Tool execution uses two tags with a `type` discriminator:
-
-**AF** carries the function lifecycle:
-- `{"id":"tool123","type":"start","name":"read_file"}` — tool name known
-- `{"id":"tool123","type":"call","name":"read_file","input":"..."}` — full input received
-
-**UF** carries the final result with status:
-- `{"id":"tool123","output":"...","status":"success"}` — execution succeeded
-- `{"id":"tool123","output":"...","status":"failed"}` — execution failed
-
-The terminal infers "pending" status from the absence of a result (no UF received for a tool call), so no explicit state frame is needed for the initial pending state. Each AF type targets its own field on the tool data model (name, input, status), so ordering between "start" and "call" frames is always safe.
-
-### Example Flow
-
-#### Text Prompt
-```
-1. User types "read main.go" in terminal
-2. Terminal adaptor emits: TLV(UT, "read main.go")
-3. Session reads TLV, creates UserPrompt task
-4. Session processes prompt through the agent loop
-5. Agent calls read_file tool:
-   → Session emits: TLV(AF, {"id":"tool123","type":"start","name":"read_file"})
-   → Session emits: TLV(AF, {"id":"tool123","type":"call","name":"read_file","input":"{\"path\":\"main.go\"}"})
-   → Tool executes → Session emits: TLV(UF, {"id":"tool123","output":"...","status":"success"})
-6. Agent calls execute_command → execution canceled:
-   → Session emits: TLV(UF, {"id":"tool123","output":"Canceled (exit 130)","status":"failed"})
-6. Agent generates response → Session emits: TLV(AT, "\x000|0\x00Here's what main.go does...")
-7. Terminal adaptor parses TLV, renders styled content in windows
-```
-
-#### Image Prompt
-```
-1. Script sends 2 images followed by text:
-   TLV(UI, "data:image/jpeg;base64,...")
-   TLV(UI, "data:image/png;base64,...")
-   TLV(UT, "What's in these images?")
-2. inputPump collects UI values, attaches them as images to the UT
-3. Session creates UserPrompt{Text: "What's in these images?", Images: [...]}
-4. handleUserPrompt builds message content: [ImagePart, ImagePart, TextPart]
-5. Provider converts to wire format:
-   - Anthropic: [{"type":"image","source":{...}}, {"type":"text","text":"..."}]
-   - OpenAI:   [{"type":"image_url","image_url":{...}}, {"type":"text","text":"..."}]
-```
+See [`tlv-samples/README.md`](../tlv-samples/README.md) for the full TLV
+protocol spec — wire format, tags, delta messages, function lifecycle,
+and binary samples for every message type.
 
 ## Data Flow
 
