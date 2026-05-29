@@ -37,14 +37,6 @@ type CommandPrompt struct {
 
 func (CommandPrompt) isTask() {}
 
-// QueueItemInfo holds serializable queue item data for clients.
-type QueueItemInfo struct {
-	QueueID   string `json:"queue_id"`
-	Type      string `json:"type"`
-	Content   string `json:"content"`
-	CreatedAt string `json:"created_at"`
-}
-
 // ============================================================================
 // TagSystemMsg (SM) payload types
 // ============================================================================
