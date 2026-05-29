@@ -175,11 +175,13 @@ func (to *outputWriter) writeColored(tag string, value string) {
 // triggerUpdateForTag marks the display as dirty for tags that modify the display
 func (to *outputWriter) triggerUpdateForTag(tag string) {
 	switch tag {
-	// Text content tags
+	// Text content tags — TagSystemMsg is NOT listed here because
+	// handleSystemMsg() calls to.dirty.Store(true) itself, after all
+	// state (including pendingQueueItems) has been fully updated.
+	// Setting dirty early would create a race where the Bubble Tea
+	// goroutine sees dirty=true but pendingQueueItems has not been set yet.
 	case stream.TagAssistantT, stream.TagAssistantR, stream.TagUserT,
-		stream.TagAssistantF,
-		// System messages
-		stream.TagSystemMsg:
+		stream.TagAssistantF:
 		to.dirty.Store(true)
 	}
 }
@@ -239,13 +241,13 @@ func (to *outputWriter) handleSystemNotify(data json.RawMessage) {
 
 func (to *outputWriter) handleSystemTask(data json.RawMessage) {
 	var m struct {
-		InProgress   bool  `json:"in_progress"`
-		CurrentStep  int   `json:"current_step"`
-		MaxSteps     int   `json:"max_steps"`
-		Context      int64 `json:"context"`
-		ContextLimit int64 `json:"context_limit"`
-		TaskError    bool  `json:"task_error"`
-		QueueItems   int   `json:"queue_items"`
+		InProgress   bool        `json:"in_progress"`
+		CurrentStep  int         `json:"current_step"`
+		MaxSteps     int         `json:"max_steps"`
+		Context      int64       `json:"context"`
+		ContextLimit int64       `json:"context_limit"`
+		TaskError    bool        `json:"task_error"`
+		QueueItems   []QueueItem `json:"queue_items"`
 	}
 	if json.Unmarshal(data, &m) != nil {
 		return

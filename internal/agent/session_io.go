@@ -473,6 +473,6 @@ func (s *Session) handleInputMsg(msg inputMsg) {
 			s.submitDeferredCommand(cmd)
 		}
 	} else {
-		s.submitTask(UserPrompt{Text: msg.text, Images: msg.images})
+		s.submitTask(QueueItem{Type: "prompt", Content: msg.text, Images: msg.images})
 	}
 }

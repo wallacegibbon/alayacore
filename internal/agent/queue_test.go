@@ -19,9 +19,9 @@ func TestQueueItemUniqueIDs(t *testing.T) {
 	}
 
 	// Submit multiple tasks and verify unique IDs
-	task1 := UserPrompt{Text: "test prompt 1"}
-	task2 := CommandPrompt{Command: "test command"}
-	task3 := UserPrompt{Text: "test prompt 2"}
+	task1 := QueueItem{Type: "prompt", Content: "test prompt 1"}
+	task2 := QueueItem{Type: "command", Content: "test command"}
+	task3 := QueueItem{Type: "prompt", Content: "test prompt 2"}
 
 	session.submitTask(task1)
 	session.submitTask(task2)
@@ -62,9 +62,9 @@ func TestDeleteQueueItem(t *testing.T) {
 	}
 
 	// Submit tasks
-	session.submitTask(UserPrompt{Text: "prompt 1"})
-	session.submitTask(UserPrompt{Text: "prompt 2"})
-	session.submitTask(UserPrompt{Text: "prompt 3"})
+	session.submitTask(QueueItem{Type: "prompt", Content: "prompt 1"})
+	session.submitTask(QueueItem{Type: "prompt", Content: "prompt 2"})
+	session.submitTask(QueueItem{Type: "prompt", Content: "prompt 3"})
 
 	// Delete middle item
 	deleted := session.DeleteQueueItem("Q2")
@@ -103,8 +103,8 @@ func TestQueueItemTypes(t *testing.T) {
 	}
 
 	// Submit different task types
-	promptTask := UserPrompt{Text: "test prompt"}
-	commandTask := CommandPrompt{Command: "test command"}
+	promptTask := QueueItem{Type: "prompt", Content: "test prompt"}
+	commandTask := QueueItem{Type: "command", Content: "test command"}
 
 	session.submitTask(promptTask)
 	session.submitTask(commandTask)
@@ -116,14 +116,14 @@ func TestQueueItemTypes(t *testing.T) {
 		t.Fatalf("Expected 2 items, got %d", len(items))
 	}
 
-	// Check first item is UserPrompt
-	if _, ok := items[0].Task.(UserPrompt); !ok {
-		t.Error("First item should be UserPrompt")
+	// Check first item type
+	if items[0].Type != "prompt" {
+		t.Error(`First item should be "prompt"`)
 	}
 
-	// Check second item is CommandPrompt
-	if _, ok := items[1].Task.(CommandPrompt); !ok {
-		t.Error("Second item should be CommandPrompt")
+	// Check second item type
+	if items[1].Type != "command" {
+		t.Error(`Second item should be "command"`)
 	}
 }
 
@@ -137,7 +137,7 @@ func TestQueueTimestamps(t *testing.T) {
 	}
 
 	before := time.Now()
-	session.submitTask(UserPrompt{Text: "test"})
+	session.submitTask(QueueItem{Type: "prompt", Content: "test"})
 	after := time.Now()
 
 	items := session.taskQueue
@@ -207,7 +207,8 @@ func TestCancelAllTasks(t *testing.T) {
 			// Add items to queue
 			for i := 0; i < tt.queueSize; i++ {
 				session.taskQueue = append(session.taskQueue, QueueItem{
-					Task:      UserPrompt{Text: "test"},
+					Type:      "prompt",
+					Content:   "test",
 					QueueID:   "Q" + string(rune('1'+i)),
 					CreatedAt: time.Now(),
 				})
@@ -259,7 +260,7 @@ func TestPausedOnError(t *testing.T) {
 	session.pausedOnError.Store(true)
 
 	// Submit a task with empty queue — should clear the paused flag
-	session.submitTask(UserPrompt{Text: "recovery prompt"})
+	session.submitTask(QueueItem{Type: "prompt", Content: "recovery prompt"})
 
 	if session.pausedOnError.Load() {
 		t.Error("submitTask should clear pausedOnError when queue was empty")
@@ -282,11 +283,11 @@ func TestSubmitTaskFront(t *testing.T) {
 	}
 
 	// Submit regular tasks
-	session.submitTask(UserPrompt{Text: "first"})
-	session.submitTask(UserPrompt{Text: "second"})
+	session.submitTask(QueueItem{Type: "prompt", Content: "first"})
+	session.submitTask(QueueItem{Type: "prompt", Content: "second"})
 
 	// Submit at front (simulates a deferred command like :continue)
-	session.enqueueTask(CommandPrompt{Command: commandNameContinue}, true)
+	session.enqueueTask(QueueItem{Type: "command", Content: commandNameContinue}, true)
 
 	items := session.taskQueue
 	if len(items) != 3 {
@@ -294,21 +295,21 @@ func TestSubmitTaskFront(t *testing.T) {
 	}
 
 	// Front item should be the command
-	if cmd, ok := items[0].Task.(CommandPrompt); !ok || cmd.Command != commandNameContinue {
-		t.Errorf("Expected first item to be CommandPrompt{%s}, got %v", commandNameContinue, items[0].Task)
+	if items[0].Type != "command" || items[0].Content != commandNameContinue {
+		t.Errorf("Expected first item to be command{%s}, got Type=%s Content=%s", commandNameContinue, items[0].Type, items[0].Content)
 	}
 	// Original tasks should follow in order
-	if p, ok := items[1].Task.(UserPrompt); !ok || p.Text != "first" {
-		t.Errorf("Expected second item to be 'first', got %v", items[1].Task)
+	if items[1].Type != "prompt" || items[1].Content != "first" {
+		t.Errorf("Expected second item to be 'first', got Type=%s Content=%s", items[1].Type, items[1].Content)
 	}
-	if p, ok := items[2].Task.(UserPrompt); !ok || p.Text != "second" {
-		t.Errorf("Expected third item to be 'second', got %v", items[2].Task)
+	if items[2].Type != "prompt" || items[2].Content != "second" {
+		t.Errorf("Expected third item to be 'second', got Type=%s Content=%s", items[2].Type, items[2].Content)
 	}
 
 	// enqueueTask should NOT clear pausedOnError (that's handled by specific commands)
 	session.pausedOnError.Store(true)
 
-	session.enqueueTask(CommandPrompt{Command: commandNameContinue}, true)
+	session.enqueueTask(QueueItem{Type: "command", Content: commandNameContinue}, true)
 
 	if !session.pausedOnError.Load() {
 		t.Error("enqueueTask should NOT clear pausedOnError")
@@ -335,14 +336,14 @@ func TestCommandCanRunWhilePaused(t *testing.T) {
 	}
 
 	// Add a user prompt to the queue
-	session.submitTask(UserPrompt{Text: "queued prompt"})
+	session.submitTask(QueueItem{Type: "prompt", Content: "queued prompt"})
 
 	// Set paused — user prompts should not run, but commands should
 	session.pausedOnError.Store(true)
 	session.inProgress = true
 
 	// Add a command to the front of the queue (simulates submitDeferredCommand)
-	session.enqueueTask(CommandPrompt{Command: commandNameSave}, true)
+	session.enqueueTask(QueueItem{Type: "command", Content: commandNameSave}, true)
 
 	// In the single-goroutine design, submitDeferredCommand always places
 	// the command at the front, and the run() goroutine checks pausedOnError
@@ -353,12 +354,12 @@ func TestCommandCanRunWhilePaused(t *testing.T) {
 	}
 
 	// Front item should be the command
-	if _, ok := items[0].Task.(CommandPrompt); !ok {
-		t.Errorf("Expected first item to be CommandPrompt")
+	if items[0].Type != "command" {
+		t.Errorf("Expected first item to be command")
 	}
 	// Second item should be the user prompt
-	if _, ok := items[1].Task.(UserPrompt); !ok {
-		t.Errorf("Expected second item to be UserPrompt")
+	if items[1].Type != "prompt" {
+		t.Errorf("Expected second item to be prompt")
 	}
 
 	// Paused state should still be set
@@ -382,17 +383,17 @@ func TestCommandBehindUserPromptWhilePaused(t *testing.T) {
 	}
 
 	// Add a user prompt to the queue
-	session.submitTask(UserPrompt{Text: "first prompt"})
+	session.submitTask(QueueItem{Type: "prompt", Content: "first prompt"})
 
 	// Add a command to the back of the queue (after user prompt)
-	session.enqueueTask(CommandPrompt{Command: commandNameSave}, false)
+	session.enqueueTask(QueueItem{Type: "command", Content: commandNameSave}, false)
 
 	// Set paused — the user prompt at front should be blocked
 	session.pausedOnError.Store(true)
 	session.inProgress = true
 
 	// Now add a command to the front (like :continue does)
-	session.enqueueTask(CommandPrompt{Command: commandNameContinue}, true)
+	session.enqueueTask(QueueItem{Type: "command", Content: commandNameContinue}, true)
 
 	items := session.taskQueue
 	if len(items) != 3 {
@@ -400,8 +401,8 @@ func TestCommandBehindUserPromptWhilePaused(t *testing.T) {
 	}
 
 	// Front item should be the continue command
-	if cmd, ok := items[0].Task.(CommandPrompt); !ok || cmd.Command != commandNameContinue {
-		t.Errorf("Expected first item to be CommandPrompt{%s}, got %v", commandNameContinue, items[0].Task)
+	if items[0].Type != "command" || items[0].Content != commandNameContinue {
+		t.Errorf("Expected first item to be command{%s}, got Type=%s Content=%s", commandNameContinue, items[0].Type, items[0].Content)
 	}
 }
 
@@ -415,13 +416,13 @@ func TestSubmitTaskDoesNotClearPauseWhenQueueNotEmpty(t *testing.T) {
 	}
 
 	// Add a task to the queue
-	session.submitTask(UserPrompt{Text: "first prompt"})
+	session.submitTask(QueueItem{Type: "prompt", Content: "first prompt"})
 
 	// Set paused on error
 	session.pausedOnError.Store(true)
 
 	// Submit another task — should NOT clear the paused flag (queue not empty)
-	session.submitTask(UserPrompt{Text: "second prompt"})
+	session.submitTask(QueueItem{Type: "prompt", Content: "second prompt"})
 
 	if !session.pausedOnError.Load() {
 		t.Error("submitTask should NOT clear pausedOnError when queue is not empty")

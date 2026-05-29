@@ -25,13 +25,13 @@ import (
 // Task Submission (called from run() goroutine only)
 // ============================================================================
 
-func (s *Session) submitTask(task Task) {
+func (s *Session) submitTask(item QueueItem) {
 	queueEmpty := len(s.taskQueue) == 0
 	// Clear paused-on-error only if queue was empty (new task will run immediately).
 	if queueEmpty {
 		s.pausedOnError.Store(false)
 	}
-	s.enqueueTask(task, false)
+	s.enqueueTask(item, false)
 }
 
 // submitDeferredCommand enqueues a deferred command at the front of the task queue.
@@ -43,7 +43,7 @@ func (s *Session) submitDeferredCommand(cmd string) {
 		s.writeError("Cannot run command while a task is running. Please wait or cancel first.")
 		return
 	}
-	s.enqueueTask(CommandPrompt{Command: cmd}, true)
+	s.enqueueTask(QueueItem{Type: "command", Content: cmd}, true)
 }
 
 // enqueueTask adds a task to the queue. When front is true, the task is
@@ -51,15 +51,10 @@ func (s *Session) submitDeferredCommand(cmd string) {
 //
 // nextQueueID is goroutine-local (only accessed from the run() goroutine),
 // so it's updated without synchronization.
-func (s *Session) enqueueTask(task Task, front bool) {
+func (s *Session) enqueueTask(item QueueItem, front bool) {
 	s.nextQueueID++
-	queueID := fmt.Sprintf("Q%d", s.nextQueueID)
-
-	item := QueueItem{
-		Task:      task,
-		QueueID:   queueID,
-		CreatedAt: time.Now(),
-	}
+	item.QueueID = fmt.Sprintf("Q%d", s.nextQueueID)
+	item.CreatedAt = time.Now()
 
 	if front {
 		s.taskQueue = append([]QueueItem{item}, s.taskQueue...)
@@ -109,19 +104,19 @@ func (s *Session) runTask(item QueueItem, taskMessages []llm.Message) {
 
 	// Echo user prompts before any work so output ordering is correct even if
 	// the task is canceled during initialization.
-	if prompt, ok := item.Task.(UserPrompt); ok {
-		s.signalPromptStart(prompt.Text)
+	if item.Type == "prompt" {
+		s.signalPromptStart(item.Content)
 	}
 
 	s.requestSystemInfo()
 
 	s.currentStep.Store(0)
 
-	switch t := item.Task.(type) {
-	case UserPrompt:
-		taskMessages = s.handleUserPrompt(ctx, taskMessages, t.Text, t.Images)
-	case CommandPrompt:
-		taskMessages = s.runTaskCommand(ctx, taskMessages, t.Command)
+	switch item.Type {
+	case "prompt":
+		taskMessages = s.handleUserPrompt(ctx, taskMessages, item.Content, item.Images)
+	case "command":
+		taskMessages = s.runTaskCommand(ctx, taskMessages, item.Content)
 	}
 
 	if ctx.Err() == context.Canceled {
@@ -182,14 +177,7 @@ func (s *Session) DeleteQueueItem(queueID string) bool {
 func (s *Session) UpdateQueueItem(queueID, newContent string) bool {
 	for i, item := range s.taskQueue {
 		if item.QueueID == queueID {
-			switch t := item.Task.(type) {
-			case UserPrompt:
-				t.Text = newContent
-				s.taskQueue[i].Task = t
-			case CommandPrompt:
-				t.Command = newContent
-				s.taskQueue[i].Task = t
-			}
+			s.taskQueue[i].Content = newContent
 			return true
 		}
 	}

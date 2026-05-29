@@ -134,7 +134,7 @@ func (s *Session) sendTaskMsg() {
 		ContextLimit: s.ContextLimit,
 		TotalTokens:  s.TotalSpent.InputTokens + s.TotalSpent.OutputTokens,
 		TaskError:    s.pausedOnError.Load(),
-		QueueItems:   len(s.taskQueue),
+		QueueItems:   s.taskQueue,
 	})
 }
 

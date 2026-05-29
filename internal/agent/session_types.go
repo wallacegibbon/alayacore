@@ -11,32 +11,14 @@ import (
 	"github.com/alayacore/alayacore/internal/skills"
 )
 
-// Task represents a unit of work for the session.
-type Task interface {
-	isTask()
-}
-
-// QueueItem wraps a Task with metadata for queue management
+// QueueItem represents a queued task with metadata.
 type QueueItem struct {
-	Task
-	QueueID   string
-	CreatedAt time.Time
+	QueueID   string    `json:"queue_id"`
+	Type      string    `json:"type"` // "prompt" or "command"
+	Content   string    `json:"content"`
+	Images    []string  `json:"images,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
 }
-
-// UserPrompt is a user text input task
-type UserPrompt struct {
-	Text   string
-	Images []string
-}
-
-func (UserPrompt) isTask() {}
-
-// CommandPrompt is a command task
-type CommandPrompt struct {
-	Command string
-}
-
-func (CommandPrompt) isTask() {}
 
 // ============================================================================
 // TagSystemMsg (SM) payload types
@@ -44,14 +26,14 @@ func (CommandPrompt) isTask() {}
 
 // TaskMsg carries task progress info (type "task").
 type TaskMsg struct {
-	InProgress   bool  `json:"in_progress"`
-	CurrentStep  int   `json:"current_step,omitempty"`
-	MaxSteps     int   `json:"max_steps,omitempty"`
-	Context      int64 `json:"context"`
-	ContextLimit int64 `json:"context_limit"`
-	TotalTokens  int64 `json:"total"`
-	TaskError    bool  `json:"task_error,omitempty"`
-	QueueItems   int   `json:"queue_items,omitempty"`
+	InProgress   bool        `json:"in_progress"`
+	CurrentStep  int         `json:"current_step,omitempty"`
+	MaxSteps     int         `json:"max_steps,omitempty"`
+	Context      int64       `json:"context"`
+	ContextLimit int64       `json:"context_limit"`
+	TotalTokens  int64       `json:"total"`
+	TaskError    bool        `json:"task_error,omitempty"`
+	QueueItems   []QueueItem `json:"queue_items"`
 }
 
 func (TaskMsg) SystemMsgType() string { return "task" }

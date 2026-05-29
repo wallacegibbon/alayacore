@@ -95,7 +95,7 @@ User types prompt
   → InputModel captures input
     → Emit TLV(UT, prompt)
       → inputPump reads TLV
-        → submitTask(UserPrompt)
+        → submitTask(QueueItem{Type: "prompt", Content: text, Images: images})
           → Task Queue
             → runTask() (task goroutine)
               → handleUserPrompt()

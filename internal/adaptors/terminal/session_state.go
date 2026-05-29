@@ -22,7 +22,6 @@ type sessionState struct {
 	// Status fields
 	contextTokens   int64
 	contextLimit    int64
-	queueCount      int
 	inProgress      bool
 	currentStep     int
 	maxSteps        int
@@ -37,7 +36,7 @@ type sessionState struct {
 	activeModelName string
 	modelConfigPath string
 
-	// Queue items — set by handleSystemTag, cleared by GetQueueItems
+	// Queue items — set by handleSystemTask, cleared by GetQueueItems
 	pendingQueueItems []QueueItem
 
 	// Theme — active theme name broadcast by the session via TagSystemMsg.
@@ -46,8 +45,8 @@ type sessionState struct {
 	activeTheme string
 }
 
-// updateTask atomically updates task progress fields.
-func (s *sessionState) updateTask(inProgress bool, currentStep, maxSteps int, context, contextLimit int64, taskError bool, queueCount int) {
+// updateTask atomically updates task progress fields and queue items.
+func (s *sessionState) updateTask(inProgress bool, currentStep, maxSteps int, context, contextLimit int64, taskError bool, queueItems []QueueItem) {
 	s.mu.Lock()
 	// Save step info when task completes (transition from in-progress to done)
 	if s.inProgress && !inProgress && s.maxSteps > 0 {
@@ -66,7 +65,7 @@ func (s *sessionState) updateTask(inProgress bool, currentStep, maxSteps int, co
 	s.maxSteps = maxSteps
 	s.contextTokens = context
 	s.contextLimit = contextLimit
-	s.queueCount = queueCount
+	s.pendingQueueItems = queueItems
 	s.mu.Unlock()
 }
 
@@ -114,7 +113,7 @@ func (s *sessionState) snapshotStatus() StatusSnapshot {
 	return StatusSnapshot{
 		ContextTokens:   s.contextTokens,
 		ContextLimit:    s.contextLimit,
-		QueueCount:      s.queueCount,
+		QueueCount:      len(s.pendingQueueItems),
 		InProgress:      s.inProgress,
 		CurrentStep:     s.currentStep,
 		MaxSteps:        s.maxSteps,
