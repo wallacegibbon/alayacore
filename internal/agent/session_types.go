@@ -31,7 +31,6 @@ type TaskMsg struct {
 	MaxSteps     int         `json:"max_steps,omitempty"`
 	Context      int64       `json:"context"`
 	ContextLimit int64       `json:"context_limit"`
-	TotalTokens  int64       `json:"total"`
 	TaskError    bool        `json:"task_error,omitempty"`
 	QueueItems   []QueueItem `json:"queue_items"`
 }

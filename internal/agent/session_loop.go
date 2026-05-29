@@ -176,8 +176,6 @@ func (s *Session) handleTaskEvent(ev TaskEvent) {
 		s.currentStep.Store(int64(e.Step))
 
 	case StepFinishEvent:
-		s.TotalSpent.InputTokens += e.InputTokens
-		s.TotalSpent.OutputTokens += e.OutputTokens
 		// Anthropic's input_tokens excludes cached tokens; sum all
 		// four fields for total context. OpenAI-compatible APIs
 		// have Cache* = 0, so this collapses to InputTokens+OutputTokens.
@@ -192,8 +190,8 @@ func (s *Session) handleTaskEvent(ev TaskEvent) {
 		}
 
 	case SetContextTokensEvent:
-		// Sets ContextTokens without affecting TotalSpent counters.
-		// Used by summarize() to correct the value after summarization.
+		// Corrects ContextTokens after summarize() to the summary size
+		// instead of the full old-context token count.
 		if e.Tokens > 0 {
 			s.ContextTokens.Store(e.Tokens)
 		}

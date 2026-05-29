@@ -132,7 +132,6 @@ func (s *Session) sendTaskMsg() {
 		MaxSteps:     s.MaxSteps,
 		Context:      s.ContextTokens.Load(),
 		ContextLimit: s.ContextLimit,
-		TotalTokens:  s.TotalSpent.InputTokens + s.TotalSpent.OutputTokens,
 		TaskError:    s.pausedOnError.Load(),
 		QueueItems:   s.taskQueue,
 	})

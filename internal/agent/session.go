@@ -49,7 +49,6 @@ import (
 type Session struct {
 	Messages       []llm.Message // owned by run() goroutine; task goroutine sends updates via stateCh
 	CreatedAt      time.Time
-	TotalSpent     llm.Usage    // updated by run() from task events
 	ContextTokens  atomic.Int64 // read by both goroutines (shouldAutoSummarize, sendSystemInfo)
 	ContextLimit   int64        // immutable after construction
 	ModelManager   *ModelManager

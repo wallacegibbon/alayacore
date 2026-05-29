@@ -163,7 +163,7 @@ Rules:
 	// (StepFinishEvent during processPrompt, then this correction).
 	// The FIFO channel guarantees the run() goroutine processes
 	// this correction after the StepFinishEvent, so ContextTokens
-	// ends up at the summary size. Does not affect TotalSpent.
+	// ends up at the summary size.
 	if outputTokens > 0 {
 		s.sendEvent(SetContextTokensEvent{Tokens: outputTokens})
 	}

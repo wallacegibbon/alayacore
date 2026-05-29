@@ -35,10 +35,9 @@ type StepFinishEvent struct {
 
 func (StepFinishEvent) taskEvent() {}
 
-// SetContextTokensEvent sets ContextTokens on the run() goroutine without
-// affecting TotalSpent counters. Used by summarize() to correct the value
-// after the StepFinishEvent from processPrompt overwrites it with the
-// full old-context token count.
+// SetContextTokensEvent sets ContextTokens on the run() goroutine.
+// Used by summarize() to correct the value after the StepFinishEvent
+// from processPrompt overwrites it with the full old-context token count.
 type SetContextTokensEvent struct {
 	Tokens int64
 }
