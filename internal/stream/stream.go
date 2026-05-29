@@ -18,6 +18,7 @@ const (
 	TagAssistantF = "AF" // JSON: id, type, name, input, status (function arguments)
 	TagUserT      = "UT" // User text input
 	TagUserF      = "UF" // JSON: id, output, status (function result)
+	TagUserI      = "UI" // User image — value is a path or URL
 
 	TagSystemMsg = "SM" // System message JSON: {"type":"...","data":{...}}
 )

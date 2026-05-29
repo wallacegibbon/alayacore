@@ -397,8 +397,9 @@ func (s *Session) resendPrompt(ctx context.Context, messages []llm.Message) []ll
 
 // inputMsg carries a parsed input message from the I/O pump to run().
 type inputMsg struct {
-	text  string // the raw user text or command text (without ':')
-	isCmd bool   // true if text starts with ':'
+	text   string   // the raw user text or command text (without ':')
+	images []string // image paths/URLs from preceding UI tags
+	isCmd  bool     // true if text starts with ':'
 }
 
 // inputPump runs in its own goroutine and reads TLV frames from the
@@ -406,35 +407,55 @@ type inputMsg struct {
 // any session state directly; for :cancel / :cancel_all commands it sends
 // to taskCancelCh (a buffered channel) which the task goroutine listens on.
 func (s *Session) inputPump(msgCh chan<- inputMsg) {
+	var pendingImages []string
+
 	for {
 		tag, value, err := stream.ReadTLV(s.Input)
 		if err != nil {
 			close(msgCh)
 			return
 		}
-		if tag != stream.TagUserT {
-			s.writeError(domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag, "invalid input tag: %s", tag).Error())
-			continue
-		}
-		if len(value) > 0 && value[0] == ':' {
-			cmd := value[1:]
-			if cmd == commandNameCancel || cmd == commandNameCancelAll {
-				// Signal cancellation to the running task (non-blocking).
-				// If no task is running, the signal is lost and the command
-				// is forwarded to msgCh so run() can handle queue clearing
-				// or report "nothing to cancel".
-				canceled := s.cancelRunningTask()
-				if canceled && cmd == commandNameCancel {
-					// Task was running and was canceled — don't send to msgCh
-					// to avoid a spurious "nothing to cancel" message.
-					continue
-				}
-				// For cancel_all, always send to msgCh for queue clearing.
-				// For cancel (when no task running), forward for error reporting.
+
+		switch tag {
+		case stream.TagUserI:
+			pendingImages = append(pendingImages, value)
+
+		case stream.TagUserT:
+			if len(pendingImages) > 0 && len(value) > 0 && value[0] == ':' {
+				// Images followed by a command is not allowed.
+				pendingImages = nil
+				s.writeError(domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
+					"command can not attach images").Error())
+				continue
 			}
-			msgCh <- inputMsg{text: cmd, isCmd: true}
-		} else {
-			msgCh <- inputMsg{text: value, isCmd: false}
+
+			msg := inputMsg{
+				text:   value,
+				images: pendingImages,
+			}
+			pendingImages = nil
+
+			if len(value) > 0 && value[0] == ':' {
+				cmd := value[1:]
+				if cmd == commandNameCancel || cmd == commandNameCancelAll {
+					canceled := s.cancelRunningTask()
+					if canceled && cmd == commandNameCancel {
+						continue
+					}
+				}
+				msg.isCmd = true
+			}
+			msgCh <- msg
+
+		default:
+			if len(pendingImages) > 0 {
+				pendingImages = nil
+				s.writeError(domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
+					"image tag must be followed by another image or text, got: %s", tag).Error())
+			} else {
+				s.writeError(domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
+					"invalid input tag: %s", tag).Error())
+			}
 		}
 	}
 }
@@ -451,6 +472,6 @@ func (s *Session) handleInputMsg(msg inputMsg) {
 			s.submitDeferredCommand(cmd)
 		}
 	} else {
-		s.submitTask(UserPrompt{Text: msg.text})
+		s.submitTask(UserPrompt{Text: msg.text, Images: msg.images})
 	}
 }

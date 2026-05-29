@@ -25,7 +25,8 @@ type QueueItem struct {
 
 // UserPrompt is a user text input task
 type UserPrompt struct {
-	Text string
+	Text   string
+	Images []string
 }
 
 func (UserPrompt) isTask() {}
