@@ -241,29 +241,29 @@ func (to *outputWriter) handleSystemNotify(data json.RawMessage) {
 
 func (to *outputWriter) handleSystemTask(data json.RawMessage) {
 	var m struct {
-		InProgress   bool        `json:"in_progress"`
-		CurrentStep  int         `json:"current_step"`
-		MaxSteps     int         `json:"max_steps"`
-		Context      int64       `json:"context"`
-		ContextLimit int64       `json:"context_limit"`
-		TaskError    bool        `json:"task_error"`
-		QueueItems   []QueueItem `json:"queue_items"`
+		InProgress  bool        `json:"in_progress"`
+		CurrentStep int         `json:"current_step"`
+		MaxSteps    int         `json:"max_steps"`
+		Context     int64       `json:"context"`
+		TaskError   bool        `json:"task_error"`
+		QueueItems  []QueueItem `json:"queue_items"`
 	}
 	if json.Unmarshal(data, &m) != nil {
 		return
 	}
-	to.status.updateTask(m.InProgress, m.CurrentStep, m.MaxSteps, m.Context, m.ContextLimit, m.TaskError, m.QueueItems)
+	to.status.updateTask(m.InProgress, m.CurrentStep, m.MaxSteps, m.Context, m.TaskError, m.QueueItems)
 }
 
 func (to *outputWriter) handleSystemModel(data json.RawMessage) {
 	var m struct {
-		ActiveID   int    `json:"active_id"`
-		ActiveName string `json:"active_name"`
+		ActiveID     int    `json:"active_id"`
+		ActiveName   string `json:"active_name"`
+		ContextLimit int64  `json:"context_limit"`
 	}
 	if json.Unmarshal(data, &m) != nil {
 		return
 	}
-	to.status.updateModel(m.ActiveID, m.ActiveName)
+	to.status.updateModel(m.ActiveID, m.ActiveName, m.ContextLimit)
 }
 
 func (to *outputWriter) handleSystemModelList(data json.RawMessage) {

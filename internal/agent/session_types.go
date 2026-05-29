@@ -29,9 +29,8 @@ type TaskMsg struct {
 	InProgress   bool        `json:"in_progress"`
 	CurrentStep  int         `json:"current_step,omitempty"`
 	MaxSteps     int         `json:"max_steps,omitempty"`
-	Context      int64       `json:"context"`
-	ContextLimit int64       `json:"context_limit"`
-	TaskError    bool        `json:"task_error,omitempty"`
+	Context     int64  `json:"context"`
+	TaskError   bool   `json:"task_error,omitempty"`
 	QueueItems   []QueueItem `json:"queue_items"`
 }
 
@@ -41,6 +40,7 @@ func (TaskMsg) SystemMsgType() string { return "task" }
 type ModelMsg struct {
 	ActiveModelID   int    `json:"active_id"`
 	ActiveModelName string `json:"active_name"`
+	ContextLimit    int64  `json:"context_limit"`
 }
 
 func (ModelMsg) SystemMsgType() string { return "model" }

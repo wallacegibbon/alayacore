@@ -131,7 +131,6 @@ func (s *Session) sendTaskMsg() {
 		CurrentStep:  int(s.currentStep.Load()),
 		MaxSteps:     s.MaxSteps,
 		Context:      s.ContextTokens.Load(),
-		ContextLimit: s.ContextLimit,
 		TaskError:    s.pausedOnError.Load(),
 		QueueItems:   s.taskQueue,
 	})
@@ -149,6 +148,7 @@ func (s *Session) sendModelMsgs() {
 	_ = stream.WriteSystemMsg(s.Output, ModelMsg{ //nolint:errcheck
 		ActiveModelID:   activeID,
 		ActiveModelName: activeName,
+		ContextLimit:    s.ContextLimit,
 	})
 	_ = stream.WriteSystemMsg(s.Output, ModelListMsg{ //nolint:errcheck
 		Models:          s.ModelManager.GetModels(),

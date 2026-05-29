@@ -46,7 +46,7 @@ type sessionState struct {
 }
 
 // updateTask atomically updates task progress fields and queue items.
-func (s *sessionState) updateTask(inProgress bool, currentStep, maxSteps int, context, contextLimit int64, taskError bool, queueItems []QueueItem) {
+func (s *sessionState) updateTask(inProgress bool, currentStep, maxSteps int, context int64, taskError bool, queueItems []QueueItem) {
 	s.mu.Lock()
 	// Save step info when task completes (transition from in-progress to done)
 	if s.inProgress && !inProgress && s.maxSteps > 0 {
@@ -64,16 +64,16 @@ func (s *sessionState) updateTask(inProgress bool, currentStep, maxSteps int, co
 	s.currentStep = currentStep
 	s.maxSteps = maxSteps
 	s.contextTokens = context
-	s.contextLimit = contextLimit
 	s.pendingQueueItems = queueItems
 	s.mu.Unlock()
 }
 
 // updateModel atomically updates active model info.
-func (s *sessionState) updateModel(activeID int, activeName string) {
+func (s *sessionState) updateModel(activeID int, activeName string, contextLimit int64) {
 	s.mu.Lock()
 	s.activeModelID = activeID
 	s.activeModelName = activeName
+	s.contextLimit = contextLimit
 	s.mu.Unlock()
 }
 
