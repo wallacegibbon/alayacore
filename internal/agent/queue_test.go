@@ -19,9 +19,9 @@ func TestQueueItemUniqueIDs(t *testing.T) {
 	}
 
 	// Submit multiple tasks and verify unique IDs
-	task1 := QueueItem{Type: "prompt", Content: "test prompt 1"}
-	task2 := QueueItem{Type: "command", Content: "test command"}
-	task3 := QueueItem{Type: "prompt", Content: "test prompt 2"}
+	task1 := QueueItem{Type: TaskTypePrompt, Content: "test prompt 1"}
+	task2 := QueueItem{Type: TaskTypeCommand, Content: "test command"}
+	task3 := QueueItem{Type: TaskTypePrompt, Content: "test prompt 2"}
 
 	session.submitTask(task1)
 	session.submitTask(task2)
@@ -62,9 +62,9 @@ func TestDeleteQueueItem(t *testing.T) {
 	}
 
 	// Submit tasks
-	session.submitTask(QueueItem{Type: "prompt", Content: "prompt 1"})
-	session.submitTask(QueueItem{Type: "prompt", Content: "prompt 2"})
-	session.submitTask(QueueItem{Type: "prompt", Content: "prompt 3"})
+	session.submitTask(QueueItem{Type: TaskTypePrompt, Content: "prompt 1"})
+	session.submitTask(QueueItem{Type: TaskTypePrompt, Content: "prompt 2"})
+	session.submitTask(QueueItem{Type: TaskTypePrompt, Content: "prompt 3"})
 
 	// Delete middle item
 	deleted := session.DeleteQueueItem("Q2")
@@ -103,8 +103,8 @@ func TestQueueItemTypes(t *testing.T) {
 	}
 
 	// Submit different task types
-	promptTask := QueueItem{Type: "prompt", Content: "test prompt"}
-	commandTask := QueueItem{Type: "command", Content: "test command"}
+	promptTask := QueueItem{Type: TaskTypePrompt, Content: "test prompt"}
+	commandTask := QueueItem{Type: TaskTypeCommand, Content: "test command"}
 
 	session.submitTask(promptTask)
 	session.submitTask(commandTask)
@@ -137,7 +137,7 @@ func TestQueueTimestamps(t *testing.T) {
 	}
 
 	before := time.Now()
-	session.submitTask(QueueItem{Type: "prompt", Content: "test"})
+	session.submitTask(QueueItem{Type: TaskTypePrompt, Content: "test"})
 	after := time.Now()
 
 	items := session.taskQueue
@@ -260,7 +260,7 @@ func TestPausedOnError(t *testing.T) {
 	session.pausedOnError.Store(true)
 
 	// Submit a task with empty queue — should clear the paused flag
-	session.submitTask(QueueItem{Type: "prompt", Content: "recovery prompt"})
+	session.submitTask(QueueItem{Type: TaskTypePrompt, Content: "recovery prompt"})
 
 	if session.pausedOnError.Load() {
 		t.Error("submitTask should clear pausedOnError when queue was empty")
@@ -283,11 +283,11 @@ func TestSubmitTaskFront(t *testing.T) {
 	}
 
 	// Submit regular tasks
-	session.submitTask(QueueItem{Type: "prompt", Content: "first"})
-	session.submitTask(QueueItem{Type: "prompt", Content: "second"})
+	session.submitTask(QueueItem{Type: TaskTypePrompt, Content: "first"})
+	session.submitTask(QueueItem{Type: TaskTypePrompt, Content: "second"})
 
 	// Submit at front (simulates a deferred command like :continue)
-	session.enqueueTask(QueueItem{Type: "command", Content: commandNameContinue}, true)
+	session.enqueueTask(QueueItem{Type: TaskTypeCommand, Content: commandNameContinue}, true)
 
 	items := session.taskQueue
 	if len(items) != 3 {
@@ -309,7 +309,7 @@ func TestSubmitTaskFront(t *testing.T) {
 	// enqueueTask should NOT clear pausedOnError (that's handled by specific commands)
 	session.pausedOnError.Store(true)
 
-	session.enqueueTask(QueueItem{Type: "command", Content: commandNameContinue}, true)
+	session.enqueueTask(QueueItem{Type: TaskTypeCommand, Content: commandNameContinue}, true)
 
 	if !session.pausedOnError.Load() {
 		t.Error("enqueueTask should NOT clear pausedOnError")
@@ -336,14 +336,14 @@ func TestCommandCanRunWhilePaused(t *testing.T) {
 	}
 
 	// Add a user prompt to the queue
-	session.submitTask(QueueItem{Type: "prompt", Content: "queued prompt"})
+	session.submitTask(QueueItem{Type: TaskTypePrompt, Content: "queued prompt"})
 
 	// Set paused — user prompts should not run, but commands should
 	session.pausedOnError.Store(true)
 	session.inProgress = true
 
 	// Add a command to the front of the queue (simulates submitDeferredCommand)
-	session.enqueueTask(QueueItem{Type: "command", Content: commandNameSave}, true)
+	session.enqueueTask(QueueItem{Type: TaskTypeCommand, Content: commandNameSave}, true)
 
 	// In the single-goroutine design, submitDeferredCommand always places
 	// the command at the front, and the run() goroutine checks pausedOnError
@@ -383,17 +383,17 @@ func TestCommandBehindUserPromptWhilePaused(t *testing.T) {
 	}
 
 	// Add a user prompt to the queue
-	session.submitTask(QueueItem{Type: "prompt", Content: "first prompt"})
+	session.submitTask(QueueItem{Type: TaskTypePrompt, Content: "first prompt"})
 
 	// Add a command to the back of the queue (after user prompt)
-	session.enqueueTask(QueueItem{Type: "command", Content: commandNameSave}, false)
+	session.enqueueTask(QueueItem{Type: TaskTypeCommand, Content: commandNameSave}, false)
 
 	// Set paused — the user prompt at front should be blocked
 	session.pausedOnError.Store(true)
 	session.inProgress = true
 
 	// Now add a command to the front (like :continue does)
-	session.enqueueTask(QueueItem{Type: "command", Content: commandNameContinue}, true)
+	session.enqueueTask(QueueItem{Type: TaskTypeCommand, Content: commandNameContinue}, true)
 
 	items := session.taskQueue
 	if len(items) != 3 {
@@ -416,13 +416,13 @@ func TestSubmitTaskDoesNotClearPauseWhenQueueNotEmpty(t *testing.T) {
 	}
 
 	// Add a task to the queue
-	session.submitTask(QueueItem{Type: "prompt", Content: "first prompt"})
+	session.submitTask(QueueItem{Type: TaskTypePrompt, Content: "first prompt"})
 
 	// Set paused on error
 	session.pausedOnError.Store(true)
 
 	// Submit another task — should NOT clear the paused flag (queue not empty)
-	session.submitTask(QueueItem{Type: "prompt", Content: "second prompt"})
+	session.submitTask(QueueItem{Type: TaskTypePrompt, Content: "second prompt"})
 
 	if !session.pausedOnError.Load() {
 		t.Error("submitTask should NOT clear pausedOnError when queue is not empty")

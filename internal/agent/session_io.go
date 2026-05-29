@@ -319,7 +319,7 @@ func (s *Session) handleReason(args []string) {
 }
 
 // handleThemeSet sets the active theme, persists it to runtime config,
-// and sends updated system info so the terminal applies it visually.
+// and sends updated system info so adaptors receive the full theme data.
 func (s *Session) handleThemeSet(args []string) {
 	if len(args) == 0 {
 		s.writeError("usage: :theme_set <name>")
@@ -327,11 +327,11 @@ func (s *Session) handleThemeSet(args []string) {
 	}
 	name := args[0]
 
-	// Validate that the theme file exists in the themes folder.
+	// Validate that the theme exists before persisting.
 	if s.ThemesFolder != "" {
 		themePath := filepath.Join(s.ThemesFolder, name+".conf")
 		if _, err := os.Stat(themePath); os.IsNotExist(err) {
-			s.writeError(fmt.Sprintf("Theme %q not found at %s", name, themePath))
+			s.writeError(fmt.Sprintf("Theme %q not found", name))
 			return
 		}
 	}
@@ -473,6 +473,6 @@ func (s *Session) handleInputMsg(msg inputMsg) {
 			s.submitDeferredCommand(cmd)
 		}
 	} else {
-		s.submitTask(QueueItem{Type: "prompt", Content: msg.text, Images: msg.images})
+		s.submitTask(QueueItem{Type: TaskTypePrompt, Content: msg.text, Images: msg.images})
 	}
 }

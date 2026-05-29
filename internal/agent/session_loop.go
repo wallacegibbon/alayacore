@@ -99,7 +99,7 @@ func (s *Session) tryStartNextTask() bool {
 
 	// When paused on error, skip user prompts — they need :continue first.
 	if s.pausedOnError.Load() {
-		if item.Type != "command" {
+		if item.Type != TaskTypeCommand {
 			return false
 		}
 	}

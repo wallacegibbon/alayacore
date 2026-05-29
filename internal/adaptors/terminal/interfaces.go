@@ -4,11 +4,19 @@ import (
 	"io"
 
 	agentpkg "github.com/alayacore/alayacore/internal/agent"
+	"github.com/alayacore/alayacore/internal/theme"
 )
 
 // ============================================================================
 // Snapshot Types
 // ============================================================================
+
+// ThemeEntry holds a cached theme with its full content, received from the
+// session via ThemeListMsg on startup.
+type ThemeEntry struct {
+	Name  string       `json:"name"`
+	Theme *theme.Theme `json:"theme"`
+}
 
 // StatusSnapshot holds a consistent point-in-time view of session status.
 type StatusSnapshot struct {
@@ -23,6 +31,7 @@ type StatusSnapshot struct {
 	TaskError       bool
 	ReasoningLevel  int
 	ActiveTheme     string
+	ActiveThemeData *theme.Theme
 }
 
 // ModelSnapshot holds a consistent point-in-time view of model state.

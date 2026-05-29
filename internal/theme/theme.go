@@ -14,22 +14,22 @@ import (
 // Each field maps to a key in the .conf theme files.
 type Theme struct {
 	// Core palette
-	Primary   string `config:"primary"`   // Primary/accent color for highlights and focused borders
-	Dim       string `config:"dim"`       // Dimmed color for unfocused borders and blurred text
-	Muted     string `config:"muted"`     // Muted color for placeholder and secondary text
-	Text      string `config:"text"`      // Primary text color
-	Warning   string `config:"warning"`   // Warning color (yellow/orange)
-	Error     string `config:"error"`     // Error color (red)
-	Success   string `config:"success"`   // Success color (green)
-	Selection string `config:"selection"` // Selection/cursor border highlight color
-	Cursor    string `config:"cursor"`    // Text input cursor color
+	Primary   string `config:"primary" json:"primary"`     // Primary/accent color for highlights and focused borders
+	Dim       string `config:"dim" json:"dim"`             // Dimmed color for unfocused borders and blurred text
+	Muted     string `config:"muted" json:"muted"`         // Muted color for placeholder and secondary text
+	Text      string `config:"text" json:"text"`           // Primary text color
+	Warning   string `config:"warning" json:"warning"`     // Warning color (yellow/orange)
+	Error     string `config:"error" json:"error"`         // Error color (red)
+	Success   string `config:"success" json:"success"`     // Success color (green)
+	Selection string `config:"selection" json:"selection"` // Selection/cursor border highlight color
+	Cursor    string `config:"cursor" json:"cursor"`       // Text input cursor color
 
 	// Diff colors
-	Added   string `config:"added"`   // Added lines in diff (green)
-	Removed string `config:"removed"` // Removed lines in diff (red)
+	Added   string `config:"added" json:"added"`     // Added lines in diff (green)
+	Removed string `config:"removed" json:"removed"` // Removed lines in diff (red)
 
 	// Fold indicator character (repeated to form the fold splitter row)
-	FoldIndicator string `config:"fold_indicator"`
+	FoldIndicator string `config:"fold_indicator" json:"fold_indicator"`
 }
 
 // DefaultTheme returns the default theme (Catppuccin Mocha)

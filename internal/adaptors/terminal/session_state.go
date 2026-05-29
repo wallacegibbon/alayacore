@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	agentpkg "github.com/alayacore/alayacore/internal/agent"
+	"github.com/alayacore/alayacore/internal/theme"
 )
 
 // sessionState caches the session's status, model, and queue item state
@@ -39,10 +40,12 @@ type sessionState struct {
 	// Queue items — set by handleSystemTask, cleared by GetQueueItems
 	pendingQueueItems []QueueItem
 
-	// Theme — active theme name broadcast by the session via TagSystemMsg.
+	// Theme — active theme broadcast by the session via TagSystemMsg.
 	// The terminal reads this in updateStatus() and applies the theme visually
 	// when it detects a change from the previously applied theme.
-	activeTheme string
+	activeTheme     string
+	activeThemeData *theme.Theme
+	cachedThemeList []ThemeEntry
 }
 
 // updateTask atomically updates task progress fields and queue items.
@@ -93,9 +96,29 @@ func (s *sessionState) updateModelList(models []agentpkg.ModelInfo, configPath s
 }
 
 // updateTheme atomically updates the active theme.
-func (s *sessionState) updateTheme(name string) {
+// When themeData is nil (theme change with just name), the cached
+// theme list is used to look up the full data.
+func (s *sessionState) updateTheme(name string, themeData *theme.Theme) {
 	s.mu.Lock()
 	s.activeTheme = name
+	if themeData != nil {
+		s.activeThemeData = themeData
+	} else {
+		// Look up from cached list
+		for _, ti := range s.cachedThemeList {
+			if ti.Name == name {
+				s.activeThemeData = ti.Theme
+				break
+			}
+		}
+	}
+	s.mu.Unlock()
+}
+
+// updateThemeList atomically replaces the cached theme list.
+func (s *sessionState) updateThemeList(themes []ThemeEntry) {
+	s.mu.Lock()
+	s.cachedThemeList = themes
 	s.mu.Unlock()
 }
 
@@ -122,6 +145,7 @@ func (s *sessionState) snapshotStatus() StatusSnapshot {
 		TaskError:       s.lastTaskError,
 		ReasoningLevel:  s.reasoningLevel,
 		ActiveTheme:     s.activeTheme,
+		ActiveThemeData: s.activeThemeData,
 	}
 }
 

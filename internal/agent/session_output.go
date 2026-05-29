@@ -11,8 +11,12 @@ package agent
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/alayacore/alayacore/internal/stream"
+	"github.com/alayacore/alayacore/internal/theme"
 )
 
 // ============================================================================
@@ -112,6 +116,7 @@ func (s *Session) sendSystemInfo(kind string) {
 	case "all":
 		s.sendTaskMsg()
 		s.sendModelMsgs()
+		s.sendThemeListMsg()
 		s.sendThemeMsg()
 		s.sendReasoningMsg()
 	case "task":
@@ -127,12 +132,12 @@ func (s *Session) sendSystemInfo(kind string) {
 
 func (s *Session) sendTaskMsg() {
 	_ = stream.WriteSystemMsg(s.Output, TaskMsg{ //nolint:errcheck
-		InProgress:   s.inProgress,
-		CurrentStep:  int(s.currentStep.Load()),
-		MaxSteps:     s.MaxSteps,
-		Context:      s.ContextTokens.Load(),
-		TaskError:    s.pausedOnError.Load(),
-		QueueItems:   s.taskQueue,
+		InProgress:  s.inProgress,
+		CurrentStep: int(s.currentStep.Load()),
+		MaxSteps:    s.MaxSteps,
+		Context:     s.ContextTokens.Load(),
+		TaskError:   s.pausedOnError.Load(),
+		QueueItems:  s.taskQueue,
 	})
 }
 
@@ -157,8 +162,44 @@ func (s *Session) sendModelMsgs() {
 }
 
 func (s *Session) sendThemeMsg() {
-	if s.RuntimeManager != nil {
-		_ = stream.WriteSystemMsg(s.Output, ThemeMsg{Name: s.RuntimeManager.GetActiveTheme()}) //nolint:errcheck
+	if s.RuntimeManager == nil {
+		return
+	}
+	name := s.RuntimeManager.GetActiveTheme()
+	_ = stream.WriteSystemMsg(s.Output, ThemeMsg{Name: name}) //nolint:errcheck
+}
+
+// sendThemeListMsg sends the full list of available themes with content.
+// Called once on startup so adaptors can cache theme data.
+func (s *Session) sendThemeListMsg() {
+	if s.ThemesFolder == "" {
+		return
+	}
+	entries, err := os.ReadDir(s.ThemesFolder)
+	if err != nil {
+		return
+	}
+	// Count .conf files to pre-allocate.
+	n := 0
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".conf") {
+			n++
+		}
+	}
+	infos := make([]ThemeInfo, 0, n)
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".conf") {
+			continue
+		}
+		name := strings.TrimSuffix(entry.Name(), ".conf")
+		t, err := theme.LoadTheme(filepath.Join(s.ThemesFolder, entry.Name()))
+		if err != nil {
+			continue
+		}
+		infos = append(infos, ThemeInfo{Name: name, Theme: t})
+	}
+	if len(infos) > 0 {
+		_ = stream.WriteSystemMsg(s.Output, ThemeListMsg{Themes: infos}) //nolint:errcheck
 	}
 }
 

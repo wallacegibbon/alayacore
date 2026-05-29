@@ -9,6 +9,7 @@ import (
 
 	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/skills"
+	"github.com/alayacore/alayacore/internal/theme"
 )
 
 // QueueItem represents a queued task with metadata.
@@ -20,18 +21,24 @@ type QueueItem struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// Task type constants for QueueItem.Type.
+const (
+	TaskTypePrompt  = "prompt"
+	TaskTypeCommand = "command"
+)
+
 // ============================================================================
 // TagSystemMsg (SM) payload types
 // ============================================================================
 
 // TaskMsg carries task progress info (type "task").
 type TaskMsg struct {
-	InProgress   bool        `json:"in_progress"`
-	CurrentStep  int         `json:"current_step,omitempty"`
-	MaxSteps     int         `json:"max_steps,omitempty"`
-	Context     int64  `json:"context"`
-	TaskError   bool   `json:"task_error,omitempty"`
-	QueueItems   []QueueItem `json:"queue_items"`
+	InProgress  bool        `json:"in_progress"`
+	CurrentStep int         `json:"current_step,omitempty"`
+	MaxSteps    int         `json:"max_steps,omitempty"`
+	Context     int64       `json:"context"`
+	TaskError   bool        `json:"task_error,omitempty"`
+	QueueItems  []QueueItem `json:"queue_items"`
 }
 
 func (TaskMsg) SystemMsgType() string { return "task" }
@@ -54,9 +61,25 @@ type ModelListMsg struct {
 
 func (ModelListMsg) SystemMsgType() string { return "model_list" }
 
+// ThemeInfo carries a theme's name and full content for adaptors.
+type ThemeInfo struct {
+	Name  string       `json:"name"`
+	Theme *theme.Theme `json:"theme"`
+}
+
+// ThemeListMsg carries all available themes (type "theme_list").
+// Sent once on startup so adaptors can cache theme content locally.
+type ThemeListMsg struct {
+	Themes []ThemeInfo `json:"themes"`
+}
+
+func (ThemeListMsg) SystemMsgType() string { return "theme_list" }
+
 // ThemeMsg carries the active theme name (type "theme").
+// On startup the full Theme is included; on theme changes only the name is sent.
 type ThemeMsg struct {
-	Name string `json:"name"`
+	Name  string       `json:"name"`
+	Theme *theme.Theme `json:"theme,omitempty"`
 }
 
 func (ThemeMsg) SystemMsgType() string { return "theme" }

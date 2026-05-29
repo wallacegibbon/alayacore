@@ -43,7 +43,7 @@ func (s *Session) submitDeferredCommand(cmd string) {
 		s.writeError("Cannot run command while a task is running. Please wait or cancel first.")
 		return
 	}
-	s.enqueueTask(QueueItem{Type: "command", Content: cmd}, true)
+	s.enqueueTask(QueueItem{Type: TaskTypeCommand, Content: cmd}, true)
 }
 
 // enqueueTask adds a task to the queue. When front is true, the task is
@@ -104,7 +104,7 @@ func (s *Session) runTask(item QueueItem, taskMessages []llm.Message) {
 
 	// Echo user prompts before any work so output ordering is correct even if
 	// the task is canceled during initialization.
-	if item.Type == "prompt" {
+	if item.Type == TaskTypePrompt {
 		s.signalPromptStart(item.Content)
 	}
 
@@ -113,9 +113,9 @@ func (s *Session) runTask(item QueueItem, taskMessages []llm.Message) {
 	s.currentStep.Store(0)
 
 	switch item.Type {
-	case "prompt":
+	case TaskTypePrompt:
 		taskMessages = s.handleUserPrompt(ctx, taskMessages, item.Content, item.Images)
-	case "command":
+	case TaskTypeCommand:
 		taskMessages = s.runTaskCommand(ctx, taskMessages, item.Content)
 	}
 

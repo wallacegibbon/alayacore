@@ -37,6 +37,7 @@ import (
 
 	agentpkg "github.com/alayacore/alayacore/internal/agent"
 	"github.com/alayacore/alayacore/internal/stream"
+	"github.com/alayacore/alayacore/internal/theme"
 )
 
 // outputWriter parses TLV from the session and writes styled content to the WindowBuffer.
@@ -209,6 +210,8 @@ func (to *outputWriter) handleSystemMsg(value string) {
 		to.handleSystemModelList(env.Data)
 	case "theme":
 		to.handleSystemTheme(env.Data)
+	case "theme_list":
+		to.handleSystemThemeList(env.Data)
 	case "reasoning":
 		to.handleSystemReasoning(env.Data)
 	}
@@ -279,12 +282,30 @@ func (to *outputWriter) handleSystemModelList(data json.RawMessage) {
 
 func (to *outputWriter) handleSystemTheme(data json.RawMessage) {
 	var m struct {
-		Name string `json:"name"`
+		Name  string       `json:"name"`
+		Theme *theme.Theme `json:"theme"`
 	}
 	if json.Unmarshal(data, &m) != nil {
 		return
 	}
-	to.status.updateTheme(m.Name)
+	to.status.updateTheme(m.Name, m.Theme)
+}
+
+func (to *outputWriter) handleSystemThemeList(data json.RawMessage) {
+	var m struct {
+		Themes []struct {
+			Name  string       `json:"name"`
+			Theme *theme.Theme `json:"theme"`
+		} `json:"themes"`
+	}
+	if json.Unmarshal(data, &m) != nil {
+		return
+	}
+	infos := make([]ThemeEntry, len(m.Themes))
+	for i, t := range m.Themes {
+		infos[i] = ThemeEntry{Name: t.Name, Theme: t.Theme}
+	}
+	to.status.updateThemeList(infos)
 }
 
 func (to *outputWriter) handleSystemReasoning(data json.RawMessage) {

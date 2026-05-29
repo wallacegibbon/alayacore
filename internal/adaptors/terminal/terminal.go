@@ -423,20 +423,24 @@ func (m *Terminal) updateStatus() {
 	m.statusText = status
 	m.inProgress = snap.InProgress
 
-	m.syncThemeFromSession(snap.ActiveTheme)
+	m.syncThemeFromSession(snap.ActiveTheme, snap.ActiveThemeData)
 	m.activeTheme = snap.ActiveTheme
 }
 
 // syncThemeFromSession checks if the session has reported a different active
 // theme and applies it visually if so.
 // This is the convergence point for both :theme_set and theme selector confirm.
-func (m *Terminal) syncThemeFromSession(sessionTheme string) {
+// Theme data is resolved by sessionState.updateTheme from the cached list;
+// the disk fallback handles older sessions that don't send theme_list.
+func (m *Terminal) syncThemeFromSession(sessionTheme string, themeData *theme.Theme) {
 	if m.appliedTheme == sessionTheme || sessionTheme == "" {
 		return
 	}
-	if m.themeManager != nil {
-		theme := m.themeManager.LoadTheme(sessionTheme)
-		m.applyTheme(theme)
+	if themeData != nil {
+		m.applyTheme(themeData)
+	} else if m.themeManager != nil {
+		t := m.themeManager.LoadTheme(sessionTheme)
+		m.applyTheme(t)
 	}
 	m.appliedTheme = sessionTheme
 }
