@@ -14,7 +14,6 @@ import (
 // Task represents a unit of work for the session.
 type Task interface {
 	isTask()
-	GetQueueID() string
 }
 
 // QueueItem wraps a Task with metadata for queue management
@@ -26,23 +25,17 @@ type QueueItem struct {
 
 // UserPrompt is a user text input task
 type UserPrompt struct {
-	Text    string
-	queueID string
+	Text string
 }
 
 func (UserPrompt) isTask() {}
 
-func (u UserPrompt) GetQueueID() string { return u.queueID }
-
 // CommandPrompt is a command task
 type CommandPrompt struct {
 	Command string
-	queueID string
 }
 
 func (CommandPrompt) isTask() {}
-
-func (c CommandPrompt) GetQueueID() string { return c.queueID }
 
 // QueueItemInfo holds serializable queue item data for clients.
 type QueueItemInfo struct {

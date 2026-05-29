@@ -55,15 +55,6 @@ func (s *Session) enqueueTask(task Task, front bool) {
 	s.nextQueueID++
 	queueID := fmt.Sprintf("Q%d", s.nextQueueID)
 
-	switch t := task.(type) {
-	case UserPrompt:
-		t.queueID = queueID
-		task = t
-	case CommandPrompt:
-		t.queueID = queueID
-		task = t
-	}
-
 	item := QueueItem{
 		Task:      task,
 		QueueID:   queueID,
