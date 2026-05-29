@@ -443,6 +443,7 @@ func (s *Session) inputPump(msgCh chan<- inputMsg) {
 						continue
 					}
 				}
+				msg.text = cmd
 				msg.isCmd = true
 			}
 			msgCh <- msg
