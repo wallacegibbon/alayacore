@@ -51,6 +51,22 @@ configured).
 printf 'UT\x00\x00\x00\x05helloUT\x00\x00\x00\x06my os?' | alayacore --rawio
 ```
 
+Inspect the raw TLV output with `tlvcat`:
+
+```sh
+# Pipe the output through tlvcat to see tags and values
+printf 'UT\x00\x00\x00\x05helloUT\x00\x00\x00\x06my os?' | alayacore --rawio | misc/tlvcat
+```
+
+Or generate a TLV request with images and inspect the result:
+
+```sh
+# Generate a request with 2 images
+go run misc/samples/tlv-requests/image/gen_tlv.go \
+  "What's in these images?" image1.jpg image2.jpg \
+  | alayacore --rawio | misc/tlvcat
+```
+
 ## Use Cases
 
 - **Orchestration**: A parent AI agent launches AlayaCore as a subprocess

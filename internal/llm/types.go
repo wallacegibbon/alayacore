@@ -51,6 +51,7 @@ type ContentPart interface {
 // its own wire-format type (e.g., Anthropic maps ContentPartReasoning to "thinking").
 const (
 	ContentPartText       = "text"
+	ContentPartImage      = "image"
 	ContentPartReasoning  = "reasoning"
 	ContentPartToolUse    = "tool_use"
 	ContentPartToolResult = "tool_result"
@@ -63,6 +64,14 @@ type TextPart struct {
 }
 
 func (TextPart) isContentPart() {}
+
+// ImagePart represents an image content (DataURI: data:image/...;base64,...)
+type ImagePart struct {
+	Type    string `json:"type"`
+	DataURL string `json:"data_url"`
+}
+
+func (ImagePart) isContentPart() {}
 
 // ReasoningPart represents reasoning/thinking content.
 // Signature is Anthropic-specific: it verifies thinking block integrity

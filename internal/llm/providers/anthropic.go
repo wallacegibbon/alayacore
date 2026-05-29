@@ -34,6 +34,7 @@ import (
 
 const (
 	anthropicBlockTypeText       = "text"
+	anthropicBlockTypeImage      = "image"
 	anthropicBlockTypeThinking   = "thinking"
 	anthropicBlockTypeToolResult = "tool_result"
 	anthropicBlockTypeToolUse    = "tool_use"
@@ -99,6 +100,15 @@ type anthropicContentBlock struct {
 	// blocks — Anthropic requires it to be passed back exactly as received.
 	// Omitted from JSON for non-thinking blocks (text, tool_use, etc.).
 	Signature string `json:"signature,omitempty"`
+
+	// For image
+	Source *anthropicImageSource `json:"source,omitempty"`
+}
+
+type anthropicImageSource struct {
+	Type      string `json:"type"`
+	MediaType string `json:"media_type"`
+	Data      string `json:"data"`
 }
 
 type anthropicTool struct {
@@ -643,46 +653,8 @@ func anthropicConvertMessages(messages []llm.Message, reasoningLevel int) []anth
 		}
 
 		for _, part := range msg.Content {
-			switch v := part.(type) {
-			case llm.TextPart:
-				apiMsg.Content = append(apiMsg.Content, anthropicContentBlock{
-					Type: anthropicBlockTypeText,
-					Text: v.Text,
-				})
-			case llm.ReasoningPart:
-				text := v.Text
-				apiMsg.Content = append(apiMsg.Content, anthropicContentBlock{
-					Type:      anthropicBlockTypeThinking,
-					Thinking:  &text,
-					Signature: v.Signature,
-				})
-			case llm.ToolCallPart:
-				apiMsg.Content = append(apiMsg.Content, anthropicContentBlock{
-					Type:  anthropicBlockTypeToolUse,
-					ID:    v.ToolCallID,
-					Name:  v.ToolName,
-					Input: v.Input,
-				})
-			case llm.ToolResultPart:
-				var content any
-				switch out := v.Output.(type) {
-				case llm.ToolResultOutputText:
-					content = out.Text
-				case llm.ToolResultOutputFailed:
-					content = out.Reason
-					apiMsg.Content = append(apiMsg.Content, anthropicContentBlock{
-						Type:      anthropicBlockTypeToolResult,
-						ToolUseID: v.ToolCallID,
-						Content:   content,
-						IsError:   true,
-					})
-					continue
-				}
-				apiMsg.Content = append(apiMsg.Content, anthropicContentBlock{
-					Type:      anthropicBlockTypeToolResult,
-					ToolUseID: v.ToolCallID,
-					Content:   content,
-				})
+			if block := anthropicPartToBlock(part); block != nil {
+				apiMsg.Content = append(apiMsg.Content, *block)
 			}
 		}
 
@@ -707,4 +679,84 @@ func anthropicConvertMessages(messages []llm.Message, reasoningLevel int) []anth
 		apiMessages = append(apiMessages, apiMsg)
 	}
 	return apiMessages
+}
+
+// anthropicPartToBlock converts a domain ContentPart to an Anthropic content block.
+// Returns nil for unsupported parts.
+func anthropicPartToBlock(part llm.ContentPart) *anthropicContentBlock {
+	switch v := part.(type) {
+	case llm.TextPart:
+		return &anthropicContentBlock{
+			Type: anthropicBlockTypeText,
+			Text: v.Text,
+		}
+	case llm.ImagePart:
+		mediaType, b64, ok := parseDataURI(v.DataURL)
+		if !ok {
+			return nil
+		}
+		return &anthropicContentBlock{
+			Type: anthropicBlockTypeImage,
+			Source: &anthropicImageSource{
+				Type:      "base64",
+				MediaType: mediaType,
+				Data:      b64,
+			},
+		}
+	case llm.ReasoningPart:
+		text := v.Text
+		return &anthropicContentBlock{
+			Type:      anthropicBlockTypeThinking,
+			Thinking:  &text,
+			Signature: v.Signature,
+		}
+	case llm.ToolCallPart:
+		return &anthropicContentBlock{
+			Type:  anthropicBlockTypeToolUse,
+			ID:    v.ToolCallID,
+			Name:  v.ToolName,
+			Input: v.Input,
+		}
+	case llm.ToolResultPart:
+		var content any
+		switch out := v.Output.(type) {
+		case llm.ToolResultOutputText:
+			content = out.Text
+		case llm.ToolResultOutputFailed:
+			return &anthropicContentBlock{
+				Type:      anthropicBlockTypeToolResult,
+				ToolUseID: v.ToolCallID,
+				Content:   out.Reason,
+				IsError:   true,
+			}
+		}
+		return &anthropicContentBlock{
+			Type:      anthropicBlockTypeToolResult,
+			ToolUseID: v.ToolCallID,
+			Content:   content,
+		}
+	}
+	return nil
+}
+
+// parseDataURI parses a Data URI into media type and base64 data.
+// Input: "data:image/jpeg;base64,/9j/4AAQ..."
+// Output: "image/jpeg", "/9j/4AAQ...", true
+func parseDataURI(uri string) (mediaType, data string, ok bool) {
+	const prefix = "data:"
+	if !strings.HasPrefix(uri, prefix) {
+		return "", "", false
+	}
+	rest := uri[len(prefix):]
+	semi := strings.IndexByte(rest, ';')
+	if semi == -1 {
+		return "", "", false
+	}
+	mediaType = rest[:semi]
+	rest = rest[semi+1:]
+	const b64Prefix = "base64,"
+	if !strings.HasPrefix(rest, b64Prefix) {
+		return "", "", false
+	}
+	return mediaType, rest[len(b64Prefix):], true
 }

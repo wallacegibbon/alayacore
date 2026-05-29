@@ -590,10 +590,18 @@ func openaiConvertToolCalls(apiMsg *openAIMessage, content []llm.ContentPart) {
 func openaiConvertRegularContent(apiMsg *openAIMessage, content []llm.ContentPart) {
 	var contentParts []map[string]any
 	for _, part := range content {
-		if v, ok := part.(llm.TextPart); ok {
+		switch v := part.(type) {
+		case llm.TextPart:
 			contentParts = append(contentParts, map[string]any{
 				"type": "text",
 				"text": v.Text,
+			})
+		case llm.ImagePart:
+			contentParts = append(contentParts, map[string]any{
+				"type": "image_url",
+				"image_url": map[string]string{
+					"url": v.DataURL,
+				},
 			})
 		}
 	}

@@ -119,7 +119,7 @@ func (s *Session) runTask(item QueueItem, taskMessages []llm.Message) {
 
 	switch t := item.Task.(type) {
 	case UserPrompt:
-		taskMessages = s.handleUserPrompt(ctx, taskMessages, t.Text)
+		taskMessages = s.handleUserPrompt(ctx, taskMessages, t.Text, t.Images)
 	case CommandPrompt:
 		taskMessages = s.runTaskCommand(ctx, taskMessages, t.Command)
 	}

@@ -1,0 +1,5 @@
+## Example
+
+```
+go run gen_tlv.go "does the animal in image 2 exist in image1?" dog.jpg hamster.webp
+```

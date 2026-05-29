@@ -98,6 +98,7 @@ AF and UF use JSON (not the delta format), since tool events are discrete, not s
 | `TagAssistantR` | AR | Reasoning/thinking content |
 | `TagAssistantT` | AT | Assistant text output |
 | `TagAssistantF` | AF | Function lifecycle: start/call (JSON) — pending inferred from lifecycle |
+| `TagUserI` | UI | User image (DataURI: data:image/...;base64,...) |
 | `TagUserT` | UT | User text input |
 | `TagUserF` | UF | Function result with status (JSON) |
 | `TagSystemMsg` | SM | System message (JSON: {"type":"...","data":{...}}) |
@@ -118,6 +119,7 @@ The terminal infers "pending" status from the absence of a result (no UF receive
 
 ### Example Flow
 
+#### Text Prompt
 ```
 1. User types "read main.go" in terminal
 2. Terminal adaptor emits: TLV(UT, "read main.go")
@@ -131,6 +133,20 @@ The terminal infers "pending" status from the absence of a result (no UF receive
    → Session emits: TLV(UF, {"id":"tool123","output":"Canceled (exit 130)","status":"failed"})
 6. Agent generates response → Session emits: TLV(AT, "\x000|0\x00Here's what main.go does...")
 7. Terminal adaptor parses TLV, renders styled content in windows
+```
+
+#### Image Prompt
+```
+1. Script sends 2 images followed by text:
+   TLV(UI, "data:image/jpeg;base64,...")
+   TLV(UI, "data:image/png;base64,...")
+   TLV(UT, "What's in these images?")
+2. inputPump collects UI values, attaches them as images to the UT
+3. Session creates UserPrompt{Text: "What's in these images?", Images: [...]}
+4. handleUserPrompt builds message content: [ImagePart, ImagePart, TextPart]
+5. Provider converts to wire format:
+   - Anthropic: [{"type":"image","source":{...}}, {"type":"text","text":"..."}]
+   - OpenAI:   [{"type":"image_url","image_url":{...}}, {"type":"text","text":"..."}]
 ```
 
 ## Data Flow

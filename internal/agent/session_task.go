@@ -30,18 +30,28 @@ const (
 
 // handleUserPrompt processes a user prompt through the agent loop.
 // Takes the current messages and returns the updated messages after processing.
-func (s *Session) handleUserPrompt(ctx context.Context, messages []llm.Message, prompt string) []llm.Message {
+func (s *Session) handleUserPrompt(ctx context.Context, messages []llm.Message, prompt string, images []string) []llm.Message {
 	if s.shouldAutoSummarize() {
 		messages = s.doAutoSummarize(ctx, messages)
 	}
 
+	// Build content parts: images first, then text
+	content := make([]llm.ContentPart, 0, 1+len(images))
+	for _, img := range images {
+		content = append(content, llm.ImagePart{Type: "image", DataURL: img})
+	}
+	content = append(content, llm.TextPart{Type: "text", Text: prompt})
+
 	if len(messages) > 0 && messages[len(messages)-1].Role == llm.RoleUser {
 		messages[len(messages)-1].Content = append(
 			messages[len(messages)-1].Content,
-			llm.TextPart{Type: "text", Text: prompt},
+			content...,
 		)
 	} else {
-		messages = append(messages, llm.NewUserMessage(prompt))
+		messages = append(messages, llm.Message{
+			Role:    llm.RoleUser,
+			Content: content,
+		})
 	}
 
 	result, _, err := s.processPrompt(ctx, messages)
