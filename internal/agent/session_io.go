@@ -398,7 +398,7 @@ func (s *Session) resendPrompt(ctx context.Context, messages []llm.Message) []ll
 // inputMsg carries a parsed input message from the I/O pump to run().
 type inputMsg struct {
 	text   string   // the raw user text or command text (without ':')
-	images []string // image paths/URLs from preceding UI tags
+	images []string // image DataURIs from preceding UI tags
 	isCmd  bool     // true if text starts with ':'
 }
 
