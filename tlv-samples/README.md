@@ -134,6 +134,7 @@ at-plain.bin                   AT "plain text without stream id"
 ar-delta.bin                   AR \x00 0|1 \x00 thinking...
 ui-image.bin                   UI data:image/jpeg;base64,...
 sm-task-start.bin              SM {"type":"task","data":{"in_progress":true,"context":0,"context_limit":0,"total":0,"queue_items":[]}}
+sm-task-queued.bin             SM {"type":"task","data":{"in_progress":true,"context":0,"context_limit":0,"total":0,"queue_items":[{"queue_id":"Q1","type":"prompt","content":"Read the file main.go","created_at":"..."},{"queue_id":"Q2","type":"command","content":":continue","created_at":"..."}]}}
 sm-task-end.bin                SM {"type":"task","data":{"in_progress":false,"context":0,"context_limit":0,"total":0,"queue_items":[]}}
 sm-error.bin                   SM {"type":"error","data":{"text":"something broke"}}
 sm-notify.bin                  SM {"type":"notify","data":{"text":"all good"}}
