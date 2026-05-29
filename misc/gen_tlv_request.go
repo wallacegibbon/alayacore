@@ -14,7 +14,7 @@ import (
 
 func main() {
 	if len(os.Args) < 3 {
-		fmt.Fprintf(os.Stderr, "usage: go run gen_tlv.go <prompt> <image1> [image2 ...] > <output>\n")
+		fmt.Fprintf(os.Stderr, "usage: go run misc/gen_tlv_request.go <prompt> <image1> [image2 ...]\n")
 		os.Exit(1)
 	}
 

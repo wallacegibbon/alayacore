@@ -67,7 +67,7 @@ Or generate a TLV request with images and inspect the result:
 
 ```sh
 # Generate a request with 2 images
-go run misc/samples/tlv-requests/image/gen_tlv.go \
+go run misc/gen_tlv_request.go \
   "What's in these images?" image1.jpg image2.jpg \
   | alayacore --rawio | misc/tlvcat
 ```
