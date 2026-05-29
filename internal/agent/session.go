@@ -166,6 +166,9 @@ func NewSession(cfg SessionConfig) *Session {
 	s.reasoningLevel.Store(int64(config.DefaultReasoningLevel))
 	s.initModelManager()
 	s.applyModelOverride()
+	if model := s.ModelManager.GetActive(); model != nil {
+		s.applyModelContextLimit(model)
+	}
 	s.sendSystemInfo("all")
 	return s
 }
