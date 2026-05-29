@@ -28,7 +28,7 @@ func NewAdaptor(cfg *app.Config) *Adaptor {
 }
 
 // Start runs the rawio adaptor. It blocks until the session finishes.
-// Returns 1 only on startup failure (config errors, no models).
+// Returns 0 on success, 1 on any error (startup or task failure).
 // The controlling process reads stdout and handles TLV itself.
 func (a *Adaptor) Start() int {
 	session, inputWriter, err := app.StartSession(a.Config, os.Stdout)
@@ -57,6 +57,10 @@ func (a *Adaptor) Start() int {
 		case <-session.Done():
 		case <-sigCh:
 		}
+	}
+
+	if session.TaskError() {
+		return 1
 	}
 
 	return 0

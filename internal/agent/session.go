@@ -103,6 +103,11 @@ func (s *Session) Done() <-chan struct{} {
 	return s.runDone
 }
 
+// TaskError reports whether the last task ended with an error.
+func (s *Session) TaskError() bool {
+	return s.pausedOnError.Load()
+}
+
 // HasModels returns true if any models are configured.
 func (s *Session) HasModels() bool {
 	if s.ModelManager == nil {

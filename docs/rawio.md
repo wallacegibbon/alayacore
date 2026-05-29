@@ -40,9 +40,14 @@ See [TLV Protocol](adaptor-architecture.md#tlv-protocol) for full details.
 
 Rawio does not inspect or interpret TLV frames. If the session encounters
 an error, it emits a TagSystemMsg with type "error" on stdout — the
-controlling process detects and handles it. The adaptor itself always
-exits with code `0` (or `1` on startup failure, e.g. no models
-configured).
+controlling process detects and handles it.
+
+## Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | Normal exit — all tasks completed successfully |
+| `1` | Error — startup failure (config, no models) or task error during execution |
 
 ## Example
 
