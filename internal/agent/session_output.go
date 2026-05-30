@@ -113,6 +113,7 @@ func (s *Session) sendSystemInfo(kind string) {
 
 	switch kind {
 	case "all":
+		s.sendMessageVersionMsg()
 		s.sendTaskMsg()
 		s.sendModelListMsg()
 		s.sendModelMsg()
@@ -128,6 +129,10 @@ func (s *Session) sendSystemInfo(kind string) {
 	case "reasoning":
 		s.sendReasoningMsg()
 	}
+}
+
+func (s *Session) sendMessageVersionMsg() {
+	_ = stream.WriteSystemMsg(s.Output, MessageVersionMsg{MessageVersion: MessageFormatVersion}) //nolint:errcheck
 }
 
 func (s *Session) sendTaskMsg() {

@@ -91,6 +91,15 @@ type ReasoningMsg struct {
 
 func (ReasoningMsg) SystemMsgType() string { return "reasoning" }
 
+// MessageVersionMsg carries the TLV message format version (type "version").
+// Sent as the first TagSystemMsg frame so adaptors can validate format
+// compatibility before processing subsequent messages.
+type MessageVersionMsg struct {
+	MessageVersion int `json:"message_version"`
+}
+
+func (MessageVersionMsg) SystemMsgType() string { return "version" }
+
 // MessageFormatVersion is the current version of the message encoding
 // used in session files. Increment when making backward-incompatible
 // changes to the TLV message format within the session body.
