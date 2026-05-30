@@ -58,8 +58,19 @@ func inferSchemaType(t reflect.Type) string {
 	}
 }
 
-// GenerateSchema generates a JSON schema from a struct using reflection.
+// GenerateSchema generates a JSON schema from a flat struct using reflection.
 // Returns an error if v is not a struct or marshaling fails.
+//
+// Limitations (flat-struct only):
+//   - Nested structs: fields with struct types fall back to "string" type
+//     in the generated schema (no recursive property expansion).
+//   - Slices/arrays: fields with slice or array types also fall back to
+//     "string" (no support for array-type schemas or array-of-objects).
+//   - Embedded (anonymous) fields are silently skipped.
+//   - No $ref, allOf, anyOf, oneOf — every field generates an inline schema.
+//
+// For complex tool schemas that need nested objects or $ref, construct the
+// json.RawMessage manually or use a full JSON schema library.
 func GenerateSchema(v any) (json.RawMessage, error) {
 	t := reflect.TypeOf(v)
 	if t.Kind() == reflect.Ptr {
