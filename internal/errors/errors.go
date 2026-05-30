@@ -17,7 +17,6 @@ var (
 	ErrModelManagerNotInitialized = &SessionError{Op: "model", Err: fmt.Errorf("model manager not initialized")}
 	ErrNoModelFilePath            = &SessionError{Op: "model_load", Err: fmt.Errorf("no model file path configured")}
 	ErrFailedToLoadModels         = &SessionError{Op: "model_load", Err: fmt.Errorf("failed to load models")}
-	ErrModelConfigInvalid         = &SessionError{Op: "model", Err: fmt.Errorf("invalid model configuration")}
 )
 
 // Queue errors
@@ -47,11 +46,6 @@ var (
 	ErrProviderCreationFailed = &SessionError{Op: "provider", Err: fmt.Errorf("provider creation failed")}
 )
 
-// Tool errors
-var (
-	ErrToolExecutionFailed = &SessionError{Op: "tool", Err: fmt.Errorf("tool execution failed")}
-)
-
 // ============================================================================
 // Structured Error Types
 // ============================================================================
@@ -59,24 +53,9 @@ var (
 // SessionError represents an error with operation context.
 // It provides structured information about what operation failed.
 type SessionError struct {
-	Op   string    // The operation that failed (e.g., "model_set", "save")
-	Err  error     // The underlying error
-	Kind ErrorKind // Categorization for programmatic dispatch
+	Op  string // The operation that failed (e.g., "model_set", "save")
+	Err error  // The underlying error
 }
-
-// ErrorKind classifies an error for structured handling.
-type ErrorKind int
-
-const (
-	KindOther ErrorKind = iota
-	KindModel
-	KindQueue
-	KindSession
-	KindCommand
-	KindInput
-	KindProvider
-	KindTool
-)
 
 // Error implements the error interface.
 func (e *SessionError) Error() string {
@@ -96,14 +75,9 @@ func (e *SessionError) Operation() string {
 	return e.Op
 }
 
-// ErrorKind returns the kind of error for programmatic dispatch.
-func (e *SessionError) ErrorKind() ErrorKind {
-	return e.Kind
-}
-
 // NewSessionErrorf creates a new SessionError with a formatted error message.
 func NewSessionErrorf(op, format string, args ...any) *SessionError {
-	return &SessionError{Op: op, Err: fmt.Errorf(format, args...), Kind: inferKind(op)}
+	return &SessionError{Op: op, Err: fmt.Errorf(format, args...)}
 }
 
 // Wrap wraps an existing error with operation context.
@@ -111,7 +85,7 @@ func Wrap(op string, err error) *SessionError {
 	if err == nil {
 		return nil
 	}
-	return &SessionError{Op: op, Err: err, Kind: inferKind(op)}
+	return &SessionError{Op: op, Err: err}
 }
 
 // Wrapf wraps an error with operation context and a formatted message.
@@ -119,7 +93,7 @@ func Wrapf(op string, err error, format string, args ...any) *SessionError {
 	if err == nil {
 		return nil
 	}
-	return &SessionError{Op: op, Err: fmt.Errorf(format+": %w", append(args, err)...), Kind: inferKind(op)}
+	return &SessionError{Op: op, Err: fmt.Errorf(format+": %w", append(args, err)...)}
 }
 
 // Common operation names for error context.
@@ -145,27 +119,3 @@ const (
 	OpStream   = "stream"
 	OpTool     = "tool"
 )
-
-// inferKind maps common operation names to ErrorKind.
-//
-//nolint:gocyclo // Simple string-to-enum mapping, intentional list of cases
-func inferKind(op string) ErrorKind {
-	switch op {
-	case OpModelSet, OpModelLoad, OpModel:
-		return KindModel
-	case OpQueueDel, OpQueueEdit, OpQueue:
-		return KindQueue
-	case OpSave, OpLoad, OpSession:
-		return KindSession
-	case OpCommand, OpCancel, OpCancelAll:
-		return KindCommand
-	case OpInput:
-		return KindInput
-	case OpProvider, OpStream:
-		return KindProvider
-	case OpTool:
-		return KindTool
-	default:
-		return KindOther
-	}
-}
