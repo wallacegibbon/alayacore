@@ -183,57 +183,52 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 	return processResult, outputTokens, nil
 }
 
-// cleanIncompleteToolCalls removes incomplete tool calls from messages.
-// An incomplete tool call is one whose ToolCallID has no matching
-// ToolResultPart in any subsequent message.  This happens when the API
-// errors mid-cycle.
+// cleanIncompleteToolCalls strips orphaned tool calls from the last
+// message and returns the cleaned slice, which may be shorter if the
+// last message was removed entirely.
+//
+// An incomplete tool call has a ToolCallID without a matching
+// ToolResultPart. This happens when the API errors mid-cycle: the model
+// emitted tool calls but the agent loop was interrupted before executing
+// them. Only the last message can have orphaned calls — earlier steps
+// are already complete.
 func cleanIncompleteToolCalls(messages []llm.Message) []llm.Message {
-	unmatchedCalls := make(map[string]bool)
-	for _, msg := range messages {
-		for _, part := range msg.Content {
-			switch p := part.(type) {
-			case llm.ToolCallPart:
-				unmatchedCalls[p.ToolCallID] = true
-			case llm.ToolResultPart:
-				delete(unmatchedCalls, p.ToolCallID)
-			}
-		}
-	}
-
-	if len(unmatchedCalls) == 0 {
+	if len(messages) == 0 {
 		return messages
 	}
 
-	for i := len(messages) - 1; i >= 0; i-- {
-		msg := messages[i]
+	last := messages[len(messages)-1]
 
-		hasUnmatchedCall := false
-		for _, part := range msg.Content {
-			if tc, ok := part.(llm.ToolCallPart); ok && unmatchedCalls[tc.ToolCallID] {
-				hasUnmatchedCall = true
-				break
-			}
+	// Collect tool call IDs from the last message. There are no messages
+	// after it, so any tool call here is orphaned by definition.
+	orphaned := make(map[string]bool)
+	for _, part := range last.Content {
+		if tc, ok := part.(llm.ToolCallPart); ok {
+			orphaned[tc.ToolCallID] = true
 		}
-
-		if hasUnmatchedCall {
-			filteredParts := make([]llm.ContentPart, 0, len(msg.Content))
-			for _, part := range msg.Content {
-				if tc, ok := part.(llm.ToolCallPart); ok && unmatchedCalls[tc.ToolCallID] {
-					continue
-				}
-				filteredParts = append(filteredParts, part)
-			}
-
-			if len(filteredParts) > 0 {
-				messages[i].Content = filteredParts
-				return messages[:i+1]
-			}
-			messages = messages[:i]
-			continue
-		}
-
-		return messages[:i+1]
+	}
+	if len(orphaned) == 0 {
+		return messages
 	}
 
-	return messages
+	filtered := stripToolCalls(last.Content, orphaned)
+	if len(filtered) > 0 {
+		messages[len(messages)-1].Content = filtered
+		return messages
+	}
+	// The last message had nothing but orphaned tool calls — drop it.
+	return messages[:len(messages)-1]
+}
+
+// stripToolCalls returns a new Content slice with all ToolCallParts whose
+// ID is in the given set removed. Non-tool-call parts are preserved.
+func stripToolCalls(content []llm.ContentPart, toolCallIDs map[string]bool) []llm.ContentPart {
+	filtered := make([]llm.ContentPart, 0, len(content))
+	for _, part := range content {
+		if tc, ok := part.(llm.ToolCallPart); ok && toolCallIDs[tc.ToolCallID] {
+			continue
+		}
+		filtered = append(filtered, part)
+	}
+	return filtered
 }
