@@ -54,7 +54,7 @@ func TestFormatRuntimeConfig_RoundTrip(t *testing.T) {
 
 func TestFormatFrontmatter_RoundTrip(t *testing.T) {
 	meta := SessionMeta{
-		Version:        SessionFileFormatVersion,
+		MessageVersion: MessageFormatVersion,
 		ActiveModel:    `model "name" \\ thing`,
 		ReasoningLevel: 1,
 		ContextTokens:  12345,
@@ -126,7 +126,7 @@ func TestRuntimeManager_NewlineInModel_RoundTrip(t *testing.T) {
 // Verify formatFrontmatter doesn't produce broken output for special chars
 func TestFormatFrontmatter_NoBrokenOutput(t *testing.T) {
 	meta := SessionMeta{
-		Version:        SessionFileFormatVersion,
+		MessageVersion: MessageFormatVersion,
 		ActiveModel:    "has\nnewlines",
 		ReasoningLevel: 1,
 	}

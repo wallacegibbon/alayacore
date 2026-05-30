@@ -18,7 +18,7 @@ import (
 )
 
 // ErrSessionVersionMismatch is returned when a session file has a version
-// that does not match SessionFileFormatVersion and cannot be loaded.
+// that does not match MessageFormatVersion and cannot be loaded.
 var ErrSessionVersionMismatch = errors.New("session file version mismatch")
 
 // ============================================================================
@@ -41,7 +41,7 @@ func (s *Session) saveSessionToFile(path string) error {
 func (s *Session) saveSessionToFileWith(messages []llm.Message, path string) error {
 	data := SessionData{
 		SessionMeta: SessionMeta{
-			Version:        SessionFileFormatVersion,
+			MessageVersion: MessageFormatVersion,
 			CreatedAt:      s.CreatedAt,
 			UpdatedAt:      time.Now(),
 			ReasoningLevel: int(s.reasoningLevel.Load()),
@@ -86,6 +86,9 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 					tag = stream.TagAssistantT
 				}
 				writeTLV(&binaryBuf, tag, p.Text)
+
+			case llm.ImagePart:
+				writeTLV(&binaryBuf, stream.TagUserI, p.DataURL)
 
 			case llm.ReasoningPart:
 				if p.Signature != "" {
@@ -174,15 +177,15 @@ func parseFrontmatter(content string) (frontmatter, body string, err error) {
 }
 
 // parseSessionMeta parses key-value pairs from frontmatter into SessionMeta using struct tags.
-// Returns an error if the session file version does not match SessionFileFormatVersion.
+// Returns an error if the session file version does not match MessageFormatVersion.
 func parseSessionMeta(frontmatter string) (SessionMeta, error) {
 	var meta SessionMeta
 	config.ParseKeyValue(frontmatter, &meta)
 
-	// Check session file format version — must match exactly.
-	if meta.Version != SessionFileFormatVersion {
+	// Check message format version — must match exactly.
+	if meta.MessageVersion != MessageFormatVersion {
 		return meta, fmt.Errorf("%w: got %d, expected %d",
-			ErrSessionVersionMismatch, meta.Version, SessionFileFormatVersion)
+			ErrSessionVersionMismatch, meta.MessageVersion, MessageFormatVersion)
 	}
 
 	// Default reasoning_level to 1 (normal) when the key is absent from the
@@ -290,6 +293,10 @@ func parseMessagesTLV(body string) ([]llm.Message, []TLVChunk, error) {
 		case stream.TagUserT:
 			msgRole = llm.RoleUser
 			msgPart = llm.TextPart{Type: "text", Text: string(content)}
+
+		case stream.TagUserI:
+			msgRole = llm.RoleUser
+			msgPart = llm.ImagePart{Type: "image", DataURL: string(content)}
 
 		case stream.TagAssistantT:
 			// Do NOT force newMessage: an assistant message may start with

@@ -12,7 +12,7 @@ func TestSessionSavePreservesTextWithToolCalls(t *testing.T) {
 	// Create session data with an assistant message containing both text and tool calls
 	data := &SessionData{
 		SessionMeta: SessionMeta{
-			Version: SessionFileFormatVersion,
+			MessageVersion: MessageFormatVersion,
 		},
 		Messages: []llm.Message{
 			{

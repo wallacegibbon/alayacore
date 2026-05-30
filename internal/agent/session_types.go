@@ -91,9 +91,11 @@ type ReasoningMsg struct {
 
 func (ReasoningMsg) SystemMsgType() string { return "reasoning" }
 
-// SessionFileFormatVersion is the current version of the session file format.
-// Increment when making backward-incompatible changes to the session file structure.
-const SessionFileFormatVersion = 1
+// MessageFormatVersion is the current version of the message encoding
+// used in session files. Increment when making backward-incompatible
+// changes to the TLV message format within the session body.
+// The frontmatter format is versioned independently.
+const MessageFormatVersion = 1
 
 // SessionMeta is the frontmatter metadata.
 type SessionMeta struct {
@@ -102,7 +104,7 @@ type SessionMeta struct {
 	ReasoningLevel int       `config:"reasoning_level"`
 	ActiveModel    string    `config:"active_model,omitempty"`
 	ContextTokens  int64     `config:"context_tokens,omitempty"`
-	Version        int       `config:"version,omitempty"`
+	MessageVersion int       `config:"message_version,omitempty"`
 }
 
 // SessionData is the persisted form of a Session.
