@@ -518,7 +518,7 @@ func TestDisplayMessagesWithToolCalls(t *testing.T) {
 			},
 		},
 		SessionMeta: SessionMeta{
-			MessageVersion: MessageFormatVersion,
+			MessageVersion: MessageVersion,
 			UpdatedAt:      time.Now(),
 		},
 	}
@@ -868,7 +868,7 @@ func TestLoadSessionVersionValid(t *testing.T) {
 	}
 
 	if data.MessageVersion != 1 {
-		t.Errorf("expected Version=1, got %d", data.MessageVersion)
+		t.Errorf("expected MessageVersion=1, got %d", data.MessageVersion)
 	}
 }
 

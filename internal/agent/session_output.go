@@ -132,7 +132,7 @@ func (s *Session) sendSystemInfo(kind string) {
 }
 
 func (s *Session) sendMessageVersionMsg() {
-	_ = stream.WriteSystemMsg(s.Output, MessageVersionMsg{MessageVersion: MessageFormatVersion}) //nolint:errcheck
+	_ = stream.WriteSystemMsg(s.Output, MessageVersionMsg{MessageVersion: MessageVersion}) //nolint:errcheck
 }
 
 func (s *Session) sendTaskMsg() {

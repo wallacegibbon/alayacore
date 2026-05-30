@@ -93,7 +93,7 @@ stdin EOF ──▶ inputPump closes msgCh ──▶ run() detects closed channe
 
 Session files use a Markdown-based format with YAML frontmatter. The body contains TLV-encoded conversation data (messages, tool calls, tool results) written directly as binary TLV records after the frontmatter.
 
-The frontmatter includes a `version` field that tracks the session file format. When loading a session, the version must match `SessionFileFormatVersion` exactly — any mismatch (missing, older, or newer) is rejected with an error and the program exits.
+The frontmatter includes a `message_version` field that tracks the TLV message encoding format. When loading a session, it must match `MessageVersion` exactly — any mismatch is rejected. The version is also broadcast to adaptors as the first `TagSystemMsg` frame on startup (`{"type":"version","data":{"message_version":1}}`), so they can validate format compatibility before processing subsequent messages.
 
 **Message grouping on load:** The session format stores a flat sequence of TLV chunks with no explicit message boundaries. On load, chunks are grouped into messages by role: consecutive chunks with the same role are merged into a single message's `Content` array. This correctly handles multi-part user messages (e.g., when a user adds context after a failed prompt) and assistant messages containing reasoning + text + tool calls.
 

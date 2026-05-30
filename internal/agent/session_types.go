@@ -100,11 +100,11 @@ type MessageVersionMsg struct {
 
 func (MessageVersionMsg) SystemMsgType() string { return "version" }
 
-// MessageFormatVersion is the current version of the message encoding
-// used in session files. Increment when making backward-incompatible
-// changes to the TLV message format within the session body.
-// The frontmatter format is versioned independently.
-const MessageFormatVersion = 1
+// MessageVersion is the current version of the message encoding
+// used in session files and TagSystemMsg broadcasts.
+// Increment when making backward-incompatible changes to the TLV
+// message format within the session body.
+const MessageVersion = 1
 
 // SessionMeta is the frontmatter metadata.
 type SessionMeta struct {
