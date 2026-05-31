@@ -183,15 +183,11 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 	return processResult, outputTokens, nil
 }
 
-// cleanIncompleteToolCalls strips orphaned tool calls from the last
-// message and returns the cleaned slice, which may be shorter if the
-// last message was removed entirely.
-//
-// An incomplete tool call has a ToolCallID without a matching
-// ToolResultPart. This happens when the API errors mid-cycle: the model
-// emitted tool calls but the agent loop was interrupted before executing
-// them. Only the last message can have orphaned calls — earlier steps
-// are already complete.
+// cleanIncompleteToolCalls removes orphaned tool calls from the last
+// message. This happens when the user cancels mid-cycle: the model
+// emitted tool calls but the agent never executed them. Only the last
+// message can have orphaned calls — earlier steps are already complete.
+// If the last message becomes empty after stripping, it is removed.
 func cleanIncompleteToolCalls(messages []llm.Message) []llm.Message {
 	if len(messages) == 0 {
 		return messages
@@ -199,36 +195,24 @@ func cleanIncompleteToolCalls(messages []llm.Message) []llm.Message {
 
 	last := messages[len(messages)-1]
 
-	// Collect tool call IDs from the last message. There are no messages
-	// after it, so any tool call here is orphaned by definition.
-	orphaned := make(map[string]bool)
-	for _, part := range last.Content {
-		if tc, ok := part.(llm.ToolCallPart); ok {
-			orphaned[tc.ToolCallID] = true
-		}
-	}
-	if len(orphaned) == 0 {
+	// Only assistant messages carry tool calls.
+	if last.Role != llm.RoleAssistant {
 		return messages
 	}
 
-	filtered := stripToolCalls(last.Content, orphaned)
+	// Tool calls in the last message are always orphaned — the agent
+	// only stops after executing all tool calls from a completed step.
+	filtered := make([]llm.ContentPart, 0, len(last.Content))
+	for _, part := range last.Content {
+		if _, ok := part.(llm.ToolCallPart); ok {
+			continue
+		}
+		filtered = append(filtered, part)
+	}
 	if len(filtered) > 0 {
 		messages[len(messages)-1].Content = filtered
 		return messages
 	}
 	// The last message had nothing but orphaned tool calls — drop it.
 	return messages[:len(messages)-1]
-}
-
-// stripToolCalls returns a new Content slice with all ToolCallParts whose
-// ID is in the given set removed. Non-tool-call parts are preserved.
-func stripToolCalls(content []llm.ContentPart, toolCallIDs map[string]bool) []llm.ContentPart {
-	filtered := make([]llm.ContentPart, 0, len(content))
-	for _, part := range content {
-		if tc, ok := part.(llm.ToolCallPart); ok && toolCallIDs[tc.ToolCallID] {
-			continue
-		}
-		filtered = append(filtered, part)
-	}
-	return filtered
 }
