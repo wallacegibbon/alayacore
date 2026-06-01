@@ -70,6 +70,15 @@ Space
 Sleep 500ms
 
 
+# ── Restore Theme ────────────────────────────────────────────────────
+Ctrl+P
+Sleep 500ms
+Type "k"
+Sleep 200ms
+Type "k"
+Sleep 500ms
+Enter
+
 # ── Exit ────────────────────────────────────────────────────────────
 
 Type ":quit"
