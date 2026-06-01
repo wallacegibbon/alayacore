@@ -73,6 +73,10 @@ type ConfirmDialog struct {
 	Width  int
 	Height int
 
+	// Description shown below the title (used for all kinds).
+	// Rendered as up to 2 centered rows in muted style.
+	Description string
+
 	// Tool confirm fields (only used for ConfirmTool kind)
 	ToolID    string
 	ToolName  string
@@ -111,6 +115,7 @@ func (cd *ConfirmDialog) IsOpen() bool {
 func (cd *ConfirmDialog) OpenQuit() {
 	cd.State = FilteredListOpen
 	cd.Kind = ConfirmQuit
+	cd.Description = "All unsaved progress will be lost."
 	cd.ToolID = ""
 	cd.ToolName = ""
 	cd.ToolInput = ""
@@ -122,6 +127,7 @@ func (cd *ConfirmDialog) OpenQuit() {
 func (cd *ConfirmDialog) OpenCancel() {
 	cd.State = FilteredListOpen
 	cd.Kind = ConfirmCancel
+	cd.Description = "The current request will be stopped."
 	cd.ToolID = ""
 	cd.ToolName = ""
 	cd.ToolInput = ""
@@ -133,6 +139,7 @@ func (cd *ConfirmDialog) OpenCancel() {
 func (cd *ConfirmDialog) OpenCancelAll() {
 	cd.State = FilteredListOpen
 	cd.Kind = ConfirmCancelAll
+	cd.Description = "Current task and all pending requests will be canceled."
 	cd.ToolID = ""
 	cd.ToolName = ""
 	cd.ToolInput = ""
@@ -147,6 +154,11 @@ func (cd *ConfirmDialog) OpenTool(toolID, toolName, toolInput string) {
 	cd.ToolID = toolID
 	cd.ToolName = toolName
 	cd.ToolInput = toolInput
+	// Derive description from tool input (up to 2 line-break segments).
+	// HardWrap in buildContentLines handles wrapping long lines, and the
+	// 2-row cap with "..." handles overflow beyond 2 rows.
+	parts := strings.SplitN(toolInput, "\n", 2)
+	cd.Description = strings.Join(parts, "\n")
 	cd.Confirmed = false
 	cd.Canceled = false
 }
@@ -156,6 +168,7 @@ func (cd *ConfirmDialog) OpenTool(toolID, toolName, toolInput string) {
 func (cd *ConfirmDialog) Close() {
 	cd.State = FilteredListClosed
 	cd.Kind = ConfirmNone
+	cd.Description = ""
 	cd.ToolID = ""
 	cd.ToolName = ""
 	cd.ToolInput = ""
@@ -232,33 +245,60 @@ func (cd *ConfirmDialog) View() tea.View {
 }
 
 // buildContentLines returns the display lines for the dialog content,
-// with styles already applied (Confirm for the question, System for hints).
+// with styles already applied (Confirm for the title, System for description/hints).
 // (Borders are applied by View via RenderBorderedBox.)
 //
-// The dialog has a fixed layout: the body (question + tool input) occupies
-// the upper rows, then "y / n" is always on the penultimate row and an
-// empty row is always on the last row. If the body overflows, the tool
-// input is truncated with "..." — same pattern used by QueueManager.
+// Every variant uses the same 3-part layout:
+//
+//	[spacing]  [title]  [spacing]  [description row 1]  [description row 2]  [spacing]
+//	[y / n]  [trailing empty]
+//
+// The description always occupies exactly 2 rows. If the text is shorter, the
+// second row is empty. If it wraps beyond 2 rows, it's truncated with "...".
 func (cd *ConfirmDialog) buildContentLines() []string {
 	innerWidth := max(0, cd.Width-BorderInnerPadding)
-	// Reserve last 2 rows for "y / n" prompt and trailing empty line
 	maxBodyLines := max(0, ConfirmContentRows-2)
 
-	var body []string
+	titleText := cd.buildTitleText()
+	if titleText == "" {
+		return nil
+	}
 
+	titleLine := cd.renderTitleLine(titleText, innerWidth)
+	descRows := cd.renderDescriptionRows(innerWidth)
+
+	body := []string{""}
+	body = append(body, titleLine)
+	body = append(body, "")
+	body = append(body, descRows...)
+	body = append(body, "")
+
+	// If the body exceeds the available rows, truncate from the bottom.
+	if len(body) > maxBodyLines {
+		body = body[:maxBodyLines-1]
+		body = append(body, cd.wrapAndCenter("...", cd.Styles.System, innerWidth)[0])
+	}
+
+	for len(body) < maxBodyLines {
+		body = append(body, "")
+	}
+
+	lines := body
+	lines = append(lines, cd.wrapAndCenter("y / n", cd.Styles.System, innerWidth)[0])
+	lines = append(lines, "")
+
+	return lines
+}
+
+// buildTitleText returns the title string for the current dialog kind.
+func (cd *ConfirmDialog) buildTitleText() string {
 	switch cd.Kind {
 	case ConfirmQuit:
-		body = []string{""}
-		body = append(body, cd.wrapAndCenter("Exit AlayaCore?", cd.Styles.Confirm, innerWidth)...)
-		body = append(body, "")
+		return "Exit AlayaCore?"
 	case ConfirmCancel:
-		body = []string{""}
-		body = append(body, cd.wrapAndCenter("Cancel current task?", cd.Styles.Confirm, innerWidth)...)
-		body = append(body, "")
+		return "Cancel current task?"
 	case ConfirmCancelAll:
-		body = []string{""}
-		body = append(body, cd.wrapAndCenter("Cancel all queued tasks?", cd.Styles.Confirm, innerWidth)...)
-		body = append(body, "")
+		return "Cancel all queued tasks?"
 	case ConfirmTool:
 		msg := "Allow "
 		if cd.ToolName != "" {
@@ -266,52 +306,71 @@ func (cd *ConfirmDialog) buildContentLines() []string {
 		} else {
 			msg += "this tool"
 		}
-		msg += " to run?"
-		body = []string{""}
-		body = append(body, cd.wrapAndCenter(msg, cd.Styles.Confirm, innerWidth)...)
-		if cd.ToolInput != "" {
-			// Show first line of tool input in muted style, truncated
-			// like queue items: wrap-check at innerWidth, then truncate
-			// with "..." if it doesn't fit on a single line.
-			inputLine := cd.ToolInput
-			if nl := strings.IndexByte(inputLine, '\n'); nl >= 0 {
-				inputLine = inputLine[:nl]
-			}
-			if inputLine != "" {
-				// Truncate width-wise like queue items do
-				truncated := ansi.Hardwrap(inputLine, innerWidth, false)
-				if truncated != inputLine {
-					truncated = ansi.Hardwrap(inputLine, innerWidth-3, false)
-					inputLine = strings.SplitN(truncated, "\n", 2)[0] + "..."
-				}
-				body = append(body, "")
-				body = append(body, cd.wrapAndCenter(inputLine, cd.Styles.System, innerWidth)...)
-			}
-		}
-		body = append(body, "")
+		return msg + " to run?"
 	default:
-		return nil
+		return ""
+	}
+}
+
+// renderTitleLine hard-wraps the styled title, takes only 1 row.
+// If it overflows, truncates and appends "...", then centers it.
+func (cd *ConfirmDialog) renderTitleLine(titleText string, innerWidth int) string {
+	styled := cd.Styles.Confirm.Render(titleText)
+	wrapped := ansi.Hardwrap(styled, innerWidth, false)
+	lines := strings.Split(wrapped, "\n")
+
+	line := lines[0]
+	if len(lines) > 1 {
+		limit := max(0, innerWidth-3)
+		if ansi.StringWidth(line) > limit {
+			line = ansi.Truncate(line, limit, "")
+		}
+		line += "..."
 	}
 
-	// If the body exceeds the available rows, truncate the body's content
-	// (the tool input section) and replace the last line with "...".
-	if len(body) > maxBodyLines {
-		body = body[:maxBodyLines-1]
-		body = append(body, cd.wrapAndCenter("...", cd.Styles.System, innerWidth)[0])
+	w := lipgloss.Width(line)
+	pad := max(0, (innerWidth-w)/2)
+	return strings.Repeat(" ", pad) + line + strings.Repeat(" ", innerWidth-w-pad)
+}
+
+// renderDescriptionRows hard-wraps the description, takes at most 2 rows.
+// If it overflows, the second row is truncated with "...". Returns 2
+// centered, styled strings suitable for appending to the body.
+func (cd *ConfirmDialog) renderDescriptionRows(innerWidth int) []string {
+	rawWrapped := ansi.Hardwrap(cd.Description, innerWidth, false)
+	rawLines := strings.Split(rawWrapped, "\n")
+
+	rawDesc := rawLines
+	if len(rawDesc) > 2 {
+		rawDesc = rawDesc[:2]
+		limit := max(0, innerWidth-3)
+		if ansi.StringWidth(rawDesc[1]) > limit {
+			rawDesc[1] = ansi.Truncate(rawDesc[1], limit, "")
+		}
+		rawDesc[1] += "..."
+	}
+	for len(rawDesc) < 2 {
+		rawDesc = append(rawDesc, "")
 	}
 
-	// Pad body to fill remaining rows before the fixed footer
-	for len(body) < maxBodyLines {
-		body = append(body, "")
+	styled := make([]string, 2)
+	for i, line := range rawDesc {
+		styled[i] = cd.Styles.System.Render(line)
 	}
 
-	// Append fixed footer: "y / n" on the penultimate row,
-	// empty row on the last row.
-	lines := body
-	lines = append(lines, cd.wrapAndCenter("y / n", cd.Styles.System, innerWidth)[0])
-	lines = append(lines, "")
-
-	return lines
+	maxW := 0
+	for _, line := range styled {
+		if w := lipgloss.Width(line); w > maxW {
+			maxW = w
+		}
+	}
+	pad := max(0, (innerWidth-maxW)/2)
+	rows := make([]string, 2)
+	for i, line := range styled {
+		w := lipgloss.Width(line)
+		rows[i] = strings.Repeat(" ", pad) + line + strings.Repeat(" ", maxW-w)
+	}
+	return rows
 }
 
 // wrapAndCenter styles, wraps, and centers text for display in the dialog.
