@@ -718,23 +718,18 @@ func anthropicPartToBlock(part llm.ContentPart) *anthropicContentBlock {
 			Input: v.Input,
 		}
 	case llm.ToolResultPart:
-		var content any
-		switch out := v.Output.(type) {
-		case llm.ToolResultOutputText:
-			content = out.Text
-		case llm.ToolResultOutputFailed:
-			return &anthropicContentBlock{
-				Type:      anthropicBlockTypeToolResult,
-				ToolUseID: v.ToolCallID,
-				Content:   out.Reason,
-				IsError:   true,
-			}
-		}
-		return &anthropicContentBlock{
+		block := &anthropicContentBlock{
 			Type:      anthropicBlockTypeToolResult,
 			ToolUseID: v.ToolCallID,
-			Content:   content,
 		}
+		switch out := v.Output.(type) {
+		case llm.ToolResultOutputText:
+			block.Content = out.Text
+		case llm.ToolResultOutputFailed:
+			block.Content = out.Reason
+			block.IsError = true
+		}
+		return block
 	}
 	return nil
 }
