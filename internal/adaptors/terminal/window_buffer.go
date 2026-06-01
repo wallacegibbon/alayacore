@@ -328,6 +328,31 @@ func (wb *WindowBuffer) ToggleFold(windowIndex int) bool {
 	return true
 }
 
+// FunctionInfo holds details about a tool call window.
+type FunctionInfo struct {
+	ID    string // tool call ID
+	Name  string // tool name (e.g. "read_file")
+	Input string // tool call input/arguments (formatted for display)
+}
+
+// GetFunctionInfo returns tool call information for a given tool call ID.
+// Returns nil if no window with that ID exists or if it's not a tool window.
+func (wb *WindowBuffer) GetFunctionInfo(id string) *FunctionInfo {
+	wb.mu.Lock()
+	defer wb.mu.Unlock()
+	if idx, ok := wb.idIndex[id]; ok {
+		w := wb.windows[idx]
+		if w.ToolName != "" {
+			return &FunctionInfo{
+				ID:    w.ID,
+				Name:  w.ToolName,
+				Input: w.ToolInput,
+			}
+		}
+	}
+	return nil
+}
+
 // GetWindowContent returns the raw content of a window by index.
 // For tool windows, returns tool input + tool output combined.
 // Returns empty string if index is out of bounds.

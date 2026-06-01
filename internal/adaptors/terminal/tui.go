@@ -60,20 +60,6 @@ const (
 )
 
 // ============================================================================
-// Confirmation Dialog
-// ============================================================================
-
-// confirmKind represents the type of active confirmation dialog.
-type confirmKind int
-
-const (
-	confirmNone      confirmKind = iota // No dialog active
-	confirmQuit                         // Confirm exit
-	confirmCancel                       // Confirm cancel current request
-	confirmCancelAll                    // Confirm cancel all queued requests
-)
-
-// ============================================================================
 // Terminal Model
 // ============================================================================
 
@@ -92,13 +78,14 @@ type Terminal struct {
 	editor      *Editor
 
 	// UI components
-	display       DisplayModel
-	input         InputModel
-	modelSelector *ModelSelector
-	queueManager  *QueueManager
-	themeSelector *ThemeSelector
-	themeManager  *ThemeManager
-	helpWindow    *HelpWindow
+	display        DisplayModel
+	input          InputModel
+	modelSelector  *ModelSelector
+	queueManager   *QueueManager
+	themeSelector  *ThemeSelector
+	themeManager   *ThemeManager
+	helpWindow     *HelpWindow
+	confirmOverlay *ConfirmDialog
 
 	// Status bar state (simplified - no separate struct)
 	statusText string
@@ -106,9 +93,8 @@ type Terminal struct {
 
 	// State
 	quitting           bool
-	confirmDialog      confirmKind // active confirmation dialog (confirmNone when inactive)
-	confirmFromCommand bool        // tracks if cancel came from :cancel command (vs Ctrl+G)
-	focusedWindow      string      // "input" or "display"
+	confirmFromCommand bool   // tracks if cancel came from :cancel command (vs Ctrl+G)
+	focusedWindow      string // "input" or "display"
 	windowWidth        int
 	windowHeight       int
 	styles             *Styles
@@ -136,24 +122,25 @@ func NewTerminalWithTheme(
 	editor := NewEditor()
 
 	m := &Terminal{
-		out:           out,
-		streamInput:   inputWriter,
-		appConfig:     appCfg,
-		editor:        editor,
-		display:       NewDisplayModel(out.WindowBuffer(), styles),
-		input:         NewInputModel(styles),
-		modelSelector: NewModelSelector(styles),
-		queueManager:  NewQueueManager(styles),
-		themeSelector: NewThemeSelector(styles),
-		themeManager:  themeManager,
-		helpWindow:    NewHelpWindow(styles),
-		windowWidth:   initialWidth,
-		windowHeight:  initialHeight,
-		styles:        styles,
-		focusedWindow: "input",
-		hasFocus:      true,
-		activeTheme:   themeName,
-		appliedTheme:  themeName,
+		out:            out,
+		streamInput:    inputWriter,
+		appConfig:      appCfg,
+		editor:         editor,
+		display:        NewDisplayModel(out.WindowBuffer(), styles),
+		input:          NewInputModel(styles),
+		modelSelector:  NewModelSelector(styles),
+		queueManager:   NewQueueManager(styles),
+		themeSelector:  NewThemeSelector(styles),
+		themeManager:   themeManager,
+		helpWindow:     NewHelpWindow(styles),
+		confirmOverlay: NewConfirmDialog(styles),
+		windowWidth:    initialWidth,
+		windowHeight:   initialHeight,
+		styles:         styles,
+		focusedWindow:  "input",
+		hasFocus:       true,
+		activeTheme:    themeName,
+		appliedTheme:   themeName,
 	}
 
 	// Initialize component widths
@@ -163,6 +150,7 @@ func NewTerminalWithTheme(
 	m.queueManager.SetSize(initialWidth, initialHeight)
 	m.themeSelector.SetSize(initialWidth, initialHeight)
 	m.helpWindow.SetSize(initialWidth, initialHeight)
+	m.confirmOverlay.SetSize(initialWidth, initialHeight)
 	m.updateDisplayHeight()
 
 	return m
@@ -244,6 +232,7 @@ func (m *Terminal) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 	m.queueManager.SetSize(msg.Width, msg.Height)
 	m.themeSelector.SetSize(msg.Width, msg.Height)
 	m.helpWindow.SetSize(msg.Width, msg.Height)
+	m.confirmOverlay.SetSize(msg.Width, msg.Height)
 	m.updateDisplayHeight()
 
 	// Clamp cursor to valid bounds (windows may have been removed) but
@@ -260,6 +249,14 @@ func (m *Terminal) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 // handleTick processes periodic updates for display and model switching.
 func (m *Terminal) handleTick() (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
+
+	// Check for pending tool confirmation from the session
+	if id, toolName, toolInput, ok := m.out.GetPendingToolConfirm(); ok && !m.confirmOverlay.IsOpen() {
+		m.confirmOverlay.OpenTool(id, toolName, toolInput)
+		// Focus lost when overlay opens
+		m.input.Blur()
+		m.display.SetDisplayFocused(false)
+	}
 
 	// Check if display needs refresh (dirty flag)
 	if m.out.DrainDirty() {
@@ -453,23 +450,23 @@ func (m *Terminal) View() tea.View {
 	sb.WriteString(m.display.View().Content)
 	sb.WriteString("\n")
 
-	// Input area with optional confirmation dialog
-	confirmText := ""
-	switch m.confirmDialog {
-	case confirmQuit:
-		confirmText = "Confirm exit? Press y/n"
-	case confirmCancel:
-		confirmText = "Confirm cancel? Press y/n"
-	case confirmCancelAll:
-		confirmText = "Confirm cancel all? Press y/n"
-	}
-	sb.WriteString(m.input.RenderWithBorder(m.confirmDialog != confirmNone, confirmText))
+	// Input area
+	sb.WriteString(m.input.RenderWithBorder(m.confirmOverlay.IsOpen(), ""))
 
 	// Status bar (simplified - just render directly)
 	sb.WriteString("\n")
 	sb.WriteString(m.renderStatusBar())
 
 	baseContent := sb.String()
+
+	// Render confirm overlay if open (highest priority — blocks all other interaction)
+	if m.confirmOverlay.IsOpen() {
+		fullContent := m.confirmOverlay.RenderOverlay(baseContent, m.windowWidth, m.windowHeight)
+		v := tea.NewView(fullContent)
+		v.AltScreen = true
+		v.ReportFocus = true
+		return v
+	}
 
 	// Render model selector overlay if open
 	if m.modelSelector.IsOpen() {
@@ -640,6 +637,7 @@ func (m *Terminal) applyTheme(theme *theme.Theme) {
 	m.queueManager.SetStyles(m.styles)
 	m.themeSelector.SetStyles(m.styles)
 	m.helpWindow.SetStyles(m.styles)
+	m.confirmOverlay.Styles = m.styles
 	m.display.updateContent()
 }
 
@@ -652,6 +650,7 @@ func (m *Terminal) handleBlur() (tea.Model, tea.Cmd) {
 	m.queueManager.SetHasFocus(false)
 	m.themeSelector.SetHasFocus(false)
 	m.helpWindow.SetHasFocus(false)
+	m.confirmOverlay.HasFocus = false
 	m.display.updateContent()
 	return m, nil
 }
@@ -664,6 +663,7 @@ func (m *Terminal) handleFocus() (tea.Model, tea.Cmd) {
 	m.queueManager.SetHasFocus(true)
 	m.themeSelector.SetHasFocus(true)
 	m.helpWindow.SetHasFocus(true)
+	m.confirmOverlay.HasFocus = true
 
 	if m.modelSelector.IsOpen() {
 		m.display.updateContent()

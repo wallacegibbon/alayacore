@@ -214,6 +214,8 @@ func (to *outputWriter) handleSystemMsg(value string) {
 		to.handleSystemThemeList(env.Data)
 	case "reasoning":
 		to.handleSystemReasoning(env.Data)
+	case "tool_confirm":
+		to.handleSystemToolConfirm(env.Data)
 	}
 	to.dirty.Store(true)
 }
@@ -316,6 +318,40 @@ func (to *outputWriter) handleSystemReasoning(data json.RawMessage) {
 		return
 	}
 	to.status.updateReasoning(m.Level)
+}
+
+// handleSystemToolConfirm processes a tool_confirm system message.
+// It displays a notification prompting the user to confirm or deny the tool call.
+func (to *outputWriter) handleSystemToolConfirm(data json.RawMessage) {
+	var m struct {
+		ID string `json:"id"`
+	}
+	if json.Unmarshal(data, &m) != nil || m.ID == "" {
+		return
+	}
+	// Look up the tool info from the function data window for a richer message.
+	toolName := ""
+	toolInput := ""
+	if info := to.windowBuffer.GetFunctionInfo(m.ID); info != nil {
+		toolName = info.Name
+		toolInput = info.Input
+	}
+	// Store pending state for the Terminal's confirm overlay.
+	to.status.setToolConfirmPending(m.ID, toolName, toolInput)
+	// Also show a notification window for record in the conversation.
+	msg := "Tool call"
+	if toolName != "" {
+		msg += " \"" + toolName + "\""
+	}
+	msg += " needs your confirmation. Type :confirm yes or :confirm no"
+	id := to.generateWindowID()
+	styles := to.styles.Load()
+	to.windowBuffer.AppendOrUpdate("SN", id, styles.System.Render(msg))
+}
+
+// GetPendingToolConfirm returns any pending tool confirmation and clears it.
+func (to *outputWriter) GetPendingToolConfirm() (id, toolName, toolInput string, ok bool) {
+	return to.status.takeToolConfirmPending()
 }
 
 // SnapshotStatus returns a consistent point-in-time view of session status.

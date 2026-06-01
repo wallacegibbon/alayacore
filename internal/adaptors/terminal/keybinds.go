@@ -49,9 +49,12 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleHelpWindowKeys(msg)
 	}
 
-	// 4. Confirmation dialogs block normal input
-	if cmd, handled := m.handleConfirmDialog(msg); handled {
-		return m, cmd
+	// 4. Confirm dialog blocks all normal input
+	if m.confirmOverlay.IsOpen() {
+		if handled := m.confirmOverlay.HandleKeyMsg(msg); handled {
+			return m.handleConfirmResult()
+		}
+		return m, nil
 	}
 
 	// 5. Tab toggles focus between display and input
@@ -235,49 +238,64 @@ func (m *Terminal) handleHelpWindowKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// handleConfirmDialog handles quit and cancel confirmation dialogs.
-func (m *Terminal) handleConfirmDialog(msg tea.KeyMsg) (tea.Cmd, bool) {
-	if m.confirmDialog == confirmNone {
-		return nil, false
+// handleConfirmResult processes the result after the confirm dialog is dismissed.
+// Called after the confirm overlay handles a key press (y/n/esc).
+func (m *Terminal) handleConfirmResult() (tea.Model, tea.Cmd) {
+	confirmed, canceled := m.confirmOverlay.ConsumeResult()
+	if !confirmed && !canceled {
+		return m, nil
 	}
 
-	key := msg.String()
+	kind := m.confirmOverlay.Kind
+	m.confirmOverlay.Close()
 
-	switch key {
-	case keyY, keyYCapital:
-		kind := m.confirmDialog
-		fromCmd := m.confirmFromCommand
-		m.confirmDialog = confirmNone
-		m.confirmFromCommand = false
+	fromCmd := m.confirmFromCommand
+	m.confirmFromCommand = false
 
-		switch kind {
-		case confirmQuit:
-			m.quitting = true
-			m.streamInput.Close()
-			m.out.Close()
-			return tea.Quit, true
-		case confirmCancel:
-			if fromCmd {
-				m.input.SetValue("")
-			}
-			return m.submitCommand("cancel", fromCmd), true
-		case confirmCancelAll:
-			if fromCmd {
-				m.input.SetValue("")
-			}
-			return m.submitCommand("cancel_all", fromCmd), true
-		}
-
-	case keyN, keyNCapital, keyEsc, keyCtrlC:
-		if m.confirmFromCommand {
+	if canceled {
+		// Clear input if the confirm was triggered by a :command
+		if fromCmd {
 			m.input.SetValue("")
 		}
-		m.confirmDialog = confirmNone
-		m.confirmFromCommand = false
-		return nil, true
+		// For tool confirm, send :confirm no even on cancel
+		if kind == ConfirmTool {
+			m.emitCommand(":confirm no")
+		}
+		// Restore focus to whatever window was active before the overlay
+		m.restoreFocus()
+		return m, nil
 	}
 
-	return nil, true
+	// confirmed
+	switch kind {
+	case ConfirmQuit:
+		m.quitting = true
+		m.streamInput.Close()
+		m.out.Close()
+		return m, tea.Quit
+
+	case ConfirmCancel:
+		if fromCmd {
+			m.input.SetValue("")
+		}
+		m.restoreFocus()
+		return m, m.submitCommand("cancel", fromCmd)
+
+	case ConfirmCancelAll:
+		if fromCmd {
+			m.input.SetValue("")
+		}
+		m.restoreFocus()
+		return m, m.submitCommand("cancel_all", fromCmd)
+
+	case ConfirmTool:
+		m.emitCommand(":confirm yes")
+		m.restoreFocus()
+		return m, nil
+	}
+
+	m.restoreFocus()
+	return m, nil
 }
 
 // Display key handler helpers (shared between multiple keys).
@@ -436,7 +454,7 @@ func (m *Terminal) handleDisplayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 func (m *Terminal) handleGlobalKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 	switch msg.String() {
 	case keyCtrlG:
-		m.confirmDialog = confirmCancel
+		m.confirmOverlay.OpenCancel()
 		m.confirmFromCommand = false
 		return nil, true
 
@@ -528,21 +546,21 @@ func (m *Terminal) handleSubmit() tea.Cmd {
 func (m *Terminal) handleCommand(command string) tea.Cmd {
 	// Quit command
 	if command == cmdQuit || command == cmdQShort {
-		m.confirmDialog = confirmQuit
+		m.confirmOverlay.OpenQuit()
 		m.confirmFromCommand = true
 		return nil
 	}
 
 	// Cancel command
 	if command == cmdCancel {
-		m.confirmDialog = confirmCancel
+		m.confirmOverlay.OpenCancel()
 		m.confirmFromCommand = true
 		return nil
 	}
 
 	// Cancel all command
 	if command == cmdCancelAll {
-		m.confirmDialog = confirmCancelAll
+		m.confirmOverlay.OpenCancelAll()
 		m.confirmFromCommand = true
 		return nil
 	}

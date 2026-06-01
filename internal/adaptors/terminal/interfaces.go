@@ -67,6 +67,9 @@ type OutputWriter interface {
 	WriteError(format string, args ...any)
 	WriteNotify(msg string)
 
+	// Confirm dialog support
+	GetPendingToolConfirm() (id, toolName, toolInput string, ok bool)
+
 	// Update signaling
 	DrainDirty() bool // returns true if display was dirty, clears the flag
 	WindowBuffer() *WindowBuffer

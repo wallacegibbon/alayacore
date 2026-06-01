@@ -46,6 +46,12 @@ type sessionState struct {
 	activeTheme     string
 	activeThemeData *theme.Theme
 	cachedThemeList []ThemeEntry
+
+	// Pending tool confirm — set by handleSystemToolConfirm, consumed by
+	// the Terminal tick handler to open the confirm overlay.
+	pendingToolConfirmID    string
+	pendingToolConfirmName  string
+	pendingToolConfirmInput string
 }
 
 // updateTask atomically updates task progress fields and queue items.
@@ -127,6 +133,32 @@ func (s *sessionState) updateReasoning(level int) {
 	s.mu.Lock()
 	s.reasoningLevel = level
 	s.mu.Unlock()
+}
+
+// setToolConfirmPending stores the pending tool confirmation request.
+func (s *sessionState) setToolConfirmPending(id, toolName, toolInput string) {
+	s.mu.Lock()
+	s.pendingToolConfirmID = id
+	s.pendingToolConfirmName = toolName
+	s.pendingToolConfirmInput = toolInput
+	s.mu.Unlock()
+}
+
+// takeToolConfirmPending returns any pending tool confirmation and clears it.
+// Returns (id, toolName, toolInput, ok). If no pending confirm, ok is false.
+func (s *sessionState) takeToolConfirmPending() (id, toolName, toolInput string, ok bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.pendingToolConfirmID == "" {
+		return "", "", "", false
+	}
+	id = s.pendingToolConfirmID
+	toolName = s.pendingToolConfirmName
+	toolInput = s.pendingToolConfirmInput
+	s.pendingToolConfirmID = ""
+	s.pendingToolConfirmName = ""
+	s.pendingToolConfirmInput = ""
+	return id, toolName, toolInput, true
 }
 
 // snapshotStatus returns a consistent point-in-time view of session status.
