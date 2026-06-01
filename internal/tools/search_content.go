@@ -16,7 +16,7 @@ type SearchContentInput struct {
 	Path       string `json:"path" jsonschema:"description=File or directory to search (default: cwd)"`
 	FileType   string `json:"file_type" jsonschema:"description=File type filter (e.g. go, python, rust)"`
 	Glob       string `json:"glob" jsonschema:"description=Glob pattern (e.g. *.go, *.{ts,tsx})"`
-	IgnoreCase string `json:"ignore_case" jsonschema:"description=Set \"true\" for case-insensitive"`
+	IgnoreCase bool   `json:"ignore_case" jsonschema:"description=Enable case-insensitive search"`
 	MaxLines   int    `json:"max_lines" jsonschema:"description=Max matching lines (default 100)"`
 }
 
@@ -55,7 +55,7 @@ func buildSearchContentArgs(args SearchContentInput) []string {
 		rgArgs = append(rgArgs, "--type", args.FileType)
 	}
 
-	if args.IgnoreCase == "true" {
+	if args.IgnoreCase {
 		rgArgs = append(rgArgs, "-i")
 	}
 

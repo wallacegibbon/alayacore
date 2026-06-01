@@ -228,7 +228,7 @@ func formatSearchContent(input string) string {
 	}
 
 	// Modifiers
-	if args.IgnoreCase == "true" {
+	if args.IgnoreCase {
 		parts = append(parts, "ignoring case")
 	}
 	if args.MaxLines > 0 {

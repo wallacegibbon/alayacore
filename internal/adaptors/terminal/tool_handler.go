@@ -163,7 +163,7 @@ func (h *SearchContentHandler) FormatCall(input json.RawMessage, _ *Styles) stri
 	}
 
 	// Modifiers
-	if args.IgnoreCase == "true" {
+	if args.IgnoreCase {
 		parts = append(parts, "ignoring case")
 	}
 	if args.MaxLines > 0 {
