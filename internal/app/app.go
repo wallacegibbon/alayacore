@@ -26,9 +26,10 @@ type Config struct {
 	Cfg               *config.Settings
 	SkillsMgr         *skills.Manager
 	AgentTools        []llm.Tool
-	SystemPrompt      string // Default system prompt (always present)
-	ExtraSystemPrompt string // User-provided extra system prompt via --system flag
-	MaxSteps          int    // Maximum agent loop steps
+	SystemPrompt      string   // Default system prompt (always present)
+	ExtraSystemPrompt string   // User-provided extra system prompt via --system flag
+	MaxSteps          int      // Maximum agent loop steps
+	ToolConfirmTools  []string // Tool names requiring user confirmation
 }
 
 // Setup initializes the common app components
@@ -81,5 +82,6 @@ func Setup(cfg *config.Settings) (*Config, error) {
 		SystemPrompt:      systemPrompt,
 		ExtraSystemPrompt: cfg.SystemPrompt, // User-provided extra system prompt (supplemental, not replacement)
 		MaxSteps:          cfg.MaxSteps,
+		ToolConfirmTools:  cfg.ToolConfirm,
 	}, nil
 }

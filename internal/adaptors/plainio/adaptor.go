@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	"github.com/alayacore/alayacore/internal/app"
+	"github.com/alayacore/alayacore/internal/stream"
 )
 
 // Compile-time check: Adaptor satisfies app.Adaptor.
@@ -49,16 +50,22 @@ func (a *Adaptor) Start() int {
 
 	exitCh := make(chan int, 1)
 
-	// Read stdin and emit TLV messages.
+	// Read stdin and emit TLV messages. On error (os.Stdin closed by main
+	// goroutine), write :cancel_all to unblock any stuck task, then close
+	// inputWriter. Only the stdin goroutine touches inputWriter.
 	go func() {
-		if err := readPromptsFromStdin(inputWriter); err != nil {
+		err := readPrompts(inputWriter, os.Stdin)
+		if err != nil {
+			stream.WriteTLV(inputWriter, stream.TagUserT, ":cancel_all") //nolint:errcheck
+		}
+		inputWriter.Close()
+		if err != nil {
 			select {
 			case exitCh <- 1:
 			default:
 			}
 			return
 		}
-		inputWriter.Close()
 		select {
 		case exitCh <- 0:
 		default:
@@ -68,15 +75,17 @@ func (a *Adaptor) Start() int {
 	// Main goroutine owns all signal handling. No SIGINT goroutine.
 	// First exit trigger wins: EOF (0), Ctrl-C (130), or error via
 	// the output.ErrorChannel() path (1).
+	// Only os.Stdin.Close() is called here — the stdin goroutine handles
+	// writing :cancel_all and closing inputWriter after ReadString fails.
 	code := 0
 	select {
 	case code = <-exitCh:
 	case <-output.ErrorChannel():
 		code = 1
-		inputWriter.Close()
+		os.Stdin.Close()
 	case <-sigCh:
 		code = 128 + int(syscall.SIGINT)
-		inputWriter.Close()
+		os.Stdin.Close()
 	}
 
 	// Let the current task finish, but a second Ctrl-C forces immediate exit.

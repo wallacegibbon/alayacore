@@ -85,6 +85,24 @@ type Session struct {
 	// listens on this channel and cancels its context when a signal arrives.
 	taskCancelCh chan struct{}
 
+	// toolConfirmRespCh is set by OnToolConfirm (task goroutine) before
+	// sending the SM, and read by the input pump to route the adaptor's
+	// response. No synchronization needed — the Output/Input channel
+	// establishes a happens-before chain:
+	//
+	//   write → Output.Write(SM) ──channel──→ Input.Read(回复) → read
+	//
+	// nil when no confirmation is pending.
+	toolConfirmRespCh chan ToolConfirmResponse
+
+	// toolConfirmID is the tool call ID of the pending confirmation,
+	// saved alongside toolConfirmRespCh for cross-reference.
+	toolConfirmID string
+
+	// toolConfirmSet contains tool names that require user confirmation
+	// before execution. If nil, no confirmation is needed for any tool.
+	toolConfirmSet map[string]struct{}
+
 	// infoUpdateCh is a buffered channel (capacity 1) used by the task
 	// goroutine to request a system-info update from the run() goroutine.
 	// The value ("task", "model", "theme", "reasoning", "all") tells the
@@ -164,6 +182,7 @@ func NewSession(cfg SessionConfig) *Session {
 		runDone:        make(chan struct{}),
 	}
 	s.reasoningLevel.Store(int64(config.DefaultReasoningLevel))
+	s.initToolConfirmSet(cfg.ToolConfirmTools)
 	s.initModelManager()
 	s.applyModelOverride()
 	if model := s.ModelManager.GetActive(); model != nil {
@@ -196,6 +215,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 	s.reasoningLevel.Store(int64(data.ReasoningLevel))
 	s.ContextTokens.Store(data.ContextTokens)
 
+	s.initToolConfirmSet(cfg.ToolConfirmTools)
 	s.initModelManager()
 
 	// Override runtime config default with the model saved in the session file.
@@ -229,9 +249,9 @@ func (s *Session) Start() {
 	go s.run()
 }
 
-// cancelRunningTask sends a cancellation signal to the running task.
-// Non-blocking — if nobody is listening (no task running), the signal is lost.
-// Returns true if the signal was sent (someone was listening).
+// cancelRunningTask sends a cancellation signal to the currently running
+// task. Non-blocking — if nobody is listening (no task running), the signal
+// is lost. Returns true if the signal was sent (someone was listening).
 func (s *Session) cancelRunningTask() bool {
 	select {
 	case s.taskCancelCh <- struct{}{}:

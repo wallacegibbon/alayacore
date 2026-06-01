@@ -144,6 +144,7 @@ sm-task-queued.bin             SM {"type":"task","data":{"in_progress":true,"con
 sm-task-end.bin                SM {"type":"task","data":{"in_progress":false,"context":0,"queue_items":[]}}
 sm-error.bin                   SM {"type":"error","data":{"text":"something broke"}}
 sm-notify.bin                  SM {"type":"notify","data":{"text":"all good"}}
+sm-tool-confirm.bin            SM {"type":"tool_confirm","data":{"id":"t1"}}
 ```
 
 ## Use

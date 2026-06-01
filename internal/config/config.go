@@ -112,6 +112,7 @@ type Settings struct {
 	SystemPrompt  string
 	MaxSteps      int
 	AutoSummarize bool
+	ToolConfirm   []string // tool names requiring user confirmation
 }
 
 // Parse parses CLI flags and returns settings
@@ -148,6 +149,7 @@ func Parse() *Settings {
 	flag.Var(systemPrompt, "system", "Extra `system-prompt` (can be specified multiple times, will be appended to default)")
 	maxSteps := flag.Int("max-steps", DefaultMaxSteps, "Maximum agent loop steps (0 = no limit)")
 	autoSummarize := flag.Bool("auto-summarize", false, "Automatically summarize conversation when context exceeds 65% of limit")
+	toolConfirm := flag.String("tool-confirm", "", "Comma-separated tool `names` requiring user confirmation (e.g. execute_command,search_content)")
 
 	flag.Parse()
 
@@ -159,6 +161,17 @@ func Parse() *Settings {
 	systemPrompts := systemPrompt.Get()
 	if len(systemPrompts) > 0 {
 		mergedSystemPrompt = strings.Join(systemPrompts, "\n\n")
+	}
+
+	// Parse tool-confirm list
+	var toolConfirmTools []string
+	if *toolConfirm != "" {
+		for _, name := range strings.Split(*toolConfirm, ",") {
+			name = strings.TrimSpace(name)
+			if name != "" {
+				toolConfirmTools = append(toolConfirmTools, name)
+			}
+		}
 	}
 
 	s := &Settings{
@@ -176,6 +189,7 @@ func Parse() *Settings {
 		SystemPrompt:  mergedSystemPrompt,
 		MaxSteps:      *maxSteps,
 		AutoSummarize: *autoSummarize,
+		ToolConfirm:   toolConfirmTools,
 	}
 
 	return s

@@ -12,6 +12,12 @@ import (
 	"github.com/alayacore/alayacore/internal/theme"
 )
 
+// ToolConfirmResponse carries the adaptor's response to a tool_confirm request.
+type ToolConfirmResponse struct {
+	ID      string
+	Allowed bool
+}
+
 // QueueItem represents a queued task with metadata.
 type QueueItem struct {
 	QueueID   string    `json:"queue_id"`
@@ -147,6 +153,7 @@ type SessionConfig struct {
 	SystemPrompt      string
 	ExtraSystemPrompt string
 	MaxSteps          int
+	ToolConfirmTools  []string // tool names requiring user confirmation (empty = no confirmation)
 
 	// Feature flags
 	DebugAPI      bool

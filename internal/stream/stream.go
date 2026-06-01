@@ -210,3 +210,20 @@ type NotifyMsg struct {
 }
 
 func (NotifyMsg) SystemMsgType() string { return "notify" }
+
+// ToolConfirmMsg is sent when a tool call needs user confirmation
+// (type "tool_confirm").
+//
+// Request (agent → adaptor):
+//
+//	SM {"type":"tool_confirm","data":{"id":"<toolCallID>"}}
+//
+// Response (adaptor → agent):
+//
+//	SM {"type":"tool_confirm","data":{"id":"<toolCallID>","allowed":true|false}}
+type ToolConfirmMsg struct {
+	ID      string `json:"id"`
+	Allowed *bool  `json:"allowed,omitempty"`
+}
+
+func (ToolConfirmMsg) SystemMsgType() string { return "tool_confirm" }

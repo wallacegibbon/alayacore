@@ -421,32 +421,7 @@ func (s *Session) inputPump(msgCh chan<- inputMsg) {
 			pendingImages = append(pendingImages, value)
 
 		case stream.TagUserT:
-			if len(pendingImages) > 0 && len(value) > 0 && value[0] == ':' {
-				// Images followed by a command is not allowed.
-				pendingImages = nil
-				s.writeError(domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
-					"command can not attach images").Error())
-				continue
-			}
-
-			msg := inputMsg{
-				text:   value,
-				images: pendingImages,
-			}
-			pendingImages = nil
-
-			if len(value) > 0 && value[0] == ':' {
-				cmd := value[1:]
-				if cmd == commandNameCancel || cmd == commandNameCancelAll {
-					canceled := s.cancelRunningTask()
-					if canceled && cmd == commandNameCancel {
-						continue
-					}
-				}
-				msg.text = cmd
-				msg.isCmd = true
-			}
-			msgCh <- msg
+			s.handleInputUserText(value, &pendingImages, msgCh)
 
 		default:
 			if len(pendingImages) > 0 {
@@ -459,6 +434,77 @@ func (s *Session) inputPump(msgCh chan<- inputMsg) {
 			}
 		}
 	}
+}
+
+// handleInputUserText processes a TagUserT (UT) frame: builds an inputMsg
+// from the text and any preceding images, detects commands, and sends the
+// result to msgCh.  pendingImages is the accumulator for preceding UI tags;
+// it is cleared when consumed or on error.
+func (s *Session) handleInputUserText(value string, pendingImages *[]string, msgCh chan<- inputMsg) {
+	if len(*pendingImages) > 0 && len(value) > 0 && value[0] == ':' {
+		// Images followed by a command is not allowed.
+		*pendingImages = nil
+		s.writeError(domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
+			"command can not attach images").Error())
+		return
+	}
+
+	msg := inputMsg{
+		text:   value,
+		images: *pendingImages,
+	}
+	*pendingImages = nil
+
+	if len(value) > 0 && value[0] == ':' {
+		cmd := value[1:]
+		if cmd == commandNameCancel || cmd == commandNameCancelAll {
+			canceled := s.cancelRunningTask()
+			if canceled && cmd == commandNameCancel {
+				return
+			}
+		}
+		parts := strings.Fields(cmd)
+		if len(parts) > 0 && parts[0] == commandNameConfirm {
+			s.handleConfirmCommand(parts[1:])
+			return
+		}
+		msg.text = cmd
+		msg.isCmd = true
+	}
+	msgCh <- msg
+}
+
+// handleConfirmCommand processes a `:confirm yes|no` command from the user.
+// It routes the response to the task goroutine's pending confirmation channel.
+// Called from the input pump goroutine.
+func (s *Session) handleConfirmCommand(args []string) {
+	respCh := s.toolConfirmRespCh
+	if respCh == nil {
+		s.writeError("No pending tool confirmation")
+		return
+	}
+
+	if len(args) != 1 {
+		s.writeError("usage: :confirm yes|no")
+		return
+	}
+
+	var allowed bool
+	switch args[0] {
+	case "yes", "y":
+		allowed = true
+	case "no", "n":
+		allowed = false
+	default:
+		s.writeError("usage: :confirm yes|no")
+		return
+	}
+
+	id := s.toolConfirmID
+	s.toolConfirmRespCh = nil
+	s.toolConfirmID = ""
+
+	respCh <- ToolConfirmResponse{ID: id, Allowed: allowed}
 }
 
 // handleInputMsg processes a parsed input message. Called from run() goroutine.

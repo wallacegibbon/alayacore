@@ -48,10 +48,12 @@ func (a *Adaptor) Start() int {
 	}()
 
 	// Wait for either EOF (stdin closed → task finishes) or SIGINT.
+	// Closing os.Stdin signals the copy goroutine to stop; it will close
+	// inputWriter itself, so there is never a double-close race.
 	select {
 	case <-session.Done():
 	case <-sigCh:
-		inputWriter.Close()
+		os.Stdin.Close()
 		// Give the session a moment to finish; second SIGINT exits immediately.
 		select {
 		case <-session.Done():

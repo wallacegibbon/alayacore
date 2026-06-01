@@ -80,6 +80,7 @@ func buildHelpItems() []HelpItem {
 		{Key: ":quit", Description: "Exit application", Type: HelpItemCommand},
 		{Key: ":model_set", Description: "Switch model by ID", Type: HelpItemCommand},
 		{Key: ":model_load", Description: "Reload model config", Type: HelpItemCommand},
+		{Key: ":confirm", Description: "Confirm or deny pending tool", Type: HelpItemCommand},
 		{Key: ":help", Description: "Open help window", Type: HelpItemCommand},
 		{Key: ":suspend", Description: "Suspend process (Ctrl+Z)", Type: HelpItemCommand},
 

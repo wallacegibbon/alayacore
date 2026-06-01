@@ -3,7 +3,6 @@ package plainio
 import (
 	"bufio"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/alayacore/alayacore/internal/stream"
@@ -60,9 +59,4 @@ func readPrompts(input io.Writer, reader io.Reader) error {
 			return err
 		}
 	}
-}
-
-// readPromptsFromStdin is a convenience wrapper that reads from os.Stdin.
-func readPromptsFromStdin(input io.Writer) error {
-	return readPrompts(input, os.Stdin)
 }

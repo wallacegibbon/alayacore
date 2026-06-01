@@ -60,6 +60,7 @@ type StreamCallbacks struct {
 	OnReasoningDelta func(delta string) error
 	OnToolCallStart  func(toolCallID, toolName string) error
 	OnToolCall       func(toolCallID, toolName string, input json.RawMessage) error
+	OnToolConfirm    func(toolCallID, toolName string, input json.RawMessage) (bool, error)
 	OnToolResult     func(toolCallID string, output ToolResultOutput) error
 	OnStepStart      func(step int) error
 	OnStepFinish     func(messages []Message, usage Usage) error
@@ -307,11 +308,47 @@ func (a *Agent) executeTool(ctx context.Context, tc ToolCallPart, callbacks Stre
 	}
 }
 
-// executeTools executes all tool calls and returns the results
+// executeTools executes all tool calls after user confirmation and returns the results.
+// Each tool call is first sent to OnToolConfirm (if set) for user approval.
+// If confirmation is denied (returns false), a failed result is returned instead
+// of executing the tool.
 func (a *Agent) executeTools(ctx context.Context, toolCalls []ToolCallPart, callbacks StreamCallbacks) []ContentPart {
-	results := make([]ContentPart, len(toolCalls))
-	for i, tc := range toolCalls {
-		results[i] = a.executeTool(ctx, tc, callbacks)
+	results := make([]ContentPart, 0, len(toolCalls))
+	for _, tc := range toolCalls {
+		if callbacks.OnToolConfirm != nil {
+			allowed, err := callbacks.OnToolConfirm(tc.ToolCallID, tc.ToolName, tc.Input)
+			if err != nil {
+				failed := ToolResultOutputFailed{
+					Type:   "error",
+					Reason: err.Error(),
+				}
+				if callbacks.OnToolResult != nil {
+					callbacks.OnToolResult(tc.ToolCallID, failed) //nolint:errcheck
+				}
+				results = append(results, ToolResultPart{
+					Type:       ContentPartToolResult,
+					ToolCallID: tc.ToolCallID,
+					Output:     failed,
+				})
+				continue
+			}
+			if !allowed {
+				denied := ToolResultOutputFailed{
+					Type:   "error",
+					Reason: "Tool execution denied by user",
+				}
+				if callbacks.OnToolResult != nil {
+					callbacks.OnToolResult(tc.ToolCallID, denied) //nolint:errcheck
+				}
+				results = append(results, ToolResultPart{
+					Type:       ContentPartToolResult,
+					ToolCallID: tc.ToolCallID,
+					Output:     denied,
+				})
+				continue
+			}
+		}
+		results = append(results, a.executeTool(ctx, tc, callbacks))
 	}
 	return results
 }

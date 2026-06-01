@@ -21,6 +21,7 @@ const (
 	commandNameTaskQueueEdit   = "taskqueue_edit"
 	commandNameReason          = "reason"
 	commandNameThemeSet        = "theme_set"
+	commandNameConfirm         = "confirm"
 )
 
 // CommandHandler is a function that handles a colon-command.
@@ -60,6 +61,8 @@ var commandDefs = []Command{
 		func(s *Session, _ context.Context, args []string) { s.handleReason(args) }},
 	{commandNameThemeSet, "Set the active theme", "<name>", true,
 		func(s *Session, _ context.Context, args []string) { s.handleThemeSet(args) }},
+	{commandNameConfirm, "Confirm or deny a pending tool execution", "yes|no", true,
+		func(s *Session, _ context.Context, args []string) { s.handleConfirmCommand(args) }},
 }
 
 // LookupCommand returns the command metadata for name, or (nil, false).

@@ -9,6 +9,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/stream"
@@ -123,6 +124,40 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 		OnToolCall: func(toolCallID, toolName string, input json.RawMessage) error {
 			s.writeToolCall(toolName, string(input), toolCallID)
 			return nil
+		},
+		OnToolConfirm: func(toolCallID, toolName string, _ json.RawMessage) (bool, error) {
+			// If no confirmation set is configured, or this tool is not
+			// in the set, allow immediately without notifying the adaptor.
+			if s.toolConfirmSet == nil {
+				return true, nil
+			}
+			if _, ok := s.toolConfirmSet[toolName]; !ok {
+				return true, nil
+			}
+
+			respCh := make(chan ToolConfirmResponse, 1)
+			s.toolConfirmRespCh = respCh
+			s.toolConfirmID = toolCallID
+
+			if err := stream.WriteSystemMsg(s.Output, stream.ToolConfirmMsg{ID: toolCallID}); err != nil {
+				s.toolConfirmRespCh = nil
+				s.toolConfirmID = ""
+				return false, fmt.Errorf("send tool_confirm failed: %w", err)
+			}
+
+			select {
+			case resp := <-respCh:
+				if resp.ID != toolCallID {
+					return false, fmt.Errorf("tool_confirm ID mismatch: want %s, got %s", toolCallID, resp.ID)
+				}
+				s.toolConfirmRespCh = nil
+				s.toolConfirmID = ""
+				return resp.Allowed, nil
+			case <-ctx.Done():
+				s.toolConfirmRespCh = nil
+				s.toolConfirmID = ""
+				return false, ctx.Err()
+			}
 		},
 		OnToolResult: func(toolCallID string, output llm.ToolResultOutput) error {
 			status := "success" //nolint:goconst // pre-existing lint, used in writeToolOutput
