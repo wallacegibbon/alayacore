@@ -59,6 +59,7 @@ export ALAYACORE_SHELL=zsh
 | `--themes` | `~/.alayacore/themes/` | Path to themes directory |
 | `--max-steps` | `0` (no limit) | Maximum number of agent loop iterations per prompt. When set to 0 (the default), the agent loops until the model produces a final response. Exceeding this limit raises an error and pauses the task queue — use `:continue` to retry with a higher limit or `:continue skip` to proceed. |
 | `--auto-summarize` | `false` | Automatically summarize when context exceeds 65% of `context_limit` |
+| `--tool-confirm` | *(none)* | Comma-separated tool `names` that require user confirmation before execution (e.g. `--tool-confirm execute_command,search_content`) |
 | `--rawio` | `false` | Raw TLV stdin/stdout mode — pipe TLV frames directly between agent and controlling process |
 | `--plainio` | `false` | Plain stdin/stdout mode — no TUI, for scripting and piping |
 | `--debug-api` | `false` | Write raw API requests and responses to a log file |

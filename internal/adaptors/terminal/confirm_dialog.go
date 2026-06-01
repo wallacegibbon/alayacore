@@ -221,19 +221,22 @@ func (cd *ConfirmDialog) buildContentLines() []string {
 
 	switch cd.Kind {
 	case ConfirmQuit:
-		lines := cd.wrapAndCenter("Exit AlayaCore?", cd.Styles.Confirm, innerWidth)
+		lines := []string{""}
+		lines = append(lines, cd.wrapAndCenter("Exit AlayaCore?", cd.Styles.Confirm, innerWidth)...)
 		lines = append(lines, "")
 		lines = append(lines, cd.wrapAndCenter("y / n", cd.Styles.System, innerWidth)...)
 		lines = append(lines, "")
 		return lines
 	case ConfirmCancel:
-		lines := cd.wrapAndCenter("Cancel current task?", cd.Styles.Confirm, innerWidth)
+		lines := []string{""}
+		lines = append(lines, cd.wrapAndCenter("Cancel current task?", cd.Styles.Confirm, innerWidth)...)
 		lines = append(lines, "")
 		lines = append(lines, cd.wrapAndCenter("y / n", cd.Styles.System, innerWidth)...)
 		lines = append(lines, "")
 		return lines
 	case ConfirmCancelAll:
-		lines := cd.wrapAndCenter("Cancel all queued tasks?", cd.Styles.Confirm, innerWidth)
+		lines := []string{""}
+		lines = append(lines, cd.wrapAndCenter("Cancel all queued tasks?", cd.Styles.Confirm, innerWidth)...)
 		lines = append(lines, "")
 		lines = append(lines, cd.wrapAndCenter("y / n", cd.Styles.System, innerWidth)...)
 		lines = append(lines, "")
@@ -246,7 +249,8 @@ func (cd *ConfirmDialog) buildContentLines() []string {
 			msg += "this tool"
 		}
 		msg += " to run?"
-		lines := cd.wrapAndCenter(msg, cd.Styles.Confirm, innerWidth)
+		lines := []string{""}
+		lines = append(lines, cd.wrapAndCenter(msg, cd.Styles.Confirm, innerWidth)...)
 		if cd.ToolInput != "" {
 			// Show first line of tool input in muted style
 			inputLine := cd.ToolInput
@@ -292,8 +296,7 @@ func (cd *ConfirmDialog) wrapAndCenter(text string, style lipgloss.Style, width 
 	// Pad all lines to the same width, then add identical left padding
 	// so the whole block is centered as one unit.
 	blockPadding := max(0, (width-maxLineWidth)/2)
-	lines := make([]string, 0, len(rawLines)+2)
-	lines = append(lines, "") // top padding
+	lines := make([]string, 0, len(rawLines))
 	for _, line := range rawLines {
 		w := lipgloss.Width(line)
 		rightPad := maxLineWidth - w

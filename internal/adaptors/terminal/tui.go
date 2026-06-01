@@ -450,8 +450,8 @@ func (m *Terminal) View() tea.View {
 	sb.WriteString(m.display.View().Content)
 	sb.WriteString("\n")
 
-	// Input area
-	sb.WriteString(m.input.RenderWithBorder(m.confirmOverlay.IsOpen(), ""))
+	// Input area (empty border when confirm overlay blocks input)
+	sb.WriteString(m.input.RenderWithBorder(m.confirmOverlay.IsOpen()))
 
 	// Status bar (simplified - just render directly)
 	sb.WriteString("\n")

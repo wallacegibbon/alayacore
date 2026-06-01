@@ -133,8 +133,10 @@ func (m *Terminal) OpenEditor() tea.Cmd {
 	return m.editor.Open(content)
 }
 
-// RenderWithBorder renders the input with a border
-func (m InputModel) RenderWithBorder(confirmDialog bool, confirmText string) string {
+// RenderWithBorder renders the input with a border.
+// When blockInput is true, renders an empty bordered box (visually indicating
+// that input is blocked by an overlay) instead of the active input field.
+func (m InputModel) RenderWithBorder(blockInput bool) string {
 	borderColor := m.styles.BorderFocused
 	if !m.focused {
 		borderColor = m.styles.BorderBlurred
@@ -149,8 +151,8 @@ func (m InputModel) RenderWithBorder(confirmDialog bool, confirmText string) str
 	styles.Cursor.Color = m.styles.CursorColor
 	m.input.SetStyles(styles)
 
-	if confirmDialog {
-		return m.styles.RenderBorderedBox(m.styles.Confirm.Render(confirmText), m.width, borderColor)
+	if blockInput {
+		return m.styles.RenderBorderedBox("", m.width, borderColor)
 	}
 
 	return m.styles.RenderBorderedBox(m.input.View(), m.width, borderColor)
