@@ -116,7 +116,14 @@ And on receive, the OpenAI adapter must **merge** three independent stream accum
 | `TextPart` | `content` (top-level field) | `content[]` array: `{type:"text", text:"..."}` |
 | `ReasoningPart` | `reasoning_content` (top-level field) | `content[]` array: `{type:"thinking", thinking:"...", signature:"..."}` |
 | `ToolCallPart` | `tool_calls[]` (top-level array) | `content[]` array: `{type:"tool_use", id, name, input}` |
-| `ToolResultPart` | Separate message: `{role:"tool", tool_call_id, content}` | `content[]` array: `{type:"tool_result", tool_use_id, content}`, **role remapped to "user"** |
+| `ToolResultPart` | Separate message: `{role:"tool", tool_call_id, content}` (content is JSON-wrapped with `"status"` field — see note below) | `content[]` array: `{type:"tool_result", tool_use_id, content}`, **role remapped to "user"** |
+
+> **Note on OpenAI tool result content format:** OpenAI's API has no native `is_error` field for tool results (unlike Anthropic). To prevent ambiguity — e.g., a tool returning `"no such file"` as an error vs. a file containing the literal text `"no such file"` — the OpenAI provider wraps tool results as JSON:
+>
+> - Success: `{"status":"success","data":"<plain text output>"}`
+> - Error:   `{"status":"error","reason":"<error message>"}`
+>
+> This ensures the model can distinguish success from failure structurally rather than guessing from the content string. The Anthropic provider uses the native `is_error: true` flag instead, so results remain unwrapped plain text.
 
 ## Receiving (Wire → Domain)
 
