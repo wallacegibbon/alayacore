@@ -431,16 +431,14 @@ func (hw *HelpWindow) renderItem(item HelpItem, selected bool) string {
 		desc = strings.SplitN(truncated, "\n", 2)[0] + "..."
 	}
 
-	// Build the full raw line: prefix + padded key + space + desc
+	// Build the full raw line: padded key + space + desc
 	keyPadded := fmt.Sprintf("%-*s", keyMaxWidth, key)
-	prefix := "> "
-	rawLine := prefix + keyPadded + " " + desc
+	line := keyPadded + " " + desc
 
 	if selected {
-		return hw.Styles.Prompt.Render(rawLine)
+		return hw.Styles.Prompt.Render("> ") + hw.Styles.Text.Render(line)
 	}
-	rawLine = "  " + keyPadded + " " + desc
-	return hw.Styles.System.Render(rawLine)
+	return hw.Styles.System.Render("  " + line)
 }
 
 // RenderOverlay renders the help window as an overlay on top of base content.

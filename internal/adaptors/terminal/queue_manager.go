@@ -164,9 +164,9 @@ func (qm *QueueManager) renderItem(item QueueItem, selected bool) string {
 	}
 
 	if selected {
-		return qm.Styles.Prompt.Render("> ") + qm.Styles.Input.Render(content)
+		return qm.Styles.Prompt.Render("> ") + qm.Styles.Text.Render(content)
 	}
-	return qm.Styles.Status.Render("> ") + qm.Styles.System.Render(content)
+	return qm.Styles.System.Render("  " + content)
 }
 
 // RenderOverlay renders the queue manager as an overlay on top of base content

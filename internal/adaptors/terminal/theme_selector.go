@@ -5,7 +5,6 @@ package terminal
 // and select themes in real-time.
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
@@ -204,9 +203,9 @@ func (ts *ThemeSelector) renderList() string {
 			}
 
 			if i == ts.SelectedIdx {
-				lines = append(lines, fmt.Sprintf("> %s", ts.Styles.Text.Render(themeName)))
+				lines = append(lines, ts.Styles.Prompt.Render("> ")+ts.Styles.Text.Render(themeName))
 			} else {
-				lines = append(lines, fmt.Sprintf("  %s", ts.Styles.System.Render(themeName)))
+				lines = append(lines, ts.Styles.System.Render("  "+themeName))
 			}
 		}
 	}

@@ -366,9 +366,9 @@ func (ms *ModelSelector) renderModelList(width int, borderColor color.Color) str
 			}
 
 			if i == ms.SelectedIdx && !ms.FilterInputFocused {
-				content.WriteString(fmt.Sprintf("> %s %s", ms.Styles.Text.Render(idStr), ms.Styles.Text.Render(modelName)))
+				content.WriteString(ms.Styles.Prompt.Render("> ") + ms.Styles.Text.Render(idStr+" "+modelName))
 			} else {
-				content.WriteString(fmt.Sprintf("  %s %s", ms.Styles.System.Render(idStr), ms.Styles.System.Render(modelName)))
+				content.WriteString(ms.Styles.System.Render("  " + idStr + " " + modelName))
 			}
 			if i < min(ms.ScrollIdx+listHeight, len(ms.filteredModels))-1 {
 				content.WriteString("\n")
