@@ -39,7 +39,7 @@ func (s *Session) submitTask(item QueueItem) {
 // currently in progress. They are placed at the front so they run ahead of
 // any accumulated user prompts.
 func (s *Session) submitDeferredCommand(cmd string) {
-	if s.inProgress && !s.pausedOnError.Load() {
+	if s.inProgress.Load() && !s.pausedOnError.Load() {
 		s.writeError("Cannot run command while a task is running. Please wait or cancel first.")
 		return
 	}

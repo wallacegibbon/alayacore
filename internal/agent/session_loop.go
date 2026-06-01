@@ -64,7 +64,7 @@ func (s *Session) run() {
 			if !ok {
 				// Input is closed (EOF on stdin). Drain the currently
 				// running task, then process any remaining queued tasks.
-				for s.inProgress || s.tryStartNextTask() {
+				for s.inProgress.Load() || s.tryStartNextTask() {
 					s.drainUntilTaskDone()
 				}
 				return
@@ -91,8 +91,17 @@ func (s *Session) run() {
 // allowed to run — user prompts must wait for explicit recovery via :continue.
 // Returns true if a task was started.
 func (s *Session) tryStartNextTask() bool {
-	if len(s.taskQueue) == 0 || s.inProgress || s.sessionCtx.Err() != nil {
+	if len(s.taskQueue) == 0 || s.inProgress.Load() || s.sessionCtx.Err() != nil {
 		return false
+	}
+
+	// Drain any stale cancellation signal left by :cancel when no task was
+	// running.  Since taskCancelCh is buffered (cap 1), cancelRunningTask()
+	// succeeds even without a listener — the signal lingers and would cancel
+	// the next task immediately on startup.
+	select {
+	case <-s.taskCancelCh:
+	default:
 	}
 
 	item := s.taskQueue[0]
@@ -105,14 +114,14 @@ func (s *Session) tryStartNextTask() bool {
 	}
 
 	s.taskQueue = s.taskQueue[1:]
-	s.inProgress = true
+	s.inProgress.Store(true)
 
 	// Ensure agent is initialized before spawning the task goroutine.
 	// This avoids calling ModelManager from the task goroutine and keeps
 	// all model state access in the run() goroutine.
 	if errMsg := s.ensureAgentInitialized(); errMsg != "" {
 		s.writeError(errMsg)
-		s.inProgress = false
+		s.inProgress.Store(false)
 		s.sendSystemInfo("task")
 		return false
 	}
@@ -131,7 +140,7 @@ func (s *Session) tryStartNextTask() bool {
 // result is the final message state returned by the task goroutine.
 func (s *Session) handleTaskDone(result []llm.Message) {
 	// Mark the task as finished so the next queue item can start.
-	s.inProgress = false
+	s.inProgress.Store(false)
 
 	// Update s.Messages with the final message state from the task goroutine.
 	if len(result) > 0 {

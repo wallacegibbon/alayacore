@@ -40,9 +40,7 @@ func (s *Session) handleCommand(ctx context.Context, cmd string) {
 }
 
 func (s *Session) cancelTask() {
-	inProg := s.inProgress
-
-	if inProg {
+	if s.inProgress.Load() {
 		if s.cancelRunningTask() {
 			return
 		}
@@ -55,7 +53,7 @@ func (s *Session) cancelAllTasks() {
 	s.taskQueue = make([]QueueItem, 0)
 
 	currentCanceled := false
-	if s.inProgress {
+	if s.inProgress.Load() {
 		if s.cancelRunningTask() {
 			currentCanceled = true
 		}
@@ -207,7 +205,7 @@ func (s *Session) handleModelSet(args []string) {
 		return
 	}
 
-	inProg := s.inProgress
+	inProg := s.inProgress.Load()
 
 	if inProg {
 		s.writeError("Cannot switch model while a task is running. Please wait or cancel the current task.")

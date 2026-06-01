@@ -202,7 +202,7 @@ func TestCancelAllTasks(t *testing.T) {
 					Output: output,
 				},
 			}
-			session.inProgress = tt.inProgress
+			session.inProgress.Store(tt.inProgress)
 
 			// Add items to queue
 			for i := 0; i < tt.queueSize; i++ {
@@ -340,7 +340,7 @@ func TestCommandCanRunWhilePaused(t *testing.T) {
 
 	// Set paused — user prompts should not run, but commands should
 	session.pausedOnError.Store(true)
-	session.inProgress = true
+	session.inProgress.Store(true)
 
 	// Add a command to the front of the queue (simulates submitDeferredCommand)
 	session.enqueueTask(QueueItem{Type: TaskTypeCommand, Content: commandNameSave}, true)
@@ -390,7 +390,7 @@ func TestCommandBehindUserPromptWhilePaused(t *testing.T) {
 
 	// Set paused — the user prompt at front should be blocked
 	session.pausedOnError.Store(true)
-	session.inProgress = true
+	session.inProgress.Store(true)
 
 	// Now add a command to the front (like :continue does)
 	session.enqueueTask(QueueItem{Type: TaskTypeCommand, Content: commandNameContinue}, true)

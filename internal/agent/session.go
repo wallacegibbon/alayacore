@@ -65,7 +65,7 @@ type Session struct {
 	reasoningLevel atomic.Int64
 	reasoningDirty atomic.Bool // true if reasoningLevel changed during task execution
 
-	inProgress    bool        // set/cleared by run() goroutine only
+	inProgress    atomic.Bool // set/cleared by run() goroutine only; readable by input pump via cancelRunningTask
 	pausedOnError atomic.Bool // set by task goroutine via event
 
 	nextPromptID uint64 // goroutine-local (task goroutine)
@@ -250,9 +250,11 @@ func (s *Session) Start() {
 }
 
 // cancelRunningTask sends a cancellation signal to the currently running
-// task. Non-blocking — if nobody is listening (no task running), the signal
-// is lost. Returns true if the signal was sent (someone was listening).
+// task. Returns true if a task was actually running and the signal was sent.
 func (s *Session) cancelRunningTask() bool {
+	if !s.inProgress.Load() {
+		return false
+	}
 	select {
 	case s.taskCancelCh <- struct{}{}:
 		return true

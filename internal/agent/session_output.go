@@ -137,7 +137,7 @@ func (s *Session) sendMessageVersionMsg() {
 
 func (s *Session) sendTaskMsg() {
 	_ = stream.WriteSystemMsg(s.Output, TaskMsg{ //nolint:errcheck
-		InProgress:  s.inProgress,
+		InProgress:  s.inProgress.Load(),
 		CurrentStep: int(s.currentStep.Load()),
 		MaxSteps:    s.MaxSteps,
 		Context:     s.ContextTokens.Load(),
