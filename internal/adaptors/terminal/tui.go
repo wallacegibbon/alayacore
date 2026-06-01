@@ -624,36 +624,36 @@ func (m *Terminal) openHelpWindow() {
 	m.display.updateContent()
 }
 
-// openConfirmOverlay prepares the UI for the confirm dialog (blurs input,
-// removes display focus) without triggering a full content update — the
-// render loop picks up the overlay state on the next frame.
-func (m *Terminal) openConfirmOverlay() {
-	m.input.Blur()
-	m.display.SetDisplayFocused(false)
-}
-
 // openConfirmQuit opens the quit confirmation dialog.
 func (m *Terminal) openConfirmQuit() {
 	m.confirmOverlay.OpenQuit()
-	m.openConfirmOverlay()
+	m.input.Blur()
+	m.display.SetDisplayFocused(false)
+	m.display.updateContent()
 }
 
 // openConfirmCancel opens the cancel-task confirmation dialog.
 func (m *Terminal) openConfirmCancel() {
 	m.confirmOverlay.OpenCancel()
-	m.openConfirmOverlay()
+	m.input.Blur()
+	m.display.SetDisplayFocused(false)
+	m.display.updateContent()
 }
 
 // openConfirmCancelAll opens the cancel-all-tasks confirmation dialog.
 func (m *Terminal) openConfirmCancelAll() {
 	m.confirmOverlay.OpenCancelAll()
-	m.openConfirmOverlay()
+	m.input.Blur()
+	m.display.SetDisplayFocused(false)
+	m.display.updateContent()
 }
 
 // openConfirmTool opens the tool-execution confirmation dialog.
 func (m *Terminal) openConfirmTool(id, toolName, toolInput string) {
 	m.confirmOverlay.OpenTool(id, toolName, toolInput)
-	m.openConfirmOverlay()
+	m.input.Blur()
+	m.display.SetDisplayFocused(false)
+	m.display.updateContent()
 }
 
 // applyTheme applies a new theme to all UI components.
