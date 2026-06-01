@@ -321,7 +321,7 @@ func (to *outputWriter) handleSystemReasoning(data json.RawMessage) {
 }
 
 // handleSystemToolConfirm processes a tool_confirm system message.
-// It displays a notification prompting the user to confirm or deny the tool call.
+// Stores the pending state so the Terminal can open its confirm overlay.
 func (to *outputWriter) handleSystemToolConfirm(data json.RawMessage) {
 	var m struct {
 		ID string `json:"id"`
@@ -338,15 +338,6 @@ func (to *outputWriter) handleSystemToolConfirm(data json.RawMessage) {
 	}
 	// Store pending state for the Terminal's confirm overlay.
 	to.status.setToolConfirmPending(m.ID, toolName, toolInput)
-	// Also show a notification window for record in the conversation.
-	msg := "Tool call"
-	if toolName != "" {
-		msg += " \"" + toolName + "\""
-	}
-	msg += " needs your confirmation. Type :confirm yes or :confirm no"
-	id := to.generateWindowID()
-	styles := to.styles.Load()
-	to.windowBuffer.AppendOrUpdate("SN", id, styles.System.Render(msg))
 }
 
 // GetPendingToolConfirm returns any pending tool confirmation and clears it.
