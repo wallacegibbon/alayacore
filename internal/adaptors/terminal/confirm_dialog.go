@@ -16,7 +16,15 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	ansi "github.com/charmbracelet/x/ansi"
 )
+
+// ConfirmContentRows defines the fixed number of content lines inside
+// the confirm dialog border. Matches SelectorListRows (8) used by
+// QueueManager, ModelSelector, ThemeSelector, and HelpWindow.
+// If content exceeds this, it gets truncated with a "..." indicator —
+// same pattern used by QueueManager for items.
+const ConfirmContentRows = 8
 
 // ConfirmKind represents the type of active confirmation dialog.
 type ConfirmKind int
@@ -196,6 +204,8 @@ func (cd *ConfirmDialog) ConsumeResult() (bool, bool) {
 
 // View returns the rendered dialog content as a tea.View.
 // Uses RenderBorderedBox for consistent styling with other overlays.
+// The dialog has a fixed content height (ConfirmContentRows) matching
+// the pattern used by QueueManager, ModelSelector, and other overlays.
 func (cd *ConfirmDialog) View() tea.View {
 	if !cd.IsOpen() {
 		return tea.NewView("")
@@ -204,43 +214,51 @@ func (cd *ConfirmDialog) View() tea.View {
 	// Build the message lines (pre-styled with Confirm/System styles)
 	msgLines := cd.buildContentLines()
 
+	// Pad to the fixed content height, same as QueueManager
+	for len(msgLines) < ConfirmContentRows {
+		msgLines = append(msgLines, "")
+	}
+
 	// Join with newlines
 	content := strings.Join(msgLines, "\n")
 
-	// Render with bordered box — border uses error color for visual warning
-	box := cd.Styles.RenderBorderedBox(content, cd.Width, cd.Styles.ColorError)
+	// Render with bordered box — border uses error color for visual warning.
+	// Pass fixed height so the window is always the same size, same as
+	// QueueManager and ModelSelector overlays.
+	box := cd.Styles.RenderBorderedBox(content, cd.Width, cd.Styles.ColorError, ConfirmContentRows)
 
-	return tea.NewView(box)
+	// Blank line underneath for consistent vertical positioning with other overlays
+	return tea.NewView(box + "\n")
 }
 
 // buildContentLines returns the display lines for the dialog content,
 // with styles already applied (Confirm for the question, System for hints).
 // (Borders are applied by View via RenderBorderedBox.)
+//
+// The dialog has a fixed layout: the body (question + tool input) occupies
+// the upper rows, then "y / n" is always on the penultimate row and an
+// empty row is always on the last row. If the body overflows, the tool
+// input is truncated with "..." — same pattern used by QueueManager.
 func (cd *ConfirmDialog) buildContentLines() []string {
 	innerWidth := max(0, cd.Width-BorderInnerPadding)
+	// Reserve last 2 rows for "y / n" prompt and trailing empty line
+	maxBodyLines := max(0, ConfirmContentRows-2)
+
+	var body []string
 
 	switch cd.Kind {
 	case ConfirmQuit:
-		lines := []string{""}
-		lines = append(lines, cd.wrapAndCenter("Exit AlayaCore?", cd.Styles.Confirm, innerWidth)...)
-		lines = append(lines, "")
-		lines = append(lines, cd.wrapAndCenter("y / n", cd.Styles.System, innerWidth)...)
-		lines = append(lines, "")
-		return lines
+		body = []string{""}
+		body = append(body, cd.wrapAndCenter("Exit AlayaCore?", cd.Styles.Confirm, innerWidth)...)
+		body = append(body, "")
 	case ConfirmCancel:
-		lines := []string{""}
-		lines = append(lines, cd.wrapAndCenter("Cancel current task?", cd.Styles.Confirm, innerWidth)...)
-		lines = append(lines, "")
-		lines = append(lines, cd.wrapAndCenter("y / n", cd.Styles.System, innerWidth)...)
-		lines = append(lines, "")
-		return lines
+		body = []string{""}
+		body = append(body, cd.wrapAndCenter("Cancel current task?", cd.Styles.Confirm, innerWidth)...)
+		body = append(body, "")
 	case ConfirmCancelAll:
-		lines := []string{""}
-		lines = append(lines, cd.wrapAndCenter("Cancel all queued tasks?", cd.Styles.Confirm, innerWidth)...)
-		lines = append(lines, "")
-		lines = append(lines, cd.wrapAndCenter("y / n", cd.Styles.System, innerWidth)...)
-		lines = append(lines, "")
-		return lines
+		body = []string{""}
+		body = append(body, cd.wrapAndCenter("Cancel all queued tasks?", cd.Styles.Confirm, innerWidth)...)
+		body = append(body, "")
 	case ConfirmTool:
 		msg := "Allow "
 		if cd.ToolName != "" {
@@ -249,26 +267,51 @@ func (cd *ConfirmDialog) buildContentLines() []string {
 			msg += "this tool"
 		}
 		msg += " to run?"
-		lines := []string{""}
-		lines = append(lines, cd.wrapAndCenter(msg, cd.Styles.Confirm, innerWidth)...)
+		body = []string{""}
+		body = append(body, cd.wrapAndCenter(msg, cd.Styles.Confirm, innerWidth)...)
 		if cd.ToolInput != "" {
-			// Show first line of tool input in muted style
+			// Show first line of tool input in muted style, truncated
+			// like queue items: wrap-check at innerWidth, then truncate
+			// with "..." if it doesn't fit on a single line.
 			inputLine := cd.ToolInput
 			if nl := strings.IndexByte(inputLine, '\n'); nl >= 0 {
 				inputLine = inputLine[:nl]
 			}
 			if inputLine != "" {
-				lines = append(lines, "")
-				lines = append(lines, cd.wrapAndCenter(inputLine, cd.Styles.System, innerWidth)...)
+				// Truncate width-wise like queue items do
+				truncated := ansi.Hardwrap(inputLine, innerWidth, false)
+				if truncated != inputLine {
+					truncated = ansi.Hardwrap(inputLine, innerWidth-3, false)
+					inputLine = strings.SplitN(truncated, "\n", 2)[0] + "..."
+				}
+				body = append(body, "")
+				body = append(body, cd.wrapAndCenter(inputLine, cd.Styles.System, innerWidth)...)
 			}
 		}
-		lines = append(lines, "")
-		lines = append(lines, cd.wrapAndCenter("y / n", cd.Styles.System, innerWidth)...)
-		lines = append(lines, "")
-		return lines
+		body = append(body, "")
 	default:
 		return nil
 	}
+
+	// If the body exceeds the available rows, truncate the body's content
+	// (the tool input section) and replace the last line with "...".
+	if len(body) > maxBodyLines {
+		body = body[:maxBodyLines-1]
+		body = append(body, cd.wrapAndCenter("...", cd.Styles.System, innerWidth)[0])
+	}
+
+	// Pad body to fill remaining rows before the fixed footer
+	for len(body) < maxBodyLines {
+		body = append(body, "")
+	}
+
+	// Append fixed footer: "y / n" on the penultimate row,
+	// empty row on the last row.
+	lines := body
+	lines = append(lines, cd.wrapAndCenter("y / n", cd.Styles.System, innerWidth)[0])
+	lines = append(lines, "")
+
+	return lines
 }
 
 // wrapAndCenter styles, wraps, and centers text for display in the dialog.

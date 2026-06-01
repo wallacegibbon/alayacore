@@ -10,6 +10,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	ansi "github.com/charmbracelet/x/ansi"
 
 	"github.com/alayacore/alayacore/internal/theme"
 )
@@ -180,6 +181,7 @@ func (ts *ThemeSelector) getPreviewTheme(themeManager *ThemeManager) *theme.Them
 func (ts *ThemeSelector) renderList() string {
 	var sb strings.Builder
 	listHeight := SelectorListRows
+	innerWidth := max(0, ts.Width-BorderInnerPadding)
 	var lines []string
 
 	switch {
@@ -189,10 +191,22 @@ func (ts *ThemeSelector) renderList() string {
 		ts.EnsureVisible()
 		for i := ts.ScrollIdx; i < min(ts.ScrollIdx+listHeight, len(ts.themes)); i++ {
 			theme := ts.themes[i]
+
+			// Available width for theme name: innerWidth minus prefix
+			nameMaxWidth := max(0, innerWidth-2)
+
+			themeName := theme.Name
+			// Truncate long theme names like queue items do
+			truncated := ansi.Hardwrap(themeName, nameMaxWidth, false)
+			if truncated != themeName {
+				truncated = ansi.Hardwrap(themeName, nameMaxWidth-3, false)
+				themeName = strings.SplitN(truncated, "\n", 2)[0] + "..."
+			}
+
 			if i == ts.SelectedIdx {
-				lines = append(lines, fmt.Sprintf("> %s", ts.Styles.Text.Render(theme.Name)))
+				lines = append(lines, fmt.Sprintf("> %s", ts.Styles.Text.Render(themeName)))
 			} else {
-				lines = append(lines, fmt.Sprintf("  %s", ts.Styles.System.Render(theme.Name)))
+				lines = append(lines, fmt.Sprintf("  %s", ts.Styles.System.Render(themeName)))
 			}
 		}
 	}

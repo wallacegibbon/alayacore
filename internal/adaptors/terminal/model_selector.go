@@ -11,6 +11,7 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	ansi "github.com/charmbracelet/x/ansi"
 
 	agentpkg "github.com/alayacore/alayacore/internal/agent"
 )
@@ -329,6 +330,7 @@ func (ms *ModelSelector) renderList() string {
 func (ms *ModelSelector) renderModelList(width int, borderColor color.Color) string {
 	var content strings.Builder
 	listHeight := SelectorListRows
+	innerWidth := max(0, width-BorderInnerPadding)
 
 	switch {
 	case len(ms.models) == 0:
@@ -351,10 +353,22 @@ func (ms *ModelSelector) renderModelList(width int, borderColor color.Color) str
 		for i := ms.ScrollIdx; i < min(ms.ScrollIdx+listHeight, len(ms.filteredModels)); i++ {
 			m := ms.filteredModels[i]
 			idStr := fmt.Sprintf("%0*d.", idWidth, m.ID)
+
+			// Available width for model name: innerWidth minus prefix/labels
+			nameMaxWidth := max(0, innerWidth-len("> ")-len(idStr)-1)
+
+			modelName := m.Name
+			// Truncate long model names like queue items do
+			truncated := ansi.Hardwrap(modelName, nameMaxWidth, false)
+			if truncated != modelName {
+				truncated = ansi.Hardwrap(modelName, nameMaxWidth-3, false)
+				modelName = strings.SplitN(truncated, "\n", 2)[0] + "..."
+			}
+
 			if i == ms.SelectedIdx && !ms.FilterInputFocused {
-				content.WriteString(fmt.Sprintf("> %s %s", ms.Styles.Text.Render(idStr), ms.Styles.Text.Render(m.Name)))
+				content.WriteString(fmt.Sprintf("> %s %s", ms.Styles.Text.Render(idStr), ms.Styles.Text.Render(modelName)))
 			} else {
-				content.WriteString(fmt.Sprintf("  %s %s", ms.Styles.System.Render(idStr), ms.Styles.System.Render(m.Name)))
+				content.WriteString(fmt.Sprintf("  %s %s", ms.Styles.System.Render(idStr), ms.Styles.System.Render(modelName)))
 			}
 			if i < min(ms.ScrollIdx+listHeight, len(ms.filteredModels))-1 {
 				content.WriteString("\n")

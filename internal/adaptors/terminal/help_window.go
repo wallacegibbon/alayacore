@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	ansi "github.com/charmbracelet/x/ansi"
 )
 
 // FuzzyMatchHelpItem checks if the search term fuzzy-matches either the Key
@@ -393,26 +394,53 @@ func (hw *HelpWindow) View() tea.View {
 	return tea.NewView(filterBox + "\n" + listBox + "\n" + helpText)
 }
 
-// renderItem renders a single help item.
+// renderItem renders a single help item using the same ansi.Hardwrap
+// truncation pattern as QueueManager.renderItem: build the raw line,
+// check if it fits at innerWidth, and truncate with "..." if not.
 func (hw *HelpWindow) renderItem(item HelpItem, selected bool) string {
+	innerWidth := max(0, hw.Width-BorderInnerPadding)
+
 	if item.IsSection {
-		return hw.Styles.System.Bold(true).Render("── " + item.Description)
+		content := "── " + item.Description
+		truncated := ansi.Hardwrap(content, innerWidth, false)
+		if truncated != content {
+			truncated = ansi.Hardwrap(content, max(1, innerWidth-3), false)
+			content = strings.SplitN(truncated, "\n", 2)[0] + "..."
+		}
+		return hw.Styles.System.Bold(true).Render(content)
 	}
 
-	keyStr := fmt.Sprintf("%-32s", item.Key)
-	maxDescWidth := hw.Width - 36 - len("> ")
-	if maxDescWidth < 4 {
-		maxDescWidth = 4
+	// Build raw line: "> key   description"
+	keyMaxWidth := max(1, min(28, innerWidth/3))
+	keyMaxWidth = min(keyMaxWidth, max(1, innerWidth-4))
+	descMaxWidth := max(1, innerWidth-3-keyMaxWidth)
+
+	// Truncate key first if too long (same Hardwrap pattern)
+	key := item.Key
+	truncated := ansi.Hardwrap(key, keyMaxWidth, false)
+	if truncated != key {
+		truncated = ansi.Hardwrap(key, max(1, keyMaxWidth-3), false)
+		key = strings.SplitN(truncated, "\n", 2)[0] + "..."
 	}
+
+	// Truncate description if too long (same Hardwrap pattern)
 	desc := item.Description
-	if len(desc) > maxDescWidth {
-		desc = desc[:maxDescWidth-3] + "..."
+	truncated = ansi.Hardwrap(desc, descMaxWidth, false)
+	if truncated != desc {
+		truncated = ansi.Hardwrap(desc, max(1, descMaxWidth-3), false)
+		desc = strings.SplitN(truncated, "\n", 2)[0] + "..."
 	}
+
+	// Build the full raw line: prefix + padded key + space + desc
+	keyPadded := fmt.Sprintf("%-*s", keyMaxWidth, key)
+	prefix := "> "
+	rawLine := prefix + keyPadded + " " + desc
 
 	if selected {
-		return hw.Styles.Prompt.Render("> "+keyStr) + hw.Styles.Text.Render(desc)
+		return hw.Styles.Prompt.Render(rawLine)
 	}
-	return "  " + hw.Styles.System.Render(keyStr) + hw.Styles.System.Render(desc)
+	rawLine = "  " + keyPadded + " " + desc
+	return hw.Styles.System.Render(rawLine)
 }
 
 // RenderOverlay renders the help window as an overlay on top of base content.
