@@ -90,15 +90,19 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 		o.handleSystemMsg(value)
 
 	case stream.TagAssistantF:
+		var fd stream.FunctionData
+		if err := json.Unmarshal([]byte(value), &fd); err != nil {
+			return
+		}
+		// Ignore "start" type — only render when full input is available ("call").
+		if fd.Type == "start" {
+			return
+		}
 		if o.lastTag != "" {
 			fmt.Fprintln(o.writer)
 		}
 		o.lastTag = tag
 		o.lastStreamID = ""
-		var fd stream.FunctionData
-		if err := json.Unmarshal([]byte(value), &fd); err != nil {
-			return
-		}
 		fmt.Fprintf(o.writer, "%s", formatToolCall(fd.Name, fd.Input))
 
 	case stream.TagUserF:
@@ -281,5 +285,14 @@ func (o *stdoutOutput) handleSystemMsg(value string) {
 			}
 			o.inProgress.Store(m.InProgress)
 		}
+	case "tool_confirm":
+		var m struct {
+			ID string `json:"id"`
+		}
+		if json.Unmarshal(env.Data, &m) != nil || m.ID == "" {
+			return
+		}
+		o.emitSeparator("")
+		fmt.Fprintf(o.writer, "[tool_confirm: allow tool %q to run?]", m.ID)
 	}
 }

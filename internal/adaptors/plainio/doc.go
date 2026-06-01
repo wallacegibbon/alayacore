@@ -23,9 +23,12 @@
 //     stream groups or different message types.
 //   - User prompts: prefixed with "> ".
 //   - Tool calls: shown as "[tool_name: key-args]" (no content).
+//     "start" type tool call frames are silently ignored; only "call" type
+//     frames with full input are displayed.
 //   - Tool results: suppressed.
 //   - Errors: prefixed with "Error: ".
 //   - Notifications: prefixed with "[...]".
+//   - Tool confirmations: shown as "[tool_confirm: allow tool "id" to run?]".
 //   - A blank line is printed after each task completes.
 //
 // Communication with the session layer uses the same TLV protocol as the
