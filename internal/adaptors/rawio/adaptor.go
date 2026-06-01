@@ -1,7 +1,7 @@
 package rawio
 
 // Package rawio provides a raw TLV stdin/stdout adaptor for AlayaCore.
-// It pipes raw bytes between stdin/stdout and the agent session —
+// It pipes raw bytes between stdin/stdout and the agent session -
 // no parsing, no formatting, no interpretation.
 
 import (
@@ -47,7 +47,7 @@ func (a *Adaptor) Start() int {
 		inputWriter.Close()
 	}()
 
-	// Wait for either EOF (stdin closed → task finishes) or SIGINT.
+	// Wait for either EOF (stdin closed -> task finishes) or SIGINT.
 	// Closing os.Stdin signals the copy goroutine to stop; it will close
 	// inputWriter itself, so there is never a double-close race.
 	select {

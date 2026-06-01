@@ -87,10 +87,10 @@ type Session struct {
 
 	// toolConfirmRespCh is set by OnToolConfirm (task goroutine) before
 	// sending the SM, and read by the input pump to route the adaptor's
-	// response. No synchronization needed — the Output/Input channel
+	// response. No synchronization needed - the Output/Input channel
 	// establishes a happens-before chain:
 	//
-	//   write → Output.Write(SM) ──channel──→ Input.Read(回复) → read
+	//   write -> Output.Write(SM) --channel--> Input.Read(response) -> read
 	//
 	// nil when no confirmation is pending.
 	toolConfirmRespCh chan ToolConfirmResponse

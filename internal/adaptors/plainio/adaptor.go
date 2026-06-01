@@ -2,7 +2,7 @@ package plainio
 
 // Package plainio provides a plain stdin/stdout adaptor for AlayaCore.
 // It reads prompts from stdin (one per line) and prints messages to stdout.
-// No terminal features are used — just plain IO.
+// No terminal features are used - just plain IO.
 
 import (
 	"fmt"
@@ -33,7 +33,7 @@ func NewAdaptor(cfg *app.Config) *Adaptor {
 //
 // plainio processes prompts one at a time. If a task produces an error
 // (TagSystemMsg with type "error"), the remaining input is discarded and the process exits
-// with code 1 — queued tasks are NOT executed.
+// with code 1 - queued tasks are NOT executed.
 func (a *Adaptor) Start() int {
 	output := newStdoutOutput()
 
@@ -75,7 +75,7 @@ func (a *Adaptor) Start() int {
 	// Main goroutine owns all signal handling. No SIGINT goroutine.
 	// First exit trigger wins: EOF (0), Ctrl-C (130), or error via
 	// the output.ErrorChannel() path (1).
-	// Only os.Stdin.Close() is called here — the stdin goroutine handles
+	// Only os.Stdin.Close() is called here - the stdin goroutine handles
 	// writing :cancel_all and closing inputWriter after ReadString fails.
 	code := 0
 	select {
