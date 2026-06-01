@@ -514,7 +514,11 @@ func openaiConvertMessages(messages []llm.Message, reasoningLevel int) []openAIM
 	return apiMessages
 }
 
-// openaiConvertToolResults converts tool result content to multiple OpenAI messages
+// openaiConvertToolResults converts tool result content to multiple OpenAI messages.
+//
+// Since OpenAI's API has no native is_error field (unlike Anthropic), tool
+// results are JSON-wrapped with a "status" field so the model can distinguish
+// success from failure structurally rather than guessing from text content.
 func openaiConvertToolResults(content []llm.ContentPart) []openAIMessage {
 	results := make([]openAIMessage, 0, len(content))
 	for _, part := range content {
@@ -528,9 +532,11 @@ func openaiConvertToolResults(content []llm.ContentPart) []openAIMessage {
 		}
 		switch out := tr.Output.(type) {
 		case llm.ToolResultOutputText:
-			apiMsg.Content = out.Text
+			data, _ := json.Marshal(out.Text) //nolint:errcheck // string can't fail marshal
+			apiMsg.Content = fmt.Sprintf(`{"status":"success","data":%s}`, data)
 		case llm.ToolResultOutputFailed:
-			apiMsg.Content = out.Reason
+			reason, _ := json.Marshal(out.Reason) //nolint:errcheck // string can't fail marshal
+			apiMsg.Content = fmt.Sprintf(`{"status":"error","reason":%s}`, reason)
 		}
 		results = append(results, apiMsg)
 	}
