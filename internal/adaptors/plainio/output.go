@@ -243,7 +243,8 @@ func formatSearchContent(input string) string {
 }
 
 // handleSystemMsg processes a TagSystemMsg frame.
-// It detects task completion transitions and prints a trailing newline.
+// Handles error, notify, task, and tool_confirm system messages.
+// Task completion transitions print a trailing blank line between tasks.
 func (o *stdoutOutput) handleSystemMsg(value string) {
 	var env struct {
 		Type string          `json:"type"`
