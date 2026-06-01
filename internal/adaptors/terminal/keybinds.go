@@ -454,7 +454,7 @@ func (m *Terminal) handleDisplayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 func (m *Terminal) handleGlobalKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 	switch msg.String() {
 	case keyCtrlG:
-		m.confirmOverlay.OpenCancel()
+		m.openConfirmCancel()
 		m.confirmFromCommand = false
 		return nil, true
 
@@ -546,21 +546,21 @@ func (m *Terminal) handleSubmit() tea.Cmd {
 func (m *Terminal) handleCommand(command string) tea.Cmd {
 	// Quit command
 	if command == cmdQuit || command == cmdQShort {
-		m.confirmOverlay.OpenQuit()
+		m.openConfirmQuit()
 		m.confirmFromCommand = true
 		return nil
 	}
 
 	// Cancel command
 	if command == cmdCancel {
-		m.confirmOverlay.OpenCancel()
+		m.openConfirmCancel()
 		m.confirmFromCommand = true
 		return nil
 	}
 
 	// Cancel all command
 	if command == cmdCancelAll {
-		m.confirmOverlay.OpenCancelAll()
+		m.openConfirmCancelAll()
 		m.confirmFromCommand = true
 		return nil
 	}

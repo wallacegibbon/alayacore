@@ -252,10 +252,7 @@ func (m *Terminal) handleTick() (tea.Model, tea.Cmd) {
 
 	// Check for pending tool confirmation from the session
 	if id, toolName, toolInput, ok := m.out.GetPendingToolConfirm(); ok && !m.confirmOverlay.IsOpen() {
-		m.confirmOverlay.OpenTool(id, toolName, toolInput)
-		// Focus lost when overlay opens
-		m.input.Blur()
-		m.display.SetDisplayFocused(false)
+		m.openConfirmTool(id, toolName, toolInput)
 	}
 
 	// Check if display needs refresh (dirty flag)
@@ -627,6 +624,38 @@ func (m *Terminal) openHelpWindow() {
 	m.display.updateContent()
 }
 
+// openConfirmOverlay prepares the UI for the confirm dialog (blurs input,
+// removes display focus) without triggering a full content update — the
+// render loop picks up the overlay state on the next frame.
+func (m *Terminal) openConfirmOverlay() {
+	m.input.Blur()
+	m.display.SetDisplayFocused(false)
+}
+
+// openConfirmQuit opens the quit confirmation dialog.
+func (m *Terminal) openConfirmQuit() {
+	m.confirmOverlay.OpenQuit()
+	m.openConfirmOverlay()
+}
+
+// openConfirmCancel opens the cancel-task confirmation dialog.
+func (m *Terminal) openConfirmCancel() {
+	m.confirmOverlay.OpenCancel()
+	m.openConfirmOverlay()
+}
+
+// openConfirmCancelAll opens the cancel-all-tasks confirmation dialog.
+func (m *Terminal) openConfirmCancelAll() {
+	m.confirmOverlay.OpenCancelAll()
+	m.openConfirmOverlay()
+}
+
+// openConfirmTool opens the tool-execution confirmation dialog.
+func (m *Terminal) openConfirmTool(id, toolName, toolInput string) {
+	m.confirmOverlay.OpenTool(id, toolName, toolInput)
+	m.openConfirmOverlay()
+}
+
 // applyTheme applies a new theme to all UI components.
 func (m *Terminal) applyTheme(theme *theme.Theme) {
 	m.styles = NewStyles(theme)
@@ -681,6 +710,11 @@ func (m *Terminal) handleFocus() (tea.Model, tea.Cmd) {
 	}
 
 	if m.helpWindow.IsOpen() {
+		m.display.updateContent()
+		return m, nil
+	}
+
+	if m.confirmOverlay.IsOpen() {
 		m.display.updateContent()
 		return m, nil
 	}
