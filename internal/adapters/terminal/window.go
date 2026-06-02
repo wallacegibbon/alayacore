@@ -7,7 +7,7 @@ package terminal
 //
 // The rendering model is intentionally simple:
 //
-//	Window.render(width, isCursor, styles) → string
+//	Window.Render(width, isCursor, styles) → string
 //
 // All caching is internal to Window. Callers don't need to know about
 // cache invalidation, line heights, or rebuild states.

@@ -37,7 +37,7 @@ All optimizations are working correctly:
 | Incremental append (1 window) | ~64μs | **1.4x** |
 | Full wrap (1 window) | ~88μs | baseline |
 
-The wrapping speedup appears modest in isolation because both paths wrap roughly the same amount of text for a single window. The real benefit of the incremental path is that it updates wrapped lines in **O(delta)** per append via `appendDeltaToLines`, avoiding the **O(n²)** cost of `Content += delta` string concatenation over a long streaming session. After 10,000 streaming deltas, the incremental path has copied ~10KB total vs ~50MB with naive string concatenation. |
+The wrapping speedup appears modest in isolation because both paths wrap roughly the same amount of text for a single window. The real benefit of the incremental path is that it updates wrapped lines in **O(delta)** per append via `appendDeltaToLines`, avoiding the **O(n²)** cost of `Content += delta` string concatenation over a long streaming session. After 10,000 streaming deltas, the incremental path has copied ~10KB total vs ~50MB with naive string concatenation.
 
 ### Cursor Movement
 
