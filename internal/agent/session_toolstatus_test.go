@@ -17,7 +17,7 @@ func TestWriteToolOutput(t *testing.T) {
 	}
 
 	// Test success case
-	session.writeToolOutput("tool123", "output text", "success")
+	session.writeToolOutput("tool123", "output text", false)
 
 	// Parse the written data to extract TLV
 	tag, value := parseTLVFromBytes(output.data)
@@ -29,13 +29,13 @@ func TestWriteToolOutput(t *testing.T) {
 	if err := json.Unmarshal([]byte(value), &got); err != nil {
 		t.Fatalf("Failed to parse UF JSON: %v", err)
 	}
-	if got.ID != "tool123" || got.Output != "output text" || got.Status != "success" {
-		t.Errorf("Expected {tool123, output text, success}, got {%s, %s, %s}", got.ID, got.Output, got.Status)
+	if got.ID != "tool123" || got.Output != "output text" || got.IsError != false {
+		t.Errorf("Expected {tool123, output text, false}, got {%s, %s, %t}", got.ID, got.Output, got.IsError)
 	}
 
 	// Test error case
 	output.data = nil
-	session.writeToolOutput("tool456", "error message", "failed")
+	session.writeToolOutput("tool456", "error message", true)
 
 	tag, value = parseTLVFromBytes(output.data)
 	if tag != stream.TagUserF {
@@ -45,8 +45,8 @@ func TestWriteToolOutput(t *testing.T) {
 	if err := json.Unmarshal([]byte(value), &got); err != nil {
 		t.Fatalf("Failed to parse UF JSON: %v", err)
 	}
-	if got.ID != "tool456" || got.Output != "error message" || got.Status != "failed" {
-		t.Errorf("Expected {tool456, error message, failed}, got {%s, %s, %s}", got.ID, got.Output, got.Status)
+	if got.ID != "tool456" || got.Output != "error message" || got.IsError != true {
+		t.Errorf("Expected {tool456, error message, true}, got {%s, %s, %t}", got.ID, got.Output, got.IsError)
 	}
 }
 
@@ -70,15 +70,11 @@ func TestOnToolResultCallback(t *testing.T) {
 			}},
 		})
 
-		// Send tool result with status to adapter
-		status := "success"
-		if _, ok := toolResult.(llm.ToolResultOutputFailed); ok {
-			status = "failed"
-		}
+		// Send tool result with error flag to adapter
 		if textOutput, ok := toolResult.(llm.ToolResultOutputText); ok {
-			session.writeToolOutput(toolCallID, textOutput.Text, status)
+			session.writeToolOutput(toolCallID, textOutput.Text, false)
 		} else if errOutput, ok := toolResult.(llm.ToolResultOutputFailed); ok {
-			session.writeToolOutput(toolCallID, errOutput.Reason, status)
+			session.writeToolOutput(toolCallID, errOutput.Reason, true)
 		}
 
 		return nil
@@ -105,8 +101,8 @@ func TestOnToolResultCallback(t *testing.T) {
 	if err := json.Unmarshal([]byte(value), &got); err != nil {
 		t.Fatalf("Failed to parse UF JSON: %v", err)
 	}
-	if got.ID != "call1" || got.Status != "success" {
-		t.Errorf("Expected {call1, success}, got {%s, %s}", got.ID, got.Status)
+	if got.ID != "call1" || got.IsError != false {
+		t.Errorf("Expected {call1, false}, got {%s, %t}", got.ID, got.IsError)
 	}
 
 	// Test error result
@@ -124,8 +120,8 @@ func TestOnToolResultCallback(t *testing.T) {
 	if err := json.Unmarshal([]byte(value), &got); err != nil {
 		t.Fatalf("Failed to parse UF JSON: %v", err)
 	}
-	if got.ID != "call2" || got.Status != "failed" {
-		t.Errorf("Expected {call2, failed}, got {%s, %s}", got.ID, got.Status)
+	if got.ID != "call2" || got.IsError != true {
+		t.Errorf("Expected {call2, true}, got {%s, %t}", got.ID, got.IsError)
 	}
 }
 
@@ -147,13 +143,13 @@ func TestWriteToolCallWithPending(t *testing.T) {
 		t.Errorf("Expected tag %s, got %s", stream.TagAssistantF, tag1)
 	}
 
-	// The tool call should be JSON with id, type, name, input
+	// The tool call should be JSON with id, is_placeholder, name, input
 	var fd1 stream.FunctionData
 	if err := json.Unmarshal([]byte(value1), &fd1); err != nil {
 		t.Fatalf("Failed to parse AF JSON: %v", err)
 	}
-	if fd1.Type != "call" || fd1.Name != "execute_command" {
-		t.Errorf("Expected type=call, name=execute_command, got type=%s, name=%s", fd1.Type, fd1.Name)
+	if fd1.IsPlaceholder || fd1.Name != "execute_command" {
+		t.Errorf("Expected is_placeholder=false, name=execute_command, got is_placeholder=%t, name=%s", fd1.IsPlaceholder, fd1.Name)
 	}
 	if fd1.ID != "tool123" {
 		t.Errorf("Expected id=tool123, got %s", fd1.ID)

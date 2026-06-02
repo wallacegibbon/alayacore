@@ -61,10 +61,10 @@ func (s *Session) writeTLVJSON(tag string, v any) {
 
 func (s *Session) writeToolCall(toolName, input, id string) {
 	s.writeTLVJSON(stream.TagAssistantF, stream.FunctionData{
-		ID:    id,
-		Type:  "call",
-		Name:  toolName,
-		Input: input,
+		ID:            id,
+		IsPlaceholder: false,
+		Name:          toolName,
+		Input:         input,
 	})
 }
 
@@ -73,17 +73,17 @@ func (s *Session) writeToolCall(toolName, input, id string) {
 // arguments have been received.
 func (s *Session) writeToolCallStart(toolName, id string) {
 	s.writeTLVJSON(stream.TagAssistantF, stream.FunctionData{
-		ID:   id,
-		Type: "start",
-		Name: toolName,
+		ID:            id,
+		IsPlaceholder: true,
+		Name:          toolName,
 	})
 }
 
-func (s *Session) writeToolOutput(toolCallID string, output string, status string) {
+func (s *Session) writeToolOutput(toolCallID string, output string, isError bool) {
 	s.writeTLVJSON(stream.TagUserF, stream.ToolResultData{
-		ID:     toolCallID,
-		Output: output,
-		Status: status,
+		ID:      toolCallID,
+		Output:  output,
+		IsError: isError,
 	})
 }
 

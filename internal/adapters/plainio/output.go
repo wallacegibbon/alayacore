@@ -94,8 +94,8 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 		if err := json.Unmarshal([]byte(value), &fd); err != nil {
 			return
 		}
-		// Ignore "start" type — only render when full input is available ("call").
-		if fd.Type == "start" {
+		// Ignore placeholder frames — only render when full input is available.
+		if fd.IsPlaceholder {
 			return
 		}
 		if o.lastTag != "" {

@@ -110,10 +110,10 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 
 			case llm.ToolCallPart:
 				fd := stream.FunctionData{
-					ID:    p.ToolCallID,
-					Type:  "call",
-					Name:  p.ToolName,
-					Input: string(p.Input),
+					ID:            p.ToolCallID,
+					IsPlaceholder: false,
+					Name:          p.ToolName,
+					Input:         string(p.Input),
 				}
 				jsonData, err := json.Marshal(fd)
 				if err != nil {
@@ -122,14 +122,13 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 				writeTLV(&binaryBuf, stream.TagAssistantF, string(jsonData))
 
 			case llm.ToolResultPart:
-				status := "success" //nolint:goconst // pre-existing, used across agent pkg
-				if _, ok := p.Output.(llm.ToolResultOutputFailed); ok {
-					status = "failed" //nolint:goconst // pre-existing, used across agent pkg
-				}
 				tr := stream.ToolResultData{
-					ID:     p.ToolCallID,
-					Output: formatToolResultOutput(p.Output),
-					Status: status,
+					ID:      p.ToolCallID,
+					Output:  formatToolResultOutput(p.Output),
+					IsError: false,
+				}
+				if _, ok := p.Output.(llm.ToolResultOutputFailed); ok {
+					tr.IsError = true
 				}
 				jsonData, err := json.Marshal(tr)
 				if err != nil {
@@ -347,7 +346,7 @@ func parseMessagesTLV(body string) ([]llm.Message, []TLVChunk, error) {
 				return nil, nil, fmt.Errorf("failed to parse tool result: %w", err)
 			}
 			var output llm.ToolResultOutput
-			if tr.Status == "failed" {
+			if tr.IsError {
 				output = llm.ToolResultOutputFailed{Type: "error", Reason: tr.Output}
 			} else {
 				output = llm.ToolResultOutputText{Type: "text", Text: tr.Output}

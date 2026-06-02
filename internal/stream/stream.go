@@ -140,23 +140,21 @@ func (n *NopOutput) Write(p []byte) (int, error) {
 }
 
 // FunctionData is the JSON payload for TagAssistantF (AF).
-// Type discriminator:
-//
-//	"start" — tool name known, input placeholder
-//	"call"  — full tool input available
+// IsPlaceholder indicates whether this is a preliminary "start" frame
+// (name known, input still streaming) or a complete "call" frame.
 type FunctionData struct {
-	ID    string `json:"id"`
-	Type  string `json:"type"`
-	Name  string `json:"name,omitempty"`
-	Input string `json:"input,omitempty"`
+	ID            string `json:"id"`
+	IsPlaceholder bool   `json:"is_placeholder"`
+	Name          string `json:"name,omitempty"`
+	Input         string `json:"input,omitempty"`
 }
 
 // ToolResultData is the JSON payload for TagUserF (UF).
-// Status is set to "success" or "failed" when the tool completes.
+// IsError indicates whether the tool completed with an error.
 type ToolResultData struct {
-	ID     string `json:"id"`
-	Output string `json:"output"`
-	Status string `json:"status,omitempty"`
+	ID      string `json:"id"`
+	Output  string `json:"output"`
+	IsError bool   `json:"is_error"`
 }
 
 // ReasoningData is the JSON payload for TagAssistantR delta values.

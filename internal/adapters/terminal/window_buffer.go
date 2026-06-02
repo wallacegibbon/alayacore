@@ -152,8 +152,7 @@ func (wb *WindowBuffer) HandleFunctionEvent(data stream.FunctionData) {
 
 	if idx, ok := wb.idIndex[data.ID]; ok {
 		w := wb.windows[idx]
-		switch data.Type {
-		case "start":
+		if data.IsPlaceholder {
 			w.ToolName = data.Name
 			if w.ToolInput == "" {
 				w.ToolInput = data.Input
@@ -161,7 +160,7 @@ func (wb *WindowBuffer) HandleFunctionEvent(data stream.FunctionData) {
 			if w.Status == ToolStatusNone {
 				w.Status = ToolStatusPending
 			}
-		case "call":
+		} else {
 			if data.Name != "" {
 				w.ToolName = data.Name
 			}
@@ -194,16 +193,17 @@ func (wb *WindowBuffer) HandleFunctionEvent(data stream.FunctionData) {
 
 // HandleFunctionResult processes a TagUserF (UF) frame.
 // Sets ToolOutput and updates Status from the result.
-func (wb *WindowBuffer) HandleFunctionResult(id, output, status string) {
+func (wb *WindowBuffer) HandleFunctionResult(id, output string, isError bool) {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 
 	if idx, ok := wb.idIndex[id]; ok {
 		w := wb.windows[idx]
 		w.ToolOutput = output
-		w.Status = ParseToolStatus(status)
-		if status == "success" && w.ToolName == "write_file" {
-			w.Folded = true
+		if isError {
+			w.Status = ToolStatusError
+		} else {
+			w.Status = ToolStatusSuccess
 		}
 		w.Invalidate()
 		wb.markDirty(idx)
@@ -211,11 +211,15 @@ func (wb *WindowBuffer) HandleFunctionResult(id, output, status string) {
 	}
 
 	// No prior AF window (e.g. replayed from session file) — create one.
+	status := ToolStatusSuccess
+	if isError {
+		status = ToolStatusError
+	}
 	w := &Window{
 		ID:         id,
 		Tag:        stream.TagUserF,
 		ToolOutput: output,
-		Status:     ParseToolStatus(status),
+		Status:     status,
 		Folded:     true,
 		Visible:    true,
 		styles:     wb.styles,

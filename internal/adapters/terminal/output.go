@@ -139,10 +139,10 @@ func (to *outputWriter) writeColored(tag string, value string) {
 		// placeholder so the tool name appears immediately. Safe because
 		// HandleFunctionEvent only sets ToolInput for "start" when it's
 		// empty — real arguments from a prior "call" are never overwritten.
-		if fd.Type == "call" {
+		if !fd.IsPlaceholder {
 			handler := GetHandler(fd.Name)
 			fd.Input = handler.FormatCall(json.RawMessage(fd.Input), to.styles.Load())
-		} else if fd.Type == "start" {
+		} else {
 			handler := GetHandler(fd.Name)
 			fd.Input = handler.FormatCall(json.RawMessage("{}"), to.styles.Load())
 		}
@@ -154,7 +154,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 		if err := json.Unmarshal([]byte(value), &tr); err != nil {
 			return
 		}
-		to.windowBuffer.HandleFunctionResult(tr.ID, tr.Output, tr.Status)
+		to.windowBuffer.HandleFunctionResult(tr.ID, tr.Output, tr.IsError)
 
 	// System tags
 	case stream.TagSystemMsg:

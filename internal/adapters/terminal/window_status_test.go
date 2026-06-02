@@ -13,10 +13,10 @@ func TestHandleFunctionEvent(t *testing.T) {
 
 	// Send a "call" type event (creates the window)
 	wb.HandleFunctionEvent(stream.FunctionData{
-		ID:    "tool123",
-		Type:  "call",
-		Name:  "execute_command",
-		Input: "execute_command: git status",
+		ID:            "tool123",
+		IsPlaceholder: false,
+		Name:          "execute_command",
+		Input:         "execute_command: git status",
 	})
 
 	// Verify window was created
@@ -30,7 +30,7 @@ func TestHandleFunctionEvent(t *testing.T) {
 	}
 
 	// Send a result
-	wb.HandleFunctionResult("tool123", "output text", "success")
+	wb.HandleFunctionResult("tool123", "output text", false)
 
 	// Check status was updated
 	if wb.GetWindow(0).Status != ToolStatusSuccess {
@@ -38,7 +38,7 @@ func TestHandleFunctionEvent(t *testing.T) {
 	}
 
 	// Send a result with error
-	wb.HandleFunctionResult("tool123", "error output", "failed")
+	wb.HandleFunctionResult("tool123", "error output", true)
 
 	// Check status was updated
 	if wb.GetWindow(0).Status != ToolStatusError {
@@ -46,7 +46,7 @@ func TestHandleFunctionEvent(t *testing.T) {
 	}
 
 	// Try to update non-existent window (should not crash)
-	wb.HandleFunctionResult("nonexistent", "output", "success")
+	wb.HandleFunctionResult("nonexistent", "output", false)
 }
 
 func TestRenderWindowContentWithStatus(t *testing.T) {
@@ -54,10 +54,10 @@ func TestRenderWindowContentWithStatus(t *testing.T) {
 
 	// Create a tool window
 	wb.HandleFunctionEvent(stream.FunctionData{
-		ID:    "tool123",
-		Type:  "call",
-		Name:  "execute_command",
-		Input: "execute_command: git status",
+		ID:            "tool123",
+		IsPlaceholder: false,
+		Name:          "execute_command",
+		Input:         "execute_command: git status",
 	})
 
 	// Test rendering with pending status (default on creation)
@@ -72,7 +72,7 @@ func TestRenderWindowContentWithStatus(t *testing.T) {
 	}
 
 	// Send result with success
-	wb.HandleFunctionResult("tool123", "output", "success")
+	wb.HandleFunctionResult("tool123", "output", false)
 
 	// Test rendering with success status
 	content = wb.RenderWindowContent(w, 76)
@@ -85,7 +85,7 @@ func TestRenderWindowContentWithStatus(t *testing.T) {
 	}
 
 	// Send result with error
-	wb.HandleFunctionResult("tool123", "error output", "failed")
+	wb.HandleFunctionResult("tool123", "error output", true)
 
 	// Test rendering with error status
 	content = wb.RenderWindowContent(w, 76)
@@ -114,18 +114,18 @@ func TestOutputWriterToolCallStartThenFull(t *testing.T) {
 	out := NewTerminalOutput(NewStyles(theme.DefaultTheme()))
 	out.SetWindowWidth(80)
 
-	makeFD := func(id, typ, name, input string) []byte {
+	makeFD := func(id string, isPlaceholder bool, name, input string) []byte {
 		fd, _ := json.Marshal(stream.FunctionData{
-			ID:    id,
-			Type:  typ,
-			Name:  name,
-			Input: input,
+			ID:            id,
+			IsPlaceholder: isPlaceholder,
+			Name:          name,
+			Input:         input,
 		})
 		return stream.EncodeTLV(stream.TagAssistantF, string(fd))
 	}
 
-	// 1. Simulate ToolCallStart: type "start" with placeholder JSON input
-	_, err := out.Write(makeFD("call-abc", "start", "write_file", "{}"))
+	// 1. Simulate ToolCallStart: is_placeholder=true with placeholder JSON input
+	_, err := out.Write(makeFD("call-abc", true, "write_file", "{}"))
 	if err != nil {
 		t.Fatalf("Write failed: %v", err)
 	}
@@ -139,8 +139,8 @@ func TestOutputWriterToolCallStartThenFull(t *testing.T) {
 		t.Errorf("Expected tool name 'write_file', got %q", w.ToolName)
 	}
 
-	// 2. Simulate ToolCallComplete: type "call" with full JSON input
-	_, err = out.Write(makeFD("call-abc", "call", "write_file", `{"path":"/tmp/f.txt","content":"hello world"}`))
+	// 2. Simulate ToolCallComplete: is_placeholder=false with full JSON input
+	_, err = out.Write(makeFD("call-abc", false, "write_file", `{"path":"/tmp/f.txt","content":"hello world"}`))
 	if err != nil {
 		t.Fatalf("Write failed: %v", err)
 	}

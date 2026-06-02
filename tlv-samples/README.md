@@ -37,15 +37,15 @@ AT and AR use NUL-delimited stream IDs for incremental streaming:
 
 ## Function Lifecycle (AF, UF)
 
-Tool execution uses two tags with a `type` discriminator:
+Tool execution uses two tags with an `is_placeholder` / `is_error` discriminator:
 
 **AF** — function lifecycle:
-- `{"id":"t1","type":"start","name":"read_file"}` — tool name known
-- `{"id":"t1","type":"call","name":"read_file","input":"..."}` — full input
+- `{"id":"t1","is_placeholder":true,"name":"read_file"}` — tool name known
+- `{"id":"t1","is_placeholder":false,"name":"read_file","input":"..."}` — full input
 
 **UF** — function result:
-- `{"id":"t1","output":"...","status":"success"}` — succeeded
-- `{"id":"t1","output":"...","status":"failed"}` — failed
+- `{"id":"t1","output":"...","is_error":false}` — succeeded
+- `{"id":"t1","output":"...","is_error":true}` — failed
 
 A tool call (AF) without a matching UF is still in progress. Each `.bin` sample below shows one frame in this lifecycle.
 
@@ -53,9 +53,9 @@ A tool call (AF) without a matching UF is still in progress. Each `.bin` sample 
 
 ```
 Adapter writes → stdin:        UT "Read the file main.go"
-Session writes → stdout:       AF {"id":"t1","type":"start","name":"read_file"}
-                               AF {"id":"t1","type":"call","name":"read_file","input":"{\"path\":\"main.go\"}"}
-                               UF {"id":"t1","output":"package main...","status":"success"}
+Session writes → stdout:       AF {"id":"t1","is_placeholder":true,"name":"read_file"}
+                               AF {"id":"t1","is_placeholder":false,"name":"read_file","input":"{\"path\":\"main.go\"}"}
+                               UF {"id":"t1","output":"package main...","is_error":false}
                                AT \x00 0|1 \x00 Here's what main.go does...
                                SM {"type":"task","data":{"in_progress":false,"context":0,"queue_items":[]}}
 ```
@@ -76,50 +76,50 @@ UI frames must precede the UT frame they belong to.
 
 ```
 ut-read-file.bin               UT "Read the file main.go"
-af-read-file-start.bin         AF {"id":"t1","type":"start","name":"read_file"}
-af-read-file-call.bin          AF {"id":"t1","type":"call","name":"read_file","input":"{\"path\":\"main.go\"}"}
-uf-read-file-success.bin       UF {"id":"t1","output":"package main...","status":"success"}
-uf-read-file-failed.bin        UF {"id":"t1","output":"Error: file not found","status":"failed"}
+af-read-file-start.bin         AF {"id":"t1","is_placeholder":true,"name":"read_file"}
+af-read-file-call.bin          AF {"id":"t1","is_placeholder":false,"name":"read_file","input":"{\"path\":\"main.go\"}"}
+uf-read-file-success.bin       UF {"id":"t1","output":"package main...","is_error":false}
+uf-read-file-failed.bin        UF {"id":"t1","output":"Error: file not found","is_error":true}
 ```
 
 ### write_file
 
 ```
 ut-write-file.bin              UT "Write a hello world Go program to hello.go"
-af-write-file-start.bin        AF {"id":"t2","type":"start","name":"write_file"}
-af-write-file-call.bin         AF {"id":"t2","type":"call","name":"write_file","input":"{\"path\":\"hello.go\",\"content\":...}"}
-uf-write-file-success.bin      UF {"id":"t2","output":"Written 43 bytes to hello.go","status":"success"}
-uf-write-file-failed.bin       UF {"id":"t2","output":"Error: permission denied","status":"failed"}
+af-write-file-start.bin        AF {"id":"t2","is_placeholder":true,"name":"write_file"}
+af-write-file-call.bin         AF {"id":"t2","is_placeholder":false,"name":"write_file","input":"{\"path\":\"hello.go\",\"content\":...}"}
+uf-write-file-success.bin      UF {"id":"t2","output":"Written 43 bytes to hello.go","is_error":false}
+uf-write-file-failed.bin       UF {"id":"t2","output":"Error: permission denied","is_error":true}
 ```
 
 ### edit_file
 
 ```
 ut-edit-file.bin               UT "Edit main.go to fix the greeting"
-af-edit-file-start.bin         AF {"id":"t3","type":"start","name":"edit_file"}
-af-edit-file-call.bin          AF {"id":"t3","type":"call","name":"edit_file","input":"{\"path\":\"main.go\",\"old_string\":\"hello\",\"new_string\":\"world\"}"}
-uf-edit-file-success.bin       UF {"id":"t3","output":"Applied edit to main.go","status":"success"}
-uf-edit-file-failed.bin        UF {"id":"t3","output":"Error: old_string not found","status":"failed"}
+af-edit-file-start.bin         AF {"id":"t3","is_placeholder":true,"name":"edit_file"}
+af-edit-file-call.bin          AF {"id":"t3","is_placeholder":false,"name":"edit_file","input":"{\"path\":\"main.go\",\"old_string\":\"hello\",\"new_string\":\"world\"}"}
+uf-edit-file-success.bin       UF {"id":"t3","output":"Applied edit to main.go","is_error":false}
+uf-edit-file-failed.bin        UF {"id":"t3","output":"Error: old_string not found","is_error":true}
 ```
 
 ### search_content
 
 ```
 ut-search-content.bin          UT "Search for TODO in Go files"
-af-search-content-start.bin    AF {"id":"t4","type":"start","name":"search_content"}
-af-search-content-call.bin     AF {"id":"t4","type":"call","name":"search_content","input":"{\"pattern\":\"TODO\",\"file_type\":\"go\"}"}
-uf-search-content-success.bin  UF {"id":"t4","output":"main.go:42: // TODO: fix this...","status":"success"}
-uf-search-content-failed.bin   UF {"id":"t4","output":"No matches found","status":"success"}
+af-search-content-start.bin    AF {"id":"t4","is_placeholder":true,"name":"search_content"}
+af-search-content-call.bin     AF {"id":"t4","is_placeholder":false,"name":"search_content","input":"{\"pattern\":\"TODO\",\"file_type\":\"go\"}"}
+uf-search-content-success.bin  UF {"id":"t4","output":"main.go:42: // TODO: fix this...","is_error":false}
+uf-search-content-failed.bin   UF {"id":"t4","output":"No matches found","is_error":false}
 ```
 
 ### execute_command
 
 ```
 ut-execute-command.bin         UT "Run: ls -la"
-af-execute-command-start.bin   AF {"id":"t5","type":"start","name":"execute_command"}
-af-execute-command-call.bin    AF {"id":"t5","type":"call","name":"execute_command","input":"{\"command\":\"ls -la\"}"}
-uf-execute-command-success.bin UF {"id":"t5","output":"total 42...","status":"success"}
-uf-execute-command-failed.bin  UF {"id":"t5","output":"bash: ls: command not found","status":"failed"}
+af-execute-command-start.bin   AF {"id":"t5","is_placeholder":true,"name":"execute_command"}
+af-execute-command-call.bin    AF {"id":"t5","is_placeholder":false,"name":"execute_command","input":"{\"command\":\"ls -la\"}"}
+uf-execute-command-success.bin UF {"id":"t5","output":"total 42...","is_error":false}
+uf-execute-command-failed.bin  UF {"id":"t5","output":"bash: ls: command not found","is_error":true}
 ```
 
 ### Text / Reasoning / System
@@ -133,7 +133,7 @@ at-delta-new-step.bin          AT \x00 0|2 \x00 Next step (new stream)
 at-plain.bin                   AT "plain text without stream id"
 ar-delta.bin                   AR \x00 0|1 \x00 thinking...
 ui-image.bin                   UI data:image/jpeg;base64,...
-sm-message-version.bin         SM {"type":"version","data":{"message_version":1}}
+sm-message-version.bin         SM {"type":"version","data":{"message_version":2}}
 sm-model-list.bin              SM {"type":"model_list","data":{"models":[{"id":0,"name":"Anthropic / Claude Haiku 4",...},{"id":4,"name":"DeepSeek / DeepSeek-V4 Flash",...}],"model_config_path":"..."}}
 sm-model.bin                   SM {"type":"model","data":{"active_id":4,"active_name":"DeepSeek / DeepSeek-V4 Flash","context_limit":1000000}}
 sm-theme-list.bin              SM {"type":"theme_list","data":{"themes":[{"name":"theme-dark",...},{"name":"theme-light",...}]}}
