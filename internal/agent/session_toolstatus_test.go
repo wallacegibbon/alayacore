@@ -70,7 +70,7 @@ func TestOnToolResultCallback(t *testing.T) {
 			}},
 		})
 
-		// Send tool result with status to adaptor
+		// Send tool result with status to adapter
 		status := "success"
 		if _, ok := toolResult.(llm.ToolResultOutputFailed); ok {
 			status = "failed"

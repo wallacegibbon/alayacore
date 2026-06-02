@@ -110,11 +110,11 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 
 	_, err := s.agent.Load().Stream(ctx, history, llm.StreamCallbacks{
 		OnTextDelta: func(delta string) error {
-			_ = stream.WriteTLV(s.Output, stream.TagAssistantT, stream.WrapDelta(stream.NewStreamID(promptID, stepCount), delta)) //nolint:errcheck // best-effort write to adaptor
+			_ = stream.WriteTLV(s.Output, stream.TagAssistantT, stream.WrapDelta(stream.NewStreamID(promptID, stepCount), delta)) //nolint:errcheck // best-effort write to adapter
 			return nil
 		},
 		OnReasoningDelta: func(delta string) error {
-			_ = stream.WriteTLV(s.Output, stream.TagAssistantR, stream.WrapDelta(stream.NewStreamID(promptID, stepCount), delta)) //nolint:errcheck // best-effort write to adaptor
+			_ = stream.WriteTLV(s.Output, stream.TagAssistantR, stream.WrapDelta(stream.NewStreamID(promptID, stepCount), delta)) //nolint:errcheck // best-effort write to adapter
 			return nil
 		},
 		OnToolCallStart: func(toolCallID, toolName string) error {
@@ -127,7 +127,7 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 		},
 		OnToolConfirm: func(toolCallID, toolName string, _ json.RawMessage) (bool, error) {
 			// If no confirmation set is configured, or this tool is not
-			// in the set, allow immediately without notifying the adaptor.
+			// in the set, allow immediately without notifying the adapter.
 			if s.toolConfirmSet == nil {
 				return true, nil
 			}

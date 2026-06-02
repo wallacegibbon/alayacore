@@ -52,7 +52,7 @@ A tool call (AF) without a matching UF is still in progress. Each `.bin` sample 
 ## Example: Text Prompt Flow
 
 ```
-Adaptor writes → stdin:        UT "Read the file main.go"
+Adapter writes → stdin:        UT "Read the file main.go"
 Session writes → stdout:       AF {"id":"t1","type":"start","name":"read_file"}
                                AF {"id":"t1","type":"call","name":"read_file","input":"{\"path\":\"main.go\"}"}
                                UF {"id":"t1","output":"package main...","status":"success"}
@@ -63,7 +63,7 @@ Session writes → stdout:       AF {"id":"t1","type":"start","name":"read_file"
 ## Example: Image Prompt Flow
 
 ```
-Adaptor writes → stdin:        UI data:image/jpeg;base64,...
+Adapter writes → stdin:        UI data:image/jpeg;base64,...
                                UI data:image/png;base64,...
                                UT "What's in these images?"
 ```

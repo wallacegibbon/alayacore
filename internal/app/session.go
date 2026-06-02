@@ -1,7 +1,7 @@
 package app
 
-// Shared session loading for adaptors.
-// Both terminal and plainio adaptors follow the same bootstrap sequence:
+// Shared session loading for adapters.
+// Both terminal and plainio adapters follow the same bootstrap sequence:
 // load session, validate init errors, print config warnings, check models,
 // then start the session goroutine.
 
@@ -18,7 +18,7 @@ import (
 // session goroutine. On success the returned session is ready to use.
 //
 // It creates the input pipe internally, returning the write end as
-// inputWriter so the adaptor can feed TLV messages to the session.
+// inputWriter so the adapter can feed TLV messages to the session.
 //
 // It handles:
 //   - LoadOrNewSession

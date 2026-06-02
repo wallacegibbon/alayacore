@@ -25,14 +25,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	var adaptor app.Adaptor
+	var adapter app.Adapter
 	switch {
 	case cfg.RawIO:
-		adaptor = rawio.NewAdaptor(appCfg)
+		adapter = rawio.NewAdapter(appCfg)
 	case cfg.PlainIO:
-		adaptor = plainio.NewAdaptor(appCfg)
+		adapter = plainio.NewAdapter(appCfg)
 	default:
-		adaptor = terminal.NewAdaptor(appCfg)
+		adapter = terminal.NewAdapter(appCfg)
 	}
-	os.Exit(adaptor.Start())
+	os.Exit(adapter.Start())
 }

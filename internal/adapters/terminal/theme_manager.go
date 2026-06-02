@@ -4,7 +4,7 @@ package terminal
 // terminal-specific initialization warnings (displayed at startup).
 //
 // The core loading, listing, and default-creation logic lives in
-// internal/theme so it can be shared with future GUI adaptors.
+// internal/theme so it can be shared with future GUI adapters.
 
 import (
 	"github.com/alayacore/alayacore/internal/theme"

@@ -1,6 +1,6 @@
 package rawio
 
-// Package rawio provides a raw TLV stdin/stdout adaptor for AlayaCore.
+// Package rawio provides a raw TLV stdin/stdout adapter for AlayaCore.
 // It pipes raw bytes between stdin/stdout and the agent session -
 // no parsing, no formatting, no interpretation.
 
@@ -14,23 +14,23 @@ import (
 	"github.com/alayacore/alayacore/internal/app"
 )
 
-// Compile-time check: Adaptor satisfies app.Adaptor.
-var _ app.Adaptor = (*Adaptor)(nil)
+// Compile-time check: Adapter satisfies app.Adapter.
+var _ app.Adapter = (*Adapter)(nil)
 
-// Adaptor pipes raw bytes between stdin/stdout and the agent session.
-type Adaptor struct {
+// Adapter pipes raw bytes between stdin/stdout and the agent session.
+type Adapter struct {
 	Config *app.Config
 }
 
-// NewAdaptor creates a new rawio adaptor.
-func NewAdaptor(cfg *app.Config) *Adaptor {
-	return &Adaptor{Config: cfg}
+// NewAdapter creates a new rawio adapter.
+func NewAdapter(cfg *app.Config) *Adapter {
+	return &Adapter{Config: cfg}
 }
 
-// Start runs the rawio adaptor. It blocks until the session finishes.
+// Start runs the rawio adapter. It blocks until the session finishes.
 // Returns 0 on success, 1 on any error (startup or task failure).
 // The controlling process reads stdout and handles TLV itself.
-func (a *Adaptor) Start() int {
+func (a *Adapter) Start() int {
 	session, inputWriter, err := app.StartSession(a.Config, os.Stdout)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)

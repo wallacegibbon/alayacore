@@ -1,6 +1,6 @@
 package terminal
 
-// Entry point for the terminal UI adaptor.
+// Package terminal implements the terminal UI adapter for AlayaCore.
 // This file handles application startup, session loading, and error handling.
 
 import (
@@ -14,23 +14,23 @@ import (
 	"github.com/alayacore/alayacore/internal/theme"
 )
 
-// Compile-time check: Adaptor satisfies app.Adaptor.
-var _ app.Adaptor = (*Adaptor)(nil)
+// Compile-time check: Adapter satisfies app.Adapter.
+var _ app.Adapter = (*Adapter)(nil)
 
 const defaultThemeName = "theme-dark"
 
-// Adaptor starts the TUI; use from main/app.
-type Adaptor struct {
+// Adapter starts the TUI; use from main/app.
+type Adapter struct {
 	Config *app.Config
 }
 
-// NewAdaptor creates a new Terminal adaptor.
-func NewAdaptor(cfg *app.Config) *Adaptor {
-	return &Adaptor{Config: cfg}
+// NewAdapter creates a new Terminal adapter.
+func NewAdapter(cfg *app.Config) *Adapter {
+	return &Adapter{Config: cfg}
 }
 
 // Start runs the Terminal program. Returns exit code.
-func (a *Adaptor) Start() int {
+func (a *Adapter) Start() int {
 	// Create theme manager
 	themeManager := NewThemeManager(a.Config.Cfg.ThemesFolder)
 

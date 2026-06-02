@@ -1,7 +1,7 @@
 // Package agent provides the core session management for AlayaCore.
 //
 // The agent package implements the session layer that sits between the
-// adaptors (terminal/plainio) and the AI model provider. It handles:
+// adapters (terminal/plainio) and the AI model provider. It handles:
 //
 //   - Task queue management (prompts and commands)
 //   - Model interaction and streaming
@@ -43,7 +43,7 @@
 //
 // Communication Protocol:
 //
-//	Adaptors communicate with Session via TLV (Tag-Length-Value) streams:
+//	Adapters communicate with Session via TLV (Tag-Length-Value) streams:
 //	  - Input: TagUserT for prompts and commands, TagUserI for images
 //	  - Output: TagAssistantT, TagAssistantR, TagAssistantF, etc.
 //

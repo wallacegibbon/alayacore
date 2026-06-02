@@ -12,7 +12,7 @@ import (
 	"github.com/alayacore/alayacore/internal/theme"
 )
 
-// ToolConfirmResponse carries the adaptor's response to a tool_confirm request.
+// ToolConfirmResponse carries the adapter's response to a tool_confirm request.
 type ToolConfirmResponse struct {
 	ID      string
 	Allowed bool
@@ -67,14 +67,14 @@ type ModelListMsg struct {
 
 func (ModelListMsg) SystemMsgType() string { return "model_list" }
 
-// ThemeInfo carries a theme's name and full content for adaptors.
+// ThemeInfo carries a theme's name and full content for adapters.
 type ThemeInfo struct {
 	Name  string       `json:"name"`
 	Theme *theme.Theme `json:"theme"`
 }
 
 // ThemeListMsg carries all available themes (type "theme_list").
-// Sent once on startup so adaptors can cache theme content locally.
+// Sent once on startup so adapters can cache theme content locally.
 type ThemeListMsg struct {
 	Themes []ThemeInfo `json:"themes"`
 }
@@ -98,7 +98,7 @@ type ReasoningMsg struct {
 func (ReasoningMsg) SystemMsgType() string { return "reasoning" }
 
 // MessageVersionMsg carries the TLV message format version (type "version").
-// Sent as the first TagSystemMsg frame so adaptors can validate format
+// Sent as the first TagSystemMsg frame so adapters can validate format
 // compatibility before processing subsequent messages.
 type MessageVersionMsg struct {
 	MessageVersion int `json:"message_version"`
@@ -138,7 +138,7 @@ type TLVChunk struct {
 // SessionConfig bundles all configuration for creating or restoring a session.
 // This avoids passing 16+ positional parameters to NewSession / RestoreFromSession.
 type SessionConfig struct {
-	// IO — required, provided by the adaptor.
+	// IO — required, provided by the adapter.
 	Input  io.Reader
 	Output io.Writer
 

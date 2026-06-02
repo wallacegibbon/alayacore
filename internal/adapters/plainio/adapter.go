@@ -1,6 +1,6 @@
 package plainio
 
-// Package plainio provides a plain stdin/stdout adaptor for AlayaCore.
+// Package plainio provides a plain stdin/stdout adapter for AlayaCore.
 // It reads prompts from stdin (one per line) and prints messages to stdout.
 // No terminal features are used - just plain IO.
 
@@ -14,27 +14,27 @@ import (
 	"github.com/alayacore/alayacore/internal/stream"
 )
 
-// Compile-time check: Adaptor satisfies app.Adaptor.
-var _ app.Adaptor = (*Adaptor)(nil)
+// Compile-time check: Adapter satisfies app.Adapter.
+var _ app.Adapter = (*Adapter)(nil)
 
-// Adaptor reads prompts from stdin and prints assistant output to stdout.
-type Adaptor struct {
+// Adapter reads prompts from stdin and prints assistant output to stdout.
+type Adapter struct {
 	Config *app.Config
 }
 
-// NewAdaptor creates a new plainio adaptor.
-func NewAdaptor(cfg *app.Config) *Adaptor {
-	return &Adaptor{Config: cfg}
+// NewAdapter creates a new plainio adapter.
+func NewAdapter(cfg *app.Config) *Adapter {
+	return &Adapter{Config: cfg}
 }
 
-// Start runs the plainio adaptor. It blocks until the session finishes.
+// Start runs the plainio adapter. It blocks until the session finishes.
 // Returns the exit code: 0 for graceful exit, 1 for errors, 130 (128+SIGINT)
 // for Ctrl-C.
 //
 // plainio processes prompts one at a time. If a task produces an error
 // (TagSystemMsg with type "error"), the remaining input is discarded and the process exits
 // with code 1 - queued tasks are NOT executed.
-func (a *Adaptor) Start() int {
+func (a *Adapter) Start() int {
 	output := newStdoutOutput()
 
 	// Load session

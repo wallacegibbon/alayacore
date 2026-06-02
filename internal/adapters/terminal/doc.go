@@ -25,7 +25,7 @@
 //
 // Key Files:
 //
-//   - terminal.go: Main Terminal model, message routing, and status bar
+//   - tui.go: Main Terminal model, message routing, and status bar
 //   - keybinds.go: Declarative key binding configuration
 //   - output.go: TLV parsing and styled rendering
 //   - window.go: Virtual scrolling, DisplayModel, and diff display
@@ -42,7 +42,7 @@
 //   - tool.go, tool_handler.go: Tool execution display
 //
 // Theme data types (Theme struct, DefaultTheme, LoadTheme) and the core
-// Manager live in internal/theme — shared with future GUI adaptors.
+// Manager live in internal/theme — shared with future GUI adapters.
 //
 // Usage:
 //

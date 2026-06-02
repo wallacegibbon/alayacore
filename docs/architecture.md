@@ -13,7 +13,7 @@ The entry point wires together all components:
    - Skills manager (loads skill metadata from `--skill` directories)
    - Tools (`read_file`, `edit_file`, `write_file`, `execute_command`, and conditionally `search_content`)
    - System prompt (default + skills section/fragment when configured + current working directory)
-3. **Adaptor creation** — Starts the terminal, PlainIO, or RawIO adaptor
+3. **Adapter creation** — Starts the terminal, PlainIO, or RawIO adapter
 
 ### Session Layer (`internal/agent/`)
 
@@ -93,7 +93,7 @@ stdin EOF ──▶ inputPump closes msgCh ──▶ run() detects closed channe
 
 Session files use a Markdown-based format with YAML frontmatter. The body contains TLV-encoded conversation data (messages, tool calls, tool results) written directly as binary TLV records after the frontmatter.
 
-The frontmatter includes a `message_version` field that tracks the TLV message encoding format. When loading a session, it must match `MessageVersion` exactly — any mismatch is rejected. The version is also broadcast to adaptors as the first `TagSystemMsg` frame on startup (`{"type":"version","data":{"message_version":1}}`), so they can validate format compatibility before processing subsequent messages.
+The frontmatter includes a `message_version` field that tracks the TLV message encoding format. When loading a session, it must match `MessageVersion` exactly — any mismatch is rejected. The version is also broadcast to adapters as the first `TagSystemMsg` frame on startup (`{"type":"version","data":{"message_version":1}}`), so they can validate format compatibility before processing subsequent messages.
 
 **Message grouping on load:** The session format stores a flat sequence of TLV chunks with no explicit message boundaries. On load, chunks are grouped into messages by role: consecutive chunks with the same role are merged into a single message's `Content` array. This correctly handles multi-part user messages (e.g., when a user adds context after a failed prompt) and assistant messages containing reasoning + text + tool calls.
 
@@ -224,7 +224,7 @@ correct base directory for the current session.
 
 ## Design Decisions
 
-1. **TLV Protocol** — Simple binary protocol for clean separation between adaptors and session. The TUI, plain-IO, and raw-IO modes all share the same session/agent logic.
+1. **TLV Protocol** — Simple binary protocol for clean separation between adapters and session. The TUI, plain-IO, and raw-IO modes all share the same session/agent logic.
 2. **Task Queue** — Deferred task processing with cancellation support. Queued tasks execute sequentially.
 3. **Virtual Scrolling** — Only visible windows are rendered. See [virtual-rendering-performance.md](virtual-rendering-performance.md).
 4. **Typed Tools** — `TypedExecute[T]` wrapper for type-safe tool implementations with auto-generated schemas. See [schema-improvements.md](schema-improvements.md).

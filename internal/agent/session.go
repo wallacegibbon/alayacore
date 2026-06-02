@@ -86,7 +86,7 @@ type Session struct {
 	taskCancelCh chan struct{}
 
 	// toolConfirmRespCh is set by OnToolConfirm (task goroutine) before
-	// sending the SM, and read by the input pump to route the adaptor's
+	// sending the SM, and read by the input pump to route the adapter's
 	// response. No synchronization needed - the Output/Input channel
 	// establishes a happens-before chain:
 	//
@@ -238,7 +238,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 
 	// Send TLV chunks directly to output (avoids reconstruction)
 	for _, chunk := range data.TLVChunks {
-		_ = stream.WriteTLV(s.Output, chunk.Tag, chunk.Value) //nolint:errcheck // best-effort write to adaptor
+		_ = stream.WriteTLV(s.Output, chunk.Tag, chunk.Value) //nolint:errcheck // best-effort write to adapter
 	}
 	return s
 }

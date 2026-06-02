@@ -10,7 +10,7 @@ import (
 	"github.com/alayacore/alayacore/internal/tools"
 )
 
-// This package provides shared initialization for all adaptors.
+// This package provides shared initialization for all adapters.
 // It builds the system prompt, initializes tools, and creates the app config.
 
 const systemPromptIdentity = `Your name is AlayaCore. You are a helpful AI assistant with access to tools for reading/writing files and executing commands.`

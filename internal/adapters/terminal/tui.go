@@ -1,6 +1,6 @@
 package terminal
 
-// This package implements the terminal UI adaptor for AlayaCore.
+// This package implements the terminal UI adapter for AlayaCore.
 // It uses Bubble Tea for the TUI framework and handles:
 //   - Display of assistant output with virtual scrolling
 //   - User input with external editor support

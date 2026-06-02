@@ -1,4 +1,4 @@
-// Package plainio provides a plain stdin/stdout adaptor for AlayaCore.
+// Package plainio provides a plain stdin/stdout adapter for AlayaCore.
 //
 // It reads user prompts from stdin (one per newline) and prints assistant
 // messages to stdout. No terminal features (ANSI codes, TTY detection, etc.)
@@ -32,10 +32,10 @@
 //   - A blank line is printed after each task completes.
 //
 // Communication with the session layer uses the same TLV protocol as the
-// terminal and plainio adaptors.
+// terminal and plainio adapters.
 //
 // Key Files:
-//   - adaptor.go: Adaptor struct, Start() entry point, signal handling
+//   - adapter.go: Adapter struct, Start() entry point, signal handling
 //   - input.go: Stdin line reader with backslash continuation
 //   - output.go: TLV parser and plain-text renderer
 package plainio

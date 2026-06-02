@@ -75,7 +75,7 @@ func TestNewStreamID(t *testing.T) {
 }
 
 func TestRoundTrip(t *testing.T) {
-	// Simulate the full session → adaptor round trip
+	// Simulate the full session → adapter round trip
 	id := NewStreamID(3, 5)
 	delta := "some thinking content"
 	wrapped := WrapDelta(id, delta)

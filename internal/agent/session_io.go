@@ -317,7 +317,7 @@ func (s *Session) handleReason(args []string) {
 }
 
 // handleThemeSet sets the active theme, persists it to runtime config,
-// and sends updated system info so adaptors receive the full theme data.
+// and sends updated system info so adapters receive the full theme data.
 func (s *Session) handleThemeSet(args []string) {
 	if len(args) == 0 {
 		s.writeError("usage: :theme_set <name>")
@@ -366,7 +366,7 @@ func (s *Session) resendPrompt(ctx context.Context, messages []llm.Message) []ll
 		// cancel, or error mid-stream). Append a continuation prompt so the
 		// model resumes naturally.
 		messages = append(messages, llm.NewUserMessage("Continue"))
-		// Echo the inserted message to the adaptor so it is visible.
+		// Echo the inserted message to the adapter so it is visible.
 		s.signalPromptStart("Continue")
 	} else {
 		// If the last message is RoleUser or RoleTool, the conversation

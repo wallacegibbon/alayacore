@@ -1,6 +1,6 @@
 package agent
 
-// Session output helpers: writing TLV messages to the adaptor output,
+// Session output helpers: writing TLV messages to the adapter output,
 // tracking token usage, and broadcasting system info.
 //
 // sendSystemInfo is called from the run() goroutine only; the task
@@ -45,7 +45,7 @@ func (s *Session) writeTLVStr(tag string, msg string) {
 	if s.Output == nil {
 		return
 	}
-	_ = stream.WriteTLV(s.Output, tag, msg) //nolint:errcheck // best-effort write to adaptor
+	_ = stream.WriteTLV(s.Output, tag, msg) //nolint:errcheck // best-effort write to adapter
 }
 
 // writeTLVJSON marshals a value to JSON and writes it as a TLV frame. Best effort.
@@ -56,7 +56,7 @@ func (s *Session) writeTLVJSON(tag string, v any) {
 		return
 	}
 	data, _ := json.Marshal(v)
-	_ = stream.WriteTLV(s.Output, tag, string(data)) //nolint:errcheck // best-effort write to adaptor
+	_ = stream.WriteTLV(s.Output, tag, string(data)) //nolint:errcheck // best-effort write to adapter
 }
 
 func (s *Session) writeToolCall(toolName, input, id string) {
@@ -102,7 +102,7 @@ func (s *Session) requestSystemInfo() {
 	}
 }
 
-// sendSystemInfo sends one or more TagSystemMsg frames to the adaptor.
+// sendSystemInfo sends one or more TagSystemMsg frames to the adapter.
 // kind selects which messages to send: "task", "model", "theme",
 // "reasoning", or "all".
 // Must only be called from the run() goroutine.
@@ -163,7 +163,7 @@ func (s *Session) sendModelMsg() {
 }
 
 // sendModelListMsg sends the full model list.
-// Called once on startup so adaptors can populate the model selector.
+// Called once on startup so adapters can populate the model selector.
 func (s *Session) sendModelListMsg() {
 	if s.ModelManager == nil {
 		return
@@ -195,7 +195,7 @@ func loadThemeFromFile(path string) (ThemeInfo, bool) {
 }
 
 // sendThemeListMsg sends the full list of available themes with content.
-// Called once on startup so adaptors can cache theme data.
+// Called once on startup so adapters can cache theme data.
 func (s *Session) sendThemeListMsg() {
 	if s.ThemesFolder == "" {
 		return

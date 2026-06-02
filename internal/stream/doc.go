@@ -1,5 +1,5 @@
 // Package stream provides the minimal IO abstraction and TLV encoding
-// used between adaptors (terminal/plainio/rawio) and the core session.
+// used between adapters (terminal/plainio/rawio) and the core session.
 //
 // The stream package provides helpers for reading/writing framed
 // Tag-Length-Value (TLV) messages over io.Reader and io.Writer.
@@ -50,7 +50,7 @@
 //
 //	"<promptID>|<step>"
 //
-// The adaptor disambiguates text vs reasoning by using tag+id as the window key.
+// The adapter disambiguates text vs reasoning by using tag+id as the window key.
 //
 // Usage:
 //

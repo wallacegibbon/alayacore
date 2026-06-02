@@ -23,7 +23,7 @@ const (
 	TabWidth = 8
 )
 
-// Window tag constants for internal window types in the terminal adaptor.
+// Window tag constants for internal window types in the terminal adapter.
 // These are NOT TLV protocol tags (those are defined in internal/stream/stream.go).
 // SE = system error window, SN = system notification window.
 const (

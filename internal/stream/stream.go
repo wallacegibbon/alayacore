@@ -1,7 +1,7 @@
 package stream
 
 // Package stream defines the minimal IO abstraction and TLV encoding
-// used between adaptors (terminal/plainio) and the core session.
+// used between adapters (terminal/plainio) and the core session.
 // It intentionally stays small: SliceBuffer plus helpers for
 // reading/writing framed Tag-Length-Value messages over io.Reader/io.Writer.
 
@@ -214,11 +214,11 @@ func (NotifyMsg) SystemMsgType() string { return "notify" }
 // ToolConfirmMsg is sent when a tool call needs user confirmation
 // (type "tool_confirm").
 //
-// Request (agent -> adaptor):
+// Request (agent -> adapter):
 //
 //	SM {"type":"tool_confirm","data":{"id":"<toolCallID>"}}
 //
-// Response (adaptor -> agent):
+// Response (adapter -> agent):
 //
 //	SM {"type":"tool_confirm","data":{"id":"<toolCallID>","allowed":true|false}}
 type ToolConfirmMsg struct {

@@ -1,5 +1,5 @@
 // Package theme defines the color palette (Theme) and loading logic.
-// It is shared between adaptors (terminal TUI, future GUI) so all
+// It is shared between adapters (terminal TUI, future GUI) so all
 // visual frontends use the same theme data and loading mechanism.
 package theme
 
