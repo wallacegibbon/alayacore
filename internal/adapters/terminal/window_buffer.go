@@ -387,6 +387,12 @@ func (wb *WindowBuffer) GetWindowContent(windowIndex int) string {
 
 // ensureLineHeights rebuilds line heights if dirty.
 // Supports incremental update when only one window changed.
+//
+// During incremental updates, only UpdateLineCount is called (fast path using
+// len(wrappedLines) instead of join+count). The full window Render is deferred
+// to GetAll → renderVirtual, which needs the rendered content for the viewport.
+// This avoids an O(n) render in ensureLineHeights that would be immediately
+// overwritten by renderVirtual's own w.Render() call.
 func (wb *WindowBuffer) ensureLineHeights() {
 	if !wb.dirty && len(wb.lineHeights) == len(wb.windows) {
 		return
@@ -402,10 +408,11 @@ func (wb *WindowBuffer) ensureLineHeights() {
 		w := wb.windows[wb.dirtyIndex]
 		// Only render and count lines for visible windows
 		if w.Visible {
-			w.UpdateLineCount(wb.width)
-			if !w.cache.valid {
-				// Fall back to full render if UpdateLineCount couldn't
-				// use the fast path (e.g. no cached wrappedLines)
+			// Fast path: UpdateLineCount uses len(wrappedLines) to avoid
+			// an O(n) join. If wrappedLines is nil (first render or after
+			// invalidation), UpdateLineCount returns false and we fall back
+			// to the full Render which populates wrappedLines.
+			if !w.UpdateLineCount(wb.width) {
 				w.Render(wb.width, false, wb.styles, wb.borderStyle, wb.cursorStyle)
 			}
 			oldHeight := wb.lineHeights[wb.dirtyIndex]

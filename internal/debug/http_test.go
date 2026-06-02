@@ -13,6 +13,7 @@ func TestNewHTTPClient(t *testing.T) {
 	client := NewHTTPClient()
 	if client == nil {
 		t.Fatal("NewHTTPClient returned nil")
+		return
 	}
 
 	transport, ok := client.Transport.(*Transport)
@@ -33,9 +34,11 @@ func TestNewHTTPClientWithProxy_HTTP(t *testing.T) {
 	client, err := NewHTTPClientWithProxy("http://127.0.0.1:7890")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+		return
 	}
 	if client == nil {
 		t.Fatal("NewHTTPClientWithProxy returned nil")
+		return
 	}
 
 	transport, ok := client.Transport.(*http.Transport)
@@ -52,9 +55,11 @@ func TestNewHTTPClientWithProxy_SOCKS5(t *testing.T) {
 	client, err := NewHTTPClientWithProxy("socks5://127.0.0.1:1080")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+		return
 	}
 	if client == nil {
 		t.Fatal("NewHTTPClientWithProxy returned nil")
+		return
 	}
 
 	transport, ok := client.Transport.(*http.Transport)
@@ -71,9 +76,11 @@ func TestNewHTTPClientWithProxy_SOCKS5WithAuth(t *testing.T) {
 	client, err := NewHTTPClientWithProxy("socks5://user:pass@127.0.0.1:1080")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+		return
 	}
 	if client == nil {
 		t.Fatal("NewHTTPClientWithProxy returned nil")
+		return
 	}
 }
 
@@ -102,9 +109,11 @@ func TestNewHTTPClientWithProxyAndDebug(t *testing.T) {
 	client, err := NewHTTPClientWithProxyAndDebug("http://127.0.0.1:7890")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+		return
 	}
 	if client == nil {
 		t.Fatal("NewHTTPClientWithProxyAndDebug returned nil")
+		return
 	}
 
 	transport, ok := client.Transport.(*Transport)
@@ -149,9 +158,11 @@ func TestTransport_RoundTrip_WithoutBody(t *testing.T) {
 	resp, err := transport.RoundTrip(req)
 	if err != nil {
 		t.Fatalf("RoundTrip failed: %v", err)
+		return
 	}
 	if resp == nil {
 		t.Fatal("expected non-nil response")
+		return
 	}
 	resp.Body.Close()
 
@@ -183,9 +194,11 @@ func TestTransport_RoundTrip_WithBody(t *testing.T) {
 	resp, err := transport.RoundTrip(req)
 	if err != nil {
 		t.Fatalf("RoundTrip failed: %v", err)
+		return
 	}
 	if resp == nil {
 		t.Fatal("expected non-nil response")
+		return
 	}
 	resp.Body.Close()
 
@@ -218,6 +231,11 @@ func TestTransport_RoundTrip_AuthorizationHeader(t *testing.T) {
 	resp, err := transport.RoundTrip(req)
 	if err != nil {
 		t.Fatalf("RoundTrip failed: %v", err)
+		return
+	}
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+		return
 	}
 	resp.Body.Close()
 

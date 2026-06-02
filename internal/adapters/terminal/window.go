@@ -274,24 +274,39 @@ func (w *Window) Invalidate() {
 // without re-rendering the border. This is ~58μs faster than Render()
 // during streaming, called from ensureLineHeights when only the line
 // count is needed (not the rendered string).
-func (w *Window) UpdateLineCount(width int) {
+//
+// Note: This used to join all wrapped lines to count newlines, but since
+// wrappedLines stores one line per element, len(wrappedLines) is the
+// exact line count. This avoids an O(n) string join on every update.
+//
+// The returned count includes the 2 border lines (top and bottom) to
+// match what rebuildCache computes via strings.Count(rendered, "\n")+1.
+// See window_cache struct: lineCount = total lines in rendered output.
+//
+// Returns true if the line count was successfully updated from cached
+// wrappedLines (fast path). Returns false if wrappedLines was nil or
+// empty — the caller should fall back to a full Render.
+func (w *Window) UpdateLineCount(width int) bool {
 	innerWidth := max(0, width-BorderInnerPadding)
 
 	if len(w.cache.wrappedLines) > 0 && innerWidth > 0 {
-		inner := strings.Join(w.cache.wrappedLines, "\n")
+		contentLines := len(w.cache.wrappedLines)
 		if w.Folded {
-			inner = w.applyFolding(inner, innerWidth, w.styles)
+			// Folded windows show at most 5 lines (2 top + indicator + 2 bottom).
+			contentLines = min(5, contentLines)
 		}
-		w.cache.lineCount = strings.Count(inner, "\n") + 1
-		w.cache.width = width
-		w.cache.inner = inner
+		// Add 2 for border (top + bottom lines rendered by lipgloss).
+		// rebuildCache computes: lineCount = strings.Count(rendered, "\n") + 1
+		// where rendered = borderStyle.Width(width).Render(inner) adds 2 lines.
+		w.cache.lineCount = contentLines + 2
 		// Mark rendered as stale — will be rebuilt on next Render() call
 		w.cache.valid = false
-		return
+		return true
 	}
 
 	// No cached wrapped lines — fall back to full render
 	w.cache.valid = false
+	return false
 }
 
 // ensureContent builds w.Content from contentParts if not already built.
