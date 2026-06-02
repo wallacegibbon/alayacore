@@ -11,6 +11,8 @@ package agent
 //   - session_io.go:          input pump, command dispatch
 
 import (
+	"context"
+
 	"github.com/alayacore/alayacore/internal/llm"
 )
 
@@ -46,7 +48,8 @@ func (s *Session) run() {
 
 	// Start the I/O pump goroutine — it reads TLV from the input and
 	// sends parsed messages to run() for processing. It has NO access
-	// to session state except taskCancelCh (for :cancel commands).
+	// to session state except the per-task cancel function (via
+	// cancelRunningTask() for :cancel commands).
 	msgCh := make(chan inputMsg, 100)
 	go s.inputPump(msgCh)
 
@@ -95,15 +98,6 @@ func (s *Session) tryStartNextTask() bool {
 		return false
 	}
 
-	// Drain any stale cancellation signal left by :cancel when no task was
-	// running.  Since taskCancelCh is buffered (cap 1), cancelRunningTask()
-	// succeeds even without a listener — the signal lingers and would cancel
-	// the next task immediately on startup.
-	select {
-	case <-s.taskCancelCh:
-	default:
-	}
-
 	item := s.taskQueue[0]
 
 	// When paused on error, skip user prompts — they need :continue first.
@@ -132,7 +126,13 @@ func (s *Session) tryStartNextTask() bool {
 	taskMessages := make([]llm.Message, len(s.Messages))
 	copy(taskMessages, s.Messages)
 
-	go s.runTask(item, taskMessages)
+	// Create a per-task context derived from sessionCtx. The cancel
+	// function is stored in s.taskCancel so cancelRunningTask() (called
+	// from inputPump) can cancel the task. Cleared in handleTaskDone().
+	taskCtx, taskCancel := context.WithCancel(s.sessionCtx)
+	s.taskCancel.Store(taskCancel)
+
+	go s.runTask(taskCtx, item, taskMessages)
 	return true
 }
 
@@ -141,6 +141,7 @@ func (s *Session) tryStartNextTask() bool {
 func (s *Session) handleTaskDone(result []llm.Message) {
 	// Mark the task as finished so the next queue item can start.
 	s.inProgress.Store(false)
+	s.taskCancel.Store((context.CancelFunc)(nil))
 
 	// Update s.Messages with the final message state from the task goroutine.
 	if len(result) > 0 {

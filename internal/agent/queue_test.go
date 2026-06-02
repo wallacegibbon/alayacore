@@ -194,9 +194,8 @@ func TestCancelAllTasks(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			output := &MockOutput{}
 			session := &Session{
-				taskQueue:    make([]QueueItem, 0),
-				taskCancelCh: make(chan struct{}, 1),
-				runDone:      make(chan struct{}),
+				taskQueue: make([]QueueItem, 0),
+				runDone:   make(chan struct{}),
 				SessionConfig: SessionConfig{
 					Input:  &stream.SliceBuffer{},
 					Output: output,

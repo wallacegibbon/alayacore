@@ -70,7 +70,7 @@ func (s *Session) enqueueTask(item QueueItem, front bool) {
 // ============================================================================
 
 // runTask executes a single task in its own goroutine. It is called from
-// run() via "go s.runTask(item, taskMessages)". On completion it sends
+// run() via "go s.runTask(ctx, item, taskMessages)". On completion it sends
 // taskMessages on taskResult so the main loop can update s.Messages.
 //
 // The task goroutine receives a snapshot of messages at task start. All
@@ -78,20 +78,7 @@ func (s *Session) enqueueTask(item QueueItem, front bool) {
 // counts) are sent to run() via stateCh. The task goroutine never writes
 // to s.Messages directly — it operates on its local taskMessages copy
 // and returns the final state via taskResult.
-func (s *Session) runTask(item QueueItem, taskMessages []llm.Message) {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	// Start a goroutine to forward cancellation signals from inputPump
-	// to the task's context.
-	go func() {
-		select {
-		case <-s.taskCancelCh:
-			cancel()
-		case <-ctx.Done():
-		}
-	}()
-
-	defer cancel()
+func (s *Session) runTask(ctx context.Context, item QueueItem, taskMessages []llm.Message) {
 	defer func() {
 		// Return the final message state to run() so it can update
 		// s.Messages with the task goroutine's final state.

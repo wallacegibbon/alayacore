@@ -9,7 +9,7 @@ package agent
 //
 //   Three goroutines:
 //     1. inputPump — reads TLV frames from input, sends parsed messages
-//        to the main loop. It has access only to taskCancelCh.
+//        to the main loop. It triggers cancellation via cancelRunningTask().
 //     2. run() — main loop that owns task queue, messages, and system
 //        info. Processes input messages and task events.
 //     3. task goroutine — spawned by run() to execute each task. It
@@ -20,7 +20,7 @@ package agent
 //   Cross-goroutine communication:
 //     msgCh (inputMsg channel)  — inputPump → run()
 //     stateCh (taskEvent)        — task → run()
-//     taskCancelCh               — inputPump → task (cancellation)
+//     taskCancel                 — inputPump → task (cancellation via cancelRunningTask)
 //     taskResult                 — task → run (messages + completion signal)
 //     infoUpdateCh               — task → run() (system-info refresh)
 //
@@ -80,11 +80,6 @@ type Session struct {
 	// and retrieve the final messages — no separate taskDone signal needed.
 	taskResult chan []llm.Message
 
-	// taskCancelCh is a buffered channel (capacity 1) used by inputPump to
-	// signal cancellation of the currently running task. The task goroutine
-	// listens on this channel and cancels its context when a signal arrives.
-	taskCancelCh chan struct{}
-
 	// toolConfirmRespCh is set by OnToolConfirm (task goroutine) before
 	// sending the SM, and read by the input pump to route the adapter's
 	// response. No synchronization needed - the Output/Input channel
@@ -109,6 +104,12 @@ type Session struct {
 	// run goroutine which messages to send, avoiding redundant broadcasts.
 	// This centralizes all sendSystemInfo calls in one place.
 	infoUpdateCh chan string
+
+	// taskCancel holds the cancel function for the currently running task.
+	// Set by run() before spawning the task goroutine, cleared by handleTaskDone().
+	// Read by cancelRunningTask() via atomic.Value (gated by inProgress atomic).
+	// Only one task can run at a time, so a single slot is sufficient.
+	taskCancel atomic.Value
 
 	sessionCtx    context.Context    // canceled when input is exhausted
 	sessionCancel context.CancelFunc // idempotent cancel
@@ -175,7 +176,6 @@ func NewSession(cfg SessionConfig) *Session {
 		taskQueue:      make([]QueueItem, 0),
 		stateCh:        make(chan TaskEvent, 64),
 		taskResult:     make(chan []llm.Message, 1),
-		taskCancelCh:   make(chan struct{}, 1),
 		infoUpdateCh:   make(chan string, 1),
 		sessionCtx:     sessionCtx,
 		sessionCancel:  sessionCancel,
@@ -206,7 +206,6 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 		taskQueue:      make([]QueueItem, 0),
 		stateCh:        make(chan TaskEvent, 64),
 		taskResult:     make(chan []llm.Message, 1),
-		taskCancelCh:   make(chan struct{}, 1),
 		infoUpdateCh:   make(chan string, 1),
 		sessionCtx:     sessionCtx,
 		sessionCancel:  sessionCancel,
@@ -249,16 +248,15 @@ func (s *Session) Start() {
 	go s.run()
 }
 
-// cancelRunningTask sends a cancellation signal to the currently running
-// task. Returns true if a task was actually running and the signal was sent.
+// cancelRunningTask cancels the currently running task via its per-task
+// context. Returns true if a task was actually running and was canceled.
 func (s *Session) cancelRunningTask() bool {
 	if !s.inProgress.Load() {
 		return false
 	}
-	select {
-	case s.taskCancelCh <- struct{}{}:
+	if cancel, ok := s.taskCancel.Load().(context.CancelFunc); ok && cancel != nil {
+		cancel()
 		return true
-	default:
-		return false
 	}
+	return false
 }

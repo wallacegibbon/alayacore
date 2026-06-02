@@ -402,8 +402,8 @@ type inputMsg struct {
 
 // inputPump runs in its own goroutine and reads TLV frames from the
 // input stream. It sends parsed messages to msgCh. It does NOT access
-// any session state directly; for :cancel / :cancel_all commands it sends
-// to taskCancelCh (a buffered channel) which the task goroutine listens on.
+// any session state directly; for :cancel / :cancel_all commands it calls
+// cancelRunningTask() which cancels the task via its per-task context.
 func (s *Session) inputPump(msgCh chan<- inputMsg) {
 	var pendingImages []string
 
