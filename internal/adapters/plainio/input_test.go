@@ -194,7 +194,7 @@ func TestReadPrompts_MixedBackslashAndNormal(t *testing.T) {
 	_ = tag
 
 	// Second: "backslash\ncontinuation"
-	tag, value, err = stream.ReadTLV(&buf)
+	_, value, err = stream.ReadTLV(&buf)
 	if err != nil {
 		t.Fatalf("second prompt: failed to read TLV: %v", err)
 	}

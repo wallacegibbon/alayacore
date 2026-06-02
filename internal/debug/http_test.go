@@ -1,6 +1,7 @@
 package debug
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -140,7 +141,7 @@ func TestTransport_RoundTrip_WithoutBody(t *testing.T) {
 	}
 
 	// Use POST with empty body so the logging path is triggered
-	req, err := http.NewRequest("GET", "http://example.com/test", http.NoBody)
+	req, err := http.NewRequestWithContext(context.Background(), "GET", "http://example.com/test", http.NoBody)
 	if err != nil {
 		t.Fatalf("failed to create request: %v", err)
 	}
@@ -152,6 +153,7 @@ func TestTransport_RoundTrip_WithoutBody(t *testing.T) {
 	if resp == nil {
 		t.Fatal("expected non-nil response")
 	}
+	resp.Body.Close()
 
 	log := logBuf.String()
 	if !strings.Contains(log, ">>> Request") {
@@ -173,7 +175,7 @@ func TestTransport_RoundTrip_WithBody(t *testing.T) {
 	}
 
 	body := strings.NewReader(`{"key":"value"}`)
-	req, err := http.NewRequest("POST", "http://example.com/api", body)
+	req, err := http.NewRequestWithContext(context.Background(), "POST", "http://example.com/api", body)
 	if err != nil {
 		t.Fatalf("failed to create request: %v", err)
 	}
@@ -185,6 +187,7 @@ func TestTransport_RoundTrip_WithBody(t *testing.T) {
 	if resp == nil {
 		t.Fatal("expected non-nil response")
 	}
+	resp.Body.Close()
 
 	log := logBuf.String()
 	if !strings.Contains(log, ">>> Request") {
@@ -206,16 +209,17 @@ func TestTransport_RoundTrip_AuthorizationHeader(t *testing.T) {
 	}
 
 	// POST with body so logging fires
-	req, err := http.NewRequest("POST", "http://example.com/api", strings.NewReader(`{}`))
+	req, err := http.NewRequestWithContext(context.Background(), "POST", "http://example.com/api", strings.NewReader(`{}`))
 	if err != nil {
 		t.Fatalf("failed to create request: %v", err)
 	}
 	req.Header.Set("Authorization", "Bearer sk-secret-key-12345")
 
-	_, err = transport.RoundTrip(req)
+	resp, err := transport.RoundTrip(req)
 	if err != nil {
 		t.Fatalf("RoundTrip failed: %v", err)
 	}
+	resp.Body.Close()
 
 	log := logBuf.String()
 	if strings.Contains(log, "sk-secret-key-12345") {
@@ -233,14 +237,17 @@ func TestTransport_RoundTrip_RequestError(t *testing.T) {
 		Writer:    &logBuf,
 	}
 
-	req, err := http.NewRequest("GET", "http://example.com/api", nil)
+	req, err := http.NewRequestWithContext(context.Background(), "GET", "http://example.com/api", nil)
 	if err != nil {
 		t.Fatalf("failed to create request: %v", err)
 	}
 
-	_, err = transport.RoundTrip(req)
+	resp, err := transport.RoundTrip(req)
 	if err == nil {
 		t.Fatal("expected error from failing round tripper")
+	}
+	if resp != nil && resp.Body != nil {
+		resp.Body.Close()
 	}
 
 	log := logBuf.String()
