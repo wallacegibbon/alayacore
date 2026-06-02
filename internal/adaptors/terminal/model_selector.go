@@ -304,6 +304,11 @@ func (ms *ModelSelector) handleListNavigationKey(key string) tea.Cmd {
 func (ms *ModelSelector) renderList() string {
 	var sb strings.Builder
 
+	// Title bar with background
+	titleStyle := lipgloss.NewStyle().Background(ms.Styles.ColorDim).Foreground(ms.Styles.ColorAccent).Bold(true)
+	sb.WriteString(titleStyle.Render(fmt.Sprintf("%-*s", ms.Width, "  Model Selector")))
+	sb.WriteString("\n")
+
 	searchBox := ms.Styles.RenderBorderedBox(ms.FilterInput.View(), ms.Width, ms.FilterBorderColor())
 	sb.WriteString(searchBox)
 	sb.WriteString("\n")
@@ -315,14 +320,19 @@ func (ms *ModelSelector) renderList() string {
 	}
 
 	listBorderColor := ms.ListBorderColor()
-	sb.WriteString(ms.renderModelList(lipgloss.Width(searchBox), listBorderColor))
+	boxWidth := lipgloss.Width(searchBox)
+	sb.WriteString(ms.renderModelList(boxWidth, listBorderColor))
 
-	sb.WriteString("\n")
+	// Help bar with background
+	helpStyle := lipgloss.NewStyle().Background(ms.Styles.ColorDim).Foreground(ms.Styles.ColorMuted)
+	var help string
 	if ms.FilterInputFocused {
-		sb.WriteString(ms.Styles.System.Render("tab: list │ enter: select │ esc: close"))
+		help = "  tab: list │ enter: select │ esc: close"
 	} else {
-		sb.WriteString(ms.Styles.System.Render("tab: search │ j/k: navigate │ e: edit │ r: reload │ enter: select │ q/esc: close"))
+		help = "  tab: search │ j/k: navigate │ e: edit │ r: reload │ enter: select │ q/esc: close"
 	}
+	sb.WriteString("\n")
+	sb.WriteString(helpStyle.Render(fmt.Sprintf("%-*s", boxWidth, help)))
 
 	return sb.String()
 }
@@ -470,7 +480,10 @@ func (ms *ModelSelector) View() tea.View {
 
 // RenderOverlay renders the model selector as an overlay on top of base content.
 func (ms *ModelSelector) RenderOverlay(baseContent string, screenWidth, screenHeight int) string {
-	return ms.FilteredListCore.RenderOverlay(baseContent, ms.View().Content, screenWidth, screenHeight)
+	if ms.State == FilteredListClosed {
+		return baseContent
+	}
+	return renderOverlay(baseContent, ms.View().Content, screenWidth, screenHeight)
 }
 
 // --- Filtering ---

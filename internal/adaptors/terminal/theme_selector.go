@@ -5,10 +5,12 @@ package terminal
 // and select themes in real-time.
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	ansi "github.com/charmbracelet/x/ansi"
 
 	"github.com/alayacore/alayacore/internal/theme"
@@ -179,6 +181,12 @@ func (ts *ThemeSelector) getPreviewTheme(themeManager *ThemeManager) *theme.Them
 
 func (ts *ThemeSelector) renderList() string {
 	var sb strings.Builder
+
+	// Title bar with background
+	titleStyle := lipgloss.NewStyle().Background(ts.Styles.ColorDim).Foreground(ts.Styles.ColorAccent).Bold(true)
+	sb.WriteString(titleStyle.Render(fmt.Sprintf("%-*s", ts.Width, "  Theme Selector")))
+	sb.WriteString("\n")
+
 	listHeight := SelectorListRows
 	innerWidth := max(0, ts.Width-BorderInnerPadding)
 	var lines []string
@@ -217,15 +225,21 @@ func (ts *ThemeSelector) renderList() string {
 	content := strings.Join(lines, "\n")
 	borderColor := ts.ListBorderColor()
 	sb.WriteString(ts.Styles.RenderBorderedBox(content, ts.Width, borderColor, listHeight))
+
+	// Help bar with background
+	helpStyle := lipgloss.NewStyle().Background(ts.Styles.ColorDim).Foreground(ts.Styles.ColorMuted)
 	sb.WriteString("\n")
-	sb.WriteString(ts.Styles.System.Render("j/k: navigate │ r: reload │ enter: select │ q/esc: close"))
+	sb.WriteString(helpStyle.Render(fmt.Sprintf("%-*s", ts.Width, "  j/k: navigate │ r: reload │ enter: select │ q/esc: close")))
 
 	return sb.String()
 }
 
 // RenderOverlay renders the theme selector as an overlay on top of base content.
 func (ts *ThemeSelector) RenderOverlay(baseContent string, screenWidth, screenHeight int) string {
-	return ts.ScrollableListCore.RenderOverlay(baseContent, ts.View().Content, screenWidth, screenHeight)
+	if ts.State == ScrollableListClosed {
+		return baseContent
+	}
+	return renderOverlay(baseContent, ts.View().Content, screenWidth, screenHeight)
 }
 
 var _ tea.Model = (*ThemeSelector)(nil)

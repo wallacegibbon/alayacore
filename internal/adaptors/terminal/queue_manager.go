@@ -1,10 +1,12 @@
 package terminal
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	ansi "github.com/charmbracelet/x/ansi"
 )
 
@@ -129,8 +131,15 @@ func (qm *QueueManager) View() tea.View {
 	content := strings.Join(lines, "\n")
 	borderedBox := qm.Styles.RenderBorderedBox(content, qm.Width, borderColor, listHeight)
 
-	helpText := qm.Styles.System.Render("j/k: navigate │ d: delete │ e: edit │ q/esc: close")
-	return tea.NewView(borderedBox + "\n" + helpText)
+	// Title bar with background
+	titleStyle := lipgloss.NewStyle().Background(qm.Styles.ColorDim).Foreground(qm.Styles.ColorAccent).Bold(true)
+	title := titleStyle.Render(fmt.Sprintf("%-*s", qm.Width, "  Task Queue"))
+
+	// Help bar with background
+	helpStyle := lipgloss.NewStyle().Background(qm.Styles.ColorDim).Foreground(qm.Styles.ColorMuted)
+	help := helpStyle.Render(fmt.Sprintf("%-*s", qm.Width, "  j/k: navigate │ d: delete │ e: edit │ q/esc: close"))
+
+	return tea.NewView(title + "\n" + borderedBox + "\n" + help)
 }
 
 func (qm *QueueManager) updateScrollForHeight(height int) {
@@ -171,5 +180,8 @@ func (qm *QueueManager) renderItem(item QueueItem, selected bool) string {
 
 // RenderOverlay renders the queue manager as an overlay on top of base content
 func (qm *QueueManager) RenderOverlay(baseContent string, screenWidth, screenHeight int) string {
-	return qm.ScrollableListCore.RenderOverlay(baseContent, qm.View().Content, screenWidth, screenHeight)
+	if qm.State == ScrollableListClosed {
+		return baseContent
+	}
+	return renderOverlay(baseContent, qm.View().Content, screenWidth, screenHeight)
 }

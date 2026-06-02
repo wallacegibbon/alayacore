@@ -178,9 +178,10 @@ func TestHelpWindowViewWhenOpen(t *testing.T) {
 		t.Error("View should contain ':continue' command")
 	}
 
-	// Should contain help text
-	if !containsStr(view.Content, "j/k: navigate") {
-		t.Error("View should contain navigation help text")
+	// RenderOverlay should contain navigation help text
+	overlay := hw.RenderOverlay("base", 80, 24)
+	if !containsStr(overlay, "j/k: navigate") {
+		t.Error("RenderOverlay should contain navigation help text")
 	}
 }
 

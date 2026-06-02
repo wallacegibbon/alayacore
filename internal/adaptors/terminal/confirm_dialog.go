@@ -240,7 +240,6 @@ func (cd *ConfirmDialog) View() tea.View {
 	// QueueManager and ModelSelector overlays.
 	box := cd.Styles.RenderBorderedBox(content, cd.Width, cd.Styles.ColorError, ConfirmContentRows)
 
-	// Blank line above and below for consistent vertical positioning with other overlays
 	return tea.NewView("\n" + box + "\n")
 }
 

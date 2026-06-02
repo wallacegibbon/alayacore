@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	ansi "github.com/charmbracelet/x/ansi"
 )
 
@@ -378,9 +379,15 @@ func (hw *HelpWindow) View() tea.View {
 	content := strings.Join(lines, "\n")
 	listBox := hw.Styles.RenderBorderedBox(content, hw.Width, listBorderColor, listHeight)
 
-	var helpText string
+	// Title bar with background
+	titleStyle := lipgloss.NewStyle().Background(hw.Styles.ColorDim).Foreground(hw.Styles.ColorAccent).Bold(true)
+	title := titleStyle.Render(fmt.Sprintf("%-*s", hw.Width, "  Help"))
+
+	// Help bar with background
+	helpStyle := lipgloss.NewStyle().Background(hw.Styles.ColorDim).Foreground(hw.Styles.ColorMuted)
+	var help string
 	if hw.FilterInputFocused {
-		helpText = hw.Styles.System.Render("tab: list │ esc: close")
+		help = "  tab: list │ esc: close"
 	} else {
 		base := "tab: filter │ j/k: navigate"
 		if hw.SelectedIdx >= 0 && hw.SelectedIdx < hw.filteredLen() &&
@@ -388,10 +395,11 @@ func (hw *HelpWindow) View() tea.View {
 			base += " │ enter: copy to input"
 		}
 		base += " │ q/esc: close"
-		helpText = hw.Styles.System.Render(base)
+		help = "  " + base
 	}
+	helpBar := helpStyle.Render(fmt.Sprintf("%-*s", hw.Width, help))
 
-	return tea.NewView(filterBox + "\n" + listBox + "\n" + helpText)
+	return tea.NewView(title + "\n" + filterBox + "\n" + listBox + "\n" + helpBar)
 }
 
 // renderItem renders a single help item using the same ansi.Hardwrap
@@ -443,5 +451,8 @@ func (hw *HelpWindow) renderItem(item HelpItem, selected bool) string {
 
 // RenderOverlay renders the help window as an overlay on top of base content.
 func (hw *HelpWindow) RenderOverlay(baseContent string, screenWidth, screenHeight int) string {
-	return hw.FilteredListCore.RenderOverlay(baseContent, hw.View().Content, screenWidth, screenHeight)
+	if hw.State == FilteredListClosed {
+		return baseContent
+	}
+	return renderOverlay(baseContent, hw.View().Content, screenWidth, screenHeight)
 }
