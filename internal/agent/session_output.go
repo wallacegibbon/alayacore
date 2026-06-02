@@ -59,7 +59,7 @@ func (s *Session) writeTLVJSON(tag string, v any) {
 	_ = stream.WriteTLV(s.Output, tag, string(data)) //nolint:errcheck // best-effort write to adapter
 }
 
-func (s *Session) writeToolCall(toolName, input, id string) {
+func (s *Session) writeToolUse(toolName, input, id string) {
 	s.writeTLVJSON(stream.TagAssistantF, stream.ToolUseData{
 		ID:            id,
 		IsPlaceholder: false,
@@ -68,10 +68,10 @@ func (s *Session) writeToolCall(toolName, input, id string) {
 	})
 }
 
-// writeToolCallStart writes a placeholder tool call window.
-// The full input is written later by writeToolCall when all
+// writeToolUseStart writes a placeholder tool use window.
+// The full input is written later by writeToolUse when all
 // arguments have been received.
-func (s *Session) writeToolCallStart(toolName, id string) {
+func (s *Session) writeToolUseStart(toolName, id string) {
 	s.writeTLVJSON(stream.TagAssistantF, stream.ToolUseData{
 		ID:            id,
 		IsPlaceholder: true,

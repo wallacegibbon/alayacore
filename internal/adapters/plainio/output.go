@@ -103,7 +103,7 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 		}
 		o.lastTag = tag
 		o.lastStreamID = ""
-		fmt.Fprintf(o.writer, "%s", formatToolCall(fd.Name, fd.Input))
+		fmt.Fprintf(o.writer, "%s", formatToolUse(fd.Name, fd.Input))
 
 	case stream.TagUserF:
 		// Suppress tool result content in plainio; do not update lastTag.
@@ -146,8 +146,8 @@ func (o *stdoutOutput) emitSeparator(tag string) {
 	o.lastStreamID = ""
 }
 
-// formatToolCall formats a tool call header for display (name + key args, no content).
-func formatToolCall(name, input string) string {
+// formatToolUse formats a tool call header for display (name + key args, no content).
+func formatToolUse(name, input string) string {
 	switch name {
 	case "execute_command":
 		return formatExecuteCommand(input)

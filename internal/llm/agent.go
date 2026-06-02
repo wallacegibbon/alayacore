@@ -144,7 +144,7 @@ func (a *Agent) executeStep(ctx context.Context, step int, allMessages []Message
 
 	allMessages = append(allMessages, stepMessage)
 
-	toolCalls := extractToolCalls(stepMessage.Content)
+	toolCalls := extractToolUses(stepMessage.Content)
 	if len(toolCalls) > 0 && !truncated {
 		toolResults := a.executeTools(ctx, toolCalls, callbacks)
 		allMessages = append(allMessages, Message{Role: RoleTool, Content: toolResults})
@@ -345,8 +345,8 @@ func (a *Agent) executeTools(ctx context.Context, toolCalls []ToolUsePart, callb
 	return results
 }
 
-// extractToolCalls extracts ToolUseParts from message content.
-func extractToolCalls(content []ContentPart) []ToolUsePart {
+// extractToolUses extracts ToolUseParts from message content.
+func extractToolUses(content []ContentPart) []ToolUsePart {
 	var calls []ToolUsePart
 	for _, part := range content {
 		if tc, ok := part.(ToolUsePart); ok {

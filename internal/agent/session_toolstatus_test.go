@@ -131,7 +131,7 @@ func TestWriteToolCallWithPending(t *testing.T) {
 		SessionConfig: SessionConfig{Output: output},
 	}
 
-	session.writeToolCall("execute_command", `{"command":"ls"}`, "tool123")
+	session.writeToolUse("execute_command", `{"command":"ls"}`, "tool123")
 
 	// Should have written one TLV message: AF with type "call"
 	// Status "pending" is inferred by the terminal from window creation.

@@ -24,7 +24,7 @@ All output is plain text with no ANSI escape codes:
 | Assistant text | Printed directly |
 | Reasoning | Printed directly |
 | User prompts | `> prompt` |
-| Tool calls | `[tool_name: args]` (only "call" type frames; "start" type frames are silently ignored) |
+| Tool calls | `[tool_name: args]` (only complete frames with full input; placeholder frames are silently ignored) |
 | Tool results | Suppressed |
 | Errors | `Error: message` |
 | Notifications | `[message]` |

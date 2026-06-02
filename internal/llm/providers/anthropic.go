@@ -427,8 +427,8 @@ func (s *anthropicStreamState) getMessage() llm.Message {
 	}
 }
 
-// lastToolCall returns the last tool call if the current block is a tool_use
-func (s *anthropicStreamState) lastToolCall() *llm.ToolUsePart {
+// lastToolUse returns the last tool use if the current block is a tool_use
+func (s *anthropicStreamState) lastToolUse() *llm.ToolUsePart {
 	if s.currentType == anthropicBlockTypeToolUse {
 		return &llm.ToolUsePart{
 			ID:       s.currentID,
@@ -530,7 +530,7 @@ func (p *AnthropicProvider) handleContentDelta(delta anthropicSSEDelta, yield fu
 
 // handleContentBlockStop handles content_block_stop events
 func (p *AnthropicProvider) handleContentBlockStop(yield func(llm.StreamEvent, error) bool, state *anthropicStreamState) bool {
-	tc := state.lastToolCall()
+	tc := state.lastToolUse()
 	state.finishBlock()
 	if tc != nil {
 		if !yield(llm.ToolUsePart{

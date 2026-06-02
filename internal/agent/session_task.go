@@ -57,7 +57,7 @@ func (s *Session) handleUserPrompt(ctx context.Context, messages []llm.Message, 
 
 	result, _, err := s.processPrompt(ctx, messages)
 
-	result = cleanIncompleteToolCalls(result)
+	result = cleanIncompleteToolUses(result)
 
 	if err != nil {
 		s.writeError(err.Error())
@@ -118,11 +118,11 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 			return nil
 		},
 		OnToolUseStart: func(toolCallID, toolName string) error {
-			s.writeToolCallStart(toolName, toolCallID)
+			s.writeToolUseStart(toolName, toolCallID)
 			return nil
 		},
 		OnToolUse: func(toolCallID, toolName string, input json.RawMessage) error {
-			s.writeToolCall(toolName, string(input), toolCallID)
+			s.writeToolUse(toolName, string(input), toolCallID)
 			return nil
 		},
 		OnToolConfirm: func(toolCallID, toolName string, _ json.RawMessage) (bool, error) {
@@ -216,12 +216,12 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 	return processResult, outputTokens, nil
 }
 
-// cleanIncompleteToolCalls removes orphaned tool calls from the last
+// cleanIncompleteToolUses removes orphaned tool uses from the last
 // message. This happens when the user cancels mid-cycle: the model
-// emitted tool calls but the agent never executed them. Only the last
-// message can have orphaned calls — earlier steps are already complete.
+// emitted tool uses but the agent never executed them. Only the last
+// message can have orphaned uses — earlier steps are already complete.
 // If the last message becomes empty after stripping, it is removed.
-func cleanIncompleteToolCalls(messages []llm.Message) []llm.Message {
+func cleanIncompleteToolUses(messages []llm.Message) []llm.Message {
 	if len(messages) == 0 {
 		return messages
 	}

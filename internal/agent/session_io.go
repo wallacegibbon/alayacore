@@ -377,7 +377,7 @@ func (s *Session) resendPrompt(ctx context.Context, messages []llm.Message) []ll
 
 	result, _, err := s.processPrompt(ctx, messages)
 
-	result = cleanIncompleteToolCalls(result)
+	result = cleanIncompleteToolUses(result)
 	if err != nil {
 		s.writeError(err.Error())
 		s.pausedOnError.Store(true)

@@ -12,10 +12,10 @@ All providers eat different wire formats and emit the same domain types:
 type ContentPart interface { isContentPart() }
 
 // Implementations:
-type TextPart      struct { Type, Text string }
-type ReasoningPart struct { Type, Text, Signature string }
-type ToolUsePart  struct { Type, ToolCallID, ToolName string; Input json.RawMessage }
-type ToolResultPart struct { Type, ToolCallID string; Output ToolResultOutput }
+type TextPart      struct { Text string }
+type ReasoningPart struct { Text, Signature string }
+type ToolUsePart   struct { ID, ToolName string; Input json.RawMessage }
+type ToolResultPart struct { ID string; Output ToolResultOutput }
 
 type Message struct {
     Role    MessageRole   // "system" | "user" | "assistant" | "tool"
@@ -27,8 +27,8 @@ type StreamEvent interface { isStreamEvent() }
 // Implementations:
 type TextDeltaEvent      struct { Delta string }
 type ReasoningDeltaEvent struct { Delta string }
-type ToolCallStartEvent  struct { ToolCallID, ToolName string }
-type ToolCallEvent       struct { ToolCallID, ToolName string; Input json.RawMessage }
+type ToolUseStartEvent   struct { ID, ToolName string }
+type ToolUsePart         struct { ID, ToolName string; Input json.RawMessage } // also a StreamEvent
 type StepCompleteEvent   struct { Message; Usage; StopReason string }
 ```
 
@@ -45,7 +45,7 @@ Message{
     Content: []ContentPart{
         ReasoningPart{Type:"reasoning", Text:"Let me think..."},
         TextPart{Type:"text", Text:"The answer is 42"},
-        ToolUsePart{Type:"tool_use", ToolCallID:"call_abc", ToolName:"read_file",
+        ToolUsePart{ID:"call_abc", ToolName:"read_file",
                      Input: json.RawMessage(`{"path":"/tmp/foo"}`)},
     },
 }
@@ -88,9 +88,9 @@ for _, part := range msg.Content {
     case llm.ReasoningPart:
         → {Type:"thinking", Thinking: &v.Text, Signature: v.Signature}
     case llm.ToolUsePart:
-        → {Type:"tool_use", ID: v.ToolCallID, Name: v.ToolName, Input: v.Input}
+        → {Type:"tool_use", ID: v.ID, Name: v.ToolName, Input: v.Input}
     case llm.ToolResultPart:
-        → {Type:"tool_result", ToolUseID: v.ToolCallID, Content: ...}
+        → {Type:"tool_result", ToolUseID: v.ID, Content: ...}
     }
 }
 ```
@@ -195,11 +195,11 @@ event: content_block_stop
 **Domain output (same for both):**
 ```go
 // Stream event at name arrival:
-ToolCallStartEvent{ToolCallID: "call_abc", ToolName: "read_file"}
+ToolUseStartEvent{ID: "call_abc", ToolName: "read_file"}
 
 // Stream event at completion (after all args received):
-ToolCallEvent{
-    ToolCallID: "call_abc",
+ToolUsePart{
+    ID: "call_abc",
     ToolName:   "read_file",
     Input:      json.RawMessage(`{"path":"/tmp/foo"}`),
 }
@@ -210,7 +210,7 @@ Message{
     Content: []ContentPart{
         ToolUsePart{
             Type:       "tool_use",
-            ToolCallID: "call_abc",
+            ID: "call_abc",
             ToolName:   "read_file",
             Input:      json.RawMessage(`{"path":"/tmp/foo"}`),
         },
@@ -242,12 +242,12 @@ Chunk 6: {"choices":[{"delta":{"tool_calls":[
 ```go
 // Interleaved stream events:
 ReasoningDeltaEvent{Delta: "Read file"}
-ToolCallStartEvent{ToolCallID: "call_abc", ToolName: "read_file"}
+ToolUseStartEvent{ID: "call_abc", ToolName: "read_file"}
 ReasoningDeltaEvent{Delta: " to check"}
-// (no more ReasoningDelta or ToolCallStart — just args accumulating)
+// (no more ReasoningDelta or ToolUseStart — just args accumulating)
 
-ToolCallEvent{
-    ToolCallID: "call_abc",
+ToolUsePart{
+    ID: "call_abc",
     ToolName:   "read_file",
     Input:      json.RawMessage(`{"path":"/tmp/foo"}`),
 }
@@ -258,7 +258,7 @@ Message{
     Content: []ContentPart{
         ReasoningPart{Type: "reasoning", Text: "Read file to check"},
         ToolUsePart{
-            Type: "tool_use", ToolCallID: "call_abc",
+            Type: "tool_use", ID: "call_abc",
             ToolName: "read_file",
             Input:    json.RawMessage(`{"path":"/tmp/foo"}`),
         },
@@ -279,7 +279,7 @@ Message{
     Content: []ContentPart{
         ReasoningPart{Type: "reasoning", Text: "Let me read the file"},
         ToolUsePart{
-            ToolCallID: "call_abc",
+            ID: "call_abc",
             ToolName:   "read_file",
             Input:      json.RawMessage(`{"path":"/tmp/foo"}`),
         },
