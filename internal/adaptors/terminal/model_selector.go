@@ -342,93 +342,87 @@ func (ms *ModelSelector) renderModelList(width int, borderColor color.Color) str
 	default:
 		ms.EnsureVisible()
 
-		maxID := 0
-		for _, m := range ms.filteredModels {
-			if m.ID > maxID {
-				maxID = m.ID
-			}
-		}
-		idWidth := len(fmt.Sprintf("%d", maxID))
-		indexGap := 2 // spaces between index and name
-
-		// First pass: measure each row so we can right-align the context/provider column.
-		type rowData struct {
-			leftPart string // cursor + index (styled)
-			name     string // model name (styled, possibly truncated)
-			right    string // context + provider (styled)
-			rightW   int
-		}
-		rows := make([]rowData, 0, min(len(ms.filteredModels), listHeight))
-		maxRightW := 0
+		idWidth := ms.maxIDWidth()
+		ctxColWidth, provColWidth := ms.measureRightColumns(listHeight)
+		nameMaxWidth := max(0, innerWidth-(2+idWidth+2)-2-ctxColWidth-provColWidth)
 
 		for i := ms.ScrollIdx; i < min(ms.ScrollIdx+listHeight, len(ms.filteredModels)); i++ {
-			m := ms.filteredModels[i]
-			idxStr := fmt.Sprintf("%0*d", idWidth, m.ID)
-
-			// Cursor + index (pre-styled)
-			var leftPart string
-			if i == ms.SelectedIdx && !ms.FilterInputFocused {
-				leftPart = ms.Styles.Prompt.Render("> ") + ms.Styles.Text.Render(idxStr)
-			} else {
-				leftPart = ms.Styles.System.Render("  " + idxStr)
-			}
-
-			// Right section: context size + provider
-			ctx := formatContextLimit(int64(m.ContextLimit))
-			provider := capitalize(m.ProtocolType)
-			right := ms.Styles.System.Render(ctx + " " + provider)
-			rightW := lipgloss.Width(right)
-
-			if rightW > maxRightW {
-				maxRightW = rightW
-			}
-
-			rows = append(rows, rowData{
-				leftPart: leftPart,
-				name:     m.Name,
-				right:    right,
-				rightW:   rightW,
-			})
-		}
-
-		// Second pass: render each row with proper spacing.
-		for idx, row := range rows {
-			nameMaxWidth := max(0, innerWidth-lipgloss.Width(row.leftPart)-indexGap-maxRightW-1)
-
-			name := row.name
-			truncated := ansi.Hardwrap(name, nameMaxWidth, false)
-			if truncated != name {
-				truncated = ansi.Hardwrap(name, nameMaxWidth-3, false)
-				name = strings.SplitN(truncated, "\n", 2)[0] + "..."
-			}
-
-			var nameStyled string
-			if ms.ScrollIdx+idx == ms.SelectedIdx && !ms.FilterInputFocused {
-				nameStyled = ms.Styles.Text.Render(name)
-			} else {
-				nameStyled = ms.Styles.System.Render(name)
-			}
-
-			leftW := lipgloss.Width(row.leftPart)
-			nameW := lipgloss.Width(nameStyled)
-
-			// Flexible space between name and right section
-			flex := max(1, innerWidth-leftW-indexGap-nameW-row.rightW)
-			gap := strings.Repeat(" ", flex)
-
-			content.WriteString(row.leftPart)
-			content.WriteString(strings.Repeat(" ", indexGap))
-			content.WriteString(nameStyled)
-			content.WriteString(gap)
-			content.WriteString(row.right)
-
-			if idx < len(rows)-1 {
+			line := ms.renderModelRow(i, idWidth, nameMaxWidth, ctxColWidth, provColWidth)
+			content.WriteString(line)
+			if i < min(ms.ScrollIdx+listHeight, len(ms.filteredModels))-1 {
 				content.WriteString("\n")
 			}
 		}
 	}
 
 	return ms.Styles.RenderBorderedBox(content.String(), width, borderColor, listHeight)
+}
+
+// maxIDWidth returns the display width needed for the largest model ID.
+func (ms *ModelSelector) maxIDWidth() int {
+	maxID := 0
+	for _, m := range ms.filteredModels {
+		if m.ID > maxID {
+			maxID = m.ID
+		}
+	}
+	return len(fmt.Sprintf("%d", maxID))
+}
+
+// measureRightColumns scans the visible rows to find the widest context
+// size and provider name for proper column alignment.
+func (ms *ModelSelector) measureRightColumns(listHeight int) (ctxColWidth, provColWidth int) {
+	for i := ms.ScrollIdx; i < min(ms.ScrollIdx+listHeight, len(ms.filteredModels)); i++ {
+		m := ms.filteredModels[i]
+		ctx := formatContextLimit(int64(m.ContextLimit))
+		provider := capitalize(m.ProtocolType)
+		if w := lipgloss.Width(ctx); w > ctxColWidth {
+			ctxColWidth = w
+		}
+		if w := len(provider); w > provColWidth {
+			provColWidth = w
+		}
+	}
+	return max(1, ctxColWidth), max(1, provColWidth)
+}
+
+// renderModelRow builds a single model list row as a raw (unstyled) string.
+// Layout: cursor(2) + index(idWidth) + gap(2) + name + gap(1) + context(right) + gap(1) + provider(left).
+func (ms *ModelSelector) renderModelRow(i, idWidth, nameMaxWidth, ctxColWidth, provColWidth int) string {
+	m := ms.filteredModels[i]
+	isSelected := i == ms.SelectedIdx && !ms.FilterInputFocused
+
+	// Cursor + index
+	idxStr := fmt.Sprintf("%0*d", idWidth, m.ID)
+	leftRaw := "  " + idxStr
+	if isSelected {
+		leftRaw = "> " + idxStr
+	}
+
+	// Right-aligned context column
+	ctx := formatContextLimit(int64(m.ContextLimit))
+	ctxRaw := fmt.Sprintf("%*s", ctxColWidth, ctx)
+
+	// Left-aligned provider column
+	provider := capitalize(m.ProtocolType)
+	provRaw := fmt.Sprintf("%-*s", provColWidth, provider)
+
+	// Truncate name if needed
+	name := m.Name
+	truncated := ansi.Hardwrap(name, nameMaxWidth, false)
+	if truncated != name {
+		truncated = ansi.Hardwrap(name, max(1, nameMaxWidth-3), false)
+		name = strings.SplitN(truncated, "\n", 2)[0] + "..."
+	}
+
+	// Build and style the full line
+	namePadded := fmt.Sprintf("%-*s", nameMaxWidth, name)
+	line := leftRaw + "  " + namePadded + " " + ctxRaw + " " + provRaw
+
+	if isSelected {
+		return ms.Styles.Prompt.Render("> ") + ms.Styles.Text.Render(line[2:])
+	}
+	return ms.Styles.System.Render(line)
 }
 
 // formatContextLimit formats a context limit (in tokens) as a human-readable
@@ -455,9 +449,13 @@ func formatContextLimit(n int64) string {
 }
 
 // capitalize returns s with the first letter uppercased.
+// Special-cases "openai" → "OpenAI".
 func capitalize(s string) string {
 	if s == "" {
 		return ""
+	}
+	if s == "openai" {
+		return "OpenAI"
 	}
 	return strings.ToUpper(s[:1]) + s[1:]
 }
