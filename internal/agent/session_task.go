@@ -117,15 +117,15 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 			_ = stream.WriteTLV(s.Output, stream.TagAssistantR, stream.WrapDelta(stream.NewStreamID(promptID, stepCount), delta)) //nolint:errcheck // best-effort write to adapter
 			return nil
 		},
-		OnToolUseStart: func(toolCallID, toolName string) error {
-			s.writeToolUseStart(toolName, toolCallID)
+		OnToolUseStart: func(id, toolName string) error {
+			s.writeToolUseStart(toolName, id)
 			return nil
 		},
-		OnToolUse: func(toolCallID, toolName string, input json.RawMessage) error {
-			s.writeToolUse(toolName, string(input), toolCallID)
+		OnToolUse: func(id, toolName string, input json.RawMessage) error {
+			s.writeToolUse(toolName, string(input), id)
 			return nil
 		},
-		OnToolConfirm: func(toolCallID, toolName string, _ json.RawMessage) (bool, error) {
+		OnToolConfirm: func(id, toolName string, _ json.RawMessage) (bool, error) {
 			// If no confirmation set is configured, or this tool is not
 			// in the set, allow immediately without notifying the adapter.
 			if s.toolConfirmSet == nil {
@@ -137,9 +137,9 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 
 			respCh := make(chan ToolConfirmResponse, 1)
 			s.toolConfirmRespCh = respCh
-			s.toolConfirmID = toolCallID
+			s.toolConfirmID = id
 
-			if err := stream.WriteSystemMsg(s.Output, stream.ToolConfirmMsg{ID: toolCallID}); err != nil {
+			if err := stream.WriteSystemMsg(s.Output, stream.ToolConfirmMsg{ID: id}); err != nil {
 				s.toolConfirmRespCh = nil
 				s.toolConfirmID = ""
 				return false, domainerrors.Wrap(domainerrors.OpTool, err)
@@ -147,8 +147,8 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 
 			select {
 			case resp := <-respCh:
-				if resp.ID != toolCallID {
-					return false, domainerrors.NewSessionErrorf(domainerrors.OpTool, "tool_confirm ID mismatch: want %s, got %s", toolCallID, resp.ID)
+				if resp.ID != id {
+					return false, domainerrors.NewSessionErrorf(domainerrors.OpTool, "tool_confirm ID mismatch: want %s, got %s", id, resp.ID)
 				}
 				s.toolConfirmRespCh = nil
 				s.toolConfirmID = ""
@@ -159,11 +159,11 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 				return false, ctx.Err()
 			}
 		},
-		OnToolResult: func(toolCallID string, output llm.ToolResultOutput) error {
+		OnToolResult: func(id string, output llm.ToolResultOutput) error {
 			if textOutput, ok := output.(llm.ToolResultOutputText); ok {
-				s.writeToolOutput(toolCallID, textOutput.Text, false)
+				s.writeToolOutput(id, textOutput.Text, false)
 			} else if errOutput, ok := output.(llm.ToolResultOutputFailed); ok {
-				s.writeToolOutput(toolCallID, errOutput.Reason, true)
+				s.writeToolOutput(id, errOutput.Reason, true)
 			}
 			return nil
 		},

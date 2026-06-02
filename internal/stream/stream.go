@@ -214,11 +214,11 @@ func (NotifyMsg) SystemMsgType() string { return "notify" }
 //
 // Request (agent -> adapter):
 //
-//	SM {"type":"tool_confirm","data":{"id":"<toolCallID>"}}
+//	SM {"type":"tool_confirm","data":{"id":"<toolUseID>"}}
 //
 // Response (adapter -> agent):
 //
-//	SM {"type":"tool_confirm","data":{"id":"<toolCallID>","allowed":true|false}}
+//	SM {"type":"tool_confirm","data":{"id":"<toolUseID>","allowed":true|false}}
 type ToolConfirmMsg struct {
 	ID      string `json:"id"`
 	Allowed *bool  `json:"allowed,omitempty"`

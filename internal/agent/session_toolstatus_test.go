@@ -59,21 +59,21 @@ func TestOnToolResultCallback(t *testing.T) {
 	}
 
 	// Create a mock tool result callback (simulating what happens in processPrompt)
-	callback := func(toolCallID string, toolResult llm.ToolResultOutput) error { //nolint:unparam // callback signature required by interface
+	callback := func(id string, toolResult llm.ToolResultOutput) error { //nolint:unparam // callback signature required by interface
 		// Add tool result message to session messages
 		session.Messages = append(session.Messages, llm.Message{
 			Role: llm.RoleTool,
 			Content: []llm.ContentPart{llm.ToolResultPart{
-				ID:     toolCallID,
+				ID:     id,
 				Output: toolResult,
 			}},
 		})
 
 		// Send tool result with error flag to adapter
 		if textOutput, ok := toolResult.(llm.ToolResultOutputText); ok {
-			session.writeToolOutput(toolCallID, textOutput.Text, false)
+			session.writeToolOutput(id, textOutput.Text, false)
 		} else if errOutput, ok := toolResult.(llm.ToolResultOutputFailed); ok {
-			session.writeToolOutput(toolCallID, errOutput.Reason, true)
+			session.writeToolOutput(id, errOutput.Reason, true)
 		}
 
 		return nil

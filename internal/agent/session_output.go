@@ -79,9 +79,9 @@ func (s *Session) writeToolUseStart(toolName, id string) {
 	})
 }
 
-func (s *Session) writeToolOutput(toolCallID string, output string, isError bool) {
+func (s *Session) writeToolOutput(id string, output string, isError bool) {
 	s.writeTLVJSON(stream.TagUserF, stream.ToolResultData{
-		ID:      toolCallID,
+		ID:      id,
 		Output:  output,
 		IsError: isError,
 	})

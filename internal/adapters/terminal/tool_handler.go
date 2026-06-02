@@ -28,7 +28,7 @@ type GenericHandler struct {
 }
 
 func (h *GenericHandler) FormatCall(input json.RawMessage, _ *Styles) string {
-	// Empty JSON object means placeholder from ToolCallStart — show just
+	// Empty JSON object means placeholder from ToolUseStart — show just
 	// the tool name as a head line, consistent with built-in tool handlers
 	// that parse empty fields into "toolname: \n".
 	if string(input) == "{}" {

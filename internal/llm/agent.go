@@ -58,10 +58,10 @@ func NewAgent(config AgentConfig) *Agent {
 type StreamCallbacks struct {
 	OnTextDelta      func(delta string) error
 	OnReasoningDelta func(delta string) error
-	OnToolUseStart   func(toolCallID, toolName string) error
-	OnToolUse        func(toolCallID, toolName string, input json.RawMessage) error
-	OnToolConfirm    func(toolCallID, toolName string, input json.RawMessage) (bool, error)
-	OnToolResult     func(toolCallID string, output ToolResultOutput) error
+	OnToolUseStart   func(id, toolName string) error
+	OnToolUse        func(id, toolName string, input json.RawMessage) error
+	OnToolConfirm    func(id, toolName string, input json.RawMessage) (bool, error)
+	OnToolResult     func(id string, output ToolResultOutput) error
 	OnStepStart      func(step int) error
 	OnStepFinish     func(messages []Message, usage Usage) error
 }
@@ -144,9 +144,9 @@ func (a *Agent) executeStep(ctx context.Context, step int, allMessages []Message
 
 	allMessages = append(allMessages, stepMessage)
 
-	toolCalls := extractToolUses(stepMessage.Content)
-	if len(toolCalls) > 0 && !truncated {
-		toolResults := a.executeTools(ctx, toolCalls, callbacks)
+	toolUses := extractToolUses(stepMessage.Content)
+	if len(toolUses) > 0 && !truncated {
+		toolResults := a.executeTools(ctx, toolUses, callbacks)
 		allMessages = append(allMessages, Message{Role: RoleTool, Content: toolResults})
 	}
 
@@ -154,7 +154,7 @@ func (a *Agent) executeStep(ctx context.Context, step int, allMessages []Message
 		return nil, Usage{}, false, false, err
 	}
 
-	taskDone := truncated || len(toolCalls) == 0
+	taskDone := truncated || len(toolUses) == 0
 	return allMessages, stepUsage, taskDone, truncated, nil
 }
 
@@ -308,9 +308,9 @@ func (a *Agent) executeTool(ctx context.Context, tc ToolUsePart, callbacks Strea
 // Each tool call is first sent to OnToolConfirm (if set) for user approval.
 // If confirmation is denied (returns false), a failed result is returned instead
 // of executing the tool.
-func (a *Agent) executeTools(ctx context.Context, toolCalls []ToolUsePart, callbacks StreamCallbacks) []ContentPart {
-	results := make([]ContentPart, 0, len(toolCalls))
-	for _, tc := range toolCalls {
+func (a *Agent) executeTools(ctx context.Context, toolUses []ToolUsePart, callbacks StreamCallbacks) []ContentPart {
+	results := make([]ContentPart, 0, len(toolUses))
+	for _, tc := range toolUses {
 		if callbacks.OnToolConfirm != nil {
 			allowed, err := callbacks.OnToolConfirm(tc.ID, tc.ToolName, tc.Input)
 			if err != nil {
@@ -347,11 +347,11 @@ func (a *Agent) executeTools(ctx context.Context, toolCalls []ToolUsePart, callb
 
 // extractToolUses extracts ToolUseParts from message content.
 func extractToolUses(content []ContentPart) []ToolUsePart {
-	var calls []ToolUsePart
+	var uses []ToolUsePart
 	for _, part := range content {
 		if tc, ok := part.(ToolUsePart); ok {
-			calls = append(calls, tc)
+			uses = append(uses, tc)
 		}
 	}
-	return calls
+	return uses
 }
