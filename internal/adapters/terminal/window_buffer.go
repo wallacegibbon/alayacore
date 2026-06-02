@@ -101,7 +101,7 @@ func (wb *WindowBuffer) SetStyles(styles *Styles) {
 
 // AppendOrUpdate adds content to an existing window or creates a new one.
 // Used for text content (UT, AT, AR, SE, SN) and replayed UF sessions.
-// Tool windows use HandleToolUseEvent and HandleFunctionResult instead.
+// Tool windows use HandleToolUseEvent and HandleToolResult instead.
 func (wb *WindowBuffer) AppendOrUpdate(tag string, id string, content string) {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
@@ -145,7 +145,7 @@ func (wb *WindowBuffer) AppendOrUpdate(tag string, id string, content string) {
 // Type "start" sets ToolName (and ToolInput if not yet set),
 // type "call" sets ToolName+ToolInput.
 // Status defaults to "pending" when a tool window is created —
-// the final status arrives via HandleFunctionResult (UF).
+// the final status arrives via HandleToolResult (UF).
 func (wb *WindowBuffer) HandleToolUseEvent(data stream.ToolUseData) {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
@@ -191,9 +191,9 @@ func (wb *WindowBuffer) HandleToolUseEvent(data stream.ToolUseData) {
 	wb.markDirty(len(wb.windows) - 1)
 }
 
-// HandleFunctionResult processes a TagUserF (UF) frame.
+// HandleToolResult processes a TagUserF (UF) frame.
 // Sets ToolOutput and updates Status from the result.
-func (wb *WindowBuffer) HandleFunctionResult(id, output string, isError bool) {
+func (wb *WindowBuffer) HandleToolResult(id, output string, isError bool) {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 

@@ -37,20 +37,6 @@ func (s ToolStatus) Indicator(styles *Styles) string {
 	}
 }
 
-// ParseToolStatus converts a status string to ToolStatus.
-func ParseToolStatus(status string) ToolStatus {
-	switch status {
-	case "success":
-		return ToolStatusSuccess
-	case "failed":
-		return ToolStatusError
-	case "pending":
-		return ToolStatusPending
-	default:
-		return ToolStatusNone
-	}
-}
-
 // ============================================================================
 // Rendering
 // ============================================================================

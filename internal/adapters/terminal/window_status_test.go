@@ -30,7 +30,7 @@ func TestHandleToolUseEvent(t *testing.T) {
 	}
 
 	// Send a result
-	wb.HandleFunctionResult("tool123", "output text", false)
+	wb.HandleToolResult("tool123", "output text", false)
 
 	// Check status was updated
 	if wb.GetWindow(0).Status != ToolStatusSuccess {
@@ -38,7 +38,7 @@ func TestHandleToolUseEvent(t *testing.T) {
 	}
 
 	// Send a result with error
-	wb.HandleFunctionResult("tool123", "error output", true)
+	wb.HandleToolResult("tool123", "error output", true)
 
 	// Check status was updated
 	if wb.GetWindow(0).Status != ToolStatusError {
@@ -46,7 +46,7 @@ func TestHandleToolUseEvent(t *testing.T) {
 	}
 
 	// Try to update non-existent window (should not crash)
-	wb.HandleFunctionResult("nonexistent", "output", false)
+	wb.HandleToolResult("nonexistent", "output", false)
 }
 
 func TestRenderWindowContentWithStatus(t *testing.T) {
@@ -72,7 +72,7 @@ func TestRenderWindowContentWithStatus(t *testing.T) {
 	}
 
 	// Send result with success
-	wb.HandleFunctionResult("tool123", "output", false)
+	wb.HandleToolResult("tool123", "output", false)
 
 	// Test rendering with success status
 	content = wb.RenderWindowContent(w, 76)
@@ -85,7 +85,7 @@ func TestRenderWindowContentWithStatus(t *testing.T) {
 	}
 
 	// Send result with error
-	wb.HandleFunctionResult("tool123", "error output", true)
+	wb.HandleToolResult("tool123", "error output", true)
 
 	// Test rendering with error status
 	content = wb.RenderWindowContent(w, 76)

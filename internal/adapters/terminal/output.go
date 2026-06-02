@@ -154,7 +154,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 		if err := json.Unmarshal([]byte(value), &tr); err != nil {
 			return
 		}
-		to.windowBuffer.HandleFunctionResult(tr.ID, tr.Output, tr.IsError)
+		to.windowBuffer.HandleToolResult(tr.ID, tr.Output, tr.IsError)
 
 	// System tags
 	case stream.TagSystemMsg:
