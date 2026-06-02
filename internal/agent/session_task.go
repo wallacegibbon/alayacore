@@ -9,8 +9,8 @@ package agent
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
+	domainerrors "github.com/alayacore/alayacore/internal/errors"
 	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/stream"
 )
@@ -142,13 +142,13 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 			if err := stream.WriteSystemMsg(s.Output, stream.ToolConfirmMsg{ID: toolCallID}); err != nil {
 				s.toolConfirmRespCh = nil
 				s.toolConfirmID = ""
-				return false, fmt.Errorf("send tool_confirm failed: %w", err)
+				return false, domainerrors.Wrap(domainerrors.OpTool, err)
 			}
 
 			select {
 			case resp := <-respCh:
 				if resp.ID != toolCallID {
-					return false, fmt.Errorf("tool_confirm ID mismatch: want %s, got %s", toolCallID, resp.ID)
+					return false, domainerrors.NewSessionErrorf(domainerrors.OpTool, "tool_confirm ID mismatch: want %s, got %s", toolCallID, resp.ID)
 				}
 				s.toolConfirmRespCh = nil
 				s.toolConfirmID = ""

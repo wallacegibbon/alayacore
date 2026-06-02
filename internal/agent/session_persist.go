@@ -15,6 +15,8 @@ import (
 	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/stream"
+
+	domainerrors "github.com/alayacore/alayacore/internal/errors"
 )
 
 // ErrSessionVersionMismatch is returned when a session file has a version
@@ -29,7 +31,7 @@ var ErrSessionVersionMismatch = errors.New("session file version mismatch")
 func LoadSession(path string) (*SessionData, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read session file: %w", err)
+		return nil, domainerrors.Wrap(domainerrors.OpLoad, err)
 	}
 	return parseSessionMarkdown(data)
 }
@@ -53,10 +55,10 @@ func (s *Session) saveSessionToFileWith(messages []llm.Message, path string) err
 
 	raw, err := formatSessionMarkdown(&data)
 	if err != nil {
-		return fmt.Errorf("failed to format session data: %w", err)
+		return domainerrors.Wrap(domainerrors.OpSave, err)
 	}
 	if err := os.WriteFile(path, raw, 0600); err != nil {
-		return fmt.Errorf("failed to write session file: %w", err)
+		return domainerrors.Wrap(domainerrors.OpSave, err)
 	}
 	return nil
 }
@@ -99,7 +101,7 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 					}
 					jsonData, err := json.Marshal(rj)
 					if err != nil {
-						return nil, fmt.Errorf("failed to marshal reasoning: %w", err)
+						return nil, domainerrors.Wrap(domainerrors.OpSave, fmt.Errorf("failed to marshal reasoning: %w", err))
 					}
 					writeTLV(&binaryBuf, stream.TagAssistantR, string(jsonData))
 				} else {
@@ -115,7 +117,7 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 				}
 				jsonData, err := json.Marshal(fd)
 				if err != nil {
-					return nil, fmt.Errorf("failed to marshal tool call: %w", err)
+					return nil, domainerrors.Wrap(domainerrors.OpSave, fmt.Errorf("failed to marshal tool call: %w", err))
 				}
 				writeTLV(&binaryBuf, stream.TagAssistantF, string(jsonData))
 
@@ -131,7 +133,7 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 				}
 				jsonData, err := json.Marshal(tr)
 				if err != nil {
-					return nil, fmt.Errorf("failed to marshal tool result: %w", err)
+					return nil, domainerrors.Wrap(domainerrors.OpSave, fmt.Errorf("failed to marshal tool result: %w", err))
 				}
 				writeTLV(&binaryBuf, stream.TagUserF, string(jsonData))
 			}
@@ -163,12 +165,12 @@ func writeTLV(buf *strings.Builder, tag string, content string) {
 // Returns the frontmatter content (between the delimiters) and the body (after the closing delimiter).
 func parseFrontmatter(content string) (frontmatter, body string, err error) {
 	if !strings.HasPrefix(content, "---\n") {
-		return "", "", fmt.Errorf("session file missing frontmatter")
+		return "", "", domainerrors.NewSessionErrorf(domainerrors.OpLoad, "session file missing frontmatter")
 	}
 
 	endIdx := strings.Index(content[4:], "\n---\n")
 	if endIdx == -1 {
-		return "", "", fmt.Errorf("session file missing frontmatter end marker")
+		return "", "", domainerrors.NewSessionErrorf(domainerrors.OpLoad, "session file missing frontmatter end marker")
 	}
 
 	frontmatter = content[4 : endIdx+4]
