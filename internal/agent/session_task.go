@@ -39,9 +39,9 @@ func (s *Session) handleUserPrompt(ctx context.Context, messages []llm.Message, 
 	// Build content parts: images first, then text
 	content := make([]llm.ContentPart, 0, 1+len(images))
 	for _, img := range images {
-		content = append(content, llm.ImagePart{Type: "image", DataURL: img})
+		content = append(content, llm.ImagePart{DataURL: img})
 	}
-	content = append(content, llm.TextPart{Type: "text", Text: prompt})
+	content = append(content, llm.TextPart{Text: prompt})
 
 	if len(messages) > 0 && messages[len(messages)-1].Role == llm.RoleUser {
 		messages[len(messages)-1].Content = append(
@@ -237,7 +237,7 @@ func cleanIncompleteToolCalls(messages []llm.Message) []llm.Message {
 	// only stops after executing all tool calls from a completed step.
 	filtered := make([]llm.ContentPart, 0, len(last.Content))
 	for _, part := range last.Content {
-		if _, ok := part.(llm.ToolCallPart); ok {
+		if _, ok := part.(llm.ToolUsePart); ok {
 			continue
 		}
 		filtered = append(filtered, part)

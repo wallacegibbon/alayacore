@@ -18,18 +18,17 @@ func TestSessionSavePreservesTextWithToolCalls(t *testing.T) {
 			{
 				Role: llm.RoleUser,
 				Content: []llm.ContentPart{
-					llm.TextPart{Type: "text", Text: "What's the weather?"},
+					llm.TextPart{Text: "What's the weather?"},
 				},
 			},
 			{
 				Role: llm.RoleAssistant,
 				Content: []llm.ContentPart{
-					llm.TextPart{Type: "text", Text: "Let me check that for you."},
-					llm.ToolCallPart{
-						Type:       "tool_use",
-						ToolCallID: "call_123",
-						ToolName:   "get_weather",
-						Input:      []byte(`{"location":"SF"}`),
+					llm.TextPart{Text: "Let me check that for you."},
+					llm.ToolUsePart{
+						ID:       "call_123",
+						ToolName: "get_weather",
+						Input:    []byte(`{"location":"SF"}`),
 					},
 				},
 			},
@@ -37,16 +36,15 @@ func TestSessionSavePreservesTextWithToolCalls(t *testing.T) {
 				Role: llm.RoleTool,
 				Content: []llm.ContentPart{
 					llm.ToolResultPart{
-						Type:       "tool_result",
-						ToolCallID: "call_123",
-						Output:     llm.ToolResultOutputText{Type: "text", Text: "Sunny, 72F"},
+						ID:     "call_123",
+						Output: llm.ToolResultOutputText{Text: "Sunny, 72F"},
 					},
 				},
 			},
 			{
 				Role: llm.RoleAssistant,
 				Content: []llm.ContentPart{
-					llm.TextPart{Type: "text", Text: "The weather in SF is sunny and 72F."},
+					llm.TextPart{Text: "The weather in SF is sunny and 72F."},
 				},
 			},
 		},
@@ -86,7 +84,7 @@ func TestSessionSavePreservesTextWithToolCalls(t *testing.T) {
 			if p.Text != "Let me check that for you." {
 				t.Errorf("Assistant text mismatch: %q", p.Text)
 			}
-		case llm.ToolCallPart:
+		case llm.ToolUsePart:
 			hasToolCall = true
 			if p.ToolName != "get_weather" {
 				t.Errorf("Tool name mismatch: %s", p.ToolName)

@@ -268,7 +268,7 @@ func (a *Agent) fireOnToolCall(callbacks StreamCallbacks, e ToolCallEvent) error
 }
 
 // executeTool executes a single tool call and returns the result.
-func (a *Agent) executeTool(ctx context.Context, tc ToolCallPart, callbacks StreamCallbacks) ContentPart {
+func (a *Agent) executeTool(ctx context.Context, tc ToolUsePart, callbacks StreamCallbacks) ContentPart {
 	var tool *Tool
 	for _, t := range a.config.Tools {
 		if t.Definition.Name == tc.ToolName {
@@ -279,10 +279,8 @@ func (a *Agent) executeTool(ctx context.Context, tc ToolCallPart, callbacks Stre
 
 	if tool == nil {
 		return ToolResultPart{
-			Type:       ContentPartToolResult,
-			ToolCallID: tc.ToolCallID,
+			ID: tc.ID,
 			Output: ToolResultOutputFailed{
-				Type:   "error",
 				Reason: fmt.Sprintf("unknown tool: %s", tc.ToolName),
 			},
 		}
@@ -291,20 +289,18 @@ func (a *Agent) executeTool(ctx context.Context, tc ToolCallPart, callbacks Stre
 	output, err := tool.Execute(ctx, tc.Input)
 	if err != nil {
 		output = ToolResultOutputFailed{
-			Type:   "error",
 			Reason: err.Error(),
 		}
 	}
 
 	if callbacks.OnToolResult != nil {
 		//nolint:errcheck // callback error shouldn't prevent tool result from being recorded
-		callbacks.OnToolResult(tc.ToolCallID, output)
+		callbacks.OnToolResult(tc.ID, output)
 	}
 
 	return ToolResultPart{
-		Type:       ContentPartToolResult,
-		ToolCallID: tc.ToolCallID,
-		Output:     output,
+		ID:     tc.ID,
+		Output: output,
 	}
 }
 
@@ -312,38 +308,34 @@ func (a *Agent) executeTool(ctx context.Context, tc ToolCallPart, callbacks Stre
 // Each tool call is first sent to OnToolConfirm (if set) for user approval.
 // If confirmation is denied (returns false), a failed result is returned instead
 // of executing the tool.
-func (a *Agent) executeTools(ctx context.Context, toolCalls []ToolCallPart, callbacks StreamCallbacks) []ContentPart {
+func (a *Agent) executeTools(ctx context.Context, toolCalls []ToolUsePart, callbacks StreamCallbacks) []ContentPart {
 	results := make([]ContentPart, 0, len(toolCalls))
 	for _, tc := range toolCalls {
 		if callbacks.OnToolConfirm != nil {
-			allowed, err := callbacks.OnToolConfirm(tc.ToolCallID, tc.ToolName, tc.Input)
+			allowed, err := callbacks.OnToolConfirm(tc.ID, tc.ToolName, tc.Input)
 			if err != nil {
 				failed := ToolResultOutputFailed{
-					Type:   "error",
 					Reason: err.Error(),
 				}
 				if callbacks.OnToolResult != nil {
-					callbacks.OnToolResult(tc.ToolCallID, failed) //nolint:errcheck
+					callbacks.OnToolResult(tc.ID, failed) //nolint:errcheck
 				}
 				results = append(results, ToolResultPart{
-					Type:       ContentPartToolResult,
-					ToolCallID: tc.ToolCallID,
-					Output:     failed,
+					ID:     tc.ID,
+					Output: failed,
 				})
 				continue
 			}
 			if !allowed {
 				denied := ToolResultOutputFailed{
-					Type:   "error",
 					Reason: "Tool execution denied by user",
 				}
 				if callbacks.OnToolResult != nil {
-					callbacks.OnToolResult(tc.ToolCallID, denied) //nolint:errcheck
+					callbacks.OnToolResult(tc.ID, denied) //nolint:errcheck
 				}
 				results = append(results, ToolResultPart{
-					Type:       ContentPartToolResult,
-					ToolCallID: tc.ToolCallID,
-					Output:     denied,
+					ID:     tc.ID,
+					Output: denied,
 				})
 				continue
 			}
@@ -353,11 +345,11 @@ func (a *Agent) executeTools(ctx context.Context, toolCalls []ToolCallPart, call
 	return results
 }
 
-// extractToolCalls extracts ToolCallParts from message content.
-func extractToolCalls(content []ContentPart) []ToolCallPart {
-	var calls []ToolCallPart
+// extractToolCalls extracts ToolUseParts from message content.
+func extractToolCalls(content []ContentPart) []ToolUsePart {
+	var calls []ToolUsePart
 	for _, part := range content {
-		if tc, ok := part.(ToolCallPart); ok {
+		if tc, ok := part.(ToolUsePart); ok {
 			calls = append(calls, tc)
 		}
 	}

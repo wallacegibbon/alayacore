@@ -131,13 +131,13 @@ func (to *outputWriter) writeColored(tag string, value string) {
 
 	// Function lifecycle (JSON: id, type, name, input, status)
 	case stream.TagAssistantF:
-		var fd stream.FunctionData
+		var fd stream.ToolUseData
 		if err := json.Unmarshal([]byte(value), &fd); err != nil {
 			return
 		}
 		// Format the call input for display. For "start", format "{}" as a
 		// placeholder so the tool name appears immediately. Safe because
-		// HandleFunctionEvent only sets ToolInput for "start" when it's
+		// HandleToolUseEvent only sets ToolInput for "start" when it's
 		// empty — real arguments from a prior "call" are never overwritten.
 		if !fd.IsPlaceholder {
 			handler := GetHandler(fd.Name)
@@ -146,7 +146,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 			handler := GetHandler(fd.Name)
 			fd.Input = handler.FormatCall(json.RawMessage("{}"), to.styles.Load())
 		}
-		to.windowBuffer.HandleFunctionEvent(fd)
+		to.windowBuffer.HandleToolUseEvent(fd)
 
 	// Function result (JSON: id, output, status)
 	case stream.TagUserF:

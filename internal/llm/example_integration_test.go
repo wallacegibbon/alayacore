@@ -187,7 +187,7 @@ func TestAgentMultiTurnWithTools(t *testing.T) {
 			Schema:      json.RawMessage(`{"type":"object","properties":{"message":{"type":"string"}},"required":["message"]}`),
 		},
 		Execute: func(_ context.Context, _ json.RawMessage) (llm.ToolResultOutput, error) {
-			return llm.ToolResultOutputText{Type: "text", Text: "Echoed!"}, nil
+			return llm.ToolResultOutputText{Text: "Echoed!"}, nil
 		},
 	}
 
@@ -200,7 +200,7 @@ func TestAgentMultiTurnWithTools(t *testing.T) {
 
 	// First query - will trigger tool call
 	allMessages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Use echo"}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Use echo"}}},
 	}
 
 	result, err := agent.Stream(context.Background(), allMessages, llm.StreamCallbacks{})
@@ -235,7 +235,7 @@ func TestAgentMultiTurnWithTools(t *testing.T) {
 	allMessages = result.Messages
 	allMessages = append(allMessages, llm.Message{
 		Role:    llm.RoleUser,
-		Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Thanks!"}},
+		Content: []llm.ContentPart{llm.TextPart{Text: "Thanks!"}},
 	})
 
 	// Second query - should NOT fail with "tool call result does not follow tool call"
@@ -294,7 +294,7 @@ func TestAgentMultiTurnSequentialTools(t *testing.T) {
 			Schema:      json.RawMessage(`{"type":"object","properties":{}}`),
 		},
 		Execute: func(ctx context.Context, input json.RawMessage) (llm.ToolResultOutput, error) {
-			return llm.ToolResultOutputText{Type: "text", Text: "ok"}, nil
+			return llm.ToolResultOutputText{Text: "ok"}, nil
 		},
 	}
 
@@ -306,7 +306,7 @@ func TestAgentMultiTurnSequentialTools(t *testing.T) {
 
 	// First query
 	allMessages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Query 1"}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Query 1"}}},
 	}
 
 	result, err := agent.Stream(context.Background(), allMessages, llm.StreamCallbacks{})
@@ -318,7 +318,7 @@ func TestAgentMultiTurnSequentialTools(t *testing.T) {
 	allMessages = result.Messages
 	allMessages = append(allMessages, llm.Message{
 		Role:    llm.RoleUser,
-		Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Query 2"}}},
+		Content: []llm.ContentPart{llm.TextPart{Text: "Query 2"}}},
 	)
 
 	result, err = agent.Stream(context.Background(), allMessages, llm.StreamCallbacks{})
@@ -330,7 +330,7 @@ func TestAgentMultiTurnSequentialTools(t *testing.T) {
 	allMessages = result.Messages
 	allMessages = append(allMessages, llm.Message{
 		Role:    llm.RoleUser,
-		Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Query 3"}}},
+		Content: []llm.ContentPart{llm.TextPart{Text: "Query 3"}}},
 	)
 
 	_, err = agent.Stream(context.Background(), allMessages, llm.StreamCallbacks{})
@@ -414,7 +414,7 @@ func TestOpenAIMultiTurnWithTools(t *testing.T) {
 			Schema:      json.RawMessage(`{"type":"object","properties":{"message":{"type":"string"}},"required":["message"]}`),
 		},
 		Execute: func(_ context.Context, _ json.RawMessage) (llm.ToolResultOutput, error) {
-			return llm.ToolResultOutputText{Type: "text", Text: "Echoed!"}, nil
+			return llm.ToolResultOutputText{Text: "Echoed!"}, nil
 		},
 	}
 
@@ -427,7 +427,7 @@ func TestOpenAIMultiTurnWithTools(t *testing.T) {
 
 	// First query - will trigger tool call
 	allMessages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Use echo"}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Use echo"}}},
 	}
 
 	result, err := agent.Stream(context.Background(), allMessages, llm.StreamCallbacks{})
@@ -462,7 +462,7 @@ func TestOpenAIMultiTurnWithTools(t *testing.T) {
 	allMessages = result.Messages
 	allMessages = append(allMessages, llm.Message{
 		Role:    llm.RoleUser,
-		Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Thanks!"}},
+		Content: []llm.ContentPart{llm.TextPart{Text: "Thanks!"}},
 	})
 
 	// Second query - should NOT fail with message order errors
@@ -514,7 +514,7 @@ func TestOpenAISequentialQueriesWithTools(t *testing.T) {
 			Schema:      json.RawMessage(`{"type":"object","properties":{}}`),
 		},
 		Execute: func(_ context.Context, _ json.RawMessage) (llm.ToolResultOutput, error) {
-			return llm.ToolResultOutputText{Type: "text", Text: "ok"}, nil
+			return llm.ToolResultOutputText{Text: "ok"}, nil
 		},
 	}
 
@@ -526,7 +526,7 @@ func TestOpenAISequentialQueriesWithTools(t *testing.T) {
 
 	// First query
 	allMessages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Query 1"}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Query 1"}}},
 	}
 
 	result, err := agent.Stream(context.Background(), allMessages, llm.StreamCallbacks{})
@@ -538,7 +538,7 @@ func TestOpenAISequentialQueriesWithTools(t *testing.T) {
 	allMessages = result.Messages
 	allMessages = append(allMessages, llm.Message{
 		Role:    llm.RoleUser,
-		Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Query 2"}},
+		Content: []llm.ContentPart{llm.TextPart{Text: "Query 2"}},
 	})
 
 	result, err = agent.Stream(context.Background(), allMessages, llm.StreamCallbacks{})
@@ -550,7 +550,7 @@ func TestOpenAISequentialQueriesWithTools(t *testing.T) {
 	allMessages = result.Messages
 	allMessages = append(allMessages, llm.Message{
 		Role:    llm.RoleUser,
-		Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Query 3"}},
+		Content: []llm.ContentPart{llm.TextPart{Text: "Query 3"}},
 	})
 
 	_, err = agent.Stream(context.Background(), allMessages, llm.StreamCallbacks{})

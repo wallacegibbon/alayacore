@@ -10,7 +10,7 @@ func NewUserMessage(text string) Message {
 	return Message{
 		Role: RoleUser,
 		Content: []ContentPart{
-			TextPart{Type: ContentPartText, Text: text},
+			TextPart{Text: text},
 		},
 	}
 }
@@ -18,7 +18,6 @@ func NewUserMessage(text string) Message {
 // NewToolResultOutputText creates a ToolResultOutputText with the given text.
 func NewToolResultOutputText(text string) ToolResultOutput {
 	return ToolResultOutputText{
-		Type: ContentPartText,
 		Text: text,
 	}
 }
@@ -26,7 +25,6 @@ func NewToolResultOutputText(text string) ToolResultOutput {
 // NewToolResultOutputFailed creates a ToolResultOutputFailed reporting tool failure.
 func NewToolResultOutputFailed(reason string) ToolResultOutput {
 	return ToolResultOutputFailed{
-		Type:   "error",
 		Reason: reason,
 	}
 }

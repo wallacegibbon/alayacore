@@ -43,7 +43,7 @@ func TestTextWithToolCalls(t *testing.T) {
 
 	// Stream messages
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "What's the weather?"}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "What's the weather?"}}},
 	}
 
 	events, err := provider.StreamMessages(context.Background(), messages, nil, "You are helpful", "")
@@ -88,9 +88,9 @@ func TestTextWithToolCalls(t *testing.T) {
 			if p.Text != "Let me help with that." {
 				t.Errorf("TextPart content mismatch: %q", p.Text)
 			}
-		case llm.ToolCallPart:
+		case llm.ToolUsePart:
 			hasToolCall = true
-			t.Logf("  ToolCallPart: %s(%s)", p.ToolName, string(p.Input))
+			t.Logf("  ToolUsePart: %s(%s)", p.ToolName, string(p.Input))
 		}
 	}
 
@@ -99,7 +99,7 @@ func TestTextWithToolCalls(t *testing.T) {
 	}
 
 	if !hasToolCall {
-		t.Error("Message missing ToolCallPart")
+		t.Error("Message missing ToolUsePart")
 	}
 
 	if hasText && hasToolCall {

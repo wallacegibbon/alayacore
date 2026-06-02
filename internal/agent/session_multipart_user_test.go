@@ -20,13 +20,13 @@ func TestMultiPartUserMessageRoundtrip(t *testing.T) {
 			{
 				Role: llm.RoleUser,
 				Content: []llm.ContentPart{
-					llm.TextPart{Type: "text", Text: "First part"},
-					llm.TextPart{Type: "text", Text: "Second part"},
+					llm.TextPart{Text: "First part"},
+					llm.TextPart{Text: "Second part"},
 				},
 			},
 			{
 				Role:    llm.RoleAssistant,
-				Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Got it."}},
+				Content: []llm.ContentPart{llm.TextPart{Text: "Got it."}},
 			},
 		},
 		SessionConfig: SessionConfig{
@@ -151,7 +151,7 @@ func TestHandleUserPromptAppendsToExistingUserMessage(t *testing.T) {
 	if len(session.Messages) > 0 && session.Messages[len(session.Messages)-1].Role == llm.RoleUser {
 		session.Messages[len(session.Messages)-1].Content = append(
 			session.Messages[len(session.Messages)-1].Content,
-			llm.TextPart{Type: "text", Text: prompt},
+			llm.TextPart{Text: prompt},
 		)
 	} else {
 		session.Messages = append(session.Messages, llm.NewUserMessage(prompt))
@@ -180,8 +180,8 @@ func TestHandleUserPromptAppendsToExistingUserMessage(t *testing.T) {
 func TestHandleUserPromptCreatesNewMessageWhenPreviousIsAssistant(t *testing.T) {
 	session := &Session{
 		Messages: []llm.Message{
-			{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Hello"}}},
-			{Role: llm.RoleAssistant, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Hi!"}}},
+			{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Hello"}}},
+			{Role: llm.RoleAssistant, Content: []llm.ContentPart{llm.TextPart{Text: "Hi!"}}},
 		},
 		taskQueue: make([]QueueItem, 0),
 	}
@@ -191,7 +191,7 @@ func TestHandleUserPromptCreatesNewMessageWhenPreviousIsAssistant(t *testing.T) 
 	if len(session.Messages) > 0 && session.Messages[len(session.Messages)-1].Role == llm.RoleUser {
 		session.Messages[len(session.Messages)-1].Content = append(
 			session.Messages[len(session.Messages)-1].Content,
-			llm.TextPart{Type: "text", Text: prompt},
+			llm.TextPart{Text: prompt},
 		)
 	} else {
 		session.Messages = append(session.Messages, llm.NewUserMessage(prompt))

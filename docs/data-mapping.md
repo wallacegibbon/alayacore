@@ -14,7 +14,7 @@ type ContentPart interface { isContentPart() }
 // Implementations:
 type TextPart      struct { Type, Text string }
 type ReasoningPart struct { Type, Text, Signature string }
-type ToolCallPart  struct { Type, ToolCallID, ToolName string; Input json.RawMessage }
+type ToolUsePart  struct { Type, ToolCallID, ToolName string; Input json.RawMessage }
 type ToolResultPart struct { Type, ToolCallID string; Output ToolResultOutput }
 
 type Message struct {
@@ -45,7 +45,7 @@ Message{
     Content: []ContentPart{
         ReasoningPart{Type:"reasoning", Text:"Let me think..."},
         TextPart{Type:"text", Text:"The answer is 42"},
-        ToolCallPart{Type:"tool_use", ToolCallID:"call_abc", ToolName:"read_file",
+        ToolUsePart{Type:"tool_use", ToolCallID:"call_abc", ToolName:"read_file",
                      Input: json.RawMessage(`{"path":"/tmp/foo"}`)},
     },
 }
@@ -87,7 +87,7 @@ for _, part := range msg.Content {
         → {Type:"text", Text: v.Text}
     case llm.ReasoningPart:
         → {Type:"thinking", Thinking: &v.Text, Signature: v.Signature}
-    case llm.ToolCallPart:
+    case llm.ToolUsePart:
         → {Type:"tool_use", ID: v.ToolCallID, Name: v.ToolName, Input: v.Input}
     case llm.ToolResultPart:
         → {Type:"tool_result", ToolUseID: v.ToolCallID, Content: ...}
@@ -101,7 +101,7 @@ The OpenAI adapter must **split** a single `[]ContentPart` across three independ
 // OpenAI — must distribute ContentParts into separate wire fields
 apiMsg.Content = ...          // only TextParts go here
 apiMsg.ReasoningContent = ... // only ReasoningParts go here
-apiMsg.ToolCalls = ...        // only ToolCallParts go here
+apiMsg.ToolCalls = ...        // only ToolUseParts go here
 // ToolResultParts become entirely separate messages with role="tool"
 ```
 
@@ -115,7 +115,7 @@ And on receive, the OpenAI adapter must **merge** three independent stream accum
 |---|---|---|
 | `TextPart` | `content` (top-level field) | `content[]` array: `{type:"text", text:"..."}` |
 | `ReasoningPart` | `reasoning_content` (top-level field) | `content[]` array: `{type:"thinking", thinking:"...", signature:"..."}` |
-| `ToolCallPart` | `tool_calls[]` (top-level array) | `content[]` array: `{type:"tool_use", id, name, input}` |
+| `ToolUsePart` | `tool_calls[]` (top-level array) | `content[]` array: `{type:"tool_use", id, name, input}` |
 | `ToolResultPart` | Separate message: `{role:"tool", tool_call_id, content}` (content is JSON-wrapped with `"status"` field — see note below) | `content[]` array: `{type:"tool_result", tool_use_id, content}`, **role remapped to "user"** |
 
 > **Note on OpenAI tool result content format:** OpenAI's API has no native `is_error` field for tool results (unlike Anthropic). To prevent ambiguity — e.g., a tool returning `"no such file"` as an error vs. a file containing the literal text `"no such file"` — the OpenAI provider wraps tool results as JSON:
@@ -208,7 +208,7 @@ ToolCallEvent{
 Message{
     Role: "assistant",
     Content: []ContentPart{
-        ToolCallPart{
+        ToolUsePart{
             Type:       "tool_use",
             ToolCallID: "call_abc",
             ToolName:   "read_file",
@@ -257,7 +257,7 @@ Message{
     Role: "assistant",
     Content: []ContentPart{
         ReasoningPart{Type: "reasoning", Text: "Read file to check"},
-        ToolCallPart{
+        ToolUsePart{
             Type: "tool_use", ToolCallID: "call_abc",
             ToolName: "read_file",
             Input:    json.RawMessage(`{"path":"/tmp/foo"}`),
@@ -278,7 +278,7 @@ Message{
     Role: "assistant",
     Content: []ContentPart{
         ReasoningPart{Type: "reasoning", Text: "Let me read the file"},
-        ToolCallPart{
+        ToolUsePart{
             ToolCallID: "call_abc",
             ToolName:   "read_file",
             Input:      json.RawMessage(`{"path":"/tmp/foo"}`),
@@ -336,7 +336,7 @@ openAIStreamState {
     textBuilder      strings.Builder       ← "content" delta chunks
     reasoningBuilder strings.Builder       ← "reasoning_content" delta chunks
     toolCallArgs     map[int]*Builder      ← "tool_calls[*].function.arguments" by index
-    toolCalls        []ToolCallPart        ← tool call metadata by index
+    toolCalls        []ToolUsePart        ← tool call metadata by index
 }
 ```
 

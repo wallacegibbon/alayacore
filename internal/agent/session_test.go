@@ -128,18 +128,17 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 		Messages: []llm.Message{
 			{
 				Role:    llm.RoleUser,
-				Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Hello, world!"}},
+				Content: []llm.ContentPart{llm.TextPart{Text: "Hello, world!"}},
 			},
 			{
 				Role: llm.RoleAssistant,
 				Content: []llm.ContentPart{
-					llm.ReasoningPart{Type: "reasoning", Text: "User needs help..."},
-					llm.TextPart{Type: "text", Text: "Let me help you."},
-					llm.ToolCallPart{
-						Type:       "tool_use",
-						ToolCallID: "call_1",
-						ToolName:   "read_file",
-						Input:      json.RawMessage(`{"path":"/tmp/test.txt"}`),
+					llm.ReasoningPart{Text: "User needs help..."},
+					llm.TextPart{Text: "Let me help you."},
+					llm.ToolUsePart{
+						ID:       "call_1",
+						ToolName: "read_file",
+						Input:    json.RawMessage(`{"path":"/tmp/test.txt"}`),
 					},
 				},
 			},
@@ -147,17 +146,16 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 				Role: llm.RoleTool,
 				Content: []llm.ContentPart{
 					llm.ToolResultPart{
-						Type:       "tool_result",
-						ToolCallID: "call_1",
-						Output:     llm.ToolResultOutputText{Type: "text", Text: "file contents"},
+						ID:     "call_1",
+						Output: llm.ToolResultOutputText{Text: "file contents"},
 					},
 				},
 			},
 			{
 				Role: llm.RoleAssistant,
 				Content: []llm.ContentPart{
-					llm.ReasoningPart{Type: "reasoning", Text: "Now I have the file..."},
-					llm.TextPart{Type: "text", Text: "Here is the file."},
+					llm.ReasoningPart{Text: "Now I have the file..."},
+					llm.TextPart{Text: "Here is the file."},
 				},
 			},
 		},
@@ -209,8 +207,8 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 	if tp, ok := loaded.Messages[1].Content[1].(llm.TextPart); !ok || tp.Text != "Let me help you." {
 		t.Errorf("Second message text part mismatch: got %v", loaded.Messages[1].Content[1])
 	}
-	if _, ok := loaded.Messages[1].Content[2].(llm.ToolCallPart); !ok {
-		t.Errorf("Second message third part should be ToolCallPart, got %T", loaded.Messages[1].Content[2])
+	if _, ok := loaded.Messages[1].Content[2].(llm.ToolUsePart); !ok {
+		t.Errorf("Second message third part should be ToolUsePart, got %T", loaded.Messages[1].Content[2])
 	}
 
 	// Check third message (tool result)
@@ -241,11 +239,11 @@ func TestMarkdownFormat_HumanReadable(t *testing.T) {
 		Messages: []llm.Message{
 			{
 				Role:    llm.RoleUser,
-				Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Hello!\nHow are you?"}},
+				Content: []llm.ContentPart{llm.TextPart{Text: "Hello!\nHow are you?"}},
 			},
 			{
 				Role:    llm.RoleAssistant,
-				Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "I'm doing well, thanks!"}},
+				Content: []llm.ContentPart{llm.TextPart{Text: "I'm doing well, thanks!"}},
 			},
 		},
 		SessionConfig: SessionConfig{
@@ -289,11 +287,11 @@ func TestReasoningOnlyMessage(t *testing.T) {
 		Messages: []llm.Message{
 			{
 				Role:    llm.RoleUser,
-				Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "What is lisp?"}},
+				Content: []llm.ContentPart{llm.TextPart{Text: "What is lisp?"}},
 			},
 			{
 				Role:    llm.RoleAssistant,
-				Content: []llm.ContentPart{llm.ReasoningPart{Type: "reasoning", Text: "The user is asking about Lisp. I should explain it."}},
+				Content: []llm.ContentPart{llm.ReasoningPart{Text: "The user is asking about Lisp. I should explain it."}},
 			},
 		},
 		SessionConfig: SessionConfig{
@@ -347,13 +345,13 @@ func TestTextAndReasoningInSameMessage(t *testing.T) {
 		Messages: []llm.Message{
 			{
 				Role:    llm.RoleUser,
-				Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "What is lisp?"}},
+				Content: []llm.ContentPart{llm.TextPart{Text: "What is lisp?"}},
 			},
 			{
 				Role: llm.RoleAssistant,
 				Content: []llm.ContentPart{
-					llm.ReasoningPart{Type: "reasoning", Text: "Let me explain Lisp."},
-					llm.TextPart{Type: "text", Text: "Lisp is a family of programming languages."},
+					llm.ReasoningPart{Text: "Let me explain Lisp."},
+					llm.TextPart{Text: "Lisp is a family of programming languages."},
 				},
 			},
 		},
@@ -485,20 +483,19 @@ func TestDisplayMessagesWithToolCalls(t *testing.T) {
 		Messages: []llm.Message{
 			{
 				Role:    llm.RoleUser,
-				Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "List files"}},
+				Content: []llm.ContentPart{llm.TextPart{Text: "List files"}},
 			},
 			{
 				Role:    llm.RoleAssistant,
-				Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "I'll list files for you."}},
+				Content: []llm.ContentPart{llm.TextPart{Text: "I'll list files for you."}},
 			},
 			{
 				Role: llm.RoleAssistant,
 				Content: []llm.ContentPart{
-					llm.ToolCallPart{
-						Type:       "tool_use",
-						ToolCallID: "call_123",
-						ToolName:   "execute_command",
-						Input:      json.RawMessage(`{"command": "ls -la"}`),
+					llm.ToolUsePart{
+						ID:       "call_123",
+						ToolName: "execute_command",
+						Input:    json.RawMessage(`{"command": "ls -la"}`),
 					},
 				},
 			},
@@ -506,15 +503,14 @@ func TestDisplayMessagesWithToolCalls(t *testing.T) {
 				Role: llm.RoleTool,
 				Content: []llm.ContentPart{
 					llm.ToolResultPart{
-						Type:       "tool_result",
-						ToolCallID: "call_123",
-						Output:     llm.ToolResultOutputText{Type: "text", Text: "file1.txt\nfile2.txt"},
+						ID:     "call_123",
+						Output: llm.ToolResultOutputText{Text: "file1.txt\nfile2.txt"},
 					},
 				},
 			},
 			{
 				Role:    llm.RoleAssistant,
-				Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Found 2 files!"}},
+				Content: []llm.ContentPart{llm.TextPart{Text: "Found 2 files!"}},
 			},
 		},
 		SessionMeta: SessionMeta{
@@ -587,38 +583,38 @@ func TestCleanIncompleteToolCalls(t *testing.T) {
 		{
 			name: "complete tool call cycle",
 			messages: []llm.Message{
-				{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Hello"}}},
+				{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Hello"}}},
 				{Role: llm.RoleAssistant, Content: []llm.ContentPart{
-					llm.ToolCallPart{Type: "tool_use", ToolCallID: "call-1", ToolName: "test_tool", Input: json.RawMessage("{}")},
+					llm.ToolUsePart{ID: "call-1", ToolName: "test_tool", Input: json.RawMessage("{}")},
 				}},
 				{Role: llm.RoleTool, Content: []llm.ContentPart{
-					llm.ToolResultPart{Type: "tool_result", ToolCallID: "call-1", Output: llm.ToolResultOutputText{Type: "text", Text: "result"}},
+					llm.ToolResultPart{ID: "call-1", Output: llm.ToolResultOutputText{Text: "result"}},
 				}},
-				{Role: llm.RoleAssistant, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Done"}}},
+				{Role: llm.RoleAssistant, Content: []llm.ContentPart{llm.TextPart{Text: "Done"}}},
 			},
 			wantLen: 4, // all kept
 		},
 		{
 			name: "complete tool call - Anthropic style (tool result in user message)",
 			messages: []llm.Message{
-				{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Hello"}}},
+				{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Hello"}}},
 				{Role: llm.RoleAssistant, Content: []llm.ContentPart{
-					llm.ToolCallPart{Type: "tool_use", ToolCallID: "call-1", ToolName: "test_tool", Input: json.RawMessage("{}")},
+					llm.ToolUsePart{ID: "call-1", ToolName: "test_tool", Input: json.RawMessage("{}")},
 				}},
 				// Anthropic puts tool result in user message
 				{Role: llm.RoleUser, Content: []llm.ContentPart{
-					llm.ToolResultPart{Type: "tool_result", ToolCallID: "call-1", Output: llm.ToolResultOutputText{Type: "text", Text: "result"}},
+					llm.ToolResultPart{ID: "call-1", Output: llm.ToolResultOutputText{Text: "result"}},
 				}},
-				{Role: llm.RoleAssistant, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Done"}}},
+				{Role: llm.RoleAssistant, Content: []llm.ContentPart{llm.TextPart{Text: "Done"}}},
 			},
 			wantLen: 4, // all kept
 		},
 		{
 			name: "incomplete tool call - no result",
 			messages: []llm.Message{
-				{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Hello"}}},
+				{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Hello"}}},
 				{Role: llm.RoleAssistant, Content: []llm.ContentPart{
-					llm.ToolCallPart{Type: "tool_use", ToolCallID: "call-1", ToolName: "test_tool", Input: json.RawMessage("{}")},
+					llm.ToolUsePart{ID: "call-1", ToolName: "test_tool", Input: json.RawMessage("{}")},
 				}},
 				// No tool result message - this happens when API errors mid-cycle
 			},
@@ -627,10 +623,10 @@ func TestCleanIncompleteToolCalls(t *testing.T) {
 		{
 			name: "incomplete tool call - assistant has text and tool call",
 			messages: []llm.Message{
-				{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Hello"}}},
+				{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Hello"}}},
 				{Role: llm.RoleAssistant, Content: []llm.ContentPart{
-					llm.TextPart{Type: "text", Text: "Let me help"},
-					llm.ToolCallPart{Type: "tool_use", ToolCallID: "call-1", ToolName: "test_tool", Input: json.RawMessage("{}")},
+					llm.TextPart{Text: "Let me help"},
+					llm.ToolUsePart{ID: "call-1", ToolName: "test_tool", Input: json.RawMessage("{}")},
 				}},
 				// Tool call has no result
 			},
@@ -639,9 +635,9 @@ func TestCleanIncompleteToolCalls(t *testing.T) {
 		{
 			name: "incomplete tool call - Anthropic style (user message with tool result is missing)",
 			messages: []llm.Message{
-				{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Hello"}}},
+				{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Hello"}}},
 				{Role: llm.RoleAssistant, Content: []llm.ContentPart{
-					llm.ToolCallPart{Type: "tool_use", ToolCallID: "call-1", ToolName: "test_tool", Input: json.RawMessage("{}")},
+					llm.ToolUsePart{ID: "call-1", ToolName: "test_tool", Input: json.RawMessage("{}")},
 				}},
 				// No user message with tool result - incomplete
 			},
@@ -650,9 +646,9 @@ func TestCleanIncompleteToolCalls(t *testing.T) {
 		{
 			name: "trailing user message preserved",
 			messages: []llm.Message{
-				{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "First"}}},
-				{Role: llm.RoleAssistant, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Response"}}},
-				{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Second (no response)"}}},
+				{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "First"}}},
+				{Role: llm.RoleAssistant, Content: []llm.ContentPart{llm.TextPart{Text: "Response"}}},
+				{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Second (no response)"}}},
 			},
 			wantLen: 3, // all kept, including trailing user message
 		},
@@ -686,16 +682,15 @@ func TestTLVFormatRecursionProtection(t *testing.T) {
 		Messages: []llm.Message{
 			{
 				Role:    llm.RoleUser,
-				Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Read the session file"}},
+				Content: []llm.ContentPart{llm.TextPart{Text: "Read the session file"}},
 			},
 			{
 				Role: llm.RoleAssistant,
 				Content: []llm.ContentPart{
-					llm.ToolCallPart{
-						Type:       "tool_use",
-						ToolCallID: "call1",
-						ToolName:   "read_file",
-						Input:      json.RawMessage(`{"path": "old-session.md"}`),
+					llm.ToolUsePart{
+						ID:       "call1",
+						ToolName: "read_file",
+						Input:    json.RawMessage(`{"path": "old-session.md"}`),
 					},
 				},
 			},
@@ -703,16 +698,15 @@ func TestTLVFormatRecursionProtection(t *testing.T) {
 				Role: llm.RoleTool,
 				Content: []llm.ContentPart{
 					llm.ToolResultPart{
-						Type:       "tool_result",
-						ToolCallID: "call1",
+						ID: "call1",
 						// This output contains text that looks like old session format markers!
-						Output: llm.ToolResultOutputText{Type: "text", Text: "---\nbase_url: https://api.test.com\n---\n\x00msg:user\nFake user message\n\x00msg:assistant\nFake assistant\n"},
+						Output: llm.ToolResultOutputText{Text: "---\nbase_url: https://api.test.com\n---\n\x00msg:user\nFake user message\n\x00msg:assistant\nFake assistant\n"},
 					},
 				},
 			},
 			{
 				Role:    llm.RoleAssistant,
-				Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Here's the file content..."}},
+				Content: []llm.ContentPart{llm.TextPart{Text: "Here's the file content..."}},
 			},
 		},
 		SessionConfig: SessionConfig{

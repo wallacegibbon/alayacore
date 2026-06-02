@@ -64,9 +64,8 @@ func TestOnToolResultCallback(t *testing.T) {
 		session.Messages = append(session.Messages, llm.Message{
 			Role: llm.RoleTool,
 			Content: []llm.ContentPart{llm.ToolResultPart{
-				Type:       "tool_result",
-				ToolCallID: toolCallID,
-				Output:     toolResult,
+				ID:     toolCallID,
+				Output: toolResult,
 			}},
 		})
 
@@ -81,7 +80,7 @@ func TestOnToolResultCallback(t *testing.T) {
 	}
 
 	// Test success result
-	err := callback("call1", llm.ToolResultOutputText{Type: "text", Text: "success output"})
+	err := callback("call1", llm.ToolResultOutputText{Text: "success output"})
 	if err != nil {
 		t.Fatalf("Callback returned error: %v", err)
 	}
@@ -107,7 +106,7 @@ func TestOnToolResultCallback(t *testing.T) {
 
 	// Test error result
 	output.data = nil
-	err = callback("call2", llm.ToolResultOutputFailed{Type: "error", Reason: "something failed"})
+	err = callback("call2", llm.ToolResultOutputFailed{Reason: "something failed"})
 	if err != nil {
 		t.Fatalf("Callback returned error: %v", err)
 	}
@@ -144,7 +143,7 @@ func TestWriteToolCallWithPending(t *testing.T) {
 	}
 
 	// The tool call should be JSON with id, is_placeholder, name, input
-	var fd1 stream.FunctionData
+	var fd1 stream.ToolUseData
 	if err := json.Unmarshal([]byte(value1), &fd1); err != nil {
 		t.Fatalf("Failed to parse AF JSON: %v", err)
 	}

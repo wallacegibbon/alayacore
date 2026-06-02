@@ -90,7 +90,7 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 		o.handleSystemMsg(value)
 
 	case stream.TagAssistantF:
-		var fd stream.FunctionData
+		var fd stream.ToolUseData
 		if err := json.Unmarshal([]byte(value), &fd); err != nil {
 			return
 		}

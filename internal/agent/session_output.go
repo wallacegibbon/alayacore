@@ -60,7 +60,7 @@ func (s *Session) writeTLVJSON(tag string, v any) {
 }
 
 func (s *Session) writeToolCall(toolName, input, id string) {
-	s.writeTLVJSON(stream.TagAssistantF, stream.FunctionData{
+	s.writeTLVJSON(stream.TagAssistantF, stream.ToolUseData{
 		ID:            id,
 		IsPlaceholder: false,
 		Name:          toolName,
@@ -72,7 +72,7 @@ func (s *Session) writeToolCall(toolName, input, id string) {
 // The full input is written later by writeToolCall when all
 // arguments have been received.
 func (s *Session) writeToolCallStart(toolName, id string) {
-	s.writeTLVJSON(stream.TagAssistantF, stream.FunctionData{
+	s.writeTLVJSON(stream.TagAssistantF, stream.ToolUseData{
 		ID:            id,
 		IsPlaceholder: true,
 		Name:          toolName,

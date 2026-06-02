@@ -8,11 +8,11 @@ import (
 	"github.com/alayacore/alayacore/internal/theme"
 )
 
-func TestHandleFunctionEvent(t *testing.T) {
+func TestHandleToolUseEvent(t *testing.T) {
 	wb := NewWindowBuffer(80, DefaultStyles())
 
 	// Send a "call" type event (creates the window)
-	wb.HandleFunctionEvent(stream.FunctionData{
+	wb.HandleToolUseEvent(stream.ToolUseData{
 		ID:            "tool123",
 		IsPlaceholder: false,
 		Name:          "execute_command",
@@ -53,7 +53,7 @@ func TestRenderWindowContentWithStatus(t *testing.T) {
 	wb := NewWindowBuffer(80, DefaultStyles())
 
 	// Create a tool window
-	wb.HandleFunctionEvent(stream.FunctionData{
+	wb.HandleToolUseEvent(stream.ToolUseData{
 		ID:            "tool123",
 		IsPlaceholder: false,
 		Name:          "execute_command",
@@ -110,12 +110,12 @@ func contains(s, substr string) bool {
 
 func TestOutputWriterToolCallStartThenFull(t *testing.T) {
 	// End-to-end test: write TagAssistantF TLVs through the actual
-	// outputWriter pipeline (Write → processBuffer → writeColored → HandleFunctionEvent).
+	// outputWriter pipeline (Write → processBuffer → writeColored → HandleToolUseEvent).
 	out := NewTerminalOutput(NewStyles(theme.DefaultTheme()))
 	out.SetWindowWidth(80)
 
 	makeFD := func(id string, isPlaceholder bool, name, input string) []byte {
-		fd, _ := json.Marshal(stream.FunctionData{
+		fd, _ := json.Marshal(stream.ToolUseData{
 			ID:            id,
 			IsPlaceholder: isPlaceholder,
 			Name:          name,

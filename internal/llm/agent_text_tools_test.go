@@ -15,7 +15,7 @@ func TestAgentPreservesTextWithToolCalls(t *testing.T) {
 		responses: []mockResponse{
 			{
 				text:      "Let me check that for you.",
-				toolCalls: []ToolCallPart{{Type: "tool_use", ToolCallID: "call_123", ToolName: "get_weather", Input: []byte(`{"location":"SF"}`)}},
+				toolCalls: []ToolUsePart{{ID: "call_123", ToolName: "get_weather", Input: []byte(`{"location":"SF"}`)}},
 			},
 			{
 				text: "The weather in SF is sunny.",
@@ -30,7 +30,7 @@ func TestAgentPreservesTextWithToolCalls(t *testing.T) {
 			{
 				Definition: ToolDefinition{Name: "get_weather", Description: "Get weather", Schema: []byte(`{"type":"object"}`)},
 				Execute: func(_ context.Context, _ json.RawMessage) (ToolResultOutput, error) {
-					return ToolResultOutputText{Type: "text", Text: "Sunny, 72F"}, nil
+					return ToolResultOutputText{Text: "Sunny, 72F"}, nil
 				},
 			},
 		},
@@ -40,7 +40,7 @@ func TestAgentPreservesTextWithToolCalls(t *testing.T) {
 	// Track messages received via OnStepFinish callback
 	var allStepMessages [][]Message
 	_, err := agent.Stream(context.Background(), []Message{
-		{Role: RoleUser, Content: []ContentPart{TextPart{Type: "text", Text: "What's the weather?"}}},
+		{Role: RoleUser, Content: []ContentPart{TextPart{Text: "What's the weather?"}}},
 	}, StreamCallbacks{
 		OnStepFinish: func(messages []Message, _ Usage) error {
 			allStepMessages = append(allStepMessages, messages)
@@ -78,7 +78,7 @@ func TestAgentPreservesTextWithToolCalls(t *testing.T) {
 			if p.Text != "Let me check that for you." {
 				t.Errorf("Text content mismatch: %q", p.Text)
 			}
-		case ToolCallPart:
+		case ToolUsePart:
 			hasToolCall = true
 			if p.ToolName != "get_weather" {
 				t.Errorf("Tool name mismatch: %s", p.ToolName)
@@ -107,7 +107,7 @@ type mockProviderWithTextAndTools struct {
 
 type mockResponse struct {
 	text      string
-	toolCalls []ToolCallPart
+	toolCalls []ToolUsePart
 }
 
 func (m *mockProviderWithTextAndTools) StreamMessages(_ context.Context, _ []Message, _ []ToolDefinition, _, _ string) (iter.Seq2[StreamEvent, error], error) {
@@ -125,7 +125,7 @@ func (m *mockProviderWithTextAndTools) StreamMessages(_ context.Context, _ []Mes
 		// Send tool call events
 		for _, tc := range resp.toolCalls {
 			if !yield(ToolCallEvent{
-				ToolCallID: tc.ToolCallID,
+				ToolCallID: tc.ID,
 				ToolName:   tc.ToolName,
 				Input:      tc.Input,
 			}, nil) {
@@ -136,7 +136,7 @@ func (m *mockProviderWithTextAndTools) StreamMessages(_ context.Context, _ []Mes
 		// Send step complete with message containing BOTH text and tool calls
 		content := []ContentPart{}
 		if resp.text != "" {
-			content = append(content, TextPart{Type: "text", Text: resp.text})
+			content = append(content, TextPart{Text: resp.text})
 		}
 		for _, tc := range resp.toolCalls {
 			content = append(content, tc)

@@ -389,21 +389,18 @@ func (s *anthropicStreamState) finishBlock() {
 	switch s.currentType {
 	case anthropicBlockTypeText:
 		s.contentParts = append(s.contentParts, llm.TextPart{
-			Type: llm.ContentPartText,
 			Text: s.currentText.String(),
 		})
 	case anthropicBlockTypeThinking:
 		s.contentParts = append(s.contentParts, llm.ReasoningPart{
-			Type:      llm.ContentPartReasoning,
 			Text:      s.currentText.String(),
 			Signature: s.currentSignature,
 		})
 	case anthropicBlockTypeToolUse:
-		s.contentParts = append(s.contentParts, llm.ToolCallPart{
-			Type:       llm.ContentPartToolUse,
-			ToolCallID: s.currentID,
-			ToolName:   s.currentName,
-			Input:      json.RawMessage(s.currentInput.String()),
+		s.contentParts = append(s.contentParts, llm.ToolUsePart{
+			ID:       s.currentID,
+			ToolName: s.currentName,
+			Input:    json.RawMessage(s.currentInput.String()),
 		})
 	}
 	s.currentType = ""
@@ -431,13 +428,12 @@ func (s *anthropicStreamState) getMessage() llm.Message {
 }
 
 // lastToolCall returns the last tool call if the current block is a tool_use
-func (s *anthropicStreamState) lastToolCall() *llm.ToolCallPart {
+func (s *anthropicStreamState) lastToolCall() *llm.ToolUsePart {
 	if s.currentType == anthropicBlockTypeToolUse {
-		return &llm.ToolCallPart{
-			Type:       llm.ContentPartToolUse,
-			ToolCallID: s.currentID,
-			ToolName:   s.currentName,
-			Input:      json.RawMessage(s.currentInput.String()),
+		return &llm.ToolUsePart{
+			ID:       s.currentID,
+			ToolName: s.currentName,
+			Input:    json.RawMessage(s.currentInput.String()),
 		}
 	}
 	return nil
@@ -538,7 +534,7 @@ func (p *AnthropicProvider) handleContentBlockStop(yield func(llm.StreamEvent, e
 	state.finishBlock()
 	if tc != nil {
 		if !yield(llm.ToolCallEvent{
-			ToolCallID: tc.ToolCallID,
+			ToolCallID: tc.ID,
 			ToolName:   tc.ToolName,
 			Input:      tc.Input,
 		}, nil) {
@@ -637,7 +633,7 @@ func unmarshalSSE[T any](data string, yield func(llm.StreamEvent, error) bool) (
 // Wire-format mappings:
 //   - llm.TextPart       → anthropicContentBlock{Type: "text"}
 //   - llm.ReasoningPart  → anthropicContentBlock{Type: "thinking"}  (domain "reasoning" → wire "thinking")
-//   - llm.ToolCallPart   → anthropicContentBlock{Type: "tool_use"}
+//   - llm.ToolUsePart   → anthropicContentBlock{Type: "tool_use"}
 //   - llm.ToolResultPart → anthropicContentBlock{Type: "tool_result"} (role remapped to "user")
 func anthropicConvertMessages(messages []llm.Message, reasoningLevel int) []anthropicMessage {
 	apiMessages := make([]anthropicMessage, 0, len(messages))
@@ -710,17 +706,17 @@ func anthropicPartToBlock(part llm.ContentPart) *anthropicContentBlock {
 			Thinking:  &text,
 			Signature: v.Signature,
 		}
-	case llm.ToolCallPart:
+	case llm.ToolUsePart:
 		return &anthropicContentBlock{
 			Type:  anthropicBlockTypeToolUse,
-			ID:    v.ToolCallID,
+			ID:    v.ID,
 			Name:  v.ToolName,
 			Input: v.Input,
 		}
 	case llm.ToolResultPart:
 		block := &anthropicContentBlock{
 			Type:      anthropicBlockTypeToolResult,
-			ToolUseID: v.ToolCallID,
+			ToolUseID: v.ID,
 		}
 		switch out := v.Output.(type) {
 		case llm.ToolResultOutputText:

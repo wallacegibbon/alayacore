@@ -56,7 +56,7 @@ func TestAnthropicRealAPI(t *testing.T) {
 	defer cancel()
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Say 'Hello, world!' and nothing else."}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Say 'Hello, world!' and nothing else."}}},
 	}
 
 	events, err := provider.StreamMessages(ctx, messages, nil, "You are a helpful assistant. Be very brief.", "")
@@ -114,7 +114,7 @@ func TestOpenAICompatibleRealAPI(t *testing.T) {
 	defer cancel()
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Say 'Hello!' and nothing else."}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Say 'Hello!' and nothing else."}}},
 	}
 
 	events, err := provider.StreamMessages(ctx, messages, nil, "", "")
@@ -182,7 +182,7 @@ func TestAnthropicRealToolCall(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Use the echo tool to say 'test123'"}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Use the echo tool to say 'test123'"}}},
 	}
 
 	events, err := provider.StreamMessages(ctx, messages, tools, "You are a helpful assistant. Use tools when requested.", "")
@@ -245,7 +245,7 @@ func TestOpenAIRealAPI(t *testing.T) {
 	defer cancel()
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Say 'Hello, world!' and nothing else."}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Say 'Hello, world!' and nothing else."}}},
 	}
 
 	events, err := provider.StreamMessages(ctx, messages, nil, "You are a helpful assistant. Be very brief.", "")
@@ -312,9 +312,9 @@ func TestAgentToolLoopRealAPI(t *testing.T) {
 				Message string `json:"message"`
 			}
 			if unmarshalErr := json.Unmarshal(input, &params); unmarshalErr != nil {
-				return llm.ToolResultOutputFailed{Type: "error", Reason: "invalid input"}, nil
+				return llm.ToolResultOutputFailed{Reason: "invalid input"}, nil
 			}
-			return llm.ToolResultOutputText{Type: "text", Text: "Echo: " + params.Message}, nil
+			return llm.ToolResultOutputText{Text: "Echo: " + params.Message}, nil
 		},
 	}
 
@@ -330,7 +330,7 @@ func TestAgentToolLoopRealAPI(t *testing.T) {
 	defer cancel()
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Use the echo tool to say 'hello world' and then tell me what the tool returned."}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Use the echo tool to say 'hello world' and then tell me what the tool returned."}}},
 	}
 
 	var textReceived strings.Builder
@@ -417,7 +417,7 @@ func TestAgentMultiToolLoopRealAPI(t *testing.T) {
 		},
 		Execute: func(_ context.Context, input json.RawMessage) (llm.ToolResultOutput, error) {
 			counter++
-			return llm.ToolResultOutputText{Type: "text", Text: fmt.Sprintf("Counter is now %d", counter)}, nil
+			return llm.ToolResultOutputText{Text: fmt.Sprintf("Counter is now %d", counter)}, nil
 		},
 	}
 
@@ -433,7 +433,7 @@ func TestAgentMultiToolLoopRealAPI(t *testing.T) {
 	defer cancel()
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Please increment the counter 3 times, then tell me the final value."}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Please increment the counter 3 times, then tell me the final value."}}},
 	}
 
 	var textReceived strings.Builder
@@ -513,9 +513,9 @@ func TestAgentSequentialQueriesWithTools(t *testing.T) {
 				Message string `json:"message"`
 			}
 			if unmarshalErr := json.Unmarshal(input, &params); unmarshalErr != nil {
-				return llm.ToolResultOutputFailed{Type: "error", Reason: "invalid input"}, nil
+				return llm.ToolResultOutputFailed{Reason: "invalid input"}, nil
 			}
-			return llm.ToolResultOutputText{Type: "text", Text: "Echo: " + params.Message}, nil
+			return llm.ToolResultOutputText{Text: "Echo: " + params.Message}, nil
 		},
 	}
 
@@ -532,7 +532,7 @@ func TestAgentSequentialQueriesWithTools(t *testing.T) {
 
 	// First query - uses tool
 	allMessages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Use the echo tool to say 'first query'"}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Use the echo tool to say 'first query'"}}},
 	}
 
 	var toolCalls []string
@@ -559,7 +559,7 @@ func TestAgentSequentialQueriesWithTools(t *testing.T) {
 	// Second query - should also work
 	allMessages = append(allMessages, llm.Message{
 		Role:    llm.RoleUser,
-		Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Now use the echo tool to say 'second query'"}},
+		Content: []llm.ContentPart{llm.TextPart{Text: "Now use the echo tool to say 'second query'"}},
 	})
 
 	toolCalls = nil
@@ -580,7 +580,7 @@ func TestAgentSequentialQueriesWithTools(t *testing.T) {
 	allMessages = result.Messages
 	allMessages = append(allMessages, llm.Message{
 		Role:    llm.RoleUser,
-		Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "What is 2+2? Just answer with the number."}},
+		Content: []llm.ContentPart{llm.TextPart{Text: "What is 2+2? Just answer with the number."}},
 	})
 
 	var textReceived strings.Builder
@@ -638,9 +638,9 @@ func TestOpenAICompatSequentialQueriesWithTools(t *testing.T) {
 				Message string `json:"message"`
 			}
 			if unmarshalErr := json.Unmarshal(input, &params); unmarshalErr != nil {
-				return llm.ToolResultOutputFailed{Type: "error", Reason: "invalid input"}, nil
+				return llm.ToolResultOutputFailed{Reason: "invalid input"}, nil
 			}
-			return llm.ToolResultOutputText{Type: "text", Text: "Echo: " + params.Message}, nil
+			return llm.ToolResultOutputText{Text: "Echo: " + params.Message}, nil
 		},
 	}
 
@@ -657,7 +657,7 @@ func TestOpenAICompatSequentialQueriesWithTools(t *testing.T) {
 
 	// First query - uses tool
 	allMessages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Use the echo tool to say 'first query'"}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Use the echo tool to say 'first query'"}}},
 	}
 
 	var toolCalls []string
@@ -684,7 +684,7 @@ func TestOpenAICompatSequentialQueriesWithTools(t *testing.T) {
 	// Second query - should also work
 	allMessages = append(allMessages, llm.Message{
 		Role:    llm.RoleUser,
-		Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "Now use the echo tool to say 'second query'"}},
+		Content: []llm.ContentPart{llm.TextPart{Text: "Now use the echo tool to say 'second query'"}},
 	})
 
 	toolCalls = nil
@@ -705,7 +705,7 @@ func TestOpenAICompatSequentialQueriesWithTools(t *testing.T) {
 	allMessages = result.Messages
 	allMessages = append(allMessages, llm.Message{
 		Role:    llm.RoleUser,
-		Content: []llm.ContentPart{llm.TextPart{Type: "text", Text: "What is 2+2? Just answer with the number."}},
+		Content: []llm.ContentPart{llm.TextPart{Text: "What is 2+2? Just answer with the number."}},
 	})
 
 	var textReceived strings.Builder

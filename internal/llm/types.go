@@ -59,7 +59,6 @@ const (
 
 // TextPart represents text content
 type TextPart struct {
-	Type string `json:"type"`
 	Text string `json:"text"`
 }
 
@@ -67,7 +66,6 @@ func (TextPart) isContentPart() {}
 
 // ImagePart represents an image content (DataURI: data:image/...;base64,...)
 type ImagePart struct {
-	Type    string `json:"type"`
 	DataURL string `json:"data_url"`
 }
 
@@ -78,28 +76,25 @@ func (ImagePart) isContentPart() {}
 // and must be passed back to the API exactly as received. Empty for
 // providers that don't use signatures (OpenAI, DeepSeek, etc.).
 type ReasoningPart struct {
-	Type      string `json:"type"`
 	Text      string `json:"text"`
 	Signature string `json:"signature,omitempty"`
 }
 
 func (ReasoningPart) isContentPart() {}
 
-// ToolCallPart represents a tool call
-type ToolCallPart struct {
-	Type       string          `json:"type"`
-	ToolCallID string          `json:"tool_call_id"`
-	ToolName   string          `json:"tool_name"`
-	Input      json.RawMessage `json:"input"`
+// ToolUsePart represents a tool call
+type ToolUsePart struct {
+	ID       string          `json:"id"`
+	ToolName string          `json:"tool_name"`
+	Input    json.RawMessage `json:"input"`
 }
 
-func (ToolCallPart) isContentPart() {}
+func (ToolUsePart) isContentPart() {}
 
 // ToolResultPart represents a tool execution result
 type ToolResultPart struct {
-	Type       string           `json:"type"`
-	ToolCallID string           `json:"tool_call_id"`
-	Output     ToolResultOutput `json:"output"`
+	ID     string           `json:"id"`
+	Output ToolResultOutput `json:"output"`
 }
 
 func (ToolResultPart) isContentPart() {}
@@ -111,7 +106,6 @@ type ToolResultOutput interface {
 
 // ToolResultOutputText represents text output
 type ToolResultOutputText struct {
-	Type string `json:"type"`
 	Text string `json:"text"`
 }
 
@@ -119,7 +113,6 @@ func (ToolResultOutputText) isToolResultOutput() {}
 
 // ToolResultOutputFailed represents a failed tool execution result.
 type ToolResultOutputFailed struct {
-	Type   string `json:"type"`
 	Reason string `json:"reason"`
 }
 

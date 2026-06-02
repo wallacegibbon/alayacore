@@ -27,11 +27,10 @@ func (m *mockProviderAlwaysToolCalls) StreamMessages(_ context.Context, _ []Mess
 			Message: Message{
 				Role: RoleAssistant,
 				Content: []ContentPart{
-					ToolCallPart{
-						Type:       ContentPartToolUse,
-						ToolCallID: "call_1",
-						ToolName:   "repeat",
-						Input:      []byte(`{}`),
+					ToolUsePart{
+						ID:       "call_1",
+						ToolName: "repeat",
+						Input:    []byte(`{}`),
 					},
 				},
 			},
@@ -51,7 +50,7 @@ func TestAgentMaxStepsExceeded(t *testing.T) {
 			{
 				Definition: ToolDefinition{Name: "repeat", Description: "Repeat", Schema: []byte(`{"type":"object"}`)},
 				Execute: func(_ context.Context, _ json.RawMessage) (ToolResultOutput, error) {
-					return ToolResultOutputText{Type: "text", Text: "repeated"}, nil
+					return ToolResultOutputText{Text: "repeated"}, nil
 				},
 			},
 		},
@@ -59,7 +58,7 @@ func TestAgentMaxStepsExceeded(t *testing.T) {
 	})
 
 	result, err := agent.Stream(context.Background(), []Message{
-		{Role: RoleUser, Content: []ContentPart{TextPart{Type: "text", Text: "go"}}},
+		{Role: RoleUser, Content: []ContentPart{TextPart{Text: "go"}}},
 	}, StreamCallbacks{})
 
 	if !errors.Is(err, ErrMaxStepsExceeded) {
@@ -82,7 +81,7 @@ func TestAgentCompletesWithinMaxSteps(t *testing.T) {
 	provider := &mockProviderWithTextAndTools{
 		responses: []mockResponse{
 			{
-				toolCalls: []ToolCallPart{{Type: "tool_use", ToolCallID: "call_1", ToolName: "ping", Input: []byte(`{}`)}},
+				toolCalls: []ToolUsePart{{ID: "call_1", ToolName: "ping", Input: []byte(`{}`)}},
 			},
 			{
 				text: "Done!",
@@ -96,7 +95,7 @@ func TestAgentCompletesWithinMaxSteps(t *testing.T) {
 			{
 				Definition: ToolDefinition{Name: "ping", Description: "Ping", Schema: []byte(`{"type":"object"}`)},
 				Execute: func(_ context.Context, _ json.RawMessage) (ToolResultOutput, error) {
-					return ToolResultOutputText{Type: "text", Text: "pong"}, nil
+					return ToolResultOutputText{Text: "pong"}, nil
 				},
 			},
 		},
@@ -104,7 +103,7 @@ func TestAgentCompletesWithinMaxSteps(t *testing.T) {
 	})
 
 	result, err := agent.Stream(context.Background(), []Message{
-		{Role: RoleUser, Content: []ContentPart{TextPart{Type: "text", Text: "go"}}},
+		{Role: RoleUser, Content: []ContentPart{TextPart{Text: "go"}}},
 	}, StreamCallbacks{})
 
 	if err != nil {
@@ -129,7 +128,7 @@ func (m *mockProviderTruncated) StreamMessages(_ context.Context, _ []Message, _
 		yield(StepCompleteEvent{
 			Message: Message{
 				Role:    RoleAssistant,
-				Content: []ContentPart{TextPart{Type: "text", Text: "Partial response..."}},
+				Content: []ContentPart{TextPart{Text: "Partial response..."}},
 			},
 			Usage:      Usage{InputTokens: 10, OutputTokens: 5},
 			StopReason: m.stopReason,
@@ -148,7 +147,7 @@ func TestAgentTruncatedMaxTokens(t *testing.T) {
 	})
 
 	result, err := agent.Stream(context.Background(), []Message{
-		{Role: RoleUser, Content: []ContentPart{TextPart{Type: "text", Text: "Write a novel"}}},
+		{Role: RoleUser, Content: []ContentPart{TextPart{Text: "Write a novel"}}},
 	}, StreamCallbacks{})
 
 	if !errors.Is(err, ErrResponseTruncated) {
@@ -171,7 +170,7 @@ func TestAgentTruncatedLength(t *testing.T) {
 	})
 
 	result, err := agent.Stream(context.Background(), []Message{
-		{Role: RoleUser, Content: []ContentPart{TextPart{Type: "text", Text: "Write a novel"}}},
+		{Role: RoleUser, Content: []ContentPart{TextPart{Text: "Write a novel"}}},
 	}, StreamCallbacks{})
 
 	if !errors.Is(err, ErrResponseTruncated) {
@@ -194,7 +193,7 @@ func TestAgentNoTruncationOnEndTurn(t *testing.T) {
 	})
 
 	result, err := agent.Stream(context.Background(), []Message{
-		{Role: RoleUser, Content: []ContentPart{TextPart{Type: "text", Text: "Hello"}}},
+		{Role: RoleUser, Content: []ContentPart{TextPart{Text: "Hello"}}},
 	}, StreamCallbacks{})
 
 	if err != nil {

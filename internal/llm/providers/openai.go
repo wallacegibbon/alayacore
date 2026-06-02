@@ -289,7 +289,7 @@ func (p *OpenAIProvider) parseStream(reader io.Reader) iter.Seq2[llm.StreamEvent
 		state.finalizeToolCalls()
 		for _, tc := range state.getToolCalls() {
 			if !yield(llm.ToolCallEvent{
-				ToolCallID: tc.ToolCallID,
+				ToolCallID: tc.ID,
 				ToolName:   tc.ToolName,
 				Input:      tc.Input,
 			}, nil) {
@@ -311,7 +311,7 @@ type openAIStreamState struct {
 	textBuilder      strings.Builder
 	reasoningBuilder strings.Builder
 	toolCallArgs     map[int]*strings.Builder // tool call index -> arguments builder
-	toolCalls        []llm.ToolCallPart
+	toolCalls        []llm.ToolUsePart
 }
 
 func (s *openAIStreamState) addTextDelta(delta string) {
@@ -343,9 +343,9 @@ func (s *openAIStreamState) appendToolCallArgs(index int, args json.RawMessage) 
 
 func (s *openAIStreamState) setToolCallName(index int, id, name string) {
 	for len(s.toolCalls) <= index {
-		s.toolCalls = append(s.toolCalls, llm.ToolCallPart{Type: llm.ContentPartToolUse})
+		s.toolCalls = append(s.toolCalls, llm.ToolUsePart{})
 	}
-	s.toolCalls[index].ToolCallID = id
+	s.toolCalls[index].ID = id
 	s.toolCalls[index].ToolName = name
 }
 
@@ -357,7 +357,7 @@ func (s *openAIStreamState) finalizeToolCalls() {
 	}
 }
 
-func (s *openAIStreamState) getToolCalls() []llm.ToolCallPart {
+func (s *openAIStreamState) getToolCalls() []llm.ToolUsePart {
 	return s.toolCalls
 }
 
@@ -369,13 +369,11 @@ func (s *openAIStreamState) getMessage() llm.Message {
 	content := make([]llm.ContentPart, 0, 2+len(s.toolCalls))
 	if s.reasoningBuilder.Len() > 0 {
 		content = append(content, llm.ReasoningPart{
-			Type: llm.ContentPartReasoning,
 			Text: s.reasoningBuilder.String(),
 		})
 	}
 	if s.textBuilder.Len() > 0 {
 		content = append(content, llm.TextPart{
-			Type: llm.ContentPartText,
 			Text: s.textBuilder.String(),
 		})
 	}
@@ -528,7 +526,7 @@ func openaiConvertToolResults(content []llm.ContentPart) []openAIMessage {
 		}
 		apiMsg := openAIMessage{
 			Role:       string(llm.RoleTool),
-			ToolCallID: tr.ToolCallID,
+			ToolCallID: tr.ID,
 		}
 		switch out := tr.Output.(type) {
 		case llm.ToolResultOutputText:
@@ -546,7 +544,7 @@ func openaiConvertToolResults(content []llm.ContentPart) []openAIMessage {
 // openaiHasToolCalls checks if content contains tool calls
 func openaiHasToolCalls(content []llm.ContentPart) bool {
 	for _, part := range content {
-		if _, ok := part.(llm.ToolCallPart); ok {
+		if _, ok := part.(llm.ToolUsePart); ok {
 			return true
 		}
 	}
@@ -570,13 +568,13 @@ func openaiConvertToolCalls(apiMsg *openAIMessage, content []llm.ContentPart) {
 	var textParts []string
 	for _, part := range content {
 		switch v := part.(type) {
-		case llm.ToolCallPart:
+		case llm.ToolUsePart:
 			argsStr, err := json.Marshal(string(v.Input))
 			if err != nil {
 				argsStr = []byte("{}")
 			}
 			apiMsg.ToolCalls = append(apiMsg.ToolCalls, openAIToolCall{
-				ID:   v.ToolCallID,
+				ID:   v.ID,
 				Type: "function",
 				Function: openAIFunction{
 					Name:      v.ToolName,

@@ -70,7 +70,7 @@ func TestAnthropicEmptyExtraPrompt(t *testing.T) {
 		Model:    "claude-3-5-sonnet-20241022",
 		Messages: []anthropicMessage{},
 		System: []anthropicSystemMessage{
-			{Type: "text", Text: "Default system prompt"},
+			{Text: "Default system prompt"},
 		},
 		MaxTokens: llm.DefaultMaxTokens,
 		Stream:    true,

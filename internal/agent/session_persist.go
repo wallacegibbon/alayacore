@@ -108,9 +108,9 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 					writeTLV(&binaryBuf, stream.TagAssistantR, p.Text)
 				}
 
-			case llm.ToolCallPart:
-				fd := stream.FunctionData{
-					ID:            p.ToolCallID,
+			case llm.ToolUsePart:
+				fd := stream.ToolUseData{
+					ID:            p.ID,
 					IsPlaceholder: false,
 					Name:          p.ToolName,
 					Input:         string(p.Input),
@@ -123,7 +123,7 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 
 			case llm.ToolResultPart:
 				tr := stream.ToolResultData{
-					ID:      p.ToolCallID,
+					ID:      p.ID,
 					Output:  formatToolResultOutput(p.Output),
 					IsError: false,
 				}
@@ -293,11 +293,11 @@ func parseMessagesTLV(body string) ([]llm.Message, []TLVChunk, error) {
 		switch tag {
 		case stream.TagUserT:
 			msgRole = llm.RoleUser
-			msgPart = llm.TextPart{Type: "text", Text: string(content)}
+			msgPart = llm.TextPart{Text: string(content)}
 
 		case stream.TagUserI:
 			msgRole = llm.RoleUser
-			msgPart = llm.ImagePart{Type: "image", DataURL: string(content)}
+			msgPart = llm.ImagePart{DataURL: string(content)}
 
 		case stream.TagAssistantT:
 			// Do NOT force newMessage: an assistant message may start with
@@ -305,7 +305,7 @@ func parseMessagesTLV(body string) ([]llm.Message, []TLVChunk, error) {
 			// the same message.  A new message is still created when
 			// currentMsg is nil or the role doesn't match.
 			msgRole = llm.RoleAssistant
-			msgPart = llm.TextPart{Type: "text", Text: string(content)}
+			msgPart = llm.TextPart{Text: string(content)}
 
 		case stream.TagAssistantR:
 			msgRole = llm.RoleAssistant
@@ -313,18 +313,17 @@ func parseMessagesTLV(body string) ([]llm.Message, []TLVChunk, error) {
 			var rd stream.ReasoningData
 			if err := json.Unmarshal(content, &rd); err == nil && rd.Text != "" {
 				msgPart = llm.ReasoningPart{
-					Type:      llm.ContentPartReasoning,
 					Text:      rd.Text,
 					Signature: rd.Signature,
 				}
 			} else {
-				msgPart = llm.ReasoningPart{Type: llm.ContentPartReasoning, Text: string(content)}
+				msgPart = llm.ReasoningPart{Text: string(content)}
 			}
 
 		case stream.TagAssistantF:
 			// TagAssistantF (AF) is the current format.
 			msgRole = llm.RoleAssistant
-			var fd stream.FunctionData
+			var fd stream.ToolUseData
 			if err := json.Unmarshal(content, &fd); err != nil {
 				return nil, nil, fmt.Errorf("failed to parse function data: %w", err)
 			}
@@ -332,11 +331,10 @@ func parseMessagesTLV(body string) ([]llm.Message, []TLVChunk, error) {
 				// Malformed data — skip
 				continue
 			}
-			msgPart = llm.ToolCallPart{
-				Type:       "tool_use",
-				ToolCallID: fd.ID,
-				ToolName:   fd.Name,
-				Input:      json.RawMessage(fd.Input),
+			msgPart = llm.ToolUsePart{
+				ID:       fd.ID,
+				ToolName: fd.Name,
+				Input:    json.RawMessage(fd.Input),
 			}
 
 		case stream.TagUserF:
@@ -347,14 +345,13 @@ func parseMessagesTLV(body string) ([]llm.Message, []TLVChunk, error) {
 			}
 			var output llm.ToolResultOutput
 			if tr.IsError {
-				output = llm.ToolResultOutputFailed{Type: "error", Reason: tr.Output}
+				output = llm.ToolResultOutputFailed{Reason: tr.Output}
 			} else {
-				output = llm.ToolResultOutputText{Type: "text", Text: tr.Output}
+				output = llm.ToolResultOutputText{Text: tr.Output}
 			}
 			msgPart = llm.ToolResultPart{
-				Type:       "tool_result",
-				ToolCallID: tr.ID,
-				Output:     output,
+				ID:     tr.ID,
+				Output: output,
 			}
 
 		default:

@@ -139,10 +139,10 @@ func (n *NopOutput) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// FunctionData is the JSON payload for TagAssistantF (AF).
+// ToolUseData is the JSON payload for TagAssistantF (AF).
 // IsPlaceholder indicates whether this is a preliminary "start" frame
 // (name known, input still streaming) or a complete "call" frame.
-type FunctionData struct {
+type ToolUseData struct {
 	ID            string `json:"id"`
 	IsPlaceholder bool   `json:"is_placeholder"`
 	Name          string `json:"name,omitempty"`
