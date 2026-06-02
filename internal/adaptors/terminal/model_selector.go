@@ -23,6 +23,7 @@ type searchableModel struct {
 	protocolTypeLower string
 	modelNameLower    string
 	baseURLLower      string
+	contextLimitStr   string // formatted context limit for search (e.g. "64kb", "1mb", "unlimited")
 }
 
 // ModelSelector manages model selection and configuration UI.
@@ -89,6 +90,7 @@ func (ms *ModelSelector) SetModels(models []searchableModel) {
 		ms.models[i].protocolTypeLower = strings.ToLower(ms.models[i].ProtocolType)
 		ms.models[i].modelNameLower = strings.ToLower(ms.models[i].ModelName)
 		ms.models[i].baseURLLower = strings.ToLower(ms.models[i].BaseURL)
+		ms.models[i].contextLimitStr = contextLimitSearchStr(int64(ms.models[i].ContextLimit))
 	}
 	ms.lastFilterValue = "\x00"
 	ms.updateFilteredModels()
@@ -133,6 +135,7 @@ func (ms *ModelSelector) LoadModels(models []agentpkg.ModelInfo, activeID int) t
 			protocolTypeLower: strings.ToLower(m.ProtocolType),
 			modelNameLower:    strings.ToLower(m.ModelName),
 			baseURLLower:      strings.ToLower(m.BaseURL),
+			contextLimitStr:   contextLimitSearchStr(int64(m.ContextLimit)),
 		}
 		if m.ID == activeID {
 			ms.activeModel = &ms.models[i]
@@ -458,6 +461,16 @@ func formatContextLimit(n int64) string {
 	return fmt.Sprintf("%d", n)
 }
 
+// contextLimitSearchStr formats a context limit as a lowercase string
+// suitable for fuzzy search (e.g. "64kb", "1mb", "unlimited").
+func contextLimitSearchStr(n int64) string {
+	s := formatContextLimit(n)
+	if s == "∞" {
+		return "unlimited"
+	}
+	return strings.ToLower(s)
+}
+
 // capitalize returns s with the first letter uppercased.
 // Special-cases "openai" → "OpenAI".
 func capitalize(s string) string {
@@ -505,7 +518,8 @@ func (ms *ModelSelector) updateFilteredModels() {
 			if FuzzyMatch(term, m.nameLower) ||
 				FuzzyMatch(term, m.protocolTypeLower) ||
 				FuzzyMatch(term, m.modelNameLower) ||
-				FuzzyMatch(term, m.baseURLLower) {
+				FuzzyMatch(term, m.baseURLLower) ||
+				FuzzyMatch(term, m.contextLimitStr) {
 				ms.filteredModels = append(ms.filteredModels, m)
 			}
 		}
