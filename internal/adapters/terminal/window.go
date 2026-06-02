@@ -280,7 +280,7 @@ func (w *Window) UpdateLineCount(width int) {
 	if len(w.cache.wrappedLines) > 0 && innerWidth > 0 {
 		inner := strings.Join(w.cache.wrappedLines, "\n")
 		if w.Folded {
-			inner = w.applyFolding(inner, innerWidth, nil)
+			inner = w.applyFolding(inner, innerWidth, w.styles)
 		}
 		w.cache.lineCount = strings.Count(inner, "\n") + 1
 		w.cache.width = width
