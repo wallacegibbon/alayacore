@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/alayacore/alayacore/internal/adaptors/plainio"
-	"github.com/alayacore/alayacore/internal/adaptors/rawio"
-	"github.com/alayacore/alayacore/internal/adaptors/terminal"
+	"github.com/alayacore/alayacore/internal/adapters/plainio"
+	"github.com/alayacore/alayacore/internal/adapters/rawio"
+	"github.com/alayacore/alayacore/internal/adapters/terminal"
 	"github.com/alayacore/alayacore/internal/app"
 	"github.com/alayacore/alayacore/internal/config"
 )

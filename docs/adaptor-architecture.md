@@ -4,7 +4,7 @@ The adaptor layer handles user interaction and translates between user actions a
 
 ## Adaptors
 
-### Terminal Adaptor (`internal/adaptors/terminal/`)
+### Terminal Adaptor (`internal/adapters/terminal/`)
 
 | Component | Description |
 |-----------|-------------|
@@ -19,22 +19,22 @@ The adaptor layer handles user interaction and translates between user actions a
 | `WindowBuffer` | Virtual scrolling buffer for display windows |
 | `Theme` | Customizable color scheme (Catppuccin Mocha default) |
 
-### PlainIO Adaptor (`internal/adaptors/plainio/`)
+### PlainIO Adaptor (`internal/adapters/plainio/`)
 
 Plain stdin/stdout mode, activated with `--plainio`. Shows assistant text, reasoning, and tool call headers ("call" type only, "start" type frames silently ignored). Suppresses tool result content. Displays tool_confirm system messages as plain text prompts. Reads prompts from stdin (one per line, backslash continuation for multi-line prompts).
 
-### RawIO Adaptor (`internal/adaptors/rawio/`)
+### RawIO Adaptor (`internal/adapters/rawio/`)
 
 Raw TLV stdin/stdout mode, activated with `--rawio`. Reads and writes raw TLV-encoded frames directly, with no text parsing or formatting. Designed for parent programs that speak the TLV protocol to control AlayaCore programmatically.
 
 ### File Naming Convention
 
-Files in the adaptor packages are named from the **session's perspective**:
+Files in the adapter packages are named from the **session's perspective**:
 
 - **`input.go`** — builds the **input to the session**. Reads user data (keystrokes, stdin lines) and feeds it into the session's input channel via TLV-encoded messages.
 - **`output.go`** — handles the **output from the session**. Receives TLV messages from the session and renders them to the user (TUI windows, stdout).
 
-The rawio adaptor is an exception — it's a single `adaptor.go` since both directions are trivial one-liners (`io.Copy` in, `os.Stdout.Write` out).
+The rawio adapter is an exception — it's a single `adaptor.go` since both directions are trivial one-liners (`io.Copy` in, `os.Stdout.Write` out).
 
 ```
 User IO ──▶ input.go ──▶ input channel ──▶ Session ──▶ output.go ──▶ User IO
@@ -42,7 +42,7 @@ User IO ──▶ input.go ──▶ input channel ──▶ Session ──▶ o
 
 ## Communication Pattern
 
-All adaptors communicate with the session through the TLV stream protocol:
+All adapters communicate with the session through the TLV stream protocol:
 
 ```
 Adaptor → Session:  inputWriter (io.WriteCloser)  — user text, commands (TLV)
@@ -53,7 +53,7 @@ This is the **only** runtime channel. The session never calls adaptor methods, a
 
 ### Theme Persistence
 
-The session persists the active theme via `RuntimeManager` and communicates it to the terminal adaptor through TLV as a `TagSystemMsg` with type `"theme"`. The plainio and rawio adaptors ignore it since they have no visual rendering. On startup, the terminal reads the initial theme from the first `"theme"` message (defaulting to `"theme-dark"`).
+The session persists the active theme via `RuntimeManager` and communicates it to the terminal adapter through TLV as a `TagSystemMsg` with type `"theme"`. The plainio and rawio adapters ignore it since they have no visual rendering. On startup, the terminal reads the initial theme from the first `"theme"` message (defaulting to `"theme-dark"`).
 
 Theme changes flow through the session to keep a single source of truth:
 
@@ -122,7 +122,7 @@ Agent.Stream() receives tool_call event
 
 ## Adaptor Bootstrap
 
-The `StartSession()` function in `app/session.go` handles shared initialization for all adaptors:
+The `StartSession()` function in `app/session.go` handles shared initialization for all adapters:
 
 - Creates the input pipe internally (`SliceBuffer`), returning the write end (`io.WriteCloser`) to the adaptor so it can feed TLV messages to the session
 - `session.InitError()` — fatal initialization check (--model flag validation)

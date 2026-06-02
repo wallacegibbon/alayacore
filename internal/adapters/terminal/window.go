@@ -296,9 +296,9 @@ func (w *Window) styleContent(content string, styles *Styles) string {
 		return styleMultiline(content, styles.Reasoning)
 	case stream.TagUserT:
 		return styles.Prompt.Render("> ") + styles.UserInput.Render(content)
-	case "SE":
+	case TagWindowSE:
 		return styleMultiline(content, styles.Error)
-	case "SN":
+	case TagWindowSN:
 		return styleMultiline(content, styles.System)
 	default:
 		return content

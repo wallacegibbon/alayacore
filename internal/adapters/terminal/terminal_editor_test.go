@@ -622,11 +622,11 @@ func TestWindowBufferNonDeltaMessages(t *testing.T) {
 	if windows[0].ID == windows[1].ID {
 		t.Errorf("Non-delta windows should have different IDs: %s", windows[0].ID)
 	}
-	// Ensure tags are correct (error → "SE", notify → "SN")
-	if windows[0].Tag != "SE" {
+	// Ensure tags are correct (error → TagWindowSE, notify → TagWindowSN)
+	if windows[0].Tag != TagWindowSE {
 		t.Errorf("Expected SE tag, got %s", windows[0].Tag)
 	}
-	if windows[1].Tag != "SN" {
+	if windows[1].Tag != TagWindowSN {
 		t.Errorf("Expected SN tag, got %s", windows[1].Tag)
 	}
 }
@@ -668,7 +668,7 @@ func TestWindowBufferEdgeCases(t *testing.T) {
 	if windows[1].Tag != stream.TagAssistantT {
 		t.Errorf("Second window tag mismatch")
 	}
-	if windows[2].Tag != "SE" {
+	if windows[2].Tag != TagWindowSE {
 		t.Errorf("Third window tag mismatch, got %s", windows[2].Tag)
 	}
 }

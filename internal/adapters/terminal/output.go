@@ -84,15 +84,15 @@ func (to *outputWriter) WriteError(format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	id := to.generateWindowID()
 	styles := to.styles.Load()
-	to.windowBuffer.AppendOrUpdate("SE", id, styles.Error.Render(msg))
+	to.windowBuffer.AppendOrUpdate(TagWindowSE, id, styles.Error.Render(msg))
 }
 
 // WriteNotify writes a notification message to the display
 func (to *outputWriter) WriteNotify(msg string) {
 	id := to.generateWindowID()
 	styles := to.styles.Load()
-	to.windowBuffer.AppendOrUpdate("SN", id, styles.System.Render(msg))
-	to.triggerUpdateForTag("SN")
+	to.windowBuffer.AppendOrUpdate(TagWindowSN, id, styles.System.Render(msg))
+	to.triggerUpdateForTag(TagWindowSN)
 }
 
 // processBuffer parses TLV-encoded data from the buffer
@@ -229,7 +229,7 @@ func (to *outputWriter) handleSystemError(data json.RawMessage) {
 	}
 	id := to.generateWindowID()
 	styles := to.styles.Load()
-	to.windowBuffer.AppendOrUpdate("SE", id, styles.Error.Render(m.Text))
+	to.windowBuffer.AppendOrUpdate(TagWindowSE, id, styles.Error.Render(m.Text))
 }
 
 func (to *outputWriter) handleSystemNotify(data json.RawMessage) {
@@ -241,7 +241,7 @@ func (to *outputWriter) handleSystemNotify(data json.RawMessage) {
 	}
 	id := to.generateWindowID()
 	styles := to.styles.Load()
-	to.windowBuffer.AppendOrUpdate("SN", id, styles.System.Render(m.Text))
+	to.windowBuffer.AppendOrUpdate(TagWindowSN, id, styles.System.Render(m.Text))
 }
 
 func (to *outputWriter) handleSystemTask(data json.RawMessage) {

@@ -121,7 +121,7 @@ issues:
         - all
 
     # Exclude goconst for terminal key handling - key strings are canonical
-    - path: internal/adaptors/terminal/
+    - path: internal/adapters/terminal/
       linters:
         - goconst
 
