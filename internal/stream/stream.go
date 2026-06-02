@@ -144,7 +144,7 @@ func (n *NopOutput) Write(p []byte) (int, error) {
 // (name known, input still streaming) or a complete "call" frame.
 type ToolUseData struct {
 	ID            string `json:"id"`
-	IsPlaceholder bool   `json:"is_placeholder"`
+	IsPlaceholder bool   `json:"is_placeholder,omitempty"`
 	Name          string `json:"name,omitempty"`
 	Input         string `json:"input,omitempty"`
 }
@@ -154,7 +154,7 @@ type ToolUseData struct {
 type ToolResultData struct {
 	ID      string `json:"id"`
 	Output  string `json:"output"`
-	IsError bool   `json:"is_error"`
+	IsError bool   `json:"is_error,omitempty"`
 }
 
 // ReasoningData is the JSON payload for TagAssistantR delta values.
