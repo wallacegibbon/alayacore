@@ -18,10 +18,10 @@ func (m *mockProviderAlwaysToolCalls) StreamMessages(_ context.Context, _ []Mess
 	m.callCount++
 	return func(yield func(StreamEvent, error) bool) {
 		// Always emit a tool call, never a text-only response
-		yield(ToolUseEvent{
-			ID: "call_1",
-			ToolName:   "repeat",
-			Input:      []byte(`{}`),
+		yield(ToolUsePart{
+			ID:       "call_1",
+			ToolName: "repeat",
+			Input:    []byte(`{}`),
 		}, nil)
 		yield(StepCompleteEvent{
 			Message: Message{

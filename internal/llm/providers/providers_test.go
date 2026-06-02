@@ -208,9 +208,9 @@ func TestToolCallStreaming(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var toolCalls []llm.ToolUseEvent
+	var toolCalls []llm.ToolUsePart
 	for event := range events {
-		if tc, ok := event.(llm.ToolUseEvent); ok {
+		if tc, ok := event.(llm.ToolUsePart); ok {
 			toolCalls = append(toolCalls, tc)
 		}
 	}
@@ -277,9 +277,9 @@ func TestToolCallStreamingChunked(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var toolCalls []llm.ToolUseEvent
+	var toolCalls []llm.ToolUsePart
 	for event := range events {
-		if tc, ok := event.(llm.ToolUseEvent); ok {
+		if tc, ok := event.(llm.ToolUsePart); ok {
 			toolCalls = append(toolCalls, tc)
 		}
 	}
@@ -342,9 +342,9 @@ func TestToolCallStreamingWithNullArguments(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var toolCalls []llm.ToolUseEvent
+	var toolCalls []llm.ToolUsePart
 	for event := range events {
-		if tc, ok := event.(llm.ToolUseEvent); ok {
+		if tc, ok := event.(llm.ToolUsePart); ok {
 			toolCalls = append(toolCalls, tc)
 		}
 	}
@@ -405,10 +405,10 @@ func TestAnthropicToolCallStreaming(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var toolCalls []llm.ToolUseEvent
+	var toolCalls []llm.ToolUsePart
 	var stepComplete *llm.StepCompleteEvent
 	for event := range events {
-		if e, ok := event.(llm.ToolUseEvent); ok {
+		if e, ok := event.(llm.ToolUsePart); ok {
 			toolCalls = append(toolCalls, e)
 		} else if e, ok := event.(llm.StepCompleteEvent); ok {
 			stepComplete = &e
@@ -446,7 +446,7 @@ func TestAnthropicToolCallStreaming(t *testing.T) {
 }
 
 func TestToolUseStartEventOpenAI(t *testing.T) {
-	// Verify ToolUseStartEvent is emitted before ToolUseEvent for OpenAI.
+	// Verify ToolUseStartEvent is emitted before ToolUsePart for OpenAI.
 	// This allows the UI to show a tool window immediately when the tool name
 	// is known, before the potentially large arguments finish streaming.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -488,7 +488,7 @@ func TestToolUseStartEventOpenAI(t *testing.T) {
 		switch e := event.(type) {
 		case llm.ToolUseStartEvent:
 			order = append(order, fmt.Sprintf("start(%s)", e.ToolName))
-		case llm.ToolUseEvent:
+		case llm.ToolUsePart:
 			order = append(order, fmt.Sprintf("complete(%s)", e.ToolName))
 		}
 	}
@@ -505,7 +505,7 @@ func TestToolUseStartEventOpenAI(t *testing.T) {
 }
 
 func TestToolUseStartEventAnthropic(t *testing.T) {
-	// Verify ToolUseStartEvent is emitted before ToolUseEvent for Anthropic.
+	// Verify ToolUseStartEvent is emitted before ToolUsePart for Anthropic.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
@@ -545,7 +545,7 @@ func TestToolUseStartEventAnthropic(t *testing.T) {
 		switch e := event.(type) {
 		case llm.ToolUseStartEvent:
 			order = append(order, fmt.Sprintf("start(%s)", e.ToolName))
-		case llm.ToolUseEvent:
+		case llm.ToolUsePart:
 			order = append(order, fmt.Sprintf("complete(%s)", e.ToolName))
 		}
 	}
@@ -1532,9 +1532,9 @@ func TestAnthropicMultiToolCall(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var toolCalls []llm.ToolUseEvent
+	var toolCalls []llm.ToolUsePart
 	for event := range events {
-		if e, ok := event.(llm.ToolUseEvent); ok {
+		if e, ok := event.(llm.ToolUsePart); ok {
 			toolCalls = append(toolCalls, e)
 		}
 	}

@@ -124,7 +124,7 @@ func (m *mockProviderWithTextAndTools) StreamMessages(_ context.Context, _ []Mes
 
 		// Send tool call events
 		for _, tc := range resp.toolCalls {
-			if !yield(ToolUseEvent{
+			if !yield(ToolUsePart{
 				ID:       tc.ID,
 				ToolName: tc.ToolName,
 				Input:    tc.Input,

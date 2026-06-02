@@ -288,7 +288,7 @@ func (p *OpenAIProvider) parseStream(reader io.Reader) iter.Seq2[llm.StreamEvent
 		// Finalize tool calls and emit events
 		state.finalizeToolCalls()
 		for _, tc := range state.getToolCalls() {
-			if !yield(llm.ToolUseEvent{
+			if !yield(llm.ToolUsePart{
 				ID:       tc.ID,
 				ToolName: tc.ToolName,
 				Input:    tc.Input,

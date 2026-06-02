@@ -90,6 +90,7 @@ type ToolUsePart struct {
 }
 
 func (ToolUsePart) isContentPart() {}
+func (ToolUsePart) isStreamEvent() {}
 
 // ToolResultPart represents a tool execution result
 type ToolResultPart struct {
@@ -172,15 +173,6 @@ type ToolUseStartEvent struct {
 }
 
 func (ToolUseStartEvent) isStreamEvent() {}
-
-// ToolUseEvent represents a complete tool use (all arguments received).
-type ToolUseEvent struct {
-	ID       string
-	ToolName string
-	Input    json.RawMessage
-}
-
-func (ToolUseEvent) isStreamEvent() {}
 
 // StepCompleteEvent represents completion of an agentic step.
 // The provider emits this as the final event after accumulating all streaming

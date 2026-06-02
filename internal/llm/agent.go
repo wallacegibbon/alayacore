@@ -58,8 +58,8 @@ func NewAgent(config AgentConfig) *Agent {
 type StreamCallbacks struct {
 	OnTextDelta      func(delta string) error
 	OnReasoningDelta func(delta string) error
-	OnToolUseStart  func(toolCallID, toolName string) error
-	OnToolUse       func(toolCallID, toolName string, input json.RawMessage) error
+	OnToolUseStart   func(toolCallID, toolName string) error
+	OnToolUse        func(toolCallID, toolName string, input json.RawMessage) error
 	OnToolConfirm    func(toolCallID, toolName string, input json.RawMessage) (bool, error)
 	OnToolResult     func(toolCallID string, output ToolResultOutput) error
 	OnStepStart      func(step int) error
@@ -210,7 +210,7 @@ func (a *Agent) processStreamEvents(events iter.Seq2[StreamEvent, error], callba
 				return Message{}, Usage{}, err
 			}
 
-		case ToolUseEvent:
+		case ToolUsePart:
 			if err := a.fireOnToolUse(callbacks, e); err != nil {
 				return Message{}, Usage{}, err
 			}
@@ -258,7 +258,7 @@ func fireOnStepFinish(callbacks StreamCallbacks, messages []Message, usage Usage
 }
 
 // fireOnToolUse invokes the OnToolUse callback if set.
-func (a *Agent) fireOnToolUse(callbacks StreamCallbacks, e ToolUseEvent) error {
+func (a *Agent) fireOnToolUse(callbacks StreamCallbacks, e ToolUsePart) error {
 	if callbacks.OnToolUse != nil {
 		if err := callbacks.OnToolUse(e.ID, e.ToolName, e.Input); err != nil {
 			return fmt.Errorf("OnToolUse callback failed: %w", err)

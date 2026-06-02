@@ -190,13 +190,13 @@ func TestAnthropicRealToolCall(t *testing.T) {
 		t.Fatalf("Failed to stream messages: %v", err)
 	}
 
-	var toolCalls []llm.ToolUseEvent
+	var toolCalls []llm.ToolUsePart
 	var textReceived string
 
 	for event := range events {
 		if e, ok := event.(llm.TextDeltaEvent); ok {
 			textReceived += e.Delta
-		} else if e, ok := event.(llm.ToolUseEvent); ok {
+		} else if e, ok := event.(llm.ToolUsePart); ok {
 			toolCalls = append(toolCalls, e)
 		}
 	}

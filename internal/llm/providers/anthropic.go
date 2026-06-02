@@ -533,7 +533,7 @@ func (p *AnthropicProvider) handleContentBlockStop(yield func(llm.StreamEvent, e
 	tc := state.lastToolCall()
 	state.finishBlock()
 	if tc != nil {
-		if !yield(llm.ToolUseEvent{
+		if !yield(llm.ToolUsePart{
 			ID:       tc.ID,
 			ToolName: tc.ToolName,
 			Input:    tc.Input,
