@@ -371,20 +371,17 @@ func (ms *ModelSelector) maxIDWidth() int {
 }
 
 // measureRightColumns scans the visible rows to find the widest context
-// size and provider name for proper column alignment.
+// size. Provider column uses a fixed width.
 func (ms *ModelSelector) measureRightColumns(listHeight int) (ctxColWidth, provColWidth int) {
+	provColWidth = 10 // fixed width for provider column
 	for i := ms.ScrollIdx; i < min(ms.ScrollIdx+listHeight, len(ms.filteredModels)); i++ {
 		m := ms.filteredModels[i]
 		ctx := formatContextLimit(int64(m.ContextLimit))
-		provider := capitalize(m.ProtocolType)
 		if w := lipgloss.Width(ctx); w > ctxColWidth {
 			ctxColWidth = w
 		}
-		if w := len(provider); w > provColWidth {
-			provColWidth = w
-		}
 	}
-	return max(1, ctxColWidth), max(1, provColWidth)
+	return max(1, ctxColWidth), provColWidth
 }
 
 // renderModelRow builds a single model list row as a raw (unstyled) string.
