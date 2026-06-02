@@ -37,6 +37,8 @@
 //   - theme_selector.go: Theme selection UI with live preview
 //   - warnings.go: Warning collection for non-fatal initialization errors
 //   - overlay.go: Overlay rendering for selectors and queue manager
+//   - help_window.go: Keybinding and command help overlay
+//   - confirm_dialog.go: Confirmation dialogs for quit/cancel/tool
 //   - tool.go, tool_handler.go: Tool execution display
 //
 // Theme data types (Theme struct, DefaultTheme, LoadTheme) and the core

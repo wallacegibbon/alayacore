@@ -16,7 +16,8 @@ import (
 	agentpkg "github.com/alayacore/alayacore/internal/agent"
 )
 
-// searchableModel wraps agentpkg.ModelInfo with pre-computed lowercase fields for fast search.
+// searchableModel wraps agentpkg.ModelInfo with a pre-computed
+// lowercase search string for fuzzy matching.
 type searchableModel struct {
 	agentpkg.ModelInfo
 	searchStr string // lowercase display string for fuzzy search: "name context provider modelname baseurl"
