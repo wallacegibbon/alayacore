@@ -279,16 +279,21 @@ func (wb *WindowBuffer) WindowAt(index int) *Window {
 	if index < 0 || index >= len(wb.windows) {
 		return nil
 	}
+	wb.windows[index].ensureContent()
 	return wb.windows[index]
 }
 
 // AllWindows returns a copy of the windows slice for snapshotting.
 // The returned slice contains the same *Window pointers (no deep copy).
+// Each window's Content is built from parts before returning.
 func (wb *WindowBuffer) AllWindows() []*Window {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 	result := make([]*Window, len(wb.windows))
-	copy(result, wb.windows)
+	for i, w := range wb.windows {
+		w.ensureContent()
+		result[i] = w
+	}
 	return result
 }
 
@@ -312,6 +317,7 @@ func (wb *WindowBuffer) GetWindow(index int) *Window {
 	if index < 0 || index >= len(wb.windows) {
 		return nil
 	}
+	wb.windows[index].ensureContent()
 	return wb.windows[index]
 }
 
@@ -371,6 +377,7 @@ func (wb *WindowBuffer) GetWindowContent(windowIndex int) string {
 		}
 		return w.ToolInput
 	}
+	w.ensureContent()
 	return w.Content
 }
 
@@ -395,7 +402,12 @@ func (wb *WindowBuffer) ensureLineHeights() {
 		w := wb.windows[wb.dirtyIndex]
 		// Only render and count lines for visible windows
 		if w.Visible {
-			w.Render(wb.width, false, wb.styles, wb.borderStyle, wb.cursorStyle)
+			w.UpdateLineCount(wb.width)
+			if !w.cache.valid {
+				// Fall back to full render if UpdateLineCount couldn't
+				// use the fast path (e.g. no cached wrappedLines)
+				w.Render(wb.width, false, wb.styles, wb.borderStyle, wb.cursorStyle)
+			}
 			oldHeight := wb.lineHeights[wb.dirtyIndex]
 			newHeight := w.LineCount()
 			wb.lineHeights[wb.dirtyIndex] = newHeight

@@ -139,7 +139,9 @@ func TestWindowRenderCacheInvalidation(t *testing.T) {
 	// AppendContent with incremental update (window has styles and wrappedLines)
 	w.AppendContent(" world", 76)
 
-	// Content should include both parts
+	// Content should include both parts — call ensureContent first since
+	// AppendContent now accumulates deltas in contentParts for O(1) append.
+	w.ensureContent()
 	if !strings.Contains(w.Content, "Hello world") {
 		t.Errorf("expected 'Hello world' in content, got %q", w.Content)
 	}
