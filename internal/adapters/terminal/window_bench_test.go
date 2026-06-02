@@ -749,7 +749,7 @@ func BenchmarkGetAllWithoutVirtual(b *testing.B) {
 //   - Updates/second:            ~3572
 //
 // Conclusion: NO RATE LIMITING NEEDED
-//   - UI refresh is polled at 250ms intervals (terminal.go → TickInterval)
+//   - UI refresh is polled at 250ms intervals (tui.go → TickInterval)
 //   - Render overhead is only 1.4% of wall time
 //   - updateContent() skips unchanged content efficiently
 //   - Virtual rendering provides 3.5x speedup

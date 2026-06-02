@@ -43,7 +43,7 @@ The session uses three goroutines for concurrent operation:
 | Mechanism | From | To | Purpose |
 |-----------|------|----|---------|
 | `msgCh` (buffered, cap 100) | inputPump | run() | Parsed user input messages |
-| `taskCancelCh` (buffered, cap 1) | inputPump | task worker | Cancel the running task |
+| `taskCancel` (atomic.Value) | inputPump | task worker | Cancel the running task |
 | `taskResult` (buffered, cap 1) | task worker | run() | Return final messages and signal task completion |
 | `stateCh` (buffered, cap 64) | task worker | run() | Step progress, token counts, paused state |
 | `infoUpdateCh` (buffered, cap 1) | task worker | run() | Request system-info broadcast |
@@ -77,7 +77,7 @@ stdin EOF ──▶ inputPump closes msgCh ──▶ run() detects closed channe
 **State ownership:**
 - The `run()` goroutine is the sole owner of session state. It reads/writes `taskQueue`, `inProgress`, `pausedOnError`, `reasoningLevel`, `reasoningDirty`, and all command-handling logic. ModelManager and RuntimeManager are also accessed only from `run()`.
 - The task goroutine communicates state changes via typed events on `stateCh` (step progress, token counts) and reads atomic fields (`agent`, `provider`, `ContextTokens`, `currentStep`, `reasoningLevel`, `reasoningDirty`, `pausedOnError`) for lock-free access. The final message state is returned via `taskResult` on completion.
-- The input pump goroutine has NO access to session state except `taskCancelCh` (for `:cancel` commands).
+- The input pump goroutine has NO access to session state except `taskCancel` (the per-task cancel func, for `:cancel` commands).
 - `sendSystemInfo` runs only in the `run()` goroutine; the task goroutine requests updates via `infoUpdateCh`.
 
 **Design rationale:** Tasks must run in a separate goroutine because LLM streaming is blocking (3-10s per step). If tasks ran synchronously in `run()`, the main loop could not process user input (`:cancel`, new prompts, immediate commands) during task execution. The per-task goroutine pattern keeps the main loop responsive while avoiding a persistent worker goroutine that would sit idle between tasks.
