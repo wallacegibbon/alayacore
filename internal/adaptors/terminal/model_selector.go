@@ -349,34 +349,117 @@ func (ms *ModelSelector) renderModelList(width int, borderColor color.Color) str
 			}
 		}
 		idWidth := len(fmt.Sprintf("%d", maxID))
+		indexGap := 2 // spaces between index and name
+
+		// First pass: measure each row so we can right-align the context/provider column.
+		type rowData struct {
+			leftPart string // cursor + index (styled)
+			name     string // model name (styled, possibly truncated)
+			right    string // context + provider (styled)
+			rightW   int
+		}
+		rows := make([]rowData, 0, min(len(ms.filteredModels), listHeight))
+		maxRightW := 0
 
 		for i := ms.ScrollIdx; i < min(ms.ScrollIdx+listHeight, len(ms.filteredModels)); i++ {
 			m := ms.filteredModels[i]
-			idStr := fmt.Sprintf("%0*d.", idWidth, m.ID)
+			idxStr := fmt.Sprintf("%0*d", idWidth, m.ID)
 
-			// Available width for model name: innerWidth minus prefix/labels
-			nameMaxWidth := max(0, innerWidth-len("> ")-len(idStr)-1)
-
-			modelName := m.Name
-			// Truncate long model names like queue items do
-			truncated := ansi.Hardwrap(modelName, nameMaxWidth, false)
-			if truncated != modelName {
-				truncated = ansi.Hardwrap(modelName, nameMaxWidth-3, false)
-				modelName = strings.SplitN(truncated, "\n", 2)[0] + "..."
-			}
-
+			// Cursor + index (pre-styled)
+			var leftPart string
 			if i == ms.SelectedIdx && !ms.FilterInputFocused {
-				content.WriteString(ms.Styles.Prompt.Render("> ") + ms.Styles.Text.Render(idStr+" "+modelName))
+				leftPart = ms.Styles.Prompt.Render("> ") + ms.Styles.Text.Render(idxStr)
 			} else {
-				content.WriteString(ms.Styles.System.Render("  " + idStr + " " + modelName))
+				leftPart = ms.Styles.System.Render("  " + idxStr)
 			}
-			if i < min(ms.ScrollIdx+listHeight, len(ms.filteredModels))-1 {
+
+			// Right section: context size + provider
+			ctx := formatContextLimit(int64(m.ContextLimit))
+			provider := capitalize(m.ProtocolType)
+			right := ms.Styles.System.Render(ctx + " " + provider)
+			rightW := lipgloss.Width(right)
+
+			if rightW > maxRightW {
+				maxRightW = rightW
+			}
+
+			rows = append(rows, rowData{
+				leftPart: leftPart,
+				name:     m.Name,
+				right:    right,
+				rightW:   rightW,
+			})
+		}
+
+		// Second pass: render each row with proper spacing.
+		for idx, row := range rows {
+			nameMaxWidth := max(0, innerWidth-lipgloss.Width(row.leftPart)-indexGap-maxRightW-1)
+
+			name := row.name
+			truncated := ansi.Hardwrap(name, nameMaxWidth, false)
+			if truncated != name {
+				truncated = ansi.Hardwrap(name, nameMaxWidth-3, false)
+				name = strings.SplitN(truncated, "\n", 2)[0] + "..."
+			}
+
+			var nameStyled string
+			if ms.ScrollIdx+idx == ms.SelectedIdx && !ms.FilterInputFocused {
+				nameStyled = ms.Styles.Text.Render(name)
+			} else {
+				nameStyled = ms.Styles.System.Render(name)
+			}
+
+			leftW := lipgloss.Width(row.leftPart)
+			nameW := lipgloss.Width(nameStyled)
+
+			// Flexible space between name and right section
+			flex := max(1, innerWidth-leftW-indexGap-nameW-row.rightW)
+			gap := strings.Repeat(" ", flex)
+
+			content.WriteString(row.leftPart)
+			content.WriteString(strings.Repeat(" ", indexGap))
+			content.WriteString(nameStyled)
+			content.WriteString(gap)
+			content.WriteString(row.right)
+
+			if idx < len(rows)-1 {
 				content.WriteString("\n")
 			}
 		}
 	}
 
 	return ms.Styles.RenderBorderedBox(content.String(), width, borderColor, listHeight)
+}
+
+// formatContextLimit formats a context limit (in tokens) as a human-readable
+// size string like "256KB", "1MB", or "∞" for unlimited (0).
+func formatContextLimit(n int64) string {
+	if n <= 0 {
+		return "∞"
+	}
+	if n >= 1_000_000 {
+		v := float64(n) / 1_000_000
+		if v == float64(int64(v)) {
+			return fmt.Sprintf("%.0fMB", v)
+		}
+		return fmt.Sprintf("%.1fMB", v)
+	}
+	if n >= 1_000 {
+		v := float64(n) / 1_000
+		if v == float64(int64(v)) {
+			return fmt.Sprintf("%.0fKB", v)
+		}
+		return fmt.Sprintf("%.1fKB", v)
+	}
+	return fmt.Sprintf("%d", n)
+}
+
+// capitalize returns s with the first letter uppercased.
+func capitalize(s string) string {
+	if s == "" {
+		return ""
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
 }
 
 // View renders the model selector as a string (used by RenderOverlay).
