@@ -499,9 +499,9 @@ func (p *AnthropicProvider) handleContentBlockStart(data string, yield func(llm.
 	}
 	state.startBlock(event.Index, event.ContentBlock.Type, event.ContentBlock.ID, event.ContentBlock.Name, event.ContentBlock.Signature)
 	if event.ContentBlock.Type == anthropicBlockTypeToolUse {
-		if !yield(llm.ToolCallStartEvent{
-			ToolCallID: event.ContentBlock.ID,
-			ToolName:   event.ContentBlock.Name,
+		if !yield(llm.ToolUseStartEvent{
+			ID:       event.ContentBlock.ID,
+			ToolName: event.ContentBlock.Name,
 		}, nil) {
 			return false
 		}
@@ -533,10 +533,10 @@ func (p *AnthropicProvider) handleContentBlockStop(yield func(llm.StreamEvent, e
 	tc := state.lastToolCall()
 	state.finishBlock()
 	if tc != nil {
-		if !yield(llm.ToolCallEvent{
-			ToolCallID: tc.ID,
-			ToolName:   tc.ToolName,
-			Input:      tc.Input,
+		if !yield(llm.ToolUseEvent{
+			ID:       tc.ID,
+			ToolName: tc.ToolName,
+			Input:    tc.Input,
 		}, nil) {
 			return false
 		}

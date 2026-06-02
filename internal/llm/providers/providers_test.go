@@ -208,9 +208,9 @@ func TestToolCallStreaming(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var toolCalls []llm.ToolCallEvent
+	var toolCalls []llm.ToolUseEvent
 	for event := range events {
-		if tc, ok := event.(llm.ToolCallEvent); ok {
+		if tc, ok := event.(llm.ToolUseEvent); ok {
 			toolCalls = append(toolCalls, tc)
 		}
 	}
@@ -223,8 +223,8 @@ func TestToolCallStreaming(t *testing.T) {
 		t.Errorf("Expected tool name 'test_tool', got '%s'", toolCalls[0].ToolName)
 	}
 
-	if toolCalls[0].ToolCallID != "call-123" {
-		t.Errorf("Expected tool call ID 'call-123', got '%s'", toolCalls[0].ToolCallID)
+	if toolCalls[0].ID != "call-123" {
+		t.Errorf("Expected tool call ID 'call-123', got '%s'", toolCalls[0].ID)
 	}
 
 	// Verify arguments are properly unquoted and can be unmarshaled
@@ -277,9 +277,9 @@ func TestToolCallStreamingChunked(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var toolCalls []llm.ToolCallEvent
+	var toolCalls []llm.ToolUseEvent
 	for event := range events {
-		if tc, ok := event.(llm.ToolCallEvent); ok {
+		if tc, ok := event.(llm.ToolUseEvent); ok {
 			toolCalls = append(toolCalls, tc)
 		}
 	}
@@ -342,9 +342,9 @@ func TestToolCallStreamingWithNullArguments(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var toolCalls []llm.ToolCallEvent
+	var toolCalls []llm.ToolUseEvent
 	for event := range events {
-		if tc, ok := event.(llm.ToolCallEvent); ok {
+		if tc, ok := event.(llm.ToolUseEvent); ok {
 			toolCalls = append(toolCalls, tc)
 		}
 	}
@@ -405,10 +405,10 @@ func TestAnthropicToolCallStreaming(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var toolCalls []llm.ToolCallEvent
+	var toolCalls []llm.ToolUseEvent
 	var stepComplete *llm.StepCompleteEvent
 	for event := range events {
-		if e, ok := event.(llm.ToolCallEvent); ok {
+		if e, ok := event.(llm.ToolUseEvent); ok {
 			toolCalls = append(toolCalls, e)
 		} else if e, ok := event.(llm.StepCompleteEvent); ok {
 			stepComplete = &e
@@ -423,8 +423,8 @@ func TestAnthropicToolCallStreaming(t *testing.T) {
 		t.Errorf("Expected tool name 'get_weather', got '%s'", toolCalls[0].ToolName)
 	}
 
-	if toolCalls[0].ToolCallID != "toolu_123" {
-		t.Errorf("Expected tool call ID 'toolu_123', got '%s'", toolCalls[0].ToolCallID)
+	if toolCalls[0].ID != "toolu_123" {
+		t.Errorf("Expected tool call ID 'toolu_123', got '%s'", toolCalls[0].ID)
 	}
 
 	// Check the input JSON
@@ -445,8 +445,8 @@ func TestAnthropicToolCallStreaming(t *testing.T) {
 	}
 }
 
-func TestToolCallStartEventOpenAI(t *testing.T) {
-	// Verify ToolCallStartEvent is emitted before ToolCallEvent for OpenAI.
+func TestToolUseStartEventOpenAI(t *testing.T) {
+	// Verify ToolUseStartEvent is emitted before ToolUseEvent for OpenAI.
 	// This allows the UI to show a tool window immediately when the tool name
 	// is known, before the potentially large arguments finish streaming.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -486,9 +486,9 @@ func TestToolCallStartEventOpenAI(t *testing.T) {
 	var order []string
 	for event := range events {
 		switch e := event.(type) {
-		case llm.ToolCallStartEvent:
+		case llm.ToolUseStartEvent:
 			order = append(order, fmt.Sprintf("start(%s)", e.ToolName))
-		case llm.ToolCallEvent:
+		case llm.ToolUseEvent:
 			order = append(order, fmt.Sprintf("complete(%s)", e.ToolName))
 		}
 	}
@@ -504,8 +504,8 @@ func TestToolCallStartEventOpenAI(t *testing.T) {
 	}
 }
 
-func TestToolCallStartEventAnthropic(t *testing.T) {
-	// Verify ToolCallStartEvent is emitted before ToolCallEvent for Anthropic.
+func TestToolUseStartEventAnthropic(t *testing.T) {
+	// Verify ToolUseStartEvent is emitted before ToolUseEvent for Anthropic.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
@@ -543,9 +543,9 @@ func TestToolCallStartEventAnthropic(t *testing.T) {
 	var order []string
 	for event := range events {
 		switch e := event.(type) {
-		case llm.ToolCallStartEvent:
+		case llm.ToolUseStartEvent:
 			order = append(order, fmt.Sprintf("start(%s)", e.ToolName))
-		case llm.ToolCallEvent:
+		case llm.ToolUseEvent:
 			order = append(order, fmt.Sprintf("complete(%s)", e.ToolName))
 		}
 	}
@@ -1532,9 +1532,9 @@ func TestAnthropicMultiToolCall(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var toolCalls []llm.ToolCallEvent
+	var toolCalls []llm.ToolUseEvent
 	for event := range events {
-		if e, ok := event.(llm.ToolCallEvent); ok {
+		if e, ok := event.(llm.ToolUseEvent); ok {
 			toolCalls = append(toolCalls, e)
 		}
 	}
@@ -1544,16 +1544,16 @@ func TestAnthropicMultiToolCall(t *testing.T) {
 	}
 
 	// Check first tool call
-	if toolCalls[0].ToolCallID != "tool-1" {
-		t.Errorf("Expected tool call ID 'tool-1', got '%s'", toolCalls[0].ToolCallID)
+	if toolCalls[0].ID != "tool-1" {
+		t.Errorf("Expected tool call ID 'tool-1', got '%s'", toolCalls[0].ID)
 	}
 	if toolCalls[0].ToolName != "get_weather" {
 		t.Errorf("Expected tool name 'get_weather', got '%s'", toolCalls[0].ToolName)
 	}
 
 	// Check second tool call
-	if toolCalls[1].ToolCallID != "tool-2" {
-		t.Errorf("Expected tool call ID 'tool-2', got '%s'", toolCalls[1].ToolCallID)
+	if toolCalls[1].ID != "tool-2" {
+		t.Errorf("Expected tool call ID 'tool-2', got '%s'", toolCalls[1].ID)
 	}
 }
 

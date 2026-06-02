@@ -117,11 +117,11 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 			_ = stream.WriteTLV(s.Output, stream.TagAssistantR, stream.WrapDelta(stream.NewStreamID(promptID, stepCount), delta)) //nolint:errcheck // best-effort write to adapter
 			return nil
 		},
-		OnToolCallStart: func(toolCallID, toolName string) error {
+		OnToolUseStart: func(toolCallID, toolName string) error {
 			s.writeToolCallStart(toolName, toolCallID)
 			return nil
 		},
-		OnToolCall: func(toolCallID, toolName string, input json.RawMessage) error {
+		OnToolUse: func(toolCallID, toolName string, input json.RawMessage) error {
 			s.writeToolCall(toolName, string(input), toolCallID)
 			return nil
 		},

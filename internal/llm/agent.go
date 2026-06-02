@@ -58,8 +58,8 @@ func NewAgent(config AgentConfig) *Agent {
 type StreamCallbacks struct {
 	OnTextDelta      func(delta string) error
 	OnReasoningDelta func(delta string) error
-	OnToolCallStart  func(toolCallID, toolName string) error
-	OnToolCall       func(toolCallID, toolName string, input json.RawMessage) error
+	OnToolUseStart  func(toolCallID, toolName string) error
+	OnToolUse       func(toolCallID, toolName string, input json.RawMessage) error
 	OnToolConfirm    func(toolCallID, toolName string, input json.RawMessage) (bool, error)
 	OnToolResult     func(toolCallID string, output ToolResultOutput) error
 	OnStepStart      func(step int) error
@@ -205,13 +205,13 @@ func (a *Agent) processStreamEvents(events iter.Seq2[StreamEvent, error], callba
 				return Message{}, Usage{}, err
 			}
 
-		case ToolCallStartEvent:
-			if err := a.fireOnToolCallStart(callbacks, e); err != nil {
+		case ToolUseStartEvent:
+			if err := a.fireOnToolUseStart(callbacks, e); err != nil {
 				return Message{}, Usage{}, err
 			}
 
-		case ToolCallEvent:
-			if err := a.fireOnToolCall(callbacks, e); err != nil {
+		case ToolUseEvent:
+			if err := a.fireOnToolUse(callbacks, e); err != nil {
 				return Message{}, Usage{}, err
 			}
 
@@ -227,11 +227,11 @@ func (a *Agent) processStreamEvents(events iter.Seq2[StreamEvent, error], callba
 	return stepMessage, stepUsage, nil
 }
 
-// fireOnToolCallStart invokes the OnToolCallStart callback if set.
-func (a *Agent) fireOnToolCallStart(callbacks StreamCallbacks, e ToolCallStartEvent) error {
-	if callbacks.OnToolCallStart != nil {
-		if err := callbacks.OnToolCallStart(e.ToolCallID, e.ToolName); err != nil {
-			return fmt.Errorf("OnToolCallStart callback failed: %w", err)
+// fireOnToolUseStart invokes the OnToolUseStart callback if set.
+func (a *Agent) fireOnToolUseStart(callbacks StreamCallbacks, e ToolUseStartEvent) error {
+	if callbacks.OnToolUseStart != nil {
+		if err := callbacks.OnToolUseStart(e.ID, e.ToolName); err != nil {
+			return fmt.Errorf("OnToolUseStart callback failed: %w", err)
 		}
 	}
 	return nil
@@ -257,11 +257,11 @@ func fireOnStepFinish(callbacks StreamCallbacks, messages []Message, usage Usage
 	return nil
 }
 
-// fireOnToolCall invokes the OnToolCall callback if set.
-func (a *Agent) fireOnToolCall(callbacks StreamCallbacks, e ToolCallEvent) error {
-	if callbacks.OnToolCall != nil {
-		if err := callbacks.OnToolCall(e.ToolCallID, e.ToolName, e.Input); err != nil {
-			return fmt.Errorf("OnToolCall callback failed: %w", err)
+// fireOnToolUse invokes the OnToolUse callback if set.
+func (a *Agent) fireOnToolUse(callbacks StreamCallbacks, e ToolUseEvent) error {
+	if callbacks.OnToolUse != nil {
+		if err := callbacks.OnToolUse(e.ID, e.ToolName, e.Input); err != nil {
+			return fmt.Errorf("OnToolUse callback failed: %w", err)
 		}
 	}
 	return nil
