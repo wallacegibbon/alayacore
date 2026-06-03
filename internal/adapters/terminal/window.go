@@ -201,7 +201,7 @@ func (w *Window) renderToolContent(innerWidth int, styles *Styles) string {
 
 	// If a tool result exists, append it
 	if w.ToolOutput != "" {
-		result := styleMultiline(w.ToolOutput, styles.Text)
+		result := styleMultiline(prepareContent(w.ToolOutput), styles.Text)
 		if innerWidth > 0 {
 			result = wrapContent(result, innerWidth)
 		}
