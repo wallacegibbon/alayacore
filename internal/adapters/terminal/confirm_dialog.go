@@ -8,7 +8,7 @@ package terminal
 //   - View renders with RenderBorderedBox
 //   - RenderOverlay delegates to the shared overlay renderer
 //
-// Key handling: y/Y = confirm, n/N/esc/Ctrl+C = cancel.
+// Key handling: y/Y = confirm, n/N/esc = cancel.
 
 import (
 	"fmt"
@@ -60,7 +60,7 @@ const (
 //	│                              │
 //	└──────────────────────────────┘
 //
-// Key handling: y/Y = confirm, n/N/esc/Ctrl+C = cancel.
+// Key handling: y/Y = confirm, n/N/esc = cancel.
 type ConfirmDialog struct {
 	// Core state — follows the FilteredListCore/ScrollableListCore pattern.
 	State    FilteredListState
@@ -193,7 +193,7 @@ func (cd *ConfirmDialog) HandleKeyMsg(msg tea.KeyMsg) bool {
 		cd.State = FilteredListClosed
 		return true
 
-	case keyN, keyNCapital, keyEsc, keyCtrlC:
+	case keyN, keyNCapital, keyEsc:
 		cd.Canceled = true
 		cd.State = FilteredListClosed
 		return true

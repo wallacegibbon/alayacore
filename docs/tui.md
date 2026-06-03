@@ -14,7 +14,7 @@ AlayaCore's terminal UI is built with [Bubble Tea](https://github.com/charmbrace
 | `Ctrl+D` | Scroll down half screen |
 | `Ctrl+U` | Scroll up half screen |
 | `g` | Go to first window, scroll to top |
-| `G` | Go to last window, enable follow |
+| `G` | Follow the last window |
 | `H` | Move cursor to top window in visible area |
 | `M` | Move cursor to middle window in visible area |
 | `L` | Move cursor to bottom window in visible area |
@@ -28,14 +28,14 @@ AlayaCore's terminal UI is built with [Bubble Tea](https://github.com/charmbrace
 |-----|--------|
 | `Enter` | Submit prompt |
 | `Ctrl+S` | Save session |
-| `Ctrl+O` | Open external editor (`$EDITOR`) for multi-line input |
+| `Ctrl+O` | Open in editor (`$EDITOR`) for multi-line input |
 | `Ctrl+L` | Open model selector |
 | `Ctrl+P` | Open theme selector |
 | `Ctrl+Q` | Open task queue manager |
 | `Ctrl+H` | Open help window |
 | `Ctrl+G` | Cancel current request (with confirmation) |
 | `Ctrl+Z` | Suspend process |
-| `Ctrl+C` | Clear input field (only when input is focused) |
+| `Ctrl+C` | Clear text |
 | `:` | Switch to input with `:` prefix (command mode) |
 | `Space` | Toggle window fold (expand/collapse) |
 
@@ -61,7 +61,7 @@ Commands are split into two categories:
 **Deferred commands** — enqueued at the front of the task queue; run in a task goroutine when no task is running. They can be canceled with `:cancel` while executing:
 | Command | Action |
 |---------|--------|
-| `:continue [skip]` | Resend the last prompt, or skip it with `skip` and resume the queue |
+| `:continue [skip]` | Retry last prompt, or skip it with `skip` and resume the queue |
 | `:summarize` | Summarize conversation to reduce token usage ⚠️ **Replaces entire conversation history with a summary** — see [context-tracking.md](context-tracking.md) |
 
 Note: `:quit` / `:q`, `:help`, and `:suspend` are handled directly by each adapter (terminal shows a confirmation dialog for quit, opens help window for help, suspends the process for suspend; plainio exits immediately for quit and help, and does not support suspend; rawio passes all commands through to the session since it doesn't interpret frame payloads) and never reaches the session command dispatch.
@@ -84,7 +84,7 @@ scrolls the viewport. While auto-follow is active:
 
 | Key | Behavior | Disables auto-follow? |
 |-----|----------|-----------------------|
-| `G` | Go to last window | ✅ Re-enables |
+| `G` | Follow the last window | ✅ Re-enables |
 | `j` / `↓` | Move cursor down | ❌ No-op (race protection) |
 | `L` | Move cursor to bottom | ❌ No-op (race protection) |
 | `J` / `Shift+Down` | Scroll down one line | ❌ No-op when at bottom |

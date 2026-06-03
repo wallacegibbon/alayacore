@@ -78,17 +78,17 @@ func buildHelpItems() []HelpItem {
 	return []HelpItem{
 		// Commands
 		{IsSection: true, Description: "Commands"},
-		{Key: ":continue", Description: "Resume after error", Type: HelpItemCommand},
+		{Key: ":continue [skip]", Description: "Retry / skip failed prompt", Type: HelpItemCommand},
 		{Key: ":cancel", Description: "Cancel current task", Type: HelpItemCommand},
 		{Key: ":cancel_all", Description: "Cancel all & clear queue", Type: HelpItemCommand},
-		{Key: ":summarize", Description: "Summarize conversation", Type: HelpItemCommand},
-		{Key: ":reason", Description: "Set reasoning level (0/1/2)", Type: HelpItemCommand},
-		{Key: ":save", Description: "Save session", Type: HelpItemCommand},
-		{Key: ":theme_set", Description: "Switch theme by name", Type: HelpItemCommand},
+		{Key: ":summarize", Description: "Summarize & compress history", Type: HelpItemCommand},
+		{Key: ":reason <0|1|2>", Description: "Set reasoning level", Type: HelpItemCommand},
+		{Key: ":save [filename]", Description: "Save session", Type: HelpItemCommand},
+		{Key: ":theme_set <name>", Description: "Switch theme by name", Type: HelpItemCommand},
 		{Key: ":quit", Description: "Exit application", Type: HelpItemCommand},
-		{Key: ":model_set", Description: "Switch model by ID", Type: HelpItemCommand},
+		{Key: ":model_set <id>", Description: "Switch model by ID", Type: HelpItemCommand},
 		{Key: ":model_load", Description: "Reload model config", Type: HelpItemCommand},
-		{Key: ":confirm", Description: "Confirm or deny pending tool", Type: HelpItemCommand},
+		{Key: ":confirm <yes|no>", Description: "Confirm or deny pending tool", Type: HelpItemCommand},
 		{Key: ":help", Description: "Open help window", Type: HelpItemCommand},
 		{Key: ":suspend", Description: "Suspend process (Ctrl+Z)", Type: HelpItemCommand},
 
@@ -98,9 +98,9 @@ func buildHelpItems() []HelpItem {
 		{Key: "Enter", Description: "Submit prompt or command", Type: HelpItemKey},
 		{Key: "Ctrl+H", Description: "Open help window", Type: HelpItemKey},
 		{Key: "Ctrl+G", Description: "Cancel current request", Type: HelpItemKey},
-		{Key: "Ctrl+C", Description: "Clear input field (input only)", Type: HelpItemKey},
+		{Key: "Ctrl+C", Description: "Clear text", Type: HelpItemKey},
 		{Key: "Ctrl+S", Description: "Save session", Type: HelpItemKey},
-		{Key: "Ctrl+O", Description: "Open external editor (input only)", Type: HelpItemKey},
+		{Key: "Ctrl+O", Description: "Open in editor (main input)", Type: HelpItemKey},
 		{Key: "Ctrl+L", Description: "Open model selector", Type: HelpItemKey},
 		{Key: "Ctrl+P", Description: "Open theme selector", Type: HelpItemKey},
 		{Key: "Ctrl+Q", Description: "Open queue manager", Type: HelpItemKey},
@@ -119,7 +119,7 @@ func buildHelpItems() []HelpItem {
 		{Key: "J/K", Description: "Scroll one line", Type: HelpItemKey},
 		{Key: "Ctrl+D/U", Description: "Scroll half screen", Type: HelpItemKey},
 		{Key: "g", Description: "Go to first window", Type: HelpItemKey},
-		{Key: "G", Description: "Go to last window, enable follow", Type: HelpItemKey},
+		{Key: "G", Description: "Follow the last window", Type: HelpItemKey},
 		{Key: "H/L/M", Description: "Cursor top/btm/mid", Type: HelpItemKey},
 		{Key: "e", Description: "Open in editor", Type: HelpItemKey},
 		{Key: "f/b", Description: "Next/prev prompt", Type: HelpItemKey},
@@ -247,7 +247,13 @@ func (hw *HelpWindow) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 			if hw.SelectedIdx >= 0 && hw.SelectedIdx < hw.filteredLen() {
 				item := hw.filteredItems[hw.SelectedIdx]
 				if !item.IsSection && item.Type == HelpItemCommand {
-					hw.pendingCommand = item.Key
+					// Extract just the command name, strip argument syntax
+					parts := strings.Fields(item.Key)
+					if len(parts) > 0 {
+						hw.pendingCommand = parts[0]
+					} else {
+						hw.pendingCommand = item.Key
+					}
 					hw.State = FilteredListClosed
 				}
 			}

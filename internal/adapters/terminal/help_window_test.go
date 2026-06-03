@@ -174,8 +174,8 @@ func TestHelpWindowViewWhenOpen(t *testing.T) {
 	}
 
 	// Should contain command entries
-	if !containsStr(view.Content, ":continue") {
-		t.Error("View should contain ':continue' command")
+	if !containsStr(view.Content, ":continue [skip]") {
+		t.Error("View should contain ':continue [skip]' command")
 	}
 
 	// RenderOverlay should contain navigation help text
@@ -276,6 +276,46 @@ func TestHelpWindowEnterOnCommand(t *testing.T) {
 	pending = hw.ConsumePendingCommand()
 	if pending != "" {
 		t.Errorf("Expected empty after consume, got %q", pending)
+	}
+}
+
+func TestHelpWindowEnterOnCommandStripsArgs(t *testing.T) {
+	styles := DefaultStyles()
+	hw := NewHelpWindow(styles)
+
+	// Set up items with argument syntax in the key
+	hw.items = []HelpItem{
+		{IsSection: true, Description: "Commands"},
+		{Key: ":continue [skip]", Description: "Resume after error", Type: HelpItemCommand},
+		{Key: ":theme_set <name>", Description: "Switch theme by name", Type: HelpItemCommand},
+		{Key: ":confirm <yes|no>", Description: "Confirm or deny pending tool", Type: HelpItemCommand},
+	}
+	hw.Open()
+
+	// Press Enter on :continue [skip] — should produce ":continue"
+	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	pending := hw.ConsumePendingCommand()
+	if pending != ":continue" {
+		t.Errorf("Expected pending command ':continue', got %q", pending)
+	}
+
+	// Re-open and test :theme_set <name> — should produce ":theme_set"
+	hw.Open()
+	hw.moveDown()
+	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	pending = hw.ConsumePendingCommand()
+	if pending != ":theme_set" {
+		t.Errorf("Expected pending command ':theme_set', got %q", pending)
+	}
+
+	// Re-open and test :confirm <yes|no> — should produce ":confirm"
+	hw.Open()
+	hw.moveDown()
+	hw.moveDown()
+	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	pending = hw.ConsumePendingCommand()
+	if pending != ":confirm" {
+		t.Errorf("Expected pending command ':confirm', got %q", pending)
 	}
 }
 

@@ -147,7 +147,7 @@ func (fl *FilteredListCore) handleFilterFocusedKey(msg tea.KeyMsg, key string) (
 // handleListFocusedKey handles keys when the list is focused.
 func (fl *FilteredListCore) handleListFocusedKey(key string, onExtra func(string) bool) (handled bool, filterChanged bool, cmd tea.Cmd) {
 	switch key {
-	case keyQ, keyEsc, keyCtrlC:
+	case keyQ, keyEsc:
 		fl.State = FilteredListClosed
 		return true, false, nil
 	case keyJ, keyDown:

@@ -122,7 +122,7 @@ func (sl *ScrollableListCore) RenderOverlay(baseContent, renderedList string, sc
 // itemsLen is the number of items in the list (for bounds checking).
 func (sl *ScrollableListCore) HandleKeyMsg(msg tea.KeyMsg, itemsLen int) (handled bool, isClose bool) {
 	switch msg.String() {
-	case keyQ, keyEsc, keyCtrlC:
+	case keyQ, keyEsc:
 		sl.State = ScrollableListClosed
 		return true, true
 	case keyJ, keyDown:
