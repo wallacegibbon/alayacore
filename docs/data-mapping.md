@@ -105,7 +105,7 @@ apiMsg.ToolCalls = ...        // only ToolUseParts go here
 // ToolResultParts become entirely separate messages with role="tool"
 ```
 
-And on receive, the OpenAI adapter must **merge** three independent stream accumulators (`reasoningBuilder`, `textBuilder`, `toolCallArgs[]`) back into a single `[]ContentPart` — while Anthropic's blocks arrive already serialized and just need direct field mapping.
+And on receive, both providers use the same pattern: accumulate content by `index` across streaming chunks, then assemble into a single `[]ContentPart` at step completion. OpenAI accumulates three parallel fields (reasoning, text, tool arguments) by index; Anthropic accumulates content blocks by index — structurally the same approach.
 
 **Conclusion:** The domain layer was clearly inspired by Anthropic's content block array model. It's the more general and extensible design — adding a new content type just means adding a new `ContentPart` implementation and a new case in each provider's switch statement. OpenAI's flat-field model is the odd one out requiring non-trivial split/merge logic.
 
@@ -342,17 +342,19 @@ openAIStreamState {
 
 All four accumulate simultaneously during streaming. At `StepCompleteEvent`, they merge into a single `Message.Content` slice.
 
-### Anthropic: Serial block processor
+### Anthropic: Indexed block accumulator (like OpenAI)
 
 ```
-anthropicStreamState {
-    contentParts  []ContentPart            ← finished blocks appended here
+blockAccumulator {
+    blockType string              // "text" | "thinking" | "tool_use"
+    buffer    strings.Builder     // text, thinking, or tool_use partial_json
+    id, name, signature string
+}
 
-    // Current block being built:
-    currentType   string                   // "text" | "thinking" | "tool_use"
-    currentBuffer strings.Builder          // shared: text, thinking, or tool_use partial_json
-    currentID, currentName, currentSignature string
+anthropicStreamState {
+    contentParts  []ContentPart              ← finished blocks appended here
+    blocks        map[int]*blockAccumulator  ← in-progress blocks by index
 }
 ```
 
-Blocks arrive serially (one `content_block_start` → deltas → `content_block_stop` at a time). Each block finishes before the next starts. `finishBlock()` converts the current block to a `ContentPart` and appends to `contentParts`.
+Every wire event carries an `index` (start, delta, stop), just like OpenAI's `tool_calls[index]`. Blocks may arrive interleaved — block 1 can start before block 0 finishes. Each block is independently accumulated by index. `content_block_stop(i)` finalizes `blocks[i]` and appends the result to `contentParts`.

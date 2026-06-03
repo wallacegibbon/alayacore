@@ -165,6 +165,11 @@ type anthropicSSEContentBlockDelta struct {
 	Delta anthropicSSEDelta `json:"delta"`
 }
 
+// anthropicSSEContentBlockStop is the payload for "content_block_stop" events.
+type anthropicSSEContentBlockStop struct {
+	Index int `json:"index"`
+}
+
 // anthropicSSEMessageDelta is the payload for "message_delta" events.
 type anthropicSSEMessageDelta struct {
 	Delta struct {
@@ -352,56 +357,60 @@ func (p *AnthropicProvider) parseStream(reader io.Reader) iter.Seq2[llm.StreamEv
 	}
 }
 
+// blockAccumulator accumulates the content of a single content block by index.
+// Anthropic's wire format includes an index on every block event (start, delta, stop),
+// allowing blocks to arrive interleaved — similar to how OpenAI indexes tool calls.
+type blockAccumulator struct {
+	blockType string          // "text" | "thinking" | "tool_use"
+	buffer    strings.Builder // shared: text, thinking deltas, or tool_use partial_json
+	id        string          // tool_use id (empty for text/thinking)
+	name      string          // tool_use name (empty for text/thinking)
+	signature string          // thinking signature (empty for text/tool_use)
+}
+
 // anthropicStreamState tracks accumulation state during streaming
 type anthropicStreamState struct {
 	streamUsage
 	contentParts []llm.ContentPart
-
-	// Current block being accumulated
-	currentIndex     int
-	currentType      string
-	currentBuffer    strings.Builder
-	currentID        string
-	currentName      string
-	currentSignature string
+	blocks       map[int]*blockAccumulator // index → block being accumulated
 }
 
-func (s *anthropicStreamState) startBlock(index int, blockType, id, name, signature string) {
-	s.currentIndex = index
-	s.currentType = blockType
-	s.currentID = id
-	s.currentName = name
-	s.currentSignature = signature
-	s.currentBuffer.Reset()
+func (s *anthropicStreamState) createBlock(index int, blockType, id, name, signature string) *blockAccumulator {
+	if s.blocks == nil {
+		s.blocks = make(map[int]*blockAccumulator)
+	}
+	s.blocks[index] = &blockAccumulator{
+		blockType: blockType,
+		id:        id,
+		name:      name,
+		signature: signature,
+	}
+	return s.blocks[index]
 }
 
-func (s *anthropicStreamState) appendText(text string) {
-	s.currentBuffer.WriteString(text)
-}
-
-func (s *anthropicStreamState) appendInput(jsonStr string) {
-	s.currentBuffer.WriteString(jsonStr)
-}
-
-func (s *anthropicStreamState) finishBlock() {
-	switch s.currentType {
+func (s *anthropicStreamState) finishBlock(index int) {
+	block, ok := s.blocks[index]
+	if !ok {
+		return
+	}
+	switch block.blockType {
 	case anthropicBlockTypeText:
 		s.contentParts = append(s.contentParts, llm.TextPart{
-			Text: s.currentBuffer.String(),
+			Text: block.buffer.String(),
 		})
 	case anthropicBlockTypeThinking:
 		s.contentParts = append(s.contentParts, llm.ReasoningPart{
-			Text:      s.currentBuffer.String(),
-			Signature: s.currentSignature,
+			Text:      block.buffer.String(),
+			Signature: block.signature,
 		})
 	case anthropicBlockTypeToolUse:
 		s.contentParts = append(s.contentParts, llm.ToolUsePart{
-			ID:       s.currentID,
-			ToolName: s.currentName,
-			Input:    json.RawMessage(s.currentBuffer.String()),
+			ID:       block.id,
+			ToolName: block.name,
+			Input:    json.RawMessage(block.buffer.String()),
 		})
 	}
-	s.currentType = ""
+	delete(s.blocks, index)
 }
 
 func (s *anthropicStreamState) setUsage(inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens int64) {
@@ -414,10 +423,8 @@ func (s *anthropicStreamState) setUsage(inputTokens, outputTokens, cacheReadToke
 }
 
 // getMessage wraps the accumulated contentParts into a domain Message.
-// Unlike OpenAI's parallel accumulators (reasoningBuilder + textBuilder + toolCallArgs),
-// Anthropic's block lifecycle model delivers content serially — each block starts, streams,
-// and finishes before the next begins. finishBlock() already converted each block to the
-// correct ContentPart type, so this function is a trivial wrapper.
+// finishBlock() already converted each block to the correct ContentPart type,
+// so this function is a trivial wrapper.
 func (s *anthropicStreamState) getMessage() llm.Message {
 	return llm.Message{
 		Role:    llm.RoleAssistant,
@@ -425,16 +432,17 @@ func (s *anthropicStreamState) getMessage() llm.Message {
 	}
 }
 
-// lastToolUse returns the last tool use if the current block is a tool_use
-func (s *anthropicStreamState) lastToolUse() *llm.ToolUsePart {
-	if s.currentType == anthropicBlockTypeToolUse {
-		return &llm.ToolUsePart{
-			ID:       s.currentID,
-			ToolName: s.currentName,
-			Input:    json.RawMessage(s.currentBuffer.String()),
-		}
+// toolUsePart returns a complete ToolUsePart if the block at the given index is a tool_use.
+func (s *anthropicStreamState) toolUsePart(index int) *llm.ToolUsePart {
+	block, ok := s.blocks[index]
+	if !ok || block.blockType != anthropicBlockTypeToolUse {
+		return nil
 	}
-	return nil
+	return &llm.ToolUsePart{
+		ID:       block.id,
+		ToolName: block.name,
+		Input:    json.RawMessage(block.buffer.String()),
+	}
 }
 
 // ============================================================================
@@ -459,10 +467,14 @@ func (p *AnthropicProvider) handleEvent(eventType, data string, yield func(llm.S
 		if !ok {
 			return false
 		}
-		return p.handleContentDelta(event.Delta, yield, state)
+		return p.handleContentDelta(event.Index, event.Delta, yield, state)
 
 	case "content_block_stop":
-		return p.handleContentBlockStop(yield, state)
+		event, ok := unmarshalSSE[anthropicSSEContentBlockStop](data, yield)
+		if !ok {
+			return false
+		}
+		return p.handleContentBlockStop(event.Index, yield, state)
 
 	case "message_delta":
 		return p.handleMessageDeltaEvent(data, yield, state)
@@ -495,7 +507,7 @@ func (p *AnthropicProvider) handleContentBlockStart(data string, yield func(llm.
 	if !ok {
 		return false
 	}
-	state.startBlock(event.Index, event.ContentBlock.Type, event.ContentBlock.ID, event.ContentBlock.Name, event.ContentBlock.Signature)
+	state.createBlock(event.Index, event.ContentBlock.Type, event.ContentBlock.ID, event.ContentBlock.Name, event.ContentBlock.Signature)
 	if event.ContentBlock.Type == anthropicBlockTypeToolUse {
 		if !yield(llm.ToolUseStartEvent{
 			ID:       event.ContentBlock.ID,
@@ -508,28 +520,32 @@ func (p *AnthropicProvider) handleContentBlockStart(data string, yield func(llm.
 }
 
 // handleContentDelta handles content block delta events
-func (p *AnthropicProvider) handleContentDelta(delta anthropicSSEDelta, yield func(llm.StreamEvent, error) bool, state *anthropicStreamState) bool {
+func (p *AnthropicProvider) handleContentDelta(index int, delta anthropicSSEDelta, yield func(llm.StreamEvent, error) bool, state *anthropicStreamState) bool {
+	block, ok := state.blocks[index]
+	if !ok {
+		return true
+	}
 	switch delta.Type {
 	case anthropicDeltaTypeText:
-		state.appendText(delta.Text)
+		block.buffer.WriteString(delta.Text)
 		if !yield(llm.TextDeltaEvent{Delta: delta.Text}, nil) {
 			return false
 		}
 	case anthropicDeltaTypeThinking:
-		state.appendText(delta.Thinking)
+		block.buffer.WriteString(delta.Thinking)
 		if !yield(llm.ReasoningDeltaEvent{Delta: delta.Thinking}, nil) {
 			return false
 		}
 	case anthropicDeltaTypeInputJSON:
-		state.appendInput(delta.PartialJSON)
+		block.buffer.WriteString(delta.PartialJSON)
 	}
 	return true
 }
 
 // handleContentBlockStop handles content_block_stop events
-func (p *AnthropicProvider) handleContentBlockStop(yield func(llm.StreamEvent, error) bool, state *anthropicStreamState) bool {
-	tc := state.lastToolUse()
-	state.finishBlock()
+func (p *AnthropicProvider) handleContentBlockStop(index int, yield func(llm.StreamEvent, error) bool, state *anthropicStreamState) bool {
+	tc := state.toolUsePart(index)
+	state.finishBlock(index)
 	if tc != nil {
 		if !yield(llm.ToolUsePart{
 			ID:       tc.ID,
