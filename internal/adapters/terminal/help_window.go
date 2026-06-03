@@ -97,7 +97,7 @@ func buildHelpItems() []HelpItem {
 		{Key: "Tab", Description: "Toggle focus display/input", Type: HelpItemKey},
 		{Key: "Enter", Description: "Submit prompt or command", Type: HelpItemKey},
 		{Key: "Ctrl+H", Description: "Open help window", Type: HelpItemKey},
-		{Key: "Ctrl+G", Description: "Cancel current request", Type: HelpItemKey},
+		{Key: "Ctrl+G", Description: "Cancel current task", Type: HelpItemKey},
 		{Key: "Ctrl+C", Description: "Clear text", Type: HelpItemKey},
 		{Key: "Ctrl+S", Description: "Save session", Type: HelpItemKey},
 		{Key: "Ctrl+O", Description: "Open in editor (main input)", Type: HelpItemKey},

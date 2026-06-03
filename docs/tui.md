@@ -33,7 +33,7 @@ AlayaCore's terminal UI is built with [Bubble Tea](https://github.com/charmbrace
 | `Ctrl+P` | Open theme selector |
 | `Ctrl+Q` | Open task queue manager |
 | `Ctrl+H` | Open help window |
-| `Ctrl+G` | Cancel current request (with confirmation) |
+| `Ctrl+G` | Cancel current task (with confirmation) |
 | `Ctrl+Z` | Suspend process |
 | `Ctrl+C` | Clear text |
 | `:` | Switch to input with `:` prefix (command mode) |
@@ -46,8 +46,8 @@ Commands are split into two categories:
 **Immediate commands** — run synchronously in the main event loop, no queuing:
 | Command | Action |
 |---------|--------|
-| `:cancel` | Cancel current request (with confirmation) |
-| `:cancel_all` | Cancel current request and clear the task queue |
+| `:cancel` | Cancel current task (with confirmation) |
+| `:cancel_all` | Cancel current task and clear the task queue |
 | `:save [filename]` | Save session. Uses `--session` path if no filename given. |
 | `:model_set <id>` | Switch to a model by numeric ID |
 | `:model_load` | Reload model configs from the config file |
