@@ -34,6 +34,7 @@ type Styles struct {
 	Error       lipgloss.Style
 	System      lipgloss.Style
 	Prompt      lipgloss.Style
+	Attachment  lipgloss.Style
 	DiffRemove  lipgloss.Style
 	DiffAdd     lipgloss.Style
 
@@ -91,6 +92,7 @@ func NewStyles(t *theme.Theme) *Styles {
 		Error:       baseStyle.Foreground(lipgloss.Color(t.Error)),
 		System:      baseStyle.Foreground(lipgloss.Color(t.Muted)),
 		Prompt:      baseStyle.Foreground(lipgloss.Color(t.Primary)).Bold(true),
+		Attachment:  baseStyle.Foreground(lipgloss.Color(t.Warning)).Bold(true),
 		DiffRemove:  baseStyle.Foreground(lipgloss.Color(t.Removed)),
 		DiffAdd:     baseStyle.Foreground(lipgloss.Color(t.Added)),
 

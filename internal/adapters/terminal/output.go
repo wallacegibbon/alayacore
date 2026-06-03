@@ -167,22 +167,26 @@ func (to *outputWriter) writeColored(tag string, value string) {
 		// Pass raw value - styling is applied during render
 		to.windowBuffer.AppendOrUpdate(tag, id, value)
 
+	// User image tag — display an attachment indicator
+	case stream.TagUserI:
+		id := to.generateWindowID()
+		to.windowBuffer.AppendOrUpdate(stream.TagUserI, id, "📎 Image")
+
 	default:
 		id := to.generateWindowID()
 		to.windowBuffer.AppendOrUpdate(tag, id, value)
 	}
 }
 
-// triggerUpdateForTag marks the display as dirty for tags that modify the display
+// triggerUpdateForTag marks the display as dirty for tags that modify the display.
+//
+// TagSystemMsg is NOT listed here because handleSystemMsg() calls
+// to.dirty.Store(true) itself after all state (including pendingQueueItems)
+// has been fully updated. Setting dirty early would create a race where the
+// Bubble Tea goroutine sees dirty=true but pendingQueueItems has not been set yet.
 func (to *outputWriter) triggerUpdateForTag(tag string) {
 	switch tag {
-	// Text content tags — TagSystemMsg is NOT listed here because
-	// handleSystemMsg() calls to.dirty.Store(true) itself, after all
-	// state (including pendingQueueItems) has been fully updated.
-	// Setting dirty early would create a race where the Bubble Tea
-	// goroutine sees dirty=true but pendingQueueItems has not been set yet.
-	case stream.TagAssistantT, stream.TagAssistantR, stream.TagUserT,
-		stream.TagAssistantF:
+	case stream.TagAssistantT, stream.TagAssistantR, stream.TagAssistantF, stream.TagUserT, stream.TagUserF, stream.TagUserI:
 		to.dirty.Store(true)
 	}
 }

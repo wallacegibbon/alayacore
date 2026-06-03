@@ -108,6 +108,10 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 	case stream.TagUserF:
 		// Suppress tool result content in plainio; do not update lastTag.
 
+	case stream.TagUserI:
+		o.emitSeparator(tag)
+		fmt.Fprint(o.writer, "[image]")
+
 	default:
 		o.emitSeparator(tag)
 		fmt.Fprintf(o.writer, "[unknown-tag:%s %s]", tag, value)

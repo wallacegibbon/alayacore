@@ -369,6 +369,8 @@ func (w *Window) styleContent(content string, styles *Styles) string {
 		return styleMultiline(content, styles.Text)
 	case stream.TagAssistantR:
 		return styleMultiline(content, styles.Reasoning)
+	case stream.TagUserI:
+		return styleMultiline(content, styles.Attachment)
 	case stream.TagUserT:
 		return styles.Prompt.Render("> ") + styles.UserInput.Render(content)
 	case TagWindowSE:
