@@ -19,6 +19,11 @@ import (
 	domainerrors "github.com/alayacore/alayacore/internal/errors"
 )
 
+// maxTLVContentSize is the safety limit for a single TLV record's content.
+// No legitimate content part should come close to this; it catches corrupted
+// session files attempting to allocate excessive memory.
+const maxTLVContentSize = 10 * 1024 * 1024
+
 // ErrSessionVersionMismatch is returned when a session file has a version
 // that does not match MessageVersion and cannot be loaded.
 var ErrSessionVersionMismatch = errors.New("session file version mismatch")
@@ -73,76 +78,68 @@ func formatFrontmatter(meta *SessionMeta) string {
 	return "---\n" + config.FormatKeyValue(meta) + "---\n"
 }
 
+// contentPartToTLV converts a ContentPart to a TLV tag and content string.
+// Returns the TLV tag and the serialized content.
+func contentPartToTLV(msgRole llm.MessageRole, part llm.ContentPart) (tag string, content string, err error) {
+	switch p := part.(type) {
+	case llm.TextPart:
+		if msgRole == llm.RoleAssistant {
+			return stream.TagAssistantT, p.Text, nil
+		}
+		return stream.TagUserT, p.Text, nil
+	case llm.ImagePart:
+		return stream.TagUserI, p.DataURL, nil
+	case llm.ReasoningPart:
+		return stream.TagAssistantR, p.Text, nil
+	case llm.ToolUsePart:
+		fd := stream.ToolUseData{ID: p.ID, Name: p.ToolName, Input: string(p.Input)}
+		jsonData, err := json.Marshal(fd)
+		if err != nil {
+			return "", "", err
+		}
+		return stream.TagAssistantF, string(jsonData), nil
+	case llm.ToolResultPart:
+		tr := stream.ToolResultData{ID: p.ID, Output: formatToolResultOutput(p.Output)}
+		_, tr.IsError = p.Output.(llm.ToolResultOutputFailed)
+		jsonData, err := json.Marshal(tr)
+		if err != nil {
+			return "", "", err
+		}
+		return stream.TagUserF, string(jsonData), nil
+	default:
+		return "", "", fmt.Errorf("unknown content part type: %T", part)
+	}
+}
+
 // formatSessionMarkdown converts SessionData to markdown format with TLV encoding.
 func formatSessionMarkdown(data *SessionData) ([]byte, error) {
-	var buf strings.Builder
+	var buf, tlvBuf strings.Builder
 	buf.WriteString(formatFrontmatter(&data.SessionMeta))
 
-	var binaryBuf strings.Builder
 	for _, msg := range data.Messages {
 		for _, part := range msg.Content {
-			switch p := part.(type) {
-			case llm.TextPart:
-				tag := stream.TagUserT
-				if msg.Role == llm.RoleAssistant {
-					tag = stream.TagAssistantT
-				}
-				writeTLV(&binaryBuf, tag, p.Text)
-
-			case llm.ImagePart:
-				writeTLV(&binaryBuf, stream.TagUserI, p.DataURL)
-
-			case llm.ReasoningPart:
-				// Signature is not preserved — see signature_delta comment in anthropic.go.
-				writeTLV(&binaryBuf, stream.TagAssistantR, p.Text)
-
-			case llm.ToolUsePart:
-				fd := stream.ToolUseData{
-					ID:            p.ID,
-					IsPlaceholder: false,
-					Name:          p.ToolName,
-					Input:         string(p.Input),
-				}
-				jsonData, err := json.Marshal(fd)
-				if err != nil {
-					return nil, domainerrors.Wrap(domainerrors.OpSave, fmt.Errorf("failed to marshal tool call: %w", err))
-				}
-				writeTLV(&binaryBuf, stream.TagAssistantF, string(jsonData))
-
-			case llm.ToolResultPart:
-				tr := stream.ToolResultData{
-					ID:      p.ID,
-					Output:  formatToolResultOutput(p.Output),
-					IsError: false,
-				}
-				if _, ok := p.Output.(llm.ToolResultOutputFailed); ok {
-					tr.IsError = true
-				}
-				jsonData, err := json.Marshal(tr)
-				if err != nil {
-					return nil, domainerrors.Wrap(domainerrors.OpSave, fmt.Errorf("failed to marshal tool result: %w", err))
-				}
-				writeTLV(&binaryBuf, stream.TagUserF, string(jsonData))
+			tag, content, err := contentPartToTLV(msg.Role, part)
+			if err != nil {
+				return nil, domainerrors.Wrap(domainerrors.OpSave, err)
 			}
+			writeTLV(&tlvBuf, tag, content)
 		}
 	}
 
-	buf.Write([]byte(binaryBuf.String()))
+	buf.WriteString(tlvBuf.String())
 	return []byte(buf.String()), nil
 }
 
 func writeTLV(buf *strings.Builder, tag string, content string) {
 	data := []byte(content)
-	length := len(data)
-
 	buf.WriteString("\n\n")
 	buf.WriteByte(tag[0])
 	buf.WriteByte(tag[1])
 	buf.Write([]byte{
-		byte(length >> 24),
-		byte(length >> 16),
-		byte(length >> 8),
-		byte(length),
+		byte(len(data) >> 24),
+		byte(len(data) >> 16),
+		byte(len(data) >> 8),
+		byte(len(data)),
 	})
 	buf.Write(data)
 }
@@ -221,120 +218,116 @@ func parseSessionMarkdown(data []byte) (*SessionData, error) {
 	return sd, nil
 }
 
-//nolint:gocyclo // parsing requires multiple branches for tag types
+// tlvReader reads sequential TLV records from a string.
+type tlvReader struct {
+	reader *strings.Reader
+}
+
+func newTLVReader(body string) *tlvReader {
+	return &tlvReader{reader: strings.NewReader(body)}
+}
+
+// read advances to the next TLV record. Returns io.EOF when exhausted.
+func (r *tlvReader) read() (tag string, content []byte, err error) {
+	// Skip whitespace/newlines between records.
+	for {
+		b, err := r.reader.ReadByte()
+		if err != nil {
+			return "", nil, err
+		}
+		if b != '\n' && b != '\r' && b != ' ' && b != '\t' {
+			r.reader.UnreadByte() //nolint:errcheck
+			break
+		}
+	}
+
+	tagBytes := make([]byte, 2)
+	if _, err := io.ReadFull(r.reader, tagBytes); err != nil {
+		return "", nil, err
+	}
+
+	var length int32
+	if err := binary.Read(r.reader, binary.BigEndian, &length); err != nil {
+		return "", nil, fmt.Errorf("failed to read length: %w", err)
+	}
+	if length < 0 || length > maxTLVContentSize {
+		return "", nil, fmt.Errorf("invalid length: %d", length)
+	}
+
+	content = make([]byte, length)
+	if _, err := io.ReadFull(r.reader, content); err != nil {
+		return "", nil, fmt.Errorf("failed to read content: %w", err)
+	}
+
+	return string(tagBytes), content, nil
+}
+
+// contentPartFromTLV converts a TLV record into a ContentPart.
+// Returns the message role and the content part.
+func contentPartFromTLV(tag string, content []byte) (llm.MessageRole, llm.ContentPart, error) {
+	switch tag {
+	case stream.TagUserT:
+		return llm.RoleUser, llm.TextPart{Text: string(content)}, nil
+	case stream.TagUserI:
+		return llm.RoleUser, llm.ImagePart{DataURL: string(content)}, nil
+	case stream.TagAssistantT:
+		return llm.RoleAssistant, llm.TextPart{Text: string(content)}, nil
+	case stream.TagAssistantR:
+		return llm.RoleAssistant, llm.ReasoningPart{Text: string(content)}, nil
+	case stream.TagAssistantF:
+		var fd stream.ToolUseData
+		if err := json.Unmarshal(content, &fd); err != nil {
+			return "", nil, fmt.Errorf("failed to parse function data: %w", err)
+		}
+		if fd.Name == "" {
+			return "", nil, nil // skip malformed
+		}
+		return llm.RoleAssistant, llm.ToolUsePart{
+			ID: fd.ID, ToolName: fd.Name, Input: json.RawMessage(fd.Input),
+		}, nil
+	case stream.TagUserF:
+		var tr stream.ToolResultData
+		if err := json.Unmarshal(content, &tr); err != nil {
+			return "", nil, fmt.Errorf("failed to parse tool result: %w", err)
+		}
+		var output llm.ToolResultOutput
+		if tr.IsError {
+			output = llm.ToolResultOutputFailed{Reason: tr.Output}
+		} else {
+			output = llm.ToolResultOutputText{Text: tr.Output}
+		}
+		return llm.RoleTool, llm.ToolResultPart{ID: tr.ID, Output: output}, nil
+	default:
+		return "", nil, fmt.Errorf("unknown tag: %s", tag)
+	}
+}
+
 func parseMessagesTLV(body string) ([]llm.Message, []TLVChunk, error) {
 	var messages []llm.Message
 	var chunks []TLVChunk
 	var currentMsg *llm.Message
 
-	reader := strings.NewReader(body)
-
+	reader := newTLVReader(body)
 	for {
-		for {
-			b, err := reader.ReadByte()
-			if err == io.EOF {
-				if currentMsg != nil {
-					messages = append(messages, *currentMsg)
-				}
-				return messages, chunks, nil
+		tag, content, err := reader.read()
+		if err == io.EOF {
+			if currentMsg != nil {
+				messages = append(messages, *currentMsg)
 			}
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to read: %w", err)
-			}
-			if b != '\n' && b != '\r' && b != ' ' && b != '\t' {
-				if unreadErr := reader.UnreadByte(); unreadErr != nil {
-					return nil, nil, fmt.Errorf("failed to unread: %w", unreadErr)
-				}
-				break
-			}
+			return messages, chunks, nil
+		}
+		if err != nil {
+			return nil, nil, err
 		}
 
-		tagBytes := make([]byte, 2)
-		if _, err := io.ReadFull(reader, tagBytes); err != nil {
-			if err == io.EOF {
-				break
-			}
-			return nil, nil, fmt.Errorf("failed to read tag: %w", err)
-		}
-		tag := string(tagBytes)
-
-		var length int32
-		if err := binary.Read(reader, binary.BigEndian, &length); err != nil {
-			return nil, nil, fmt.Errorf("failed to read length: %w", err)
-		}
-
-		if length < 0 || length > 10*1024*1024 {
-			return nil, nil, fmt.Errorf("invalid length: %d", length)
-		}
-
-		content := make([]byte, length)
-		if _, err := io.ReadFull(reader, content); err != nil {
-			return nil, nil, fmt.Errorf("failed to read content: %w", err)
-		}
-
-		// Store TLV chunk for display
 		chunks = append(chunks, TLVChunk{Tag: tag, Value: string(content)})
 
-		var msgPart llm.ContentPart
-		var msgRole llm.MessageRole
-
-		switch tag {
-		case stream.TagUserT:
-			msgRole = llm.RoleUser
-			msgPart = llm.TextPart{Text: string(content)}
-
-		case stream.TagUserI:
-			msgRole = llm.RoleUser
-			msgPart = llm.ImagePart{DataURL: string(content)}
-
-		case stream.TagAssistantT:
-			// Do NOT force newMessage: an assistant message may start with
-			// TagAssistantR or TagAssistantF; the text part belongs in
-			// the same message.  A new message is still created when
-			// currentMsg is nil or the role doesn't match.
-			msgRole = llm.RoleAssistant
-			msgPart = llm.TextPart{Text: string(content)}
-
-		case stream.TagAssistantR:
-			msgRole = llm.RoleAssistant
-			msgPart = llm.ReasoningPart{Text: string(content)}
-
-		case stream.TagAssistantF:
-			// TagAssistantF (AF) is the current format.
-			msgRole = llm.RoleAssistant
-			var fd stream.ToolUseData
-			if err := json.Unmarshal(content, &fd); err != nil {
-				return nil, nil, fmt.Errorf("failed to parse function data: %w", err)
-			}
-			if fd.Name == "" {
-				// Malformed data — skip
-				continue
-			}
-			msgPart = llm.ToolUsePart{
-				ID:       fd.ID,
-				ToolName: fd.Name,
-				Input:    json.RawMessage(fd.Input),
-			}
-
-		case stream.TagUserF:
-			msgRole = llm.RoleTool
-			var tr stream.ToolResultData
-			if err := json.Unmarshal(content, &tr); err != nil {
-				return nil, nil, fmt.Errorf("failed to parse tool result: %w", err)
-			}
-			var output llm.ToolResultOutput
-			if tr.IsError {
-				output = llm.ToolResultOutputFailed{Reason: tr.Output}
-			} else {
-				output = llm.ToolResultOutputText{Text: tr.Output}
-			}
-			msgPart = llm.ToolResultPart{
-				ID:     tr.ID,
-				Output: output,
-			}
-
-		default:
-			return nil, nil, fmt.Errorf("unknown tag: %s", tag)
+		msgRole, msgPart, err := contentPartFromTLV(tag, content)
+		if err != nil {
+			return nil, nil, err
+		}
+		if msgPart == nil {
+			continue // skip malformed
 		}
 
 		roleMismatch := currentMsg != nil && currentMsg.Role != msgRole
@@ -342,20 +335,11 @@ func parseMessagesTLV(body string) ([]llm.Message, []TLVChunk, error) {
 			if currentMsg != nil {
 				messages = append(messages, *currentMsg)
 			}
-			currentMsg = &llm.Message{
-				Role:    msgRole,
-				Content: []llm.ContentPart{msgPart},
-			}
+			currentMsg = &llm.Message{Role: msgRole, Content: []llm.ContentPart{msgPart}}
 		} else {
 			currentMsg.Content = append(currentMsg.Content, msgPart)
 		}
 	}
-
-	if currentMsg != nil {
-		messages = append(messages, *currentMsg)
-	}
-
-	return messages, chunks, nil
 }
 
 func formatToolResultOutput(output llm.ToolResultOutput) string {
