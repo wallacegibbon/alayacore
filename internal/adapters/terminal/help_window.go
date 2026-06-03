@@ -78,19 +78,19 @@ func buildHelpItems() []HelpItem {
 	return []HelpItem{
 		// Commands
 		{IsSection: true, Description: "Commands"},
+		{Key: ":confirm <yes|no>", Description: "Confirm or deny pending tool", Type: HelpItemCommand},
 		{Key: ":continue [skip]", Description: "Retry / skip failed prompt", Type: HelpItemCommand},
-		{Key: ":cancel", Description: "Cancel current task", Type: HelpItemCommand},
-		{Key: ":cancel_all", Description: "Cancel all & clear queue", Type: HelpItemCommand},
-		{Key: ":summarize", Description: "Summarize & compress history", Type: HelpItemCommand},
 		{Key: ":reason <0|1|2>", Description: "Set reasoning level", Type: HelpItemCommand},
-		{Key: ":save [filename]", Description: "Save session", Type: HelpItemCommand},
+		{Key: ":cancel_all", Description: "Cancel all & clear queue", Type: HelpItemCommand},
+		{Key: ":cancel", Description: "Cancel current task", Type: HelpItemCommand},
+		{Key: ":summarize", Description: "Summarize & compress history", Type: HelpItemCommand},
 		{Key: ":theme_set <name>", Description: "Switch theme by name", Type: HelpItemCommand},
-		{Key: ":quit", Description: "Exit application", Type: HelpItemCommand},
 		{Key: ":model_set <id>", Description: "Switch model by ID", Type: HelpItemCommand},
 		{Key: ":model_load", Description: "Reload model config", Type: HelpItemCommand},
-		{Key: ":confirm <yes|no>", Description: "Confirm or deny pending tool", Type: HelpItemCommand},
+		{Key: ":save [filename]", Description: "Save session", Type: HelpItemCommand},
+		{Key: ":suspend", Description: "Suspend process", Type: HelpItemCommand},
+		{Key: ":quit", Description: "Exit application", Type: HelpItemCommand},
 		{Key: ":help", Description: "Open help window", Type: HelpItemCommand},
-		{Key: ":suspend", Description: "Suspend process (Ctrl+Z)", Type: HelpItemCommand},
 
 		// Global Shortcuts
 		{IsSection: true, Description: "Global Shortcuts"},
