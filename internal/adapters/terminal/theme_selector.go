@@ -125,37 +125,37 @@ func (ts *ThemeSelector) HandleKeyMsg(msg tea.KeyMsg, themeManager *ThemeManager
 	}
 
 	key := msg.String()
-	var previewTheme *theme.Theme
 
-	switch key {
-	case keyUp, keyK:
-		if ts.SelectedIdx > 0 {
-			ts.SelectedIdx--
-			ts.EnsureVisible()
-			previewTheme = ts.getPreviewTheme(themeManager)
+	// Handle 'r' for reload (parent handles the actual reload)
+	if key == keyR {
+		return nil, false
+	}
+
+	// Handle navigation and close via base type
+	handled, isClose := ts.ScrollableListCore.HandleKeyMsg(msg, len(ts.themes))
+	if handled {
+		if isClose {
+			// Closed without selection — close properly
+			ts.Close()
+			return nil, true
 		}
-	case keyDown, keyJ:
-		if ts.SelectedIdx < len(ts.themes)-1 {
-			ts.SelectedIdx++
-			ts.EnsureVisible()
-			previewTheme = ts.getPreviewTheme(themeManager)
-		}
-	case keyEnter:
+		// Navigated — get preview
+		previewTheme := ts.getPreviewTheme(themeManager)
+		return previewTheme, true
+	}
+
+	// Handle Enter for selection
+	if key == keyEnter {
 		if len(ts.themes) > 0 && ts.SelectedIdx >= 0 {
 			ts.themeJustSelected = true
 			ts.State = ScrollableListClosed
-			previewTheme = ts.getPreviewTheme(themeManager)
+			previewTheme := ts.getPreviewTheme(themeManager)
 			ts.previewTheme = nil
 			return previewTheme, true
 		}
-	case keyR:
-		return nil, false // Parent handles reload
-	case keyEsc, keyQ:
-		ts.Close()
-		return nil, true
 	}
 
-	return previewTheme, true
+	return nil, true
 }
 
 func (ts *ThemeSelector) getPreviewTheme(themeManager *ThemeManager) *theme.Theme {

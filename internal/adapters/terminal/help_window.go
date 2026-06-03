@@ -193,72 +193,36 @@ func (hw *HelpWindow) filteredLen() int {
 func (hw *HelpWindow) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	key := msg.String()
 
-	if key == keyTab {
-		hw.HandleTabKey()
-		return nil
-	}
-
-	if hw.FilterInputFocused {
-		return hw.handleFilterInputKey(msg, key)
-	}
-
-	return hw.handleListKey(key)
-}
-
-// handleFilterInputKey handles keys when the filter input is focused.
-func (hw *HelpWindow) handleFilterInputKey(msg tea.KeyMsg, key string) tea.Cmd {
-	if key == keyEsc {
-		hw.State = FilteredListClosed
-		return nil
-	}
-
-	if key == keyCtrlC {
-		hw.HandleFilterCtrlC()
-		hw.updateFilteredItems()
-		hw.clampSelection()
-		return nil
-	}
-
-	if key == keyCtrlU || key == keyCtrlD {
-		return nil
-	}
-
-	oldValue := hw.FilterInput.Value()
-	var cmd tea.Cmd
-	hw.FilterInput, cmd = hw.FilterInput.Update(msg)
-
-	if oldValue != hw.FilterInput.Value() {
-		hw.updateFilteredItems()
-		hw.clampSelection()
-	}
-
-	return cmd
-}
-
-// handleListKey handles keys when the list is focused.
-func (hw *HelpWindow) handleListKey(key string) tea.Cmd {
-	switch key {
-	case keyQ, keyEsc, keyCtrlC:
-		hw.State = FilteredListClosed
-		return nil
-
-	case keyEnter:
-		if hw.SelectedIdx >= 0 && hw.SelectedIdx < hw.filteredLen() {
-			item := hw.filteredItems[hw.SelectedIdx]
-			if !item.IsSection && item.Type == HelpItemCommand {
-				hw.pendingCommand = item.Key
-				hw.State = FilteredListClosed
+	// Common filtered list handling (tab, esc, ctrl+c, filter input keys)
+	handled, filterChanged, cmd := hw.FilteredListCore.HandleKeyMsg(msg, func(extraKey string) bool {
+		// Called for Enter when list is focused
+		if extraKey == keyEnter {
+			if hw.SelectedIdx >= 0 && hw.SelectedIdx < hw.filteredLen() {
+				item := hw.filteredItems[hw.SelectedIdx]
+				if !item.IsSection && item.Type == HelpItemCommand {
+					hw.pendingCommand = item.Key
+					hw.State = FilteredListClosed
+				}
 			}
+			return true
 		}
-		return nil
+		return false
+	})
 
-	case keyJ, keyDown:
-		hw.moveDown()
-		return nil
+	if handled {
+		if filterChanged {
+			hw.updateFilteredItems()
+			hw.clampSelection()
+		}
 
-	case keyK, keyUp:
-		hw.moveUp()
-		return nil
+		// If list is focused and j/k was pressed, use section-aware navigation
+		if !hw.FilterInputFocused && (key == keyJ || key == keyDown) {
+			hw.moveDown()
+		} else if !hw.FilterInputFocused && (key == keyK || key == keyUp) {
+			hw.moveUp()
+		}
+
+		return cmd
 	}
 
 	return nil

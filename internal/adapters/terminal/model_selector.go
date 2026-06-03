@@ -210,85 +210,69 @@ func (ms *ModelSelector) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	if ms.State == FilteredListClosed {
 		return nil
 	}
-	return ms.handleListKeyMsg(msg)
-}
 
-func (ms *ModelSelector) handleListKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	key := msg.String()
 
-	if key == keyTab {
-		ms.HandleTabKey()
-		return nil
+	// Common filtered list handling (tab, esc, ctrl+c, filter input, j/k)
+	handled, filterChanged, cmd := ms.FilteredListCore.HandleKeyMsg(msg, func(extraKey string) bool {
+		if extraKey == keyEnter {
+			return ms.handleListEnter()
+		}
+		return false
+	})
+
+	if handled {
+		if filterChanged && ms.FilterInputFocused {
+			ms.updateFilteredModels()
+			ms.ClampSelection(len(ms.filteredModels))
+		}
+		if !ms.FilterInputFocused {
+			ms.handleListKeys(key)
+		}
+		if ms.FilterInputFocused && key == keyEnter && len(ms.filteredModels) > 0 {
+			ms.handleSearchEnter()
+		}
+		return cmd
 	}
 
-	if ms.FilterInputFocused {
-		return ms.handleSearchInputKey(msg, key)
-	}
-
-	return ms.handleListNavigationKey(key)
+	return nil
 }
 
-func (ms *ModelSelector) handleSearchInputKey(msg tea.KeyMsg, key string) tea.Cmd {
-	if key == keyEsc {
-		ms.State = FilteredListClosed
-		return nil
-	}
-
-	if key == keyCtrlC {
-		ms.HandleFilterCtrlC()
-		ms.updateFilteredModels()
-		ms.ClampSelection(len(ms.filteredModels))
-		return nil
-	}
-
-	if key == keyCtrlU || key == keyCtrlD {
-		return nil
-	}
-
-	if key == keyEnter && len(ms.filteredModels) > 0 {
-		ms.SelectedIdx = 0
-		ms.activeModel = &ms.filteredModels[0]
+// handleListEnter handles Enter when the list is focused.
+func (ms *ModelSelector) handleListEnter() bool {
+	if len(ms.filteredModels) > 0 && ms.SelectedIdx >= 0 {
+		ms.activeModel = &ms.filteredModels[ms.SelectedIdx]
 		ms.modelJustSelected = true
 		ms.State = FilteredListClosed
-		return nil
+		return true
 	}
-
-	oldValue := ms.FilterInput.Value()
-	var cmd tea.Cmd
-	ms.FilterInput, cmd = ms.FilterInput.Update(msg)
-
-	if oldValue != ms.FilterInput.Value() {
-		ms.updateFilteredModels()
-		ms.ClampSelection(len(ms.filteredModels))
-	}
-
-	return cmd
+	return false
 }
 
-func (ms *ModelSelector) handleListNavigationKey(key string) tea.Cmd {
+// handleSearchEnter handles Enter when the search input is focused.
+func (ms *ModelSelector) handleSearchEnter() {
+	ms.SelectedIdx = 0
+	ms.activeModel = &ms.filteredModels[0]
+	ms.modelJustSelected = true
+	ms.State = FilteredListClosed
+}
+
+// handleListKeys handles navigation and action keys when the list is focused.
+func (ms *ModelSelector) handleListKeys(key string) {
 	switch key {
-	case keyUp, keyK:
-		if ms.SelectedIdx > 0 {
-			ms.SelectedIdx--
-		}
-	case keyDown, keyJ:
+	case keyJ, keyDown:
 		if ms.SelectedIdx < len(ms.filteredModels)-1 {
 			ms.SelectedIdx++
 		}
-	case keyEnter:
-		if len(ms.filteredModels) > 0 && ms.SelectedIdx >= 0 {
-			ms.activeModel = &ms.filteredModels[ms.SelectedIdx]
-			ms.modelJustSelected = true
-			ms.State = FilteredListClosed
+	case keyK, keyUp:
+		if ms.SelectedIdx > 0 {
+			ms.SelectedIdx--
 		}
 	case keyE:
 		ms.openModelFile = true
 	case keyR:
 		ms.reloadModels = true
-	case keyEsc, keyQ:
-		ms.State = FilteredListClosed
 	}
-	return nil
 }
 
 // --- Rendering ---

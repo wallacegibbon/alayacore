@@ -36,20 +36,34 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// 2. Model selector takes precedence when open
 	if m.modelSelector.IsOpen() {
-		return m.handleModelSelectorKeys(msg)
+		return m.handleOverlayModelSelector(msg)
 	}
 
 	// 3. Queue manager takes precedence when open
 	if m.queueManager.IsOpen() {
-		return m.handleQueueManagerKeys(msg)
+		return m.handleOverlayQueueManager(msg)
 	}
 
-	// 3.5 Help window takes precedence when open
+	// 4. Help window takes precedence when open
 	if m.helpWindow.IsOpen() {
-		return m.handleHelpWindowKeys(msg)
+		t := trackOverlay(m.helpWindow)
+		cmd := m.helpWindow.HandleKeyMsg(msg)
+		if t.JustClosed(m.helpWindow) {
+			// If a command was selected via Enter, copy it to input
+			if pending := m.helpWindow.ConsumePendingCommand(); pending != "" {
+				m.restoreFocus()
+				m.input.SetValue(pending + " ")
+				m.input.CursorEnd()
+				m.input.Focus()
+				m.focusedWindow = "input"
+				return m, nil
+			}
+			m.restoreFocus()
+		}
+		return m, cmd
 	}
 
-	// 4. Confirm dialog blocks all normal input
+	// 5. Confirm dialog blocks all normal input
 	if m.confirmOverlay.IsOpen() {
 		if handled := m.confirmOverlay.HandleKeyMsg(msg); handled {
 			return m.handleConfirmResult()
@@ -57,25 +71,25 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// 5. Tab toggles focus between display and input
+	// 6. Tab toggles focus between display and input
 	if msg.String() == keyTab {
 		m.toggleFocus()
 		return m, nil
 	}
 
-	// 6. Display-specific keys when display is focused
+	// 7. Display-specific keys when display is focused
 	if m.focusedWindow == focusDisplay {
 		if cmd, handled := m.handleDisplayKeys(msg); handled {
 			return m, cmd
 		}
 	}
 
-	// 7. Global shortcuts (work from any context)
+	// 8. Global shortcuts (work from any context)
 	if cmd, handled := m.handleGlobalKeys(msg); handled {
 		return m, cmd
 	}
 
-	// 8. Default: pass to input
+	// 9. Default: pass to input
 	return m.handleInputKeys(msg)
 }
 
@@ -156,90 +170,6 @@ func (m *Terminal) handleThemePreview(msg themePreviewMsg) (tea.Model, tea.Cmd) 
 	return m, nil
 }
 
-// handleModelSelectorKeys handles input when model selector is open.
-func (m *Terminal) handleModelSelectorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	cmd := m.modelSelector.HandleKeyMsg(msg)
-
-	// Check if a model was selected
-	if m.modelSelector.ConsumeModelSelected() {
-		m.switchToSelectedModel()
-	}
-
-	// Check if user wants to open model file
-	if m.modelSelector.ConsumeOpenModelFile() {
-		return m, tea.Batch(cmd, m.openModelConfigFile())
-	}
-
-	// Check if user wants to reload models
-	if m.modelSelector.ConsumeReloadModels() {
-		m.emitCommand(":model_load")
-	}
-
-	// Restore focus when model selector closes
-	if !m.modelSelector.IsOpen() {
-		m.restoreFocus()
-	}
-
-	return m, cmd
-}
-
-// handleQueueManagerKeys handles input when queue manager is open.
-func (m *Terminal) handleQueueManagerKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Handle 'd' key for delete
-	if msg.String() == keyD {
-		selectedItem := m.queueManager.GetSelectedItem()
-		if selectedItem != nil {
-			// Send delete command to session
-			m.emitCommand(":taskqueue_del " + selectedItem.QueueID)
-			// Request updated queue list
-			m.emitCommand(":taskqueue_get_all")
-		}
-		return m, nil
-	}
-
-	// Handle 'e' key for edit in external editor
-	if msg.String() == keyE {
-		selectedItem := m.queueManager.GetSelectedItem()
-		if selectedItem != nil {
-			return m, m.editor.OpenForQueue(selectedItem.Content, selectedItem.QueueID)
-		}
-		return m, nil
-	}
-
-	cmd := m.queueManager.HandleKeyMsg(msg)
-
-	// Restore focus when queue manager closes
-	if !m.queueManager.IsOpen() {
-		m.restoreFocus()
-	}
-
-	return m, cmd
-}
-
-// handleHelpWindowKeys handles input when help window is open.
-func (m *Terminal) handleHelpWindowKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	m.helpWindow.HandleKeyMsg(msg)
-
-	// Check if a command was selected via Enter before window closed
-	if pending := m.helpWindow.ConsumePendingCommand(); pending != "" {
-		m.restoreFocus()
-		m.input.SetValue(pending + " ")
-		m.input.CursorEnd()
-		m.input.Focus()
-		m.focusedWindow = "input"
-		return m, nil
-	}
-
-	// Restore focus when help window closes
-	if !m.helpWindow.IsOpen() {
-		m.restoreFocus()
-	}
-
-	return m, nil
-}
-
-// handleConfirmResult processes the result after the confirm dialog is dismissed.
-// Called after the confirm overlay handles a key press (y/n/esc).
 func (m *Terminal) handleConfirmResult() (tea.Model, tea.Cmd) {
 	confirmed, canceled := m.confirmOverlay.ConsumeResult()
 	if !confirmed && !canceled {
@@ -296,6 +226,53 @@ func (m *Terminal) handleConfirmResult() (tea.Model, tea.Cmd) {
 
 	m.restoreFocus()
 	return m, nil
+}
+
+// handleOverlayModelSelector handles keyboard input when the model selector is open.
+func (m *Terminal) handleOverlayModelSelector(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	wasOpen := m.modelSelector.IsOpen()
+	cmd := m.modelSelector.HandleKeyMsg(msg)
+
+	if m.modelSelector.ConsumeModelSelected() {
+		m.switchToSelectedModel()
+	}
+	if m.modelSelector.ConsumeOpenModelFile() {
+		return m, tea.Batch(cmd, m.openModelConfigFile())
+	}
+	if m.modelSelector.ConsumeReloadModels() {
+		m.emitCommand(":model_load")
+	}
+	if wasOpen && !m.modelSelector.IsOpen() {
+		m.restoreFocus()
+	}
+	return m, cmd
+}
+
+// handleOverlayQueueManager handles keyboard input when the queue manager is open.
+func (m *Terminal) handleOverlayQueueManager(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if msg.String() == keyD {
+		selectedItem := m.queueManager.GetSelectedItem()
+		if selectedItem != nil {
+			m.emitCommand(":taskqueue_del " + selectedItem.QueueID)
+			m.emitCommand(":taskqueue_get_all")
+		}
+		return m, nil
+	}
+
+	if msg.String() == keyE {
+		selectedItem := m.queueManager.GetSelectedItem()
+		if selectedItem != nil {
+			return m, m.editor.OpenForQueue(selectedItem.Content, selectedItem.QueueID)
+		}
+		return m, nil
+	}
+
+	wasOpen := m.queueManager.IsOpen()
+	cmd := m.queueManager.HandleKeyMsg(msg)
+	if wasOpen && !m.queueManager.IsOpen() {
+		m.restoreFocus()
+	}
+	return m, cmd
 }
 
 // Display key handler helpers (shared between multiple keys).

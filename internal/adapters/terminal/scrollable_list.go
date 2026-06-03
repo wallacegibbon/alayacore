@@ -1,7 +1,7 @@
 package terminal
 
-// ScrollableListCore provides shared state and methods for simple
-// scrollable list components (QueueManager, ThemeSelector).
+// ScrollableListCore provides shared state, methods, and key handling
+// for simple scrollable list components (QueueManager, ThemeSelector).
 //
 // Both components follow the same pattern:
 //   - A list of items with keyboard navigation (j/k, up/down)
@@ -12,13 +12,15 @@ package terminal
 // a plain scrollable list.
 //
 // Embedding types embed ScrollableListCore and add their own item
-// types, rendering, and specialized key handling.
+// types, rendering, and specialized key handling via the onExtra callback.
 //
 // SINGLE-GOROUTINE: All methods of ScrollableListCore are called
 // exclusively from the Bubble Tea event loop. No mutex is needed.
 
 import (
 	"image/color"
+
+	tea "charm.land/bubbletea/v2"
 )
 
 // ScrollableListState represents the current state of a scrollable list.
@@ -112,4 +114,29 @@ func (sl *ScrollableListCore) RenderOverlay(baseContent, renderedList string, sc
 		return baseContent
 	}
 	return renderOverlay(baseContent, renderedList, screenWidth, screenHeight)
+}
+
+// HandleKeyMsg handles common scrollable list navigation keys.
+// Returns (handled, isClose). If handled is false, the caller should
+// check component-specific keys. If isClose is true, the list was closed.
+// itemsLen is the number of items in the list (for bounds checking).
+func (sl *ScrollableListCore) HandleKeyMsg(msg tea.KeyMsg, itemsLen int) (handled bool, isClose bool) {
+	switch msg.String() {
+	case keyQ, keyEsc, keyCtrlC:
+		sl.State = ScrollableListClosed
+		return true, true
+	case keyJ, keyDown:
+		if sl.SelectedIdx < itemsLen-1 {
+			sl.SelectedIdx++
+			sl.EnsureVisible()
+		}
+		return true, false
+	case keyK, keyUp:
+		if sl.SelectedIdx > 0 {
+			sl.SelectedIdx--
+			sl.EnsureVisible()
+		}
+		return true, false
+	}
+	return false, false
 }

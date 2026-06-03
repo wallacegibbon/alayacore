@@ -21,6 +21,7 @@ import (
 	"image/color"
 
 	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
 )
 
 // FilteredListState represents the current state of a filtered list.
@@ -100,6 +101,68 @@ func (fl *FilteredListCore) HandleFilterEscape() bool {
 // HandleFilterCtrlC clears the filter input value.
 func (fl *FilteredListCore) HandleFilterCtrlC() {
 	fl.FilterInput.SetValue("")
+}
+
+// HandleKeyMsg handles common filtered list navigation keys.
+// Returns (handled, filterChanged, cmd) where filterChanged indicates the filter
+// input value changed and should trigger a filter update, and cmd is an optional
+// tea.Cmd from the filter input.
+// Component-specific keys (like Enter) are delegated to onExtra callback.
+func (fl *FilteredListCore) HandleKeyMsg(msg tea.KeyMsg, onExtra func(string) bool) (handled bool, filterChanged bool, cmd tea.Cmd) {
+	key := msg.String()
+
+	if key == keyTab {
+		fl.HandleTabKey()
+		return true, false, nil
+	}
+
+	if fl.FilterInputFocused {
+		return fl.handleFilterFocusedKey(msg, key)
+	}
+
+	return fl.handleListFocusedKey(key, onExtra)
+}
+
+// handleFilterFocusedKey handles keys when the filter input is focused.
+func (fl *FilteredListCore) handleFilterFocusedKey(msg tea.KeyMsg, key string) (handled bool, filterChanged bool, cmd tea.Cmd) {
+	if key == keyEsc {
+		fl.State = FilteredListClosed
+		return true, false, nil
+	}
+
+	if key == keyCtrlC {
+		fl.HandleFilterCtrlC()
+		return true, true, nil
+	}
+
+	if key == keyCtrlU || key == keyCtrlD {
+		return true, false, nil
+	}
+
+	oldValue := fl.FilterInput.Value()
+	fl.FilterInput, cmd = fl.FilterInput.Update(msg)
+	return true, oldValue != fl.FilterInput.Value(), cmd
+}
+
+// handleListFocusedKey handles keys when the list is focused.
+func (fl *FilteredListCore) handleListFocusedKey(key string, onExtra func(string) bool) (handled bool, filterChanged bool, cmd tea.Cmd) {
+	switch key {
+	case keyQ, keyEsc, keyCtrlC:
+		fl.State = FilteredListClosed
+		return true, false, nil
+	case keyJ, keyDown:
+		// Navigation bounds checking is done by the embedding type
+		return true, false, nil
+	case keyK, keyUp:
+		// Navigation bounds checking is done by the embedding type
+		return true, false, nil
+	case keyEnter:
+		if onExtra != nil && onExtra(key) {
+			return true, false, nil
+		}
+		return true, false, nil
+	}
+	return false, false, nil
 }
 
 // ClampSelection clamps the selected index to valid bounds.

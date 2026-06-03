@@ -61,36 +61,14 @@ func (qm *QueueManager) GetSelectedItem() *QueueItem {
 
 // --- Input Handling ---
 
-// HandleKeyMsg processes keyboard input and returns a tea.Cmd
+// HandleKeyMsg processes keyboard input and returns a tea.Cmd.
+// Common navigation keys (j/k/q/esc/up/down) are handled by ScrollableListCore.
+// Keys d and e are not handled here — the parent (Terminal) intercepts them.
 func (qm *QueueManager) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
-	switch msg.String() {
-	case keyQ, keyEsc, keyCtrlC:
-		qm.State = ScrollableListClosed
-		return nil
-
-	case keyJ, keyDown:
-		if len(qm.items) > 0 && qm.SelectedIdx < len(qm.items)-1 {
-			qm.SelectedIdx++
-			qm.updateScrollForHeight(SelectorListRows)
-		}
-		return nil
-
-	case keyK, keyUp:
-		if qm.SelectedIdx > 0 {
-			qm.SelectedIdx--
-			qm.updateScrollForHeight(SelectorListRows)
-		}
-		return nil
-
-	case keyD:
-		// Delete is handled by parent
-		return nil
-
-	case keyE:
-		// Edit is handled by parent
+	handled, _ := qm.ScrollableListCore.HandleKeyMsg(msg, len(qm.items))
+	if handled {
 		return nil
 	}
-
 	return nil
 }
 
