@@ -49,6 +49,11 @@ type HelpWindow struct {
 	// pendingCommand is set when Enter is pressed on a :command item.
 	// Consumed by the Terminal after HandleKeyMsg returns.
 	pendingCommand string
+
+	// keyColumnWidth is the fixed width of the key column, computed from the
+	// longest key and description so that all descriptions align vertically
+	// and the longest description reaches the right edge of the window.
+	keyColumnWidth int
 }
 
 // NewHelpWindow creates a new help window.
@@ -63,6 +68,7 @@ func NewHelpWindow(styles *Styles) *HelpWindow {
 	hw.FilterInput = input
 	hw.lastFilterValue = "\x00"
 	hw.Styles = styles
+	hw.recalculateColumnWidths()
 	hw.updateFilteredItems()
 	return hw
 }
@@ -120,6 +126,47 @@ func buildHelpItems() []HelpItem {
 		{Key: ":", Description: "Enter command mode", Type: HelpItemKey},
 		{Key: "Space", Description: "Toggle window fold", Type: HelpItemKey},
 	}
+}
+
+// --- Column Widths ---
+
+// recalculateColumnWidths computes keyColumnWidth so that all descriptions
+// align at the same column and the longest description reaches the right edge.
+//
+// Layout per row: prefix(2) + keyPadded + " " + desc
+// We want: 2 + keyColumnWidth + 1 + maxDescLen = innerWidth
+// So: keyColumnWidth = innerWidth - 3 - maxDescLen
+//
+// If the window is too narrow, keyColumnWidth is at least maxKeyLen.
+func (hw *HelpWindow) recalculateColumnWidths() {
+	maxKeyLen := 0
+	maxDescLen := 0
+	for _, item := range hw.items {
+		if !item.IsSection {
+			if len(item.Key) > maxKeyLen {
+				maxKeyLen = len(item.Key)
+			}
+			if len(item.Description) > maxDescLen {
+				maxDescLen = len(item.Description)
+			}
+		}
+	}
+
+	innerWidth := max(0, hw.Width-BorderInnerPadding)
+	idealKeyWidth := innerWidth - 3 - maxDescLen
+
+	// Must fit the longest key
+	if idealKeyWidth < maxKeyLen {
+		idealKeyWidth = maxKeyLen
+	}
+
+	hw.keyColumnWidth = max(1, idealKeyWidth)
+}
+
+// SetSize sets the size of the help window and recalculates column widths.
+func (hw *HelpWindow) SetSize(width, height int) {
+	hw.FilteredListCore.SetSize(width, height)
+	hw.recalculateColumnWidths()
 }
 
 // --- Open / Close ---
@@ -382,9 +429,8 @@ func (hw *HelpWindow) renderItem(item HelpItem, selected bool) string {
 		return hw.Styles.System.Bold(true).Render(content)
 	}
 
-	// Build raw line: "> key   description"
-	keyMaxWidth := max(1, min(28, innerWidth/3))
-	keyMaxWidth = min(keyMaxWidth, max(1, innerWidth-4))
+	// Build raw line with fixed key column width
+	keyMaxWidth := hw.keyColumnWidth
 	descMaxWidth := max(1, innerWidth-3-keyMaxWidth)
 
 	// Truncate key first if too long (same Hardwrap pattern)
