@@ -157,6 +157,7 @@ type anthropicSSEDelta struct {
 	Text        string `json:"text,omitempty"`
 	Thinking    string `json:"thinking,omitempty"`
 	PartialJSON string `json:"partial_json,omitempty"`
+	Signature   string `json:"signature,omitempty"`
 }
 
 // anthropicSSEContentBlockDelta is the payload for "content_block_delta" events.
@@ -538,6 +539,8 @@ func (p *AnthropicProvider) handleContentDelta(index int, delta anthropicSSEDelt
 		}
 	case anthropicDeltaTypeInputJSON:
 		block.buffer.WriteString(delta.PartialJSON)
+	case "signature_delta":
+		block.signature = delta.Signature
 	}
 	return true
 }

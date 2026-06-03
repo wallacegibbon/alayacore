@@ -137,9 +137,10 @@ Chunk 2: {"choices":[{"delta":{"reasoning_content":" about this"}}]}
 
 **Anthropic wire:**
 ```
-event: content_block_start / {"type":"thinking","signature":"abc123"}
+event: content_block_start / {"type":"thinking","thinking":"","signature":""}
 event: content_block_delta / {"delta":{"type":"thinking_delta","thinking":"Let me think..."}}
 event: content_block_delta / {"delta":{"type":"thinking_delta","thinking":" about this"}}
+event: content_block_delta / {"delta":{"type":"signature_delta","signature":"abc123"}}
 event: content_block_stop
 ```
 

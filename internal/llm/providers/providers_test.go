@@ -692,8 +692,9 @@ func TestAnthropicThinkingSignature(t *testing.T) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
 		flusher, _ := w.(http.Flusher)
-		fmt.Fprintf(w, "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\",\"signature\":\"%s\"}}\n\n", testSignature)
+		fmt.Fprintf(w, "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\",\"signature\":\"\"}}\n\n")
 		fmt.Fprint(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"Thinking...\"}}\n\n")
+		fmt.Fprintf(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"signature_delta\",\"signature\":\"%s\"}}\n\n", testSignature)
 		fmt.Fprint(w, "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n")
 		fmt.Fprint(w, "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":1,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n")
 		fmt.Fprint(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"Done.\"}}\n\n")
@@ -745,6 +746,81 @@ func TestAnthropicThinkingSignature(t *testing.T) {
 				t.Errorf("Expected signature in response %q, got %q", testSignature, rp.Signature)
 			}
 		}
+	}
+}
+
+func TestAnthropicThinkingOmittedMode(t *testing.T) {
+	// Test the "display: omitted" mode where the thinking block has no
+	// thinking_delta events — just signature_delta then immediately stop.
+	// Text streaming begins right after the thinking block closes.
+	const testSignature = "EosnCkYICxIMMb3LzNrMu..."
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		flusher, _ := w.(http.Flusher)
+
+		// Thinking block: start with empty signature, only signature_delta, no thinking_delta
+		fmt.Fprint(w, "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\",\"signature\":\"\"}}\n\n")
+		fmt.Fprintf(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"signature_delta\",\"signature\":\"%s\"}}\n\n", testSignature)
+		fmt.Fprint(w, "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n")
+
+		// Text block streams immediately after
+		fmt.Fprint(w, "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":1,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n")
+		fmt.Fprint(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"The GCD is 21.\"}}\n\n")
+		fmt.Fprint(w, "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":1}\n\n")
+
+		fmt.Fprint(w, "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":10}}\n\n")
+		fmt.Fprint(w, "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
+		flusher.Flush()
+	}))
+	defer server.Close()
+
+	provider, err := providers.NewAnthropic(
+		providers.WithAPIKey("test"),
+		providers.WithBaseURL(server.URL),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	events, err := provider.StreamMessages(context.Background(), []llm.Message{
+		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "GCD of 1071 and 462?"}}},
+	}, nil, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var (
+		reasoningParts int
+		textParts      int
+		signature      string
+	)
+	for event := range events {
+		if e, ok := event.(llm.StepCompleteEvent); ok {
+			for _, part := range e.Message.Content {
+				switch p := part.(type) {
+				case llm.ReasoningPart:
+					reasoningParts++
+					signature = p.Signature
+					if p.Text != "" {
+						t.Errorf("Expected empty thinking text in omitted mode, got %q", p.Text)
+					}
+				case llm.TextPart:
+					textParts++
+				}
+			}
+		}
+	}
+
+	if reasoningParts != 1 {
+		t.Errorf("Expected 1 reasoning part, got %d", reasoningParts)
+	}
+	if textParts != 1 {
+		t.Errorf("Expected 1 text part, got %d", textParts)
+	}
+	if signature != testSignature {
+		t.Errorf("Expected signature %q, got %q", testSignature, signature)
 	}
 }
 
