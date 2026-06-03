@@ -350,8 +350,7 @@ anthropicStreamState {
 
     // Current block being built:
     currentType   string                   // "text" | "thinking" | "tool_use"
-    currentText   strings.Builder
-    currentInput  strings.Builder          // tool_use partial_json
+    currentBuffer strings.Builder          // shared: text, thinking, or tool_use partial_json
     currentID, currentName, currentSignature string
 }
 ```

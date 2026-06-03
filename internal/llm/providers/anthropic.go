@@ -360,8 +360,7 @@ type anthropicStreamState struct {
 	// Current block being accumulated
 	currentIndex     int
 	currentType      string
-	currentText      strings.Builder
-	currentInput     strings.Builder
+	currentBuffer    strings.Builder
 	currentID        string
 	currentName      string
 	currentSignature string
@@ -373,34 +372,33 @@ func (s *anthropicStreamState) startBlock(index int, blockType, id, name, signat
 	s.currentID = id
 	s.currentName = name
 	s.currentSignature = signature
-	s.currentText.Reset()
-	s.currentInput.Reset()
+	s.currentBuffer.Reset()
 }
 
 func (s *anthropicStreamState) appendText(text string) {
-	s.currentText.WriteString(text)
+	s.currentBuffer.WriteString(text)
 }
 
 func (s *anthropicStreamState) appendInput(jsonStr string) {
-	s.currentInput.WriteString(jsonStr)
+	s.currentBuffer.WriteString(jsonStr)
 }
 
 func (s *anthropicStreamState) finishBlock() {
 	switch s.currentType {
 	case anthropicBlockTypeText:
 		s.contentParts = append(s.contentParts, llm.TextPart{
-			Text: s.currentText.String(),
+			Text: s.currentBuffer.String(),
 		})
 	case anthropicBlockTypeThinking:
 		s.contentParts = append(s.contentParts, llm.ReasoningPart{
-			Text:      s.currentText.String(),
+			Text:      s.currentBuffer.String(),
 			Signature: s.currentSignature,
 		})
 	case anthropicBlockTypeToolUse:
 		s.contentParts = append(s.contentParts, llm.ToolUsePart{
 			ID:       s.currentID,
 			ToolName: s.currentName,
-			Input:    json.RawMessage(s.currentInput.String()),
+			Input:    json.RawMessage(s.currentBuffer.String()),
 		})
 	}
 	s.currentType = ""
@@ -433,7 +431,7 @@ func (s *anthropicStreamState) lastToolUse() *llm.ToolUsePart {
 		return &llm.ToolUsePart{
 			ID:       s.currentID,
 			ToolName: s.currentName,
-			Input:    json.RawMessage(s.currentInput.String()),
+			Input:    json.RawMessage(s.currentBuffer.String()),
 		}
 	}
 	return nil
