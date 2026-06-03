@@ -96,9 +96,9 @@ type anthropicContentBlock struct {
 	// Pointer so we can emit `"thinking": ""` (DeepSeek requires empty thinking block)
 	// vs. omitting the field on non-thinking blocks.
 	Thinking *string `json:"thinking,omitempty"`
-	// Signature verifies thinking block integrity. Only present on "thinking"
-	// blocks — Anthropic requires it to be passed back exactly as received.
-	// Omitted from JSON for non-thinking blocks (text, tool_use, etc.).
+	// Signature is present in the wire format but currently ignored.
+	// If Anthropic ever requires it to be passed back, capture it from
+	// the signature_delta event and include it here.
 	Signature string `json:"signature,omitempty"`
 
 	// For image
@@ -366,7 +366,6 @@ type blockAccumulator struct {
 	buffer    strings.Builder // shared: text, thinking deltas, or tool_use partial_json
 	id        string          // tool_use id (empty for text/thinking)
 	name      string          // tool_use name (empty for text/thinking)
-	signature string          // thinking signature (empty for text/tool_use)
 }
 
 // anthropicStreamState tracks accumulation state during streaming
@@ -376,7 +375,7 @@ type anthropicStreamState struct {
 	blocks       map[int]*blockAccumulator // index → block being accumulated
 }
 
-func (s *anthropicStreamState) createBlock(index int, blockType, id, name, signature string) *blockAccumulator {
+func (s *anthropicStreamState) createBlock(index int, blockType, id, name string) *blockAccumulator {
 	if s.blocks == nil {
 		s.blocks = make(map[int]*blockAccumulator)
 	}
@@ -384,7 +383,6 @@ func (s *anthropicStreamState) createBlock(index int, blockType, id, name, signa
 		blockType: blockType,
 		id:        id,
 		name:      name,
-		signature: signature,
 	}
 	return s.blocks[index]
 }
@@ -401,8 +399,7 @@ func (s *anthropicStreamState) finishBlock(index int) {
 		})
 	case anthropicBlockTypeThinking:
 		s.contentParts = append(s.contentParts, llm.ReasoningPart{
-			Text:      block.buffer.String(),
-			Signature: block.signature,
+			Text: block.buffer.String(),
 		})
 	case anthropicBlockTypeToolUse:
 		s.contentParts = append(s.contentParts, llm.ToolUsePart{
@@ -508,7 +505,7 @@ func (p *AnthropicProvider) handleContentBlockStart(data string, yield func(llm.
 	if !ok {
 		return false
 	}
-	state.createBlock(event.Index, event.ContentBlock.Type, event.ContentBlock.ID, event.ContentBlock.Name, event.ContentBlock.Signature)
+	state.createBlock(event.Index, event.ContentBlock.Type, event.ContentBlock.ID, event.ContentBlock.Name)
 	if event.ContentBlock.Type == anthropicBlockTypeToolUse {
 		if !yield(llm.ToolUseStartEvent{
 			ID:       event.ContentBlock.ID,
@@ -539,8 +536,9 @@ func (p *AnthropicProvider) handleContentDelta(index int, delta anthropicSSEDelt
 		}
 	case anthropicDeltaTypeInputJSON:
 		block.buffer.WriteString(delta.PartialJSON)
-	case "signature_delta":
-		block.signature = delta.Signature
+		// signature_delta carries Anthropic's thinking block signature.
+		// Not currently used — if Anthropic requires it to be passed back,
+		// capture delta.Signature here and include it in the ReasoningPart.
 	}
 	return true
 }
@@ -719,9 +717,9 @@ func anthropicPartToBlock(part llm.ContentPart) *anthropicContentBlock {
 	case llm.ReasoningPart:
 		text := v.Text
 		return &anthropicContentBlock{
-			Type:      anthropicBlockTypeThinking,
-			Thinking:  &text,
-			Signature: v.Signature,
+			Type:     anthropicBlockTypeThinking,
+			Thinking: &text,
+			// Signature field intentionally omitted — see signature_delta comment.
 		}
 	case llm.ToolUsePart:
 		return &anthropicContentBlock{

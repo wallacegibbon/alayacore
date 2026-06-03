@@ -56,7 +56,7 @@ Message{
 anthropicMessage{
     Role: "assistant",
     Content: []anthropicContentBlock{
-        {Type:"thinking", Thinking: &"Let me think...", Signature: "abc123"},
+        {Type:"thinking", Thinking: &"Let me think..."},  // Signature available via signature_delta but ignored
         {Type:"text", Text: "The answer is 42"},
         {Type:"tool_use", ID:"call_abc", Name:"read_file", Input: {"path":"/tmp/foo"}},
     },
@@ -86,7 +86,7 @@ for _, part := range msg.Content {
     case llm.TextPart:
         → {Type:"text", Text: v.Text}
     case llm.ReasoningPart:
-        → {Type:"thinking", Thinking: &v.Text, Signature: v.Signature}
+        → {Type:"thinking", Thinking: &v.Text}  // Signature not sent back
     case llm.ToolUsePart:
         → {Type:"tool_use", ID: v.ID, Name: v.ToolName, Input: v.Input}
     case llm.ToolResultPart:
@@ -157,7 +157,8 @@ Message{
         ReasoningPart{
             Type: "reasoning",
             Text: "Let me think... about this",
-            // Signature: "abc123"  ← anthropic only, empty for OpenAI
+            // Signature is available in the wire format (signature_delta) but
+            // currently ignored. See anthropic.go for the breadcrumb comment.
         },
     },
 }
@@ -309,7 +310,7 @@ Message{
 {
     "role": "assistant",
     "content": [
-        {"type": "thinking", "thinking": "Let me read the file", "signature": ""},
+        {"type": "thinking", "thinking": "Let me read the file"},
         {"type": "tool_use", "id": "call_abc", "name": "read_file",
          "input": {"path": "/tmp/foo"}}
     ]
@@ -323,7 +324,7 @@ Message{
 | **Message structure** | Flat fields (`content`, `reasoning_content`, `tool_calls` at top level) | Content is always `[]anthropicContentBlock` array |
 | **Tool result role** | `"tool"` | Remapped to `"user"` |
 | **Tool call args encoding** | Double-encoded JSON string (`json.Marshal(string(rawMsg))`) | Raw JSON object (`json.RawMessage` directly) |
-| **Thinking signature** | Not used | Required, passed back verbatim from API |
+| **Thinking signature** | Not used | Available via `signature_delta` but currently ignored |
 | **Empty reasoning when reasoning mode is on** | Sets `"reasoning_content": ""` (string pointer) | Prepends `{"type":"thinking","thinking":""}` to content array |
 | **SSE event format** | Data-only lines, `[DONE]` terminator | Named events (`message_start`, `content_block_start`, etc.) |
 | **Tool call arg chunks** | Linked by `index` field across multiple deltas | Grouped by block lifecycle (start → delta → stop) |

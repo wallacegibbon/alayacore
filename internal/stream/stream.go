@@ -158,12 +158,12 @@ type ToolResultData struct {
 }
 
 // ReasoningData is the JSON payload for TagAssistantR delta values.
-// Used for persistence when Anthropic's thinking block includes a signature.
-// Text is the thinking content; Signature is Anthropic-specific and only
-// present on thinking blocks.
+// Currently unused (reasoning is stored as plain text).
+// If Anthropic's signature ever needs to be preserved, this struct
+// is ready — uncomment the Signature field and use it in session_persist.go.
 type ReasoningData struct {
-	Text      string `json:"text"`
-	Signature string `json:"signature,omitempty"`
+	Text string `json:"text"`
+	// Signature string `json:"signature,omitempty"`
 }
 
 // ============================================================================
