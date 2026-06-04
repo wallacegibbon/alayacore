@@ -363,9 +363,9 @@ func (p *AnthropicProvider) parseStream(reader io.Reader) iter.Seq2[llm.StreamEv
 // allowing blocks to arrive interleaved — similar to how OpenAI indexes tool calls.
 type blockAccumulator struct {
 	blockType string          // "text" | "thinking" | "tool_use"
-	buffer    strings.Builder // shared: text, thinking deltas, or tool_use partial_json
 	id        string          // tool_use id (empty for text/thinking)
 	name      string          // tool_use name (empty for text/thinking)
+	buffer    strings.Builder // shared: text, thinking deltas, or tool_use partial_json
 }
 
 // anthropicStreamState tracks accumulation state during streaming

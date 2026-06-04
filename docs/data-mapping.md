@@ -268,7 +268,7 @@ Message{
 }
 ```
 
-**Why this works:** The `openAIStreamState` has **two independent accumulators** — `reasoningBuilder` for reasoning text, and `toolCallArgs[index]` for each tool's arguments. They never interfere. `getMessage()` simply appends all non-empty accumulators to the Content slice.
+**Why this works:** The `openAIStreamState` has a single `toolAccumulators[index]` per tool call, storing both metadata and argument fragments. Reasoning text accumulates independently in `reasoningBuilder`. They never interfere. `getMessage()` simply appends all non-empty accumulators to the Content slice.
 
 ## Sending (Domain → Wire)
 
@@ -335,14 +335,19 @@ Message{
 
 ```
 openAIStreamState {
-    textBuilder      strings.Builder       ← "content" delta chunks
-    reasoningBuilder strings.Builder       ← "reasoning_content" delta chunks
-    toolCallArgs     map[int]*Builder      ← "tool_calls[*].function.arguments" by index
-    toolCalls        []ToolUsePart        ← tool call metadata by index
+    textBuilder       strings.Builder                ← "content" delta chunks
+    reasoningBuilder  strings.Builder                ← "reasoning_content" delta chunks
+    toolAccumulators  map[int]*openAIToolAccumulator ← tool calls keyed by index
+}
+
+openAIToolAccumulator {
+    id   string          ← tool call id
+    name string          ← function name
+    args strings.Builder ← accumulated arguments fragments
 }
 ```
 
-All four accumulate simultaneously during streaming. At `StepCompleteEvent`, they merge into a single `Message.Content` slice.
+All three accumulate simultaneously during streaming. At `StepCompleteEvent`, they merge into a single `Message.Content` slice.
 
 ### Anthropic: Indexed block accumulator (like OpenAI)
 

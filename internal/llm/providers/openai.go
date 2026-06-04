@@ -41,6 +41,7 @@ import (
 	"io"
 	"iter"
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/alayacore/alayacore/internal/config"
@@ -285,8 +286,7 @@ func (p *OpenAIProvider) parseStream(reader io.Reader) iter.Seq2[llm.StreamEvent
 			return
 		}
 
-		// Finalize tool calls and emit events
-		state.finalizeToolCalls()
+		// Emit tool call events from accumulators
 		for _, tc := range state.getToolCalls() {
 			if !yield(llm.ToolUsePart{
 				ID:       tc.ID,
@@ -306,12 +306,21 @@ func (p *OpenAIProvider) parseStream(reader io.Reader) iter.Seq2[llm.StreamEvent
 }
 
 // openAIStreamState tracks state across streaming events
+// openAIToolAccumulator accumulates a single tool call across streaming deltas.
+// OpenAI splits tool call data across delta events: one event carries id+name,
+// subsequent events carry argument fragments keyed by index.
+// This struct merges them, mirroring anthropicStreamState.blockAccumulator.
+type openAIToolAccumulator struct {
+	id   string
+	name string
+	args strings.Builder
+}
+
 type openAIStreamState struct {
 	streamUsage
 	textBuilder      strings.Builder
 	reasoningBuilder strings.Builder
-	toolCallArgs     map[int]*strings.Builder // tool call index -> arguments builder
-	toolCalls        []llm.ToolUsePart
+	toolAccumulators map[int]*openAIToolAccumulator // tool call index -> accumulator
 }
 
 func (s *openAIStreamState) addTextDelta(delta string) {
@@ -322,43 +331,54 @@ func (s *openAIStreamState) addReasoningDelta(delta string) {
 	s.reasoningBuilder.WriteString(delta)
 }
 
+func (s *openAIStreamState) toolAccumulator(index int) *openAIToolAccumulator {
+	if s.toolAccumulators == nil {
+		s.toolAccumulators = make(map[int]*openAIToolAccumulator)
+	}
+	acc, ok := s.toolAccumulators[index]
+	if !ok {
+		acc = &openAIToolAccumulator{}
+		s.toolAccumulators[index] = acc
+	}
+	return acc
+}
+
 func (s *openAIStreamState) appendToolCallArgs(index int, args json.RawMessage) {
-	if s.toolCallArgs == nil {
-		s.toolCallArgs = make(map[int]*strings.Builder)
-	}
-	if _, exists := s.toolCallArgs[index]; !exists {
-		s.toolCallArgs[index] = &strings.Builder{}
-	}
+	acc := s.toolAccumulator(index)
 	if len(args) > 0 && args[0] == '"' {
 		var unquoted string
 		if err := json.Unmarshal(args, &unquoted); err == nil {
-			s.toolCallArgs[index].WriteString(unquoted)
+			acc.args.WriteString(unquoted)
 			return
 		}
 	}
 	if string(args) != "null" {
-		s.toolCallArgs[index].WriteString(string(args))
+		acc.args.WriteString(string(args))
 	}
 }
 
 func (s *openAIStreamState) setToolCallName(index int, id, name string) {
-	for len(s.toolCalls) <= index {
-		s.toolCalls = append(s.toolCalls, llm.ToolUsePart{})
-	}
-	s.toolCalls[index].ID = id
-	s.toolCalls[index].ToolName = name
-}
-
-func (s *openAIStreamState) finalizeToolCalls() {
-	for i := range s.toolCalls {
-		if builder, exists := s.toolCallArgs[i]; exists {
-			s.toolCalls[i].Input = json.RawMessage(builder.String())
-		}
-	}
+	acc := s.toolAccumulator(index)
+	acc.id = id
+	acc.name = name
 }
 
 func (s *openAIStreamState) getToolCalls() []llm.ToolUsePart {
-	return s.toolCalls
+	indices := make([]int, 0, len(s.toolAccumulators))
+	for i := range s.toolAccumulators {
+		indices = append(indices, i)
+	}
+	sort.Ints(indices)
+	result := make([]llm.ToolUsePart, len(indices))
+	for pos, i := range indices {
+		acc := s.toolAccumulators[i]
+		result[pos] = llm.ToolUsePart{
+			ID:       acc.id,
+			ToolName: acc.name,
+			Input:    json.RawMessage(acc.args.String()),
+		}
+	}
+	return result
 }
 
 // getMessage assembles a domain Message from the three parallel OpenAI stream accumulators.
@@ -366,7 +386,8 @@ func (s *openAIStreamState) getToolCalls() []llm.ToolUsePart {
 // This function merges them into a single domain Message with a unified ContentPart array,
 // matching the Anthropic-inspired content block model used by the rest of the codebase.
 func (s *openAIStreamState) getMessage() llm.Message {
-	content := make([]llm.ContentPart, 0, 2+len(s.toolCalls))
+	tcs := s.getToolCalls()
+	content := make([]llm.ContentPart, 0, 2+len(tcs))
 	if s.reasoningBuilder.Len() > 0 {
 		content = append(content, llm.ReasoningPart{
 			Text: s.reasoningBuilder.String(),
@@ -377,7 +398,7 @@ func (s *openAIStreamState) getMessage() llm.Message {
 			Text: s.textBuilder.String(),
 		})
 	}
-	for _, tc := range s.toolCalls {
+	for _, tc := range tcs {
 		content = append(content, tc)
 	}
 	return llm.Message{
