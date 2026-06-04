@@ -22,6 +22,7 @@ import (
 	"io"
 	"iter"
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/alayacore/alayacore/internal/config"
@@ -338,7 +339,7 @@ func (p *AnthropicProvider) parseStream(reader io.Reader) iter.Seq2[llm.StreamEv
 		}()
 
 		state := &anthropicStreamState{
-			contentParts: make([]llm.ContentPart, 0),
+			contentParts: make(map[int]llm.ContentPart),
 		}
 		scanner := newSSEScanner(reader)
 
@@ -371,8 +372,8 @@ type blockAccumulator struct {
 // anthropicStreamState tracks accumulation state during streaming
 type anthropicStreamState struct {
 	streamUsage
-	contentParts []llm.ContentPart
-	blocks       map[int]*blockAccumulator // index → block being accumulated
+	contentParts map[int]llm.ContentPart // completed blocks by index
+	blocks       map[int]*blockAccumulator              // index → block being accumulated
 }
 
 func (s *anthropicStreamState) createBlock(index int, blockType, id, name string) *blockAccumulator {
@@ -394,19 +395,19 @@ func (s *anthropicStreamState) finishBlock(index int) {
 	}
 	switch block.blockType {
 	case anthropicBlockTypeText:
-		s.contentParts = append(s.contentParts, llm.TextPart{
+		s.contentParts[index] = llm.TextPart{
 			Text: block.buffer.String(),
-		})
+		}
 	case anthropicBlockTypeThinking:
-		s.contentParts = append(s.contentParts, llm.ReasoningPart{
+		s.contentParts[index] = llm.ReasoningPart{
 			Text: block.buffer.String(),
-		})
+		}
 	case anthropicBlockTypeToolUse:
-		s.contentParts = append(s.contentParts, llm.ToolUsePart{
+		s.contentParts[index] = llm.ToolUsePart{
 			ID:       block.id,
 			ToolName: block.name,
 			Input:    json.RawMessage(block.buffer.String()),
-		})
+		}
 	}
 	delete(s.blocks, index)
 }
@@ -421,12 +422,22 @@ func (s *anthropicStreamState) setUsage(inputTokens, outputTokens, cacheReadToke
 }
 
 // getMessage wraps the accumulated contentParts into a domain Message.
-// finishBlock() already converted each block to the correct ContentPart type,
-// so this function is a trivial wrapper.
+// finishBlock() already converted each block to the correct ContentPart type
+// and stored it by index in the map. This function sorts by index to ensure
+// correct ordering regardless of the order blocks finished.
 func (s *anthropicStreamState) getMessage() llm.Message {
+	indices := make([]int, 0, len(s.contentParts))
+	for i := range s.contentParts {
+		indices = append(indices, i)
+	}
+	sort.Ints(indices)
+	content := make([]llm.ContentPart, len(indices))
+	for pos, i := range indices {
+		content[pos] = s.contentParts[i]
+	}
 	return llm.Message{
 		Role:    llm.RoleAssistant,
-		Content: append([]llm.ContentPart{}, s.contentParts...),
+		Content: content,
 	}
 }
 

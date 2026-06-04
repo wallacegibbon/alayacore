@@ -359,9 +359,9 @@ blockAccumulator {
 }
 
 anthropicStreamState {
-    contentParts  []ContentPart              ← finished blocks appended here
-    blocks        map[int]*blockAccumulator  ← in-progress blocks by index
+    contentParts  map[int]ContentPart          ← finished blocks by index
+    blocks        map[int]*blockAccumulator    ← in-progress blocks by index
 }
 ```
 
-Every wire event carries an `index` (start, delta, stop), just like OpenAI's `tool_calls[index]`. Blocks may arrive interleaved — block 1 can start before block 0 finishes. Each block is independently accumulated by index. `content_block_stop(i)` finalizes `blocks[i]` and appends the result to `contentParts`.
+Every wire event carries an `index` (start, delta, stop), just like OpenAI's `tool_calls[index]`. Blocks may arrive interleaved — block 1 can start before block 0 finishes. Each block is independently accumulated by index. `content_block_stop(i)` stores the result in `contentParts[i]`, and `getMessage()` sorts by index to produce the final ordered slice.
