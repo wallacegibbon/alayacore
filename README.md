@@ -12,6 +12,10 @@ A fast, minimal AI Agent that runs in your terminal.
 
 ![AlayaCore plainio demo](misc/alayacore-demo-plainio.gif)
 
+**Raw IO Mode** — full control and integration with other programs via raw TLV frames on stdin/stdout.
+
+![AlayaCore rawio demo](misc/alayacore-demo-rawio.gif)
+
 AlayaCore connects to any OpenAI-compatible or Anthropic-compatible LLM and gives it the tools to read, write, and edit files, and execute commands — all from an interactive TUI with streaming output, session persistence, and multi-step agentic tool-calling loops.
 
 ## Quick Start

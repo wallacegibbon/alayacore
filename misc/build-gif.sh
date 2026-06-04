@@ -3,8 +3,12 @@
 # build-gif.sh — Build an optimized GIF from a VHS tape file
 #
 # Usage:
-#   ./misc/build-gif.sh misc/demo.tape
-#   ./misc/build-gif.sh misc/demo-plainio.tape
+#   ./misc/build-gif.sh <file.tape>
+#   LOSSY=1 ./misc/build-gif.sh <file.tape>
+#
+# By default optimizes with 128 colors. Set LOSSY=1 to use lossy
+# compression with a 16-color palette (smaller files, fine for
+# plainio/rawio demos — just text, no need for full color).
 
 set -euo pipefail
 
@@ -35,6 +39,12 @@ echo "Recorded $dir/$gif ($(du -h "$gif" | cut -f1))"
 
 # Optimize if gifsicle is available
 if command -v gifsicle &>/dev/null; then
-	gifsicle -O3 --colors 128 "$gif" -o "$gif"
+	if [[ -n "${LOSSY:-}" ]]; then
+		echo "gifsicle -O3 --colors 16 --lossy=80 $gif"
+		gifsicle -O3 --colors 16 --lossy=80 "$gif" -o "$gif"
+	else
+		echo "gifsicle -O3 --colors 128 $gif"
+		gifsicle -O3 --colors 128 "$gif" -o "$gif"
+	fi
 	echo "Optimized $dir/$gif ($(du -h "$gif" | cut -f1))"
 fi

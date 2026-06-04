@@ -12,6 +12,10 @@
 
 ![AlayaCore plainio demo](misc/alayacore-demo-plainio.gif)
 
+**Raw IO 模式** — 完整的控制权，通过原始 TLV 帧与其他程序集成（stdin/stdout）。
+
+![AlayaCore rawio demo](misc/alayacore-demo-rawio.gif)
+
 AlayaCore 可连接任何兼容 OpenAI 或 Anthropic 的 LLM，并为其提供读取、写入、编辑文件和执行命令的能力——全部通过支持流式输出、会话持久化和多步骤智能工具调用循环的交互式 TUI 完成。
 
 ## 快速开始
