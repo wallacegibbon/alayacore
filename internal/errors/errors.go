@@ -95,27 +95,3 @@ func Wrapf(op string, err error, format string, args ...any) *SessionError {
 	}
 	return &SessionError{Op: op, Err: fmt.Errorf(format+": %w", append(args, err)...)}
 }
-
-// Common operation names for error context.
-const (
-	OpModelSet  = "model_set"
-	OpModelLoad = "model_load"
-	OpModel     = "model"
-
-	OpQueueDel  = "taskqueue_del"
-	OpQueueEdit = "taskqueue_edit"
-	OpQueue     = "taskqueue"
-
-	OpSave    = "save"
-	OpLoad    = "load"
-	OpSession = "session"
-
-	OpCommand   = "command"
-	OpCancel    = "cancel"
-	OpCancelAll = "cancel_all"
-
-	OpInput    = "input"
-	OpProvider = "provider"
-	OpStream   = "stream"
-	OpTool     = "tool"
-)

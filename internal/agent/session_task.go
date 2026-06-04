@@ -142,13 +142,13 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 			if err := stream.WriteSystemMsg(s.Output, stream.ToolConfirmMsg{ID: id}); err != nil {
 				s.toolConfirmRespCh = nil
 				s.toolConfirmID = ""
-				return false, domainerrors.Wrap(domainerrors.OpTool, err)
+				return false, domainerrors.Wrap("tool", err)
 			}
 
 			select {
 			case resp := <-respCh:
 				if resp.ID != id {
-					return false, domainerrors.NewSessionErrorf(domainerrors.OpTool, "tool_confirm ID mismatch: want %s, got %s", id, resp.ID)
+					return false, domainerrors.NewSessionErrorf("tool", "tool_confirm ID mismatch: want %s, got %s", id, resp.ID)
 				}
 				s.toolConfirmRespCh = nil
 				s.toolConfirmID = ""

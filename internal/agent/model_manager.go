@@ -238,7 +238,7 @@ func validateModel(m ModelConfig) []string {
 // Reload reloads models from the config file
 func (mm *ModelManager) Reload() error {
 	if mm.filePath == "" {
-		return domainerrors.Wrap(domainerrors.OpModel, fmt.Errorf("no config file path set"))
+		return domainerrors.Wrap("model", fmt.Errorf("no config file path set"))
 	}
 	return mm.LoadFromFile(mm.filePath)
 }
@@ -298,7 +298,7 @@ func (mm *ModelManager) SetActive(id int) error {
 			return nil
 		}
 	}
-	return domainerrors.Wrapf(domainerrors.OpModelSet, domainerrors.ErrModelNotFound, "model not found: %d", id)
+	return domainerrors.Wrapf(CommandNameModelSet, domainerrors.ErrModelNotFound, "model not found: %d", id)
 }
 
 // SetActiveToFirst sets the active model to the first one in the list.
@@ -350,7 +350,7 @@ func (mm *ModelManager) FindModelByName(name string) int {
 func (mm *ModelManager) SetActiveByName(name string) error {
 	id := mm.FindModelByName(name)
 	if id == 0 {
-		return domainerrors.Wrapf(domainerrors.OpModelSet, domainerrors.ErrModelNotFound, "model not found: %q", name)
+		return domainerrors.Wrapf(CommandNameModelSet, domainerrors.ErrModelNotFound, "model not found: %q", name)
 	}
 	return mm.SetActive(id)
 }

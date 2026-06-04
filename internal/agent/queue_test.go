@@ -286,7 +286,7 @@ func TestSubmitTaskFront(t *testing.T) {
 	session.submitTask(QueueItem{Type: TaskTypePrompt, Content: "second"})
 
 	// Submit at front (simulates a deferred command like :continue)
-	session.enqueueTask(QueueItem{Type: TaskTypeCommand, Content: commandNameContinue}, true)
+	session.enqueueTask(QueueItem{Type: TaskTypeCommand, Content: CommandNameContinue}, true)
 
 	items := session.taskQueue
 	if len(items) != 3 {
@@ -294,8 +294,8 @@ func TestSubmitTaskFront(t *testing.T) {
 	}
 
 	// Front item should be the command
-	if items[0].Type != "command" || items[0].Content != commandNameContinue {
-		t.Errorf("Expected first item to be command{%s}, got Type=%s Content=%s", commandNameContinue, items[0].Type, items[0].Content)
+	if items[0].Type != "command" || items[0].Content != CommandNameContinue {
+		t.Errorf("Expected first item to be command{%s}, got Type=%s Content=%s", CommandNameContinue, items[0].Type, items[0].Content)
 	}
 	// Original tasks should follow in order
 	if items[1].Type != "prompt" || items[1].Content != "first" {
@@ -308,7 +308,7 @@ func TestSubmitTaskFront(t *testing.T) {
 	// enqueueTask should NOT clear pausedOnError (that's handled by specific commands)
 	session.pausedOnError.Store(true)
 
-	session.enqueueTask(QueueItem{Type: TaskTypeCommand, Content: commandNameContinue}, true)
+	session.enqueueTask(QueueItem{Type: TaskTypeCommand, Content: CommandNameContinue}, true)
 
 	if !session.pausedOnError.Load() {
 		t.Error("enqueueTask should NOT clear pausedOnError")
@@ -342,7 +342,7 @@ func TestCommandCanRunWhilePaused(t *testing.T) {
 	session.inProgress.Store(true)
 
 	// Add a command to the front of the queue (simulates submitDeferredCommand)
-	session.enqueueTask(QueueItem{Type: TaskTypeCommand, Content: commandNameSave}, true)
+	session.enqueueTask(QueueItem{Type: TaskTypeCommand, Content: CommandNameSave}, true)
 
 	// In the single-goroutine design, submitDeferredCommand always places
 	// the command at the front, and the run() goroutine checks pausedOnError
@@ -385,14 +385,14 @@ func TestCommandBehindUserPromptWhilePaused(t *testing.T) {
 	session.submitTask(QueueItem{Type: TaskTypePrompt, Content: "first prompt"})
 
 	// Add a command to the back of the queue (after user prompt)
-	session.enqueueTask(QueueItem{Type: TaskTypeCommand, Content: commandNameSave}, false)
+	session.enqueueTask(QueueItem{Type: TaskTypeCommand, Content: CommandNameSave}, false)
 
 	// Set paused — the user prompt at front should be blocked
 	session.pausedOnError.Store(true)
 	session.inProgress.Store(true)
 
 	// Now add a command to the front (like :continue does)
-	session.enqueueTask(QueueItem{Type: TaskTypeCommand, Content: commandNameContinue}, true)
+	session.enqueueTask(QueueItem{Type: TaskTypeCommand, Content: CommandNameContinue}, true)
 
 	items := session.taskQueue
 	if len(items) != 3 {
@@ -400,8 +400,8 @@ func TestCommandBehindUserPromptWhilePaused(t *testing.T) {
 	}
 
 	// Front item should be the continue command
-	if items[0].Type != "command" || items[0].Content != commandNameContinue {
-		t.Errorf("Expected first item to be command{%s}, got Type=%s Content=%s", commandNameContinue, items[0].Type, items[0].Content)
+	if items[0].Type != "command" || items[0].Content != CommandNameContinue {
+		t.Errorf("Expected first item to be command{%s}, got Type=%s Content=%s", CommandNameContinue, items[0].Type, items[0].Content)
 	}
 }
 

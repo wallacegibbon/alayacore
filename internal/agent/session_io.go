@@ -188,7 +188,7 @@ func (s *Session) saveSession(args []string) {
 	}
 
 	if err := s.saveSessionToFile(path); err != nil {
-		s.writeError(domainerrors.Wrap(domainerrors.OpSave, fmt.Errorf("%w: %v", domainerrors.ErrFailedToSaveSession, err)).Error())
+		s.writeError(domainerrors.Wrap(CommandNameSave, fmt.Errorf("%w: %v", domainerrors.ErrFailedToSaveSession, err)).Error())
 	} else {
 		s.writeNotifyf("Session saved to %s", path)
 	}
@@ -215,12 +215,12 @@ func (s *Session) handleModelSet(args []string) {
 	modelIDStr := args[0]
 	modelID, err := strconv.Atoi(modelIDStr)
 	if err != nil {
-		s.writeError(domainerrors.NewSessionErrorf(domainerrors.OpModelSet, "invalid model ID: %s", modelIDStr).Error())
+		s.writeError(domainerrors.NewSessionErrorf(CommandNameModelSet, "invalid model ID: %s", modelIDStr).Error())
 		return
 	}
 	model := s.ModelManager.GetModel(modelID)
 	if model == nil {
-		s.writeError(domainerrors.Wrapf(domainerrors.OpModelSet, domainerrors.ErrModelNotFound, "model not found: %d", modelID).Error())
+		s.writeError(domainerrors.Wrapf(CommandNameModelSet, domainerrors.ErrModelNotFound, "model not found: %d", modelID).Error())
 		return
 	}
 
@@ -254,7 +254,7 @@ func (s *Session) handleModelLoad() {
 	}
 
 	if err := s.ModelManager.LoadFromFile(path); err != nil {
-		s.writeError(domainerrors.Wrap(domainerrors.OpModelLoad, fmt.Errorf("%w: %v", domainerrors.ErrFailedToLoadModels, err)).Error())
+		s.writeError(domainerrors.Wrap(CommandNameModelLoad, fmt.Errorf("%w: %v", domainerrors.ErrFailedToLoadModels, err)).Error())
 		return
 	}
 
@@ -455,14 +455,14 @@ func (s *Session) handleInputUserText(value string, pendingImages *[]string, msg
 
 	if len(value) > 0 && value[0] == ':' {
 		cmd := value[1:]
-		if cmd == commandNameCancel || cmd == commandNameCancelAll {
+		if cmd == CommandNameCancel || cmd == CommandNameCancelAll {
 			canceled := s.cancelRunningTask()
-			if canceled && cmd == commandNameCancel {
+			if canceled && cmd == CommandNameCancel {
 				return
 			}
 		}
 		parts := strings.Fields(cmd)
-		if len(parts) > 0 && parts[0] == commandNameConfirm {
+		if len(parts) > 0 && parts[0] == CommandNameConfirm {
 			s.handleConfirmCommand(parts[1:])
 			return
 		}

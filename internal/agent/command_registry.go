@@ -9,19 +9,19 @@ import (
 
 // Command name constants
 const (
-	commandNameSummarize       = "summarize"
-	commandNameCancel          = "cancel"
-	commandNameCancelAll       = "cancel_all"
-	commandNameContinue        = "continue"
-	commandNameSave            = "save"
-	commandNameModelSet        = "model_set"
-	commandNameModelLoad       = "model_load"
-	commandNameTaskQueueGetAll = "taskqueue_get_all"
-	commandNameTaskQueueDel    = "taskqueue_del"
-	commandNameTaskQueueEdit   = "taskqueue_edit"
-	commandNameReason          = "reason"
-	commandNameThemeSet        = "theme_set"
-	commandNameConfirm         = "confirm"
+	CommandNameSummarize       = "summarize"
+	CommandNameCancel          = "cancel"
+	CommandNameCancelAll       = "cancel_all"
+	CommandNameContinue        = "continue"
+	CommandNameSave            = "save"
+	CommandNameModelSet        = "model_set"
+	CommandNameModelLoad       = "model_load"
+	CommandNameTaskQueueGetAll = "taskqueue_get_all"
+	CommandNameTaskQueueDel    = "taskqueue_del"
+	CommandNameTaskQueueEdit   = "taskqueue_edit"
+	CommandNameReason          = "reason"
+	CommandNameThemeSet        = "theme_set"
+	CommandNameConfirm         = "confirm"
 )
 
 // CommandHandler is a function that handles a colon-command.
@@ -41,27 +41,27 @@ type Command struct {
 // commandDefs is the single source of truth for all colon-commands.
 // Order here determines the order used by LookupCommand iteration.
 var commandDefs = []Command{
-	{commandNameCancel, "Cancel the current task", "", true,
+	{CommandNameCancel, "Cancel the current task", "", true,
 		func(s *Session, _ context.Context, _ []string) { s.cancelTask() }},
-	{commandNameCancelAll, "Cancel current task and clear the task queue", "", true,
+	{CommandNameCancelAll, "Cancel current task and clear the task queue", "", true,
 		func(s *Session, _ context.Context, _ []string) { s.cancelAllTasks() }},
-	{commandNameSave, "Save the current session", "[filename]", true,
+	{CommandNameSave, "Save the current session", "[filename]", true,
 		func(s *Session, _ context.Context, args []string) { s.saveSession(args) }},
-	{commandNameModelSet, "Switch to a different model", "<id>", true,
+	{CommandNameModelSet, "Switch to a different model", "<id>", true,
 		func(s *Session, _ context.Context, args []string) { s.handleModelSet(args) }},
-	{commandNameModelLoad, "Reload models from configuration file", "", true,
+	{CommandNameModelLoad, "Reload models from configuration file", "", true,
 		func(s *Session, _ context.Context, _ []string) { s.handleModelLoad() }},
-	{commandNameTaskQueueGetAll, "List all queued tasks", "", true,
+	{CommandNameTaskQueueGetAll, "List all queued tasks", "", true,
 		func(s *Session, _ context.Context, _ []string) { s.handleTaskQueueGetAll() }},
-	{commandNameTaskQueueDel, "Delete a queued task", "<queue_id>", true,
+	{CommandNameTaskQueueDel, "Delete a queued task", "<queue_id>", true,
 		func(s *Session, _ context.Context, args []string) { s.handleTaskQueueDel(args) }},
-	{commandNameTaskQueueEdit, "Edit a queued task's content", "<queue_id> <new_content>", true,
+	{CommandNameTaskQueueEdit, "Edit a queued task's content", "<queue_id> <new_content>", true,
 		func(s *Session, _ context.Context, args []string) { s.handleTaskQueueEdit(args) }},
-	{commandNameReason, "Set reasoning level (0=off, 1=normal, 2=max)", "[0|1|2]", true,
+	{CommandNameReason, "Set reasoning level (0=off, 1=normal, 2=max)", "[0|1|2]", true,
 		func(s *Session, _ context.Context, args []string) { s.handleReason(args) }},
-	{commandNameThemeSet, "Set the active theme", "<name>", true,
+	{CommandNameThemeSet, "Set the active theme", "<name>", true,
 		func(s *Session, _ context.Context, args []string) { s.handleThemeSet(args) }},
-	{commandNameConfirm, "Confirm or deny a pending tool execution", "yes|no", true,
+	{CommandNameConfirm, "Confirm or deny a pending tool execution", "yes|no", true,
 		func(s *Session, _ context.Context, args []string) { s.handleConfirmCommand(args) }},
 }
 

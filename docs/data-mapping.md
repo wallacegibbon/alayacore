@@ -13,7 +13,7 @@ type ContentPart interface { isContentPart() }
 
 // Implementations:
 type TextPart      struct { Text string }
-type ReasoningPart struct { Text, Signature string }
+type ReasoningPart struct { Text string }
 type ToolUsePart   struct { ID, ToolName string; Input json.RawMessage }
 type ToolResultPart struct { ID string; Output ToolResultOutput }
 
@@ -56,7 +56,7 @@ Message{
 anthropicMessage{
     Role: "assistant",
     Content: []anthropicContentBlock{
-        {Type:"thinking", Thinking: &"Let me think..."},  // Signature available via signature_delta but ignored
+        {Type:"thinking", Thinking: &"Let me think..."},
         {Type:"text", Text: "The answer is 42"},
         {Type:"tool_use", ID:"call_abc", Name:"read_file", Input: {"path":"/tmp/foo"}},
     },
@@ -86,7 +86,7 @@ for _, part := range msg.Content {
     case llm.TextPart:
         → {Type:"text", Text: v.Text}
     case llm.ReasoningPart:
-        → {Type:"thinking", Thinking: &v.Text}  // Signature not sent back
+        → {Type:"thinking", Thinking: &v.Text}
     case llm.ToolUsePart:
         → {Type:"tool_use", ID: v.ID, Name: v.ToolName, Input: v.Input}
     case llm.ToolResultPart:
@@ -114,7 +114,7 @@ And on receive, both providers use the same pattern: accumulate content by `inde
 | Domain Type | OpenAI Wire | Anthropic Wire |
 |---|---|---|
 | `TextPart` | `content` (top-level field) | `content[]` array: `{type:"text", text:"..."}` |
-| `ReasoningPart` | `reasoning_content` (top-level field) | `content[]` array: `{type:"thinking", thinking:"...", signature:"..."}` |
+| `ReasoningPart` | `reasoning_content` (top-level field) | `content[]` array: `{type:"thinking", thinking:"..."}` |
 | `ToolUsePart` | `tool_calls[]` (top-level array) | `content[]` array: `{type:"tool_use", id, name, input}` |
 | `ToolResultPart` | Separate message: `{role:"tool", tool_call_id, content}` (content is JSON-wrapped with `"status"` field — see note below) | `content[]` array: `{type:"tool_result", tool_use_id, content}`, **role remapped to "user"** |
 
@@ -137,10 +137,9 @@ Chunk 2: {"choices":[{"delta":{"reasoning_content":" about this"}}]}
 
 **Anthropic wire:**
 ```
-event: content_block_start / {"type":"thinking","thinking":"","signature":""}
+event: content_block_start / {"type":"thinking","thinking":""}
 event: content_block_delta / {"delta":{"type":"thinking_delta","thinking":"Let me think..."}}
 event: content_block_delta / {"delta":{"type":"thinking_delta","thinking":" about this"}}
-event: content_block_delta / {"delta":{"type":"signature_delta","signature":"abc123"}}
 event: content_block_stop
 ```
 
@@ -157,8 +156,6 @@ Message{
         ReasoningPart{
             Type: "reasoning",
             Text: "Let me think... about this",
-            // Signature is available in the wire format (signature_delta) but
-            // currently ignored. See anthropic.go for the breadcrumb comment.
         },
     },
 }
@@ -324,7 +321,6 @@ Message{
 | **Message structure** | Flat fields (`content`, `reasoning_content`, `tool_calls` at top level) | Content is always `[]anthropicContentBlock` array |
 | **Tool result role** | `"tool"` | Remapped to `"user"` |
 | **Tool call args encoding** | Double-encoded JSON string (`json.Marshal(string(rawMsg))`) | Raw JSON object (`json.RawMessage` directly) |
-| **Thinking signature** | Not used | Available via `signature_delta` but currently ignored |
 | **Empty reasoning when reasoning mode is on** | Sets `"reasoning_content": ""` (string pointer) | Prepends `{"type":"thinking","thinking":""}` to content array |
 | **SSE event format** | Data-only lines, `[DONE]` terminator | Named events (`message_start`, `content_block_start`, etc.) |
 | **Tool call arg chunks** | Linked by `index` field across multiple deltas | Grouped by block lifecycle (start → delta → stop) |
@@ -355,7 +351,7 @@ All three accumulate simultaneously during streaming. At `StepCompleteEvent`, th
 blockAccumulator {
     blockType string              // "text" | "thinking" | "tool_use"
     buffer    strings.Builder     // text, thinking, or tool_use partial_json
-    id, name, signature string
+    id, name string
 }
 
 anthropicStreamState {

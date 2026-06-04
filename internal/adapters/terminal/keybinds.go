@@ -11,6 +11,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	agentpkg "github.com/alayacore/alayacore/internal/agent"
 	"github.com/alayacore/alayacore/internal/theme"
 )
 
@@ -209,14 +210,14 @@ func (m *Terminal) handleConfirmResult() (tea.Model, tea.Cmd) {
 			m.input.SetValue("")
 		}
 		m.restoreFocus()
-		return m, m.submitCommand("cancel", fromCmd)
+		return m, m.submitCommand(agentpkg.CommandNameCancel, fromCmd)
 
 	case ConfirmCancelAll:
 		if fromCmd {
 			m.input.SetValue("")
 		}
 		m.restoreFocus()
-		return m, m.submitCommand("cancel_all", fromCmd)
+		return m, m.submitCommand(agentpkg.CommandNameCancelAll, fromCmd)
 
 	case ConfirmTool:
 		m.emitCommand(":confirm yes")
@@ -436,7 +437,7 @@ func (m *Terminal) handleGlobalKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 		return nil, true
 
 	case keyCtrlS:
-		return m.submitCommand("save", false), true
+		return m.submitCommand(agentpkg.CommandNameSave, false), true
 
 	case keyCtrlL:
 		m.openModelSelector()

@@ -72,17 +72,23 @@ type ImagePart struct {
 func (ImagePart) isContentPart() {}
 
 // ReasoningPart represents reasoning/thinking content.
-// Signature is Anthropic-specific: it verifies thinking block integrity
-// and must be passed back to the API exactly as received. Empty for
-// providers that don't use signatures (OpenAI, DeepSeek, etc.).
 type ReasoningPart struct {
-	Text      string `json:"text"`
-	Signature string `json:"signature,omitempty"`
+	Text string `json:"text"`
 }
 
 func (ReasoningPart) isContentPart() {}
 
-// ToolUsePart represents a tool call
+// ToolUsePart represents a tool call.
+//
+// It implements both ContentPart and StreamEvent:
+//   - As a ContentPart, it is stored in Message.Content for conversation history.
+//   - As a StreamEvent, it is yielded by providers to signal completion of a
+//     tool call so the agent can execute it. ToolUseStartEvent is yielded first
+//     (when name+ID are known), followed by ToolUsePart when arguments finish
+//     streaming.
+//
+// This dual role is intentional — the same data flows through the streaming
+// pipeline (as an event) and into the persisted conversation (as content).
 type ToolUsePart struct {
 	ID       string          `json:"id"`
 	ToolName string          `json:"tool_name"`

@@ -120,9 +120,9 @@ func (s *Session) runTaskCommand(ctx context.Context, messages []llm.Message, cm
 		return messages
 	}
 	switch parts[0] {
-	case commandNameSummarize:
+	case CommandNameSummarize:
 		return s.summarize(ctx, messages)
-	case commandNameContinue:
+	case CommandNameContinue:
 		return s.handleContinue(ctx, messages, parts[1:])
 	default:
 		s.writeError(domainerrors.NewSessionErrorf("command", "unknown cmd <%s>", parts[0]).Error())

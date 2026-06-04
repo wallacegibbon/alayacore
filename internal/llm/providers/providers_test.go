@@ -650,7 +650,7 @@ func TestAnthropicReasoningStreaming(t *testing.T) {
 
 func TestAnthropicThinkingOmittedMode(t *testing.T) {
 	// Test the "display: omitted" mode where the thinking block has no
-	// thinking_delta events — just signature_delta then immediately stop.
+	// thinking_delta events — just a signature_delta then immediately stop.
 	// Text streaming begins right after the thinking block closes.
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -658,8 +658,8 @@ func TestAnthropicThinkingOmittedMode(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		flusher, _ := w.(http.Flusher)
 
-		// Thinking block: no thinking_delta, just signature_delta then stop
-		fmt.Fprint(w, "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\",\"signature\":\"\"}}\n\n")
+		// Thinking block: no thinking_delta, just stop
+		fmt.Fprint(w, "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\"}}\n\n")
 		fmt.Fprint(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"signature_delta\",\"signature\":\"abc123\"}}\n\n")
 		fmt.Fprint(w, "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n")
 
@@ -699,7 +699,6 @@ func TestAnthropicThinkingOmittedMode(t *testing.T) {
 				switch p := part.(type) {
 				case llm.ReasoningPart:
 					reasoningParts++
-					// Signature is not captured — see signature_delta comment.
 					_ = p
 				case llm.TextPart:
 					textParts++

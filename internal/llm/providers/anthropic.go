@@ -97,10 +97,6 @@ type anthropicContentBlock struct {
 	// Pointer so we can emit `"thinking": ""` (DeepSeek requires empty thinking block)
 	// vs. omitting the field on non-thinking blocks.
 	Thinking *string `json:"thinking,omitempty"`
-	// Signature is present in the wire format but currently ignored.
-	// If Anthropic ever requires it to be passed back, capture it from
-	// the signature_delta event and include it here.
-	Signature string `json:"signature,omitempty"`
 
 	// For image
 	Source *anthropicImageSource `json:"source,omitempty"`
@@ -140,10 +136,9 @@ type anthropicSSEMessageStart struct {
 
 // anthropicSSEContentBlock is a content block in "content_block_start" events.
 type anthropicSSEContentBlock struct {
-	Type      string `json:"type"`
-	ID        string `json:"id,omitempty"`
-	Name      string `json:"name,omitempty"`
-	Signature string `json:"signature,omitempty"`
+	Type string `json:"type"`
+	ID   string `json:"id,omitempty"`
+	Name string `json:"name,omitempty"`
 }
 
 // anthropicSSEContentBlockStart is the payload for "content_block_start" events.
@@ -158,7 +153,6 @@ type anthropicSSEDelta struct {
 	Text        string `json:"text,omitempty"`
 	Thinking    string `json:"thinking,omitempty"`
 	PartialJSON string `json:"partial_json,omitempty"`
-	Signature   string `json:"signature,omitempty"`
 }
 
 // anthropicSSEContentBlockDelta is the payload for "content_block_delta" events.
@@ -372,8 +366,8 @@ type blockAccumulator struct {
 // anthropicStreamState tracks accumulation state during streaming
 type anthropicStreamState struct {
 	streamUsage
-	contentParts map[int]llm.ContentPart // completed blocks by index
-	blocks       map[int]*blockAccumulator              // index → block being accumulated
+	contentParts map[int]llm.ContentPart   // completed blocks by index
+	blocks       map[int]*blockAccumulator // index → block being accumulated
 }
 
 func (s *anthropicStreamState) createBlock(index int, blockType, id, name string) *blockAccumulator {
@@ -547,9 +541,6 @@ func (p *AnthropicProvider) handleContentDelta(index int, delta anthropicSSEDelt
 		}
 	case anthropicDeltaTypeInputJSON:
 		block.buffer.WriteString(delta.PartialJSON)
-		// signature_delta carries Anthropic's thinking block signature.
-		// Not currently used — if Anthropic requires it to be passed back,
-		// capture delta.Signature here and include it in the ReasoningPart.
 	}
 	return true
 }
@@ -730,7 +721,6 @@ func anthropicPartToBlock(part llm.ContentPart) *anthropicContentBlock {
 		return &anthropicContentBlock{
 			Type:     anthropicBlockTypeThinking,
 			Thinking: &text,
-			// Signature field intentionally omitted — see signature_delta comment.
 		}
 	case llm.ToolUsePart:
 		return &anthropicContentBlock{

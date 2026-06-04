@@ -157,15 +157,6 @@ type ToolResultData struct {
 	IsError bool   `json:"is_error,omitempty"`
 }
 
-// ReasoningData is the JSON payload for TagAssistantR delta values.
-// Currently unused (reasoning is stored as plain text).
-// If Anthropic's signature ever needs to be preserved, this struct
-// is ready — uncomment the Signature field and use it in session_persist.go.
-type ReasoningData struct {
-	Text string `json:"text"`
-	// Signature string `json:"signature,omitempty"`
-}
-
 // ============================================================================
 // TagSystemMsg (SM) — typed system messages
 // Wire format: {"type":"...","data":{...}}

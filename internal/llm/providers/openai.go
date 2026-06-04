@@ -10,7 +10,7 @@ package providers
 //
 // 2. TOOL CALL ARGUMENTS IN REQUESTS: When sending tool calls back in conversation
 //    history, arguments must be marshaled to a JSON string (not raw JSON).
-//    See `convertToolCalls()`.
+//    See `openaiConvertToolCalls()`.
 //
 // 3. REASONING SUPPORT: OpenAI-compatible APIs (DeepSeek, Qwen, etc.) use
 //    `reasoning_content` field for thinking tokens. Handled in `handleEvent()`.
@@ -25,7 +25,7 @@ package providers
 //
 // 5. NULL ARGUMENTS IN TOOL CALL CHUNKS: Some providers emit no-op deltas
 //    with "arguments": null. Must be skipped to avoid corrupting the
-//    accumulated arguments string. See docs/architecture.md →
+//    accumulated arguments string. See docs/providers.md →
 //    "Null arguments in tool call chunks".
 //    See `appendToolCallArgs()`.
 //

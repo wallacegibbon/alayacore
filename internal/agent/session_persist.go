@@ -36,7 +36,7 @@ var ErrSessionVersionMismatch = errors.New("session file version mismatch")
 func LoadSession(path string) (*SessionData, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, domainerrors.Wrap(domainerrors.OpLoad, err)
+		return nil, domainerrors.Wrap("load", err)
 	}
 	return parseSessionData(data)
 }
@@ -60,10 +60,10 @@ func (s *Session) saveSessionToFileWith(messages []llm.Message, path string) err
 
 	raw, err := formatSessionMarkdown(&data)
 	if err != nil {
-		return domainerrors.Wrap(domainerrors.OpSave, err)
+		return domainerrors.Wrap(CommandNameSave, err)
 	}
 	if err := os.WriteFile(path, raw, 0600); err != nil {
-		return domainerrors.Wrap(domainerrors.OpSave, err)
+		return domainerrors.Wrap(CommandNameSave, err)
 	}
 	return nil
 }
@@ -120,7 +120,7 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 		for _, part := range msg.Content {
 			tag, content, err := contentPartToTLV(msg.Role, part)
 			if err != nil {
-				return nil, domainerrors.Wrap(domainerrors.OpSave, err)
+				return nil, domainerrors.Wrap(CommandNameSave, err)
 			}
 			writeTLV(&tlvBuf, tag, content)
 		}
@@ -148,12 +148,12 @@ func writeTLV(buf *strings.Builder, tag string, content string) {
 // Returns the frontmatter content (between the delimiters) and the body (after the closing delimiter).
 func parseFrontmatter(content string) (frontmatter, body string, err error) {
 	if !strings.HasPrefix(content, "---\n") {
-		return "", "", domainerrors.NewSessionErrorf(domainerrors.OpLoad, "session file missing frontmatter")
+		return "", "", domainerrors.NewSessionErrorf("load", "session file missing frontmatter")
 	}
 
 	endIdx := strings.Index(content[4:], "\n---\n")
 	if endIdx == -1 {
-		return "", "", domainerrors.NewSessionErrorf(domainerrors.OpLoad, "session file missing frontmatter end marker")
+		return "", "", domainerrors.NewSessionErrorf("load", "session file missing frontmatter end marker")
 	}
 
 	frontmatter = content[4 : endIdx+4]
