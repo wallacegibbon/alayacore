@@ -38,7 +38,7 @@ func LoadSession(path string) (*SessionData, error) {
 	if err != nil {
 		return nil, domainerrors.Wrap(domainerrors.OpLoad, err)
 	}
-	return parseSessionMarkdown(data)
+	return parseSessionData(data)
 }
 
 func (s *Session) saveSessionToFile(path string) error {
@@ -144,7 +144,6 @@ func writeTLV(buf *strings.Builder, tag string, content string) {
 	buf.Write(data)
 }
 
-// parseSessionMarkdown parses markdown format with TLV encoding.
 // parseFrontmatter extracts the frontmatter and body from content with "---" delimiters.
 // Returns the frontmatter content (between the delimiters) and the body (after the closing delimiter).
 func parseFrontmatter(content string) (frontmatter, body string, err error) {
@@ -191,7 +190,8 @@ func parseSessionMeta(frontmatter string) (SessionMeta, error) {
 	return meta, nil
 }
 
-func parseSessionMarkdown(data []byte) (*SessionData, error) {
+// parseSessionData parses a session file (frontmatter + TLV body) into SessionData.
+func parseSessionData(data []byte) (*SessionData, error) {
 	frontmatter, body, err := parseFrontmatter(string(data))
 	if err != nil {
 		return nil, err
@@ -303,41 +303,48 @@ func contentPartFromTLV(tag string, content []byte) (llm.MessageRole, llm.Conten
 }
 
 func parseMessagesTLV(body string) ([]llm.Message, []TLVChunk, error) {
-	var messages []llm.Message
-	var chunks []TLVChunk
-	var currentMsg *llm.Message
+	// Pre-allocate with a rough capacity estimate: each TLV record has at least
+	// 6 bytes of overhead (2 tag + 4 length), so body/64 is a conservative
+	// lower bound that avoids most reallocations for large sessions.
+	est := len(body) / 64
+	if est < 8 {
+		est = 8
+	}
+	messages := make([]llm.Message, 0, est)
+	chunks := make([]TLVChunk, 0, est)
 
 	reader := newTLVReader(body)
+	currentIdx := -1 // -1 means no message is being built
+
 	for {
 		tag, content, err := reader.read()
 		if err == io.EOF {
-			if currentMsg != nil {
-				messages = append(messages, *currentMsg)
-			}
 			return messages, chunks, nil
 		}
 		if err != nil {
-			return nil, nil, err
+			return messages, chunks, fmt.Errorf("read error at chunk %d: %w", len(chunks), err)
 		}
 
 		chunks = append(chunks, TLVChunk{Tag: tag, Value: string(content)})
 
 		msgRole, msgPart, err := contentPartFromTLV(tag, content)
 		if err != nil {
-			return nil, nil, err
+			return messages, chunks, fmt.Errorf("parse error at chunk %d (tag %q): %w", len(chunks)-1, tag, err)
 		}
 		if msgPart == nil {
-			continue // skip malformed
+			// Malformed record (e.g. TagAssistantF with an empty tool name);
+			// skip for messages but keep the raw chunk for display/debugging.
+			continue
 		}
 
-		roleMismatch := currentMsg != nil && currentMsg.Role != msgRole
-		if currentMsg == nil || roleMismatch {
-			if currentMsg != nil {
-				messages = append(messages, *currentMsg)
-			}
-			currentMsg = &llm.Message{Role: msgRole, Content: []llm.ContentPart{msgPart}}
+		if currentIdx < 0 || messages[currentIdx].Role != msgRole {
+			messages = append(messages, llm.Message{
+				Role:    msgRole,
+				Content: []llm.ContentPart{msgPart},
+			})
+			currentIdx = len(messages) - 1
 		} else {
-			currentMsg.Content = append(currentMsg.Content, msgPart)
+			messages[currentIdx].Content = append(messages[currentIdx].Content, msgPart)
 		}
 	}
 }

@@ -84,9 +84,9 @@ func TestConsecutiveUserChunksGrouped(t *testing.T) {
 	body += string(stream.EncodeTLV(stream.TagUserT, " world"))
 	body += string(stream.EncodeTLV(stream.TagAssistantT, "Hi there"))
 
-	loaded, err := parseSessionMarkdown(append(raw, body...))
+	loaded, err := parseSessionData(append(raw, body...))
 	if err != nil {
-		t.Fatalf("parseSessionMarkdown failed: %v", err)
+		t.Fatalf("parseSessionData failed: %v", err)
 	}
 
 	// Should be 2 messages: user (with 2 parts), assistant

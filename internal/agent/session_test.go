@@ -571,7 +571,7 @@ func TestDisplayMessagesWithToolCalls(t *testing.T) {
 
 // LoadSessionFromBytes loads a session from raw bytes (for testing)
 func LoadSessionFromBytes(data []byte) (*SessionData, error) {
-	return parseSessionMarkdown(data)
+	return parseSessionData(data)
 }
 
 func TestCleanIncompleteToolCalls(t *testing.T) {
@@ -762,9 +762,9 @@ func TestLoadSessionMissingReasoningLevel(t *testing.T) {
 	// Must include message_version: 2 for the version check to pass.
 	raw := []byte("---\nmessage_version: 2\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\n---\n")
 
-	data, err := parseSessionMarkdown(raw)
+	data, err := parseSessionData(raw)
 	if err != nil {
-		t.Fatalf("parseSessionMarkdown failed: %v", err)
+		t.Fatalf("parseSessionData failed: %v", err)
 	}
 
 	if data.ReasoningLevel != 1 {
@@ -774,9 +774,9 @@ func TestLoadSessionMissingReasoningLevel(t *testing.T) {
 	// Also verify that an explicit reasoning_level: 0 is preserved.
 	raw2 := []byte("---\nmessage_version: 2\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\nreasoning_level: 0\n---\n")
 
-	data2, err := parseSessionMarkdown(raw2)
+	data2, err := parseSessionData(raw2)
 	if err != nil {
-		t.Fatalf("parseSessionMarkdown failed: %v", err)
+		t.Fatalf("parseSessionData failed: %v", err)
 	}
 
 	if data2.ReasoningLevel != 0 {
@@ -806,9 +806,9 @@ func TestLoadSessionInvalidReasoningLevel(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			raw := []byte("---\nmessage_version: 2\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\n" + tt.value + "\n---\n")
 
-			data, err := parseSessionMarkdown(raw)
+			data, err := parseSessionData(raw)
 			if err != nil {
-				t.Fatalf("parseSessionMarkdown failed: %v", err)
+				t.Fatalf("parseSessionData failed: %v", err)
 			}
 
 			if data.ReasoningLevel != tt.want {
@@ -840,7 +840,7 @@ func TestLoadSessionVersionMismatch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := parseSessionMarkdown([]byte(tt.raw))
+			_, err := parseSessionData([]byte(tt.raw))
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			}
@@ -856,9 +856,9 @@ func TestLoadSessionVersionMismatch(t *testing.T) {
 func TestLoadSessionVersionValid(t *testing.T) {
 	raw := []byte("---\nmessage_version: 2\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\n---\n")
 
-	data, err := parseSessionMarkdown(raw)
+	data, err := parseSessionData(raw)
 	if err != nil {
-		t.Fatalf("parseSessionMarkdown failed: %v", err)
+		t.Fatalf("parseSessionData failed: %v", err)
 	}
 
 	if data.MessageVersion != 2 {

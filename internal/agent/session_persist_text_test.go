@@ -59,7 +59,7 @@ func TestSessionSavePreservesTextWithToolCalls(t *testing.T) {
 	t.Logf("Serialized session size: %d bytes", len(raw))
 
 	// Parse back
-	loaded, err := parseSessionMarkdown(raw)
+	loaded, err := parseSessionData(raw)
 	if err != nil {
 		t.Fatalf("Failed to parse session: %v", err)
 	}
