@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/alayacore/alayacore/internal/app"
 )
@@ -30,6 +28,7 @@ func NewAdapter(cfg *app.Config) *Adapter {
 // Start runs the rawio adapter. It blocks until the session finishes.
 // Returns 0 on success, 1 on any error (startup or task failure).
 // The controlling process reads stdout and handles TLV itself.
+// Ctrl-C (SIGINT) terminates immediately with default signal handling.
 func (a *Adapter) Start() int {
 	session, inputWriter, err := app.StartSession(a.Config, os.Stdout)
 	if err != nil {
@@ -37,29 +36,14 @@ func (a *Adapter) Start() int {
 		return 1
 	}
 
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT)
-	defer signal.Stop(sigCh)
-
 	// Pipe stdin to the session.
 	go func() {
 		_, _ = io.Copy(inputWriter, os.Stdin) //nolint:errcheck // stdin EOF is normal termination
 		inputWriter.Close()
 	}()
 
-	// Wait for either EOF (stdin closed -> task finishes) or SIGINT.
-	// Closing os.Stdin signals the copy goroutine to stop; it will close
-	// inputWriter itself, so there is never a double-close race.
-	select {
-	case <-session.Done():
-	case <-sigCh:
-		os.Stdin.Close()
-		// Give the session a moment to finish; second SIGINT exits immediately.
-		select {
-		case <-session.Done():
-		case <-sigCh:
-		}
-	}
+	// Wait for the session to finish (EOF from stdin or task completion).
+	<-session.Done()
 
 	if session.TaskError() {
 		return 1

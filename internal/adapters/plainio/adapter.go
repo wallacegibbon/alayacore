@@ -7,8 +7,6 @@ package plainio
 import (
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/alayacore/alayacore/internal/app"
 	"github.com/alayacore/alayacore/internal/stream"
@@ -28,8 +26,8 @@ func NewAdapter(cfg *app.Config) *Adapter {
 }
 
 // Start runs the plainio adapter. It blocks until the session finishes.
-// Returns the exit code: 0 for graceful exit, 1 for errors, 130 (128+SIGINT)
-// for Ctrl-C.
+// Returns 0 on success, 1 on errors. Ctrl-C (SIGINT) terminates immediately
+// with default signal handling (exit code 130).
 //
 // plainio processes prompts one at a time. If a task produces an error
 // (TagSystemMsg with type "error"), the remaining input is discarded and the process exits
@@ -44,15 +42,11 @@ func (a *Adapter) Start() int {
 		return 1
 	}
 
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT)
-	defer signal.Stop(sigCh)
-
 	exitCh := make(chan int, 1)
 
-	// Read stdin and emit TLV messages. On error (os.Stdin closed by main
-	// goroutine), write :cancel_all to unblock any stuck task, then close
-	// inputWriter. Only the stdin goroutine touches inputWriter.
+	// Read stdin and emit TLV messages. On read error, write :cancel_all to
+	// unblock any stuck task, then close inputWriter.
+	// Only the stdin goroutine touches inputWriter.
 	go func() {
 		err := readPrompts(inputWriter, os.Stdin)
 		if err != nil {
@@ -72,28 +66,18 @@ func (a *Adapter) Start() int {
 		}
 	}()
 
-	// Main goroutine owns all signal handling. No SIGINT goroutine.
-	// First exit trigger wins: EOF (0), Ctrl-C (130), or error via
-	// the output.ErrorChannel() path (1).
-	// Only os.Stdin.Close() is called here - the stdin goroutine handles
-	// writing :cancel_all and closing inputWriter after ReadString fails.
+	// Wait for EOF (Ctrl-D), error, or session completion.
 	code := 0
 	select {
 	case code = <-exitCh:
 	case <-output.ErrorChannel():
 		code = 1
 		os.Stdin.Close()
-	case <-sigCh:
-		code = 128 + int(syscall.SIGINT)
-		os.Stdin.Close()
+	case <-session.Done():
 	}
 
-	// Let the current task finish, but a second Ctrl-C forces immediate exit.
-	select {
-	case <-session.Done():
-	case <-sigCh:
-		code = 128 + int(syscall.SIGINT)
-	}
+	// Wait for the session to finish processing.
+	<-session.Done()
 
 	// Final check: even on a clean EOF path the session may have written
 	// errors (network failures, API errors, etc.) that arrived after the

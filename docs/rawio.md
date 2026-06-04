@@ -25,8 +25,8 @@ See [TLV Protocol](adapter-architecture.md#tlv-protocol) for full details.
   `io.ReadFull` handles TLV frame boundary detection internally.
 - **Ctrl-D** (EOF): closes stdin, the session finishes queued tasks, and
   the process exits with code `0`.
-- **Ctrl-C** (SIGINT): closes stdin. The current task finishes before
-  exit. A second Ctrl-C forces immediate exit.
+- **Ctrl-C** (SIGINT): terminates immediately with the default OS signal
+  handling (exit code 130).
 
 ## Output
 

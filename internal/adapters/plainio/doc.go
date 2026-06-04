@@ -10,8 +10,8 @@
 //   - Each line is treated as a separate prompt.
 //   - A trailing backslash (\) before newline continues the prompt on the next line.
 //   - Ctrl-D (EOF) closes input; the program exits after the current task finishes (code 0).
-//   - Ctrl-C (SIGINT): closes input, waits for the current task to finish, then exits
-//     with code 130 (128+SIGINT). A second Ctrl-C forces an immediate exit.
+//   - Ctrl-C (SIGINT): terminates immediately with default signal handling
+//     (exit code 130).
 //   - Errors during the session cause input to close. The program waits for the
 //     current task to finish, then exits with code 1. Remaining queued tasks
 //     are NOT executed.
@@ -35,7 +35,7 @@
 // terminal and plainio adapters.
 //
 // Key Files:
-//   - adapter.go: Adapter struct, Start() entry point, signal handling
+//   - adapter.go: Adapter struct, Start() entry point
 //   - input.go: Stdin line reader with backslash continuation
 //   - output.go: TLV parser and plain-text renderer
 package plainio

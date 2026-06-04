@@ -13,7 +13,8 @@ prompt that spans two lines.
 ```
 
 - **Ctrl-D** (EOF): closes stdin, waits for queued tasks to finish, exits with code `0`
-- **Ctrl-C** (SIGINT): sends `:cancel_all`, exits with code `130` (128+SIGINT)
+- **Ctrl-C** (SIGINT): terminates immediately with default signal handling
+  (exit code 130).
 
 ## Output
 
