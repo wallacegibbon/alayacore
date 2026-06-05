@@ -11,7 +11,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	ansi "github.com/charmbracelet/x/ansi"
 
 	"github.com/alayacore/alayacore/internal/theme"
 )
@@ -203,11 +202,8 @@ func (ts *ThemeSelector) renderList() string {
 			nameMaxWidth := max(0, innerWidth-2)
 
 			themeName := theme.Name
-			// Truncate long theme names like queue items do
-			truncated := ansi.Hardwrap(themeName, nameMaxWidth, false)
-			if truncated != themeName {
-				truncated = ansi.Hardwrap(themeName, nameMaxWidth-3, false)
-				themeName = strings.SplitN(truncated, "\n", 2)[0] + "..."
+			if nameMaxWidth > 0 {
+				themeName = truncateWithSuffix(themeName, nameMaxWidth)
 			}
 
 			if i == ts.SelectedIdx {

@@ -7,7 +7,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	ansi "github.com/charmbracelet/x/ansi"
 )
 
 // QueueItem represents a queued task for display
@@ -144,11 +143,7 @@ func (qm *QueueManager) renderItem(item QueueItem, selected bool) string {
 		content = ":" + content
 	}
 
-	truncated := ansi.Hardwrap(content, maxWidth, false)
-	if truncated != content {
-		truncated = ansi.Hardwrap(content, maxWidth-3, false)
-		content = strings.SplitN(truncated, "\n", 2)[0] + "..."
-	}
+	content = truncateWithSuffix(content, maxWidth)
 
 	if selected {
 		return qm.Styles.Prompt.Render("> ") + qm.Styles.Text.Render(content)
