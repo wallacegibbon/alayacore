@@ -11,12 +11,11 @@ import (
 func TestHandleToolUseEvent(t *testing.T) {
 	wb := NewWindowBuffer(80, DefaultStyles())
 
-	// Send a "call" type event (creates the window)
+	// Send a "call" type event (creates the window with Name set = start frame)
 	wb.HandleToolUseEvent(stream.ToolUseData{
-		ID:            "tool123",
-		IsPlaceholder: false,
-		Name:          "execute_command",
-		Input:         "execute_command: git status",
+		ID:    "tool123",
+		Name:  "execute_command",
+		Input: "execute_command: git status",
 	})
 
 	// Verify window was created
@@ -52,12 +51,11 @@ func TestHandleToolUseEvent(t *testing.T) {
 func TestRenderWindowContentWithStatus(t *testing.T) {
 	wb := NewWindowBuffer(80, DefaultStyles())
 
-	// Create a tool window
+	// Create a tool window (Name set = start frame)
 	wb.HandleToolUseEvent(stream.ToolUseData{
-		ID:            "tool123",
-		IsPlaceholder: false,
-		Name:          "execute_command",
-		Input:         "execute_command: git status",
+		ID:    "tool123",
+		Name:  "execute_command",
+		Input: "execute_command: git status",
 	})
 
 	// Test rendering with pending status (default on creation)
@@ -114,18 +112,24 @@ func TestOutputWriterToolCallStartThenFull(t *testing.T) {
 	out := NewTerminalOutput(NewStyles(theme.DefaultTheme()))
 	out.SetWindowWidth(80)
 
-	makeFD := func(id string, isPlaceholder bool, name, input string) []byte {
+	makeStartFD := func(id, name string) []byte {
 		fd, _ := json.Marshal(stream.ToolUseData{
-			ID:            id,
-			IsPlaceholder: isPlaceholder,
-			Name:          name,
-			Input:         input,
+			ID:   id,
+			Name: name,
 		})
 		return stream.EncodeTLV(stream.TagAssistantF, string(fd))
 	}
 
-	// 1. Simulate ToolCallStart: is_placeholder=true with placeholder JSON input
-	_, err := out.Write(makeFD("call-abc", true, "write_file", "{}"))
+	makeInputFD := func(id, input string) []byte {
+		fd, _ := json.Marshal(stream.ToolUseData{
+			ID:    id,
+			Input: input,
+		})
+		return stream.EncodeTLV(stream.TagAssistantF, string(fd))
+	}
+
+	// 1. Simulate ToolCallStart: Name set, no input yet
+	_, err := out.Write(makeStartFD("call-abc", "write_file"))
 	if err != nil {
 		t.Fatalf("Write failed: %v", err)
 	}
@@ -139,8 +143,8 @@ func TestOutputWriterToolCallStartThenFull(t *testing.T) {
 		t.Errorf("Expected tool name 'write_file', got %q", w.ToolName)
 	}
 
-	// 2. Simulate ToolCallComplete: is_placeholder=false with full JSON input
-	_, err = out.Write(makeFD("call-abc", false, "write_file", `{"path":"/tmp/f.txt","content":"hello world"}`))
+	// 2. Simulate ToolCallComplete: Name nil with full JSON input
+	_, err = out.Write(makeInputFD("call-abc", `{"path":"/tmp/f.txt","content":"hello world"}`))
 	if err != nil {
 		t.Fatalf("Write failed: %v", err)
 	}

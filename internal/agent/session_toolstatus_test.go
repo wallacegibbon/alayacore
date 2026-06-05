@@ -17,7 +17,7 @@ func TestWriteToolOutput(t *testing.T) {
 	}
 
 	// Test success case
-	session.writeToolOutput("tool123", "output text", false)
+	session.writeToolUseOutput("tool123", "output text", false)
 
 	// Parse the written data to extract TLV
 	tag, value := parseTLVFromBytes(output.data)
@@ -35,7 +35,7 @@ func TestWriteToolOutput(t *testing.T) {
 
 	// Test error case
 	output.data = nil
-	session.writeToolOutput("tool456", "error message", true)
+	session.writeToolUseOutput("tool456", "error message", true)
 
 	tag, value = parseTLVFromBytes(output.data)
 	if tag != stream.TagUserF {
@@ -50,7 +50,7 @@ func TestWriteToolOutput(t *testing.T) {
 	}
 }
 
-func TestOnToolResultCallback(t *testing.T) {
+func TestOnToolUseOutputCallback(t *testing.T) {
 	// Create a session with mock output
 	output := &mockOutput{}
 	session := &Session{
@@ -71,9 +71,9 @@ func TestOnToolResultCallback(t *testing.T) {
 
 		// Send tool result with error flag to adapter
 		if textOutput, ok := toolResult.(llm.ToolResultOutputText); ok {
-			session.writeToolOutput(id, textOutput.Text, false)
+			session.writeToolUseOutput(id, textOutput.Text, false)
 		} else if errOutput, ok := toolResult.(llm.ToolResultOutputFailed); ok {
-			session.writeToolOutput(id, errOutput.Reason, true)
+			session.writeToolUseOutput(id, errOutput.Reason, true)
 		}
 
 		return nil
@@ -131,7 +131,7 @@ func TestWriteToolCallWithPending(t *testing.T) {
 		SessionConfig: SessionConfig{Output: output},
 	}
 
-	session.writeToolUse("execute_command", `{"command":"ls"}`, "tool123")
+	session.writeToolUseInput(`{"command":"ls"}`, "tool123")
 
 	// Should have written one TLV message: AF with type "call"
 	// Status "pending" is inferred by the terminal from window creation.
@@ -142,13 +142,13 @@ func TestWriteToolCallWithPending(t *testing.T) {
 		t.Errorf("Expected tag %s, got %s", stream.TagAssistantF, tag1)
 	}
 
-	// The tool call should be JSON with id, name, input (is_placeholder:false omitted)
+	// The tool call should be JSON with id, input (name omitted for input frame)
 	var fd1 stream.ToolUseData
 	if err := json.Unmarshal([]byte(value1), &fd1); err != nil {
 		t.Fatalf("Failed to parse AF JSON: %v", err)
 	}
-	if fd1.IsPlaceholder || fd1.Name != "execute_command" {
-		t.Errorf("Expected is_placeholder=false, name=execute_command, got is_placeholder=%t, name=%s", fd1.IsPlaceholder, fd1.Name)
+	if fd1.Name != "" {
+		t.Errorf("Expected empty name (input frame), got name=%s", fd1.Name)
 	}
 	if fd1.ID != "tool123" {
 		t.Errorf("Expected id=tool123, got %s", fd1.ID)

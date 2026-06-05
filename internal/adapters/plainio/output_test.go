@@ -105,7 +105,8 @@ func TestNoPrefixNoNewline(t *testing.T) {
 		writer: &buf,
 	}
 
-	// Messages without stream prefixes should not cause newlines
+	// Messages without stream prefixes are treated as complete text parts
+	// (session load style) and each ends with a newline.
 	msg1 := encodeTLV(stream.TagAssistantT, "hello ")
 	msg2 := encodeTLV(stream.TagAssistantT, "world")
 
@@ -113,7 +114,7 @@ func TestNoPrefixNoNewline(t *testing.T) {
 	o.Write(msg2)
 
 	got := buf.String()
-	want := "hello world"
+	want := "hello \nworld\n"
 	if got != want {
 		t.Errorf("output = %q, want %q", got, want)
 	}

@@ -22,9 +22,7 @@
 //     A blank line is inserted when consecutive deltas belong to different
 //     stream groups or different message types.
 //   - User prompts: prefixed with "> ".
-//   - Tool calls: shown as "[tool_name: key-args]" (no content).
-//     "start" type tool call frames are silently ignored; only "call" type
-//     frames with full input are displayed.
+//   - Tool calls: start frames show the tool name; input frames show the arguments.
 //   - Tool results: suppressed.
 //   - Errors: prefixed with "Error: ".
 //   - Notifications: prefixed with "[...]".

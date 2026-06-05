@@ -135,17 +135,22 @@ func (to *outputWriter) writeColored(tag string, value string) {
 		if err := json.Unmarshal([]byte(value), &fd); err != nil {
 			return
 		}
-		// Format the call input for display. For "start", format "{}" as a
-		// placeholder so the tool name appears immediately. Safe because
-		// HandleToolUseEvent only sets ToolInput for "start" when it's
-		// empty — real arguments from a prior "call" are never overwritten.
-		if !fd.IsPlaceholder {
-			handler := GetHandler(fd.Name)
-			fd.Input = handler.FormatCall(json.RawMessage(fd.Input), to.styles.Load())
-		} else {
-			handler := GetHandler(fd.Name)
-			fd.Input = handler.FormatCall(json.RawMessage("{}"), to.styles.Load())
+
+		// Resolve the tool name — prefer the existing window (input frame)
+		// over the frame itself (start/combined).
+		name := fd.Name
+		if info := to.windowBuffer.GetFunctionInfo(fd.ID); info != nil {
+			name = info.Name
 		}
+
+		// Format the input for display.
+		if fd.Input == "" {
+			fd.Input = name + ": \n"
+		} else {
+			handler := GetHandler(name)
+			fd.Input = handler.FormatCall(json.RawMessage(fd.Input), to.styles.Load())
+		}
+
 		to.windowBuffer.HandleToolUseEvent(fd)
 
 	// Function result (JSON: id, output, status)

@@ -6,12 +6,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 	"sync"
 	"sync/atomic"
 
 	"github.com/alayacore/alayacore/internal/stream"
-	"github.com/alayacore/alayacore/internal/tools"
 )
 
 // stdoutOutput implements io.Writer.
@@ -84,7 +82,7 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 
 	case stream.TagUserT:
 		o.emitSeparator(tag)
-		fmt.Fprintf(o.writer, "> %s", value)
+		fmt.Fprintf(o.writer, "> %s\n", value)
 
 	case stream.TagSystemMsg:
 		o.handleSystemMsg(value)
@@ -94,23 +92,29 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 		if err := json.Unmarshal([]byte(value), &fd); err != nil {
 			return
 		}
-		// Ignore placeholder frames — only render when full input is available.
-		if fd.IsPlaceholder {
-			return
-		}
 		if o.lastTag != "" {
 			fmt.Fprintln(o.writer)
 		}
 		o.lastTag = tag
 		o.lastStreamID = ""
-		fmt.Fprintf(o.writer, "%s", formatToolUse(fd.Name, fd.Input))
+		switch {
+		case fd.Name != "" && fd.Input == "":
+			// Start frame: tool name only.
+			fmt.Fprintf(o.writer, "%s\n", fd.Name)
+		case fd.Name != "":
+			// Combined frame (session load): name and input.
+			fmt.Fprintf(o.writer, "%s\n%s\n", fd.Name, fd.Input)
+		default:
+			// Input frame: arguments only.
+			fmt.Fprintf(o.writer, "%s\n", fd.Input)
+		}
 
 	case stream.TagUserF:
 		// Suppress tool result content in plainio; do not update lastTag.
 
 	case stream.TagUserI:
 		o.emitSeparator(tag)
-		fmt.Fprint(o.writer, "[image]")
+		fmt.Fprintf(o.writer, "[image]\n")
 
 	default:
 		o.emitSeparator(tag)
@@ -119,128 +123,36 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 }
 
 // handleTextDelta handles AT (assistant text) and AR (reasoning text) tags.
-// It prints a separator when transitioning between different tag groups or
+// It prints a separator when transitioning between different tags or
 // stream IDs, then prints the content delta.
 func (o *stdoutOutput) handleTextDelta(tag, value string) {
 	id, content, _ := stream.UnwrapDelta(value)
 	// When id is "" (replayed from session file, no NUL prefix),
 	// we just track it as-is — no stream transition to detect.
-	if o.lastTag != "" && (o.lastTag != stream.TagAssistantT && o.lastTag != stream.TagAssistantR) {
-		// Transitioning from a different tag group → separator
+	if o.lastStreamID != "" && o.lastTag != tag {
+		// Transitioning from a different tag → separator
 		fmt.Fprintln(o.writer)
 	} else if o.lastStreamID != "" && id != o.lastStreamID {
-		// Same group but different stream → separator
+		// Same tag but different stream → separator
 		fmt.Fprintln(o.writer)
 	}
 	o.lastTag = tag
 	o.lastStreamID = id
 	fmt.Fprint(o.writer, content)
+	if id == "" {
+		fmt.Fprintln(o.writer)
+	}
 }
 
 // emitSeparator prints a newline if the previous visible tag differs from the
-// new tag. It updates lastTag to the new tag.
+// new tag and the previous frame was streamed (had a non-empty stream ID).
+// It updates lastTag to the new tag.
 func (o *stdoutOutput) emitSeparator(tag string) {
-	if o.lastTag != "" && o.lastTag != tag {
+	if o.lastStreamID != "" && o.lastTag != "" && o.lastTag != tag {
 		fmt.Fprintln(o.writer)
 	}
 	o.lastTag = tag
 	o.lastStreamID = ""
-}
-
-// formatToolUse formats a tool call header for display (name + key args, no content).
-func formatToolUse(name, input string) string {
-	switch name {
-	case "execute_command":
-		return formatExecuteCommand(input)
-	case "read_file":
-		return formatReadFile(input)
-	case "write_file":
-		return formatWriteFile(input)
-	case "edit_file":
-		return formatEditFile(input)
-	case "search_content":
-		return formatSearchContent(input)
-	default:
-		return fmt.Sprintf("[%s]", name)
-	}
-}
-
-func formatExecuteCommand(input string) string {
-	// Use anonymous struct since executeCommandInput is unexported
-	var args struct {
-		Command string `json:"command"`
-	}
-	if err := json.Unmarshal([]byte(input), &args); err != nil {
-		return "[execute_command]"
-	}
-	return fmt.Sprintf("[execute_command: %s]", args.Command)
-}
-
-func formatReadFile(input string) string {
-	var args tools.ReadFileInput
-	if err := json.Unmarshal([]byte(input), &args); err != nil {
-		return "[read_file]"
-	}
-	parts := []string{args.Path}
-	if args.StartLine > 0 {
-		parts = append(parts, fmt.Sprintf("%d", args.StartLine))
-	}
-	if args.EndLine > 0 {
-		parts = append(parts, fmt.Sprintf("%d", args.EndLine))
-	}
-	return fmt.Sprintf("[read_file: %s]", strings.Join(parts, ", "))
-}
-
-func formatWriteFile(input string) string {
-	var args tools.WriteFileInput
-	if err := json.Unmarshal([]byte(input), &args); err != nil {
-		return "[write_file]"
-	}
-	return fmt.Sprintf("[write_file: %s]", args.Path)
-}
-
-func formatEditFile(input string) string {
-	var args tools.EditFileInput
-	if err := json.Unmarshal([]byte(input), &args); err != nil {
-		return "[edit_file]"
-	}
-	return fmt.Sprintf("[edit_file: %s]", args.Path)
-}
-
-func formatSearchContent(input string) string {
-	var args tools.SearchContentInput
-	if err := json.Unmarshal([]byte(input), &args); err != nil {
-		return "[search_content]"
-	}
-
-	var parts []string
-
-	// Pattern and path
-	part := args.Pattern
-	if args.Path != "" {
-		part += " in " + args.Path
-	}
-	parts = append(parts, part)
-
-	// FileType and/or Glob
-	switch {
-	case args.FileType != "" && args.Glob != "":
-		parts = append(parts, fmt.Sprintf("for %s files (%s)", args.FileType, args.Glob))
-	case args.FileType != "":
-		parts = append(parts, fmt.Sprintf("for %s files", args.FileType))
-	case args.Glob != "":
-		parts = append(parts, fmt.Sprintf("matching %s", args.Glob))
-	}
-
-	// Modifiers
-	if args.IgnoreCase {
-		parts = append(parts, "ignoring case")
-	}
-	if args.MaxLines > 0 {
-		parts = append(parts, fmt.Sprintf("limit %d", args.MaxLines))
-	}
-
-	return fmt.Sprintf("[search_content: %s]", strings.Join(parts, ", "))
 }
 
 // handleSystemMsg processes a TagSystemMsg frame.
@@ -260,8 +172,9 @@ func (o *stdoutOutput) handleSystemMsg(value string) {
 			Text string `json:"text"`
 		}
 		if json.Unmarshal(env.Data, &m) == nil {
-			o.emitSeparator("")
-			fmt.Fprintf(o.writer, "[error: %s]", m.Text)
+			fmt.Fprintf(o.writer, "\n[error: %s]\n", m.Text)
+			o.lastTag = ""
+			o.lastStreamID = ""
 			o.hasError.Store(true)
 			if o.errorClosed.CompareAndSwap(false, true) {
 				close(o.errorCh)
@@ -272,8 +185,9 @@ func (o *stdoutOutput) handleSystemMsg(value string) {
 			Text string `json:"text"`
 		}
 		if json.Unmarshal(env.Data, &m) == nil {
-			o.emitSeparator("")
-			fmt.Fprintf(o.writer, "[%s]", m.Text)
+			fmt.Fprintf(o.writer, "\n[%s]\n", m.Text)
+			o.lastTag = ""
+			o.lastStreamID = ""
 		}
 	case "task":
 		var m struct {
@@ -294,7 +208,8 @@ func (o *stdoutOutput) handleSystemMsg(value string) {
 		if json.Unmarshal(env.Data, &m) != nil || m.ID == "" {
 			return
 		}
-		o.emitSeparator("")
-		fmt.Fprintf(o.writer, "[tool_confirm: allow tool %q to run?]", m.ID)
+		fmt.Fprintf(o.writer, "\n[tool_confirm: allow tool %q to run?]\n", m.ID)
+		o.lastTag = ""
+		o.lastStreamID = ""
 	}
 }

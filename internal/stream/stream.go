@@ -140,13 +140,13 @@ func (n *NopOutput) Write(p []byte) (int, error) {
 }
 
 // ToolUseData is the JSON payload for TagAssistantF (AF).
-// IsPlaceholder indicates whether this is a preliminary "start" frame
-// (name known, input still streaming) or a complete "call" frame.
+// A frame with a non-empty Name and empty Input is a preliminary
+// "start" frame that announces the tool name. All other frames
+// carry the actual tool arguments.
 type ToolUseData struct {
-	ID            string `json:"id"`
-	Name          string `json:"name,omitempty"`
-	Input         string `json:"input,omitempty"`
-	IsPlaceholder bool   `json:"is_placeholder,omitempty"`
+	ID    string `json:"id"`
+	Name  string `json:"name,omitempty"`
+	Input string `json:"input,omitempty"`
 }
 
 // ToolResultData is the JSON payload for TagUserF (UF).

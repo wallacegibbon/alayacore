@@ -95,6 +95,41 @@ func (s *Session) doAutoSummarize(ctx context.Context, messages []llm.Message) [
 // Prompt Processing
 // ============================================================================
 
+// confirmToolCall prompts the user for tool approval when the tool is in
+// the confirmation set. Returns immediately (true) if no confirmation is needed.
+func (s *Session) confirmToolCall(ctx context.Context, id, toolName string) (bool, error) {
+	if s.toolConfirmSet == nil {
+		return true, nil
+	}
+	if _, ok := s.toolConfirmSet[toolName]; !ok {
+		return true, nil
+	}
+
+	respCh := make(chan ToolConfirmResponse, 1)
+	s.toolConfirmRespCh = respCh
+	s.toolConfirmID = id
+
+	if err := stream.WriteSystemMsg(s.Output, stream.ToolConfirmMsg{ID: id}); err != nil {
+		s.toolConfirmRespCh = nil
+		s.toolConfirmID = ""
+		return false, domainerrors.Wrap("tool", err)
+	}
+
+	select {
+	case resp := <-respCh:
+		if resp.ID != id {
+			return false, domainerrors.NewSessionErrorf("tool", "tool_confirm ID mismatch: want %s, got %s", id, resp.ID)
+		}
+		s.toolConfirmRespCh = nil
+		s.toolConfirmID = ""
+		return resp.Allowed, nil
+	case <-ctx.Done():
+		s.toolConfirmRespCh = nil
+		s.toolConfirmID = ""
+		return false, ctx.Err()
+	}
+}
+
 func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]llm.Message, int64, error) {
 	// nextPromptID is goroutine-local (only accessed from the task goroutine),
 	// so it's updated outside the mutex.
@@ -121,51 +156,20 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 			s.writeToolUseStart(toolName, id)
 			return nil
 		},
-		OnToolUse: func(id, toolName string, input json.RawMessage) error {
-			s.writeToolUse(toolName, string(input), id)
+		OnToolUseInput: func(id string, input json.RawMessage) error {
+			s.writeToolUseInput(string(input), id)
+			return nil
+		},
+		OnToolUseOutput: func(id string, output llm.ToolResultOutput) error {
+			if textOutput, ok := output.(llm.ToolResultOutputText); ok {
+				s.writeToolUseOutput(id, textOutput.Text, false)
+			} else if errOutput, ok := output.(llm.ToolResultOutputFailed); ok {
+				s.writeToolUseOutput(id, errOutput.Reason, true)
+			}
 			return nil
 		},
 		OnToolConfirm: func(id, toolName string, _ json.RawMessage) (bool, error) {
-			// If no confirmation set is configured, or this tool is not
-			// in the set, allow immediately without notifying the adapter.
-			if s.toolConfirmSet == nil {
-				return true, nil
-			}
-			if _, ok := s.toolConfirmSet[toolName]; !ok {
-				return true, nil
-			}
-
-			respCh := make(chan ToolConfirmResponse, 1)
-			s.toolConfirmRespCh = respCh
-			s.toolConfirmID = id
-
-			if err := stream.WriteSystemMsg(s.Output, stream.ToolConfirmMsg{ID: id}); err != nil {
-				s.toolConfirmRespCh = nil
-				s.toolConfirmID = ""
-				return false, domainerrors.Wrap("tool", err)
-			}
-
-			select {
-			case resp := <-respCh:
-				if resp.ID != id {
-					return false, domainerrors.NewSessionErrorf("tool", "tool_confirm ID mismatch: want %s, got %s", id, resp.ID)
-				}
-				s.toolConfirmRespCh = nil
-				s.toolConfirmID = ""
-				return resp.Allowed, nil
-			case <-ctx.Done():
-				s.toolConfirmRespCh = nil
-				s.toolConfirmID = ""
-				return false, ctx.Err()
-			}
-		},
-		OnToolResult: func(id string, output llm.ToolResultOutput) error {
-			if textOutput, ok := output.(llm.ToolResultOutputText); ok {
-				s.writeToolOutput(id, textOutput.Text, false)
-			} else if errOutput, ok := output.(llm.ToolResultOutputFailed); ok {
-				s.writeToolOutput(id, errOutput.Reason, true)
-			}
-			return nil
+			return s.confirmToolCall(ctx, id, toolName)
 		},
 		OnStepStart: func(step int) error {
 			stepCount = step

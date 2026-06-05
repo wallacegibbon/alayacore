@@ -5,7 +5,7 @@ package llm
 // 1. ONSTEPFINISH RECEIVES FULL HISTORY: OnStepFinish callback receives
 //    the complete allMessages slice (full conversation history), not just
 //    the current step's messages. The session layer replaces its state
-//    from this rather than appending increments. OnToolResult should only
+//    from this rather than appending increments. OnToolUseOutput should only
 //    send UI notifications, not append to session messages.
 //
 // 2. INCOMPLETE TOOL CALLS ON CANCEL: When user cancels mid-tool-call, messages may have
@@ -59,9 +59,9 @@ type StreamCallbacks struct {
 	OnTextDelta      func(delta string, index int) error
 	OnReasoningDelta func(delta string, index int) error
 	OnToolUseStart   func(id, toolName string) error
-	OnToolUse        func(id, toolName string, input json.RawMessage) error
+	OnToolUseInput   func(id string, input json.RawMessage) error
 	OnToolConfirm    func(id, toolName string, input json.RawMessage) (bool, error)
-	OnToolResult     func(id string, output ToolResultOutput) error
+	OnToolUseOutput  func(id string, output ToolResultOutput) error
 	OnStepStart      func(step int) error
 	OnStepFinish     func(messages []Message, usage Usage) error
 }
@@ -211,7 +211,7 @@ func (a *Agent) processStreamEvents(events iter.Seq2[StreamEvent, error], callba
 			}
 
 		case ToolUsePart:
-			if err := a.fireOnToolUse(callbacks, e); err != nil {
+			if err := a.fireOnToolUseInput(callbacks, e); err != nil {
 				return Message{}, Usage{}, err
 			}
 
@@ -257,11 +257,11 @@ func fireOnStepFinish(callbacks StreamCallbacks, messages []Message, usage Usage
 	return nil
 }
 
-// fireOnToolUse invokes the OnToolUse callback if set.
-func (a *Agent) fireOnToolUse(callbacks StreamCallbacks, e ToolUsePart) error {
-	if callbacks.OnToolUse != nil {
-		if err := callbacks.OnToolUse(e.ID, e.ToolName, e.Input); err != nil {
-			return fmt.Errorf("OnToolUse callback failed: %w", err)
+// fireOnToolUseInput invokes the OnToolUseInput callback if set.
+func (a *Agent) fireOnToolUseInput(callbacks StreamCallbacks, e ToolUsePart) error {
+	if callbacks.OnToolUseInput != nil {
+		if err := callbacks.OnToolUseInput(e.ID, e.Input); err != nil {
+			return fmt.Errorf("OnToolUseInput callback failed: %w", err)
 		}
 	}
 	return nil
@@ -293,9 +293,9 @@ func (a *Agent) executeTool(ctx context.Context, tc ToolUsePart, callbacks Strea
 		}
 	}
 
-	if callbacks.OnToolResult != nil {
+	if callbacks.OnToolUseOutput != nil {
 		//nolint:errcheck // callback error shouldn't prevent tool result from being recorded
-		callbacks.OnToolResult(tc.ID, output)
+		callbacks.OnToolUseOutput(tc.ID, output)
 	}
 
 	return ToolResultPart{
@@ -317,8 +317,8 @@ func (a *Agent) executeTools(ctx context.Context, toolUses []ToolUsePart, callba
 				failed := ToolResultOutputFailed{
 					Reason: err.Error(),
 				}
-				if callbacks.OnToolResult != nil {
-					callbacks.OnToolResult(tc.ID, failed) //nolint:errcheck
+				if callbacks.OnToolUseOutput != nil {
+					callbacks.OnToolUseOutput(tc.ID, failed) //nolint:errcheck
 				}
 				results = append(results, ToolResultPart{
 					ID:     tc.ID,
@@ -330,8 +330,8 @@ func (a *Agent) executeTools(ctx context.Context, toolUses []ToolUsePart, callba
 				denied := ToolResultOutputFailed{
 					Reason: "Tool execution denied by user",
 				}
-				if callbacks.OnToolResult != nil {
-					callbacks.OnToolResult(tc.ID, denied) //nolint:errcheck
+				if callbacks.OnToolUseOutput != nil {
+					callbacks.OnToolUseOutput(tc.ID, denied) //nolint:errcheck
 				}
 				results = append(results, ToolResultPart{
 					ID:     tc.ID,

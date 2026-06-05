@@ -19,4 +19,4 @@ A **step** is one LLM round trip. It produces 1 or 2 messages in the conversatio
 - **Tool execution** is driven by extracting `ToolUsePart`s from `stepMessage.Content` in `executeStep`, not from a separate collection.
 - **All tool results** go into one tool result message per step (required by both Anthropic and OpenAI).
 - **Incomplete tool calls on cancel:** When user cancels mid-tool-call, messages may have `tool_use` without matching `tool_result`. `cleanIncompleteToolUses()` removes these to prevent API errors on next request.
-- **Tool result message ordering:** `OnStepFinish` receives complete step messages including both the assistant message (with tool calls) and the tool result message. `OnToolResult` should only send UI notifications — the agent loop handles message assembly.
+- **Tool result message ordering:** `OnStepFinish` receives complete step messages including both the assistant message (with tool calls) and the tool result message. `OnToolUseOutput` should only send UI notifications — the agent loop handles message assembly.

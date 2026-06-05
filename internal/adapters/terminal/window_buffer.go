@@ -135,8 +135,8 @@ func (wb *WindowBuffer) AppendOrUpdate(tag string, id string, content string) {
 }
 
 // HandleToolUseEvent processes a TagAssistantF (AF) frame.
-// Type "start" sets ToolName (and ToolInput if not yet set),
-// type "call" sets ToolName+ToolInput.
+// A frame with Name non-empty and Input empty is a "start" that sets
+// the tool name. All other frames carry actual tool arguments.
 // Status defaults to "pending" when a tool window is created —
 // the final status arrives via HandleToolResult (UF).
 func (wb *WindowBuffer) HandleToolUseEvent(data stream.ToolUseData) {
@@ -145,22 +145,19 @@ func (wb *WindowBuffer) HandleToolUseEvent(data stream.ToolUseData) {
 
 	if idx, ok := wb.idIndex[data.ID]; ok {
 		w := wb.windows[idx]
-		if data.IsPlaceholder {
+		if data.Name != "" && data.Input == "" {
 			w.ToolName = data.Name
 			if w.ToolInput == "" {
 				w.ToolInput = data.Input
-			}
-			if w.Status == ToolStatusNone {
-				w.Status = ToolStatusPending
 			}
 		} else {
 			if data.Name != "" {
 				w.ToolName = data.Name
 			}
 			w.ToolInput = data.Input
-			if w.Status == ToolStatusNone {
-				w.Status = ToolStatusPending
-			}
+		}
+		if w.Status == ToolStatusNone {
+			w.Status = ToolStatusPending
 		}
 		w.Invalidate()
 		wb.markDirty(idx)

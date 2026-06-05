@@ -52,8 +52,8 @@ func Example_usage() {
 			fmt.Print(delta)
 			return nil
 		},
-		OnToolUse: func(_ string, toolName string, input json.RawMessage) error {
-			fmt.Printf("\n[Tool: %s]\n", toolName)
+		OnToolUseInput: func(_ string, input json.RawMessage) error {
+			fmt.Printf("\n[Tool input: %s]\n", string(input))
 			return nil
 		},
 	})
