@@ -129,14 +129,13 @@ func buildHelpItems() []HelpItem {
 
 // --- Column Widths ---
 
-// recalculateColumnWidths computes keyColumnWidth so that all descriptions
-// align at the same column and the longest description reaches the right edge.
+// recalculateColumnWidths computes keyColumnWidth so the key always
+// gets enough space for its longest entry; the description (rightmost)
+// takes whatever is left. When the window is wide, the key column expands
+// to push the description to the right edge (flexible spacing). When narrow,
+// the key is truncated before the description overflows.
 //
 // Layout per row: prefix(2) + keyPadded + " " + desc
-// We want: 2 + keyColumnWidth + 1 + maxDescLen = innerWidth
-// So: keyColumnWidth = innerWidth - 3 - maxDescLen
-//
-// If the window is too narrow, keyColumnWidth is at least maxKeyLen.
 func (hw *HelpWindow) recalculateColumnWidths() {
 	maxKeyLen := 0
 	maxDescLen := 0
@@ -152,14 +151,19 @@ func (hw *HelpWindow) recalculateColumnWidths() {
 	}
 
 	innerWidth := max(0, hw.Width-BorderInnerPadding)
+
+	// Ideal width: push the longest description to the right edge.
+	// Total = prefix(2) + key + gap(1) + desc = innerWidth
+	// So key = innerWidth - 3 - desc
 	idealKeyWidth := innerWidth - 3 - maxDescLen
 
-	// Must fit the longest key
-	if idealKeyWidth < maxKeyLen {
-		idealKeyWidth = maxKeyLen
-	}
-
-	hw.keyColumnWidth = max(1, idealKeyWidth)
+	// Key needs at least maxKeyLen to show its longest entry without truncation.
+	// If the window can't fit even that, clamp to available space (key gets
+	// truncated and description is hidden).
+	hw.keyColumnWidth = min(
+		max(maxKeyLen, idealKeyWidth), // at least maxKeyLen, expand if space allows
+		max(1, innerWidth-2),          // never exceed available space for key+prefix
+	)
 }
 
 // SetSize sets the size of the help window and recalculates column widths.
@@ -430,7 +434,7 @@ func (hw *HelpWindow) renderItem(item HelpItem, selected bool) string {
 
 	// Build raw line with fixed key column width
 	keyMaxWidth := hw.keyColumnWidth
-	descMaxWidth := max(1, innerWidth-3-keyMaxWidth)
+	descMaxWidth := max(0, innerWidth-3-keyMaxWidth)
 
 	// Truncate key if too long (gracefully degraded)
 	key := item.Key
@@ -444,12 +448,14 @@ func (hw *HelpWindow) renderItem(item HelpItem, selected bool) string {
 		desc = truncateWithSuffix(desc, descMaxWidth)
 	}
 
-	// Build the full raw line: padded key + space + desc
+	// Build the full raw line: padded key + optional space + desc
 	// Use display-width-aware padding instead of fmt.Sprintf, which pads by rune count
 	// and misaligns wide characters (e.g. CJK).
 	padding := max(0, keyMaxWidth-lipgloss.Width(key))
-	keyPadded := key + strings.Repeat(" ", padding)
-	line := keyPadded + " " + desc
+	line := key + strings.Repeat(" ", padding)
+	if descMaxWidth > 0 {
+		line += " " + desc
+	}
 
 	if selected {
 		return hw.Styles.Prompt.Render("> ") + hw.Styles.Text.Render(line)
