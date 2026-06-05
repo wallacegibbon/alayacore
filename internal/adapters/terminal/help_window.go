@@ -429,8 +429,7 @@ func (hw *HelpWindow) renderItem(item HelpItem, selected bool) string {
 		content := "── " + item.Description
 		truncated := ansi.Hardwrap(content, innerWidth, false)
 		if truncated != content {
-			truncated = ansi.Hardwrap(content, max(1, innerWidth-3), false)
-			content = strings.SplitN(truncated, "\n", 2)[0] + "..."
+			content = truncateWithSuffix(content, innerWidth)
 		}
 		return hw.Styles.System.Bold(true).Render(content)
 	}
@@ -439,20 +438,16 @@ func (hw *HelpWindow) renderItem(item HelpItem, selected bool) string {
 	keyMaxWidth := hw.keyColumnWidth
 	descMaxWidth := max(1, innerWidth-3-keyMaxWidth)
 
-	// Truncate key first if too long (same Hardwrap pattern)
+	// Truncate key if too long (gracefully degraded)
 	key := item.Key
-	truncated := ansi.Hardwrap(key, keyMaxWidth, false)
-	if truncated != key {
-		truncated = ansi.Hardwrap(key, max(1, keyMaxWidth-3), false)
-		key = strings.SplitN(truncated, "\n", 2)[0] + "..."
+	if keyMaxWidth > 0 {
+		key = truncateWithSuffix(key, keyMaxWidth)
 	}
 
-	// Truncate description if too long (same Hardwrap pattern)
+	// Truncate description if too long (gracefully degraded)
 	desc := item.Description
-	truncated = ansi.Hardwrap(desc, descMaxWidth, false)
-	if truncated != desc {
-		truncated = ansi.Hardwrap(desc, max(1, descMaxWidth-3), false)
-		desc = strings.SplitN(truncated, "\n", 2)[0] + "..."
+	if descMaxWidth > 0 {
+		desc = truncateWithSuffix(desc, descMaxWidth)
 	}
 
 	// Build the full raw line: padded key + space + desc
