@@ -52,11 +52,12 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if t.JustClosed(m.helpWindow) {
 			// If a command was selected via Enter, copy it to input
 			if pending := m.helpWindow.ConsumePendingCommand(); pending != "" {
-				m.restoreFocus()
+				// Insert the command into the input box and focus it.
+				// Input and display are never focused simultaneously.
+				m.focusInput()
 				m.input.SetValue(pending + " ")
 				m.input.CursorEnd()
-				m.input.Focus()
-				m.focusedWindow = "input"
+				m.display.updateContent()
 				return m, nil
 			}
 			m.restoreFocus()
