@@ -61,10 +61,9 @@ func (s *Session) writeTLVJSON(tag string, v any) {
 
 func (s *Session) writeToolUse(toolName, input, id string) {
 	s.writeTLVJSON(stream.TagAssistantF, stream.ToolUseData{
-		ID:            id,
-		IsPlaceholder: false,
-		Name:          toolName,
-		Input:         input,
+		ID:    id,
+		Name:  toolName,
+		Input: input,
 	})
 }
 

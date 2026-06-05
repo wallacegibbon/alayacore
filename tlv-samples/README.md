@@ -48,11 +48,11 @@ AT and AR use NUL-delimited stream IDs for incremental streaming:
 Tool execution uses two tags with an `is_placeholder` / `is_error` discriminator:
 
 **AF** — function lifecycle:
-- `{"id":"t1","is_placeholder":true,"name":"read_file"}` — tool name known
-- `{"id":"t1","is_placeholder":false,"name":"read_file","input":"..."}` — full input
+- `{"id":"t1","name":"read_file","is_placeholder":true}` — tool name known
+- `{"id":"t1","name":"read_file","input":"..."}` — full input (`is_placeholder` is omitted when `false`)
 
 **UF** — function result:
-- `{"id":"t1","output":"...","is_error":false}` — succeeded
+- `{"id":"t1","output":"..."}` — succeeded (`is_error` is omitted when `false`)
 - `{"id":"t1","output":"...","is_error":true}` — failed
 
 A tool call (AF) without a matching UF is still in progress. Each `.bin` sample below shows one frame in this lifecycle.
@@ -61,9 +61,9 @@ A tool call (AF) without a matching UF is still in progress. Each `.bin` sample 
 
 ```
 Adapter writes → stdin:        UT "Read the file main.go"
-Session writes → stdout:       AF {"id":"t1","is_placeholder":true,"name":"read_file"}
-                               AF {"id":"t1","is_placeholder":false,"name":"read_file","input":"{\"path\":\"main.go\"}"}
-                               UF {"id":"t1","output":"package main...","is_error":false}
+Session writes → stdout:       AF {"id":"t1","name":"read_file","is_placeholder":true}
+                               AF {"id":"t1","name":"read_file","input":"{\"path\":\"main.go\"}"}
+                               UF {"id":"t1","output":"package main..."}
                                AT \x00 0|1|0 \x00 Here's what main.go does...
                                SM {"type":"task","data":{"in_progress":false,"context":0,"queue_items":[]}}
 ```
@@ -84,9 +84,9 @@ UI frames must precede the UT frame they belong to.
 
 ```
 ut-read-file.bin               UT "Read the file main.go"
-af-read-file-start.bin         AF {"id":"t1","is_placeholder":true,"name":"read_file"}
-af-read-file-call.bin          AF {"id":"t1","is_placeholder":false,"name":"read_file","input":"{\"path\":\"main.go\"}"}
-uf-read-file-success.bin       UF {"id":"t1","output":"package main...","is_error":false}
+af-read-file-start.bin         AF {"id":"t1","name":"read_file","is_placeholder":true}
+af-read-file-call.bin          AF {"id":"t1","name":"read_file","input":"{\"path\":\"main.go\"}"}
+uf-read-file-success.bin       UF {"id":"t1","output":"package main..."}
 uf-read-file-failed.bin        UF {"id":"t1","output":"Error: file not found","is_error":true}
 ```
 
@@ -94,9 +94,9 @@ uf-read-file-failed.bin        UF {"id":"t1","output":"Error: file not found","i
 
 ```
 ut-write-file.bin              UT "Write a hello world Go program to hello.go"
-af-write-file-start.bin        AF {"id":"t2","is_placeholder":true,"name":"write_file"}
-af-write-file-call.bin         AF {"id":"t2","is_placeholder":false,"name":"write_file","input":"{\"path\":\"hello.go\",\"content\":...}"}
-uf-write-file-success.bin      UF {"id":"t2","output":"Written 43 bytes to hello.go","is_error":false}
+af-write-file-start.bin        AF {"id":"t2","name":"write_file","is_placeholder":true}
+af-write-file-call.bin         AF {"id":"t2","name":"write_file","input":"{\"path\":\"hello.go\",\"content\":...}"}
+uf-write-file-success.bin      UF {"id":"t2","output":"Written 43 bytes to hello.go"}
 uf-write-file-failed.bin       UF {"id":"t2","output":"Error: permission denied","is_error":true}
 ```
 
@@ -104,9 +104,9 @@ uf-write-file-failed.bin       UF {"id":"t2","output":"Error: permission denied"
 
 ```
 ut-edit-file.bin               UT "Edit main.go to fix the greeting"
-af-edit-file-start.bin         AF {"id":"t3","is_placeholder":true,"name":"edit_file"}
-af-edit-file-call.bin          AF {"id":"t3","is_placeholder":false,"name":"edit_file","input":"{\"path\":\"main.go\",\"old_string\":\"hello\",\"new_string\":\"world\"}"}
-uf-edit-file-success.bin       UF {"id":"t3","output":"Applied edit to main.go","is_error":false}
+af-edit-file-start.bin         AF {"id":"t3","name":"edit_file","is_placeholder":true}
+af-edit-file-call.bin          AF {"id":"t3","name":"edit_file","input":"{\"path\":\"main.go\",\"old_string\":\"hello\",\"new_string\":\"world\"}"}
+uf-edit-file-success.bin       UF {"id":"t3","output":"Applied edit to main.go"}
 uf-edit-file-failed.bin        UF {"id":"t3","output":"Error: old_string not found","is_error":true}
 ```
 
@@ -114,19 +114,19 @@ uf-edit-file-failed.bin        UF {"id":"t3","output":"Error: old_string not fou
 
 ```
 ut-search-content.bin          UT "Search for TODO in Go files"
-af-search-content-start.bin    AF {"id":"t4","is_placeholder":true,"name":"search_content"}
-af-search-content-call.bin     AF {"id":"t4","is_placeholder":false,"name":"search_content","input":"{\"pattern\":\"TODO\",\"file_type\":\"go\"}"}
-uf-search-content-success.bin  UF {"id":"t4","output":"main.go:42: // TODO: fix this...","is_error":false}
-uf-search-content-failed.bin   UF {"id":"t4","output":"No matches found","is_error":false}
+af-search-content-start.bin    AF {"id":"t4","name":"search_content","is_placeholder":true}
+af-search-content-call.bin     AF {"id":"t4","name":"search_content","input":"{\"pattern\":\"TODO\",\"file_type\":\"go\"}"}
+uf-search-content-success.bin  UF {"id":"t4","output":"main.go:42: // TODO: fix this..."}
+uf-search-content-failed.bin   UF {"id":"t4","output":"No matches found"}
 ```
 
 ### execute_command
 
 ```
 ut-execute-command.bin         UT "Run: ls -la"
-af-execute-command-start.bin   AF {"id":"t5","is_placeholder":true,"name":"execute_command"}
-af-execute-command-call.bin    AF {"id":"t5","is_placeholder":false,"name":"execute_command","input":"{\"command\":\"ls -la\"}"}
-uf-execute-command-success.bin UF {"id":"t5","output":"total 42...","is_error":false}
+af-execute-command-start.bin   AF {"id":"t5","name":"execute_command","is_placeholder":true}
+af-execute-command-call.bin    AF {"id":"t5","name":"execute_command","input":"{\"command\":\"ls -la\"}"}
+uf-execute-command-success.bin UF {"id":"t5","output":"total 42..."}
 uf-execute-command-failed.bin  UF {"id":"t5","output":"bash: ls: command not found","is_error":true}
 ```
 

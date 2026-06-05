@@ -142,7 +142,7 @@ func TestWriteToolCallWithPending(t *testing.T) {
 		t.Errorf("Expected tag %s, got %s", stream.TagAssistantF, tag1)
 	}
 
-	// The tool call should be JSON with id, is_placeholder, name, input
+	// The tool call should be JSON with id, name, input (is_placeholder:false omitted)
 	var fd1 stream.ToolUseData
 	if err := json.Unmarshal([]byte(value1), &fd1); err != nil {
 		t.Fatalf("Failed to parse AF JSON: %v", err)

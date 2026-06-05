@@ -144,9 +144,9 @@ func (n *NopOutput) Write(p []byte) (int, error) {
 // (name known, input still streaming) or a complete "call" frame.
 type ToolUseData struct {
 	ID            string `json:"id"`
-	IsPlaceholder bool   `json:"is_placeholder,omitempty"`
 	Name          string `json:"name,omitempty"`
 	Input         string `json:"input,omitempty"`
+	IsPlaceholder bool   `json:"is_placeholder,omitempty"`
 }
 
 // ToolResultData is the JSON payload for TagUserF (UF).
