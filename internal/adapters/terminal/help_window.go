@@ -129,11 +129,12 @@ func buildHelpItems() []HelpItem {
 
 // --- Column Widths ---
 
-// recalculateColumnWidths computes keyColumnWidth so the key always
-// gets enough space for its longest entry; the description (rightmost)
+// recalculateColumnWidths computes keyColumnWidth so the key gets
+// space for its longest entry when possible; the description (rightmost)
 // takes whatever is left. When the window is wide, the key column expands
-// to push the description to the right edge (flexible spacing). When narrow,
-// the key is truncated before the description overflows.
+// to push the description to the right edge (flexible spacing). When
+// narrow, the description shrinks or hides; if the window is too narrow
+// for the longest key, the key itself is truncated.
 //
 // Layout per row: prefix(2) + keyPadded + " " + desc
 func (hw *HelpWindow) recalculateColumnWidths() {

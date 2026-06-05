@@ -398,7 +398,7 @@ func (ms *ModelSelector) measureColumns(listHeight, innerWidth, idWidth int) (na
 	nameMaxWidth = innerWidth - prefixWidth
 
 	// Try to fit context column after name (needs a gap + content).
-	// Gracefully degrades: full, "...", "..", ".", 1 char, then hidden.
+	// Gracefully degrades: full, "...", "..", ".", then "." at 1 char.
 	minCol := 2 // gap(1) + minContent(1)
 	extraCtx := nameMaxWidth - minName
 	switch {
