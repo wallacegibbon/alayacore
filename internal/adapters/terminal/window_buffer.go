@@ -108,14 +108,7 @@ func (wb *WindowBuffer) AppendOrUpdate(tag string, id string, content string) {
 
 	innerWidth := max(0, wb.width-BorderInnerPadding)
 
-	// Use tag+id as the window key for AT/AR deltas so text and reasoning
-	// from the same step get separate windows.
-	key := id
-	if tag == stream.TagAssistantT || tag == stream.TagAssistantR {
-		key = tag + id
-	}
-
-	if idx, ok := wb.idIndex[key]; ok {
+	if idx, ok := wb.idIndex[id]; ok {
 		w := wb.windows[idx]
 		w.AppendContent(content, innerWidth)
 		// Update visibility for delta windows when new content arrives
@@ -137,7 +130,7 @@ func (wb *WindowBuffer) AppendOrUpdate(tag string, id string, content string) {
 		styles:  wb.styles,
 	}
 	wb.windows = append(wb.windows, w)
-	wb.idIndex[key] = len(wb.windows) - 1
+	wb.idIndex[id] = len(wb.windows) - 1
 	wb.markDirty(len(wb.windows) - 1)
 }
 

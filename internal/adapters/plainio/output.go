@@ -123,20 +123,17 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 // stream IDs, then prints the content delta.
 func (o *stdoutOutput) handleTextDelta(tag, value string) {
 	id, content, _ := stream.UnwrapDelta(value)
-	// Use tag+id as the stream key so text and reasoning from the same step
-	// are treated as separate streams.
-	streamKey := tag + id
 	// When id is "" (replayed from session file, no NUL prefix),
 	// we just track it as-is — no stream transition to detect.
 	if o.lastTag != "" && (o.lastTag != stream.TagAssistantT && o.lastTag != stream.TagAssistantR) {
 		// Transitioning from a different tag group → separator
 		fmt.Fprintln(o.writer)
-	} else if o.lastStreamID != "" && streamKey != o.lastStreamID {
+	} else if o.lastStreamID != "" && id != o.lastStreamID {
 		// Same group but different stream → separator
 		fmt.Fprintln(o.writer)
 	}
 	o.lastTag = tag
-	o.lastStreamID = streamKey
+	o.lastStreamID = id
 	fmt.Fprint(o.writer, content)
 }
 

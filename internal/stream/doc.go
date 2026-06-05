@@ -60,7 +60,9 @@
 //     OpenAI never emits multiple blocks of the same type, so fixed values
 //     are sufficient.
 //
-// The adapter disambiguates text vs reasoning by using tag+id as the window key.
+// The stream ID itself serves as the window key — the index ensures each
+// content block has a unique ID regardless of type, so no tag prefix is
+// needed for disambiguation.
 //
 // Usage:
 //
