@@ -329,8 +329,7 @@ func (ms *ModelSelector) renderModelList(width int, borderColor color.Color) str
 		ms.EnsureVisible()
 
 		idWidth := ms.maxIDWidth()
-		ctxColWidth, provColWidth := ms.measureRightColumns(listHeight)
-		nameMaxWidth := max(0, innerWidth-(2+idWidth+2)-2-ctxColWidth-provColWidth)
+		nameMaxWidth, ctxColWidth, provColWidth := ms.measureColumns(listHeight, innerWidth, idWidth)
 
 		for i := ms.ScrollIdx; i < min(ms.ScrollIdx+listHeight, len(ms.filteredModels)); i++ {
 			line := ms.renderModelRow(i, idWidth, nameMaxWidth, ctxColWidth, provColWidth)
@@ -355,21 +354,81 @@ func (ms *ModelSelector) maxIDWidth() int {
 	return len(fmt.Sprintf("%d", maxID))
 }
 
-// measureRightColumns scans the visible rows to find the widest context
-// size and provider name.
-func (ms *ModelSelector) measureRightColumns(listHeight int) (ctxColWidth, provColWidth int) {
+// measureColumns allocates column widths for the model list, respecting
+// priority: name (most important) gets space first, then context, then
+// provider (rightmost, least important). The name gets enough space to
+// show its longest visible entry; right columns only take leftovers.
+//
+// Layout (all columns visible):
+//
+//	cursor(2) + index(idWidth) + gap(2) + name + gap(1) + ctx + gap(1) + prov
+//
+// When a right column is hidden (width 0), its gap is also removed from
+// the line, giving the name more room.
+func (ms *ModelSelector) measureColumns(listHeight, innerWidth, idWidth int) (nameMaxWidth, ctxColWidth, provColWidth int) {
+	// Measure display widths of the longest name, context, and provider
+	// among the visible rows.
+	longestName := 0
+	naturalCtx := 0
+	naturalProv := 0
 	for i := ms.ScrollIdx; i < min(ms.ScrollIdx+listHeight, len(ms.filteredModels)); i++ {
 		m := ms.filteredModels[i]
+		if w := lipgloss.Width(m.Name); w > longestName {
+			longestName = w
+		}
 		ctx := formatContextLimit(int64(m.ContextLimit))
-		if w := lipgloss.Width(ctx); w > ctxColWidth {
-			ctxColWidth = w
+		if w := lipgloss.Width(ctx); w > naturalCtx {
+			naturalCtx = w
 		}
 		provider := capitalize(m.ProtocolType)
-		if w := lipgloss.Width(provider); w > provColWidth {
-			provColWidth = w
+		if w := lipgloss.Width(provider); w > naturalProv {
+			naturalProv = w
 		}
 	}
-	return max(1, ctxColWidth), max(1, provColWidth)
+	naturalCtx = max(1, naturalCtx)
+	naturalProv = max(1, naturalProv)
+
+	// Fixed prefix: cursor(2) + index(idWidth) + gap(2) = 4 + idWidth
+	prefixWidth := 4 + idWidth
+
+	// The name should be wide enough to show its longest entry.
+	// If the window is too narrow, it gets whatever space is available.
+	minName := max(10, longestName)
+
+	// Name takes all remaining space first.
+	nameMaxWidth = innerWidth - prefixWidth
+
+	// Try to fit context column after name (needs a gap + content).
+	// Gracefully degrades: full, "...", "..", ".", 1 char, then hidden.
+	minCol := 2 // gap(1) + minContent(1)
+	extraCtx := nameMaxWidth - minName
+	switch {
+	case extraCtx >= 1+naturalCtx:
+		// Full context fits.
+		ctxColWidth = naturalCtx
+		nameMaxWidth -= 1 + naturalCtx
+	case extraCtx >= minCol:
+		// Partial context (truncated with "...").
+		ctxColWidth = extraCtx - 1
+		nameMaxWidth = minName
+	}
+	// else ctx stays 0
+
+	// Try to fit provider column after context (needs a gap + content).
+	extraProv := nameMaxWidth - minName
+	switch {
+	case extraProv >= 1+naturalProv:
+		// Full provider fits.
+		provColWidth = naturalProv
+		nameMaxWidth -= 1 + naturalProv
+	case extraProv >= minCol:
+		// Partial provider (truncated with "...").
+		provColWidth = extraProv - 1
+		nameMaxWidth = minName
+	}
+	// else prov stays 0
+
+	return max(1, nameMaxWidth), ctxColWidth, provColWidth
 }
 
 // renderModelRow builds a single model list row as a raw (unstyled) string.
@@ -385,20 +444,24 @@ func (ms *ModelSelector) renderModelRow(i, idWidth, nameMaxWidth, ctxColWidth, p
 		leftRaw = "> " + idxStr
 	}
 
-	// Right-aligned context column
+	// Right-aligned context column (gracefully truncated)
 	ctx := formatContextLimit(int64(m.ContextLimit))
+	if ctxColWidth > 0 {
+		ctx = truncateWithSuffix(ctx, ctxColWidth)
+	}
 	ctxRaw := fmt.Sprintf("%*s", ctxColWidth, ctx)
 
-	// Left-aligned provider column
+	// Left-aligned provider column (gracefully truncated)
 	provider := capitalize(m.ProtocolType)
+	if provColWidth > 0 {
+		provider = truncateWithSuffix(provider, provColWidth)
+	}
 	provRaw := fmt.Sprintf("%-*s", provColWidth, provider)
 
-	// Truncate name if needed
+	// Truncate name if needed (gracefully)
 	name := m.Name
-	truncated := ansi.Hardwrap(name, nameMaxWidth, false)
-	if truncated != name {
-		truncated = ansi.Hardwrap(name, max(1, nameMaxWidth-3), false)
-		name = strings.SplitN(truncated, "\n", 2)[0] + "..."
+	if nameMaxWidth > 0 {
+		name = truncateWithSuffix(name, nameMaxWidth)
 	}
 
 	// Build and style the full line
@@ -406,12 +469,47 @@ func (ms *ModelSelector) renderModelRow(i, idWidth, nameMaxWidth, ctxColWidth, p
 	// and misaligns wide characters (e.g. CJK).
 	padding := max(0, nameMaxWidth-lipgloss.Width(name))
 	namePadded := name + strings.Repeat(" ", padding)
-	line := leftRaw + "  " + namePadded + " " + ctxRaw + " " + provRaw
+	line := leftRaw + "  " + namePadded
+	if ctxColWidth > 0 {
+		line += " " + ctxRaw
+	}
+	if provColWidth > 0 {
+		line += " " + provRaw
+	}
 
 	if isSelected {
 		return ms.Styles.Prompt.Render("> ") + ms.Styles.Text.Render(line[2:])
 	}
 	return ms.Styles.System.Render(line)
+}
+
+// truncateWithSuffix truncates content to fit within maxWidth, using a
+// progressively shorter suffix as space shrinks: "…", "..", ".", or just "."
+// for a single character — indicating content exists but is too narrow.
+func truncateWithSuffix(content string, maxWidth int) string {
+	if maxWidth <= 0 {
+		return ""
+	}
+	if maxWidth == 1 {
+		return "."
+	}
+	truncated := ansi.Hardwrap(content, maxWidth, false)
+	if truncated == content {
+		return content
+	}
+
+	var suffix string
+	switch {
+	case maxWidth >= 4:
+		suffix = "..."
+	case maxWidth == 3:
+		suffix = ".."
+	case maxWidth == 2:
+		suffix = "."
+	}
+
+	inner := ansi.Hardwrap(content, max(1, maxWidth-lipgloss.Width(suffix)), false)
+	return strings.SplitN(inner, "\n", 2)[0] + suffix
 }
 
 // formatContextLimit formats a context limit (in tokens) as a human-readable
