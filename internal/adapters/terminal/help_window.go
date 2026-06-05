@@ -10,7 +10,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	ansi "github.com/charmbracelet/x/ansi"
 )
 
 // FuzzyMatchHelpItem checks if the search term fuzzy-matches either the Key
@@ -419,18 +418,13 @@ func (hw *HelpWindow) View() tea.View {
 	return tea.NewView(title + "\n" + filterBox + "\n" + listBox + "\n" + helpBar)
 }
 
-// renderItem renders a single help item using the same ansi.Hardwrap
-// truncation pattern as QueueManager.renderItem: build the raw line,
-// check if it fits at innerWidth, and truncate with "..." if not.
+// renderItem renders a single help item, truncating with truncateWithSuffix
 func (hw *HelpWindow) renderItem(item HelpItem, selected bool) string {
 	innerWidth := max(0, hw.Width-BorderInnerPadding)
 
 	if item.IsSection {
 		content := "── " + item.Description
-		truncated := ansi.Hardwrap(content, innerWidth, false)
-		if truncated != content {
-			content = truncateWithSuffix(content, innerWidth)
-		}
+		content = truncateWithSuffix(content, innerWidth)
 		return hw.Styles.System.Bold(true).Render(content)
 	}
 

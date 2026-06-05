@@ -408,7 +408,7 @@ func (ms *ModelSelector) measureColumns(listHeight, innerWidth, idWidth int) (na
 		ctxColWidth = naturalCtx
 		nameMaxWidth -= 1 + naturalCtx
 	case extraCtx >= minCol:
-		// Partial context (truncated with "...").
+		// Partial context (gracefully degraded).
 		ctxColWidth = extraCtx - 1
 		nameMaxWidth = minName
 	}
@@ -422,7 +422,7 @@ func (ms *ModelSelector) measureColumns(listHeight, innerWidth, idWidth int) (na
 		provColWidth = naturalProv
 		nameMaxWidth -= 1 + naturalProv
 	case extraProv >= minCol:
-		// Partial provider (truncated with "...").
+		// Partial provider (gracefully degraded).
 		provColWidth = extraProv - 1
 		nameMaxWidth = minName
 	}
@@ -484,7 +484,7 @@ func (ms *ModelSelector) renderModelRow(i, idWidth, nameMaxWidth, ctxColWidth, p
 }
 
 // truncateWithSuffix truncates content to fit within maxWidth, using a
-// progressively shorter suffix as space shrinks: "…", "..", ".", or just "."
+// progressively shorter suffix as space shrinks: "...", "..", ".", or just "."
 // for a single character — indicating content exists but is too narrow.
 func truncateWithSuffix(content string, maxWidth int) string {
 	if maxWidth <= 0 {
