@@ -143,11 +143,11 @@ func (hw *HelpWindow) recalculateColumnWidths() {
 	maxDescLen := 0
 	for _, item := range hw.items {
 		if !item.IsSection {
-			if len(item.Key) > maxKeyLen {
-				maxKeyLen = len(item.Key)
+			if w := lipgloss.Width(item.Key); w > maxKeyLen {
+				maxKeyLen = w
 			}
-			if len(item.Description) > maxDescLen {
-				maxDescLen = len(item.Description)
+			if w := lipgloss.Width(item.Description); w > maxDescLen {
+				maxDescLen = w
 			}
 		}
 	}
@@ -456,7 +456,10 @@ func (hw *HelpWindow) renderItem(item HelpItem, selected bool) string {
 	}
 
 	// Build the full raw line: padded key + space + desc
-	keyPadded := fmt.Sprintf("%-*s", keyMaxWidth, key)
+	// Use display-width-aware padding instead of fmt.Sprintf, which pads by rune count
+	// and misaligns wide characters (e.g. CJK).
+	padding := max(0, keyMaxWidth-lipgloss.Width(key))
+	keyPadded := key + strings.Repeat(" ", padding)
 	line := keyPadded + " " + desc
 
 	if selected {
