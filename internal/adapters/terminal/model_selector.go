@@ -356,17 +356,20 @@ func (ms *ModelSelector) maxIDWidth() int {
 }
 
 // measureRightColumns scans the visible rows to find the widest context
-// size. Provider column uses a fixed width.
+// size and provider name.
 func (ms *ModelSelector) measureRightColumns(listHeight int) (ctxColWidth, provColWidth int) {
-	provColWidth = 10 // fixed width for provider column
 	for i := ms.ScrollIdx; i < min(ms.ScrollIdx+listHeight, len(ms.filteredModels)); i++ {
 		m := ms.filteredModels[i]
 		ctx := formatContextLimit(int64(m.ContextLimit))
 		if w := lipgloss.Width(ctx); w > ctxColWidth {
 			ctxColWidth = w
 		}
+		provider := capitalize(m.ProtocolType)
+		if w := lipgloss.Width(provider); w > provColWidth {
+			provColWidth = w
+		}
 	}
-	return max(1, ctxColWidth), provColWidth
+	return max(1, ctxColWidth), max(1, provColWidth)
 }
 
 // renderModelRow builds a single model list row as a raw (unstyled) string.
@@ -399,7 +402,10 @@ func (ms *ModelSelector) renderModelRow(i, idWidth, nameMaxWidth, ctxColWidth, p
 	}
 
 	// Build and style the full line
-	namePadded := fmt.Sprintf("%-*s", nameMaxWidth, name)
+	// Use display-width-aware padding instead of fmt.Sprintf, which pads by rune count
+	// and misaligns wide characters (e.g. CJK).
+	padding := max(0, nameMaxWidth-lipgloss.Width(name))
+	namePadded := name + strings.Repeat(" ", padding)
 	line := leftRaw + "  " + namePadded + " " + ctxRaw + " " + provRaw
 
 	if isSelected {
