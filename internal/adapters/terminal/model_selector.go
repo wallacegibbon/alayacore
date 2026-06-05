@@ -11,7 +11,6 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	ansi "github.com/charmbracelet/x/ansi"
 
 	agentpkg "github.com/alayacore/alayacore/internal/agent"
 )
@@ -485,33 +484,6 @@ func (ms *ModelSelector) renderModelRow(i, idWidth, nameMaxWidth, ctxColWidth, p
 
 // truncateWithSuffix truncates content to fit within maxWidth, using a
 // progressively shorter suffix as space shrinks: "...", "..", ".", or just "."
-// for a single character — indicating content exists but is too narrow.
-func truncateWithSuffix(content string, maxWidth int) string {
-	if maxWidth <= 0 {
-		return ""
-	}
-	if maxWidth == 1 {
-		return "."
-	}
-	truncated := ansi.Hardwrap(content, maxWidth, false)
-	if truncated == content {
-		return content
-	}
-
-	var suffix string
-	switch {
-	case maxWidth >= 4:
-		suffix = "..."
-	case maxWidth == 3:
-		suffix = ".."
-	case maxWidth == 2:
-		suffix = "."
-	}
-
-	inner := ansi.Hardwrap(content, max(1, maxWidth-lipgloss.Width(suffix)), false)
-	return strings.SplitN(inner, "\n", 2)[0] + suffix
-}
-
 // formatContextLimit formats a context limit (in tokens) as a human-readable
 // size string like "256KB", "1MB", or "∞" for unlimited (0).
 func formatContextLimit(n int64) string {

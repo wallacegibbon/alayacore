@@ -91,3 +91,32 @@ func styleMultiline(content string, style lipgloss.Style) string {
 	}
 	return strings.Join(lines, "\n")
 }
+
+// truncateWithSuffix truncates content to fit within maxWidth, using a
+// progressively shorter suffix as space shrinks: "...", "..", ".", or just "."
+// for a single character — indicating content exists but is too narrow.
+func truncateWithSuffix(content string, maxWidth int) string {
+	if maxWidth <= 0 {
+		return ""
+	}
+	if maxWidth == 1 {
+		return "."
+	}
+	truncated := ansi.Hardwrap(content, maxWidth, false)
+	if truncated == content {
+		return content
+	}
+
+	var suffix string
+	switch {
+	case maxWidth >= 4:
+		suffix = "..."
+	case maxWidth == 3:
+		suffix = ".."
+	case maxWidth == 2:
+		suffix = "."
+	}
+
+	inner := ansi.Hardwrap(content, max(1, maxWidth-lipgloss.Width(suffix)), false)
+	return strings.SplitN(inner, "\n", 2)[0] + suffix
+}
