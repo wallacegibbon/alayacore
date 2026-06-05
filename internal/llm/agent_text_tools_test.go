@@ -117,7 +117,7 @@ func (m *mockProviderWithTextAndTools) StreamMessages(_ context.Context, _ []Mes
 	return func(yield func(StreamEvent, error) bool) {
 		// Send text delta
 		if resp.text != "" {
-			if !yield(TextDeltaEvent{Delta: resp.text}, nil) {
+			if !yield(TextDeltaEvent{Delta: resp.text, Index: 0}, nil) {
 				return
 			}
 		}

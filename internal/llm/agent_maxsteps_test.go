@@ -124,7 +124,7 @@ type mockProviderTruncated struct {
 
 func (m *mockProviderTruncated) StreamMessages(_ context.Context, _ []Message, _ []ToolDefinition, _, _ string) (iter.Seq2[StreamEvent, error], error) {
 	return func(yield func(StreamEvent, error) bool) {
-		yield(TextDeltaEvent{Delta: "Partial response..."}, nil)
+		yield(TextDeltaEvent{Delta: "Partial response...", Index: 0}, nil)
 		yield(StepCompleteEvent{
 			Message: Message{
 				Role:    RoleAssistant,

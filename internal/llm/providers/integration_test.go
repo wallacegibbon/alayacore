@@ -337,7 +337,7 @@ func TestAgentToolLoopRealAPI(t *testing.T) {
 	var toolCalls []string
 
 	result, err := agent.Stream(ctx, messages, llm.StreamCallbacks{
-		OnTextDelta: func(delta string) error {
+		OnTextDelta: func(delta string, _ int) error {
 			textReceived.WriteString(delta)
 			return nil
 		},
@@ -440,7 +440,7 @@ func TestAgentMultiToolLoopRealAPI(t *testing.T) {
 	var toolCalls []string
 
 	result, err := agent.Stream(ctx, messages, llm.StreamCallbacks{
-		OnTextDelta: func(delta string) error {
+		OnTextDelta: func(delta string, _ int) error {
 			textReceived.WriteString(delta)
 			return nil
 		},
@@ -585,7 +585,7 @@ func TestAgentSequentialQueriesWithTools(t *testing.T) {
 
 	var textReceived strings.Builder
 	_, err = agent.Stream(ctx, allMessages, llm.StreamCallbacks{
-		OnTextDelta: func(delta string) error {
+		OnTextDelta: func(delta string, _ int) error {
 			textReceived.WriteString(delta)
 			return nil
 		},
@@ -710,7 +710,7 @@ func TestOpenAICompatSequentialQueriesWithTools(t *testing.T) {
 
 	var textReceived strings.Builder
 	_, err = agent.Stream(ctx, allMessages, llm.StreamCallbacks{
-		OnTextDelta: func(delta string) error {
+		OnTextDelta: func(delta string, _ int) error {
 			textReceived.WriteString(delta)
 			return nil
 		},

@@ -10,12 +10,12 @@ func TestWrapUnwrapDelta(t *testing.T) {
 		id      string
 		content string
 	}{
-		{"normal text", "0-1-t", "Hello world"},
-		{"empty content", "0-1-t", ""},
-		{"content with brackets", "0-1-t", "[:fake-id:]this looks like a prefix"},
-		{"content starting with brackets", "0-2-r", "[:0-1-t:]fake prefix as content"},
-		{"unicode content", "0-1-t", "你好世界 🌍"},
-		{"special chars", "0-1-t", "tabs\there\nnewlines\nand \"quotes\""},
+		{"normal text", "0|1|0", "Hello world"},
+		{"empty content", "0|1|1", ""},
+		{"content with brackets", "0|1|0", "[:fake-id:]this looks like a prefix"},
+		{"content starting with brackets", "0|2|1", "[:0-1-t:]fake prefix as content"},
+		{"unicode content", "0|1|0", "你好世界 🌍"},
+		{"special chars", "0|1|1", "tabs\there\nnewlines\nand \"quotes\""},
 		{"empty id would fail", "", "content"},
 	}
 
@@ -67,16 +67,16 @@ func TestUnwrapDelta_InvalidInput(t *testing.T) {
 }
 
 func TestNewStreamID(t *testing.T) {
-	got := NewStreamID(0, 1)
-	want := "0|1"
+	got := NewStreamID(0, 1, 0)
+	want := "0|1|0"
 	if got != want {
-		t.Errorf("NewStreamID(0, 1) = %q, want %q", got, want)
+		t.Errorf("NewStreamID(0, 1, 0) = %q, want %q", got, want)
 	}
 }
 
 func TestRoundTrip(t *testing.T) {
 	// Simulate the full session → adapter round trip
-	id := NewStreamID(3, 5)
+	id := NewStreamID(3, 5, 2)
 	delta := "some thinking content"
 	wrapped := WrapDelta(id, delta)
 

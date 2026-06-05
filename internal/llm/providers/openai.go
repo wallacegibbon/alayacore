@@ -467,14 +467,14 @@ func (p *OpenAIProvider) checkFinishReason(reason string) (bool, error) {
 func (p *OpenAIProvider) handleDelta(delta openAIDelta, yield func(llm.StreamEvent, error) bool, state *openAIStreamState) bool {
 	if delta.ReasoningContent != "" {
 		state.addReasoningDelta(delta.ReasoningContent)
-		if !yield(llm.ReasoningDeltaEvent{Delta: delta.ReasoningContent}, nil) {
+		if !yield(llm.ReasoningDeltaEvent{Delta: delta.ReasoningContent, Index: 0}, nil) {
 			return false
 		}
 	}
 
 	if delta.Content != "" {
 		state.addTextDelta(delta.Content)
-		if !yield(llm.TextDeltaEvent{Delta: delta.Content}, nil) {
+		if !yield(llm.TextDeltaEvent{Delta: delta.Content, Index: 1}, nil) {
 			return false
 		}
 	}

@@ -109,12 +109,12 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 	var processResult []llm.Message
 
 	_, err := s.agent.Load().Stream(ctx, history, llm.StreamCallbacks{
-		OnTextDelta: func(delta string) error {
-			_ = stream.WriteTLV(s.Output, stream.TagAssistantT, stream.WrapDelta(stream.NewStreamID(promptID, stepCount), delta)) //nolint:errcheck // best-effort write to adapter
+		OnTextDelta: func(delta string, index int) error {
+			_ = stream.WriteTLV(s.Output, stream.TagAssistantT, stream.WrapDelta(stream.NewStreamID(promptID, stepCount, index), delta)) //nolint:errcheck // best-effort write to adapter
 			return nil
 		},
-		OnReasoningDelta: func(delta string) error {
-			_ = stream.WriteTLV(s.Output, stream.TagAssistantR, stream.WrapDelta(stream.NewStreamID(promptID, stepCount), delta)) //nolint:errcheck // best-effort write to adapter
+		OnReasoningDelta: func(delta string, index int) error {
+			_ = stream.WriteTLV(s.Output, stream.TagAssistantR, stream.WrapDelta(stream.NewStreamID(promptID, stepCount, index), delta)) //nolint:errcheck // best-effort write to adapter
 			return nil
 		},
 		OnToolUseStart: func(id, toolName string) error {

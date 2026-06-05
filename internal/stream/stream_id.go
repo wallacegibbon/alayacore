@@ -18,12 +18,18 @@ import (
 //
 // The id string itself follows the convention:
 //
-//	"<promptID>|<step>"
+//	"<promptID>|<step>|<index>"
+//
+// The index uniquely identifies each content block within a step.
+// For Anthropic, blocks can interleave (e.g., thinking[0], text[1],
+// thinking[2], tool_use[3]), so the index is critical for the adapter
+// to route deltas to the correct window.
 
 // NewStreamID constructs a stream ID string from components.
-func NewStreamID(promptID uint64, step int) string {
+func NewStreamID(promptID uint64, step int, index int) string {
 	return strconv.FormatUint(promptID, 10) + "|" +
-		strconv.FormatInt(int64(step), 10)
+		strconv.FormatInt(int64(step), 10) + "|" +
+		strconv.FormatInt(int64(index), 10)
 }
 
 // WrapDelta prepends the NUL-delimited stream ID prefix to content.

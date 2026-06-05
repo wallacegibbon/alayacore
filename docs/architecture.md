@@ -114,8 +114,8 @@ The agent layer handles LLM interaction and tool-calling orchestration.
 
 ```go
 Agent.Stream(ctx, messages, llm.StreamCallbacks{
-	OnTextDelta:      func(delta string) error { ... },
-	OnReasoningDelta: func(delta string) error { ... },
+	OnTextDelta:      func(delta string, index int) error { ... },
+	OnReasoningDelta: func(delta string, index int) error { ... },
 	OnToolUseStart:  func(id, name string) error { ... },
 	OnToolUse:       func(id, name string, input json.RawMessage) error { ... },
 	OnToolResult:     func(id string, output ToolResultOutput) error { ... },

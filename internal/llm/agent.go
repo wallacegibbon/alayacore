@@ -56,8 +56,8 @@ func NewAgent(config AgentConfig) *Agent {
 
 // StreamCallbacks receives streaming events
 type StreamCallbacks struct {
-	OnTextDelta      func(delta string) error
-	OnReasoningDelta func(delta string) error
+	OnTextDelta      func(delta string, index int) error
+	OnReasoningDelta func(delta string, index int) error
 	OnToolUseStart   func(id, toolName string) error
 	OnToolUse        func(id, toolName string, input json.RawMessage) error
 	OnToolConfirm    func(id, toolName string, input json.RawMessage) (bool, error)
@@ -195,7 +195,7 @@ func (a *Agent) processStreamEvents(events iter.Seq2[StreamEvent, error], callba
 		switch e := event.(type) {
 		case TextDeltaEvent:
 			if callbacks.OnTextDelta != nil {
-				if err := callbacks.OnTextDelta(e.Delta); err != nil {
+				if err := callbacks.OnTextDelta(e.Delta, e.Index); err != nil {
 					return Message{}, Usage{}, fmt.Errorf("OnTextDelta callback failed: %w", err)
 				}
 			}
@@ -240,7 +240,7 @@ func (a *Agent) fireOnToolUseStart(callbacks StreamCallbacks, e ToolUseStartEven
 // fireOnReasoningDelta invokes the OnReasoningDelta callback if set.
 func fireOnReasoningDelta(callbacks StreamCallbacks, e ReasoningDeltaEvent) error {
 	if callbacks.OnReasoningDelta != nil {
-		if err := callbacks.OnReasoningDelta(e.Delta); err != nil {
+		if err := callbacks.OnReasoningDelta(e.Delta, e.Index); err != nil {
 			return fmt.Errorf("OnReasoningDelta callback failed: %w", err)
 		}
 	}

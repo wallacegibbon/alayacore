@@ -158,6 +158,7 @@ type StreamEvent interface {
 // TextDeltaEvent represents text content streaming
 type TextDeltaEvent struct {
 	Delta string
+	Index int
 }
 
 func (TextDeltaEvent) isStreamEvent() {}
@@ -165,6 +166,7 @@ func (TextDeltaEvent) isStreamEvent() {}
 // ReasoningDeltaEvent represents reasoning content streaming
 type ReasoningDeltaEvent struct {
 	Delta string
+	Index int
 }
 
 func (ReasoningDeltaEvent) isStreamEvent() {}

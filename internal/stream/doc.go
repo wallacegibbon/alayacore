@@ -48,7 +48,17 @@
 //
 // Stream ID format for AT/AR:
 //
-//	"<promptID>|<step>"
+//	"<promptID>|<step>|<index>"
+//
+// The index uniquely identifies each content block within a step:
+//   - Anthropic: uses the content block index from the API.
+//     Blocks can interleave (e.g. thinking, text, thinking, text, tool_use),
+//     each with a unique sequential index regardless of type. This lets the
+//     adapter route deltas to the correct window — without it, two reasoning
+//     blocks in the same step would be indistinguishable.
+//   - OpenAI: reasoning blocks get index 0, text blocks get index 1.
+//     OpenAI never emits multiple blocks of the same type, so fixed values
+//     are sufficient.
 //
 // The adapter disambiguates text vs reasoning by using tag+id as the window key.
 //

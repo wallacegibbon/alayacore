@@ -522,7 +522,12 @@ func (p *AnthropicProvider) handleContentBlockStart(data string, yield func(llm.
 	return true
 }
 
-// handleContentDelta handles content block delta events
+// handleContentDelta handles content block delta events.
+//
+// The index is the content block index from the Anthropic API. Blocks can
+// interleave (e.g. thinking[0], text[1], thinking[2], tool_use[3]), so the
+// index is critical for the adapter to distinguish multiple blocks of the
+// same type within a single step.
 func (p *AnthropicProvider) handleContentDelta(index int, delta anthropicSSEDelta, yield func(llm.StreamEvent, error) bool, state *anthropicStreamState) bool {
 	block, ok := state.blocks[index]
 	if !ok {
@@ -531,12 +536,12 @@ func (p *AnthropicProvider) handleContentDelta(index int, delta anthropicSSEDelt
 	switch delta.Type {
 	case anthropicDeltaTypeText:
 		block.buffer.WriteString(delta.Text)
-		if !yield(llm.TextDeltaEvent{Delta: delta.Text}, nil) {
+		if !yield(llm.TextDeltaEvent{Delta: delta.Text, Index: index}, nil) {
 			return false
 		}
 	case anthropicDeltaTypeThinking:
 		block.buffer.WriteString(delta.Thinking)
-		if !yield(llm.ReasoningDeltaEvent{Delta: delta.Thinking}, nil) {
+		if !yield(llm.ReasoningDeltaEvent{Delta: delta.Thinking, Index: index}, nil) {
 			return false
 		}
 	case anthropicDeltaTypeInputJSON:

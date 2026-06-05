@@ -48,7 +48,7 @@ func Example_usage() {
 	}
 
 	result, err := agent.Stream(context.Background(), messages, llm.StreamCallbacks{
-		OnTextDelta: func(delta string) error {
+		OnTextDelta: func(delta string, _ int) error {
 			fmt.Print(delta)
 			return nil
 		},
