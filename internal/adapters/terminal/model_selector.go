@@ -226,6 +226,13 @@ func (ms *ModelSelector) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 			ms.ClampSelection(len(ms.filteredModels))
 		}
 		if !ms.FilterInputFocused {
+			// When tabbing from search box to list after typing a filter,
+			// select the first filtered result. If filter is empty, preserve
+			// the original selection (e.g. active model).
+			if key == keyTab && len(ms.filteredModels) > 0 && ms.FilterInput.Value() != "" {
+				ms.SelectedIdx = 0
+				ms.ScrollIdx = 0
+			}
 			ms.handleListKeys(key)
 		}
 		if ms.FilterInputFocused && key == keyEnter && len(ms.filteredModels) > 0 {

@@ -272,11 +272,18 @@ func (hw *HelpWindow) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 			hw.clampSelection()
 		}
 
-		// If list is focused and j/k was pressed, use section-aware navigation
-		if !hw.FilterInputFocused && (key == keyJ || key == keyDown) {
-			hw.moveDown()
-		} else if !hw.FilterInputFocused && (key == keyK || key == keyUp) {
-			hw.moveUp()
+		if !hw.FilterInputFocused {
+			// When tabbing from search box to list after typing a filter,
+			// select the first filtered result. If filter is empty, preserve
+			// the original selection.
+			switch {
+			case key == keyTab:
+				hw.handleTabToList()
+			case key == keyJ || key == keyDown:
+				hw.moveDown()
+			case key == keyK || key == keyUp:
+				hw.moveUp()
+			}
 		}
 
 		return cmd
@@ -290,6 +297,16 @@ func (hw *HelpWindow) ConsumePendingCommand() string {
 	cmd := hw.pendingCommand
 	hw.pendingCommand = ""
 	return cmd
+}
+
+// handleTabToList handles the tab key when switching focus from the search box
+// back to the list. If the user has typed a filter, the selection is reset to
+// the first matching item. Otherwise the original selection is preserved.
+func (hw *HelpWindow) handleTabToList() {
+	if hw.FilterInput.Value() != "" {
+		hw.SelectedIdx = hw.firstSelectableIdx()
+		hw.ScrollIdx = 0
+	}
 }
 
 // --- Navigation ---
