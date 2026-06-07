@@ -405,7 +405,7 @@ func (hw *HelpWindow) View() tea.View {
 	} else {
 		endIdx := min(hw.ScrollIdx+listHeight, hw.filteredLen())
 		for i := hw.ScrollIdx; i < endIdx; i++ {
-			lines = append(lines, hw.renderItem(hw.filteredItems[i], i == hw.SelectedIdx))
+			lines = append(lines, hw.renderItem(hw.filteredItems[i], i == hw.SelectedIdx && !hw.FilterInputFocused))
 		}
 	}
 
