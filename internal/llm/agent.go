@@ -203,7 +203,7 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 	// so the buffer must be large enough for all of them.
 	// Unbuffered would also work (execution already done by time of send).
 	resultCh := make(chan ContentPart, 16)
-	toolCount := 0
+	execCount := 0
 
 	for event, err := range events {
 		if err != nil {
@@ -232,7 +232,8 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 			if err := a.fireOnToolUseInput(callbacks, e); err != nil {
 				return Message{}, Usage{}, false, nil, err
 			}
-			deferred, results, toolCount = a.handleStreamedToolUse(ctx, e, callbacks, deferred, results, resultCh, toolCount)
+			execCount++
+			deferred = a.handleStreamedToolUse(ctx, e, callbacks, deferred, resultCh)
 
 		case StepCompleteEvent:
 			stepMessage = e.Message
@@ -243,20 +244,12 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 		}
 	}
 
-	// Collect no-confirm results.
 	// Handle deferred tools (those needing confirmation). They send
 	// results through the same channel as no-confirm tools.
-	// Skip when truncated — the response was incomplete.
-	if !truncated {
-		a.executeDeferredTools(ctx, deferred, callbacks, resultCh)
-	}
+	a.executeDeferredTools(ctx, deferred, callbacks, resultCh)
 
 	// Collect all results from both no-confirm and deferred paths.
-	totalResults := toolCount
-	if !truncated {
-		totalResults += len(deferred)
-	}
-	for i := 0; i < totalResults; i++ {
+	for i := 0; i < execCount; i++ {
 		results = append(results, <-resultCh)
 	}
 
@@ -266,16 +259,15 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 // handleStreamedToolUse processes a completed tool use during streaming.
 // If no confirmation is needed, the tool executes immediately in a goroutine
 // and sends the result through resultCh. Otherwise, it's deferred.
-func (a *Agent) handleStreamedToolUse(ctx context.Context, tc ToolUsePart, callbacks StreamCallbacks, deferred []ToolUsePart, results []ContentPart, resultCh chan<- ContentPart, toolCount int) ([]ToolUsePart, []ContentPart, int) {
+func (a *Agent) handleStreamedToolUse(ctx context.Context, tc ToolUsePart, callbacks StreamCallbacks, deferred []ToolUsePart, resultCh chan<- ContentPart) []ToolUsePart {
 	if callbacks.OnToolConfirm == nil {
-		toolCount++
 		go func(tc ToolUsePart) {
 			resultCh <- a.executeTool(ctx, tc, callbacks)
 		}(tc)
 	} else {
 		deferred = append(deferred, tc)
 	}
-	return deferred, results, toolCount
+	return deferred
 }
 
 // executeDeferredTools sends deferred tools for confirmation and executes
