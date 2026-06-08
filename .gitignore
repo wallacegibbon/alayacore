@@ -11,4 +11,4 @@ alayacore-*.log
 REFACTOR.md
 STATE.md
 TODO.md
-.alayacore.tmp/
+.alayacore-tmp-*

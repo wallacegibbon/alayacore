@@ -7,8 +7,8 @@ How AlayaCore handles large outputs from tools to stay within context budgets.
 | Tool | Behavior | File Pattern |
 |------|----------|--------------|
 | `read_file` | Truncates at 64KB with metadata header | N/A (in-memory) |
-| `execute_command` | Saves to file | `.alayacore.tmp/cmd-*.txt` |
-| `search_content` | Saves to file | `.alayacore.tmp/search-*.txt` |
+| `execute_command` | Saves to file | `cmd-*.txt` |
+| `search_content` | Saves to file | `search-*.txt` |
 
 ## read_file
 
@@ -28,15 +28,15 @@ Files larger than 64KB are truncated at a line boundary with metadata:
 Command output larger than 64KB is saved to a temp file:
 
 ```
-Output (5000 lines, 194.2KB) saved to: .alayacore.tmp/cmd-12345.txt
+Output (5000 lines, 194.2KB) saved to: .alayacore-tmp-28980-3b5ffe86220d3d7a/cmd-12345.txt
 Use read_file to access specific sections.
 ```
 
 Or with error:
 ```
-Exit Code: 1
-Output (5000 lines, 194.2KB) saved to: .alayacore.tmp/cmd-12345.txt
-Use read_file to access specific sections.
+Command completed with exit code 1.
+Output (5000 lines, 194.2KB) saved to: .alayacore-tmp-28980-3b5ffe86220d3d7a/cmd-12345.txt
+Use read_file to access the full output.
 ```
 
 - Agent uses `read_file` with line ranges to access specific sections
@@ -48,7 +48,7 @@ Use read_file to access specific sections.
 Search results exceeding `max_lines` (default 100) are saved to a temp file:
 
 ```
-Search found 500 matching lines. Results saved to: .alayacore.tmp/search-12345.txt
+Search found 500 matching lines. Results saved to: .alayacore-tmp-28980-3b5ffe86220d3d7a/search-12345.txt
 Use read_file to access specific matches.
 ```
 
@@ -56,7 +56,14 @@ Use read_file to access specific matches.
 
 ## Temp File Location
 
-All temp files are saved to `.alayacore.tmp/` in the current working directory.
+Each process gets its own directory under the current working directory:
+
+```
+.alayacore-tmp-<pid>-<random>/cmd-*.txt
+.alayacore-tmp-<pid>-<random>/search-*.txt
+```
+
+The directory name encodes the process ID and a random suffix, so concurrently running `alayacore` processes never collide.
 
 **Why CWD instead of /tmp?**
 - Avoids cross-filesystem issues when `/tmp` is on a different mount
@@ -64,13 +71,15 @@ All temp files are saved to `.alayacore.tmp/` in the current working directory.
 - Uses `os.CreateTemp` for atomic file creation
 
 **Cleanup:**
-```bash
-rm -rf .alayacore.tmp/
-```
+- Automatic on normal exit (`tools.Cleanup()` in `main.go`)
+- For stray directories (e.g. after `kill -9`):
+  ```bash
+  rm -rf .alayacore-tmp-*/
+  ```
 
 Or add to `.gitignore`:
 ```
-.alayacore.tmp/
+.alayacore-tmp-*
 ```
 
 ## Related

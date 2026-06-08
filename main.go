@@ -9,6 +9,7 @@ import (
 	"github.com/alayacore/alayacore/internal/adapters/terminal"
 	"github.com/alayacore/alayacore/internal/app"
 	"github.com/alayacore/alayacore/internal/config"
+	"github.com/alayacore/alayacore/internal/tools"
 )
 
 func main() {
@@ -34,5 +35,14 @@ func main() {
 	default:
 		adapter = terminal.NewAdapter(appCfg)
 	}
-	os.Exit(adapter.Start())
+
+	exitCode := adapter.Start()
+
+	// Clean up this process's temporary files.
+	// Each process gets its own uniquely-named directory under CWD
+	// (e.g. .alayacore-tmp-<pid>-<random>/), so there's no risk of
+	// interfering with other concurrently running processes.
+	tools.Cleanup()
+
+	os.Exit(exitCode)
 }

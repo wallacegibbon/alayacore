@@ -238,9 +238,9 @@ func TestSearchContentMaxLinesGlobal(t *testing.T) {
 		t.Errorf("expected 'Results saved to:' in output, got:\n%s", text.Text)
 	}
 
-	// Should contain .alayacore.tmp path
-	if !strings.Contains(text.Text, ".alayacore.tmp/search-") {
-		t.Errorf("expected .alayacore.tmp/search- path, got:\n%s", text.Text)
+	// Should contain tmp directory and search- file pattern
+	if !strings.Contains(text.Text, ".alayacore-tmp-") || !strings.Contains(text.Text, "search-") {
+		t.Errorf("expected .alayacore-tmp- directory and search- file pattern, got:\n%s", text.Text)
 	}
 }
 
