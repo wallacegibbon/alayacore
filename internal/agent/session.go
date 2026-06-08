@@ -88,19 +88,11 @@ type Session struct {
 	// and retrieve the final messages — no separate taskDone signal needed.
 	taskResult chan []llm.Message
 
-	// toolConfirmRespCh is set by OnToolConfirm (task goroutine) before
-	// sending the SM, and read by the input pump to route the adapter's
-	// response. No synchronization needed - the Output/Input channel
-	// establishes a happens-before chain:
-	//
-	//   write -> Output.Write(SM) --channel--> Input.Read(response) -> read
-	//
-	// nil when no confirmation is pending.
-	toolConfirmRespCh chan ToolConfirmResponse
-
-	// toolConfirmID is the tool call ID of the pending confirmation,
-	// saved alongside toolConfirmRespCh for cross-reference.
-	toolConfirmID string
+	// confirmCh receives confirm responses from the input pump when the
+	// async OnToolConfirm callback is used. Set by the callback, read by
+	// handleConfirmCommand. No synchronization needed — the Output/Input
+	// channel chain establishes happens-before.
+	confirmCh chan<- llm.ToolConfirmResponse
 
 	// toolConfirmSet contains tool names that require user confirmation
 	// before execution. If nil, no confirmation is needed for any tool.

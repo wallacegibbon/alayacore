@@ -31,9 +31,22 @@ var ErrResponseTruncated = errors.New("response truncated: hit output token limi
 
 // Tool represents an executable tool
 type Tool struct {
-	Definition   ToolDefinition
-	Execute      func(ctx context.Context, input json.RawMessage) (ToolResultOutput, error)
-	SafeToConcur bool // when true, this tool can safely run in parallel with other SafeToConcur tools
+	Definition ToolDefinition
+	Execute    func(ctx context.Context, input json.RawMessage) (ToolResultOutput, error)
+}
+
+// deferredTool represents a tool call that arrived during streaming
+// and needs confirmation before execution.
+type deferredTool struct {
+	index int
+	tc    ToolUsePart
+}
+
+// execResult carries a tool execution result tagged with its index
+// so the receiver can place it in the correct order.
+type execResult struct {
+	index   int
+	content ContentPart
 }
 
 // AgentConfig configures the agent
@@ -61,10 +74,26 @@ type StreamCallbacks struct {
 	OnReasoningDelta func(delta string, index int) error
 	OnToolUseStart   func(id, toolName string) error
 	OnToolUseInput   func(id string, input json.RawMessage) error
-	OnToolConfirm    func(id, toolName string, input json.RawMessage) (bool, error)
+	OnToolConfirm    func(requests []ToolConfirmRequest) <-chan ToolConfirmResponse
 	OnToolUseOutput  func(id string, output ToolResultOutput) error
 	OnStepStart      func(step int) error
 	OnStepFinish     func(messages []Message, usage Usage) error
+}
+
+// ToolConfirmRequest represents a single tool call awaiting user confirmation.
+type ToolConfirmRequest struct {
+	ID       string          `json:"id"`
+	ToolName string          `json:"tool_name"`
+	Input    json.RawMessage `json:"input"`
+}
+
+// ToolConfirmResponse represents the user's decision for a specific tool call.
+// If Error is non-empty, the tool result is recorded as failed with that reason.
+// If Allowed is false (and Error is empty), the tool is recorded as denied by user.
+type ToolConfirmResponse struct {
+	ID      string `json:"id"`
+	Allowed bool   `json:"allowed"`
+	Error   string `json:"error,omitempty"`
 }
 
 // StreamResult is the final result of streaming.
@@ -121,6 +150,9 @@ func (a *Agent) Stream(ctx context.Context, messages []Message, callbacks Stream
 // executeStep runs one iteration of the agent loop.
 // step is 1-indexed. Returns updated allMessages, stepUsage, whether the task is
 // done, whether the response was truncated, and any fatal error.
+//
+// Tools are confirmed and executed as soon as their arguments finish streaming
+// (on ToolUsePart event), overlapping with other tools still being streamed.
 func (a *Agent) executeStep(ctx context.Context, step int, allMessages []Message, callbacks StreamCallbacks) ([]Message, Usage, bool, bool, error) {
 	if err := a.invokeStepStart(callbacks, step); err != nil {
 		return nil, Usage{}, false, false, err
@@ -137,18 +169,36 @@ func (a *Agent) executeStep(ctx context.Context, step int, allMessages []Message
 		return nil, Usage{}, false, false, fmt.Errorf("provider stream failed: %w", err)
 	}
 
-	stepMessage, stepUsage, err := a.processStreamEvents(events, callbacks)
-	truncated := errors.Is(err, ErrResponseTruncated)
-	if err != nil && !truncated {
+	stepMessage, stepUsage, truncated, deferred, results, err := a.streamEvents(ctx, events, callbacks)
+	if err != nil {
 		return nil, Usage{}, false, false, err
 	}
 
-	allMessages = append(allMessages, stepMessage)
+	// Handle deferred tools (those needing confirmation).
+	a.executeDeferredTools(ctx, deferred, callbacks, &results, truncated)
 
+	// Re-order results by tool call ID to match the LLM's intended order.
+	// toolUses are extracted from stepMessage.Content, which preserves the
+	// SSE index order (0, 1, 2...) from the streaming response. Each result
+	// carries its tool call ID, so we place them at the correct position
+	// regardless of execution or collection order.
 	toolUses := extractToolUses(stepMessage.Content)
-	if len(toolUses) > 0 && !truncated {
-		toolResults := a.executeTools(ctx, toolUses, callbacks)
-		allMessages = append(allMessages, Message{Role: RoleTool, Content: toolResults})
+	finalResults := make([]ContentPart, len(toolUses))
+	idToTool := make(map[string]int, len(toolUses))
+	for i, tc := range toolUses {
+		idToTool[tc.ID] = i
+	}
+	for _, r := range results {
+		if tr, ok := r.(ToolResultPart); ok {
+			if idx, ok := idToTool[tr.ID]; ok {
+				finalResults[idx] = r
+			}
+		}
+	}
+
+	allMessages = append(allMessages, stepMessage)
+	if len(finalResults) > 0 && !truncated {
+		allMessages = append(allMessages, Message{Role: RoleTool, Content: finalResults})
 	}
 
 	if err := fireOnStepFinish(callbacks, allMessages, stepUsage); err != nil {
@@ -157,6 +207,148 @@ func (a *Agent) executeStep(ctx context.Context, step int, allMessages []Message
 
 	taskDone := truncated || len(toolUses) == 0
 	return allMessages, stepUsage, taskDone, truncated, nil
+}
+
+// streamEvents iterates streaming events, firing callbacks and collecting
+// tool calls. Tools needing confirmation are deferred; others execute immediately.
+//
+//nolint:gocyclo // 16 is borderline; extracting further would harm readability.
+func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, error], callbacks StreamCallbacks) (Message, Usage, bool, []deferredTool, []ContentPart, error) {
+	var (
+		stepMessage Message
+		stepUsage   Usage
+		truncated   bool
+		deferred    []deferredTool
+		results     []ContentPart
+	)
+
+	// Channel for collecting tool execution results during streaming.
+	// Each result is tagged with its index so the receiver can order them.
+	resultCh := make(chan execResult)
+	toolCount := 0
+
+	for event, err := range events {
+		if err != nil {
+			return Message{}, Usage{}, false, nil, nil, err
+		}
+
+		switch e := event.(type) {
+		case TextDeltaEvent:
+			if callbacks.OnTextDelta != nil {
+				if err := callbacks.OnTextDelta(e.Delta, e.Index); err != nil {
+					return Message{}, Usage{}, false, nil, nil, err
+				}
+			}
+
+		case ReasoningDeltaEvent:
+			if err := fireOnReasoningDelta(callbacks, e); err != nil {
+				return Message{}, Usage{}, false, nil, nil, err
+			}
+
+		case ToolUseStartEvent:
+			if err := a.fireOnToolUseStart(callbacks, e); err != nil {
+				return Message{}, Usage{}, false, nil, nil, err
+			}
+
+		case ToolUsePart:
+			if err := a.fireOnToolUseInput(callbacks, e); err != nil {
+				return Message{}, Usage{}, false, nil, nil, err
+			}
+			deferred, results, toolCount = a.handleStreamedToolUse(ctx, e, callbacks, deferred, results, resultCh, toolCount)
+
+		case StepCompleteEvent:
+			stepMessage = e.Message
+			stepUsage = e.Usage
+			if e.StopReason == "max_tokens" || e.StopReason == "length" {
+				truncated = true
+			}
+		}
+	}
+
+	// Wait for all no-confirm executions and collect results.
+	if toolCount > 0 {
+		for i := 0; i < toolCount; i++ {
+			r := <-resultCh
+			results[r.index] = r.content
+		}
+	}
+
+	return stepMessage, stepUsage, truncated, deferred, results, nil
+}
+
+// handleStreamedToolUse processes a completed tool use during streaming.
+// If no confirmation is needed, the tool executes immediately in a goroutine
+// and sends the result through resultCh. Otherwise, it's deferred.
+func (a *Agent) handleStreamedToolUse(ctx context.Context, tc ToolUsePart, callbacks StreamCallbacks, deferred []deferredTool, results []ContentPart, resultCh chan<- execResult, toolCount int) ([]deferredTool, []ContentPart, int) {
+	if callbacks.OnToolConfirm == nil {
+		i := len(results)
+		results = append(results, ToolResultPart{})
+		toolCount++
+		go func(i int, tc ToolUsePart) {
+			resultCh <- execResult{i, a.executeTool(ctx, tc, callbacks)}
+		}(i, tc)
+	} else {
+		deferred = append(deferred, deferredTool{index: len(deferred), tc: tc})
+	}
+	return deferred, results, toolCount
+}
+
+// executeDeferredTools sends deferred tools for confirmation and executes
+// confirmed tools concurrently as confirm responses arrive.
+// It waits for all deferred executions to finish before returning.
+func (a *Agent) executeDeferredTools(ctx context.Context, deferred []deferredTool, callbacks StreamCallbacks, results *[]ContentPart, truncated bool) {
+	if len(deferred) == 0 || truncated {
+		return
+	}
+
+	requests := make([]ToolConfirmRequest, len(deferred))
+	idToIdx := make(map[string]int, len(deferred))
+	for i, d := range deferred {
+		requests[i] = ToolConfirmRequest{ID: d.tc.ID, ToolName: d.tc.ToolName, Input: d.tc.Input}
+		idToIdx[d.tc.ID] = i
+	}
+
+	confirmCh := callbacks.OnToolConfirm(requests)
+
+	// Process confirm results as they arrive. Confirmed tools execute
+	// concurrently via goroutines and report results through a channel.
+	pendingConfirm := len(deferred)
+	execCh := make(chan ContentPart, len(deferred))
+	execCount := 0
+
+	for pendingConfirm > 0 {
+		resp := <-confirmCh
+		pendingConfirm--
+
+		if resp.Error != "" {
+			failed := ToolResultOutputFailed{Reason: resp.Error}
+			if callbacks.OnToolUseOutput != nil {
+				callbacks.OnToolUseOutput(resp.ID, failed) //nolint:errcheck
+			}
+			*results = append(*results, ToolResultPart{ID: resp.ID, Output: failed})
+			continue
+		}
+		if !resp.Allowed {
+			denied := ToolResultOutputFailed{Reason: "Tool execution denied by user"}
+			if callbacks.OnToolUseOutput != nil {
+				callbacks.OnToolUseOutput(resp.ID, denied) //nolint:errcheck
+			}
+			*results = append(*results, ToolResultPart{ID: resp.ID, Output: denied})
+			continue
+		}
+
+		// Confirmed — execute concurrently.
+		d := deferred[idToIdx[resp.ID]]
+		execCount++
+		go func(tc ToolUsePart) {
+			execCh <- a.executeTool(ctx, tc, callbacks)
+		}(d.tc)
+	}
+
+	// Collect results from all executed goroutines.
+	for i := 0; i < execCount; i++ {
+		*results = append(*results, <-execCh)
+	}
 }
 
 // invokeStepStart fires the OnStepStart callback if set.
@@ -176,56 +368,6 @@ func (a *Agent) toolDefinitions() []ToolDefinition {
 		defs[i] = tool.Definition
 	}
 	return defs
-}
-
-// processStreamEvents iterates streaming events from the provider and returns
-// the assistant Message from StepCompleteEvent (all content parts accumulated)
-// and token usage. Tool calls in Message.Content drive execution in executeStep.
-// Returns ErrResponseTruncated if stop_reason is "max_tokens" or "length".
-func (a *Agent) processStreamEvents(events iter.Seq2[StreamEvent, error], callbacks StreamCallbacks) (Message, Usage, error) {
-	var (
-		stepMessage Message
-		stepUsage   Usage
-	)
-
-	for event, err := range events {
-		if err != nil {
-			return Message{}, Usage{}, err
-		}
-
-		switch e := event.(type) {
-		case TextDeltaEvent:
-			if callbacks.OnTextDelta != nil {
-				if err := callbacks.OnTextDelta(e.Delta, e.Index); err != nil {
-					return Message{}, Usage{}, fmt.Errorf("OnTextDelta callback failed: %w", err)
-				}
-			}
-
-		case ReasoningDeltaEvent:
-			if err := fireOnReasoningDelta(callbacks, e); err != nil {
-				return Message{}, Usage{}, err
-			}
-
-		case ToolUseStartEvent:
-			if err := a.fireOnToolUseStart(callbacks, e); err != nil {
-				return Message{}, Usage{}, err
-			}
-
-		case ToolUsePart:
-			if err := a.fireOnToolUseInput(callbacks, e); err != nil {
-				return Message{}, Usage{}, err
-			}
-
-		case StepCompleteEvent:
-			stepMessage = e.Message
-			stepUsage = e.Usage
-			if e.StopReason == "max_tokens" || e.StopReason == "length" {
-				return stepMessage, stepUsage, ErrResponseTruncated
-			}
-		}
-	}
-
-	return stepMessage, stepUsage, nil
 }
 
 // fireOnToolUseStart invokes the OnToolUseStart callback if set.
@@ -306,81 +448,10 @@ func (a *Agent) executeTool(ctx context.Context, tc ToolUsePart, callbacks Strea
 }
 
 // executeTools executes all tool calls after user confirmation and returns the results.
-// Each tool call is first sent to OnToolConfirm (if set) for user approval.
-// If confirmation is denied (returns false), a failed result is returned instead
-// of executing the tool.
-//
-// All confirmed tools run concurrently via goroutines. Results are collected
-// in the same order as toolUses.
-func (a *Agent) executeTools(ctx context.Context, toolUses []ToolUsePart, callbacks StreamCallbacks) []ContentPart {
-	results := make([]ContentPart, len(toolUses))
-
-	// Track which tools are confirmed for execution.
-	type toolJob struct {
-		index int
-		tc    ToolUsePart
-	}
-	var jobs []toolJob
-
-	for i, tc := range toolUses {
-		if callbacks.OnToolConfirm != nil {
-			allowed, err := callbacks.OnToolConfirm(tc.ID, tc.ToolName, tc.Input)
-			if err != nil {
-				failed := ToolResultOutputFailed{
-					Reason: err.Error(),
-				}
-				if callbacks.OnToolUseOutput != nil {
-					callbacks.OnToolUseOutput(tc.ID, failed) //nolint:errcheck
-				}
-				results[i] = ToolResultPart{
-					ID:     tc.ID,
-					Output: failed,
-				}
-				continue
-			}
-			if !allowed {
-				denied := ToolResultOutputFailed{
-					Reason: "Tool execution denied by user",
-				}
-				if callbacks.OnToolUseOutput != nil {
-					callbacks.OnToolUseOutput(tc.ID, denied) //nolint:errcheck
-				}
-				results[i] = ToolResultPart{
-					ID:     tc.ID,
-					Output: denied,
-				}
-				continue
-			}
-		}
-		jobs = append(jobs, toolJob{index: i, tc: tc})
-	}
-
-	// Run all confirmed tools concurrently.
-	if len(jobs) > 0 {
-		type jobResult struct {
-			index   int
-			content ContentPart
-		}
-		ch := make(chan jobResult, len(jobs))
-
-		for _, job := range jobs {
-			go func(job toolJob) {
-				ch <- jobResult{
-					index:   job.index,
-					content: a.executeTool(ctx, job.tc, callbacks),
-				}
-			}(job)
-		}
-
-		for range jobs {
-			r := <-ch
-			results[r.index] = r.content
-		}
-	}
-
-	return results
-}
-
+// If OnToolConfirm is set, all tools are sent for confirmation. The adapter returns a
+// channel and sends responses asynchronously — as each tool is confirmed, it executes
+// immediately (concurrently with other confirms and executions).
+// Results are collected in the same order as toolUses.
 // extractToolUses extracts ToolUseParts from message content.
 func extractToolUses(content []ContentPart) []ToolUsePart {
 	var uses []ToolUsePart

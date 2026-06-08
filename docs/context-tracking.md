@@ -15,7 +15,7 @@ How AlayaCore tracks conversation context size across LLM API calls and provider
 Provider API response
   → Provider extracts usage (InputTokens, OutputTokens, CacheReadTokens, CacheCreationTokens)
     → Provider emits StreamEvent{Usage: ...}
-      → Agent.processStreamEvents merges partial usage into stepUsage
+      → Agent.streamEvents merges partial usage into stepUsage
         → Agent fires OnStepFinish(messages, stepUsage) callback
           → Session.sendEvent(StepFinishEvent{...})
             → handleTaskEvent in run() goroutine

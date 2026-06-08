@@ -179,6 +179,7 @@ func (m *Terminal) handleConfirmResult() (tea.Model, tea.Cmd) {
 	}
 
 	kind := m.confirmOverlay.Kind
+	toolID := m.confirmOverlay.ToolID
 	m.confirmOverlay.Close()
 
 	fromCmd := m.confirmFromCommand
@@ -191,7 +192,13 @@ func (m *Terminal) handleConfirmResult() (tea.Model, tea.Cmd) {
 		}
 		// For tool confirm, send :confirm no even on cancel
 		if kind == ConfirmTool {
-			m.emitCommand(":confirm no")
+			m.emitCommand(":confirm " + toolID + " no")
+			m.restoreFocus()
+			// Immediately check for the next pending confirm.
+			if id, toolName, toolInput, ok := m.out.GetPendingToolConfirm(); ok {
+				m.openConfirmTool(id, toolName, toolInput)
+			}
+			return m, scheduleTick()
 		}
 		// Restore focus to whatever window was active before the overlay
 		m.restoreFocus()
@@ -221,9 +228,13 @@ func (m *Terminal) handleConfirmResult() (tea.Model, tea.Cmd) {
 		return m, m.submitCommand(agentpkg.CommandNameCancelAll, fromCmd)
 
 	case ConfirmTool:
-		m.emitCommand(":confirm yes")
+		m.emitCommand(":confirm " + toolID + " yes")
 		m.restoreFocus()
-		return m, nil
+		// Immediately check for the next pending confirm.
+		if nextID, nextName, nextInput, ok := m.out.GetPendingToolConfirm(); ok {
+			m.openConfirmTool(nextID, nextName, nextInput)
+		}
+		return m, scheduleTick()
 	}
 
 	m.restoreFocus()

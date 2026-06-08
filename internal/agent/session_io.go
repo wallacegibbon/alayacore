@@ -491,37 +491,33 @@ func (s *Session) handleInputUserText(value string, pendingImages *[]string, msg
 	msgCh <- msg
 }
 
-// handleConfirmCommand processes a `:confirm yes|no` command from the user.
+// handleConfirmCommand processes a `:confirm <id> yes|no` command from the user.
 // It routes the response to the task goroutine's pending confirmation channel.
 // Called from the input pump goroutine.
 func (s *Session) handleConfirmCommand(args []string) {
-	respCh := s.toolConfirmRespCh
-	if respCh == nil {
+	if len(args) != 2 {
+		s.writeError("usage: :confirm <id> yes|no")
+		return
+	}
+
+	id := args[0]
+	if s.confirmCh == nil {
 		s.writeError("No pending tool confirmation")
 		return
 	}
 
-	if len(args) != 1 {
-		s.writeError("usage: :confirm yes|no")
-		return
-	}
-
 	var allowed bool
-	switch args[0] {
+	switch args[1] {
 	case "yes", "y":
 		allowed = true
 	case "no", "n":
 		allowed = false
 	default:
-		s.writeError("usage: :confirm yes|no")
+		s.writeError("usage: :confirm <id> yes|no")
 		return
 	}
 
-	id := s.toolConfirmID
-	s.toolConfirmRespCh = nil
-	s.toolConfirmID = ""
-
-	respCh <- ToolConfirmResponse{ID: id, Allowed: allowed}
+	s.confirmCh <- llm.ToolConfirmResponse{ID: id, Allowed: allowed}
 }
 
 // handleInputMsg processes a parsed input message. Called from run() goroutine.

@@ -251,8 +251,10 @@ func (m *Terminal) handleTick() (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	// Check for pending tool confirmation from the session
-	if id, toolName, toolInput, ok := m.out.GetPendingToolConfirm(); ok && !m.confirmOverlay.IsOpen() {
-		m.openConfirmTool(id, toolName, toolInput)
+	if !m.confirmOverlay.IsOpen() {
+		if id, toolName, toolInput, ok := m.out.GetPendingToolConfirm(); ok {
+			m.openConfirmTool(id, toolName, toolInput)
+		}
 	}
 
 	// Check if display needs refresh (dirty flag)

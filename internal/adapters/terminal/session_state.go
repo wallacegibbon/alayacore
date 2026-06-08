@@ -47,11 +47,17 @@ type sessionState struct {
 	activeThemeData *theme.Theme
 	cachedThemeList []ThemeEntry
 
-	// Pending tool confirm — set by handleSystemToolConfirm, consumed by
+	// Pending tool confirms — set by handleSystemToolConfirm, consumed by
 	// the Terminal tick handler to open the confirm overlay.
-	pendingToolConfirmID    string
-	pendingToolConfirmName  string
-	pendingToolConfirmInput string
+	// Stored as a queue so multiple confirms arriving at once aren't lost.
+	pendingToolConfirms []toolConfirmPending
+}
+
+// toolConfirmPending holds a single pending tool confirmation.
+type toolConfirmPending struct {
+	ID    string
+	Name  string
+	Input string
 }
 
 // updateTask atomically updates task progress fields and queue items.
@@ -135,30 +141,26 @@ func (s *sessionState) updateReasoning(level int) {
 	s.mu.Unlock()
 }
 
-// setToolConfirmPending stores the pending tool confirmation request.
+// setToolConfirmPending appends a pending tool confirmation request.
 func (s *sessionState) setToolConfirmPending(id, toolName, toolInput string) {
 	s.mu.Lock()
-	s.pendingToolConfirmID = id
-	s.pendingToolConfirmName = toolName
-	s.pendingToolConfirmInput = toolInput
+	s.pendingToolConfirms = append(s.pendingToolConfirms, toolConfirmPending{
+		ID: id, Name: toolName, Input: toolInput,
+	})
 	s.mu.Unlock()
 }
 
-// takeToolConfirmPending returns any pending tool confirmation and clears it.
-// Returns (id, toolName, toolInput, ok). If no pending confirm, ok is false.
+// takeToolConfirmPending pops the next pending tool confirmation.
+// Returns (id, toolName, toolInput, ok). If no pending confirms, ok is false.
 func (s *sessionState) takeToolConfirmPending() (id, toolName, toolInput string, ok bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.pendingToolConfirmID == "" {
+	if len(s.pendingToolConfirms) == 0 {
 		return "", "", "", false
 	}
-	id = s.pendingToolConfirmID
-	toolName = s.pendingToolConfirmName
-	toolInput = s.pendingToolConfirmInput
-	s.pendingToolConfirmID = ""
-	s.pendingToolConfirmName = ""
-	s.pendingToolConfirmInput = ""
-	return id, toolName, toolInput, true
+	p := s.pendingToolConfirms[0]
+	s.pendingToolConfirms = s.pendingToolConfirms[1:]
+	return p.ID, p.Name, p.Input, true
 }
 
 // snapshotStatus returns a consistent point-in-time view of session status.

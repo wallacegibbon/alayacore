@@ -5,7 +5,7 @@ package providers
 // during streaming. This file contains the common parts.
 //
 // IMPORTANT: All methods are called from within a single goroutine
-// (the iterator consumed by processStreamEvents in agent.go), so no
+// (the iterator consumed by streamEvents in agent.go), so no
 // locking is needed.
 
 import (

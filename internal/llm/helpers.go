@@ -58,13 +58,6 @@ func (b *ToolBuilder) WithExecute(fn func(ctx context.Context, input json.RawMes
 	return b
 }
 
-// SafeToConcur marks this tool as safe for parallel execution with other
-// SafeToConcur tools. Only use for read-only tools with no side effects.
-func (b *ToolBuilder) SafeToConcur() *ToolBuilder {
-	b.tool.SafeToConcur = true
-	return b
-}
-
 // Build returns the tool
 func (b *ToolBuilder) Build() Tool {
 	return b.tool

@@ -27,7 +27,6 @@ func NewReadFileTool() llm.Tool {
 	).
 		WithSchema(llm.MustGenerateSchema(ReadFileInput{})).
 		WithExecute(llm.TypedExecute(executeReadFile)).
-		SafeToConcur().
 		Build()
 }
 

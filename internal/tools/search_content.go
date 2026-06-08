@@ -36,7 +36,6 @@ func NewSearchContentTool() llm.Tool {
 	).
 		WithSchema(llm.MustGenerateSchema(SearchContentInput{})).
 		WithExecute(llm.TypedExecute(executeSearchContent)).
-		SafeToConcur().
 		Build()
 }
 

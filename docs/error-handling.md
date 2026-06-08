@@ -76,7 +76,7 @@ if stopReason != "" && stopReason != "end_turn" && stopReason != "max_tokens" &&
 ### Provider-level errors (content filter, refusal, unknown reasons)
 
 1. The provider returns an error from the event handler via the streaming iterator's error parameter (`yield(nil, err)`)
-2. The agent's `processStreamEvents` function receives the error from the `iter.Seq2[StreamEvent, error]` iterator (`for event, err := range events`)
+2. The agent's event loop in `streamEvents` receives the error from the `iter.Seq2[StreamEvent, error]` iterator (`for event, err := range events`)
 3. The agent loop terminates and returns the error to the caller
 4. The session sets `pausedOnError = true` and notifies the user via a system error message
 5. The UI displays the error message to the user
@@ -85,15 +85,15 @@ if stopReason != "" && stopReason != "end_turn" && stopReason != "max_tokens" &&
 
 Truncation (`max_tokens` / `length`) is **not** an error at the provider level — the response is valid, just incomplete. The provider includes the stop reason in `StepCompleteEvent.StopReason`.
 
-The agent detects truncation in `processStreamEvents` and returns `ErrResponseTruncated`. Partial messages are still included in the `StreamResult` so the caller can inspect what was generated before the cutoff.
+The agent detects truncation in `streamEvents` and returns `ErrResponseTruncated` via `executeStep`. Partial messages are still included in the `StreamResult` so the caller can inspect what was generated before the cutoff.
 
 ```go
-// In processStreamEvents:
+// In streamEvents:
 case StepCompleteEvent:
     stepMessage = e.Message
     stepUsage = e.Usage
     if e.StopReason == "max_tokens" || e.StopReason == "length" {
-        return stepMessage, stepUsage, ErrResponseTruncated
+        truncated = true
     }
 ```
 

@@ -229,7 +229,7 @@ correct base directory for the current session.
 3. **Virtual Scrolling** — Only visible windows are rendered. See [virtual-rendering-performance.md](virtual-rendering-performance.md).
 4. **Typed Tools** — `TypedExecute[T]` wrapper for type-safe tool implementations with auto-generated schemas. See [schema-improvements.md](schema-improvements.md).
 5. **Lazy Agent Init** — Agent and provider are created on first use, not at startup.
-6. **Sequential Tool Execution** — Tools execute one at a time, avoiding race conditions. See [sequential-tool-execution.md](sequential-tool-execution.md).
+6. **Tool Execution** — Tools execute concurrently during streaming (no-confirm) or as confirmations arrive (deferred). See [tool-execution.md](tool-execution.md).
 7. **Context Efficiency** — Large outputs (>64KB) saved to `os.TempDir()/alayacore-<suffix>/` instead of inline. See [truncation.md](truncation.md).
 8. **Reasoning Mode** — Provider-specific thinking fields added to API requests. Three levels: 0=off, 1=normal, 2=max. Toggled via `:reason [0|1|2]`.
 9. **Concurrent Task Execution** — Each task runs in its own goroutine so the main loop stays responsive during LLM streaming. Communication via typed channels and atomic fields.

@@ -95,41 +95,6 @@ func (s *Session) doAutoSummarize(ctx context.Context, messages []llm.Message) [
 // Prompt Processing
 // ============================================================================
 
-// confirmToolCall prompts the user for tool approval when the tool is in
-// the confirmation set. Returns immediately (true) if no confirmation is needed.
-func (s *Session) confirmToolCall(ctx context.Context, id, toolName string) (bool, error) {
-	if s.toolConfirmSet == nil {
-		return true, nil
-	}
-	if _, ok := s.toolConfirmSet[toolName]; !ok {
-		return true, nil
-	}
-
-	respCh := make(chan ToolConfirmResponse, 1)
-	s.toolConfirmRespCh = respCh
-	s.toolConfirmID = id
-
-	if err := stream.WriteSystemMsg(s.Output, stream.ToolConfirmMsg{ID: id}); err != nil {
-		s.toolConfirmRespCh = nil
-		s.toolConfirmID = ""
-		return false, domainerrors.Wrap("tool", err)
-	}
-
-	select {
-	case resp := <-respCh:
-		if resp.ID != id {
-			return false, domainerrors.NewSessionErrorf("tool", "tool_confirm ID mismatch: want %s, got %s", id, resp.ID)
-		}
-		s.toolConfirmRespCh = nil
-		s.toolConfirmID = ""
-		return resp.Allowed, nil
-	case <-ctx.Done():
-		s.toolConfirmRespCh = nil
-		s.toolConfirmID = ""
-		return false, ctx.Err()
-	}
-}
-
 func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]llm.Message, int64, error) {
 	// nextPromptID is goroutine-local (only accessed from the task goroutine),
 	// so it's updated outside the mutex.
@@ -168,8 +133,25 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 			}
 			return nil
 		},
-		OnToolConfirm: func(id, toolName string, _ json.RawMessage) (bool, error) {
-			return s.confirmToolCall(ctx, id, toolName)
+		OnToolConfirm: func(requests []llm.ToolConfirmRequest) <-chan llm.ToolConfirmResponse {
+			ch := make(chan llm.ToolConfirmResponse, len(requests))
+
+			for _, req := range requests {
+				if s.toolConfirmSet != nil {
+					if _, ok := s.toolConfirmSet[req.ToolName]; ok {
+						// Needs user confirmation — send prompt to adapter.
+						if err := stream.WriteSystemMsg(s.Output, stream.ToolConfirmMsg{ID: req.ID}); err != nil {
+							ch <- llm.ToolConfirmResponse{ID: req.ID, Error: domainerrors.Wrap("tool", err).Error()}
+						}
+						continue
+					}
+				}
+				// No confirmation needed — auto-confirm immediately.
+				ch <- llm.ToolConfirmResponse{ID: req.ID, Allowed: true}
+			}
+
+			s.confirmCh = ch
+			return ch
 		},
 		OnStepStart: func(step int) error {
 			stepCount = step
