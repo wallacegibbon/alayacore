@@ -59,8 +59,9 @@ type Session struct {
 
 	// sessionMetaModel is the model name stored in the session file's
 	// active_model frontmatter. Set by RestoreFromSession; empty for
-	// fresh sessions. Used by setActiveFromSessionMeta() on reload to
-	// re-apply the session's model preference.
+	// fresh sessions. Updated by handleModelSet when the user switches
+	// models in a meta-specified session. Used by setActiveFromSessionMeta()
+	// on reload to re-apply the session's model preference.
 	sessionMetaModel string
 
 	// === State owned by run() goroutine, updated via task events ===

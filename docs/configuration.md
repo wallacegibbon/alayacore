@@ -92,6 +92,11 @@ Press `Ctrl+L` to open the model selector. From there:
 | `e` | Open config file in `$EDITOR` (or `vim`) |
 | `r` | Reload models after editing |
 
+When you select a model:
+
+- **Sessions loaded from a file** (`--session`) store the switch in the session file's frontmatter on next `:save`. The global `runtime.conf` is left untouched — each session keeps its own preference.
+- **Sessions without a file** update `runtime.conf` so the choice persists across sessions.
+
 ## Runtime Config
 
 **Default location**: `~/.alayacore/runtime.conf`
@@ -106,9 +111,12 @@ active_theme: "theme-dark"
 
 ### Model Selection Priority
 
-1. If `--model` is specified and the name exists in `model.conf`, that model is used
-2. If `runtime.conf` has a saved `active_model`, that model is used
-3. Otherwise, the **first model** in `model.conf` is active
+When a session starts (or reloads via `:model_load`), the active model is resolved using this priority chain:
+
+1. **`--model` CLI flag** — highest priority. If specified and the name exists in `model.conf`, it overrides everything else.
+2. **Session file frontmatter** — if loading a saved session (via `--session`), the `active_model` field in the file's frontmatter is applied next.
+3. **Runtime config** — `~/.alayacore/runtime.conf`. Persisted across sessions. Updated only when switching models in sessions without a file-specified model.
+4. **First model** — if none of the above are set or match, the first model in `model.conf` is used.
 
 ## Theme Configuration
 

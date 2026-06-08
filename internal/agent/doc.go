@@ -33,13 +33,28 @@
 //
 // Architecture Overview:
 //
-//	Session wires together the model, tools, IO streams, and managers:
-//	  model.conf --(ModelManager)--> available models
-//	        ^                               |
-//	        |                               v
-//	  runtime.conf --(RuntimeManager)--> active model name
-//	        |                               |
-//	        +--------(Session)--------------+
+//	Session wires together the model, tools, IO streams, and managers.
+//	The active model is resolved by priority (highest first):
+//
+//	  --model CLI flag
+//	  session file frontmatter  (when loading via --session)
+//	  runtime.conf              (global default)
+//	  model.conf first entry    (fallback)
+//
+//	Model switching is scoped: sessions with a file-specified model
+//	store switches in-memory (saved to the session file on :save),
+//	while sessions without one write to the global runtime.conf.
+//
+//	  --model flag ──────────────────────┐
+//	                                     │
+//	  session file ──▶ SessionMeta ──────┤ override
+//	                                     │
+//	  runtime.conf ──▶ RuntimeManager ───┤ active_model
+//	                                     │
+//	  model.conf ────▶ ModelManager ─────┤ fallback
+//	                                     │
+//	                                     ▼
+//	                               Session.activeModel
 //
 // Communication Protocol:
 //
