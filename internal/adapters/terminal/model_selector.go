@@ -118,6 +118,12 @@ func (ms *ModelSelector) LoadModels(models []agentpkg.ModelInfo, activeID int) t
 
 	savedSelectedIdx := ms.SelectedIdx
 	savedScrollIdx := ms.ScrollIdx
+	// Save the ID of the model at the old cursor position so we can
+	// detect if it was deleted after the reload.
+	var prevSelectedModelID int
+	if savedSelectedIdx >= 0 && savedSelectedIdx < len(ms.filteredModels) {
+		prevSelectedModelID = ms.filteredModels[savedSelectedIdx].ID
+	}
 	shouldPreserveSelection := ms.State != FilteredListClosed
 
 	for i, m := range models {
@@ -142,6 +148,23 @@ func (ms *ModelSelector) LoadModels(models []agentpkg.ModelInfo, activeID int) t
 			ms.SelectedIdx = savedSelectedIdx
 			ms.ScrollIdx = savedScrollIdx
 			ms.ClampSelection(len(ms.filteredModels))
+
+			// If the model that was selected before the reload no longer
+			// exists (e.g. it was deleted from the config file), move the
+			// cursor to the new active model instead of leaving it on a
+			// different model at the same index.
+			if prevSelectedModelID > 0 {
+				found := false
+				for _, m := range ms.filteredModels {
+					if m.ID == prevSelectedModelID {
+						found = true
+						break
+					}
+				}
+				if !found {
+					ms.selectActiveModel()
+				}
+			}
 		}
 	}
 	return func() tea.Msg { return nil }
