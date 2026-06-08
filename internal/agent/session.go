@@ -57,6 +57,12 @@ type Session struct {
 	SessionConfig        // embedded — immutable config set once at construction
 	initError      error // Set during construction if --model refers to a non-existent model
 
+	// sessionMetaModel is the model name stored in the session file's
+	// active_model frontmatter. Set by RestoreFromSession; empty for
+	// fresh sessions. Used by setActiveFromSessionMeta() on reload to
+	// re-apply the session's model preference.
+	sessionMetaModel string
+
 	// === State owned by run() goroutine, updated via task events ===
 	agent          atomic.Pointer[llm.Agent]
 	provider       atomic.Pointer[llm.Provider]
@@ -215,14 +221,9 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 	s.ContextTokens.Store(data.ContextTokens)
 
 	s.initToolConfirmSet(cfg.ToolConfirmTools)
+	s.sessionMetaModel = data.ActiveModel // used by setActiveFromSessionMeta
 	s.setActiveFromRuntimeConfig()
-
-	// Override runtime config default with the model saved in the session file.
-	// If the model was removed from config since the session was saved,
-	// fall back to whatever setActiveFromRuntimeConfig already set.
-	if data.ActiveModel != "" {
-		_ = s.ModelManager.SetActiveByName(data.ActiveModel) //nolint:errcheck // best-effort restore, fall back to runtime config default
-	}
+	s.setActiveFromSessionMeta()
 
 	// --model CLI flag takes highest priority: override whatever was resolved above.
 	s.setActiveFromCliFlag()

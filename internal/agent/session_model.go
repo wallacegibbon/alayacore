@@ -58,6 +58,17 @@ func (s *Session) initToolConfirmSet(tools []string) {
 	}
 }
 
+// setActiveFromSessionMeta restores the model saved in the session file's
+// frontmatter, if one was set. This is a best-effort override — if the
+// model was removed from config since the session was saved, the current
+// active model is preserved.
+func (s *Session) setActiveFromSessionMeta() {
+	if s.sessionMetaModel == "" || s.ModelManager == nil {
+		return
+	}
+	_ = s.ModelManager.SetActiveByName(s.sessionMetaModel) //nolint:errcheck // best-effort; model may no longer exist
+}
+
 // setActiveFromCliFlag applies the --model CLI flag override.
 // If overrideActiveModel is set and a model with that name exists in the
 // model config, it becomes the active model. If the name doesn't match
