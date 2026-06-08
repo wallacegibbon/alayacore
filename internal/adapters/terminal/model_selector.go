@@ -90,26 +90,14 @@ func (ms *ModelSelector) SetModels(models []searchableModel) {
 
 func (ms *ModelSelector) LoadModels(models []agentpkg.ModelInfo, activeID int) tea.Cmd {
 	// Skip update if model list hasn't changed.
-	// We check both ms.models length AND ms.lastModelCount because
-	// SetModels may have been called independently between LoadModels calls.
-	//nolint:gocritic // intentional double-check against stale state
-	if len(models) == len(ms.models) && len(models) == ms.lastModelCount {
-		modelsChanged := false
-		for i, m := range models {
-			if i >= len(ms.models) || ms.models[i].ID != m.ID || ms.models[i].Name != m.Name {
-				modelsChanged = true
+	if ms.modelsUnchangedSinceLastLoad(models) {
+		for i := range ms.models {
+			if ms.models[i].ID == activeID {
+				ms.activeModel = &ms.models[i]
 				break
 			}
 		}
-		if !modelsChanged {
-			for i := range ms.models {
-				if ms.models[i].ID == activeID {
-					ms.activeModel = &ms.models[i]
-					break
-				}
-			}
-			return nil
-		}
+		return nil
 	}
 
 	prevModelCount := ms.lastModelCount
@@ -148,26 +136,41 @@ func (ms *ModelSelector) LoadModels(models []agentpkg.ModelInfo, activeID int) t
 			ms.SelectedIdx = savedSelectedIdx
 			ms.ScrollIdx = savedScrollIdx
 			ms.ClampSelection(len(ms.filteredModels))
-
-			// If the model that was selected before the reload no longer
-			// exists (e.g. it was deleted from the config file), move the
-			// cursor to the new active model instead of leaving it on a
-			// different model at the same index.
-			if prevSelectedModelID > 0 {
-				found := false
-				for _, m := range ms.filteredModels {
-					if m.ID == prevSelectedModelID {
-						found = true
-						break
-					}
-				}
-				if !found {
-					ms.selectActiveModel()
-				}
-			}
+			ms.selectActiveModelIfPrevDeleted(prevSelectedModelID)
 		}
 	}
 	return func() tea.Msg { return nil }
+}
+
+// modelsUnchangedSinceLastLoad checks whether the given model list is
+// identical to the currently cached models. SetModels may have been called
+// independently between LoadModels calls, so we check both ms.models length
+// AND ms.lastModelCount.
+func (ms *ModelSelector) modelsUnchangedSinceLastLoad(models []agentpkg.ModelInfo) bool {
+	if len(models) != len(ms.models) || len(models) != ms.lastModelCount {
+		return false
+	}
+	for i, m := range models {
+		if i >= len(ms.models) || ms.models[i].ID != m.ID || ms.models[i].Name != m.Name {
+			return false
+		}
+	}
+	return true
+}
+
+// selectActiveModelIfPrevDeleted moves the cursor to the active model if the
+// model that was selected before a reload no longer exists in the filtered
+// list (e.g. it was deleted from the config file).
+func (ms *ModelSelector) selectActiveModelIfPrevDeleted(prevSelectedModelID int) {
+	if prevSelectedModelID <= 0 {
+		return
+	}
+	for _, m := range ms.filteredModels {
+		if m.ID == prevSelectedModelID {
+			return
+		}
+	}
+	ms.selectActiveModel()
 }
 
 // --- Action Consumption ---
