@@ -281,8 +281,16 @@ func (s *Session) handleModelLoad() {
 		_ = s.ModelManager.SetActiveByName(prevActiveName) //nolint:errcheck // best-effort; falls back to initModelManager default
 	}
 
+	// Re-initialize the provider/agent with the (potentially edited)
+	// model config. This ensures that changes made to the active model's
+	// settings (base_url, api_key, model_name, etc.) take effect immediately.
+	if model := s.ModelManager.GetActive(); model != nil {
+		if err := s.SwitchModel(model); err != nil {
+			s.writeError("Failed to reinitialize model after reload: " + err.Error())
+		}
+	}
+
 	s.sendModelListMsg()
-	s.sendSystemInfo("model")
 	s.writeNotify("Models reloaded from configuration file")
 }
 
