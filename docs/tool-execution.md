@@ -6,7 +6,7 @@ AlayaCore executes tool calls using a **two-phase strategy**: tools that don't n
 
 When a `ToolUsePart` event arrives during streaming, the agent checks whether confirmation is needed:
 
-1. **No confirmation needed** — The tool executes immediately in a goroutine. Results flow back through a channel tagged with their index.
+1. **No confirmation needed** — The tool executes immediately in a goroutine. Results flow back through a channel and are appended in receive order.
 2. **Confirmation needed** — The tool is deferred. After streaming completes, `OnToolConfirm` is called with all deferred tools. As each confirm response arrives, the confirmed tool executes in a goroutine.
 
 All results are collected and then re-ordered by tool call ID to match the original `stepMessage.Content` order.
@@ -17,7 +17,7 @@ See `internal/llm/agent.go` → `executeStep()`, `streamEvents()`, and `executeD
 
 | Phase | Tools | Execution |
 |-------|-------|-----------|
-| **During streaming** | No confirmation needed (`OnToolConfirm == nil`) | Concurrent goroutines, results by index |
+| **During streaming** | No confirmation needed (`OnToolConfirm == nil`) | Concurrent goroutines, results appended and re-ordered by ID |
 | **After streaming** | Confirmation needed (deferred) | Concurrent goroutines per confirm response, results appended and re-ordered by ID |
 | **Final** | All results | Re-ordered by tool call ID to match LLM response order |
 

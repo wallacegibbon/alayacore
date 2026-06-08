@@ -8,15 +8,15 @@ A **step** is one LLM round trip. It produces 1 or 2 messages in the conversatio
 ## Flow
 
 1. `Stream()` calls the provider and processes streaming events via `streamEvents()`
-2. That returns a single `Message` (the assistant message with all content parts), token usage, and any deferred tool calls
-3. `executeStep()` appends the assistant message to `allMessages`, executes deferred tools (or tools that ran immediately during streaming) via `executeDeferredTools()`, collects all tool results, re-orders them by ID to match the assistant message's content order, appends them as one tool result message, then fires `OnStepFinish(allMessages, stepUsage)`
+2. `streamEvents()` handles both no-confirm tools (execute immediately in goroutines) and deferred tools (confirm then execute), collecting all results into one slice
+3. `executeStep()` appends the assistant message to `allMessages`, re-orders tool results by ID to match the assistant message's content order, appends them as one tool result message, then fires `OnStepFinish(allMessages, stepUsage)`
 4. The session receives the *full* history and replaces its own copy. `Stream()` also returns the final messages as a convenience.
 5. Loop repeats until the model responds with text only (no tool calls) or the response is truncated.
 
 ## Key details
 
 - **`StepCompleteEvent.Message`** is a single `Message` (the assistant message). Tool calls, text, and reasoning are all content parts within it.
-- **Tool execution** starts during streaming (no-confirm tools execute immediately via goroutines) and continues after streaming (deferred tools are confirmed then executed). Results are matched to their tool call by ID.
+- **Tool execution** starts during streaming (no-confirm tools execute immediately via goroutines) and continues after streaming (deferred tools are confirmed then executed). All results flow through a shared channel and are collected in a single loop. Results are matched to their tool call by ID.
 - **All tool results** go into one tool result message per step (required by both Anthropic and OpenAI).
 - **Incomplete tool calls on cancel:** When user cancels mid-tool-call, messages may have `tool_use` without matching `tool_result`. `cleanIncompleteToolUses()` removes these to prevent API errors on next request.
 - **Tool result message ordering:** `OnStepFinish` receives complete step messages including both the assistant message (with tool calls) and the tool result message. `OnToolUseOutput` should only send UI notifications — the agent loop handles message assembly.
