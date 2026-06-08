@@ -28,14 +28,14 @@ Files larger than 64KB are truncated at a line boundary with metadata:
 Command output larger than 64KB is saved to a temp file:
 
 ```
-Output (5000 lines, 194.2KB) saved to: .alayacore-tmp-28980-3b5ffe86220d3d7a/cmd-12345.txt
+Output (5000 lines, 194.2KB) saved to: /tmp/alayacore-1234567890/cmd-12345.txt
 Use read_file to access specific sections.
 ```
 
 Or with error:
 ```
 Command completed with exit code 1.
-Output (5000 lines, 194.2KB) saved to: .alayacore-tmp-28980-3b5ffe86220d3d7a/cmd-12345.txt
+Output (5000 lines, 194.2KB) saved to: /tmp/alayacore-1234567890/cmd-12345.txt
 Use read_file to access the full output.
 ```
 
@@ -48,7 +48,7 @@ Use read_file to access the full output.
 Search results exceeding `max_lines` (default 100) are saved to a temp file:
 
 ```
-Search found 500 matching lines. Results saved to: .alayacore-tmp-28980-3b5ffe86220d3d7a/search-12345.txt
+Search found 500 matching lines. Results saved to: /tmp/alayacore-1234567890/search-12345.txt
 Use read_file to access specific matches.
 ```
 
@@ -56,31 +56,22 @@ Use read_file to access specific matches.
 
 ## Temp File Location
 
-Each process gets its own directory under the current working directory:
+Each process gets its own directory under the system temp directory, created atomically by `os.MkdirTemp`:
 
 ```
-.alayacore-tmp-<pid>-<random>/cmd-*.txt
-.alayacore-tmp-<pid>-<random>/search-*.txt
+/tmp/alayacore-1234567890/cmd-*.txt
+/tmp/alayacore-1234567890/search-*.txt
 ```
 
-The directory name encodes the process ID and a random suffix, so concurrently running `alayacore` processes never collide.
-
-**Why CWD instead of /tmp?**
-- Avoids cross-filesystem issues when `/tmp` is on a different mount
-- Same approach as `edit_file` for atomic file operations
-- Uses `os.CreateTemp` for atomic file creation
+The random suffix guarantees no collisions between concurrently running `alayacore` instances. The returned path is absolute, so `read_file` can access it regardless of the current working directory.
 
 **Cleanup:**
 - Automatic on normal exit (`tools.Cleanup()` in `main.go`)
-- For stray directories (e.g. after `kill -9`):
+- The OS typically cleans system temp on reboot
+- For immediate cleanup of stray directories:
   ```bash
-  rm -rf .alayacore-tmp-*/
+  rm -rf /tmp/alayacore-*/
   ```
-
-Or add to `.gitignore`:
-```
-.alayacore-tmp-*
-```
 
 ## Related
 

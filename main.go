@@ -38,10 +38,7 @@ func main() {
 
 	exitCode := adapter.Start()
 
-	// Clean up this process's temporary files.
-	// Each process gets its own uniquely-named directory under CWD
-	// (e.g. .alayacore-tmp-<pid>-<random>/), so there's no risk of
-	// interfering with other concurrently running processes.
+	// Clean up this process's temporary files under os.TempDir().
 	tools.Cleanup()
 
 	os.Exit(exitCode)

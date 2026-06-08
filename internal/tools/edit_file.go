@@ -163,7 +163,8 @@ func editToTemp(ctx context.Context, args EditFileInput, path string) (result *e
 	result = &editResult{}
 
 	// Create temp file in the same directory as the target file to avoid
-	// cross-device rename errors on Windows (e.g. temp dir on C: vs target on D:).
+	// cross-device rename errors (os.Rename fails when source and target are
+	// on different filesystems on any OS).
 	dir := filepath.Dir(path)
 	tempFile, err = os.CreateTemp(dir, "edit_file_*.tmp")
 	if err != nil {

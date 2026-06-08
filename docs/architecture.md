@@ -133,8 +133,8 @@ Messages are appended incrementally in `OnStepFinish` so they're preserved even 
 | `read_file` | Read file contents with optional line ranges. 64KB max for full reads (truncates at line boundary with metadata). | Safe | — |
 | `edit_file` | Search/replace edits on existing files | Medium | — |
 | `write_file` | Create or overwrite files | Dangerous | — |
-| `execute_command` | Execute commands in the detected shell (cross-platform). Large output (>64KB) saved to `.alayacore-tmp-<pid>-<random>/cmd-*.txt`; only file path and metadata returned. | Most Dangerous | — |
-| `search_content` | Search file contents using ripgrep (`rg`). Results exceeding `max_lines` (default 100) saved to `.alayacore-tmp-<pid>-<random>/search-*.txt`; only match count and file path returned. | Safe | Requires `rg` binary |
+| `execute_command` | Execute commands in the detected shell (cross-platform). Large output (>64KB) saved to a temp file under `os.TempDir()/alayacore-<suffix>/cmd-*.txt`; only file path and metadata returned. | Most Dangerous | — |
+| `search_content` | Search file contents using ripgrep (`rg`). Results exceeding `max_lines` (default 100) saved to a temp file under `os.TempDir()/alayacore-<suffix>/search-*.txt`; only match count and file path returned. | Safe | Requires `rg` binary |
 
 Each tool is implemented with type-safe input structs and auto-generated JSON schemas. All tools accept a `context.Context` parameter and respect cancellation — `:cancel` will interrupt long-running tool execution. See [schema-improvements.md](schema-improvements.md) for the pattern.
 
@@ -230,7 +230,7 @@ correct base directory for the current session.
 4. **Typed Tools** — `TypedExecute[T]` wrapper for type-safe tool implementations with auto-generated schemas. See [schema-improvements.md](schema-improvements.md).
 5. **Lazy Agent Init** — Agent and provider are created on first use, not at startup.
 6. **Sequential Tool Execution** — Tools execute one at a time, avoiding race conditions. See [sequential-tool-execution.md](sequential-tool-execution.md).
-7. **Context Efficiency** — Large outputs (>64KB) saved to `.alayacore-tmp-<pid>-<random>/` instead of inline. See [truncation.md](truncation.md).
+7. **Context Efficiency** — Large outputs (>64KB) saved to `os.TempDir()/alayacore-<suffix>/` instead of inline. See [truncation.md](truncation.md).
 8. **Reasoning Mode** — Provider-specific thinking fields added to API requests. Three levels: 0=off, 1=normal, 2=max. Toggled via `:reason [0|1|2]`.
 9. **Concurrent Task Execution** — Each task runs in its own goroutine so the main loop stays responsive during LLM streaming. Communication via typed channels and atomic fields.
 10. **Filter-What-You-See** — Searchable list components (ModelSelector, HelpWindow) build a pre-computed, lowercased `searchStr` that concatenates all visible fields of each item. Filtering is a single `FuzzyMatch(term, searchStr)` against this string, ensuring the search always matches exactly what the user can see, including cross-field queries (e.g. typing "quitexit" matches `:quit` + `Exit application`).

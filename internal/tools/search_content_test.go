@@ -239,8 +239,8 @@ func TestSearchContentMaxLinesGlobal(t *testing.T) {
 	}
 
 	// Should contain tmp directory and search- file pattern
-	if !strings.Contains(text.Text, ".alayacore-tmp-") || !strings.Contains(text.Text, "search-") {
-		t.Errorf("expected .alayacore-tmp- directory and search- file pattern, got:\n%s", text.Text)
+	if !strings.Contains(text.Text, "alayacore-") || !strings.Contains(text.Text, "search-") {
+		t.Errorf("expected alayacore- directory and search- file pattern, got:\n%s", text.Text)
 	}
 }
 
