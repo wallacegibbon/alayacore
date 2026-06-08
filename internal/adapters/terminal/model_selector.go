@@ -233,6 +233,12 @@ func (ms *ModelSelector) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 		return cmd
 	}
 
+	// Let component-specific keys (e, r) through even if the core didn't
+	// recognize them as navigation keys.
+	if !ms.FilterInputFocused {
+		ms.handleListKeys(key)
+	}
+
 	return nil
 }
 
