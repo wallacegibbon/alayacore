@@ -286,8 +286,18 @@ func (w *Window) Invalidate() {
 // Returns true if the line count was successfully updated from cached
 // wrappedLines (fast path). Returns false if wrappedLines was nil or
 // empty — the caller should fall back to a full Render.
+//
+// CAVEAT: For tool windows with output, wrappedLines only holds the
+// tool input portion — the output is rendered separately and never
+// stored there. This function returns false for such windows so the
+// caller falls through to the full Render(), which counts correctly.
 func (w *Window) UpdateLineCount(width int) bool {
 	innerWidth := max(0, width-BorderInnerPadding)
+
+	if w.IsToolWindow() && w.ToolOutput != "" {
+		w.cache.valid = false
+		return false
+	}
 
 	if len(w.cache.wrappedLines) > 0 && innerWidth > 0 {
 		contentLines := len(w.cache.wrappedLines)
