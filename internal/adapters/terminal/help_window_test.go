@@ -60,10 +60,10 @@ func TestHelpWindowSkipsSectionHeaders(t *testing.T) {
 
 	// Manually set items with a specific structure for testing
 	hw.items = []HelpItem{
-		{IsSection: true, Description: "Section 1"},
-		{Key: "a", Description: "Action A"},
-		{IsSection: true, Description: "Section 2"},
-		{Key: "b", Description: "Action B"},
+		{ID: 1, IsSection: true, Description: "Section 1"},
+		{ID: 2, Key: "a", Description: "Action A"},
+		{ID: 3, IsSection: true, Description: "Section 2"},
+		{ID: 4, Key: "b", Description: "Action B"},
 	}
 	hw.Open()
 
@@ -90,9 +90,9 @@ func TestHelpWindowNavigationBoundary(t *testing.T) {
 	hw := NewHelpWindow(styles)
 
 	hw.items = []HelpItem{
-		{IsSection: true, Description: "Section"},
-		{Key: "a", Description: "Action A"},
-		{Key: "b", Description: "Action B"},
+		{ID: 1, IsSection: true, Description: "Section"},
+		{ID: 2, Key: "a", Description: "Action A"},
+		{ID: 3, Key: "b", Description: "Action B"},
 	}
 	hw.Open()
 
@@ -248,9 +248,9 @@ func TestHelpWindowEnterOnCommand(t *testing.T) {
 
 	// Set up items with a :command at index 1
 	hw.items = []HelpItem{
-		{IsSection: true, Description: "Commands"},
-		{Key: ":quit", Description: "Exit application", Type: HelpItemCommand},
-		{Key: ":save", Description: "Save session", Type: HelpItemCommand},
+		{ID: 1, IsSection: true, Description: "Commands"},
+		{ID: 2, Key: ":quit", Description: "Exit application", Type: HelpItemCommand},
+		{ID: 3, Key: ":save", Description: "Save session", Type: HelpItemCommand},
 	}
 	hw.Open()
 	// Should start at index 1 (first non-header)
@@ -285,10 +285,10 @@ func TestHelpWindowEnterOnCommandStripsArgs(t *testing.T) {
 
 	// Set up items with argument syntax in the key
 	hw.items = []HelpItem{
-		{IsSection: true, Description: "Commands"},
-		{Key: ":continue [skip]", Description: "Resume after error", Type: HelpItemCommand},
-		{Key: ":theme_set <name>", Description: "Switch theme by name", Type: HelpItemCommand},
-		{Key: ":confirm <yes|no>", Description: "Confirm or deny pending tool", Type: HelpItemCommand},
+		{ID: 1, IsSection: true, Description: "Commands"},
+		{ID: 2, Key: ":continue [skip]", Description: "Resume after error", Type: HelpItemCommand},
+		{ID: 3, Key: ":theme_set <name>", Description: "Switch theme by name", Type: HelpItemCommand},
+		{ID: 4, Key: ":confirm <yes|no>", Description: "Confirm or deny pending tool", Type: HelpItemCommand},
 	}
 	hw.Open()
 
@@ -325,8 +325,8 @@ func TestHelpWindowEnterOnKeyBinding(t *testing.T) {
 
 	// Set up items with a key binding (not a :command)
 	hw.items = []HelpItem{
-		{IsSection: true, Description: "Global Shortcuts"},
-		{Key: "Ctrl+H", Description: "Open help window"},
+		{ID: 1, IsSection: true, Description: "Global Shortcuts"},
+		{ID: 2, Key: "Ctrl+H", Description: "Open help window"},
 	}
 	hw.updateFilteredItems()
 	hw.Open()
@@ -473,16 +473,16 @@ func TestHelpWindowHeaderReappearsOnScrollBack(t *testing.T) {
 	// Use a small set of items to control the scenario precisely:
 	// 1 header + 9 items = 10 entries, with SelectorListRows = 8
 	hw.items = []HelpItem{
-		{IsSection: true, Description: "Commands"},
-		{Key: ":a", Description: "A"},
-		{Key: ":b", Description: "B"},
-		{Key: ":c", Description: "C"},
-		{Key: ":d", Description: "D"},
-		{Key: ":e", Description: "E"},
-		{Key: ":f", Description: "F"},
-		{Key: ":g", Description: "G"},
-		{Key: ":h", Description: "H"},
-		{Key: ":i", Description: "I"},
+		{ID: 1, IsSection: true, Description: "Commands"},
+		{ID: 2, Key: ":a", Description: "A"},
+		{ID: 3, Key: ":b", Description: "B"},
+		{ID: 4, Key: ":c", Description: "C"},
+		{ID: 5, Key: ":d", Description: "D"},
+		{ID: 6, Key: ":e", Description: "E"},
+		{ID: 7, Key: ":f", Description: "F"},
+		{ID: 8, Key: ":g", Description: "G"},
+		{ID: 9, Key: ":h", Description: "H"},
+		{ID: 10, Key: ":i", Description: "I"},
 	}
 	hw.Open()
 

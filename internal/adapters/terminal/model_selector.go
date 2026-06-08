@@ -223,16 +223,8 @@ func (ms *ModelSelector) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	if handled {
 		if filterChanged && ms.FilterInputFocused {
 			ms.updateFilteredModels()
-			ms.ClampSelection(len(ms.filteredModels))
 		}
 		if !ms.FilterInputFocused {
-			// When tabbing from search box to list after typing a filter,
-			// select the first filtered result. If filter is empty, preserve
-			// the original selection (e.g. active model).
-			if key == keyTab && len(ms.filteredModels) > 0 && ms.FilterInput.Value() != "" {
-				ms.SelectedIdx = 0
-				ms.ScrollIdx = 0
-			}
 			ms.handleListKeys(key)
 		}
 		if ms.FilterInputFocused && key == keyEnter && len(ms.filteredModels) > 0 {
@@ -552,11 +544,21 @@ func (ms *ModelSelector) RenderOverlay(baseContent string, screenWidth, screenHe
 
 // --- Filtering ---
 
+// updateFilteredModels rebuilds filteredModels from models based on the current
+// filter input. Preserves the cursor position by matching the previously selected
+// model's ID, falling back to the first item if it was filtered out.
 func (ms *ModelSelector) updateFilteredModels() {
 	search := ms.FilterInput.Value()
 	if search == ms.lastFilterValue {
 		return
 	}
+
+	// Save previous selection to preserve cursor position across filter changes.
+	var prevSelectedID = -1
+	if ms.SelectedIdx >= 0 && ms.SelectedIdx < len(ms.filteredModels) {
+		prevSelectedID = ms.filteredModels[ms.SelectedIdx].ID
+	}
+
 	ms.lastFilterValue = search
 
 	if search == "" {
@@ -571,6 +573,30 @@ func (ms *ModelSelector) updateFilteredModels() {
 			}
 		}
 	}
-	ms.ScrollIdx = 0
-	ms.ClampSelection(len(ms.filteredModels))
+
+	// Preserve cursor position if the previously selected model is still in
+	// the filtered list. Only adjust scroll when the selection is not visible.
+	if prevSelectedID >= 0 {
+		found := false
+		for i, m := range ms.filteredModels {
+			if m.ID == prevSelectedID {
+				ms.SelectedIdx = i
+				found = true
+				break
+			}
+		}
+		if found {
+			ms.EnsureVisible()
+			ms.ClampScroll(len(ms.filteredModels))
+		} else {
+			// Previous item no longer in filtered list, reset to first item.
+			ms.SelectedIdx = 0
+			ms.ScrollIdx = 0
+			ms.ClampSelection(len(ms.filteredModels))
+		}
+	} else {
+		ms.SelectedIdx = 0
+		ms.ScrollIdx = 0
+		ms.ClampSelection(len(ms.filteredModels))
+	}
 }

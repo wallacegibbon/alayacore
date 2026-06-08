@@ -32,6 +32,7 @@ const (
 
 // HelpItem represents a single help entry with a key and description.
 type HelpItem struct {
+	ID          int // stable identifier for cursor preservation across filter changes
 	Key         string
 	Description string
 	IsSection   bool         // true for section headers
@@ -74,56 +75,61 @@ func NewHelpWindow(styles *Styles) *HelpWindow {
 
 // buildHelpItems constructs the static list of help entries.
 func buildHelpItems() []HelpItem {
+	id := 0
+	nextID := func() int {
+		id++
+		return id
+	}
 	return []HelpItem{
 		// Commands
-		{IsSection: true, Description: "Commands"},
-		{Key: ":confirm <yes|no>", Description: "Confirm or deny pending tool", Type: HelpItemCommand},
-		{Key: ":continue [skip]", Description: "Retry / skip failed prompt", Type: HelpItemCommand},
-		{Key: ":reason <0|1|2>", Description: "Set reasoning level", Type: HelpItemCommand},
-		{Key: ":cancel_all", Description: "Cancel all & clear queue", Type: HelpItemCommand},
-		{Key: ":cancel", Description: "Cancel current task", Type: HelpItemCommand},
-		{Key: ":summarize", Description: "Summarize & compress history", Type: HelpItemCommand},
-		{Key: ":theme_set <name>", Description: "Switch theme by name", Type: HelpItemCommand},
-		{Key: ":model_set <id>", Description: "Switch model by ID", Type: HelpItemCommand},
-		{Key: ":model_load", Description: "Reload model config", Type: HelpItemCommand},
-		{Key: ":save [filename]", Description: "Save session", Type: HelpItemCommand},
-		{Key: ":suspend", Description: "Suspend process", Type: HelpItemCommand},
-		{Key: ":quit", Description: "Exit application", Type: HelpItemCommand},
-		{Key: ":help", Description: "Open help window", Type: HelpItemCommand},
+		{ID: nextID(), IsSection: true, Description: "Commands"},
+		{ID: nextID(), Key: ":confirm <yes|no>", Description: "Confirm or deny pending tool", Type: HelpItemCommand},
+		{ID: nextID(), Key: ":continue [skip]", Description: "Retry / skip failed prompt", Type: HelpItemCommand},
+		{ID: nextID(), Key: ":reason <0|1|2>", Description: "Set reasoning level", Type: HelpItemCommand},
+		{ID: nextID(), Key: ":cancel_all", Description: "Cancel all & clear queue", Type: HelpItemCommand},
+		{ID: nextID(), Key: ":cancel", Description: "Cancel current task", Type: HelpItemCommand},
+		{ID: nextID(), Key: ":summarize", Description: "Summarize & compress history", Type: HelpItemCommand},
+		{ID: nextID(), Key: ":theme_set <name>", Description: "Switch theme by name", Type: HelpItemCommand},
+		{ID: nextID(), Key: ":model_set <id>", Description: "Switch model by ID", Type: HelpItemCommand},
+		{ID: nextID(), Key: ":model_load", Description: "Reload model config", Type: HelpItemCommand},
+		{ID: nextID(), Key: ":save [filename]", Description: "Save session", Type: HelpItemCommand},
+		{ID: nextID(), Key: ":suspend", Description: "Suspend process", Type: HelpItemCommand},
+		{ID: nextID(), Key: ":quit", Description: "Exit application", Type: HelpItemCommand},
+		{ID: nextID(), Key: ":help", Description: "Open help window", Type: HelpItemCommand},
 
 		// Global Shortcuts
-		{IsSection: true, Description: "Global Shortcuts"},
-		{Key: "Tab", Description: "Toggle focus display/input", Type: HelpItemKey},
-		{Key: "Enter", Description: "Submit prompt or command", Type: HelpItemKey},
-		{Key: "Ctrl+H", Description: "Open help window", Type: HelpItemKey},
-		{Key: "Ctrl+G", Description: "Cancel current task", Type: HelpItemKey},
-		{Key: "Ctrl+C", Description: "Clear text", Type: HelpItemKey},
-		{Key: "Ctrl+S", Description: "Save session", Type: HelpItemKey},
-		{Key: "Ctrl+O", Description: "Open in editor (main input)", Type: HelpItemKey},
-		{Key: "Ctrl+L", Description: "Open model selector", Type: HelpItemKey},
-		{Key: "Ctrl+P", Description: "Open theme selector", Type: HelpItemKey},
-		{Key: "Ctrl+Q", Description: "Open queue manager", Type: HelpItemKey},
-		{Key: "Ctrl+Z", Description: "Suspend process", Type: HelpItemKey},
+		{ID: nextID(), IsSection: true, Description: "Global Shortcuts"},
+		{ID: nextID(), Key: "Tab", Description: "Toggle focus display/input", Type: HelpItemKey},
+		{ID: nextID(), Key: "Enter", Description: "Submit prompt or command", Type: HelpItemKey},
+		{ID: nextID(), Key: "Ctrl+H", Description: "Open help window", Type: HelpItemKey},
+		{ID: nextID(), Key: "Ctrl+G", Description: "Cancel current task", Type: HelpItemKey},
+		{ID: nextID(), Key: "Ctrl+C", Description: "Clear text", Type: HelpItemKey},
+		{ID: nextID(), Key: "Ctrl+S", Description: "Save session", Type: HelpItemKey},
+		{ID: nextID(), Key: "Ctrl+O", Description: "Open in editor (main input)", Type: HelpItemKey},
+		{ID: nextID(), Key: "Ctrl+L", Description: "Open model selector", Type: HelpItemKey},
+		{ID: nextID(), Key: "Ctrl+P", Description: "Open theme selector", Type: HelpItemKey},
+		{ID: nextID(), Key: "Ctrl+Q", Description: "Open queue manager", Type: HelpItemKey},
+		{ID: nextID(), Key: "Ctrl+Z", Description: "Suspend process", Type: HelpItemKey},
 
 		// Queue Manager
-		{IsSection: true, Description: "Queue Manager"},
-		{Key: "j/k", Description: "Navigate queue items", Type: HelpItemKey},
-		{Key: "d", Description: "Delete selected queue item", Type: HelpItemKey},
-		{Key: "e", Description: "Edit selected item in editor", Type: HelpItemKey},
-		{Key: "q/esc", Description: "Close queue manager", Type: HelpItemKey},
+		{ID: nextID(), IsSection: true, Description: "Queue Manager"},
+		{ID: nextID(), Key: "j/k", Description: "Navigate queue items", Type: HelpItemKey},
+		{ID: nextID(), Key: "d", Description: "Delete selected queue item", Type: HelpItemKey},
+		{ID: nextID(), Key: "e", Description: "Edit selected item in editor", Type: HelpItemKey},
+		{ID: nextID(), Key: "q/esc", Description: "Close queue manager", Type: HelpItemKey},
 
 		// Display Mode
-		{IsSection: true, Description: "Display Mode"},
-		{Key: "j/k", Description: "Move window cursor", Type: HelpItemKey},
-		{Key: "J/K", Description: "Scroll one line", Type: HelpItemKey},
-		{Key: "Ctrl+D/U", Description: "Scroll half screen", Type: HelpItemKey},
-		{Key: "g", Description: "Go to first window", Type: HelpItemKey},
-		{Key: "G", Description: "Follow the last window", Type: HelpItemKey},
-		{Key: "H/L/M", Description: "Cursor top/btm/mid", Type: HelpItemKey},
-		{Key: "e", Description: "Open in editor", Type: HelpItemKey},
-		{Key: "f/b", Description: "Next/prev prompt", Type: HelpItemKey},
-		{Key: ":", Description: "Enter command mode", Type: HelpItemKey},
-		{Key: "Space", Description: "Toggle window fold", Type: HelpItemKey},
+		{ID: nextID(), IsSection: true, Description: "Display Mode"},
+		{ID: nextID(), Key: "j/k", Description: "Move window cursor", Type: HelpItemKey},
+		{ID: nextID(), Key: "J/K", Description: "Scroll one line", Type: HelpItemKey},
+		{ID: nextID(), Key: "Ctrl+D/U", Description: "Scroll half screen", Type: HelpItemKey},
+		{ID: nextID(), Key: "g", Description: "Go to first window", Type: HelpItemKey},
+		{ID: nextID(), Key: "G", Description: "Follow the last window", Type: HelpItemKey},
+		{ID: nextID(), Key: "H/L/M", Description: "Cursor top/btm/mid", Type: HelpItemKey},
+		{ID: nextID(), Key: "e", Description: "Open in editor", Type: HelpItemKey},
+		{ID: nextID(), Key: "f/b", Description: "Next/prev prompt", Type: HelpItemKey},
+		{ID: nextID(), Key: ":", Description: "Enter command mode", Type: HelpItemKey},
+		{ID: nextID(), Key: "Space", Description: "Toggle window fold", Type: HelpItemKey},
 	}
 }
 
@@ -192,6 +198,8 @@ func (hw *HelpWindow) Open() {
 // updateFilteredItems rebuilds filteredItems from items based on the current filter.
 // Only non-header items are matched; section headers are included only if they
 // have at least one matching item below them.
+// Preserves the cursor position by matching the previously selected item's ID,
+// falling back to the first item if it was filtered out.
 func (hw *HelpWindow) updateFilteredItems() {
 	filter := strings.ToLower(hw.FilterInput.Value())
 	if filter == hw.lastFilterValue {
@@ -199,38 +207,70 @@ func (hw *HelpWindow) updateFilteredItems() {
 	}
 	hw.lastFilterValue = filter
 
+	// Save previous selection ID to preserve cursor position across filter changes.
+	var prevItemID = -1
+	if hw.SelectedIdx >= 0 && hw.SelectedIdx < hw.filteredLen() {
+		item := hw.filteredItems[hw.SelectedIdx]
+		if !item.IsSection {
+			prevItemID = item.ID
+		}
+	}
+
 	if filter == "" {
 		hw.filteredItems = hw.items
-		return
+	} else {
+		var result []HelpItem
+		var currentSection []HelpItem
+		var sectionHeader *HelpItem
+
+		flushSection := func() {
+			if sectionHeader != nil && len(currentSection) > 0 {
+				result = append(result, *sectionHeader)
+				result = append(result, currentSection...)
+			}
+			sectionHeader = nil
+			currentSection = nil
+		}
+
+		for _, item := range hw.items {
+			if item.IsSection {
+				flushSection()
+				h := item
+				sectionHeader = &h
+				continue
+			}
+			if FuzzyMatchHelpItem(filter, item) {
+				currentSection = append(currentSection, item)
+			}
+		}
+		flushSection()
+
+		hw.filteredItems = result
 	}
 
-	var result []HelpItem
-	var currentSection []HelpItem
-	var sectionHeader *HelpItem
-
-	flushSection := func() {
-		if sectionHeader != nil && len(currentSection) > 0 {
-			result = append(result, *sectionHeader)
-			result = append(result, currentSection...)
+	// Preserve cursor position if the same item is still in the filtered list.
+	if prevItemID >= 0 {
+		found := false
+		for i, item := range hw.filteredItems {
+			if item.ID == prevItemID {
+				hw.SelectedIdx = i
+				found = true
+				break
+			}
 		}
-		sectionHeader = nil
-		currentSection = nil
+		if found {
+			hw.ensureVisible()
+			hw.ClampScroll(hw.filteredLen())
+		} else {
+			// Previous item no longer in filtered list, reset to first item.
+			hw.SelectedIdx = 0
+			hw.clampSelection()
+		}
+	} else {
+		// No previous selection, reset to first item.
+		hw.SelectedIdx = 0
+		hw.clampSelection()
 	}
-
-	for _, item := range hw.items {
-		if item.IsSection {
-			flushSection()
-			h := item
-			sectionHeader = &h
-			continue
-		}
-		if FuzzyMatchHelpItem(filter, item) {
-			currentSection = append(currentSection, item)
-		}
-	}
-	flushSection()
-
-	hw.filteredItems = result
 }
 
 // filteredLen returns the length of filteredItems.
@@ -269,7 +309,6 @@ func (hw *HelpWindow) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	if handled {
 		if filterChanged {
 			hw.updateFilteredItems()
-			hw.clampSelection()
 		}
 
 		if !hw.FilterInputFocused {
@@ -300,13 +339,11 @@ func (hw *HelpWindow) ConsumePendingCommand() string {
 }
 
 // handleTabToList handles the tab key when switching focus from the search box
-// back to the list. If the user has typed a filter, the selection is reset to
-// the first matching item. Otherwise the original selection is preserved.
+// back to the list. The cursor is already preserved by updateFilteredItems
+// during typing, so no reset is needed.
 func (hw *HelpWindow) handleTabToList() {
-	if hw.FilterInput.Value() != "" {
-		hw.SelectedIdx = hw.firstSelectableIdx()
-		hw.ScrollIdx = 0
-	}
+	// Cursor was preserved by updateFilteredItems during typing.
+	// No reset needed.
 }
 
 // --- Navigation ---
@@ -379,7 +416,7 @@ func (hw *HelpWindow) clampSelection() {
 func (hw *HelpWindow) ensureVisible() {
 	listHeight := SelectorListRows
 
-	if hw.SelectedIdx <= hw.ScrollIdx && hw.SelectedIdx > 0 {
+	if hw.SelectedIdx <= hw.ScrollIdx {
 		hw.ScrollIdx = max(0, hw.SelectedIdx-1)
 	} else if hw.SelectedIdx >= hw.ScrollIdx+listHeight {
 		hw.ScrollIdx = hw.SelectedIdx - listHeight + 1
