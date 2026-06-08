@@ -511,7 +511,7 @@ func formatContextLimit(n int64) string {
 func buildSearchStr(m *searchableModel) string {
 	ctx := formatContextLimit(int64(m.ContextLimit))
 	provider := capitalize(m.ProtocolType)
-	return strings.ToLower(m.Name + " " + ctx + " " + provider)
+	return strings.ToLower(fmt.Sprintf("%d %s %s %s", m.ID, m.Name, ctx, provider))
 }
 
 // capitalize returns s with the first letter uppercased.
