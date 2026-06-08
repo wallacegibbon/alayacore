@@ -41,7 +41,6 @@ type ModelInfo struct {
 	ModelName    string `json:"model_name"`
 	ContextLimit int    `json:"context_limit"`
 	MaxTokens    int    `json:"max_tokens"`
-	IsActive     bool   `json:"is_active"`
 }
 
 // ModelManager manages model configurations
@@ -273,7 +272,6 @@ func (mm *ModelManager) GetModels() []ModelInfo {
 			ModelName:    m.ModelName,
 			ContextLimit: m.ContextLimit,
 			MaxTokens:    m.MaxTokens,
-			IsActive:     m.ID == mm.activeID,
 		}
 	}
 	return result
