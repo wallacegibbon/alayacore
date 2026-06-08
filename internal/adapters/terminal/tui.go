@@ -365,6 +365,13 @@ func (m *Terminal) updateStatus() {
 		segments = append(segments, strings.Join(switches, " "))
 	}
 
+	// Queue segment
+	if snap.QueueCount > 0 {
+		segments = append(segments,
+			keyStyle.Render("Q:")+valStyle.Render(fmt.Sprintf("%d", snap.QueueCount)),
+		)
+	}
+
 	// Context segment
 	if snap.ContextTokens > 0 {
 		var ctxVal string
@@ -376,13 +383,6 @@ func (m *Terminal) updateStatus() {
 		}
 		segments = append(segments,
 			valStyle.Render(ctxVal),
-		)
-	}
-
-	// Queue segment (2nd rightmost)
-	if snap.QueueCount > 0 {
-		segments = append(segments,
-			keyStyle.Render("Q:")+valStyle.Render(fmt.Sprintf("%d", snap.QueueCount)),
 		)
 	}
 

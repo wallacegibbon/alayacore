@@ -364,7 +364,7 @@ func (to *outputWriter) SnapshotModels() ModelSnapshot {
 	return to.status.snapshotModels()
 }
 
-// GetQueueItems returns and clears the pending queue items.
+// GetQueueItems returns the pending queue items (a copy, not cleared).
 func (to *outputWriter) GetQueueItems() []QueueItem {
 	return to.status.takeQueueItems()
 }

@@ -37,7 +37,8 @@ type sessionState struct {
 	activeModelName string
 	modelConfigPath string
 
-	// Queue items — set by handleSystemTask, cleared by GetQueueItems
+	// Queue items — set by handleSystemTask, read by GetQueueItems
+	// (set again on each task update, so no accumulation).
 	pendingQueueItems []QueueItem
 
 	// Theme — active theme broadcast by the session via TagSystemMsg.
@@ -198,11 +199,13 @@ func (s *sessionState) snapshotModels() ModelSnapshot {
 	return snap
 }
 
-// takeQueueItems returns and clears the pending queue items.
+// takeQueueItems returns the pending queue items without clearing them.
+// The status bar reads QueueCount from SnapshotStatus, so clearing would
+// lose the count after the first tick that consumes them.
 func (s *sessionState) takeQueueItems() []QueueItem {
 	s.mu.Lock()
-	items := s.pendingQueueItems
-	s.pendingQueueItems = nil
+	items := make([]QueueItem, len(s.pendingQueueItems))
+	copy(items, s.pendingQueueItems)
 	s.mu.Unlock()
 	return items
 }
