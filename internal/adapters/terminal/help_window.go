@@ -74,7 +74,7 @@ func buildHelpItems() []HelpItem {
 	items := []HelpItem{
 		// Commands
 		{ID: nextID(), IsSection: true, Description: "Commands"},
-		{ID: nextID(), Key: ":confirm <yes|no>", Description: "Confirm or deny pending tool", Type: HelpItemCommand},
+		{ID: nextID(), Key: ":confirm <id> <yes|no>", Description: "Confirm or deny pending tool", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":continue [skip]", Description: "Retry / skip failed prompt", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":reason <0|1|2>", Description: "Set reasoning level", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":cancel_all", Description: "Cancel all & clear queue", Type: HelpItemCommand},
