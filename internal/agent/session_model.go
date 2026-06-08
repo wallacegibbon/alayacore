@@ -29,7 +29,9 @@ func (s *Session) SwitchModel(modelConfig *ModelConfig) error {
 	return nil
 }
 
-func (s *Session) initModelManager() {
+// setActiveFromRuntimeConfig sets the active model from runtime.conf.
+// Falls back to the first available model if none is configured.
+func (s *Session) setActiveFromRuntimeConfig() {
 	if s.ModelManager == nil || s.RuntimeManager == nil {
 		return
 	}
@@ -56,11 +58,11 @@ func (s *Session) initToolConfirmSet(tools []string) {
 	}
 }
 
-// applyModelOverride applies the --model CLI flag override.
+// setActiveFromCliFlag applies the --model CLI flag override.
 // If overrideActiveModel is set and a model with that name exists in the
 // model config, it becomes the active model. If the name doesn't match
 // any configured model, an error is stored so the caller can report it and exit.
-func (s *Session) applyModelOverride() {
+func (s *Session) setActiveFromCliFlag() {
 	if s.OverrideActiveModel == "" || s.ModelManager == nil {
 		return
 	}

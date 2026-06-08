@@ -265,20 +265,20 @@ func (s *Session) handleModelLoad() {
 		}
 	}
 
-	// Snapshot the currently effective active model before initModelManager
+	// Snapshot the currently effective active model before setActiveFromRuntimeConfig
 	// re-reads runtime.conf and discards session-meta / CLI overrides.
 	prevActiveName := ""
 	if model := s.ModelManager.GetActive(); model != nil {
 		prevActiveName = model.Name
 	}
 
-	s.initModelManager()
+	s.setActiveFromRuntimeConfig()
 
 	// Restore the previously effective model if it still exists in the
 	// reloaded config. This preserves session-meta and --model CLI
 	// overrides that were applied at session construction time.
 	if prevActiveName != "" {
-		_ = s.ModelManager.SetActiveByName(prevActiveName) //nolint:errcheck // best-effort; falls back to initModelManager default
+		_ = s.ModelManager.SetActiveByName(prevActiveName) //nolint:errcheck // best-effort; falls back to setActiveFromRuntimeConfig default
 	}
 
 	// Re-initialize the provider/agent with the (potentially edited)

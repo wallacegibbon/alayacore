@@ -183,8 +183,8 @@ func NewSession(cfg SessionConfig) *Session {
 	}
 	s.reasoningLevel.Store(int64(config.DefaultReasoningLevel))
 	s.initToolConfirmSet(cfg.ToolConfirmTools)
-	s.initModelManager()
-	s.applyModelOverride()
+	s.setActiveFromRuntimeConfig()
+	s.setActiveFromCliFlag()
 	if model := s.ModelManager.GetActive(); model != nil {
 		s.applyModelContextLimit(model)
 	}
@@ -215,17 +215,17 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 	s.ContextTokens.Store(data.ContextTokens)
 
 	s.initToolConfirmSet(cfg.ToolConfirmTools)
-	s.initModelManager()
+	s.setActiveFromRuntimeConfig()
 
 	// Override runtime config default with the model saved in the session file.
 	// If the model was removed from config since the session was saved,
-	// fall back to whatever initModelManager already set.
+	// fall back to whatever setActiveFromRuntimeConfig already set.
 	if data.ActiveModel != "" {
-		_ = s.ModelManager.SetActiveByName(data.ActiveModel) //nolint:errcheck // best-effort restore, fall back to initModelManager default
+		_ = s.ModelManager.SetActiveByName(data.ActiveModel) //nolint:errcheck // best-effort restore, fall back to runtime config default
 	}
 
 	// --model CLI flag takes highest priority: override whatever was resolved above.
-	s.applyModelOverride()
+	s.setActiveFromCliFlag()
 
 	// Apply context limit from the resolved model so the status bar
 	// can show "tokens/limit (pct%)" immediately, before any API call.
