@@ -232,7 +232,7 @@ func (s *Session) handleModelSet(args []string) {
 	// Persist the switch. Sessions with a file-specified model store the
 	// preference in-memory (saved to the session file on :save), while
 	// sessions without one write to the global runtime.conf.
-	if s.sessionMetaModel != "" {
+	if s.SessionFile != "" {
 		s.sessionMetaModel = model.Name
 	} else if s.RuntimeManager != nil {
 		_ = s.RuntimeManager.SetActiveModel(model.Name) //nolint:errcheck // best-effort save, errors ignored
