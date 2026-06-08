@@ -31,8 +31,9 @@ var ErrResponseTruncated = errors.New("response truncated: hit output token limi
 
 // Tool represents an executable tool
 type Tool struct {
-	Definition ToolDefinition
-	Execute    func(ctx context.Context, input json.RawMessage) (ToolResultOutput, error)
+	Definition   ToolDefinition
+	Execute      func(ctx context.Context, input json.RawMessage) (ToolResultOutput, error)
+	SafeToConcur bool // when true, this tool can safely run in parallel with other SafeToConcur tools
 }
 
 // AgentConfig configures the agent
@@ -308,9 +309,20 @@ func (a *Agent) executeTool(ctx context.Context, tc ToolUsePart, callbacks Strea
 // Each tool call is first sent to OnToolConfirm (if set) for user approval.
 // If confirmation is denied (returns false), a failed result is returned instead
 // of executing the tool.
+//
+// All confirmed tools run concurrently via goroutines. Results are collected
+// in the same order as toolUses.
 func (a *Agent) executeTools(ctx context.Context, toolUses []ToolUsePart, callbacks StreamCallbacks) []ContentPart {
-	results := make([]ContentPart, 0, len(toolUses))
-	for _, tc := range toolUses {
+	results := make([]ContentPart, len(toolUses))
+
+	// Track which tools are confirmed for execution.
+	type toolJob struct {
+		index int
+		tc    ToolUsePart
+	}
+	var jobs []toolJob
+
+	for i, tc := range toolUses {
 		if callbacks.OnToolConfirm != nil {
 			allowed, err := callbacks.OnToolConfirm(tc.ID, tc.ToolName, tc.Input)
 			if err != nil {
@@ -320,10 +332,10 @@ func (a *Agent) executeTools(ctx context.Context, toolUses []ToolUsePart, callba
 				if callbacks.OnToolUseOutput != nil {
 					callbacks.OnToolUseOutput(tc.ID, failed) //nolint:errcheck
 				}
-				results = append(results, ToolResultPart{
+				results[i] = ToolResultPart{
 					ID:     tc.ID,
 					Output: failed,
-				})
+				}
 				continue
 			}
 			if !allowed {
@@ -333,15 +345,39 @@ func (a *Agent) executeTools(ctx context.Context, toolUses []ToolUsePart, callba
 				if callbacks.OnToolUseOutput != nil {
 					callbacks.OnToolUseOutput(tc.ID, denied) //nolint:errcheck
 				}
-				results = append(results, ToolResultPart{
+				results[i] = ToolResultPart{
 					ID:     tc.ID,
 					Output: denied,
-				})
+				}
 				continue
 			}
 		}
-		results = append(results, a.executeTool(ctx, tc, callbacks))
+		jobs = append(jobs, toolJob{index: i, tc: tc})
 	}
+
+	// Run all confirmed tools concurrently.
+	if len(jobs) > 0 {
+		type jobResult struct {
+			index   int
+			content ContentPart
+		}
+		ch := make(chan jobResult, len(jobs))
+
+		for _, job := range jobs {
+			go func(job toolJob) {
+				ch <- jobResult{
+					index:   job.index,
+					content: a.executeTool(ctx, job.tc, callbacks),
+				}
+			}(job)
+		}
+
+		for range jobs {
+			r := <-ch
+			results[r.index] = r.content
+		}
+	}
+
 	return results
 }
 
