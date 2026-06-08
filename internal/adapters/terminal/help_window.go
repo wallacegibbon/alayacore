@@ -12,16 +12,6 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-// FuzzyMatchHelpItem checks if the search term fuzzy-matches either the Key
-// or Description field of a HelpItem (case-insensitive).
-func FuzzyMatchHelpItem(search string, item HelpItem) bool {
-	if search == "" {
-		return true
-	}
-	return FuzzyMatch(search, strings.ToLower(item.Key)) ||
-		FuzzyMatch(search, strings.ToLower(item.Description))
-}
-
 // HelpItemType classifies a HelpItem as either a command or a key binding.
 type HelpItemType int
 
@@ -37,6 +27,7 @@ type HelpItem struct {
 	Description string
 	IsSection   bool         // true for section headers
 	Type        HelpItemType // HelpItemCommand for :commands, HelpItemKey for key bindings
+	searchStr   string       // pre-computed lowercase "key description" for fuzzy matching
 }
 
 // HelpWindow manages a help overlay that displays keybindings and commands.
@@ -80,7 +71,7 @@ func buildHelpItems() []HelpItem {
 		id++
 		return id
 	}
-	return []HelpItem{
+	items := []HelpItem{
 		// Commands
 		{ID: nextID(), IsSection: true, Description: "Commands"},
 		{ID: nextID(), Key: ":confirm <yes|no>", Description: "Confirm or deny pending tool", Type: HelpItemCommand},
@@ -131,6 +122,12 @@ func buildHelpItems() []HelpItem {
 		{ID: nextID(), Key: ":", Description: "Enter command mode", Type: HelpItemKey},
 		{ID: nextID(), Key: "Space", Description: "Toggle window fold", Type: HelpItemKey},
 	}
+	for i := range items {
+		if !items[i].IsSection {
+			items[i].searchStr = strings.ToLower(items[i].Key + " " + items[i].Description)
+		}
+	}
+	return items
 }
 
 // --- Column Widths ---
@@ -239,7 +236,7 @@ func (hw *HelpWindow) updateFilteredItems() {
 				sectionHeader = &h
 				continue
 			}
-			if FuzzyMatchHelpItem(filter, item) {
+			if FuzzyMatch(filter, item.searchStr) {
 				currentSection = append(currentSection, item)
 			}
 		}

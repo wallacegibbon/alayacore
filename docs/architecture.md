@@ -233,4 +233,5 @@ correct base directory for the current session.
 7. **Context Efficiency** — Large outputs (>64KB) saved to `.alayacore.tmp/` instead of inline. See [truncation.md](truncation.md).
 8. **Reasoning Mode** — Provider-specific thinking fields added to API requests. Three levels: 0=off, 1=normal, 2=max. Toggled via `:reason [0|1|2]`.
 9. **Concurrent Task Execution** — Each task runs in its own goroutine so the main loop stays responsive during LLM streaming. Communication via typed channels and atomic fields.
+10. **Filter-What-You-See** — Searchable list components (ModelSelector, HelpWindow) build a pre-computed, lowercased `searchStr` that concatenates all visible fields of each item. Filtering is a single `FuzzyMatch(term, searchStr)` against this string, ensuring the search always matches exactly what the user can see, including cross-field queries (e.g. typing "quitexit" matches `:quit` + `Exit application`).
 

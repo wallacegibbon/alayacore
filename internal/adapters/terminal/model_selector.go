@@ -19,7 +19,7 @@ import (
 // lowercase search string for fuzzy matching.
 type searchableModel struct {
 	agentpkg.ModelInfo
-	searchStr string // lowercase display string for fuzzy search: "name context provider modelname baseurl"
+	searchStr string // lowercase "id name context provider" — matches what users see in the list
 }
 
 // ModelSelector manages model selection and configuration UI.
