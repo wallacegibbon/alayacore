@@ -266,6 +266,7 @@ func (s *Session) handleModelLoad() {
 	}
 
 	s.initModelManager()
+	s.sendModelListMsg()
 	s.sendSystemInfo("model")
 	s.writeNotify("Models reloaded from configuration file")
 }
