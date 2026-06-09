@@ -39,26 +39,8 @@ const (
 
 // ConfirmDialog manages a floating confirmation overlay.
 //
-// Renders as a centered dialog box:
-//
-//	┌──────────────────────────────┐
-//	│                              │
-//	│     Exit AlayaCore?          │
-//	│                              │
-//	│     y / n                    │
-//	│                              │
-//	└──────────────────────────────┘
-//
-// For tool confirmations, the tool input is shown below the message:
-//
-//	┌──────────────────────────────┐
-//	│                              │
-//	│  Allow "read_file" to run?   │
-//	│  read_file: /path/to/file    │
-//	│                              │
-//	│     y / n                    │
-//	│                              │
-//	└──────────────────────────────┘
+// Renders as a centered dialog box.
+// For tool confirmations, the tool input is shown below the message.
 //
 // Key handling: y/Y = confirm, n/N/esc = cancel.
 type ConfirmDialog struct {
@@ -157,8 +139,17 @@ func (cd *ConfirmDialog) OpenTool(toolID, toolName, toolInput string) {
 	// Derive description from tool input (up to 2 line-break segments).
 	// HardWrap in buildContentLines handles wrapping long lines, and the
 	// 2-row cap with "..." handles overflow beyond 2 rows.
+	// Strip the redundant "toolName: " prefix since it's already shown in the title.
 	parts := strings.SplitN(toolInput, "\n", 2)
-	cd.Description = strings.Join(parts, "\n")
+	desc := strings.Join(parts, "\n")
+	if toolName != "" && strings.HasPrefix(desc, toolName+": ") {
+		desc = desc[len(toolName)+2:]
+	}
+	// Strip trailing newline — FormatCall adds one for display window layout,
+	// but in the confirm dialog it creates a spurious empty line that triggers
+	// the 2-row "..." truncation prematurely.
+	desc = strings.TrimRight(desc, "\n")
+	cd.Description = desc
 	cd.Confirmed = false
 	cd.Canceled = false
 }

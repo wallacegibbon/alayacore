@@ -67,10 +67,7 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// 5. Confirm dialog blocks all normal input
 	if m.confirmOverlay.IsOpen() {
-		if handled := m.confirmOverlay.HandleKeyMsg(msg); handled {
-			return m.handleConfirmResult()
-		}
-		return m, nil
+		return m.handleOverlayConfirm(msg)
 	}
 
 	// 6. Tab toggles focus between display and input
@@ -286,6 +283,23 @@ func (m *Terminal) handleOverlayQueueManager(msg tea.KeyMsg) (tea.Model, tea.Cmd
 		m.restoreFocus()
 	}
 	return m, cmd
+}
+
+// handleOverlayConfirm handles keyboard input when the confirm dialog is open.
+func (m *Terminal) handleOverlayConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// 'e' opens the full tool input in an external editor for inspection
+	// (view-only — dialog stays open after editor closes)
+	if msg.String() == keyE && m.confirmOverlay.Kind == ConfirmTool && m.confirmOverlay.ToolInput != "" {
+		content := m.confirmOverlay.ToolInput
+		if toolName := m.confirmOverlay.ToolName; toolName != "" && strings.HasPrefix(content, toolName+": ") {
+			content = content[len(toolName)+2:]
+		}
+		return m, m.editor.OpenForDisplay(content)
+	}
+	if handled := m.confirmOverlay.HandleKeyMsg(msg); handled {
+		return m.handleConfirmResult()
+	}
+	return m, nil
 }
 
 // Display key handler helpers (shared between multiple keys).

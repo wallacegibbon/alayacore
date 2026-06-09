@@ -131,6 +131,18 @@ When you submit prompts or commands while a previous task is running, they are q
 
 Each queued task shows its queue ID (Q1, Q2, …), type (`P` for prompt, `C` for command), and a truncated content preview.
 
+## Tool Confirm Dialog
+
+When a tool requires confirmation (configured via `--tool-confirm`), a dialog overlay appears:
+
+| Key | Action |
+|-----|--------|
+| `y` | Allow the tool to run |
+| `n`, `Esc` | Reject the tool |
+| `e` | Open full tool input in external editor (view-only) |
+
+The dialog shows the tool name in the title and a 2-line preview of the tool's input arguments. Press `e` to inspect the complete input in `$EDITOR` without closing the dialog.
+
 ## Line Wrapping
 
 Content in each window is soft-wrapped to fit the available width. The wrapping is **character-boundary** — it breaks mid-word when a word exceeds the line width, matching how a typical terminal behaves.
