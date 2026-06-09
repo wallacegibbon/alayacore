@@ -45,19 +45,6 @@ func (s *Session) setActiveFromRuntimeConfig() {
 	s.ModelManager.SetActiveToFirst()
 }
 
-// initToolConfirmSet builds the tool confirmation lookup set from config.
-// If ToolConfirmTools is empty, toolConfirmSet stays nil and no tools
-// require confirmation.
-func (s *Session) initToolConfirmSet(tools []string) {
-	if len(tools) == 0 {
-		return
-	}
-	s.toolConfirmSet = make(map[string]struct{}, len(tools))
-	for _, name := range tools {
-		s.toolConfirmSet[name] = struct{}{}
-	}
-}
-
 // setActiveFromSessionMeta restores the model saved in the session file's
 // frontmatter, if one was set. This is a best-effort override — if the
 // model was removed from config since the session was saved, the current

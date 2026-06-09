@@ -255,3 +255,16 @@ func (s *Session) cancelRunningTask() bool {
 	}
 	return false
 }
+
+// initToolConfirmSet builds the tool confirmation lookup set from config.
+// If ToolConfirmTools is empty, toolConfirmSet stays nil and no tools
+// require confirmation.
+func (s *Session) initToolConfirmSet(tools []string) {
+	if len(tools) == 0 {
+		return
+	}
+	s.toolConfirmSet = make(map[string]struct{}, len(tools))
+	for _, name := range tools {
+		s.toolConfirmSet[name] = struct{}{}
+	}
+}
