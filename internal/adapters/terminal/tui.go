@@ -458,52 +458,34 @@ func (m *Terminal) View() tea.View {
 
 	baseContent := sb.String()
 
-	// Render confirm overlay if open (highest priority — blocks all other interaction)
+	// Layer 1: Regular overlay windows (model selector, theme selector, queue manager, help).
+	// These are mutually exclusive — only one can be open at a time.
+	overlayContent := baseContent
+
+	switch {
+	case m.modelSelector.IsOpen():
+		overlayContent = m.modelSelector.RenderOverlay(baseContent, m.windowWidth, m.windowHeight)
+	case m.themeSelector.IsOpen():
+		overlayContent = m.themeSelector.RenderOverlay(baseContent, m.windowWidth, m.windowHeight)
+	case m.queueManager.IsOpen():
+		overlayContent = m.queueManager.RenderOverlay(baseContent, m.windowWidth, m.windowHeight)
+	case m.helpWindow.IsOpen():
+		overlayContent = m.helpWindow.RenderOverlay(baseContent, m.windowWidth, m.windowHeight)
+	}
+
+	// Layer 2: Confirm dialog — rendered ON TOP of any regular overlay.
+	// Confirm is a separate layer because it must be visible even when
+	// another overlay (e.g. model selector) is active, for example when
+	// a tool confirmation arrives while the model selector is open.
 	if m.confirmOverlay.IsOpen() {
-		fullContent := m.confirmOverlay.RenderOverlay(baseContent, m.windowWidth, m.windowHeight)
+		fullContent := m.confirmOverlay.RenderOverlay(overlayContent, m.windowWidth, m.windowHeight)
 		v := tea.NewView(fullContent)
 		v.AltScreen = true
 		v.ReportFocus = true
 		return v
 	}
 
-	// Render model selector overlay if open
-	if m.modelSelector.IsOpen() {
-		fullContent := m.modelSelector.RenderOverlay(baseContent, m.windowWidth, m.windowHeight)
-		v := tea.NewView(fullContent)
-		v.AltScreen = true
-		v.ReportFocus = true
-		return v
-	}
-
-	// Render theme selector overlay if open
-	if m.themeSelector.IsOpen() {
-		fullContent := m.themeSelector.RenderOverlay(baseContent, m.windowWidth, m.windowHeight)
-		v := tea.NewView(fullContent)
-		v.AltScreen = true
-		v.ReportFocus = true
-		return v
-	}
-
-	// Render queue manager overlay if open
-	if m.queueManager.IsOpen() {
-		fullContent := m.queueManager.RenderOverlay(baseContent, m.windowWidth, m.windowHeight)
-		v := tea.NewView(fullContent)
-		v.AltScreen = true
-		v.ReportFocus = true
-		return v
-	}
-
-	// Render help window overlay if open
-	if m.helpWindow.IsOpen() {
-		fullContent := m.helpWindow.RenderOverlay(baseContent, m.windowWidth, m.windowHeight)
-		v := tea.NewView(fullContent)
-		v.AltScreen = true
-		v.ReportFocus = true
-		return v
-	}
-
-	v := tea.NewView(baseContent)
+	v := tea.NewView(overlayContent)
 	v.AltScreen = true
 	v.ReportFocus = true
 	return v

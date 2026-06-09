@@ -30,22 +30,29 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Suspend
 	}
 
-	// 1. Theme selector takes precedence when open
+	// 1. Confirm dialog takes priority over all other overlays.
+	//    It must be on a higher layer because confirmations (e.g. tool
+	//    execution prompts) can appear while another overlay is active.
+	if m.confirmOverlay.IsOpen() {
+		return m.handleOverlayConfirm(msg)
+	}
+
+	// 2. Theme selector takes precedence when open
 	if m.themeSelector.IsOpen() {
 		return m.handleThemeSelectorKeys(msg)
 	}
 
-	// 2. Model selector takes precedence when open
+	// 3. Model selector takes precedence when open
 	if m.modelSelector.IsOpen() {
 		return m.handleOverlayModelSelector(msg)
 	}
 
-	// 3. Queue manager takes precedence when open
+	// 4. Queue manager takes precedence when open
 	if m.queueManager.IsOpen() {
 		return m.handleOverlayQueueManager(msg)
 	}
 
-	// 4. Help window takes precedence when open
+	// 5. Help window takes precedence when open
 	if m.helpWindow.IsOpen() {
 		t := trackOverlay(m.helpWindow)
 		cmd := m.helpWindow.HandleKeyMsg(msg)
@@ -63,11 +70,6 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.restoreFocus()
 		}
 		return m, cmd
-	}
-
-	// 5. Confirm dialog blocks all normal input
-	if m.confirmOverlay.IsOpen() {
-		return m.handleOverlayConfirm(msg)
 	}
 
 	// 6. Tab toggles focus between display and input
@@ -183,26 +185,45 @@ func (m *Terminal) handleConfirmResult() (tea.Model, tea.Cmd) {
 	m.confirmFromCommand = false
 
 	if canceled {
-		// Clear input if the confirm was triggered by a :command
-		if fromCmd {
-			m.input.SetValue("")
-		}
-		// For tool confirm, send :confirm no even on cancel
-		if kind == ConfirmTool {
-			m.emitCommand(":confirm " + toolID + " no")
-			m.restoreFocus()
-			// Immediately check for the next pending confirm.
-			if id, toolName, toolInput, ok := m.out.GetPendingToolConfirm(); ok {
-				m.openConfirmTool(id, toolName, toolInput)
-			}
-			return m, scheduleTick()
-		}
-		// Restore focus to whatever window was active before the overlay
-		m.restoreFocus()
-		return m, nil
+		return m.handleConfirmCanceled(kind, toolID, fromCmd)
+	}
+	return m.handleConfirmConfirmed(kind, toolID, fromCmd)
+}
+
+// restoreFocusAfterConfirm restores input/display focus only if no overlay
+// is still open. If another overlay (e.g. model selector) was active before
+// the confirm appeared, it remains active — the overlay naturally catches
+// keys in handleKeyMsg.
+func (m *Terminal) restoreFocusAfterConfirm() {
+	if m.modelSelector.IsOpen() || m.themeSelector.IsOpen() ||
+		m.queueManager.IsOpen() || m.helpWindow.IsOpen() {
+		m.display.updateContent()
+		return
+	}
+	m.restoreFocus()
+}
+
+// handleConfirmCanceled handles the cancel path of a confirm dialog result.
+func (m *Terminal) handleConfirmCanceled(kind ConfirmKind, toolID string, fromCmd bool) (tea.Model, tea.Cmd) {
+	if fromCmd {
+		m.input.SetValue("")
 	}
 
-	// confirmed
+	if kind == ConfirmTool {
+		m.emitCommand(":confirm " + toolID + " no")
+		m.restoreFocusAfterConfirm()
+		if id, toolName, toolInput, ok := m.out.GetPendingToolConfirm(); ok {
+			m.openConfirmTool(id, toolName, toolInput)
+		}
+		return m, scheduleTick()
+	}
+
+	m.restoreFocusAfterConfirm()
+	return m, nil
+}
+
+// handleConfirmConfirmed handles the confirm (yes) path of a confirm dialog result.
+func (m *Terminal) handleConfirmConfirmed(kind ConfirmKind, toolID string, fromCmd bool) (tea.Model, tea.Cmd) {
 	switch kind {
 	case ConfirmQuit:
 		m.quitting = true
@@ -214,27 +235,26 @@ func (m *Terminal) handleConfirmResult() (tea.Model, tea.Cmd) {
 		if fromCmd {
 			m.input.SetValue("")
 		}
-		m.restoreFocus()
+		m.restoreFocusAfterConfirm()
 		return m, m.submitCommand(agentpkg.CommandNameCancel, fromCmd)
 
 	case ConfirmCancelAll:
 		if fromCmd {
 			m.input.SetValue("")
 		}
-		m.restoreFocus()
+		m.restoreFocusAfterConfirm()
 		return m, m.submitCommand(agentpkg.CommandNameCancelAll, fromCmd)
 
 	case ConfirmTool:
 		m.emitCommand(":confirm " + toolID + " yes")
-		m.restoreFocus()
-		// Immediately check for the next pending confirm.
+		m.restoreFocusAfterConfirm()
 		if nextID, nextName, nextInput, ok := m.out.GetPendingToolConfirm(); ok {
 			m.openConfirmTool(nextID, nextName, nextInput)
 		}
 		return m, scheduleTick()
 	}
 
-	m.restoreFocus()
+	m.restoreFocusAfterConfirm()
 	return m, nil
 }
 
