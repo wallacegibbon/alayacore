@@ -32,7 +32,7 @@ var ErrResponseTruncated = errors.New("response truncated: hit output token limi
 // Tool represents an executable tool
 type Tool struct {
 	Definition ToolDefinition
-	Execute    func(ctx context.Context, input json.RawMessage) (ToolResultOutput, error)
+	Execute    func(ctx context.Context, input json.RawMessage) ([]ContentPart, error)
 }
 
 // AgentConfig configures the agent
@@ -61,7 +61,7 @@ type StreamCallbacks struct {
 	OnToolUseStart   func(id, toolName string) error
 	OnToolUseInput   func(id string, input json.RawMessage) error
 	OnToolConfirm    func(requests []ToolConfirmRequest) <-chan ToolConfirmResponse
-	OnToolUseOutput  func(id string, output ToolResultOutput) error
+	OnToolUseOutput  func(id string, content []ContentPart, err error) error
 	OnStepStart      func(step int) error
 	OnStepFinish     func(messages []Message, usage Usage) error
 }
@@ -297,11 +297,11 @@ func (a *Agent) executeDeferredTools(ctx context.Context, deferred []ToolUsePart
 		pendingConfirm--
 
 		if resp.Error != "" {
-			resultCh <- newToolResult(callbacks, resp.ID, ToolResultOutputFailed{Reason: resp.Error})
+			resultCh <- newToolResult(callbacks, resp.ID, nil, fmt.Errorf("denied: %s", resp.Error))
 			continue
 		}
 		if !resp.Allowed {
-			resultCh <- newToolResult(callbacks, resp.ID, ToolResultOutputFailed{Reason: "Tool execution denied by user"})
+			resultCh <- newToolResult(callbacks, resp.ID, nil, fmt.Errorf("Tool execution denied by user"))
 			continue
 		}
 
@@ -383,27 +383,27 @@ func (a *Agent) executeTool(ctx context.Context, tc ToolUsePart, callbacks Strea
 	}
 
 	if tool == nil {
-		return ToolResultPart{
-			ID:     tc.ID,
-			Output: ToolResultOutputFailed{Reason: fmt.Sprintf("unknown tool: %s", tc.ToolName)},
-		}
+		return newToolResult(callbacks, tc.ID, nil, fmt.Errorf("unknown tool: %s", tc.ToolName))
 	}
 
-	output, err := tool.Execute(ctx, tc.Input)
-	if err != nil {
-		output = ToolResultOutputFailed{Reason: err.Error()}
-	}
-
-	return newToolResult(callbacks, tc.ID, output)
+	content, err := tool.Execute(ctx, tc.Input)
+	return newToolResult(callbacks, tc.ID, content, err)
 }
 
 // newToolResult creates a ToolResultPart and fires the OnToolUseOutput callback
 // so the UI is notified immediately as each tool finishes.
-func newToolResult(callbacks StreamCallbacks, id string, output ToolResultOutput) ToolResultPart {
+func newToolResult(callbacks StreamCallbacks, id string, content []ContentPart, err error) ToolResultPart {
 	if callbacks.OnToolUseOutput != nil {
-		callbacks.OnToolUseOutput(id, output) //nolint:errcheck
+		callbacks.OnToolUseOutput(id, content, err) //nolint:errcheck
 	}
-	return ToolResultPart{ID: id, Output: output}
+	if content == nil {
+		content = []ContentPart{}
+	}
+	isError := err != nil
+	if isError && len(content) == 0 {
+		content = []ContentPart{TextPart{Text: err.Error()}}
+	}
+	return ToolResultPart{ID: id, Content: content, IsError: isError}
 }
 
 // extractToolUses extracts ToolUseParts from message content.// Results are collected in the same order as toolUses.

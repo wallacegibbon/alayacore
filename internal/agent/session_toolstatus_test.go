@@ -3,6 +3,7 @@ package agent
 import (
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/alayacore/alayacore/internal/llm"
@@ -10,16 +11,13 @@ import (
 )
 
 func TestWriteToolOutput(t *testing.T) {
-	// Create a mock output to capture TLV messages
 	output := &mockOutput{}
 	session := &Session{
 		SessionConfig: SessionConfig{Output: output},
 	}
 
-	// Test success case
 	session.writeToolUseOutput("tool123", "output text", false)
 
-	// Parse the written data to extract TLV
 	tag, value := parseTLVFromBytes(output.data)
 	if tag != stream.TagUserF {
 		t.Errorf("Expected tag %s, got %s", stream.TagUserF, tag)
@@ -29,11 +27,12 @@ func TestWriteToolOutput(t *testing.T) {
 	if err := json.Unmarshal([]byte(value), &got); err != nil {
 		t.Fatalf("Failed to parse UF JSON: %v", err)
 	}
-	if got.ID != "tool123" || got.Output != "output text" || got.IsError != false {
-		t.Errorf("Expected {tool123, output text, false}, got {%s, %s, %t}", got.ID, got.Output, got.IsError)
+	if got.ID != "tool123" || got.IsError != false {
+		t.Errorf("Expected {tool123, false}, got {%s, %t}", got.ID, got.IsError)
 	}
+	// Content should contain the output text
+	checkToolResultContent(t, got.Output, "output text")
 
-	// Test error case
 	output.data = nil
 	session.writeToolUseOutput("tool456", "error message", true)
 
@@ -45,52 +44,44 @@ func TestWriteToolOutput(t *testing.T) {
 	if err := json.Unmarshal([]byte(value), &got); err != nil {
 		t.Fatalf("Failed to parse UF JSON: %v", err)
 	}
-	if got.ID != "tool456" || got.Output != "error message" || got.IsError != true {
-		t.Errorf("Expected {tool456, error message, true}, got {%s, %s, %t}", got.ID, got.Output, got.IsError)
+	if got.ID != "tool456" || got.IsError != true {
+		t.Errorf("Expected {tool456, true}, got {%s, %t}", got.ID, got.IsError)
 	}
+	checkToolResultContent(t, got.Output, "error message")
 }
 
 func TestOnToolUseOutputCallback(t *testing.T) {
-	// Create a session with mock output
 	output := &mockOutput{}
 	session := &Session{
 		SessionConfig: SessionConfig{Output: output},
 		Messages:      []llm.Message{},
 	}
 
-	// Create a mock tool result callback (simulating what happens in processPrompt)
-	callback := func(id string, toolResult llm.ToolResultOutput) error { //nolint:unparam // callback signature required by interface
-		// Add tool result message to session messages
+	// Simulate the OnToolUseOutput callback from processPrompt
+	callback := func(id string, content []llm.ContentPart, err error) {
 		session.Messages = append(session.Messages, llm.Message{
 			Role: llm.RoleTool,
 			Content: []llm.ContentPart{llm.ToolResultPart{
-				ID:     id,
-				Output: toolResult,
+				ID:      id,
+				Content: content,
+				IsError: err != nil,
 			}},
 		})
 
-		// Send tool result with error flag to adapter
-		if textOutput, ok := toolResult.(llm.ToolResultOutputText); ok {
-			session.writeToolUseOutput(id, textOutput.Text, false)
-		} else if errOutput, ok := toolResult.(llm.ToolResultOutputFailed); ok {
-			session.writeToolUseOutput(id, errOutput.Reason, true)
+		displayText := extractDisplayText(content)
+		if err != nil {
+			session.writeToolUseOutput(id, displayText, true)
+		} else {
+			session.writeToolUseOutput(id, displayText, false)
 		}
-
-		return nil
 	}
 
-	// Test success result
-	err := callback("call1", llm.ToolResultOutputText{Text: "success output"})
-	if err != nil {
-		t.Fatalf("Callback returned error: %v", err)
-	}
+	callback("call1", []llm.ContentPart{llm.TextPart{Text: "success output"}}, nil)
 
-	// Check that message was added
 	if len(session.Messages) != 1 {
 		t.Fatalf("Expected 1 message, got %d", len(session.Messages))
 	}
 
-	// Check that TLV was sent
 	tag, value := parseTLVFromBytes(output.data)
 	if tag != stream.TagUserF {
 		t.Errorf("Expected tag %s, got %s", stream.TagUserF, tag)
@@ -104,12 +95,8 @@ func TestOnToolUseOutputCallback(t *testing.T) {
 		t.Errorf("Expected {call1, false}, got {%s, %t}", got.ID, got.IsError)
 	}
 
-	// Test error result
 	output.data = nil
-	err = callback("call2", llm.ToolResultOutputFailed{Reason: "something failed"})
-	if err != nil {
-		t.Fatalf("Callback returned error: %v", err)
-	}
+	callback("call2", []llm.ContentPart{llm.TextPart{Text: "something failed"}}, errors.New("something failed"))
 
 	tag, value = parseTLVFromBytes(output.data)
 	if tag != stream.TagUserF {
@@ -125,7 +112,6 @@ func TestOnToolUseOutputCallback(t *testing.T) {
 }
 
 func TestWriteToolCallWithPending(t *testing.T) {
-	// Create a session with mock output
 	output := &mockOutput{}
 	session := &Session{
 		SessionConfig: SessionConfig{Output: output},
@@ -133,16 +119,11 @@ func TestWriteToolCallWithPending(t *testing.T) {
 
 	session.writeToolUseInput(`{"command":"ls"}`, "tool123")
 
-	// Should have written one TLV message: AF with type "call"
-	// Status "pending" is inferred by the terminal from window creation.
-
-	// Parse the message (tool call display)
 	tag1, value1 := parseTLVFromBytes(output.data)
 	if tag1 != stream.TagAssistantF {
 		t.Errorf("Expected tag %s, got %s", stream.TagAssistantF, tag1)
 	}
 
-	// The tool call should be JSON with id, input (name omitted for input frame)
 	var fd1 stream.ToolUseData
 	if err := json.Unmarshal([]byte(value1), &fd1); err != nil {
 		t.Fatalf("Failed to parse AF JSON: %v", err)
@@ -158,7 +139,26 @@ func TestWriteToolCallWithPending(t *testing.T) {
 	}
 }
 
-// parseTLVFromBytes extracts tag and value from TLV-encoded bytes
+func checkToolResultContent(t *testing.T, content json.RawMessage, expectedText string) {
+	t.Helper()
+	var items []struct {
+		Type string `json:"type"`
+		Text string `json:"text,omitempty"`
+	}
+	if err := json.Unmarshal(content, &items); err != nil {
+		t.Fatalf("Failed to parse content: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("Expected 1 content item, got %d", len(items))
+	}
+	if items[0].Type != "text" {
+		t.Errorf("Expected type 'text', got %q", items[0].Type)
+	}
+	if items[0].Text != expectedText {
+		t.Errorf("Expected text %q, got %q", expectedText, items[0].Text)
+	}
+}
+
 func parseTLVFromBytes(data []byte) (string, string) {
 	if len(data) < 6 {
 		return "", ""

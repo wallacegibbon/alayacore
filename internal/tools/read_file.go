@@ -3,8 +3,12 @@ package tools
 import (
 	"bufio"
 	"context"
+	"encoding/base64"
 	"fmt"
+	"mime"
+	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/alayacore/alayacore/internal/llm"
@@ -23,22 +27,70 @@ type ReadFileInput struct {
 func NewReadFileTool() llm.Tool {
 	return llm.NewTool(
 		"read_file",
-		"Read the contents of a file. Supports optional line range using start_line and end_line parameters (1-indexed).",
+		`Read file contents. For image files (PNG, JPEG, etc.), returns the image directly for you to see. For text files, supports optional line range using start_line and end_line parameters (1-indexed).`,
 	).
 		WithSchema(llm.MustGenerateSchema(ReadFileInput{})).
 		WithExecute(llm.TypedExecute(executeReadFile)).
 		Build()
 }
 
-func executeReadFile(ctx context.Context, args ReadFileInput) (llm.ToolResultOutput, error) {
+// imageMimePrefixes are MIME type prefixes that indicate an image file.
+var imageMimePrefixes = []string{"image/"}
+
+// isImageFile checks whether the file at path is an image by examining
+// the extension and content. Returns the MIME type if it's an image.
+func isImageFile(path string) (mimeType string, ok bool) {
+	// First try extension-based detection
+	ext := strings.ToLower(filepath.Ext(path))
+	if ext != "" {
+		mimeType = mime.TypeByExtension(ext)
+		if mimeType != "" {
+			for _, prefix := range imageMimePrefixes {
+				if strings.HasPrefix(mimeType, prefix) {
+					return mimeType, true
+				}
+			}
+		}
+	}
+
+	// Extension didn't match — sniff content (first 512 bytes)
+	f, err := os.Open(path)
+	if err != nil {
+		return "", false
+	}
+	defer f.Close()
+
+	buf := make([]byte, 512)
+	n, _ := f.Read(buf) //nolint:errcheck // partial read is fine for sniffing
+	if n == 0 {
+		return "", false
+	}
+
+	mimeType = http.DetectContentType(buf[:n])
+	for _, prefix := range imageMimePrefixes {
+		if strings.HasPrefix(mimeType, prefix) {
+			return mimeType, true
+		}
+	}
+	return "", false
+}
+
+func executeReadFile(ctx context.Context, args ReadFileInput) ([]llm.ContentPart, error) {
 	info, err := os.Stat(args.Path)
 	if err != nil {
-		return llm.NewToolResultOutputFailed(err.Error()), nil
+		return nil, err
 	}
 
 	// Validate line range parameters
 	if valErr := validateLineRange(args.StartLine, args.EndLine); valErr != nil {
-		return llm.NewToolResultOutputFailed(valErr.Error()), nil
+		return nil, valErr
+	}
+
+	// Detect image files — return image content directly
+	if args.StartLine == 0 && args.EndLine == 0 {
+		if mimeType, ok := isImageFile(args.Path); ok {
+			return readImageFile(args.Path, mimeType, info.Size())
+		}
 	}
 
 	// Full file read case
@@ -49,32 +101,58 @@ func executeReadFile(ctx context.Context, args ReadFileInput) (llm.ToolResultOut
 		var content []byte
 		content, err = os.ReadFile(args.Path)
 		if err != nil {
-			return llm.NewToolResultOutputFailed(err.Error()), nil
+			return nil, err
 		}
-		return llm.NewToolResultOutputText(string(content)), nil
+		return []llm.ContentPart{llm.TextPart{Text: string(content)}}, nil
 	}
 
 	// Line range case: stream from file to avoid loading entire file into memory
 	file, err := os.Open(args.Path)
 	if err != nil {
-		return llm.NewToolResultOutputFailed(err.Error()), nil
+		return nil, err
 	}
 	defer file.Close()
 
 	lines, err := readLinesRange(ctx, file, args.StartLine, args.EndLine)
 	if err != nil {
-		return llm.NewToolResultOutputFailed(err.Error()), nil
+		return nil, err
 	}
 
-	return llm.NewToolResultOutputText(strings.Join(lines, "\n")), nil
+	return []llm.ContentPart{llm.TextPart{Text: strings.Join(lines, "\n")}}, nil
+}
+
+// readImageFile reads an image file and returns an ImagePart with base64-encoded data.
+// Images larger than maxFullReadSize are reported as too large rather than
+// being embedded in the conversation (base64 expands size by ~33%).
+func readImageFile(path, mimeType string, size int64) ([]llm.ContentPart, error) {
+	if size > maxFullReadSize {
+		return []llm.ContentPart{llm.TextPart{Text: fmt.Sprintf(
+			"Image %s (%.1fKB) exceeds the %dKB limit for direct reading. Use execute_command to process it.",
+			filepath.Base(path), float64(size)/1024, maxFullReadSize/1024,
+		)}}, nil
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	b64 := base64.StdEncoding.EncodeToString(data)
+	dataURL := fmt.Sprintf("data:%s;base64,%s", mimeType, b64)
+	sizeKB := float64(size) / 1024
+
+	return []llm.ContentPart{
+		llm.TextPart{Text: fmt.Sprintf("Read %s (%.1fKB)", filepath.Base(path), sizeKB)},
+		llm.ImagePart{DataURL: dataURL},
+	}, nil
 }
 
 // readLargeFileTruncated reads a large file up to maxFullReadSize and returns
 // the content with metadata about the truncation.
-func readLargeFileTruncated(path string, totalSize int64) (llm.ToolResultOutput, error) {
+func readLargeFileTruncated(path string, totalSize int64) ([]llm.ContentPart, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return llm.NewToolResultOutputFailed(err.Error()), nil
+		return nil, err
 	}
 	defer file.Close()
 
@@ -86,12 +164,12 @@ func readLargeFileTruncated(path string, totalSize int64) (llm.ToolResultOutput,
 		totalLines++
 	}
 	if err := scanner.Err(); err != nil {
-		return llm.NewToolResultOutputFailed(err.Error()), nil
+		return nil, err
 	}
 
 	// Reset file position for second pass
 	if _, err := file.Seek(0, 0); err != nil {
-		return llm.NewToolResultOutputFailed(err.Error()), nil
+		return nil, err
 	}
 
 	// Second pass: read lines up to maxFullReadSize
@@ -113,7 +191,7 @@ func readLargeFileTruncated(path string, totalSize int64) (llm.ToolResultOutput,
 		bytesRead += lineBytes
 	}
 	if err := scanner.Err(); err != nil {
-		return llm.NewToolResultOutputFailed(err.Error()), nil
+		return nil, err
 	}
 
 	shownLines := len(lines)
@@ -124,7 +202,7 @@ func readLargeFileTruncated(path string, totalSize int64) (llm.ToolResultOutput,
 		float64(bytesRead)/1024, float64(totalSize)/1024,
 	)
 
-	return llm.NewToolResultOutputText(header + "\n" + content), nil
+	return []llm.ContentPart{llm.TextPart{Text: header + "\n" + content}}, nil
 }
 
 func validateLineRange(startLine, endLine int) error {

@@ -46,12 +46,12 @@ func TestFullIntegration(t *testing.T) {
 
 	echoTool := llm.NewTool("echo", "Echo back a message").
 		WithSchema(llm.MustGenerateSchema(EchoInput{})).
-		WithExecute(func(_ context.Context, input json.RawMessage) (llm.ToolResultOutput, error) {
+		WithExecute(func(_ context.Context, input json.RawMessage) ([]llm.ContentPart, error) {
 			var params EchoInput
 			if unmarshalErr := json.Unmarshal(input, &params); unmarshalErr != nil {
-				return llm.NewToolResultOutputFailed("invalid input"), nil
+				return nil, fmt.Errorf("invalid input")
 			}
-			return llm.NewToolResultOutputText(fmt.Sprintf("Echo: %s", params.Message)), nil
+			return []llm.ContentPart{llm.TextPart{Text: fmt.Sprintf("Echo: %s", params.Message)}}, nil
 		}).
 		Build()
 
@@ -186,8 +186,8 @@ func TestAgentMultiTurnWithTools(t *testing.T) {
 			Description: "Echo back a message",
 			Schema:      json.RawMessage(`{"type":"object","properties":{"message":{"type":"string"}},"required":["message"]}`),
 		},
-		Execute: func(_ context.Context, _ json.RawMessage) (llm.ToolResultOutput, error) {
-			return llm.ToolResultOutputText{Text: "Echoed!"}, nil
+		Execute: func(_ context.Context, _ json.RawMessage) ([]llm.ContentPart, error) {
+			return []llm.ContentPart{llm.TextPart{Text: "Echoed!"}}, nil
 		},
 	}
 
@@ -293,8 +293,8 @@ func TestAgentMultiTurnSequentialTools(t *testing.T) {
 			Description: "Echo",
 			Schema:      json.RawMessage(`{"type":"object","properties":{}}`),
 		},
-		Execute: func(ctx context.Context, input json.RawMessage) (llm.ToolResultOutput, error) {
-			return llm.ToolResultOutputText{Text: "ok"}, nil
+		Execute: func(ctx context.Context, input json.RawMessage) ([]llm.ContentPart, error) {
+			return []llm.ContentPart{llm.TextPart{Text: "ok"}}, nil
 		},
 	}
 
@@ -413,8 +413,8 @@ func TestOpenAIMultiTurnWithTools(t *testing.T) {
 			Description: "Echo back a message",
 			Schema:      json.RawMessage(`{"type":"object","properties":{"message":{"type":"string"}},"required":["message"]}`),
 		},
-		Execute: func(_ context.Context, _ json.RawMessage) (llm.ToolResultOutput, error) {
-			return llm.ToolResultOutputText{Text: "Echoed!"}, nil
+		Execute: func(_ context.Context, _ json.RawMessage) ([]llm.ContentPart, error) {
+			return []llm.ContentPart{llm.TextPart{Text: "Echoed!"}}, nil
 		},
 	}
 
@@ -513,8 +513,8 @@ func TestOpenAISequentialQueriesWithTools(t *testing.T) {
 			Description: "Echo",
 			Schema:      json.RawMessage(`{"type":"object","properties":{}}`),
 		},
-		Execute: func(_ context.Context, _ json.RawMessage) (llm.ToolResultOutput, error) {
-			return llm.ToolResultOutputText{Text: "ok"}, nil
+		Execute: func(_ context.Context, _ json.RawMessage) ([]llm.ContentPart, error) {
+			return []llm.ContentPart{llm.TextPart{Text: "ok"}}, nil
 		},
 	}
 

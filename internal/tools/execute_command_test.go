@@ -12,61 +12,51 @@ import (
 )
 
 func TestExecuteCommandNormalCompletion(t *testing.T) {
-	result, err := executeCommand(context.Background(), executeCommandInput{
+	content, err := executeCommand(context.Background(), executeCommandInput{
 		Command: "echo hello",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	text, ok := result.(llm.ToolResultOutputText)
-	if !ok {
-		t.Fatalf("expected text output, got %T", result)
-	}
-	if text.Text != "hello\n" {
-		t.Errorf("expected %q, got %q", "hello\n", text.Text)
+	text := extractText(content)
+	if text != "hello\n" {
+		t.Errorf("expected %q, got %q", "hello\n", text)
 	}
 }
 
 func TestExecuteCommandExitError(t *testing.T) {
-	result, err := executeCommand(context.Background(), executeCommandInput{
+	_, err := executeCommand(context.Background(), executeCommandInput{
 		Command: "exit 42",
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Fatal("expected error for exit 42")
 	}
-	errOut, ok := result.(llm.ToolResultOutputFailed)
-	if !ok {
-		t.Fatalf("expected error output, got %T", result)
-	}
-	if errOut.Reason == "" {
-		t.Error("expected non-empty error output")
+	if err.Error() == "" {
+		t.Error("expected non-empty error message")
 	}
 }
 
 func TestExecuteCommandCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// Start a long-running command
-	done := make(chan llm.ToolResultOutput, 1)
+	done := make(chan error, 1)
 	go func() {
-		result, _ := executeCommand(ctx, executeCommandInput{
+		_, err := executeCommand(ctx, executeCommandInput{
 			Command: "sleep 60",
 		})
-		done <- result
+		done <- err
 	}()
 
-	// Cancel after a short delay
 	time.Sleep(500 * time.Millisecond)
 	cancel()
 
 	select {
-	case result := <-done:
-		errOut, ok := result.(llm.ToolResultOutputFailed)
-		if !ok {
-			t.Fatalf("expected error output, got %T", result)
+	case err := <-done:
+		if err == nil {
+			t.Fatal("expected error for canceled command")
 		}
-		if !strings.HasPrefix(errOut.Reason, "Canceled") {
-			t.Errorf("expected message to start with 'Canceled', got %q", errOut.Reason)
+		if !strings.HasPrefix(err.Error(), "canceled") {
+			t.Errorf("expected message to start with 'canceled', got %q", err.Error())
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("command was not canceled within timeout")
@@ -74,38 +64,25 @@ func TestExecuteCommandCancellation(t *testing.T) {
 }
 
 func TestExecuteCommandTimeout(t *testing.T) {
-	// Override the default timeout for this test
-	original := defaultCommandTimeout
-	defer func() {
-		// Restore the original value — cannot reassign const, so we
-		// rely on the fact that the test below uses a context timeout
-		// shorter than defaultCommandTimeout.
-		_ = original
-	}()
-
-	// Use a context with a very short timeout to simulate the timeout path
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	done := make(chan llm.ToolResultOutput, 1)
+	done := make(chan error, 1)
 	go func() {
-		result, _ := executeCommand(ctx, executeCommandInput{
-			// vim hangs when there's no TTY — perfect for testing timeout
+		_, err := executeCommand(ctx, executeCommandInput{
 			Command: "sleep 60",
 		})
-		done <- result
+		done <- err
 	}()
 
 	select {
-	case result := <-done:
-		errOut, ok := result.(llm.ToolResultOutputFailed)
-		if !ok {
-			t.Fatalf("expected error output, got %T", result)
+	case err := <-done:
+		if err == nil {
+			t.Fatal("expected error for timed out command")
 		}
-		if !strings.HasPrefix(errOut.Reason, "Canceled") && !strings.HasPrefix(errOut.Reason, "Timed out") {
-			// Either is acceptable depending on whether the parent context
-			// or the internal timeout fires first
-			t.Errorf("expected message to start with 'Canceled' or 'Timed out', got %q", errOut.Reason)
+		msg := err.Error()
+		if !strings.HasPrefix(msg, "canceled") && !strings.HasPrefix(msg, "timed out") {
+			t.Errorf("expected message to start with 'canceled' or 'timed out', got %q", msg)
 		}
 	case <-time.After(10 * time.Second):
 		t.Fatal("command was not terminated within timeout")
@@ -119,25 +96,21 @@ func TestExecuteCommandWorkingDir(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Save and restore working directory
 	originalWd, _ := os.Getwd()
 	if err := os.Chdir(tmpDir); err != nil {
 		t.Fatal(err)
 	}
 	defer os.Chdir(originalWd)
 
-	result, err := executeCommand(context.Background(), executeCommandInput{
+	content, err := executeCommand(context.Background(), executeCommandInput{
 		Command: "pwd",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	text, ok := result.(llm.ToolResultOutputText)
-	if !ok {
-		t.Fatalf("expected text output, got %T", result)
-	}
-	if text.Text != tmpDir+"\n" {
-		t.Errorf("expected %q, got %q", tmpDir+"\n", text.Text)
+	text := extractText(content)
+	if text != tmpDir+"\n" {
+		t.Errorf("expected %q, got %q", tmpDir+"\n", text)
 	}
 }
 
@@ -161,21 +134,31 @@ func TestHandleCommandCompletion(t *testing.T) {
 			stdout := bytes.NewBufferString("hello")
 			stderr := &bytes.Buffer{}
 
-			result := handleCommandCompletion(tt.execErr, stdout, stderr)
+			content, err := handleCommandOutput(stdout, stderr, 0, tt.execErr)
 
 			if tt.wantError {
-				if _, ok := result.(llm.ToolResultOutputFailed); !ok {
-					t.Error("expected error output")
+				if err == nil {
+					t.Error("expected error")
 				}
 			} else {
-				text, ok := result.(llm.ToolResultOutputText)
-				if !ok {
-					t.Fatalf("expected text output, got %T", result)
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
 				}
-				if text.Text != tt.wantInText {
-					t.Errorf("expected %q, got %q", tt.wantInText, text.Text)
+				text := extractText(content)
+				if text != tt.wantInText {
+					t.Errorf("expected %q, got %q", tt.wantInText, text)
 				}
 			}
 		})
 	}
+}
+
+// extractText is a test helper to get the text from a ContentPart slice.
+func extractText(content []llm.ContentPart) string {
+	for _, p := range content {
+		if tp, ok := p.(llm.TextPart); ok {
+			return tp.Text
+		}
+	}
+	return ""
 }

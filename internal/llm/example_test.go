@@ -26,12 +26,12 @@ func Example_usage() {
 
 	tool := llm.NewTool("echo", "Echo back the input").
 		WithSchema(llm.MustGenerateSchema(EchoInput{})).
-		WithExecute(func(_ context.Context, input json.RawMessage) (llm.ToolResultOutput, error) {
+		WithExecute(func(_ context.Context, input json.RawMessage) ([]llm.ContentPart, error) {
 			var params EchoInput
 			if unmarshalErr := json.Unmarshal(input, &params); unmarshalErr != nil {
-				return llm.NewToolResultOutputFailed("invalid input"), nil
+				return nil, fmt.Errorf("invalid input: %w", unmarshalErr)
 			}
-			return llm.NewToolResultOutputText(fmt.Sprintf("Echo: %s", params.Message)), nil
+			return []llm.ContentPart{llm.TextPart{Text: fmt.Sprintf("Echo: %s", params.Message)}}, nil
 		}).
 		Build()
 

@@ -77,9 +77,17 @@ func (s *Session) writeToolUseInput(input, id string) {
 }
 
 func (s *Session) writeToolUseOutput(id string, output string, isError bool) {
+	content := []map[string]any{
+		{"type": "text", "text": output},
+	}
+	contentJSON, err := json.Marshal(content)
+	if err != nil {
+		// Should never happen with our simple content structure
+		contentJSON = []byte(`[{"type":"text","text":"(serialization error)"}]`)
+	}
 	s.writeTLVJSON(stream.TagUserF, stream.ToolResultData{
 		ID:      id,
-		Output:  output,
+		Output:  contentJSON,
 		IsError: isError,
 	})
 }

@@ -12,7 +12,6 @@ import (
 )
 
 func TestReadFileFull(t *testing.T) {
-	// Create a temp file
 	tmpDir := t.TempDir()
 	tmpFile := filepath.Join(tmpDir, "test.txt")
 	content := "line1\nline2\nline3\n"
@@ -31,17 +30,13 @@ func TestReadFileFull(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	textResp, ok := result.(llm.ToolResultOutputText)
-	if !ok {
-		t.Errorf("expected text response, got %T", result)
-	}
-	if textResp.Text != content {
-		t.Errorf("expected %q, got %q", content, textResp.Text)
+	text := extractFirstText(result)
+	if text != content {
+		t.Errorf("expected %q, got %q", content, text)
 	}
 }
 
 func TestReadFileWithLineRange(t *testing.T) {
-	// Create a temp file with many lines
 	tmpDir := t.TempDir()
 	tmpFile := filepath.Join(tmpDir, "test.txt")
 	var content string
@@ -113,38 +108,32 @@ func TestReadFileWithLineRange(t *testing.T) {
 				t.Fatal(err)
 			}
 			result, err := tool.Execute(context.Background(), inputJSON)
-			if err != nil {
-				t.Fatal(err)
-			}
 
 			if tt.wantError {
-				errResp, ok := result.(llm.ToolResultOutputFailed)
-				if !ok {
-					t.Errorf("expected error response, got %T", result)
+				if err == nil {
+					t.Errorf("expected error, got success: %v", result)
 					return
 				}
-				if !strings.Contains(errResp.Reason, tt.errorMsg) {
-					t.Errorf("expected error containing %q, got %q", tt.errorMsg, errResp.Reason)
+				if !strings.Contains(err.Error(), tt.errorMsg) {
+					t.Errorf("expected error containing %q, got %q", tt.errorMsg, err.Error())
 				}
 				return
 			}
 
-			textResp, ok := result.(llm.ToolResultOutputText)
-			if !ok {
-				t.Errorf("expected text response, got %T", result)
-				return
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
 			}
 
+			text := extractFirstText(result)
 			expected := strings.Join(tt.wantLines, "\n")
-			if textResp.Text != expected {
-				t.Errorf("expected %q, got %q", expected, textResp.Text)
+			if text != expected {
+				t.Errorf("expected %q, got %q", expected, text)
 			}
 		})
 	}
 }
 
 func TestReadFileTooLarge(t *testing.T) {
-	// Create a temp file larger than maxFullReadSize
 	tmpDir := t.TempDir()
 	tmpFile := filepath.Join(tmpDir, "large.txt")
 	largeContent := make([]byte, maxFullReadSize+1)
@@ -166,31 +155,24 @@ func TestReadFileTooLarge(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Should get truncated content with metadata, not an error
-	textResp, ok := result.(llm.ToolResultOutputText)
-	if !ok {
-		t.Errorf("expected text response for truncated file, got %T", result)
+	text := extractFirstText(result)
+	if !strings.Contains(text, "[Lines 1-") {
+		t.Errorf("expected truncation header, got %q", text[:100])
 	}
-	if !strings.Contains(textResp.Text, "[Lines 1-") {
-		t.Errorf("expected truncation header, got %q", textResp.Text[:100])
-	}
-	if !strings.Contains(textResp.Text, "of ") {
-		t.Errorf("expected 'of' in truncation header, got %q", textResp.Text[:100])
+	if !strings.Contains(text, "of ") {
+		t.Errorf("expected 'of' in truncation header, got %q", text[:100])
 	}
 }
 
 func TestReadFileLargeWithLineRange(t *testing.T) {
-	// Create a temp file larger than maxFullReadSize
 	tmpDir := t.TempDir()
 	tmpFile := filepath.Join(tmpDir, "large.txt")
 
-	// Create lines: first line small, then many lines to make file large, then more
 	f, err := os.Create(tmpFile)
 	if err != nil {
 		t.Fatal(err)
 	}
 	_, _ = f.WriteString("first line\n")
-	// Write enough data to exceed maxFullReadSize, but with reasonable line lengths
 	for i := 0; i < 100000; i++ {
 		_, _ = f.WriteString("x")
 	}
@@ -199,7 +181,6 @@ func TestReadFileLargeWithLineRange(t *testing.T) {
 
 	tool := NewReadFileTool()
 
-	// Should be able to read first and last lines without loading entire file
 	input := ReadFileInput{Path: tmpFile, StartLine: 1, EndLine: 1}
 	inputJSON, err := json.Marshal(input)
 	if err != nil {
@@ -210,17 +191,11 @@ func TestReadFileLargeWithLineRange(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	textResp, ok := result.(llm.ToolResultOutputText)
-	if !ok {
-		errResp, _ := result.(llm.ToolResultOutputFailed)
-		t.Errorf("expected text response, got error: %q", errResp.Reason)
-		return
-	}
-	if textResp.Text != "first line" {
-		t.Errorf("expected 'first line', got %q", textResp.Text)
+	text := extractFirstText(result)
+	if text != "first line" {
+		t.Errorf("expected 'first line', got %q", text)
 	}
 
-	// Also test reading the third line
 	input = ReadFileInput{Path: tmpFile, StartLine: 3, EndLine: 3}
 	inputJSON, err = json.Marshal(input)
 	if err != nil {
@@ -231,12 +206,9 @@ func TestReadFileLargeWithLineRange(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	textResp, ok = result.(llm.ToolResultOutputText)
-	if !ok {
-		t.Errorf("expected text response, got %T", result)
-	}
-	if textResp.Text != "third line" {
-		t.Errorf("expected 'third line', got %q", textResp.Text)
+	text = extractFirstText(result)
+	if text != "third line" {
+		t.Errorf("expected 'third line', got %q", text)
 	}
 }
 
@@ -247,14 +219,9 @@ func TestReadFileNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := tool.Execute(context.Background(), inputJSON)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, ok := result.(llm.ToolResultOutputFailed)
-	if !ok {
-		t.Errorf("expected error response, got %T", result)
+	_, err = tool.Execute(context.Background(), inputJSON)
+	if err == nil {
+		t.Errorf("expected error for nonexistent file")
 	}
 }
 
@@ -262,39 +229,32 @@ func TestReadFileBinary(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	tests := []struct {
-		name        string
-		content     []byte
-		expectError bool
+		name    string
+		content []byte
 	}{
 		{
-			name:        "text file",
-			content:     []byte("Hello, world!\nThis is text.\n"),
-			expectError: false,
+			name:    "text file",
+			content: []byte("Hello, world!\nThis is text.\n"),
 		},
 		{
-			name:        "binary with null bytes",
-			content:     []byte{0x00, 0x01, 0x02, 0x03, 'H', 'e', 'l', 'l', 'o'},
-			expectError: false,
+			name:    "binary with null bytes",
+			content: []byte{0x00, 0x01, 0x02, 0x03, 'H', 'e', 'l', 'l', 'o'},
 		},
 		{
-			name:        "PNG header",
-			content:     []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00},
-			expectError: false,
+			name:    "PNG header",
+			content: []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00},
 		},
 		{
-			name:        "UTF-8 text with special chars",
-			content:     []byte("Hello 世界\nПривет мир\n🎉\n"),
-			expectError: false,
+			name:    "UTF-8 text with special chars",
+			content: []byte("Hello 世界\nПривет мир\n🎉\n"),
 		},
 		{
-			name:        "empty file",
-			content:     []byte{},
-			expectError: false,
+			name:    "empty file",
+			content: []byte{},
 		},
 		{
-			name:        "code file",
-			content:     []byte("package main\n\nfunc main() {\n\tprintln(\"hello\")\n}\n"),
-			expectError: false,
+			name:    "code file",
+			content: []byte("package main\n\nfunc main() {\n\tprintln(\"hello\")\n}\n"),
 		},
 	}
 
@@ -317,32 +277,14 @@ func TestReadFileBinary(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if tt.expectError {
-				errResp, ok := result.(llm.ToolResultOutputFailed)
-				if !ok {
-					t.Errorf("expected error response, got %T", result)
-					return
-				}
-				if errResp.Reason == "" {
-					t.Errorf("expected non-empty error message, got empty")
-				}
-			} else {
-				textResp, ok := result.(llm.ToolResultOutputText)
-				if !ok {
-					errResp, _ := result.(llm.ToolResultOutputFailed)
-					t.Errorf("expected text response for text file, got error: %q", errResp.Reason)
-					return
-				}
-				// For empty file, just check we got empty content
-				if len(tt.content) == 0 && textResp.Text != "" {
-					t.Errorf("expected empty content for empty file, got %q", textResp.Text)
-				}
+			text := extractFirstText(result)
+			if len(tt.content) == 0 && text != "" {
+				t.Errorf("expected empty content for empty file, got %q", text)
 			}
 		})
 	}
 }
 
-// Helper function to convert int to string without strconv
 func itoa(i int) string {
 	if i == 0 {
 		return "0"
@@ -361,4 +303,13 @@ func itoa(i int) string {
 		b = append([]byte{'-'}, b...)
 	}
 	return string(b)
+}
+
+func extractFirstText(parts []llm.ContentPart) string {
+	for _, p := range parts {
+		if tp, ok := p.(llm.TextPart); ok {
+			return tp.Text
+		}
+	}
+	return ""
 }

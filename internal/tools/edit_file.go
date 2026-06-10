@@ -122,34 +122,34 @@ type editResult struct {
 	occurrences int
 }
 
-func executeEditFile(ctx context.Context, args EditFileInput) (llm.ToolResultOutput, error) {
+func executeEditFile(ctx context.Context, args EditFileInput) ([]llm.ContentPart, error) {
 	path, err := validateEditFileInput(args)
 	if err != nil {
-		return llm.NewToolResultOutputFailed(err.Error()), nil
+		return nil, err
 	}
 
-	result, resp := editToTemp(ctx, args, path)
+	result, err := editToTemp(ctx, args, path)
 	defer func() {
 		if result != nil && result.tempPath != "" {
 			os.Remove(result.tempPath)
 		}
 	}()
-	if resp != nil {
-		return resp, nil
+	if err != nil {
+		return nil, err
 	}
 
-	return replaceFile(result.tempPath, path, result.fileInfo), nil
+	return replaceFile(result.tempPath, path, result.fileInfo)
 }
 
 // editToTemp applies the edit to a temp file and returns the result.
 // On error, the caller should clean up tempPath if it is non-empty.
-func editToTemp(ctx context.Context, args EditFileInput, path string) (result *editResult, resp llm.ToolResultOutput) {
+func editToTemp(ctx context.Context, args EditFileInput, path string) (result *editResult, err error) {
 	file, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, llm.NewToolResultOutputFailed(fmt.Sprintf("file not found: %s", path))
+			return nil, fmt.Errorf("file not found: %s", path)
 		}
-		return nil, llm.NewToolResultOutputFailed(err.Error())
+		return nil, err
 	}
 
 	var tempFile *os.File
@@ -169,7 +169,7 @@ func editToTemp(ctx context.Context, args EditFileInput, path string) (result *e
 	tempFile, err = os.CreateTemp(dir, "edit_file_*.tmp")
 	if err != nil {
 		cleanup()
-		return result, llm.NewToolResultOutputFailed(fmt.Sprintf("failed to create temp file: %v", err))
+		return result, fmt.Errorf("failed to create temp file: %v", err)
 	}
 	result.tempPath = tempFile.Name()
 
@@ -178,7 +178,7 @@ func editToTemp(ctx context.Context, args EditFileInput, path string) (result *e
 	fileInfo, err := file.Stat()
 	if err != nil {
 		cleanup()
-		return result, llm.NewToolResultOutputFailed(fmt.Sprintf("failed to get file info: %v", err))
+		return result, fmt.Errorf("failed to get file info: %v", err)
 	}
 
 	editor := newStreamEditor(args.OldString, args.NewString)
@@ -187,14 +187,14 @@ func editToTemp(ctx context.Context, args EditFileInput, path string) (result *e
 		select {
 		case <-ctx.Done():
 			cleanup()
-			return result, llm.NewToolResultOutputFailed("Canceled")
+			return result, fmt.Errorf("Canceled")
 		default:
 		}
 
 		done, pErr := editor.processChunk(file, tempFile)
 		if pErr != nil {
 			cleanup()
-			return result, llm.NewToolResultOutputFailed(pErr.Error())
+			return result, pErr
 		}
 		if done {
 			break
@@ -203,13 +203,13 @@ func editToTemp(ctx context.Context, args EditFileInput, path string) (result *e
 
 	if err = editor.flushRemaining(tempFile); err != nil {
 		cleanup()
-		return result, llm.NewToolResultOutputFailed(err.Error())
+		return result, err
 	}
 
 	if editor.occurrences == 0 {
 		cleanup()
-		return result, llm.NewToolResultOutputFailed(
-			fmt.Sprintf("old_string not found in file. Make sure to copy the exact text including all whitespace and indentation.\n\nSearched for:\n%q", args.OldString))
+		return result, fmt.Errorf(
+			"old_string not found in file. Make sure to copy the exact text including all whitespace and indentation.\n\nSearched for:\n%q", args.OldString)
 	}
 
 	result.fileInfo = fileInfo
@@ -218,17 +218,17 @@ func editToTemp(ctx context.Context, args EditFileInput, path string) (result *e
 	return result, nil
 }
 
-func replaceFile(tempPath string, path string, fileInfo os.FileInfo) llm.ToolResultOutput {
+func replaceFile(tempPath string, path string, fileInfo os.FileInfo) ([]llm.ContentPart, error) {
 	// On Windows, os.Rename fails with "Access is denied" if the target
 	// file still has an open handle. All source file handles are closed
 	// by the time we get here (editToTemp's cleanup closes them).
 	if err := os.Rename(tempPath, path); err != nil {
-		return llm.NewToolResultOutputFailed(fmt.Sprintf("failed to replace file: %v", err))
+		return nil, fmt.Errorf("failed to replace file: %v", err)
 	}
 
 	if err := os.Chmod(path, fileInfo.Mode()); err != nil {
-		return llm.NewToolResultOutputFailed(fmt.Sprintf("failed to restore file permissions: %v", err))
+		return nil, fmt.Errorf("failed to restore file permissions: %v", err)
 	}
 
-	return llm.NewToolResultOutputText("File edited successfully")
+	return []llm.ContentPart{llm.TextPart{Text: "File edited successfully"}}, nil
 }

@@ -29,8 +29,8 @@ func TestAgentPreservesTextWithToolCalls(t *testing.T) {
 		Tools: []Tool{
 			{
 				Definition: ToolDefinition{Name: "get_weather", Description: "Get weather", Schema: []byte(`{"type":"object"}`)},
-				Execute: func(_ context.Context, _ json.RawMessage) (ToolResultOutput, error) {
-					return ToolResultOutputText{Text: "Sunny, 72F"}, nil
+				Execute: func(_ context.Context, _ json.RawMessage) ([]ContentPart, error) {
+					return []ContentPart{TextPart{Text: "Sunny, 72F"}}, nil
 				},
 			},
 		},

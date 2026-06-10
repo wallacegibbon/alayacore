@@ -307,14 +307,14 @@ func TestAgentToolLoopRealAPI(t *testing.T) {
 				"required": ["message"]
 			}`),
 		},
-		Execute: func(_ context.Context, input json.RawMessage) (llm.ToolResultOutput, error) {
+		Execute: func(_ context.Context, input json.RawMessage) ([]llm.ContentPart, error) {
 			var params struct {
 				Message string `json:"message"`
 			}
 			if unmarshalErr := json.Unmarshal(input, &params); unmarshalErr != nil {
-				return llm.ToolResultOutputFailed{Reason: "invalid input"}, nil
+				return []llm.ContentPart{llm.TextPart{Text: "invalid input"}}, nil
 			}
-			return llm.ToolResultOutputText{Text: "Echo: " + params.Message}, nil
+			return []llm.ContentPart{llm.TextPart{Text: "Echo: " + params.Message}}, nil
 		},
 	}
 
@@ -415,9 +415,9 @@ func TestAgentMultiToolLoopRealAPI(t *testing.T) {
 				"required": []
 			}`),
 		},
-		Execute: func(_ context.Context, input json.RawMessage) (llm.ToolResultOutput, error) {
+		Execute: func(_ context.Context, input json.RawMessage) ([]llm.ContentPart, error) {
 			counter++
-			return llm.ToolResultOutputText{Text: fmt.Sprintf("Counter is now %d", counter)}, nil
+			return []llm.ContentPart{llm.TextPart{Text: fmt.Sprintf("Counter is now %d", counter)}}, nil
 		},
 	}
 
@@ -508,14 +508,14 @@ func TestAgentSequentialQueriesWithTools(t *testing.T) {
 				"required": ["message"]
 			}`),
 		},
-		Execute: func(_ context.Context, input json.RawMessage) (llm.ToolResultOutput, error) {
+		Execute: func(_ context.Context, input json.RawMessage) ([]llm.ContentPart, error) {
 			var params struct {
 				Message string `json:"message"`
 			}
 			if unmarshalErr := json.Unmarshal(input, &params); unmarshalErr != nil {
-				return llm.ToolResultOutputFailed{Reason: "invalid input"}, nil
+				return []llm.ContentPart{llm.TextPart{Text: "invalid input"}}, nil
 			}
-			return llm.ToolResultOutputText{Text: "Echo: " + params.Message}, nil
+			return []llm.ContentPart{llm.TextPart{Text: "Echo: " + params.Message}}, nil
 		},
 	}
 
@@ -633,14 +633,14 @@ func TestOpenAICompatSequentialQueriesWithTools(t *testing.T) {
 				"required": ["message"]
 			}`),
 		},
-		Execute: func(_ context.Context, input json.RawMessage) (llm.ToolResultOutput, error) {
+		Execute: func(_ context.Context, input json.RawMessage) ([]llm.ContentPart, error) {
 			var params struct {
 				Message string `json:"message"`
 			}
 			if unmarshalErr := json.Unmarshal(input, &params); unmarshalErr != nil {
-				return llm.ToolResultOutputFailed{Reason: "invalid input"}, nil
+				return []llm.ContentPart{llm.TextPart{Text: "invalid input"}}, nil
 			}
-			return llm.ToolResultOutputText{Text: "Echo: " + params.Message}, nil
+			return []llm.ContentPart{llm.TextPart{Text: "Echo: " + params.Message}}, nil
 		},
 	}
 

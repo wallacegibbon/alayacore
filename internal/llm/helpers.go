@@ -15,20 +15,6 @@ func NewUserMessage(text string) Message {
 	}
 }
 
-// NewToolResultOutputText creates a ToolResultOutputText with the given text.
-func NewToolResultOutputText(text string) ToolResultOutput {
-	return ToolResultOutputText{
-		Text: text,
-	}
-}
-
-// NewToolResultOutputFailed creates a ToolResultOutputFailed reporting tool failure.
-func NewToolResultOutputFailed(reason string) ToolResultOutput {
-	return ToolResultOutputFailed{
-		Reason: reason,
-	}
-}
-
 // ToolBuilder helps build tool definitions
 type ToolBuilder struct {
 	tool Tool
@@ -53,7 +39,7 @@ func (b *ToolBuilder) WithSchema(schema json.RawMessage) *ToolBuilder {
 }
 
 // WithExecute sets the execute function
-func (b *ToolBuilder) WithExecute(fn func(ctx context.Context, input json.RawMessage) (ToolResultOutput, error)) *ToolBuilder {
+func (b *ToolBuilder) WithExecute(fn func(ctx context.Context, input json.RawMessage) ([]ContentPart, error)) *ToolBuilder {
 	b.tool.Execute = fn
 	return b
 }

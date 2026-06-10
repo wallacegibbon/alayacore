@@ -49,8 +49,8 @@ func TestAgentMaxStepsExceeded(t *testing.T) {
 		Tools: []Tool{
 			{
 				Definition: ToolDefinition{Name: "repeat", Description: "Repeat", Schema: []byte(`{"type":"object"}`)},
-				Execute: func(_ context.Context, _ json.RawMessage) (ToolResultOutput, error) {
-					return ToolResultOutputText{Text: "repeated"}, nil
+				Execute: func(_ context.Context, _ json.RawMessage) ([]ContentPart, error) {
+					return []ContentPart{TextPart{Text: "repeated"}}, nil
 				},
 			},
 		},
@@ -94,8 +94,8 @@ func TestAgentCompletesWithinMaxSteps(t *testing.T) {
 		Tools: []Tool{
 			{
 				Definition: ToolDefinition{Name: "ping", Description: "Ping", Schema: []byte(`{"type":"object"}`)},
-				Execute: func(_ context.Context, _ json.RawMessage) (ToolResultOutput, error) {
-					return ToolResultOutputText{Text: "pong"}, nil
+				Execute: func(_ context.Context, _ json.RawMessage) ([]ContentPart, error) {
+					return []ContentPart{TextPart{Text: "pong"}}, nil
 				},
 			},
 		},

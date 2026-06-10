@@ -738,13 +738,22 @@ func anthropicPartToBlock(part llm.ContentPart) *anthropicContentBlock {
 		block := &anthropicContentBlock{
 			Type:      anthropicBlockTypeToolResult,
 			ToolUseID: v.ID,
+			IsError:   v.IsError,
 		}
-		switch out := v.Output.(type) {
-		case llm.ToolResultOutputText:
-			block.Content = out.Text
-		case llm.ToolResultOutputFailed:
-			block.Content = out.Reason
-			block.IsError = true
+		// Convert each ContentPart to an anthropic content block.
+		// This handles TextPart, ImagePart, etc. via the same converter.
+		blocks := make([]anthropicContentBlock, 0, len(v.Content))
+		for _, part := range v.Content {
+			if b := anthropicPartToBlock(part); b != nil {
+				blocks = append(blocks, *b)
+			}
+		}
+		if len(blocks) == 1 && blocks[0].Type == "text" {
+			// Single text block: use string for backward compat with simpler wire format
+			block.Content = blocks[0].Text
+		} else {
+			// Multiple blocks or non-text: use array format (supports images)
+			block.Content = blocks
 		}
 		return block
 	}

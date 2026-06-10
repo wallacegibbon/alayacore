@@ -153,13 +153,15 @@ func (to *outputWriter) writeColored(tag string, value string) {
 
 		to.windowBuffer.HandleToolUseEvent(fd)
 
-	// Function result (JSON: id, output, status)
+	// Function result (JSON: id, content, is_error)
 	case stream.TagUserF:
 		var tr stream.ToolResultData
 		if err := json.Unmarshal([]byte(value), &tr); err != nil {
 			return
 		}
-		to.windowBuffer.HandleToolResult(tr.ID, tr.Output, tr.IsError)
+		// Extract display text from the content JSON array
+		displayText := extractToolResultDisplayText(tr.Output)
+		to.windowBuffer.HandleToolResult(tr.ID, displayText, tr.IsError)
 
 	// System tags
 	case stream.TagSystemMsg:
@@ -377,4 +379,25 @@ func (to *outputWriter) generateWindowID() string {
 // SetWindowWidth updates the window buffer width.
 func (to *outputWriter) SetWindowWidth(width int) {
 	to.windowBuffer.SetWidth(width)
+}
+
+// extractToolResultDisplayText extracts display text from a tool result content JSON array.
+// The content is a JSON array of {"type":"text","text":"..."} items.
+func extractToolResultDisplayText(content json.RawMessage) string {
+	if len(content) == 0 {
+		return ""
+	}
+	var items []struct {
+		Type string `json:"type"`
+		Text string `json:"text,omitempty"`
+	}
+	if err := json.Unmarshal(content, &items); err != nil {
+		return string(content)
+	}
+	for _, item := range items {
+		if item.Type == "text" {
+			return item.Text
+		}
+	}
+	return "(non-text result)"
 }

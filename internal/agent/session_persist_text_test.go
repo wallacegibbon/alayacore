@@ -36,8 +36,8 @@ func TestSessionSavePreservesTextWithToolCalls(t *testing.T) {
 				Role: llm.RoleTool,
 				Content: []llm.ContentPart{
 					llm.ToolResultPart{
-						ID:     "call_123",
-						Output: llm.ToolResultOutputText{Text: "Sunny, 72F"},
+						ID:      "call_123",
+						Content: []llm.ContentPart{llm.TextPart{Text: "Sunny, 72F"}},
 					},
 				},
 			},

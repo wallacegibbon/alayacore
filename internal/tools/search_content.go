@@ -3,6 +3,7 @@ package tools
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,7 +11,6 @@ import (
 	"github.com/alayacore/alayacore/internal/llm"
 )
 
-// SearchContentInput represents the input for the search_content tool
 type SearchContentInput struct {
 	Pattern    string `json:"pattern" jsonschema:"required,description=Regex pattern to search for"`
 	Path       string `json:"path" jsonschema:"description=File or directory to search (default: cwd)"`
@@ -22,13 +22,11 @@ type SearchContentInput struct {
 
 const defaultSearchContentMaxLines = 100
 
-// RGAvailable checks if the rg binary is available on the system
 func RGAvailable() bool {
 	_, err := exec.LookPath("rg")
 	return err == nil
 }
 
-// NewSearchContentTool creates a tool for searching file contents using ripgrep (rg)
 func NewSearchContentTool() llm.Tool {
 	return llm.NewTool(
 		"search_content",
@@ -66,12 +64,12 @@ func buildSearchContentArgs(args SearchContentInput) []string {
 	return rgArgs
 }
 
-func handleSearchContentResult(execErr error, stdout, stderr *bytes.Buffer, maxLines int) llm.ToolResultOutput {
+func handleSearchContentResult(execErr error, stdout, stderr *bytes.Buffer, maxLines int) ([]llm.ContentPart, error) {
 	if execErr != nil {
 		// rg exits with code 1 when no matches found — that's not an error for us
 		if exitErr, ok := execErr.(*exec.ExitError); ok {
 			if exitErr.ExitCode() == 1 && stderr.Len() == 0 {
-				return llm.NewToolResultOutputText("No matches found")
+				return []llm.ContentPart{llm.TextPart{Text: "No matches found"}}, nil
 			}
 		}
 		// Real error (bad regex, permission denied, etc.)
@@ -79,7 +77,7 @@ func handleSearchContentResult(execErr error, stdout, stderr *bytes.Buffer, maxL
 		if stderr.Len() > 0 {
 			errMsg = stderr.String()
 		}
-		return llm.NewToolResultOutputFailed(errMsg)
+		return nil, errors.New(errMsg)
 	}
 
 	// Use default if maxLines not specified
@@ -89,7 +87,7 @@ func handleSearchContentResult(execErr error, stdout, stderr *bytes.Buffer, maxL
 
 	output := stdout.String()
 	if output == "" {
-		return llm.NewToolResultOutputText("No matches found")
+		return []llm.ContentPart{llm.TextPart{Text: "No matches found"}}, nil
 	}
 
 	// Count total lines in output
@@ -100,32 +98,29 @@ func handleSearchContentResult(execErr error, stdout, stderr *bytes.Buffer, maxL
 		return handleLargeSearchResult(output, totalLines)
 	}
 
-	return llm.NewToolResultOutputText(output)
+	return []llm.ContentPart{llm.TextPart{Text: output}}, nil
 }
 
-// handleLargeSearchResult saves full search output to a temp file and returns
-// a message with the file path. This avoids partial results being misinterpreted.
-func handleLargeSearchResult(output string, totalLines int) llm.ToolResultOutput {
-	// Save full output to temp file
+func handleLargeSearchResult(output string, totalLines int) ([]llm.ContentPart, error) {
 	filePath, err := saveToTmpFile(output, "search-*.txt")
 	if err != nil {
-		return llm.NewToolResultOutputFailed(fmt.Sprintf("failed to save large search results to temp file: %v", err))
+		return nil, fmt.Errorf("failed to save large search results: %w", err)
 	}
 
-	return llm.NewToolResultOutputText(fmt.Sprintf(
+	return []llm.ContentPart{llm.TextPart{Text: fmt.Sprintf(
 		"Search found %d matching lines. Results saved to: %s\nUse read_file to access specific matches.",
 		totalLines, filePath,
-	))
+	)}}, nil
 }
 
-func executeSearchContent(ctx context.Context, args SearchContentInput) (llm.ToolResultOutput, error) {
+func executeSearchContent(ctx context.Context, args SearchContentInput) ([]llm.ContentPart, error) {
 	if args.Pattern == "" {
-		return llm.NewToolResultOutputFailed("pattern is required"), nil
+		return nil, fmt.Errorf("pattern is required")
 	}
 
 	rgPath, err := exec.LookPath("rg")
 	if err != nil {
-		return llm.NewToolResultOutputFailed("ripgrep (rg) is not available on this system"), nil
+		return nil, fmt.Errorf("ripgrep (rg) is not available on this system")
 	}
 
 	rgArgs := buildSearchContentArgs(args)
@@ -135,7 +130,7 @@ func executeSearchContent(ctx context.Context, args SearchContentInput) (llm.Too
 		cwd = "."
 	}
 
-	//nolint:gosec // G204: rg path is validated, args are from user input which is intentional
+	//nolint:gosec // G204: rg path is validated, args are from user input
 	cmd := exec.CommandContext(ctx, rgPath, rgArgs...)
 	cmd.Dir = cwd
 
@@ -144,11 +139,10 @@ func executeSearchContent(ctx context.Context, args SearchContentInput) (llm.Too
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		// If the context was canceled, report cancellation
 		if ctx.Err() != nil {
-			return llm.NewToolResultOutputFailed("Canceled"), nil
+			return nil, fmt.Errorf("canceled")
 		}
-		return handleSearchContentResult(err, &stdout, &stderr, args.MaxLines), nil
+		return handleSearchContentResult(err, &stdout, &stderr, args.MaxLines)
 	}
-	return handleSearchContentResult(nil, &stdout, &stderr, args.MaxLines), nil
+	return handleSearchContentResult(nil, &stdout, &stderr, args.MaxLines)
 }

@@ -146,8 +146,8 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 				Role: llm.RoleTool,
 				Content: []llm.ContentPart{
 					llm.ToolResultPart{
-						ID:     "call_1",
-						Output: llm.ToolResultOutputText{Text: "file contents"},
+						ID:      "call_1",
+						Content: []llm.ContentPart{llm.TextPart{Text: "file contents"}},
 					},
 				},
 			},
@@ -503,8 +503,8 @@ func TestDisplayMessagesWithToolCalls(t *testing.T) {
 				Role: llm.RoleTool,
 				Content: []llm.ContentPart{
 					llm.ToolResultPart{
-						ID:     "call_123",
-						Output: llm.ToolResultOutputText{Text: "file1.txt\nfile2.txt"},
+						ID:      "call_123",
+						Content: []llm.ContentPart{llm.TextPart{Text: "file1.txt\nfile2.txt"}},
 					},
 				},
 			},
@@ -588,7 +588,7 @@ func TestCleanIncompleteToolCalls(t *testing.T) {
 					llm.ToolUsePart{ID: "call-1", ToolName: "test_tool", Input: json.RawMessage("{}")},
 				}},
 				{Role: llm.RoleTool, Content: []llm.ContentPart{
-					llm.ToolResultPart{ID: "call-1", Output: llm.ToolResultOutputText{Text: "result"}},
+					llm.ToolResultPart{ID: "call-1", Content: []llm.ContentPart{llm.TextPart{Text: "result"}}},
 				}},
 				{Role: llm.RoleAssistant, Content: []llm.ContentPart{llm.TextPart{Text: "Done"}}},
 			},
@@ -603,7 +603,7 @@ func TestCleanIncompleteToolCalls(t *testing.T) {
 				}},
 				// Anthropic puts tool result in user message
 				{Role: llm.RoleUser, Content: []llm.ContentPart{
-					llm.ToolResultPart{ID: "call-1", Output: llm.ToolResultOutputText{Text: "result"}},
+					llm.ToolResultPart{ID: "call-1", Content: []llm.ContentPart{llm.TextPart{Text: "result"}}},
 				}},
 				{Role: llm.RoleAssistant, Content: []llm.ContentPart{llm.TextPart{Text: "Done"}}},
 			},
@@ -700,7 +700,7 @@ func TestTLVFormatRecursionProtection(t *testing.T) {
 					llm.ToolResultPart{
 						ID: "call1",
 						// This output contains text that looks like old session format markers!
-						Output: llm.ToolResultOutputText{Text: "---\nbase_url: https://api.test.com\n---\n\x00msg:user\nFake user message\n\x00msg:assistant\nFake assistant\n"},
+						Content: []llm.ContentPart{llm.TextPart{Text: "---\nbase_url: https://api.test.com\n---\n\x00msg:user\nFake user message\n\x00msg:assistant\nFake assistant\n"}},
 					},
 				},
 			},
@@ -741,16 +741,19 @@ func TestTLVFormatRecursionProtection(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected ToolResultPart, got %T", loaded.Messages[2].Content[0])
 	}
-	output, ok := tr.Output.(llm.ToolResultOutputText)
+	if len(tr.Content) == 0 {
+		t.Fatalf("expected non-empty tool result content")
+	}
+	textPart, ok := tr.Content[0].(llm.TextPart)
 	if !ok {
-		t.Fatalf("expected ToolResultOutputText, got %T", tr.Output)
+		t.Fatalf("expected TextPart, got %T", tr.Content[0])
 	}
 	// The output should contain the fake markers (not stripped or misparsed)
-	if !strings.Contains(output.Text, "msg:user") {
-		t.Errorf("tool result should contain 'msg:user', got: %q", output.Text)
+	if !strings.Contains(textPart.Text, "msg:user") {
+		t.Errorf("tool result should contain 'msg:user', got: %q", textPart.Text)
 	}
-	if !strings.Contains(output.Text, "Fake user message") {
-		t.Errorf("tool result should contain 'Fake user message', got: %q", output.Text)
+	if !strings.Contains(textPart.Text, "Fake user message") {
+		t.Errorf("tool result should contain 'Fake user message', got: %q", textPart.Text)
 	}
 }
 

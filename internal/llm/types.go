@@ -98,32 +98,16 @@ type ToolUsePart struct {
 func (ToolUsePart) isContentPart() {}
 func (ToolUsePart) isStreamEvent() {}
 
-// ToolResultPart represents a tool execution result
+// ToolResultPart represents a tool execution result.
+// Content holds the output content parts (TextPart, ImagePart, etc.).
+// IsError indicates whether the tool execution failed.
 type ToolResultPart struct {
-	ID     string           `json:"id"`
-	Output ToolResultOutput `json:"output"`
+	ID      string        `json:"id"`
+	Content []ContentPart `json:"content"`
+	IsError bool          `json:"is_error"`
 }
 
 func (ToolResultPart) isContentPart() {}
-
-// ToolResultOutput represents the output of a tool
-type ToolResultOutput interface {
-	isToolResultOutput()
-}
-
-// ToolResultOutputText represents text output
-type ToolResultOutputText struct {
-	Text string `json:"text"`
-}
-
-func (ToolResultOutputText) isToolResultOutput() {}
-
-// ToolResultOutputFailed represents a failed tool execution result.
-type ToolResultOutputFailed struct {
-	Reason string `json:"reason"`
-}
-
-func (ToolResultOutputFailed) isToolResultOutput() {}
 
 // Message represents a single message in the conversation
 type Message struct {

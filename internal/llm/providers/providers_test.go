@@ -1350,7 +1350,7 @@ func TestOpenAITextWithToolCallsConversion(t *testing.T) {
 			llm.ToolUsePart{ID: "call_123", ToolName: "get_weather", Input: json.RawMessage(`{"location":"SF"}`)},
 		}},
 		{Role: llm.RoleTool, Content: []llm.ContentPart{
-			llm.ToolResultPart{ID: "call_123", Output: llm.ToolResultOutputText{Text: "Sunny, 72°F"}},
+			llm.ToolResultPart{ID: "call_123", Content: []llm.ContentPart{llm.TextPart{Text: "Sunny, 72°F"}}},
 		}},
 	}
 
@@ -1440,8 +1440,8 @@ func TestAnthropicToolResultMessageFormat(t *testing.T) {
 			Input:    json.RawMessage(`{"input": "value"}`),
 		}}},
 		{Role: llm.RoleTool, Content: []llm.ContentPart{llm.ToolResultPart{
-			ID:     "tool-123",
-			Output: llm.ToolResultOutputText{Text: "Tool executed successfully"},
+			ID:      "tool-123",
+			Content: []llm.ContentPart{llm.TextPart{Text: "Tool executed successfully"}},
 		}}},
 	}
 
@@ -1593,8 +1593,8 @@ func TestOpenAIToolResultMessageFormat(t *testing.T) {
 			Input:    json.RawMessage(`{"input": "value"}`),
 		}}},
 		{Role: llm.RoleTool, Content: []llm.ContentPart{llm.ToolResultPart{
-			ID:     "call-123",
-			Output: llm.ToolResultOutputText{Text: "Tool executed successfully"},
+			ID:      "call-123",
+			Content: []llm.ContentPart{llm.TextPart{Text: "Tool executed successfully"}},
 		}}},
 	}
 
@@ -1710,12 +1710,12 @@ func TestOpenAIMultiToolResultMessageFormat(t *testing.T) {
 		}},
 		{Role: llm.RoleTool, Content: []llm.ContentPart{
 			llm.ToolResultPart{
-				ID:     "call-1",
-				Output: llm.ToolResultOutputText{Text: "Result A"},
+				ID:      "call-1",
+				Content: []llm.ContentPart{llm.TextPart{Text: "Result A"}},
 			},
 			llm.ToolResultPart{
-				ID:     "call-2",
-				Output: llm.ToolResultOutputText{Text: "Result B"},
+				ID:      "call-2",
+				Content: []llm.ContentPart{llm.TextPart{Text: "Result B"}},
 			},
 		}},
 	}
@@ -1798,8 +1798,9 @@ func TestAnthropicToolResultError(t *testing.T) {
 			Input:    json.RawMessage(`{}`),
 		}}},
 		{Role: llm.RoleTool, Content: []llm.ContentPart{llm.ToolResultPart{
-			ID:     "tool-123",
-			Output: llm.ToolResultOutputFailed{Reason: "Something went wrong"},
+			ID:      "tool-123",
+			Content: []llm.ContentPart{llm.TextPart{Text: "Something went wrong"}},
+			IsError: true,
 		}}},
 	}
 

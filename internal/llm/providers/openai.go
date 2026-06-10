@@ -549,13 +549,24 @@ func openaiConvertToolResults(content []llm.ContentPart) []openAIMessage {
 			Role:       string(llm.RoleTool),
 			ToolCallID: tr.ID,
 		}
-		switch out := tr.Output.(type) {
-		case llm.ToolResultOutputText:
-			data, _ := json.Marshal(out.Text) //nolint:errcheck // string can't fail marshal
+		// Build combined text from all content parts.
+		// TextParts contribute their text directly; ImageParts contribute
+		// their data URI so the model can still access the image data.
+		var textParts []string
+		for _, cp := range tr.Content {
+			switch v := cp.(type) {
+			case llm.TextPart:
+				textParts = append(textParts, v.Text)
+			case llm.ImagePart:
+				textParts = append(textParts, v.DataURL)
+			}
+		}
+		combined := strings.Join(textParts, "\n")
+		data, _ := json.Marshal(combined) //nolint:errcheck // string can't fail marshal
+		if tr.IsError {
+			apiMsg.Content = fmt.Sprintf(`{"status":"error","data":%s}`, data)
+		} else {
 			apiMsg.Content = fmt.Sprintf(`{"status":"success","data":%s}`, data)
-		case llm.ToolResultOutputFailed:
-			reason, _ := json.Marshal(out.Reason) //nolint:errcheck // string can't fail marshal
-			apiMsg.Content = fmt.Sprintf(`{"status":"error","reason":%s}`, reason)
 		}
 		results = append(results, apiMsg)
 	}

@@ -99,8 +99,11 @@ func contentPartToTLV(msgRole llm.MessageRole, part llm.ContentPart) (tag string
 		}
 		return stream.TagAssistantF, string(jsonData), nil
 	case llm.ToolResultPart:
-		tr := stream.ToolResultData{ID: p.ID, Output: formatToolResultOutput(p.Output)}
-		_, tr.IsError = p.Output.(llm.ToolResultOutputFailed)
+		contentJSON, err := serializeContentParts(p.Content)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to serialize tool result content: %w", err)
+		}
+		tr := stream.ToolResultData{ID: p.ID, Output: contentJSON, IsError: p.IsError}
 		jsonData, err := json.Marshal(tr)
 		if err != nil {
 			return "", "", err
@@ -290,13 +293,11 @@ func contentPartFromTLV(tag string, content []byte) (llm.MessageRole, llm.Conten
 		if err := json.Unmarshal(content, &tr); err != nil {
 			return "", nil, fmt.Errorf("failed to parse tool result: %w", err)
 		}
-		var output llm.ToolResultOutput
-		if tr.IsError {
-			output = llm.ToolResultOutputFailed{Reason: tr.Output}
-		} else {
-			output = llm.ToolResultOutputText{Text: tr.Output}
+		contentParts, err := deserializeContentParts(tr.Output)
+		if err != nil {
+			return "", nil, fmt.Errorf("failed to parse tool result content: %w", err)
 		}
-		return llm.RoleTool, llm.ToolResultPart{ID: tr.ID, Output: output}, nil
+		return llm.RoleTool, llm.ToolResultPart{ID: tr.ID, Content: contentParts, IsError: tr.IsError}, nil
 	default:
 		return "", nil, fmt.Errorf("unknown tag: %s", tag)
 	}
@@ -349,12 +350,55 @@ func parseMessagesTLV(body string) ([]llm.Message, []TLVChunk, error) {
 	}
 }
 
-func formatToolResultOutput(output llm.ToolResultOutput) string {
-	if text, ok := output.(llm.ToolResultOutputText); ok {
-		return text.Text
+// serializeContentParts serializes []ContentPart to JSON for persistence.
+// Only TextPart and ImagePart are supported in tool results.
+func serializeContentParts(parts []llm.ContentPart) (json.RawMessage, error) {
+	type contentItem struct {
+		Type    string `json:"type"`
+		Text    string `json:"text,omitempty"`
+		DataURL string `json:"data_url,omitempty"`
 	}
-	if e, ok := output.(llm.ToolResultOutputFailed); ok {
-		return e.Reason
+	items := make([]contentItem, 0, len(parts))
+	for _, p := range parts {
+		switch v := p.(type) {
+		case llm.TextPart:
+			items = append(items, contentItem{Type: "text", Text: v.Text})
+		case llm.ImagePart:
+			items = append(items, contentItem{Type: "image", DataURL: v.DataURL})
+		default:
+			return nil, fmt.Errorf("unsupported content part type in tool result: %T", p)
+		}
 	}
-	return fmt.Sprintf("%v", output)
+	data, err := json.Marshal(items)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+// deserializeContentParts deserializes []ContentPart from JSON persisted by serializeContentParts.
+func deserializeContentParts(data json.RawMessage) ([]llm.ContentPart, error) {
+	if len(data) == 0 {
+		return []llm.ContentPart{}, nil
+	}
+	var items []struct {
+		Type    string `json:"type"`
+		Text    string `json:"text,omitempty"`
+		DataURL string `json:"data_url,omitempty"`
+	}
+	if err := json.Unmarshal(data, &items); err != nil {
+		return nil, err
+	}
+	parts := make([]llm.ContentPart, 0, len(items))
+	for _, item := range items {
+		switch item.Type {
+		case "text":
+			parts = append(parts, llm.TextPart{Text: item.Text})
+		case "image":
+			parts = append(parts, llm.ImagePart{DataURL: item.DataURL})
+		default:
+			return nil, fmt.Errorf("unknown content part type in tool result: %s", item.Type)
+		}
+	}
+	return parts, nil
 }

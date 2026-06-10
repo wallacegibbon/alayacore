@@ -150,11 +150,12 @@ type ToolUseData struct {
 }
 
 // ToolResultData is the JSON payload for TagUserF (UF).
+// Output is the JSON-serialized []ContentPart.
 // IsError indicates whether the tool completed with an error.
 type ToolResultData struct {
-	ID      string `json:"id"`
-	Output  string `json:"output"`
-	IsError bool   `json:"is_error,omitempty"`
+	ID      string          `json:"id"`
+	Output  json.RawMessage `json:"output"`
+	IsError bool            `json:"is_error,omitempty"`
 }
 
 // ============================================================================

@@ -7,12 +7,9 @@ import (
 	"runtime"
 	"strings"
 	"testing"
-
-	"github.com/alayacore/alayacore/internal/llm"
 )
 
 func TestEditFileStreamingMemory(t *testing.T) {
-	// Create a moderately large test file (10MB)
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "large_test.txt")
 
@@ -21,9 +18,8 @@ func TestEditFileStreamingMemory(t *testing.T) {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
-	// Write 10MB of data with a unique pattern in the middle
-	targetSize := 10 * 1024 * 1024   // 10MB
-	chunk := make([]byte, 1024*1024) // 1MB chunk
+	targetSize := 10 * 1024 * 1024
+	chunk := make([]byte, 1024*1024)
 	for i := range chunk {
 		chunk[i] = byte('A' + (i % 26))
 	}
@@ -39,7 +35,6 @@ func TestEditFileStreamingMemory(t *testing.T) {
 		}
 
 		if written <= patternPos && written+toWrite > patternPos {
-			// Write first part
 			part1 := patternPos - written
 			if part1 > 0 {
 				if _, wErr := file.Write(chunk[:part1]); wErr != nil {
@@ -47,12 +42,10 @@ func TestEditFileStreamingMemory(t *testing.T) {
 				}
 				written += part1
 			}
-			// Write pattern
 			if _, wErr := file.Write(pattern); wErr != nil {
 				t.Fatalf("Failed to write pattern: %v", wErr)
 			}
 			written += len(pattern)
-			// Write remaining part
 			remaining := toWrite - part1
 			if remaining > 0 {
 				if _, wErr := file.Write(chunk[:remaining]); wErr != nil {
@@ -67,22 +60,18 @@ func TestEditFileStreamingMemory(t *testing.T) {
 			written += toWrite
 		}
 	}
-
 	file.Close()
 
-	// Get memory stats before
 	var m1 runtime.MemStats
 	runtime.GC()
 	runtime.ReadMemStats(&m1)
 
-	// Test the edit
-	result, err := executeEditFile(context.TODO(), EditFileInput{
+	_, err = executeEditFile(context.TODO(), EditFileInput{
 		Path:      testFile,
 		OldString: string(pattern),
 		NewString: "REPLACED_SUCCESSFULLY",
 	})
 
-	// Get memory stats after
 	var m2 runtime.MemStats
 	runtime.ReadMemStats(&m2)
 
@@ -90,12 +79,6 @@ func TestEditFileStreamingMemory(t *testing.T) {
 		t.Fatalf("executeEditFile failed: %v", err)
 	}
 
-	// Check if result is an error
-	if errResult, ok := result.(llm.ToolResultOutputFailed); ok {
-		t.Fatalf("Edit failed: %s", errResult.Reason)
-	}
-
-	// Verify the replacement
 	content, err := os.ReadFile(testFile)
 	if err != nil {
 		t.Fatalf("Failed to read edited file: %v", err)
@@ -109,13 +92,11 @@ func TestEditFileStreamingMemory(t *testing.T) {
 		t.Error("Original pattern still exists in file")
 	}
 
-	// Check memory usage - should not exceed 20MB for a 10MB file
 	memIncrease := int64(m2.Alloc) - int64(m1.Alloc)
-	maxAllowed := int64(20 * 1024 * 1024) // 20MB
+	maxAllowed := int64(20 * 1024 * 1024)
 
 	if memIncrease > 0 {
 		t.Logf("Memory increase: %.2f MB", float64(memIncrease)/1024/1024)
-
 		if memIncrease > maxAllowed {
 			t.Errorf("Memory usage too high: %.2f MB (max allowed: %.2f MB)",
 				float64(memIncrease)/1024/1024,
@@ -193,38 +174,29 @@ func TestEditFileStreamingEdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create temp file
 			tmpDir := t.TempDir()
 			testFile := filepath.Join(tmpDir, "test.txt")
 			if err := os.WriteFile(testFile, []byte(tt.content), 0644); err != nil {
 				t.Fatalf("Failed to create test file: %v", err)
 			}
 
-			// Execute edit
-			result, err := executeEditFile(context.TODO(), EditFileInput{
+			_, err := executeEditFile(context.TODO(), EditFileInput{
 				Path:      testFile,
 				OldString: tt.oldString,
 				NewString: tt.newString,
 			})
 
-			if err != nil {
-				t.Fatalf("executeEditFile returned error: %v", err)
-			}
-
-			// Check result
 			if tt.shouldError {
-				errResult, ok := result.(llm.ToolResultOutputFailed)
-				if !ok {
-					t.Errorf("Expected error result, got: %v", result)
-				} else if tt.errorMsg != "" && !contains([]byte(errResult.Reason), []byte(tt.errorMsg)) {
-					t.Errorf("Error message should contain %q, got: %q", tt.errorMsg, errResult.Reason)
+				if err == nil {
+					t.Errorf("Expected error, got success")
+				} else if tt.errorMsg != "" && !strings.Contains(err.Error(), tt.errorMsg) {
+					t.Errorf("Error message should contain %q, got: %q", tt.errorMsg, err.Error())
 				}
 			} else {
-				if errResult, ok := result.(llm.ToolResultOutputFailed); ok {
-					t.Errorf("Expected success, got error: %s", errResult.Reason)
+				if err != nil {
+					t.Errorf("Expected success, got error: %v", err)
 				}
 
-				// Verify file content
 				content, err := os.ReadFile(testFile)
 				if err != nil {
 					t.Fatalf("Failed to read file: %v", err)

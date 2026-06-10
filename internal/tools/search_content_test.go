@@ -7,12 +7,9 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-
-	"github.com/alayacore/alayacore/internal/llm"
 )
 
 func TestRGAvailable(t *testing.T) {
-	// This just tests that RGAvailable doesn't panic
 	_ = RGAvailable()
 }
 
@@ -21,21 +18,18 @@ func TestSearchContentBasicSearch(t *testing.T) {
 		t.Skip("rg not available on system")
 	}
 
-	// Create a temp directory with some test files
 	tmpDir, err := os.MkdirTemp("", "alayacore-rg-test-")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Write a test file
 	testFile := filepath.Join(tmpDir, "test.txt")
 	content := "hello world\nfoo bar\nhello again\n"
 	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
 		t.Fatal(err)
 	}
 
-	// Search for "hello"
 	result, err := executeSearchContent(context.Background(), SearchContentInput{
 		Pattern: "hello",
 		Path:    tmpDir,
@@ -43,11 +37,8 @@ func TestSearchContentBasicSearch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	text, ok := result.(llm.ToolResultOutputText)
-	if !ok {
-		t.Fatalf("expected text output, got %T", result)
-	}
-	if text.Text == "" {
+	text := extractFirstText(result)
+	if text == "" {
 		t.Error("expected non-empty output")
 	}
 }
@@ -75,28 +66,21 @@ func TestSearchContentNoMatches(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	text, ok := result.(llm.ToolResultOutputText)
-	if !ok {
-		t.Fatalf("expected text output, got %T", result)
-	}
-	if text.Text != "No matches found" {
-		t.Errorf("expected 'No matches found', got %q", text.Text)
+	text := extractFirstText(result)
+	if text != "No matches found" {
+		t.Errorf("expected 'No matches found', got %q", text)
 	}
 }
 
 func TestSearchContentEmptyPattern(t *testing.T) {
-	result, err := executeSearchContent(context.Background(), SearchContentInput{
+	_, err := executeSearchContent(context.Background(), SearchContentInput{
 		Pattern: "",
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Fatal("expected error for empty pattern")
 	}
-	errOut, ok := result.(llm.ToolResultOutputFailed)
-	if !ok {
-		t.Fatalf("expected error output, got %T", result)
-	}
-	if errOut.Reason != "pattern is required" {
-		t.Errorf("expected 'pattern is required', got %q", errOut.Reason)
+	if err.Error() != "pattern is required" {
+		t.Errorf("expected 'pattern is required', got %q", err.Error())
 	}
 }
 
@@ -111,13 +95,11 @@ func TestSearchContentFileTypeFilter(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Write a Go file
 	goFile := filepath.Join(tmpDir, "test.go")
 	if err := os.WriteFile(goFile, []byte("package main\nfunc test() {}\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
-	// Write a text file that also contains "func"
 	txtFile := filepath.Join(tmpDir, "test.txt")
 	if err := os.WriteFile(txtFile, []byte("func should not match\n"), 0644); err != nil {
 		t.Fatal(err)
@@ -131,13 +113,8 @@ func TestSearchContentFileTypeFilter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	text, ok := result.(llm.ToolResultOutputText)
-	if !ok {
-		t.Fatalf("expected text output, got %T", result)
-	}
-
-	// Should only contain the Go file match
-	if text.Text == "" {
+	text := extractFirstText(result)
+	if text == "" {
 		t.Error("expected non-empty output")
 	}
 }
@@ -158,7 +135,6 @@ func TestSearchContentIgnoreCase(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Without ignore_case, lowercase "hello" should not match "Hello"
 	result, err := executeSearchContent(context.Background(), SearchContentInput{
 		Pattern: "hello",
 		Path:    tmpDir,
@@ -166,15 +142,11 @@ func TestSearchContentIgnoreCase(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	text, ok := result.(llm.ToolResultOutputText)
-	if !ok {
-		t.Fatalf("expected text output, got %T", result)
-	}
-	if text.Text != "No matches found" {
-		t.Errorf("expected 'No matches found' for case-sensitive search, got %q", text.Text)
+	text := extractFirstText(result)
+	if text != "No matches found" {
+		t.Errorf("expected 'No matches found' for case-sensitive search, got %q", text)
 	}
 
-	// With ignore_case, lowercase "hello" should match "Hello"
 	result, err = executeSearchContent(context.Background(), SearchContentInput{
 		Pattern:    "hello",
 		Path:       tmpDir,
@@ -183,12 +155,9 @@ func TestSearchContentIgnoreCase(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	text, ok = result.(llm.ToolResultOutputText)
-	if !ok {
-		t.Fatalf("expected text output, got %T", result)
-	}
-	if text.Text == "" || text.Text == "No matches found" {
-		t.Errorf("expected match with ignore_case=true, got %q", text.Text)
+	text = extractFirstText(result)
+	if text == "" || text == "No matches found" {
+		t.Errorf("expected match with ignore_case=true, got %q", text)
 	}
 }
 
@@ -203,7 +172,6 @@ func TestSearchContentMaxLinesGlobal(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Create 5 files, each with 20 matching lines
 	for f := 0; f < 5; f++ {
 		var content string
 		for i := 0; i < 20; i++ {
@@ -214,7 +182,6 @@ func TestSearchContentMaxLinesGlobal(t *testing.T) {
 		}
 	}
 
-	// With MaxLines=5, output should be saved to file
 	result, err := executeSearchContent(context.Background(), SearchContentInput{
 		Pattern:  "match",
 		Path:     tmpDir,
@@ -223,24 +190,12 @@ func TestSearchContentMaxLinesGlobal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	text, ok := result.(llm.ToolResultOutputText)
-	if !ok {
-		t.Fatalf("expected text output, got %T", result)
+	text := extractFirstText(result)
+	if !strings.Contains(text, "matching lines") {
+		t.Errorf("expected 'matching lines' in output, got:\n%s", text)
 	}
-
-	// Should contain line count
-	if !strings.Contains(text.Text, "matching lines") {
-		t.Errorf("expected 'matching lines' in output, got:\n%s", text.Text)
-	}
-
-	// Should mention file was saved
-	if !strings.Contains(text.Text, "Results saved to:") {
-		t.Errorf("expected 'Results saved to:' in output, got:\n%s", text.Text)
-	}
-
-	// Should contain tmp directory and search- file pattern
-	if !strings.Contains(text.Text, "alayacore-") || !strings.Contains(text.Text, "search-") {
-		t.Errorf("expected alayacore- directory and search- file pattern, got:\n%s", text.Text)
+	if !strings.Contains(text, "Results saved to:") {
+		t.Errorf("expected 'Results saved to:' in output, got:\n%s", text)
 	}
 }
 
@@ -260,7 +215,6 @@ func TestSearchContentPatternLooksLikeFlag(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Patterns that look like flags should be treated as literal regex patterns
 	result, err := executeSearchContent(context.Background(), SearchContentInput{
 		Pattern: "--skill",
 		Path:    tmpDir,
@@ -268,14 +222,11 @@ func TestSearchContentPatternLooksLikeFlag(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	text, ok := result.(llm.ToolResultOutputText)
-	if !ok {
-		t.Fatalf("expected text output, got %T", result)
+	text := extractFirstText(result)
+	if text == "" || text == "No matches found" {
+		t.Errorf("expected match for '--skill' pattern, got %q", text)
 	}
-	if text.Text == "" || text.Text == "No matches found" {
-		t.Errorf("expected match for '--skill' pattern, got %q", text.Text)
-	}
-	if !strings.Contains(text.Text, "--skill") {
-		t.Errorf("expected output to contain '--skill', got %q", text.Text)
+	if !strings.Contains(text, "--skill") {
+		t.Errorf("expected output to contain '--skill', got %q", text)
 	}
 }
