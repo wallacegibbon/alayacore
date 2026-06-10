@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/stream"
 	"github.com/alayacore/alayacore/internal/theme"
 )
@@ -76,13 +77,9 @@ func (s *Session) writeToolUseInput(input json.RawMessage, id string) {
 	})
 }
 
-func (s *Session) writeToolUseOutput(id string, output string, isError bool) {
-	content := []map[string]any{
-		{"type": "text", "text": output},
-	}
-	contentJSON, err := json.Marshal(content)
+func (s *Session) writeToolUseOutput(id string, content []llm.ContentPart, isError bool) {
+	contentJSON, err := serializeContentParts(content)
 	if err != nil {
-		// Should never happen with our simple content structure
 		contentJSON = []byte(`[{"type":"text","text":"(serialization error)"}]`)
 	}
 	s.writeTLVJSON(stream.TagUserF, stream.ToolResultData{

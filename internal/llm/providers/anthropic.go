@@ -701,6 +701,12 @@ func anthropicConvertMessages(messages []llm.Message, reasoningLevel int) []anth
 
 // anthropicPartToBlock converts a domain ContentPart to an Anthropic content block.
 // Returns nil for unsupported parts.
+//
+// Recursion: When handling ToolResultPart, the function calls itself for each
+// sub-part in the result's Content slice. This allows tool results containing
+// ImagePart, TextPart, etc. to be serialized as nested content blocks inside
+// the tool_result block — matching Anthropic's wire format where
+// tool_result.content is an array of content blocks (text, image, etc.).
 func anthropicPartToBlock(part llm.ContentPart) *anthropicContentBlock {
 	switch v := part.(type) {
 	case llm.TextPart:
@@ -740,8 +746,10 @@ func anthropicPartToBlock(part llm.ContentPart) *anthropicContentBlock {
 			ToolUseID: v.ID,
 			IsError:   v.IsError,
 		}
-		// Convert each ContentPart to an anthropic content block.
-		// This handles TextPart, ImagePart, etc. via the same converter.
+		// Recursively convert each sub-part to an Anthropic content block.
+		// This handles TextPart → text block, ImagePart → image block, etc.
+		// via the same anthropicPartToBlock function, enabling nested content
+		// inside tool_result (e.g. text + image in a single tool result).
 		blocks := make([]anthropicContentBlock, 0, len(v.Content))
 		for _, part := range v.Content {
 			if b := anthropicPartToBlock(part); b != nil {

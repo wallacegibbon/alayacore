@@ -150,7 +150,7 @@ type ToolUseData struct {
 }
 
 // ToolResultData is the JSON payload for TagUserF (UF).
-// Output is the JSON-serialized []ContentPart.
+// Output is a JSON array of content blocks (text, image, etc.).
 // IsError indicates whether the tool completed with an error.
 type ToolResultData struct {
 	ID      string          `json:"id"`

@@ -126,12 +126,10 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 			return nil
 		},
 		OnToolUseOutput: func(id string, content []llm.ContentPart, err error) error {
-			// Extract display text from the first TextPart for the terminal UI.
-			displayText := extractDisplayText(content)
 			if err != nil {
-				s.writeToolUseOutput(id, displayText, true)
+				s.writeToolUseOutput(id, content, true)
 			} else {
-				s.writeToolUseOutput(id, displayText, false)
+				s.writeToolUseOutput(id, content, false)
 			}
 			return nil
 		},
@@ -236,15 +234,4 @@ func cleanIncompleteToolUses(messages []llm.Message) []llm.Message {
 	}
 	// The last message had nothing but orphaned tool calls — drop it.
 	return messages[:len(messages)-1]
-}
-
-// extractDisplayText extracts display text from the first TextPart in content,
-// or returns a fallback message if no text part is found.
-func extractDisplayText(content []llm.ContentPart) string {
-	for _, part := range content {
-		if tp, ok := part.(llm.TextPart); ok {
-			return tp.Text
-		}
-	}
-	return "(non-text result)"
 }

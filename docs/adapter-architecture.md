@@ -115,7 +115,7 @@ Agent.Stream() receives tool_call event
   → OnToolUseStart callback → TLV(AF, {"id":"<id>","name":"<tool>"}) → UI shows tool name immediately
     → OnToolUseInput callback → TLV(AF, {"id":"<id>","input":{...}}) → UI fills in arguments
       → Agent executes tool: tool.Execute(ctx, input)
-        → OnToolUseOutput callback → TLV(UF, {"id":"<id>","output":"..."}) → UI shows output and indicator
+        → OnToolUseOutput callback → TLV(UF, {"id":"<id>","output":[{"type":"text","text":"..."}]}) → UI shows output and indicator
           → Tool result added to messages
             → Agent continues to next step (if under max_steps)
 ```

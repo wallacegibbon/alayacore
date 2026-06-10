@@ -18,22 +18,25 @@
 //	  - TagUserI (UI): User image (DataURI: data:image/...;base64,...)
 //	  - TagAssistantT (AT): Assistant text output
 //	  - TagAssistantR (AR): Reasoning/thinking content
-//	  - TagAssistantF (AF): Function lifecycle (JSON: id, type, name, input)
-//	  - TagUserF (UF): Function result (JSON: id, output, status)
+//	  - TagAssistantF (AF): Function lifecycle (JSON: id, name, input)
+//	  - TagUserF (UF): Function result (JSON: id, output, is_error)
 //	  - TagSystemMsg (SM): System message (JSON: {"type":"...","data":{...}})
 //
 // Function Lifecycle:
 //
-// The TagAssistantF tag (AF) carries a JSON payload with a type discriminator:
-//   - `{"id":"tool123","type":"start","name":"read_file"}` — tool name known
-//   - `{"id":"tool123","type":"call","name":"read_file","input":"..."}` — full input
+// The TagAssistantF tag (AF) carries a JSON payload:
+//   - `{"id":"tool123","name":"read_file"}` — tool name known (start frame)
+//   - `{"id":"tool123","input":{...}}` — full tool arguments (input frame)
 //
-// TagUserF (UF) carries the final output and status:
-//   - `{"id":"tool123","output":"...","status":"success"}` — execution succeeded
-//   - `{"id":"tool123","output":"...","status":"failed"}` — execution failed
+// TagUserF (UF) carries the final output and error flag:
+//   - `{"id":"tool123","output":[{"type":"text","text":"..."}]}` — execution succeeded (`is_error` omitted when false)
+//   - `{"id":"tool123","output":[{"type":"text","text":"..."}],"is_error":true}` — execution failed
+//
+// Output is a JSON array of content blocks (text, image, etc.) matching the
+// format used by Anthropic's tool_result content blocks. Single text results
+// are rendered as `[{"type":"text","text":"..."}]`.
 //
 // The terminal infers "pending" while waiting for a result (no UF received).
-// The AF "state" type was removed — the final status arrives via UF.
 //
 // Delta Messages:
 //

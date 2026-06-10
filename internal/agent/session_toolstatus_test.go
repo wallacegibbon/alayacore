@@ -16,7 +16,7 @@ func TestWriteToolOutput(t *testing.T) {
 		SessionConfig: SessionConfig{Output: output},
 	}
 
-	session.writeToolUseOutput("tool123", "output text", false)
+	session.writeToolUseOutput("tool123", []llm.ContentPart{llm.TextPart{Text: "output text"}}, false)
 
 	tag, value := parseTLVFromBytes(output.data)
 	if tag != stream.TagUserF {
@@ -34,7 +34,7 @@ func TestWriteToolOutput(t *testing.T) {
 	checkToolResultContent(t, got.Output, "output text")
 
 	output.data = nil
-	session.writeToolUseOutput("tool456", "error message", true)
+	session.writeToolUseOutput("tool456", []llm.ContentPart{llm.TextPart{Text: "error message"}}, true)
 
 	tag, value = parseTLVFromBytes(output.data)
 	if tag != stream.TagUserF {
@@ -68,11 +68,10 @@ func TestOnToolUseOutputCallback(t *testing.T) {
 			}},
 		})
 
-		displayText := extractDisplayText(content)
 		if err != nil {
-			session.writeToolUseOutput(id, displayText, true)
+			session.writeToolUseOutput(id, content, true)
 		} else {
-			session.writeToolUseOutput(id, displayText, false)
+			session.writeToolUseOutput(id, content, false)
 		}
 	}
 
