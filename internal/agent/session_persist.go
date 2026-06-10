@@ -125,26 +125,13 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 			if err != nil {
 				return nil, domainerrors.Wrap(CommandNameSave, err)
 			}
-			writeTLV(&tlvBuf, tag, content)
+			tlvBuf.WriteString("\n\n")
+			tlvBuf.Write(stream.EncodeTLV(tag, content))
 		}
 	}
 
 	buf.WriteString(tlvBuf.String())
 	return []byte(buf.String()), nil
-}
-
-func writeTLV(buf *strings.Builder, tag string, content string) {
-	data := []byte(content)
-	buf.WriteString("\n\n")
-	buf.WriteByte(tag[0])
-	buf.WriteByte(tag[1])
-	buf.Write([]byte{
-		byte(len(data) >> 24),
-		byte(len(data) >> 16),
-		byte(len(data) >> 8),
-		byte(len(data)),
-	})
-	buf.Write(data)
 }
 
 // parseFrontmatter extracts the frontmatter and body from content with "---" delimiters.
@@ -267,19 +254,27 @@ func (r *tlvReader) read() (tag string, content []byte, err error) {
 
 // contentPartFromTLV converts a TLV record into a ContentPart.
 // Returns the message role and the content part.
+// If the TLV value has a NUL-delimited historyID prefix, it is stripped
+// so the stored message contains clean content.
 func contentPartFromTLV(tag string, content []byte) (llm.MessageRole, llm.ContentPart, error) {
+	// Strip NUL-delimited historyID prefix if present (added during live streaming).
+	cleanContent := string(content)
+	if _, stripped, ok := stream.UnwrapDelta(cleanContent); ok {
+		cleanContent = stripped
+	}
+
 	switch tag {
 	case stream.TagUserT:
-		return llm.RoleUser, llm.TextPart{Text: string(content)}, nil
+		return llm.RoleUser, llm.TextPart{Text: cleanContent}, nil
 	case stream.TagUserI:
-		return llm.RoleUser, llm.ImagePart{DataURL: string(content)}, nil
+		return llm.RoleUser, llm.ImagePart{DataURL: cleanContent}, nil
 	case stream.TagAssistantT:
-		return llm.RoleAssistant, llm.TextPart{Text: string(content)}, nil
+		return llm.RoleAssistant, llm.TextPart{Text: cleanContent}, nil
 	case stream.TagAssistantR:
-		return llm.RoleAssistant, llm.ReasoningPart{Text: string(content)}, nil
+		return llm.RoleAssistant, llm.ReasoningPart{Text: cleanContent}, nil
 	case stream.TagAssistantF:
 		var fd stream.ToolUseData
-		if err := json.Unmarshal(content, &fd); err != nil {
+		if err := json.Unmarshal([]byte(cleanContent), &fd); err != nil {
 			return "", nil, fmt.Errorf("failed to parse function data: %w", err)
 		}
 		if fd.Name == "" {
@@ -290,7 +285,7 @@ func contentPartFromTLV(tag string, content []byte) (llm.MessageRole, llm.Conten
 		}, nil
 	case stream.TagUserF:
 		var tr stream.ToolResultData
-		if err := json.Unmarshal(content, &tr); err != nil {
+		if err := json.Unmarshal([]byte(cleanContent), &tr); err != nil {
 			return "", nil, fmt.Errorf("failed to parse tool result: %w", err)
 		}
 		contentParts, err := deserializeContentParts(tr.Output)

@@ -28,7 +28,7 @@ AT and AR use NUL-delimited stream IDs for incremental streaming:
 \x00<stream-id>\x00<content>
 ```
 
-**Stream ID format:** `<promptID>|<step>|<index>` (e.g. `0|1|0`, `0|2|1`, `1|1|0`)
+**Stream ID format:** `<historyCount>` or `<historyCount+blockIndex>` (e.g. `5`, `6`, `7`)
 
 **Stream ID:**
 - Same stream ID → content is a continuation of that stream
@@ -40,8 +40,8 @@ AT and AR use NUL-delimited stream IDs for incremental streaming:
   (e.g. thinking[0], text[1], thinking[2], text[3], tool_use[4]) — each gets
   a unique sequential index regardless of type. Without the index, two
   reasoning blocks in the same step would be indistinguishable.
-- OpenAI: reasoning blocks get index `0`, text blocks get index `1` (never
-  more than one of each per step).
+- OpenAI: reasoning blocks get index `0`, text blocks get index `1`, and
+  tool calls get index `2+` (never more than one of each type per step).
 
 ## Function Lifecycle (AF, UF)
 
@@ -64,7 +64,7 @@ Adapter writes → stdin:        UT "Read the file main.go"
 Session writes → stdout:       AF {"id":"t1","name":"read_file"}
                                AF {"id":"t1","input":{"path":"main.go"}}
                                UF {"id":"t1","output":[{"text":"package main...","type":"text"}]}
-                               AT \x00 0|1|0 \x00 Here's what main.go does...
+                               AT \x00 5 \x00 Here's what main.go does...
                                SM {"type":"task","data":{"in_progress":false,"context":0,"queue_items":[]}}
 ```
 
@@ -135,11 +135,11 @@ uf-execute-command-failed.bin  UF {"id":"t5","output":[{"text":"command not foun
 ```
 ut-hello.bin                   UT "hello"
 ut-empty.bin                   UT "" (length 0)
-at-delta-hello.bin             AT \x00 0|1|0 \x00 Hello
-at-delta-world.bin             AT \x00 0|1|0 \x00 world (same stream)
-at-delta-new-step.bin          AT \x00 0|2|0 \x00 Next step (new stream)
+at-delta-hello.bin             AT \x00 5 \x00 Hello
+at-delta-world.bin             AT \x00 5 \x00 world (same stream)
+at-delta-new-step.bin          AT \x00 6 \x00 Next step (new stream)
 at-plain.bin                   AT "plain text without stream id"
-ar-delta.bin                   AR \x00 0|1|0 \x00 thinking...
+ar-delta.bin                   AR \x00 5 \x00 thinking...
 ui-image.bin                   UI data:image/jpeg;base64,...
 sm-message-version.bin         SM {"type":"version","data":{"message_version":4}}
 sm-model-list.bin              SM {"type":"model_list","data":{"models":[{"id":0,"name":"Anthropic / Claude Haiku 4",...},{"id":4,"name":"DeepSeek / DeepSeek-V4 Flash",...}],"model_config_path":"..."}}

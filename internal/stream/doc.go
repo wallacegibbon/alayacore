@@ -40,32 +40,34 @@
 //
 // Delta Messages:
 //
-// AT and AR are delta messages that arrive piece-by-piece during streaming.
-// Their TLV values use NUL-delimited stream IDs:
+// All content tags (UT, UI, AT, AR, AF, UF) may carry a NUL-delimited
+// historyCount-based ID for live streaming. The adapter uses this ID to
+// route content to the correct window. When messages are replayed from a
+// saved session file the ID is absent and the adapter falls back to
+// generating a local window ID.
 //
-//	\x00<stream-id>\x00<content>
+// TLV value format with ID:
+//
+//	\x00<id>\x00<content>
 //
 // NUL bytes (\x00) are used as delimiters because they can never appear in
 // normal UTF-8 text, making the split unambiguous. See WrapDelta and
 // UnwrapDelta in stream_id.go.
 //
-// Stream ID format for AT/AR:
+// The id is derived from historyCount + blockIndex:
+//   - User content (UT, UI, cancel AT): historyCount (incremented on echo)
+//   - Delta content (AT, AR, AF): historyCount + index
+//   - Tool results (UF): historyCount (incremented on result)
 //
-//	"<promptID>|<step>|<index>"
-//
-// The index uniquely identifies each content block within a step:
+// The blockIndex uniquely identifies each content block within a step.
 //   - Anthropic: uses the content block index from the API.
 //     Blocks can interleave (e.g. thinking, text, thinking, text, tool_use),
 //     each with a unique sequential index regardless of type. This lets the
 //     adapter route deltas to the correct window — without it, two reasoning
 //     blocks in the same step would be indistinguishable.
-//   - OpenAI: reasoning blocks get index 0, text blocks get index 1.
-//     OpenAI never emits multiple blocks of the same type, so fixed values
-//     are sufficient.
-//
-// The stream ID itself serves as the window key — the index ensures each
-// content block has a unique ID regardless of type, so no tag prefix is
-// needed for disambiguation.
+//   - OpenAI: reasoning blocks get index 0, text blocks get index 1,
+//     and tool calls get index 2+. OpenAI never emits multiple blocks of
+//     the same type, so fixed values are sufficient.
 //
 // Usage:
 //

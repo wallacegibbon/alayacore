@@ -15,7 +15,7 @@ func TestAgentPreservesTextWithToolCalls(t *testing.T) {
 		responses: []mockResponse{
 			{
 				text:      "Let me check that for you.",
-				toolCalls: []ToolUsePart{{ID: "call_123", ToolName: "get_weather", Input: []byte(`{"location":"SF"}`)}},
+				toolCalls: []ToolUseDeltaEvent{{ID: "call_123", ToolName: "get_weather", Input: []byte(`{"location":"SF"}`)}},
 			},
 			{
 				text: "The weather in SF is sunny.",
@@ -107,7 +107,7 @@ type mockProviderWithTextAndTools struct {
 
 type mockResponse struct {
 	text      string
-	toolCalls []ToolUsePart
+	toolCalls []ToolUseDeltaEvent
 }
 
 func (m *mockProviderWithTextAndTools) StreamMessages(_ context.Context, _ []Message, _ []ToolDefinition, _, _ string) (iter.Seq2[StreamEvent, error], error) {
@@ -124,11 +124,7 @@ func (m *mockProviderWithTextAndTools) StreamMessages(_ context.Context, _ []Mes
 
 		// Send tool call events
 		for _, tc := range resp.toolCalls {
-			if !yield(ToolUsePart{
-				ID:       tc.ID,
-				ToolName: tc.ToolName,
-				Input:    tc.Input,
-			}, nil) {
+			if !yield(tc, nil) {
 				return
 			}
 		}
@@ -139,7 +135,11 @@ func (m *mockProviderWithTextAndTools) StreamMessages(_ context.Context, _ []Mes
 			content = append(content, TextPart{Text: resp.text})
 		}
 		for _, tc := range resp.toolCalls {
-			content = append(content, tc)
+			content = append(content, ToolUsePart{
+				ID:       tc.ID,
+				ToolName: tc.ToolName,
+				Input:    tc.Input,
+			})
 		}
 
 		yield(StepCompleteEvent{

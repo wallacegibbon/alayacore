@@ -78,7 +78,7 @@ func TestFullIntegration(t *testing.T) {
 			fmt.Printf("[Thinking] %s", delta)
 			return nil
 		},
-		OnToolUseInput: func(_ string, _ json.RawMessage) error {
+		OnToolUseInput: func(_ string, _ json.RawMessage, _ int) error {
 			fmt.Printf("\n[Calling tool]\n")
 			return nil
 		},

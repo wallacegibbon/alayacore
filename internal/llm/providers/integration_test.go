@@ -196,8 +196,8 @@ func TestAnthropicRealToolCall(t *testing.T) {
 	for event := range events {
 		if e, ok := event.(llm.TextDeltaEvent); ok {
 			textReceived += e.Delta
-		} else if e, ok := event.(llm.ToolUsePart); ok {
-			toolCalls = append(toolCalls, e)
+		} else if e, ok := event.(llm.ToolUseDeltaEvent); ok {
+			toolCalls = append(toolCalls, llm.ToolUsePart{ID: e.ID, ToolName: e.ToolName, Input: e.Input})
 		}
 	}
 
@@ -341,7 +341,7 @@ func TestAgentToolLoopRealAPI(t *testing.T) {
 			textReceived.WriteString(delta)
 			return nil
 		},
-		OnToolUseInput: func(_ string, input json.RawMessage) error {
+		OnToolUseInput: func(_ string, input json.RawMessage, _ int) error {
 			toolCalls = append(toolCalls, fmt.Sprintf("tool(%s)", string(input)))
 			return nil
 		},
@@ -444,7 +444,7 @@ func TestAgentMultiToolLoopRealAPI(t *testing.T) {
 			textReceived.WriteString(delta)
 			return nil
 		},
-		OnToolUseInput: func(_ string, input json.RawMessage) error {
+		OnToolUseInput: func(_ string, input json.RawMessage, _ int) error {
 			toolCalls = append(toolCalls, fmt.Sprintf("tool(%s)", string(input)))
 			return nil
 		},
@@ -537,7 +537,7 @@ func TestAgentSequentialQueriesWithTools(t *testing.T) {
 
 	var toolCalls []string
 	result, err := agent.Stream(ctx, allMessages, llm.StreamCallbacks{
-		OnToolUseInput: func(_ string, input json.RawMessage) error {
+		OnToolUseInput: func(_ string, input json.RawMessage, _ int) error {
 			toolCalls = append(toolCalls, fmt.Sprintf("tool(%s)", string(input)))
 			return nil
 		},
@@ -564,7 +564,7 @@ func TestAgentSequentialQueriesWithTools(t *testing.T) {
 
 	toolCalls = nil
 	result, err = agent.Stream(ctx, allMessages, llm.StreamCallbacks{
-		OnToolUseInput: func(_ string, input json.RawMessage) error {
+		OnToolUseInput: func(_ string, input json.RawMessage, _ int) error {
 			toolCalls = append(toolCalls, fmt.Sprintf("tool(%s)", string(input)))
 			return nil
 		},
@@ -662,7 +662,7 @@ func TestOpenAICompatSequentialQueriesWithTools(t *testing.T) {
 
 	var toolCalls []string
 	result, err := agent.Stream(ctx, allMessages, llm.StreamCallbacks{
-		OnToolUseInput: func(_ string, input json.RawMessage) error {
+		OnToolUseInput: func(_ string, input json.RawMessage, _ int) error {
 			toolCalls = append(toolCalls, fmt.Sprintf("tool(%s)", string(input)))
 			return nil
 		},
@@ -689,7 +689,7 @@ func TestOpenAICompatSequentialQueriesWithTools(t *testing.T) {
 
 	toolCalls = nil
 	result, err = agent.Stream(ctx, allMessages, llm.StreamCallbacks{
-		OnToolUseInput: func(_ string, input json.RawMessage) error {
+		OnToolUseInput: func(_ string, input json.RawMessage, _ int) error {
 			toolCalls = append(toolCalls, fmt.Sprintf("tool(%s)", string(input)))
 			return nil
 		},

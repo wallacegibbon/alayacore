@@ -6,7 +6,7 @@ import (
 )
 
 // StreamID identifies a delta stream across multiple TLV frames.
-// Used by AT and AR (delta messages). AF uses JSON instead.
+// Used by AT, AR, UT, UI, AF, and UF to carry a historyCount-based ID.
 //
 // Wire format within a TLV value:
 //
@@ -16,11 +16,12 @@ import (
 // in normal UTF-8 text content, making the split unambiguous regardless of
 // what the LLM generates.
 //
-// The id string itself follows the convention:
+// The id is a decimal number derived from historyCount + blockIndex:
+//   - User content (UT, UI, cancel): historyCount (incremented on echo)
+//   - Delta content (AT, AR, AF): historyCount + index
+//   - Tool results (UF): historyCount (incremented on result)
 //
-//	"<promptID>|<step>|<index>"
-//
-// The index uniquely identifies each content block within a step.
+// The blockIndex uniquely identifies each content block within a step.
 // For Anthropic, blocks can interleave (e.g., thinking[0], text[1],
 // thinking[2], tool_use[3]), so the index is critical for the adapter
 // to route deltas to the correct window.

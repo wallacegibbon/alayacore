@@ -81,31 +81,44 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 		o.handleTextDelta(tag, value)
 
 	case stream.TagUserT:
+		_, content, ok := stream.UnwrapDelta(value)
+		if !ok {
+			content = value
+		}
 		o.emitSeparator(tag)
-		fmt.Fprintf(o.writer, "> %s\n", value)
+		fmt.Fprintf(o.writer, "> %s\n", content)
 
 	case stream.TagSystemMsg:
 		o.handleSystemMsg(value)
 
 	case stream.TagAssistantF:
+		_, payload, ok := stream.UnwrapDelta(value)
+		if !ok {
+			payload = value
+		}
 		if o.lastTag != "" {
 			fmt.Fprintln(o.writer)
 		}
 		o.lastTag = tag
 		o.lastStreamID = ""
 		// Show complete tool call JSON.
-		fmt.Fprintf(o.writer, "%s\n", value)
+		fmt.Fprintf(o.writer, "%s\n", payload)
 
 	case stream.TagUserF:
+		_, payload, ok := stream.UnwrapDelta(value)
+		if !ok {
+			payload = value
+		}
 		// Show complete tool result JSON.
 		if o.lastTag != "" && o.lastTag != tag {
 			fmt.Fprintln(o.writer)
 		}
 		o.lastTag = tag
 		o.lastStreamID = ""
-		fmt.Fprintf(o.writer, "%s\n", value)
+		fmt.Fprintf(o.writer, "%s\n", payload)
 
 	case stream.TagUserI:
+		stream.UnwrapDelta(value)
 		o.emitSeparator(tag)
 		fmt.Fprintf(o.writer, "[image]\n")
 

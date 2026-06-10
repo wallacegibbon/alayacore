@@ -288,11 +288,7 @@ func (p *OpenAIProvider) parseStream(reader io.Reader) iter.Seq2[llm.StreamEvent
 
 		// Emit tool call events from accumulators
 		for _, tc := range state.getToolCalls() {
-			if !yield(llm.ToolUsePart{
-				ID:       tc.ID,
-				ToolName: tc.ToolName,
-				Input:    tc.Input,
-			}, nil) {
+			if !yield(tc, nil) {
 				return
 			}
 		}
@@ -363,19 +359,20 @@ func (s *openAIStreamState) setToolCallName(index int, id, name string) {
 	acc.name = name
 }
 
-func (s *openAIStreamState) getToolCalls() []llm.ToolUsePart {
+func (s *openAIStreamState) getToolCalls() []llm.ToolUseDeltaEvent {
 	indices := make([]int, 0, len(s.toolAccumulators))
 	for i := range s.toolAccumulators {
 		indices = append(indices, i)
 	}
 	sort.Ints(indices)
-	result := make([]llm.ToolUsePart, len(indices))
+	result := make([]llm.ToolUseDeltaEvent, len(indices))
 	for pos, i := range indices {
 		acc := s.toolAccumulators[i]
-		result[pos] = llm.ToolUsePart{
+		result[pos] = llm.ToolUseDeltaEvent{
 			ID:       acc.id,
 			ToolName: acc.name,
 			Input:    json.RawMessage(acc.args.String()),
+			Index:    2 + i, // content block: 0=reasoning, 1=text, 2+=tools
 		}
 	}
 	return result
@@ -399,7 +396,11 @@ func (s *openAIStreamState) getMessage() llm.Message {
 		})
 	}
 	for _, tc := range tcs {
-		content = append(content, tc)
+		content = append(content, llm.ToolUsePart{
+			ID:       tc.ID,
+			ToolName: tc.ToolName,
+			Input:    tc.Input,
+		})
 	}
 	return llm.Message{
 		Role:    llm.RoleAssistant,
@@ -488,6 +489,7 @@ func (p *OpenAIProvider) handleDelta(delta openAIDelta, yield func(llm.StreamEve
 			if !yield(llm.ToolUseStartEvent{
 				ID:       tc.ID,
 				ToolName: tc.Function.Name,
+				Index:    2 + tc.Index, // content block: 0=reasoning, 1=text, 2+=tools
 			}, nil) {
 				return false
 			}

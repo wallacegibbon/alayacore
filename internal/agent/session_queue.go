@@ -12,6 +12,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -95,9 +96,11 @@ func (s *Session) runTask(ctx context.Context, item QueueItem, taskMessages []ll
 	// followed by the text as TagUserT.
 	if item.Type == TaskTypePrompt {
 		for _, img := range item.Images {
-			s.writeTLVStr(stream.TagUserI, img)
+			id := s.histIncAndGet()
+			s.writeTLVStr(stream.TagUserI, stream.WrapDelta(strconv.FormatUint(id, 10), img))
 		}
-		s.writeTLVStr(stream.TagUserT, item.Content)
+		id := s.histIncAndGet()
+		s.writeTLVStr(stream.TagUserT, stream.WrapDelta(strconv.FormatUint(id, 10), item.Content))
 	}
 
 	s.requestSystemInfo()
@@ -146,7 +149,8 @@ func (s *Session) appendCancelMessage(messages []llm.Message) []llm.Message {
 	})
 	// Also push to the output so the cancel message appears live in the UI,
 	// matching the behavior on session restore where TLV chunks are replayed.
-	s.writeTLVStr(stream.TagAssistantT, cancelMessage)
+	id := s.histIncAndGet()
+	s.writeTLVStr(stream.TagAssistantT, stream.WrapDelta(strconv.FormatUint(id, 10), cancelMessage))
 	return messages
 }
 

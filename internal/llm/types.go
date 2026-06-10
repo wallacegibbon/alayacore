@@ -78,17 +78,11 @@ type ReasoningPart struct {
 
 func (ReasoningPart) isContentPart() {}
 
-// ToolUsePart represents a tool call.
-//
-// It implements both ContentPart and StreamEvent:
-//   - As a ContentPart, it is stored in Message.Content for conversation history.
-//   - As a StreamEvent, it is yielded by providers to signal completion of a
-//     tool call so the agent can execute it. ToolUseStartEvent is yielded first
-//     (when name+ID are known), followed by ToolUsePart when arguments finish
-//     streaming.
-//
-// This dual role is intentional — the same data flows through the streaming
-// pipeline (as an event) and into the persisted conversation (as content).
+// ToolUsePart represents a tool call stored in conversation history.
+// As a ContentPart, it is stored in Message.Content.
+// During streaming, providers emit ToolUseStartEvent followed by
+// ToolUseDeltaEvent — the agent converts the delta into a ToolUsePart for
+// execution and storage.
 type ToolUsePart struct {
 	ID       string          `json:"id"`
 	ToolName string          `json:"tool_name"`
@@ -96,7 +90,6 @@ type ToolUsePart struct {
 }
 
 func (ToolUsePart) isContentPart() {}
-func (ToolUsePart) isStreamEvent() {}
 
 // ToolResultPart represents a tool execution result.
 // Content holds the output content parts (TextPart, ImagePart, etc.).
@@ -159,12 +152,26 @@ func (ReasoningDeltaEvent) isStreamEvent() {}
 // but arguments may still be streaming). Providers emit this as soon as the
 // tool name is available so the UI can show a placeholder window immediately,
 // before the potentially large argument payload finishes streaming.
+// Index is the content block position within the step.
 type ToolUseStartEvent struct {
 	ID       string
 	ToolName string
+	Index    int
 }
 
 func (ToolUseStartEvent) isStreamEvent() {}
+
+// ToolUseDeltaEvent signals that a tool use's arguments have finished
+// streaming. It carries the complete input payload and the content block
+// index, enabling the adapter to route it to the correct window.
+type ToolUseDeltaEvent struct {
+	ID       string
+	ToolName string
+	Input    json.RawMessage
+	Index    int
+}
+
+func (ToolUseDeltaEvent) isStreamEvent() {}
 
 // StepCompleteEvent represents completion of an agentic step.
 // The provider emits this as the final event after accumulating all streaming

@@ -76,8 +76,11 @@ type Session struct {
 	inProgress    atomic.Bool // set/cleared by run() goroutine only; readable by input pump via cancelRunningTask
 	pausedOnError atomic.Bool // set by task goroutine via event
 
-	nextPromptID uint64 // goroutine-local (task goroutine)
-	nextQueueID  uint64 // goroutine-local (run() goroutine)
+	nextQueueID uint64 // goroutine-local (run() goroutine)
+
+	// history ID generator — single goroutine owns the counter.
+	histIncCh chan<- uint64
+	histGetCh chan<- chan<- uint64
 
 	// stateCh carries state mutations from the task goroutine to run().
 	stateCh chan TaskEvent
@@ -167,6 +170,7 @@ func LoadOrNewSession(cfg SessionConfig) (*Session, string, error) {
 // call Start() to begin processing input.
 func NewSession(cfg SessionConfig) *Session {
 	sessionCtx, sessionCancel := context.WithCancel(context.Background())
+	incCh, getCh := newHistoryIDGenerator()
 	s := &Session{
 		CreatedAt:      time.Now(),
 		ModelManager:   NewModelManager(cfg.ModelConfigPath),
@@ -177,6 +181,8 @@ func NewSession(cfg SessionConfig) *Session {
 		stateCh:        make(chan TaskEvent, 64),
 		taskResult:     make(chan []llm.Message, 1),
 		infoUpdateCh:   make(chan string, 1),
+		histIncCh:      incCh,
+		histGetCh:      getCh,
 		sessionCtx:     sessionCtx,
 		sessionCancel:  sessionCancel,
 		runDone:        make(chan struct{}),
@@ -196,6 +202,7 @@ func NewSession(cfg SessionConfig) *Session {
 // Does NOT start goroutines — call Start() to begin processing input.
 func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 	sessionCtx, sessionCancel := context.WithCancel(context.Background())
+	incCh, getCh := newHistoryIDGenerator()
 	s := &Session{
 		Messages:       data.Messages,
 		CreatedAt:      data.CreatedAt,
@@ -207,6 +214,8 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 		stateCh:        make(chan TaskEvent, 64),
 		taskResult:     make(chan []llm.Message, 1),
 		infoUpdateCh:   make(chan string, 1),
+		histIncCh:      incCh,
+		histGetCh:      getCh,
 		sessionCtx:     sessionCtx,
 		sessionCancel:  sessionCancel,
 		runDone:        make(chan struct{}),

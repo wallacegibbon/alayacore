@@ -515,6 +515,7 @@ func (p *AnthropicProvider) handleContentBlockStart(data string, yield func(llm.
 		if !yield(llm.ToolUseStartEvent{
 			ID:       event.ContentBlock.ID,
 			ToolName: event.ContentBlock.Name,
+			Index:    event.Index,
 		}, nil) {
 			return false
 		}
@@ -555,10 +556,11 @@ func (p *AnthropicProvider) handleContentBlockStop(index int, yield func(llm.Str
 	tc := state.toolUsePart(index)
 	state.finishBlock(index)
 	if tc != nil {
-		if !yield(llm.ToolUsePart{
+		if !yield(llm.ToolUseDeltaEvent{
 			ID:       tc.ID,
 			ToolName: tc.ToolName,
 			Input:    tc.Input,
+			Index:    index,
 		}, nil) {
 			return false
 		}

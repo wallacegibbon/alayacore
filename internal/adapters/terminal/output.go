@@ -112,6 +112,8 @@ func (to *outputWriter) processBuffer() {
 }
 
 // writeColored writes styled content based on the TLV tag
+//
+//nolint:gocyclo // dispatch over many tag types; each case is simple
 func (to *outputWriter) writeColored(tag string, value string) {
 	to.triggerUpdateForTag(tag)
 
@@ -129,10 +131,33 @@ func (to *outputWriter) writeColored(tag string, value string) {
 		// Pass raw content - styling is applied during render
 		to.windowBuffer.AppendOrUpdate(tag, id, content)
 
+	// User text tag — may carry NUL-delimited historyID
+	case stream.TagUserT:
+		id, content, ok := stream.UnwrapDelta(value)
+		if !ok {
+			id = to.generateWindowID()
+			content = value
+		}
+		// Pass raw value - styling is applied during render
+		to.windowBuffer.AppendOrUpdate(tag, id, content)
+
+	// User image tag — may carry NUL-delimited historyID
+	case stream.TagUserI:
+		id, _, ok := stream.UnwrapDelta(value)
+		if !ok {
+			id = to.generateWindowID()
+		}
+		to.windowBuffer.AppendOrUpdate(stream.TagUserI, id, "📎 Image")
+
 	// Function lifecycle (JSON: id, type, name, input, status)
+	// May carry NUL-delimited historyID prefix
 	case stream.TagAssistantF:
+		_, payload, ok := stream.UnwrapDelta(value)
+		if !ok {
+			payload = value
+		}
 		var fd stream.ToolUseData
-		if err := json.Unmarshal([]byte(value), &fd); err != nil {
+		if err := json.Unmarshal([]byte(payload), &fd); err != nil {
 			return
 		}
 
@@ -154,9 +179,14 @@ func (to *outputWriter) writeColored(tag string, value string) {
 		to.windowBuffer.HandleToolUseEvent(fd)
 
 	// Function result (JSON: id, content, is_error)
+	// May carry NUL-delimited historyID prefix
 	case stream.TagUserF:
+		_, payload, ok := stream.UnwrapDelta(value)
+		if !ok {
+			payload = value
+		}
 		var tr stream.ToolResultData
-		if err := json.Unmarshal([]byte(value), &tr); err != nil {
+		if err := json.Unmarshal([]byte(payload), &tr); err != nil {
 			return
 		}
 		// Extract display text from the content JSON array
@@ -167,17 +197,6 @@ func (to *outputWriter) writeColored(tag string, value string) {
 	case stream.TagSystemMsg:
 		to.handleSystemMsg(value)
 		return
-
-	// User text tag
-	case stream.TagUserT:
-		id := to.generateWindowID()
-		// Pass raw value - styling is applied during render
-		to.windowBuffer.AppendOrUpdate(tag, id, value)
-
-	// User image tag — display an attachment indicator
-	case stream.TagUserI:
-		id := to.generateWindowID()
-		to.windowBuffer.AppendOrUpdate(stream.TagUserI, id, "📎 Image")
 
 	default:
 		id := to.generateWindowID()

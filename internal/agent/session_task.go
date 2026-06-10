@@ -9,6 +9,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 
 	domainerrors "github.com/alayacore/alayacore/internal/errors"
 	"github.com/alayacore/alayacore/internal/llm"
@@ -96,41 +97,69 @@ func (s *Session) doAutoSummarize(ctx context.Context, messages []llm.Message) [
 // ============================================================================
 
 func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]llm.Message, int64, error) {
-	// nextPromptID is goroutine-local (only accessed from the task goroutine),
-	// so it's updated outside the mutex.
-	s.nextPromptID++
-	promptID := s.nextPromptID - 1
-
-	var stepCount int
 	var outputTokens int64
 
 	// processResult captures the final message state from the agent.
 	// It is set by OnStepFinish and returned to the caller.
 	var processResult []llm.Message
 
+	// maxIndex tracks the highest content block index in the current step.
+	var maxIndex int
+
+	// toolResultCount counts tool results emitted in this step.
+	var toolResultCount int
+
 	_, err := s.agent.Load().Stream(ctx, history, llm.StreamCallbacks{
 		OnTextDelta: func(delta string, index int) error {
-			_ = stream.WriteTLV(s.Output, stream.TagAssistantT, stream.WrapDelta(stream.NewStreamID(promptID, stepCount, index), delta)) //nolint:errcheck // best-effort write to adapter
+			if index > maxIndex {
+				maxIndex = index
+			}
+			base := s.histGet()
+			id := strconv.FormatUint(base+uint64(index), 10)                                 //nolint:gosec // index is non-negative small int
+			_ = stream.WriteTLV(s.Output, stream.TagAssistantT, stream.WrapDelta(id, delta)) //nolint:errcheck // best-effort write to adapter
 			return nil
 		},
 		OnReasoningDelta: func(delta string, index int) error {
-			_ = stream.WriteTLV(s.Output, stream.TagAssistantR, stream.WrapDelta(stream.NewStreamID(promptID, stepCount, index), delta)) //nolint:errcheck // best-effort write to adapter
+			if index > maxIndex {
+				maxIndex = index
+			}
+			base := s.histGet()
+			id := strconv.FormatUint(base+uint64(index), 10)                                 //nolint:gosec // index is non-negative small int
+			_ = stream.WriteTLV(s.Output, stream.TagAssistantR, stream.WrapDelta(id, delta)) //nolint:errcheck // best-effort write to adapter
 			return nil
 		},
-		OnToolUseStart: func(id, toolName string) error {
-			s.writeToolUseStart(toolName, id)
+		OnToolUseStart: func(id, toolName string, index int) error {
+			if index > maxIndex {
+				maxIndex = index
+			}
+			base := s.histGet()
+			wid := strconv.FormatUint(base+uint64(index), 10)                                        //nolint:gosec // index is non-negative small int
+			data, _ := json.Marshal(stream.ToolUseData{ID: id, Name: toolName})                      //nolint:errcheck // simple struct can't fail
+			_ = stream.WriteTLV(s.Output, stream.TagAssistantF, stream.WrapDelta(wid, string(data))) //nolint:errcheck
 			return nil
 		},
-		OnToolUseInput: func(id string, input json.RawMessage) error {
-			s.writeToolUseInput(input, id)
+		OnToolUseInput: func(id string, input json.RawMessage, index int) error {
+			base := s.histGet()
+			wid := strconv.FormatUint(base+uint64(index), 10)                                        //nolint:gosec // index is non-negative small int
+			data, _ := json.Marshal(stream.ToolUseData{ID: id, Input: input})                        //nolint:errcheck // simple struct can't fail
+			_ = stream.WriteTLV(s.Output, stream.TagAssistantF, stream.WrapDelta(wid, string(data))) //nolint:errcheck
 			return nil
 		},
 		OnToolUseOutput: func(id string, content []llm.ContentPart, err error) error {
-			if err != nil {
-				s.writeToolUseOutput(id, content, true)
-			} else {
-				s.writeToolUseOutput(id, content, false)
+			contentJSON, err2 := serializeContentParts(content)
+			if err2 != nil {
+				contentJSON = []byte(`[{"type":"text","text":"(serialization error)"}]`)
 			}
+			// UF IDs sit beyond the AT/AF range: base + maxIndex + 1 + resultCount.
+			base := s.histGet()
+			wid := strconv.FormatUint(base+uint64(maxIndex+1+toolResultCount), 10) //nolint:gosec // small non-negative ints
+			toolResultCount++
+			data, _ := json.Marshal(stream.ToolResultData{ //nolint:errcheck // simple struct can't fail
+				ID:      id,
+				Output:  contentJSON,
+				IsError: err != nil,
+			})
+			_ = stream.WriteTLV(s.Output, stream.TagUserF, stream.WrapDelta(wid, string(data))) //nolint:errcheck
 			return nil
 		},
 		OnToolConfirm: func(requests []llm.ToolConfirmRequest) <-chan llm.ToolConfirmResponse {
@@ -154,7 +183,13 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 			return ch
 		},
 		OnStepStart: func(step int) error {
-			stepCount = step
+			// Increment historyCount for each new step to establish
+			// the base for all delta IDs within this step.
+			s.histInc(1)
+
+			// Reset per-step tracking.
+			maxIndex = 0
+			toolResultCount = 0
 
 			// Send step start event to run().
 			s.sendEvent(StepStartEvent{
@@ -190,6 +225,14 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 			})
 
 			outputTokens += usage.OutputTokens
+
+			// Bump historyCount past the highest ID used in this step:
+			// AT/AF use base + 0..maxIndex, UF uses base + maxIndex + 1..toolResultCount.
+			padding := uint64(maxIndex + toolResultCount) //nolint:gosec // small non-negative ints
+			if padding > 0 {
+				s.histInc(padding)
+			}
+
 			s.requestSystemInfo()
 			return nil
 		},
