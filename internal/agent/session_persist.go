@@ -55,6 +55,7 @@ func (s *Session) saveSessionToFileWith(messages []llm.Message, path string) err
 			ActiveModel:    s.activeModelName(),
 			ContextTokens:  s.ContextTokens.Load(),
 		},
+		Content:  s.Content,
 		Messages: messages,
 	}
 
@@ -78,8 +79,7 @@ func formatFrontmatter(meta *SessionMeta) string {
 	return "---\n" + config.FormatKeyValue(meta) + "---\n"
 }
 
-// contentPartToTLV converts a ContentPart to a TLV tag and content string.
-// Returns the TLV tag and the serialized content.
+// contentPartToTLV serializes a ContentPart as a TLV tag and value string (without history ID).
 func contentPartToTLV(msgRole llm.MessageRole, part llm.ContentPart) (tag string, content string, err error) {
 	switch p := part.(type) {
 	case llm.TextPart:
@@ -114,7 +114,8 @@ func contentPartToTLV(msgRole llm.MessageRole, part llm.ContentPart) (tag string
 	}
 }
 
-// formatSessionMarkdown converts SessionData to markdown format with TLV encoding.
+// formatSessionMarkdown serializes Messages to TLV (without history IDs). Content
+// is not serialized — IDs are ephemeral and rebuilt on load.
 func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 	var buf, tlvBuf strings.Builder
 	buf.WriteString(formatFrontmatter(&data.SessionMeta))
@@ -197,10 +198,11 @@ func parseSessionData(data []byte) (*SessionData, error) {
 	}
 
 	if len(body) > 0 {
-		msgs, chunks, err := parseMessagesTLV(body)
+		content, msgs, chunks, err := parseMessagesTLV(body)
 		if err != nil {
 			return nil, err
 		}
+		sd.Content = content
 		sd.Messages = msgs
 		sd.TLVChunks = chunks
 	}
@@ -254,8 +256,8 @@ func (r *tlvReader) read() (tag string, content []byte, err error) {
 
 // contentPartFromTLV converts a TLV record into a ContentPart.
 // Returns the message role and the content part.
-// If the TLV value has a NUL-delimited historyID prefix, it is stripped
-// so the stored message contains clean content.
+// History IDs in the TLV value are stripped — they are ephemeral and
+// rebuilt when the session is loaded.
 func contentPartFromTLV(tag string, content []byte) (llm.MessageRole, llm.ContentPart, error) {
 	// Strip NUL-delimited historyID prefix if present (added during live streaming).
 	cleanContent := string(content)
@@ -298,41 +300,48 @@ func contentPartFromTLV(tag string, content []byte) (llm.MessageRole, llm.Conten
 	}
 }
 
-func parseMessagesTLV(body string) ([]llm.Message, []TLVChunk, error) {
-	// Pre-allocate with a rough capacity estimate: each TLV record has at least
-	// 6 bytes of overhead (2 tag + 4 length), so body/64 is a conservative
-	// lower bound that avoids most reallocations for large sessions.
+func parseMessagesTLV(body string) ([]ContentItem, []llm.Message, []TLVChunk, error) {
 	est := len(body) / 64
 	if est < 8 {
 		est = 8
 	}
+	content := make([]ContentItem, 0, est)
 	messages := make([]llm.Message, 0, est)
 	chunks := make([]TLVChunk, 0, est)
 
 	reader := newTLVReader(body)
-	currentIdx := -1 // -1 means no message is being built
+	currentIdx := -1
+	var seqID uint64
 
 	for {
-		tag, content, err := reader.read()
+		tag, raw, err := reader.read()
 		if err == io.EOF {
-			return messages, chunks, nil
+			return content, messages, chunks, nil
 		}
 		if err != nil {
-			return messages, chunks, fmt.Errorf("read error at chunk %d: %w", len(chunks), err)
+			return content, messages, chunks, fmt.Errorf("read error at chunk %d: %w", len(chunks), err)
 		}
 
-		chunks = append(chunks, TLVChunk{Tag: tag, Value: string(content)})
+		chunks = append(chunks, TLVChunk{Tag: tag, Value: string(raw)})
 
-		msgRole, msgPart, err := contentPartFromTLV(tag, content)
+		msgRole, msgPart, err := contentPartFromTLV(tag, raw)
 		if err != nil {
-			return messages, chunks, fmt.Errorf("parse error at chunk %d (tag %q): %w", len(chunks)-1, tag, err)
+			return content, messages, chunks, fmt.Errorf("parse error at chunk %d (tag %q): %w", len(chunks)-1, tag, err)
 		}
 		if msgPart == nil {
-			// Malformed record (e.g. TagAssistantF with an empty tool name);
-			// skip for messages but keep the raw chunk for display/debugging.
 			continue
 		}
 
+		// Build ContentItem with sequential ID — IDs are ephemeral, only for
+		// in-session adapter references, not persisted in the file format.
+		seqID++
+		content = append(content, ContentItem{
+			ID:   seqID,
+			Tag:  tag,
+			Part: msgPart,
+		})
+
+		// Derive Messages by grouping consecutive same-role parts.
 		if currentIdx < 0 || messages[currentIdx].Role != msgRole {
 			messages = append(messages, llm.Message{
 				Role:    msgRole,

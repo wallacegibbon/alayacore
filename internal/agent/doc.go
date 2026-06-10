@@ -9,16 +9,27 @@
 //   - Command processing (:save, :model_set, :taskqueue_*, etc.)
 //   - Session persistence (save/load conversations)
 //
+// Data Model:
+//
+//	The session stores conversation history as a flat, ordered slice of
+//	ContentItem, where each item has a stable ID matching the TLV stream ID
+//	sent to the adapter. This enables the adapter to reference individual
+//	content blocks by ID (e.g. ":save 5") without any secondary index.
+//	For LLM API calls, ContentItems are grouped by role into []llm.Message
+//	on the fly at the task boundary.
+//
 // Concurrency Model:
 //
 //	The session uses an actor model with three goroutines:
-//	  1. run() — owns all mutable session state (messages, task queue,
+//	  1. run() — owns all mutable session state (Content, task queue,
 //	     token counts). Processes input messages and task events.
 //	     When the input stream reaches EOF while a task is in progress,
 //	     it drains remaining events until the task completes before
 //	     exiting (see drainUntilTaskDone).
 //	  2. task goroutine — spawned per task, runs in background, sends
 //	     state mutations via typed channel events (stateCh) to run().
+//	     On completion it sends a TaskResult with the final messages
+//	     and new ContentItems back via taskResult.
 //	  3. inputPump — reads TLV frames from input, forwards to run()
 //	     via a message channel.
 //
@@ -62,9 +73,14 @@
 //	  - Input: TagUserT for prompts and commands, TagUserI for images
 //	  - Output: TagAssistantT, TagAssistantR, TagAssistantF, etc.
 //
+//	Each TLV frame carries a NUL-delimited history ID prefix that the
+//	adapter uses to route content to display windows. These IDs correspond
+//	directly to ContentItem.ID in the session's content store.
+//
 // Key Components:
 //
 //   - Session: Main session struct managing conversation state
+//   - ContentItem: Atomic unit of conversation content with stable ID
 //   - ModelManager: Loads and manages AI model configurations.
 //     Rejects models with invalid protocol_type, base_url, or model_name.
 //     Use GetLoadErrors() to retrieve validation messages.
@@ -74,9 +90,14 @@
 //
 // Key Files:
 //
-//   - session.go: Session struct, main loop, and command handling
-//   - session_io.go: TLV input/output handling
+//   - session.go: Session struct, lifecycle, and cross-goroutine channels
+//   - session_task.go: Prompt processing, agent loop, OnStepFinish ContentItem building
+//   - session_queue.go: Task queue, task runner, deferred commands
+//   - session_loop.go: Main event loop, task start/done
+//   - session_io.go: TLV input/output, summarize, continue commands
+//   - session_content.go: ContentItem helpers, tag mapping, ID lookup
 //   - session_persist.go: Session save/load functionality
+//   - session_types.go: Type definitions (ContentItem, TaskResult, etc.)
 //   - command_registry.go: Declarative command registration
 //   - model_manager.go: Model configuration management
 //   - runtime_manager.go: Runtime persistence

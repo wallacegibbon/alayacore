@@ -24,8 +24,8 @@ type StepStartEvent struct {
 func (StepStartEvent) taskEvent() {}
 
 // StepFinishEvent signals that an agent step has completed.
-// Carries only token usage metadata. The final message state is
-// returned separately via taskResult on task completion.
+// Carries only token usage metadata. The final message state and
+// ContentItems are returned together via taskResult on task completion.
 type StepFinishEvent struct {
 	InputTokens         int64
 	OutputTokens        int64

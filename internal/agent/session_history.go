@@ -43,3 +43,17 @@ func (s *Session) histIncAndGet() uint64 {
 	s.histGetCh <- reply
 	return <-reply
 }
+
+// histSyncAfterLoad advances the history counter past the highest Content ID
+// so that new streaming IDs don't collide with IDs from the loaded session.
+func (s *Session) histSyncAfterLoad() {
+	var maxID uint64
+	for _, item := range s.Content {
+		if item.ID > maxID {
+			maxID = item.ID
+		}
+	}
+	if maxID > 0 {
+		s.histInc(maxID)
+	}
+}

@@ -15,20 +15,22 @@ func TestMultiPartUserMessageRoundtrip(t *testing.T) {
 	tmpDir := t.TempDir()
 	sessionPath := filepath.Join(tmpDir, "multipart-user.md")
 
-	session := &Session{
-		Messages: []llm.Message{
-			{
-				Role: llm.RoleUser,
-				Content: []llm.ContentPart{
-					llm.TextPart{Text: "First part"},
-					llm.TextPart{Text: "Second part"},
-				},
-			},
-			{
-				Role:    llm.RoleAssistant,
-				Content: []llm.ContentPart{llm.TextPart{Text: "Got it."}},
+	msgs := []llm.Message{
+		{
+			Role: llm.RoleUser,
+			Content: []llm.ContentPart{
+				llm.TextPart{Text: "First part"},
+				llm.TextPart{Text: "Second part"},
 			},
 		},
+		{
+			Role:    llm.RoleAssistant,
+			Content: []llm.ContentPart{llm.TextPart{Text: "Got it."}},
+		},
+	}
+	session := &Session{
+		Content:  contentFromMessagesForTest(msgs),
+		Messages: msgs,
 		SessionConfig: SessionConfig{
 			Input:  &stream.NopInput{},
 			Output: &stream.NopOutput{},

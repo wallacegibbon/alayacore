@@ -21,7 +21,7 @@ package agent
 //     msgCh (inputMsg channel)  — inputPump → run()
 //     stateCh (taskEvent)        — task → run()
 //     taskCancel                 — inputPump → task (cancellation via cancelRunningTask)
-//     taskResult                 — task → run (messages + completion signal)
+//     taskResult                 — task → run (TaskResult with messages + entries)
 //     infoUpdateCh               — task → run() (system-info refresh)
 //
 // Related files:
@@ -36,6 +36,7 @@ package agent
 import (
 	"context"
 	"errors"
+	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -47,7 +48,8 @@ import (
 
 // Session manages conversation state and task execution.
 type Session struct {
-	Messages       []llm.Message // owned by run() goroutine; task goroutine sends updates via stateCh
+	Content        []ContentItem // source of truth — flat, ordered, 1:1 with TLV
+	Messages       []llm.Message // derived from Content for API calls (rebuilt after each task)
 	CreatedAt      time.Time
 	ContextTokens  atomic.Int64 // read by both goroutines (shouldAutoSummarize, sendSystemInfo)
 	ContextLimit   int64        // immutable after construction
@@ -85,11 +87,9 @@ type Session struct {
 	// stateCh carries state mutations from the task goroutine to run().
 	stateCh chan TaskEvent
 
-	// taskResult carries the final message state from the task goroutine
+	// taskResult carries the final state from the task goroutine
 	// back to run() on completion. Buffered (capacity 1).
-	// The main loop selects on this channel to detect task completion
-	// and retrieve the final messages — no separate taskDone signal needed.
-	taskResult chan []llm.Message
+	taskResult chan TaskResult
 
 	// confirmCh receives confirm responses from the input pump when the
 	// async OnToolConfirm callback is used. Set by the callback, read by
@@ -172,6 +172,8 @@ func NewSession(cfg SessionConfig) *Session {
 	sessionCtx, sessionCancel := context.WithCancel(context.Background())
 	incCh, getCh := newHistoryIDGenerator()
 	s := &Session{
+		Content:        make([]ContentItem, 0),
+		Messages:       make([]llm.Message, 0),
 		CreatedAt:      time.Now(),
 		ModelManager:   NewModelManager(cfg.ModelConfigPath),
 		RuntimeManager: NewRuntimeManager(cfg.RuntimeConfigPath, cfg.ModelConfigPath),
@@ -179,7 +181,7 @@ func NewSession(cfg SessionConfig) *Session {
 		SessionConfig:  cfg,
 		taskQueue:      make([]QueueItem, 0),
 		stateCh:        make(chan TaskEvent, 64),
-		taskResult:     make(chan []llm.Message, 1),
+		taskResult:     make(chan TaskResult, 1),
 		infoUpdateCh:   make(chan string, 1),
 		histIncCh:      incCh,
 		histGetCh:      getCh,
@@ -204,6 +206,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 	sessionCtx, sessionCancel := context.WithCancel(context.Background())
 	incCh, getCh := newHistoryIDGenerator()
 	s := &Session{
+		Content:        data.Content,
 		Messages:       data.Messages,
 		CreatedAt:      data.CreatedAt,
 		ModelManager:   NewModelManager(cfg.ModelConfigPath),
@@ -212,7 +215,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 		SessionConfig:  cfg,
 		taskQueue:      make([]QueueItem, 0),
 		stateCh:        make(chan TaskEvent, 64),
-		taskResult:     make(chan []llm.Message, 1),
+		taskResult:     make(chan TaskResult, 1),
 		infoUpdateCh:   make(chan string, 1),
 		histIncCh:      incCh,
 		histGetCh:      getCh,
@@ -239,9 +242,16 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 
 	s.sendSystemInfo("all")
 
-	// Send TLV chunks directly to output (avoids reconstruction)
-	for _, chunk := range data.TLVChunks {
-		_ = stream.WriteTLV(s.Output, chunk.Tag, chunk.Value) //nolint:errcheck // best-effort write to adapter
+	s.histSyncAfterLoad()
+
+	// Send session content to adapter with IDs so the adapter can reference
+	// content by ID even after session reload.
+	for _, item := range s.Content {
+		tag, content, err := contentPartToTLV(roleFromTag(item.Tag), item.Part)
+		if err != nil {
+			continue // skip malformed items
+		}
+		_ = stream.WriteTLV(s.Output, tag, stream.WrapDelta(strconv.FormatUint(item.ID, 10), content)) //nolint:errcheck // best-effort write to adapter
 	}
 	return s
 }

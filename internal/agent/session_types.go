@@ -116,11 +116,31 @@ type SessionMeta struct {
 	MessageVersion int       `config:"message_version,omitempty"`
 }
 
+// ContentItem is the atomic unit of conversation content.
+// It is the session's storage primitive — one per TLV record.
+// ID is the history/stream ID, assigned at creation time (first delta or echo).
+// It matches the ID sent to the adapter via WrapDelta, so the adapter can
+// reference content by this ID (e.g. ":save 5").
+type ContentItem struct {
+	ID   uint64          `json:"id"`
+	Tag  string          `json:"tag"` // "AT", "AR", "AF", "UF", "UT", "UI"
+	Part llm.ContentPart `json:"-"`
+}
+
+// TaskResult carries the final state from the task goroutine back to run().
+// Messages is the grouped API format (for provider compatibility).
+// Entries are the new ContentItems produced during this task.
+type TaskResult struct {
+	Messages []llm.Message
+	Entries  []ContentItem
+}
+
 // SessionData is the persisted form of a Session.
 type SessionData struct {
 	SessionMeta
-	Messages  []llm.Message
-	TLVChunks []TLVChunk // Parsed TLV for direct display (avoids reconstruction)
+	Content   []ContentItem // source of truth on reload
+	Messages  []llm.Message // derived from Content for API use
+	TLVChunks []TLVChunk    // Parsed TLV for direct display (avoids reconstruction)
 }
 
 // TLVChunk represents a single TLV message for display.

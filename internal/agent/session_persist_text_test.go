@@ -9,45 +9,48 @@ import (
 // TestSessionSavePreservesTextWithToolCalls verifies that text messages
 // are preserved when saving/loading sessions with tool calls
 func TestSessionSavePreservesTextWithToolCalls(t *testing.T) {
-	// Create session data with an assistant message containing both text and tool calls
+	msgs := []llm.Message{
+		{
+			Role: llm.RoleUser,
+			Content: []llm.ContentPart{
+				llm.TextPart{Text: "What's the weather?"},
+			},
+		},
+		{
+			Role: llm.RoleAssistant,
+			Content: []llm.ContentPart{
+				llm.TextPart{Text: "Let me check that for you."},
+				llm.ToolUsePart{
+					ID:       "call_123",
+					ToolName: "get_weather",
+					Input:    []byte(`{"location":"SF"}`),
+				},
+			},
+		},
+		{
+			Role: llm.RoleTool,
+			Content: []llm.ContentPart{
+				llm.ToolResultPart{
+					ID:      "call_123",
+					Content: []llm.ContentPart{llm.TextPart{Text: "Sunny, 72F"}},
+				},
+			},
+		},
+		{
+			Role: llm.RoleAssistant,
+			Content: []llm.ContentPart{
+				llm.TextPart{Text: "The weather in SF is sunny and 72F."},
+			},
+		},
+	}
+
+	// Create session data with Content (source of truth) derived from Messages.
 	data := &SessionData{
 		SessionMeta: SessionMeta{
 			MessageVersion: MessageVersion,
 		},
-		Messages: []llm.Message{
-			{
-				Role: llm.RoleUser,
-				Content: []llm.ContentPart{
-					llm.TextPart{Text: "What's the weather?"},
-				},
-			},
-			{
-				Role: llm.RoleAssistant,
-				Content: []llm.ContentPart{
-					llm.TextPart{Text: "Let me check that for you."},
-					llm.ToolUsePart{
-						ID:       "call_123",
-						ToolName: "get_weather",
-						Input:    []byte(`{"location":"SF"}`),
-					},
-				},
-			},
-			{
-				Role: llm.RoleTool,
-				Content: []llm.ContentPart{
-					llm.ToolResultPart{
-						ID:      "call_123",
-						Content: []llm.ContentPart{llm.TextPart{Text: "Sunny, 72F"}},
-					},
-				},
-			},
-			{
-				Role: llm.RoleAssistant,
-				Content: []llm.ContentPart{
-					llm.TextPart{Text: "The weather in SF is sunny and 72F."},
-				},
-			},
-		},
+		Messages: msgs,
+		Content:  contentFromMessagesForTest(msgs),
 	}
 
 	// Format to markdown (TLV format)
@@ -121,4 +124,21 @@ func TestSessionSavePreservesTextWithToolCalls(t *testing.T) {
 	if hasText && hasToolCall {
 		t.Log("PASS: Text messages preserved during save/load with tool calls")
 	}
+}
+
+// contentFromMessagesForTest builds Content from Messages for test setup.
+func contentFromMessagesForTest(msgs []llm.Message) []ContentItem {
+	var items []ContentItem
+	var id uint64
+	for _, msg := range msgs {
+		for _, part := range msg.Content {
+			id++
+			items = append(items, ContentItem{
+				ID:   id,
+				Tag:  tagForPart(msg.Role, part),
+				Part: part,
+			})
+		}
+	}
+	return items
 }

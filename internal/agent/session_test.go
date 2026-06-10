@@ -124,41 +124,43 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 
 	// Create session with messages simulating a realistic agent conversation:
 	// user → assistant(reasoning+text+toolcall) → tool(result) → assistant(reasoning+text)
-	session := &Session{
-		Messages: []llm.Message{
-			{
-				Role:    llm.RoleUser,
-				Content: []llm.ContentPart{llm.TextPart{Text: "Hello, world!"}},
-			},
-			{
-				Role: llm.RoleAssistant,
-				Content: []llm.ContentPart{
-					llm.ReasoningPart{Text: "User needs help..."},
-					llm.TextPart{Text: "Let me help you."},
-					llm.ToolUsePart{
-						ID:       "call_1",
-						ToolName: "read_file",
-						Input:    json.RawMessage(`{"path":"/tmp/test.txt"}`),
-					},
-				},
-			},
-			{
-				Role: llm.RoleTool,
-				Content: []llm.ContentPart{
-					llm.ToolResultPart{
-						ID:      "call_1",
-						Content: []llm.ContentPart{llm.TextPart{Text: "file contents"}},
-					},
-				},
-			},
-			{
-				Role: llm.RoleAssistant,
-				Content: []llm.ContentPart{
-					llm.ReasoningPart{Text: "Now I have the file..."},
-					llm.TextPart{Text: "Here is the file."},
+	msgs := []llm.Message{
+		{
+			Role:    llm.RoleUser,
+			Content: []llm.ContentPart{llm.TextPart{Text: "Hello, world!"}},
+		},
+		{
+			Role: llm.RoleAssistant,
+			Content: []llm.ContentPart{
+				llm.ReasoningPart{Text: "User needs help..."},
+				llm.TextPart{Text: "Let me help you."},
+				llm.ToolUsePart{
+					ID:       "call_1",
+					ToolName: "read_file",
+					Input:    json.RawMessage(`{"path":"/tmp/test.txt"}`),
 				},
 			},
 		},
+		{
+			Role: llm.RoleTool,
+			Content: []llm.ContentPart{
+				llm.ToolResultPart{
+					ID:      "call_1",
+					Content: []llm.ContentPart{llm.TextPart{Text: "file contents"}},
+				},
+			},
+		},
+		{
+			Role: llm.RoleAssistant,
+			Content: []llm.ContentPart{
+				llm.ReasoningPart{Text: "Now I have the file..."},
+				llm.TextPart{Text: "Here is the file."},
+			},
+		},
+	}
+	session := &Session{
+		Content:  contentFromMessagesForTest(msgs),
+		Messages: msgs,
 		SessionConfig: SessionConfig{
 			Input:  &stream.NopInput{},
 			Output: &stream.NopOutput{},
@@ -235,17 +237,19 @@ func TestMarkdownFormat_HumanReadable(t *testing.T) {
 	tmpDir := t.TempDir()
 	sessionPath := filepath.Join(tmpDir, "readable.md")
 
-	session := &Session{
-		Messages: []llm.Message{
-			{
-				Role:    llm.RoleUser,
-				Content: []llm.ContentPart{llm.TextPart{Text: "Hello!\nHow are you?"}},
-			},
-			{
-				Role:    llm.RoleAssistant,
-				Content: []llm.ContentPart{llm.TextPart{Text: "I'm doing well, thanks!"}},
-			},
+	msgs := []llm.Message{
+		{
+			Role:    llm.RoleUser,
+			Content: []llm.ContentPart{llm.TextPart{Text: "Hello!\nHow are you?"}},
 		},
+		{
+			Role:    llm.RoleAssistant,
+			Content: []llm.ContentPart{llm.TextPart{Text: "I'm doing well, thanks!"}},
+		},
+	}
+	session := &Session{
+		Content:  contentFromMessagesForTest(msgs),
+		Messages: msgs,
 		SessionConfig: SessionConfig{
 			Input:  &stream.NopInput{},
 			Output: &stream.NopOutput{},
@@ -283,17 +287,19 @@ func TestReasoningOnlyMessage(t *testing.T) {
 	sessionPath := filepath.Join(tmpDir, "reasoning-only.md")
 
 	// Session with assistant message that only has reasoning (no text)
-	session := &Session{
-		Messages: []llm.Message{
-			{
-				Role:    llm.RoleUser,
-				Content: []llm.ContentPart{llm.TextPart{Text: "What is lisp?"}},
-			},
-			{
-				Role:    llm.RoleAssistant,
-				Content: []llm.ContentPart{llm.ReasoningPart{Text: "The user is asking about Lisp. I should explain it."}},
-			},
+	msgs := []llm.Message{
+		{
+			Role:    llm.RoleUser,
+			Content: []llm.ContentPart{llm.TextPart{Text: "What is lisp?"}},
 		},
+		{
+			Role:    llm.RoleAssistant,
+			Content: []llm.ContentPart{llm.ReasoningPart{Text: "The user is asking about Lisp. I should explain it."}},
+		},
+	}
+	session := &Session{
+		Content:  contentFromMessagesForTest(msgs),
+		Messages: msgs,
 		SessionConfig: SessionConfig{
 			Input:  &stream.NopInput{},
 			Output: &stream.NopOutput{},
@@ -341,20 +347,22 @@ func TestTextAndReasoningInSameMessage(t *testing.T) {
 	// Session with assistant message that has both reasoning and text.
 	// After save/load, they must remain in the SAME assistant message so that
 	// providers that require reasoning_content/thinking to be passed back receive it.
-	session := &Session{
-		Messages: []llm.Message{
-			{
-				Role:    llm.RoleUser,
-				Content: []llm.ContentPart{llm.TextPart{Text: "What is lisp?"}},
-			},
-			{
-				Role: llm.RoleAssistant,
-				Content: []llm.ContentPart{
-					llm.ReasoningPart{Text: "Let me explain Lisp."},
-					llm.TextPart{Text: "Lisp is a family of programming languages."},
-				},
+	msgs := []llm.Message{
+		{
+			Role:    llm.RoleUser,
+			Content: []llm.ContentPart{llm.TextPart{Text: "What is lisp?"}},
+		},
+		{
+			Role: llm.RoleAssistant,
+			Content: []llm.ContentPart{
+				llm.ReasoningPart{Text: "Let me explain Lisp."},
+				llm.TextPart{Text: "Lisp is a family of programming languages."},
 			},
 		},
+	}
+	session := &Session{
+		Content:  contentFromMessagesForTest(msgs),
+		Messages: msgs,
 		SessionConfig: SessionConfig{
 			Input:  &stream.NopInput{},
 			Output: &stream.NopOutput{},
@@ -478,41 +486,44 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 }
 
 func TestDisplayMessagesWithToolCalls(t *testing.T) {
-	// Create session data with messages
-	sessionData := &SessionData{
-		Messages: []llm.Message{
-			{
-				Role:    llm.RoleUser,
-				Content: []llm.ContentPart{llm.TextPart{Text: "List files"}},
-			},
-			{
-				Role:    llm.RoleAssistant,
-				Content: []llm.ContentPart{llm.TextPart{Text: "I'll list files for you."}},
-			},
-			{
-				Role: llm.RoleAssistant,
-				Content: []llm.ContentPart{
-					llm.ToolUsePart{
-						ID:       "call_123",
-						ToolName: "execute_command",
-						Input:    json.RawMessage(`{"command": "ls -la"}`),
-					},
+	msgs := []llm.Message{
+		{
+			Role:    llm.RoleUser,
+			Content: []llm.ContentPart{llm.TextPart{Text: "List files"}},
+		},
+		{
+			Role:    llm.RoleAssistant,
+			Content: []llm.ContentPart{llm.TextPart{Text: "I'll list files for you."}},
+		},
+		{
+			Role: llm.RoleAssistant,
+			Content: []llm.ContentPart{
+				llm.ToolUsePart{
+					ID:       "call_123",
+					ToolName: "execute_command",
+					Input:    json.RawMessage(`{"command": "ls -la"}`),
 				},
-			},
-			{
-				Role: llm.RoleTool,
-				Content: []llm.ContentPart{
-					llm.ToolResultPart{
-						ID:      "call_123",
-						Content: []llm.ContentPart{llm.TextPart{Text: "file1.txt\nfile2.txt"}},
-					},
-				},
-			},
-			{
-				Role:    llm.RoleAssistant,
-				Content: []llm.ContentPart{llm.TextPart{Text: "Found 2 files!"}},
 			},
 		},
+		{
+			Role: llm.RoleTool,
+			Content: []llm.ContentPart{
+				llm.ToolResultPart{
+					ID:      "call_123",
+					Content: []llm.ContentPart{llm.TextPart{Text: "file1.txt\nfile2.txt"}},
+				},
+			},
+		},
+		{
+			Role:    llm.RoleAssistant,
+			Content: []llm.ContentPart{llm.TextPart{Text: "Found 2 files!"}},
+		},
+	}
+
+	// Create session data with Content (source of truth)
+	sessionData := &SessionData{
+		Content:  contentFromMessagesForTest(msgs),
+		Messages: msgs,
 		SessionMeta: SessionMeta{
 			MessageVersion: MessageVersion,
 			UpdatedAt:      time.Now(),
@@ -678,37 +689,38 @@ func TestTLVFormatRecursionProtection(t *testing.T) {
 	sessionPath := filepath.Join(tmpDir, "recursion-test.md")
 
 	// Create a session that contains what looks like session markers in tool output
-	session := &Session{
-		Messages: []llm.Message{
-			{
-				Role:    llm.RoleUser,
-				Content: []llm.ContentPart{llm.TextPart{Text: "Read the session file"}},
-			},
-			{
-				Role: llm.RoleAssistant,
-				Content: []llm.ContentPart{
-					llm.ToolUsePart{
-						ID:       "call1",
-						ToolName: "read_file",
-						Input:    json.RawMessage(`{"path": "old-session.md"}`),
-					},
+	msgs := []llm.Message{
+		{
+			Role:    llm.RoleUser,
+			Content: []llm.ContentPart{llm.TextPart{Text: "Read the session file"}},
+		},
+		{
+			Role: llm.RoleAssistant,
+			Content: []llm.ContentPart{
+				llm.ToolUsePart{
+					ID:       "call1",
+					ToolName: "read_file",
+					Input:    json.RawMessage(`{"path": "old-session.md"}`),
 				},
-			},
-			{
-				Role: llm.RoleTool,
-				Content: []llm.ContentPart{
-					llm.ToolResultPart{
-						ID: "call1",
-						// This output contains text that looks like old session format markers!
-						Content: []llm.ContentPart{llm.TextPart{Text: "---\nbase_url: https://api.test.com\n---\n\x00msg:user\nFake user message\n\x00msg:assistant\nFake assistant\n"}},
-					},
-				},
-			},
-			{
-				Role:    llm.RoleAssistant,
-				Content: []llm.ContentPart{llm.TextPart{Text: "Here's the file content..."}},
 			},
 		},
+		{
+			Role: llm.RoleTool,
+			Content: []llm.ContentPart{
+				llm.ToolResultPart{
+					ID:      "call1",
+					Content: []llm.ContentPart{llm.TextPart{Text: "---\nbase_url: https://api.test.com\n---\n\x00msg:user\nFake user message\n\x00msg:assistant\nFake assistant\n"}},
+				},
+			},
+		},
+		{
+			Role:    llm.RoleAssistant,
+			Content: []llm.ContentPart{llm.TextPart{Text: "Here's the file content..."}},
+		},
+	}
+	session := &Session{
+		Content:  contentFromMessagesForTest(msgs),
+		Messages: msgs,
 		SessionConfig: SessionConfig{
 			Input:  &stream.NopInput{},
 			Output: &stream.NopOutput{},

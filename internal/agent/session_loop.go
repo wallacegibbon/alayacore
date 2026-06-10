@@ -21,16 +21,19 @@ import (
 // ============================================================================
 
 // run is the main loop that owns input processing, task queue management,
-// and the authoritative copy of session state (s.Messages, taskQueue,
+// and the authoritative copy of session state (s.Content, taskQueue,
 // totals, etc.). It runs in a single goroutine (started by Start()).
 //
-// s.Messages is the single source of truth for the conversation history,
-// owned entirely by the run() goroutine. When a task starts, a snapshot
-// of s.Messages is passed to the task goroutine as its local working copy.
-// The task goroutine never writes to s.Messages directly — it returns the
+// s.Content is the single source of truth for the conversation history,
+// a flat ordered slice of ContentItem where each item has a stable ID
+// that matches the adapter's TLV stream IDs. s.Messages is derived from
+// s.Content for API calls and rebuilt after each task completes.
+// When a task starts, a snapshot of s.Messages (derived from Content)
+// is passed to the task goroutine as its local working copy.
+// The task goroutine never writes to s.Content directly — it returns the
 // final state via taskResult channel on completion.
 //
-// The loop processes three kinds of events:
+// The loop processes four kinds of events:
 //   - Input messages from the user (via inputPump → msgCh)
 //   - Task state changes (via task goroutine → stateCh)
 //   - Task completion signals (via taskResult)
@@ -39,10 +42,9 @@ func (s *Session) run() {
 	defer close(s.runDone)
 	defer s.sessionCancel()
 
-	// Initialize s.Messages if nil (fresh session).
-	// When restoring from a session (RestoreFromSession), s.Messages
-	// already contains the loaded history.
-	if s.Messages == nil {
+	// Initialize Content for fresh sessions.
+	if s.Content == nil {
+		s.Content = make([]ContentItem, 0)
 		s.Messages = make([]llm.Message, 0)
 	}
 
@@ -120,9 +122,8 @@ func (s *Session) tryStartNextTask() bool {
 		return false
 	}
 
-	// Create a snapshot of s.Messages for the task goroutine.
-	// The task goroutine owns this copy and returns the final state
-	// via taskResult when done.
+	// Create a snapshot of Messages for the task goroutine.
+	// Messages is always derived from Content, so this is in sync.
 	taskMessages := make([]llm.Message, len(s.Messages))
 	copy(taskMessages, s.Messages)
 
@@ -137,15 +138,17 @@ func (s *Session) tryStartNextTask() bool {
 }
 
 // handleTaskDone processes a task completion signal from the task goroutine.
-// result is the final message state returned by the task goroutine.
-func (s *Session) handleTaskDone(result []llm.Message) {
+// result carries the final message state and new ContentItems.
+func (s *Session) handleTaskDone(result TaskResult) {
 	// Mark the task as finished so the next queue item can start.
 	s.inProgress.Store(false)
 	s.taskCancel.Store((context.CancelFunc)(nil))
 
-	// Update s.Messages with the final message state from the task goroutine.
-	if len(result) > 0 {
-		s.Messages = result
+	// Append new ContentItems.
+	if len(result.Entries) > 0 {
+		s.Content = append(s.Content, result.Entries...)
+		// Rebuild Messages from Content.
+		s.Messages = result.Messages
 	}
 
 	// Auto-save if configured

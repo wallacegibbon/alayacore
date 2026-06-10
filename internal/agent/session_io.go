@@ -78,33 +78,33 @@ func (s *Session) cancelAllTasks() {
 	s.requestSystemInfo()
 }
 
-func (s *Session) handleContinue(ctx context.Context, messages []llm.Message, args []string) []llm.Message {
+func (s *Session) handleContinue(ctx context.Context, messages []llm.Message, entries []ContentItem, args []string) ([]llm.Message, []ContentItem) {
 	// Validate arguments before doing anything.
 	if len(args) > 0 && args[0] != "skip" {
 		s.writeError("usage: :continue [skip]")
-		return messages
+		return messages, entries
 	}
 
 	s.pausedOnError.Store(false)
 
 	// With no arguments, resend the last prompt.
 	if len(args) == 0 {
-		return s.resendPrompt(ctx, messages)
+		return s.resendPrompt(ctx, messages, entries)
 	}
 
 	// "skip" — skip the failed prompt and resume the remaining queue.
 	qLen := len(s.taskQueue)
 	if qLen == 0 {
 		s.writeNotify("Queue is empty")
-		return messages
+		return messages, entries
 	}
 
 	s.writeNotify("Resuming queue...")
 	s.requestSystemInfo()
-	return messages
+	return messages, entries
 }
 
-func (s *Session) summarize(ctx context.Context, messages []llm.Message) []llm.Message {
+func (s *Session) summarize(ctx context.Context, messages []llm.Message, entries []ContentItem) ([]llm.Message, []ContentItem) {
 	prompt := `Summarize the conversation for continuation. The resuming instance has no prior context.
 
 Provide:
@@ -124,12 +124,14 @@ Rules:
 
 	s.writeNotify("Summarizing conversation...")
 
-	result, outputTokens, err := s.processPrompt(ctx, messages)
+	result, newEntries, outputTokens, err := s.processPrompt(ctx, messages)
+	entries = append(entries, newEntries...)
+
 	if err != nil {
 		s.writeError(err.Error())
 		s.pausedOnError.Store(true)
 		s.requestSystemInfo()
-		return result
+		return result, entries
 	}
 
 	var lastAssistantMsg llm.Message
@@ -139,36 +141,58 @@ Rules:
 		}
 	}
 	// Strip reasoning/thinking content from the summary message — it's
-	// internal model deliberation, not summary content. Keeping only text
-	// and tool calls saves tokens and avoids confusing the model on resume.
+	// internal model deliberation, not summary content.
 	filtered := make([]llm.ContentPart, 0, len(lastAssistantMsg.Content))
 	for _, part := range lastAssistantMsg.Content {
 		switch part.(type) {
 		case llm.ReasoningPart:
-			continue // drop thinking blocks
+			continue
 		default:
 			filtered = append(filtered, part)
 		}
 	}
 	lastAssistantMsg.Content = filtered
-	// Anthropic requires the first message to be from the user, so prepend
-	// a "Continue" user message before the summary assistant message.
+	// Prepend a "Continue" user message before the summary assistant message.
 	result = []llm.Message{
 		llm.NewUserMessage("Continue"),
 		lastAssistantMsg,
 	}
-	// Both events are sent from this same goroutine sequentially
-	// (StepFinishEvent during processPrompt, then this correction).
-	// The FIFO channel guarantees the run() goroutine processes
-	// this correction after the StepFinishEvent, so ContextTokens
-	// ends up at the summary size.
+	// Rebuild entries to match the new message structure:
+	// [UserMessage("Continue"), filteredAssistantMsg]
+	// Assign new IDs since the old entries are being replaced.
+	entries = entries[:0] // Keep the slice, discard old entries
+	continueID := s.histIncAndGet()
+	entries = append(entries, ContentItem{
+		ID:   continueID,
+		Tag:  stream.TagUserT,
+		Part: llm.TextPart{Text: "Continue"},
+	})
+	// The assistant message keeps its original entry IDs from newEntries,
+	// but we need to filter out reasoning parts. Since we rebuilt result
+	// from scratch, just regenerate entries from the new result.
+	// For simplicity, assign fresh IDs for the filtered summary.
+	summaryID := s.histIncAndGet()
+	entries = append(entries, ContentItem{
+		ID:   summaryID,
+		Tag:  stream.TagAssistantT,
+		Part: lastAssistantMsg.Content[0], // first non-reasoning part
+	})
+	for i := 1; i < len(lastAssistantMsg.Content); i++ {
+		id := s.histIncAndGet()
+		entries = append(entries, ContentItem{
+			ID:   id,
+			Tag:  tagForPart(llm.RoleAssistant, lastAssistantMsg.Content[i]),
+			Part: lastAssistantMsg.Content[i],
+		})
+	}
+
 	if outputTokens > 0 {
 		s.sendEvent(SetContextTokensEvent{Tokens: outputTokens})
 	}
 
 	s.writeNotify("Summarized conversation")
 	s.requestSystemInfo()
-	return result
+	return result, entries
 }
 
 func (s *Session) saveSession(args []string) {
@@ -372,41 +396,40 @@ func (s *Session) handleThemeSet(args []string) {
 //  3. Latest message is an assistant message → the API partially succeeded
 //     or was canceled. A "Continue" user message is appended so the
 //     model picks up where it left off.
-func (s *Session) resendPrompt(ctx context.Context, messages []llm.Message) []llm.Message {
+func (s *Session) resendPrompt(ctx context.Context, messages []llm.Message, entries []ContentItem) ([]llm.Message, []ContentItem) {
 	if len(messages) == 0 {
 		s.writeError("No messages to resend")
-		return messages
+		return messages, entries
 	}
 
 	msgCount := len(messages)
 	lastMsg := messages[msgCount-1]
 	if lastMsg.Role == llm.RoleAssistant {
-		// The last message is an assistant response (partial success,
-		// cancel, or error mid-stream). Append a continuation prompt so the
-		// model resumes naturally.
 		messages = append(messages, llm.NewUserMessage("Continue"))
-		// Echo the inserted message to the adapter so it is visible.
 		id := s.histIncAndGet()
+		entries = append(entries, ContentItem{
+			ID:   id,
+			Tag:  stream.TagUserT,
+			Part: llm.TextPart{Text: "Continue"},
+		})
 		s.writeTLVStr(stream.TagUserT, stream.WrapDelta(strconv.FormatUint(id, 10), "Continue"))
 	} else {
-		// If the last message is RoleUser or RoleTool, the conversation
-		// history is already at a valid point for the LLM to respond — just
-		// re-send as-is.
 		s.writeNotify("Resending...")
 	}
 
-	result, _, err := s.processPrompt(ctx, messages)
+	result, newEntries, _, err := s.processPrompt(ctx, messages)
+	entries = append(entries, newEntries...)
 
 	result = cleanIncompleteToolUses(result)
 	if err != nil {
 		s.writeError(err.Error())
 		s.pausedOnError.Store(true)
 		s.requestSystemInfo()
-		return result
+		return result, entries
 	}
 
 	s.requestSystemInfo()
-	return result
+	return result, entries
 }
 
 // ============================================================================

@@ -72,34 +72,42 @@ func (s *Session) enqueueTask(item QueueItem, front bool) {
 
 // runTask executes a single task in its own goroutine. It is called from
 // run() via "go s.runTask(ctx, item, taskMessages)". On completion it sends
-// taskMessages on taskResult so the main loop can update s.Messages.
+// the result on taskResult so the main loop can update s.Content and s.Messages.
 //
 // The task goroutine receives a snapshot of messages at task start. All
 // state mutations during execution (step progress, new messages, token
 // counts) are sent to run() via stateCh. The task goroutine never writes
-// to s.Messages directly — it operates on its local taskMessages copy
-// and returns the final state via taskResult.
+// to s.Content or s.Messages directly.
 func (s *Session) runTask(ctx context.Context, item QueueItem, taskMessages []llm.Message) {
+	var entries []ContentItem // accumulated ContentItems for this task
+
 	defer func() {
-		// Return the final message state to run() so it can update
-		// s.Messages with the task goroutine's final state.
-		// Non-blocking send — the channel is buffered (capacity 1).
+		// Return the final state to run() so it can update
+		// s.Content and s.Messages.
 		select {
-		case s.taskResult <- taskMessages:
+		case s.taskResult <- TaskResult{Messages: taskMessages, Entries: entries}:
 		default:
 		}
 	}()
 
 	// Echo user prompts before any work so output ordering is correct even if
 	// the task is canceled during initialization.
-	// Images are echoed as TagUserI frames (consistent with session restore),
-	// followed by the text as TagUserT.
 	if item.Type == TaskTypePrompt {
 		for _, img := range item.Images {
 			id := s.histIncAndGet()
+			entries = append(entries, ContentItem{
+				ID:   id,
+				Tag:  stream.TagUserI,
+				Part: llm.ImagePart{DataURL: img},
+			})
 			s.writeTLVStr(stream.TagUserI, stream.WrapDelta(strconv.FormatUint(id, 10), img))
 		}
 		id := s.histIncAndGet()
+		entries = append(entries, ContentItem{
+			ID:   id,
+			Tag:  stream.TagUserT,
+			Part: llm.TextPart{Text: item.Content},
+		})
 		s.writeTLVStr(stream.TagUserT, stream.WrapDelta(strconv.FormatUint(id, 10), item.Content))
 	}
 
@@ -109,32 +117,32 @@ func (s *Session) runTask(ctx context.Context, item QueueItem, taskMessages []ll
 
 	switch item.Type {
 	case TaskTypePrompt:
-		taskMessages = s.handleUserPrompt(ctx, taskMessages, item.Content, item.Images)
+		taskMessages, entries = s.handleUserPrompt(ctx, taskMessages, entries, item.Content, item.Images)
 	case TaskTypeCommand:
-		taskMessages = s.runTaskCommand(ctx, taskMessages, item.Content)
+		taskMessages, entries = s.runTaskCommand(ctx, taskMessages, entries, item.Content)
 	}
 
 	if ctx.Err() == context.Canceled {
-		taskMessages = s.appendCancelMessage(taskMessages)
+		taskMessages, entries = s.appendCancelMessage(taskMessages, entries)
 	}
 }
 
 // runTaskCommand handles a deferred command in the task goroutine.
 // Unlike immediate commands (handled by handleCommand in run()'s goroutine),
 // deferred commands operate on the task's local message copy and return it.
-func (s *Session) runTaskCommand(ctx context.Context, messages []llm.Message, cmd string) []llm.Message {
+func (s *Session) runTaskCommand(ctx context.Context, messages []llm.Message, entries []ContentItem, cmd string) ([]llm.Message, []ContentItem) {
 	parts := strings.Fields(cmd)
 	if len(parts) == 0 {
-		return messages
+		return messages, entries
 	}
 	switch parts[0] {
 	case CommandNameSummarize:
-		return s.summarize(ctx, messages)
+		return s.summarize(ctx, messages, entries)
 	case CommandNameContinue:
-		return s.handleContinue(ctx, messages, parts[1:])
+		return s.handleContinue(ctx, messages, entries, parts[1:])
 	default:
 		s.writeError(domainerrors.NewSessionErrorf("command", "unknown cmd <%s>", parts[0]).Error())
-		return messages
+		return messages, entries
 	}
 }
 
@@ -142,16 +150,19 @@ func (s *Session) runTaskCommand(ctx context.Context, messages []llm.Message, cm
 // message window when a task is canceled by the user.
 const cancelMessage = "Canceled"
 
-func (s *Session) appendCancelMessage(messages []llm.Message) []llm.Message {
+func (s *Session) appendCancelMessage(messages []llm.Message, entries []ContentItem) ([]llm.Message, []ContentItem) {
 	messages = append(messages, llm.Message{
 		Role:    llm.RoleAssistant,
 		Content: []llm.ContentPart{llm.TextPart{Text: cancelMessage}},
 	})
-	// Also push to the output so the cancel message appears live in the UI,
-	// matching the behavior on session restore where TLV chunks are replayed.
 	id := s.histIncAndGet()
+	entries = append(entries, ContentItem{
+		ID:   id,
+		Tag:  stream.TagAssistantT,
+		Part: llm.TextPart{Text: cancelMessage},
+	})
 	s.writeTLVStr(stream.TagAssistantT, stream.WrapDelta(strconv.FormatUint(id, 10), cancelMessage))
-	return messages
+	return messages, entries
 }
 
 // ============================================================================
