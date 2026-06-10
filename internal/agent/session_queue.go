@@ -91,8 +91,13 @@ func (s *Session) runTask(ctx context.Context, item QueueItem, taskMessages []ll
 
 	// Echo user prompts before any work so output ordering is correct even if
 	// the task is canceled during initialization.
+	// Images are echoed as TagUserI frames (consistent with session restore),
+	// followed by the text as TagUserT.
 	if item.Type == TaskTypePrompt {
-		s.signalPromptStart(item.Content)
+		for _, img := range item.Images {
+			s.writeTLVStr(stream.TagUserI, img)
+		}
+		s.writeTLVStr(stream.TagUserT, item.Content)
 	}
 
 	s.requestSystemInfo()

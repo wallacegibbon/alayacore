@@ -23,10 +23,6 @@ import (
 // TLV Write Helpers
 // ============================================================================
 
-func (s *Session) signalPromptStart(prompt string) {
-	s.writeTLVStr(stream.TagUserT, prompt)
-}
-
 func (s *Session) writeError(msg string) {
 	_ = stream.WriteSystemMsg(s.Output, stream.ErrorMsg{Text: msg}) //nolint:errcheck
 }

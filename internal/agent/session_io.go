@@ -386,7 +386,7 @@ func (s *Session) resendPrompt(ctx context.Context, messages []llm.Message) []ll
 		// model resumes naturally.
 		messages = append(messages, llm.NewUserMessage("Continue"))
 		// Echo the inserted message to the adapter so it is visible.
-		s.signalPromptStart("Continue")
+		s.writeTLVStr(stream.TagUserT, "Continue")
 	} else {
 		// If the last message is RoleUser or RoleTool, the conversation
 		// history is already at a valid point for the LLM to respond — just
