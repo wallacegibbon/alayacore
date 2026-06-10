@@ -118,7 +118,7 @@ Agent.Stream(ctx, messages, llm.StreamCallbacks{
 	OnReasoningDelta: func(delta string, index int) error { ... },
 	OnToolUseStart:  func(id, name string) error { ... },
 	OnToolUseInput:       func(id string, input json.RawMessage) error { ... },
-	OnToolUseOutput:     func(id string, output ToolResultOutput) error { ... },
+	OnToolUseOutput:     func(id string, content []ContentPart, err error) error { ... },
 	OnStepStart:      func(step int) error { ... },
 	OnStepFinish:     func(msgs []Message, usage Usage) error { ... },
 })

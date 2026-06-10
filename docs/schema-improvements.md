@@ -19,17 +19,17 @@ func NewWriteFileTool() llm.Tool {
 		Build()
 }
 
-func executeWriteFile(_ context.Context, args WriteFileInput) (llm.ToolResultOutput, error) {
+func executeWriteFile(_ context.Context, args WriteFileInput) ([]llm.ContentPart, error) {
 	if args.Path == "" {
-		return llm.NewToolResultOutputFailed("path is required"), nil
+		return nil, fmt.Errorf("path is required")
 	}
 	if args.Content == "" {
-		return llm.NewToolResultOutputFailed("content is required"), nil
+		return nil, fmt.Errorf("content is required")
 	}
 	if err := os.WriteFile(args.Path, []byte(args.Content), 0600); err != nil {
-		return llm.NewToolResultOutputFailed(err.Error()), nil
+		return nil, err
 	}
-	return llm.NewToolResultOutputText("File written successfully"), nil
+	return []llm.ContentPart{llm.TextPart{Text: "File written successfully"}}, nil
 }
 ```
 
@@ -92,7 +92,7 @@ func NewMyTool() llm.Tool {
 		Build()
 }
 
-func executeMyTool(_ context.Context, args MyInput) (llm.ToolResultOutput, error) {
+func executeMyTool(_ context.Context, args MyInput) ([]llm.ContentPart, error) {
 	// Just the business logic
 }
 ```
@@ -103,7 +103,7 @@ For tools needing closure variables:
 func NewMyTool(dep *Dependency) llm.Tool {
 	return llm.NewTool("name", "description").
 		WithSchema(llm.MustGenerateSchema(MyInput{})).
-		WithExecute(llm.TypedExecute(func(_ context.Context, args MyInput) (llm.ToolResultOutput, error) {
+		WithExecute(llm.TypedExecute(func(_ context.Context, args MyInput) ([]llm.ContentPart, error) {
 			// Can use dep here
 		})).
 		Build()

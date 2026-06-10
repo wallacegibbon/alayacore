@@ -14,8 +14,9 @@ type ContentPart interface { isContentPart() }
 // Implementations:
 type TextPart      struct { Text string }
 type ReasoningPart struct { Text string }
+type ImagePart     struct { DataURL string }
 type ToolUsePart   struct { ID, ToolName string; Input json.RawMessage }
-type ToolResultPart struct { ID string; Output ToolResultOutput }
+type ToolResultPart struct { ID string; Content []ContentPart; IsError bool }
 
 type Message struct {
     Role    MessageRole   // "system" | "user" | "assistant" | "tool"
@@ -90,7 +91,9 @@ for _, part := range msg.Content {
     case llm.ToolUsePart:
         → {Type:"tool_use", ID: v.ID, Name: v.ToolName, Input: v.Input}
     case llm.ToolResultPart:
-        → {Type:"tool_result", ToolUseID: v.ID, Content: ...}
+        → {Type:"tool_result", ToolUseID: v.ID, Content: [...], IsError: v.IsError}
+        // Content is an array of content blocks (text, image, etc.)
+        // Single text block uses string shorthand for backward compat
     }
 }
 ```
@@ -116,7 +119,7 @@ And on receive, both providers use the same pattern: accumulate content by `inde
 | `TextPart` | `content` (top-level field) | `content[]` array: `{type:"text", text:"..."}` |
 | `ReasoningPart` | `reasoning_content` (top-level field) | `content[]` array: `{type:"thinking", thinking:"..."}` |
 | `ToolUsePart` | `tool_calls[]` (top-level array) | `content[]` array: `{type:"tool_use", id, name, input}` |
-| `ToolResultPart` | Separate message: `{role:"tool", tool_call_id, content}` (content is JSON-wrapped with `"status"` field — see note below) | `content[]` array: `{type:"tool_result", tool_use_id, content}`, **role remapped to "user"** |
+| `ToolResultPart` | Separate message: `{role:"tool", tool_call_id, content}` (content is JSON-wrapped with `"status"` field — see note below) | `content[]` array: `{type:"tool_result", tool_use_id, content, is_error}`, **role remapped to "user"**. `content` can be a string or an array of content blocks (text, image, etc.) |
 
 > **Note on OpenAI tool result content format:** OpenAI's API has no native `is_error` field for tool results (unlike Anthropic). To prevent ambiguity — e.g., a tool returning `"no such file"` as an error vs. a file containing the literal text `"no such file"` — the OpenAI provider wraps tool results as JSON:
 >
