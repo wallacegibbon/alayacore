@@ -36,9 +36,9 @@ Type "alayacore --plainio"
 Enter
 
 Sleep 500ms
-Type "what Go version does this project use?"
+Type "My kernel version"
 Enter
-Sleep 4s
+Sleep 3s
 
 # ── Exit ────────────────────────────────────────────────────────────
 
@@ -51,6 +51,6 @@ Sleep 1s
 Type "# Use with pipe"
 Enter
 Sleep 500ms
-Type "echo 'what Go version does this project use?' | alayacore --plainio"
+Type "echo 'My kernel version' | alayacore --plainio"
 Enter
-Sleep 6s
+Sleep 5s
