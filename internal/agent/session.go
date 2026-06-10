@@ -207,7 +207,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 	incCh, getCh := newHistoryIDGenerator()
 	s := &Session{
 		Content:        data.Content,
-		Messages:       data.Messages,
+		Messages:       contentToMessages(data.Content),
 		CreatedAt:      data.CreatedAt,
 		ModelManager:   NewModelManager(cfg.ModelConfigPath),
 		RuntimeManager: NewRuntimeManager(cfg.RuntimeConfigPath, cfg.ModelConfigPath),

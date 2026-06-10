@@ -38,7 +38,12 @@ func LoadSession(path string) (*SessionData, error) {
 	if err != nil {
 		return nil, domainerrors.Wrap("load", err)
 	}
-	return parseSessionData(data)
+	sd, err := parseSessionData(data)
+	if err != nil {
+		return nil, err
+	}
+	sd.Messages = contentToMessages(sd.Content)
+	return sd, nil
 }
 
 func (s *Session) saveSessionToFile(path string) error {
@@ -198,12 +203,11 @@ func parseSessionData(data []byte) (*SessionData, error) {
 	}
 
 	if len(body) > 0 {
-		content, msgs, chunks, err := parseMessagesTLV(body)
+		content, chunks, err := parseMessagesTLV(body)
 		if err != nil {
 			return nil, err
 		}
 		sd.Content = content
-		sd.Messages = msgs
 		sd.TLVChunks = chunks
 	}
 
@@ -300,56 +304,41 @@ func contentPartFromTLV(tag string, content []byte) (llm.MessageRole, llm.Conten
 	}
 }
 
-func parseMessagesTLV(body string) ([]ContentItem, []llm.Message, []TLVChunk, error) {
+func parseMessagesTLV(body string) ([]ContentItem, []TLVChunk, error) {
 	est := len(body) / 64
 	if est < 8 {
 		est = 8
 	}
 	content := make([]ContentItem, 0, est)
-	messages := make([]llm.Message, 0, est)
 	chunks := make([]TLVChunk, 0, est)
 
 	reader := newTLVReader(body)
-	currentIdx := -1
 	var seqID uint64
 
 	for {
 		tag, raw, err := reader.read()
 		if err == io.EOF {
-			return content, messages, chunks, nil
+			return content, chunks, nil
 		}
 		if err != nil {
-			return content, messages, chunks, fmt.Errorf("read error at chunk %d: %w", len(chunks), err)
+			return content, chunks, fmt.Errorf("read error at chunk %d: %w", len(chunks), err)
 		}
 
 		chunks = append(chunks, TLVChunk{Tag: tag, Value: string(raw)})
 
-		msgRole, msgPart, err := contentPartFromTLV(tag, raw)
+		_, msgPart, err := contentPartFromTLV(tag, raw)
 		if err != nil {
-			return content, messages, chunks, fmt.Errorf("parse error at chunk %d (tag %q): %w", len(chunks)-1, tag, err)
+			return content, chunks, fmt.Errorf("parse error at chunk %d (tag %q): %w", len(chunks)-1, tag, err)
 		}
 		if msgPart == nil {
 			continue
 		}
 
-		// Build ContentItem with sequential ID — IDs are ephemeral, only for
-		// in-session adapter references, not persisted in the file format.
 		seqID++
 		content = append(content, ContentItem{
 			ID:   seqID,
 			Tag:  tag,
 			Part: msgPart,
 		})
-
-		// Derive Messages by grouping consecutive same-role parts.
-		if currentIdx < 0 || messages[currentIdx].Role != msgRole {
-			messages = append(messages, llm.Message{
-				Role:    msgRole,
-				Content: []llm.ContentPart{msgPart},
-			})
-			currentIdx = len(messages) - 1
-		} else {
-			messages[currentIdx].Content = append(messages[currentIdx].Content, msgPart)
-		}
 	}
 }

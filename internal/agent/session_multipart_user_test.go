@@ -90,6 +90,7 @@ func TestConsecutiveUserChunksGrouped(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseSessionData failed: %v", err)
 	}
+	loaded.Messages = contentToMessages(loaded.Content)
 
 	// Should be 2 messages: user (with 2 parts), assistant
 	if len(loaded.Messages) != 2 {

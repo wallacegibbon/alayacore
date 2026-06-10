@@ -582,7 +582,12 @@ func TestDisplayMessagesWithToolCalls(t *testing.T) {
 
 // LoadSessionFromBytes loads a session from raw bytes (for testing)
 func LoadSessionFromBytes(data []byte) (*SessionData, error) {
-	return parseSessionData(data)
+	sd, err := parseSessionData(data)
+	if err != nil {
+		return nil, err
+	}
+	sd.Messages = contentToMessages(sd.Content)
+	return sd, nil
 }
 
 func TestCleanIncompleteToolCalls(t *testing.T) {

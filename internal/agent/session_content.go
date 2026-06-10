@@ -89,6 +89,24 @@ func roleFromTag(tag string) llm.MessageRole {
 	}
 }
 
+// contentToMessages groups consecutive ContentItems with the same role into
+// []llm.Message for API calls. Content is the source of truth — Messages is
+// always derived from it.
+func contentToMessages(content []ContentItem) []llm.Message {
+	if len(content) == 0 {
+		return nil
+	}
+	msgs := make([]llm.Message, 0)
+	for _, item := range content {
+		role := roleFromTag(item.Tag)
+		if len(msgs) == 0 || msgs[len(msgs)-1].Role != role {
+			msgs = append(msgs, llm.Message{Role: role})
+		}
+		msgs[len(msgs)-1].Content = append(msgs[len(msgs)-1].Content, item.Part)
+	}
+	return msgs
+}
+
 // deserializeContentParts deserializes []ContentPart from JSON produced by serializeContentParts.
 func deserializeContentParts(data json.RawMessage) ([]llm.ContentPart, error) {
 	if len(data) == 0 {

@@ -66,6 +66,7 @@ func TestSessionSavePreservesTextWithToolCalls(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to parse session: %v", err)
 	}
+	loaded.Messages = contentToMessages(loaded.Content)
 
 	// Verify all messages are preserved
 	if len(loaded.Messages) != len(data.Messages) {
