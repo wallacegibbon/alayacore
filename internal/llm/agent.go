@@ -392,16 +392,19 @@ func (a *Agent) executeTool(ctx context.Context, tc ToolUsePart, callbacks Strea
 
 // newToolResult creates a ToolResultPart and fires the OnToolUseOutput callback
 // so the UI is notified immediately as each tool finishes.
+//
+// Note: content is processed (nil → empty, error → TextPart) BEFORE the
+// callback fires, so the callback always receives meaningful display text.
 func newToolResult(callbacks StreamCallbacks, id string, content []ContentPart, err error) ToolResultPart {
-	if callbacks.OnToolUseOutput != nil {
-		callbacks.OnToolUseOutput(id, content, err) //nolint:errcheck
-	}
 	if content == nil {
 		content = []ContentPart{}
 	}
 	isError := err != nil
 	if isError && len(content) == 0 {
 		content = []ContentPart{TextPart{Text: err.Error()}}
+	}
+	if callbacks.OnToolUseOutput != nil {
+		callbacks.OnToolUseOutput(id, content, err) //nolint:errcheck
 	}
 	return ToolResultPart{ID: id, Content: content, IsError: isError}
 }
