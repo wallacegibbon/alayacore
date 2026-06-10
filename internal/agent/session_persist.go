@@ -92,7 +92,7 @@ func contentPartToTLV(msgRole llm.MessageRole, part llm.ContentPart) (tag string
 	case llm.ReasoningPart:
 		return stream.TagAssistantR, p.Text, nil
 	case llm.ToolUsePart:
-		fd := stream.ToolUseData{ID: p.ID, Name: p.ToolName, Input: string(p.Input)}
+		fd := stream.ToolUseData{ID: p.ID, Name: p.ToolName, Input: p.Input}
 		jsonData, err := json.Marshal(fd)
 		if err != nil {
 			return "", "", err
@@ -286,7 +286,7 @@ func contentPartFromTLV(tag string, content []byte) (llm.MessageRole, llm.Conten
 			return "", nil, nil // skip malformed
 		}
 		return llm.RoleAssistant, llm.ToolUsePart{
-			ID: fd.ID, ToolName: fd.Name, Input: json.RawMessage(fd.Input),
+			ID: fd.ID, ToolName: fd.Name, Input: fd.Input,
 		}, nil
 	case stream.TagUserF:
 		var tr stream.ToolResultData

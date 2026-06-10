@@ -144,9 +144,9 @@ func (n *NopOutput) Write(p []byte) (int, error) {
 // "start" frame that announces the tool name. All other frames
 // carry the actual tool arguments.
 type ToolUseData struct {
-	ID    string `json:"id"`
-	Name  string `json:"name,omitempty"`
-	Input string `json:"input,omitempty"`
+	ID    string          `json:"id"`
+	Name  string          `json:"name,omitempty"`
+	Input json.RawMessage `json:"input,omitempty"`
 }
 
 // ToolResultData is the JSON payload for TagUserF (UF).

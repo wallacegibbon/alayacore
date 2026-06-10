@@ -1,6 +1,7 @@
 package terminal
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -855,7 +856,7 @@ func TestDisplayEditorFinishedWithError(t *testing.T) {
 func TestGetWindowContentWriteFile(t *testing.T) {
 	wb := NewWindowBuffer(80, DefaultStyles())
 	content := "write_file: /path/to/file.txt\nline1\nline2\nline3"
-	wb.HandleToolUseEvent(stream.ToolUseData{ID: "test-id", Name: "write_file", Input: content})
+	wb.HandleToolUseEvent(stream.ToolUseData{ID: "test-id", Name: "write_file", Input: json.RawMessage(content)})
 
 	result := wb.GetWindowContent(0)
 	if result != content {
@@ -867,7 +868,7 @@ func TestGetWindowContentDiff(t *testing.T) {
 	wb := NewWindowBuffer(80, DefaultStyles())
 	// Simulate formatted diff content (what parseDiffFromFormatted produces)
 	content := "edit_file: /path/to/file.txt\n- old line 1\n+ new line 1\n  same line\n"
-	wb.HandleToolUseEvent(stream.ToolUseData{ID: "test-id", Name: "edit_file", Input: content})
+	wb.HandleToolUseEvent(stream.ToolUseData{ID: "test-id", Name: "edit_file", Input: json.RawMessage(content)})
 
 	result := wb.GetWindowContent(0)
 

@@ -144,11 +144,11 @@ func (to *outputWriter) writeColored(tag string, value string) {
 		}
 
 		// Format the input for display.
-		if fd.Input == "" {
-			fd.Input = name + ": \n"
+		if len(fd.Input) == 0 {
+			fd.Input = json.RawMessage(name + ": \n")
 		} else {
 			handler := GetHandler(name)
-			fd.Input = handler.FormatCall(json.RawMessage(fd.Input), to.styles.Load())
+			fd.Input = json.RawMessage(handler.FormatCall(fd.Input, to.styles.Load()))
 		}
 
 		to.windowBuffer.HandleToolUseEvent(fd)

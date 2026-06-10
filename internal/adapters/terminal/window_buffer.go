@@ -145,16 +145,16 @@ func (wb *WindowBuffer) HandleToolUseEvent(data stream.ToolUseData) {
 
 	if idx, ok := wb.idIndex[data.ID]; ok {
 		w := wb.windows[idx]
-		if data.Name != "" && data.Input == "" {
+		if data.Name != "" && len(data.Input) == 0 {
 			w.ToolName = data.Name
 			if w.ToolInput == "" {
-				w.ToolInput = data.Input
+				w.ToolInput = string(data.Input)
 			}
 		} else {
 			if data.Name != "" {
 				w.ToolName = data.Name
 			}
-			w.ToolInput = data.Input
+			w.ToolInput = string(data.Input)
 		}
 		if w.Status == ToolStatusNone {
 			w.Status = ToolStatusPending
@@ -170,7 +170,7 @@ func (wb *WindowBuffer) HandleToolUseEvent(data stream.ToolUseData) {
 		ID:        data.ID,
 		Tag:       stream.TagAssistantF,
 		ToolName:  data.Name,
-		ToolInput: data.Input,
+		ToolInput: string(data.Input),
 		Folded:    true,
 		Visible:   true,
 		Status:    ToolStatusPending,

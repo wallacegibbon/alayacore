@@ -98,7 +98,7 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 		o.lastTag = tag
 		o.lastStreamID = ""
 		switch {
-		case fd.Name != "" && fd.Input == "":
+		case fd.Name != "" && len(fd.Input) == 0:
 			// Start frame: tool name only.
 			fmt.Fprintf(o.writer, "%s\n", fd.Name)
 		case fd.Name != "":

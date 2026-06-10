@@ -122,7 +122,7 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 			return nil
 		},
 		OnToolUseInput: func(id string, input json.RawMessage) error {
-			s.writeToolUseInput(string(input), id)
+			s.writeToolUseInput(input, id)
 			return nil
 		},
 		OnToolUseOutput: func(id string, content []llm.ContentPart, err error) error {

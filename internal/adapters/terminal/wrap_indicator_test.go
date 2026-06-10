@@ -1,6 +1,7 @@
 package terminal
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -13,7 +14,7 @@ func TestFoldIndicator(t *testing.T) {
 	// Create a tool window with VERY long content that will definitely wrap to more than 5 lines
 	// At 76 chars inner width, we need more than 380 characters to get 6+ lines
 	longContent := strings.Repeat("This is a test sentence that will wrap. ", 12)
-	wb.HandleToolUseEvent(stream.ToolUseData{ID: "tool123", Name: "test_tool", Input: longContent})
+	wb.HandleToolUseEvent(stream.ToolUseData{ID: "tool123", Name: "test_tool", Input: json.RawMessage(longContent)})
 
 	// Set to folded mode
 	wb.WindowAt(0).Folded = true
@@ -46,7 +47,7 @@ func TestFoldIndicatorColor(t *testing.T) {
 		content.WriteString(string(rune('0' + i%10)))
 		content.WriteString("\n")
 	}
-	wb.HandleToolUseEvent(stream.ToolUseData{ID: "diff123", Name: "edit_file", Input: content.String()})
+	wb.HandleToolUseEvent(stream.ToolUseData{ID: "diff123", Name: "edit_file", Input: json.RawMessage(content.String())})
 
 	// Render the folded diff
 	rendered := wb.GetAll(-1)

@@ -15,7 +15,7 @@ func TestHandleToolUseEvent(t *testing.T) {
 	wb.HandleToolUseEvent(stream.ToolUseData{
 		ID:    "tool123",
 		Name:  "execute_command",
-		Input: "execute_command: git status",
+		Input: json.RawMessage("execute_command: git status"),
 	})
 
 	// Verify window was created
@@ -55,7 +55,7 @@ func TestRenderWindowContentWithStatus(t *testing.T) {
 	wb.HandleToolUseEvent(stream.ToolUseData{
 		ID:    "tool123",
 		Name:  "execute_command",
-		Input: "execute_command: git status",
+		Input: json.RawMessage("execute_command: git status"),
 	})
 
 	// Test rendering with pending status (default on creation)
@@ -123,7 +123,7 @@ func TestOutputWriterToolCallStartThenFull(t *testing.T) {
 	makeInputFD := func(id, input string) []byte {
 		fd, _ := json.Marshal(stream.ToolUseData{
 			ID:    id,
-			Input: input,
+			Input: json.RawMessage(input),
 		})
 		return stream.EncodeTLV(stream.TagAssistantF, string(fd))
 	}

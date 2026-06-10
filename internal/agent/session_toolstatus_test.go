@@ -117,7 +117,7 @@ func TestWriteToolCallWithPending(t *testing.T) {
 		SessionConfig: SessionConfig{Output: output},
 	}
 
-	session.writeToolUseInput(`{"command":"ls"}`, "tool123")
+	session.writeToolUseInput(json.RawMessage(`{"command":"ls"}`), "tool123")
 
 	tag1, value1 := parseTLVFromBytes(output.data)
 	if tag1 != stream.TagAssistantF {
@@ -134,7 +134,7 @@ func TestWriteToolCallWithPending(t *testing.T) {
 	if fd1.ID != "tool123" {
 		t.Errorf("Expected id=tool123, got %s", fd1.ID)
 	}
-	if fd1.Input != `{"command":"ls"}` {
+	if string(fd1.Input) != `{"command":"ls"}` {
 		t.Errorf("Expected input with command=ls, got %s", fd1.Input)
 	}
 }

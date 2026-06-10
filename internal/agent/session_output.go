@@ -69,7 +69,7 @@ func (s *Session) writeToolUseStart(toolName, id string) {
 	})
 }
 
-func (s *Session) writeToolUseInput(input, id string) {
+func (s *Session) writeToolUseInput(input json.RawMessage, id string) {
 	s.writeTLVJSON(stream.TagAssistantF, stream.ToolUseData{
 		ID:    id,
 		Input: input,
