@@ -49,11 +49,11 @@ Tool execution uses a two-frame lifecycle for AF, with an `is_error` discriminat
 
 **AF** — function lifecycle:
 - `{"id":"t1","name":"read_file"}` — tool name announced (start frame, no input yet)
-- `{"id":"t1","input":"..."}` — full tool arguments (input frame, name already known)
+- `{"id":"t1","input":{...}}` — full tool arguments (input frame, name already known)
 
 **UF** — function result:
-- `{"id":"t1","output":"..."}` — succeeded (`is_error` is omitted when `false`)
-- `{"id":"t1","output":"...","is_error":true}` — failed
+- `{"id":"t1","output":[...]}` — succeeded (`is_error` is omitted when `false`)
+- `{"id":"t1","output":[...],"is_error":true}` — failed
 
 A tool call (AF) without a matching UF is still in progress. Each `.bin` sample below shows one frame in this lifecycle.
 
@@ -62,7 +62,7 @@ A tool call (AF) without a matching UF is still in progress. Each `.bin` sample 
 ```
 Adapter writes → stdin:        UT "Read the file main.go"
 Session writes → stdout:       AF {"id":"t1","name":"read_file"}
-                               AF {"id":"t1","input":"{\"path\":\"main.go\"}"}
+                               AF {"id":"t1","input":{"path":"main.go"}}
                                UF {"id":"t1","output":"package main..."}
                                AT \x00 0|1|0 \x00 Here's what main.go does...
                                SM {"type":"task","data":{"in_progress":false,"context":0,"queue_items":[]}}
