@@ -21,7 +21,7 @@ The adapter layer handles user interaction and translates between user actions a
 
 ### PlainIO Adapter (`internal/adapters/plainio/`)
 
-Plain stdin/stdout mode, activated with `--plainio`. Shows assistant text, reasoning, and tool call headers ("call" type only, placeholder frames silently ignored). Suppresses tool result content. Displays tool_confirm system messages as plain text prompts. Reads prompts from stdin (one per line, backslash continuation for multi-line prompts).
+Plain stdin/stdout mode, activated with `--plainio`. Shows assistant text, reasoning, tool call JSON, and tool result JSON. Displays tool_confirm system messages as plain text prompts. Reads prompts from stdin (one per line, backslash continuation for multi-line prompts).
 
 ### RawIO Adapter (`internal/adapters/rawio/`)
 

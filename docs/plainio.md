@@ -25,8 +25,8 @@ All output is plain text with no ANSI escape codes:
 | Assistant text | Printed directly |
 | Reasoning | Printed directly |
 | User prompts | `> prompt` |
-| Tool calls | `[tool_name: args]` (only complete frames with full input; placeholder frames are silently ignored) |
-| Tool results | Suppressed |
+| Tool calls | Raw JSON (id, name, input) |
+| Tool results | Raw JSON (id, output, is_error) |
 | Errors | `Error: message` |
 | Notifications | `[message]` |
 | Tool confirmations | `[tool_confirm: allow tool "id" to run?]` |

@@ -22,8 +22,8 @@
 //     A blank line is inserted when consecutive deltas belong to different
 //     stream groups or different message types.
 //   - User prompts: prefixed with "> ".
-//   - Tool calls: start frames show the tool name; input frames show the arguments.
-//   - Tool results: suppressed.
+//   - Tool calls: printed as raw JSON (id, name, input).
+//   - Tool results: printed as raw JSON (id, output, is_error).
 //   - Errors: prefixed with "Error: ".
 //   - Notifications: prefixed with "[...]".
 //   - Tool confirmations: shown as "[tool_confirm: allow tool "id" to run?]".

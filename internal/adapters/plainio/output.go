@@ -88,29 +88,22 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 		o.handleSystemMsg(value)
 
 	case stream.TagAssistantF:
-		var fd stream.ToolUseData
-		if err := json.Unmarshal([]byte(value), &fd); err != nil {
-			return
-		}
 		if o.lastTag != "" {
 			fmt.Fprintln(o.writer)
 		}
 		o.lastTag = tag
 		o.lastStreamID = ""
-		switch {
-		case fd.Name != "" && len(fd.Input) == 0:
-			// Start frame: tool name only.
-			fmt.Fprintf(o.writer, "%s\n", fd.Name)
-		case fd.Name != "":
-			// Combined frame (session load): name and input.
-			fmt.Fprintf(o.writer, "%s\n%s\n", fd.Name, fd.Input)
-		default:
-			// Input frame: arguments only.
-			fmt.Fprintf(o.writer, "%s\n", fd.Input)
-		}
+		// Show complete tool call JSON.
+		fmt.Fprintf(o.writer, "%s\n", value)
 
 	case stream.TagUserF:
-		// Suppress tool result content in plainio; do not update lastTag.
+		// Show complete tool result JSON.
+		if o.lastTag != "" && o.lastTag != tag {
+			fmt.Fprintln(o.writer)
+		}
+		o.lastTag = tag
+		o.lastStreamID = ""
+		fmt.Fprintf(o.writer, "%s\n", value)
 
 	case stream.TagUserI:
 		o.emitSeparator(tag)
