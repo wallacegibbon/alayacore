@@ -136,7 +136,7 @@ func TestReadFileWithLineRange(t *testing.T) {
 func TestReadFileTooLarge(t *testing.T) {
 	tmpDir := t.TempDir()
 	tmpFile := filepath.Join(tmpDir, "large.txt")
-	largeContent := make([]byte, maxFullReadSize+1)
+	largeContent := make([]byte, maxTextReadSize+1)
 	for i := range largeContent {
 		largeContent[i] = 'x'
 	}

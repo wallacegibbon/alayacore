@@ -14,7 +14,7 @@ import (
 	"github.com/alayacore/alayacore/internal/llm"
 )
 
-const maxFullReadSize = 64 * 1024 // 64KB limit for full file reads (~16K tokens)
+const maxTextReadSize = 64 * 1024 // 64KB limit for text files (~16K tokens)
 
 // ReadFileInput represents the input for the read_file tool
 type ReadFileInput struct {
@@ -89,13 +89,13 @@ func executeReadFile(ctx context.Context, args ReadFileInput) ([]llm.ContentPart
 	// Detect image files — return image content directly
 	if args.StartLine == 0 && args.EndLine == 0 {
 		if mimeType, ok := isImageFile(args.Path); ok {
-			return readImageFile(args.Path, mimeType, info.Size())
+			return readImageFile(args.Path, mimeType)
 		}
 	}
 
 	// Full file read case
 	if args.StartLine == 0 && args.EndLine == 0 {
-		if info.Size() > maxFullReadSize {
+		if info.Size() > maxTextReadSize {
 			return readLargeFileTruncated(args.Path, info.Size())
 		}
 		var content []byte
@@ -122,16 +122,7 @@ func executeReadFile(ctx context.Context, args ReadFileInput) ([]llm.ContentPart
 }
 
 // readImageFile reads an image file and returns an ImagePart with base64-encoded data.
-// Images larger than maxFullReadSize are reported as too large rather than
-// being embedded in the conversation (base64 expands size by ~33%).
-func readImageFile(path, mimeType string, size int64) ([]llm.ContentPart, error) {
-	if size > maxFullReadSize {
-		return []llm.ContentPart{llm.TextPart{Text: fmt.Sprintf(
-			"Image %s (%.1fKB) exceeds the %dKB limit for direct reading. Use execute_command to process it.",
-			filepath.Base(path), float64(size)/1024, maxFullReadSize/1024,
-		)}}, nil
-	}
-
+func readImageFile(path, mimeType string) ([]llm.ContentPart, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -139,7 +130,7 @@ func readImageFile(path, mimeType string, size int64) ([]llm.ContentPart, error)
 
 	b64 := base64.StdEncoding.EncodeToString(data)
 	dataURL := fmt.Sprintf("data:%s;base64,%s", mimeType, b64)
-	sizeKB := float64(size) / 1024
+	sizeKB := float64(len(data)) / 1024
 
 	return []llm.ContentPart{
 		llm.TextPart{Text: fmt.Sprintf("Read %s (%.1fKB)", filepath.Base(path), sizeKB)},
@@ -147,7 +138,7 @@ func readImageFile(path, mimeType string, size int64) ([]llm.ContentPart, error)
 	}, nil
 }
 
-// readLargeFileTruncated reads a large file up to maxFullReadSize and returns
+// readLargeFileTruncated reads a large file up to maxTextReadSize and returns
 // the content with metadata about the truncation.
 func readLargeFileTruncated(path string, totalSize int64) ([]llm.ContentPart, error) {
 	file, err := os.Open(path)
@@ -172,7 +163,7 @@ func readLargeFileTruncated(path string, totalSize int64) ([]llm.ContentPart, er
 		return nil, err
 	}
 
-	// Second pass: read lines up to maxFullReadSize
+	// Second pass: read lines up to maxTextReadSize
 	var lines []string
 	var bytesRead int64
 	scanner = bufio.NewScanner(file)
@@ -183,7 +174,7 @@ func readLargeFileTruncated(path string, totalSize int64) ([]llm.ContentPart, er
 		lineBytes := int64(len(line)) + 1 // +1 for newline
 
 		// Stop if adding this line would exceed limit (but always include at least one line)
-		if bytesRead+lineBytes > maxFullReadSize && len(lines) > 0 {
+		if bytesRead+lineBytes > maxTextReadSize && len(lines) > 0 {
 			break
 		}
 
