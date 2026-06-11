@@ -266,11 +266,10 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 			stepMessage = e.Message
 			stepUsage = e.Usage
 			// Set IDs on final content parts from tracked values.
-			for i, part := range stepMessage.Content {
+			for i := range stepMessage.Content {
 				if id, ok := idByIndex[i]; ok {
 					stepMessage.Content[i].UpdateContentPartMeta(id, RoleAssistant)
 				}
-				_ = part // suppress unused
 			}
 			if e.StopReason == "max_tokens" || e.StopReason == "length" {
 				truncated = true
