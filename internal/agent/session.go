@@ -10,12 +10,12 @@ package agent
 //   Three goroutines:
 //     1. inputPump — reads TLV frames from input, sends parsed messages
 //        to the main loop. It triggers cancellation via cancelRunningTask().
-//     2. run() — main loop that owns task queue, messages, and system
+//     2. run() — main loop that owns Content, task queue, and system
 //        info. Processes input messages and task events.
 //     3. task goroutine — spawned by run() to execute each task. It
-//        receives a snapshot of messages at task start and sends state
-//        mutations (step progress, new messages, token counts) back to
-//        run() via stateCh.
+//        receives a snapshot of Messages (derived from Content) at task
+//        start and sends state mutations (step progress, new ContentItems,
+//        token counts) back to run() via stateCh.
 //
 //   Cross-goroutine communication:
 //     msgCh (inputMsg channel)  — inputPump → run()

@@ -1,6 +1,6 @@
 package agent
 
-// Content part serialization for TLV framing.
+// Content part serialization, tag mapping, and ContentItem helpers.
 //
 // serializeContentParts and deserializeContentParts convert between
 // domain ContentPart slices (TextPart, ImagePart) and the JSON array
@@ -85,7 +85,7 @@ func roleFromTag(tag string) llm.MessageRole {
 	case stream.TagUserF:
 		return llm.RoleTool
 	default:
-		return llm.RoleUser
+		return llm.RoleAssistant
 	}
 }
 

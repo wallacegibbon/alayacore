@@ -7,7 +7,7 @@ package agent
 // the run() goroutine — no mutex needed.
 //
 // The task goroutine communicates state changes (step progress, new
-// messages, token counts) back to run() via stateCh.
+// ContentItems, token counts) back to run() via stateCh.
 
 import (
 	"context"
