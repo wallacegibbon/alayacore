@@ -106,34 +106,34 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 	var newEntries []llm.ContentPart
 
 	_, err := s.agent.Load().Stream(ctx, history, llm.StreamCallbacks{
-		OnTextDelta: func(delta string, streamID uint64) error {
-			id := strconv.FormatUint(streamID, 10)
+		OnTextDelta: func(delta string, historyID uint64) error {
+			id := strconv.FormatUint(historyID, 10)
 			_ = stream.WriteTLV(s.Output, stream.TagAssistantT, stream.WrapDelta(id, delta)) //nolint:errcheck
 			return nil
 		},
-		OnReasoningDelta: func(delta string, streamID uint64) error {
-			id := strconv.FormatUint(streamID, 10)
+		OnReasoningDelta: func(delta string, historyID uint64) error {
+			id := strconv.FormatUint(historyID, 10)
 			_ = stream.WriteTLV(s.Output, stream.TagAssistantR, stream.WrapDelta(id, delta)) //nolint:errcheck
 			return nil
 		},
-		OnToolUseStart: func(toolCallID, toolName string, streamID uint64) error {
-			id := strconv.FormatUint(streamID, 10)
+		OnToolUseStart: func(toolCallID, toolName string, historyID uint64) error {
+			id := strconv.FormatUint(historyID, 10)
 			data, _ := json.Marshal(stream.ToolUseData{ID: toolCallID, Name: toolName})             //nolint:errcheck
 			_ = stream.WriteTLV(s.Output, stream.TagAssistantF, stream.WrapDelta(id, string(data))) //nolint:errcheck
 			return nil
 		},
-		OnToolUseInput: func(toolCallID string, input json.RawMessage, streamID uint64) error {
-			id := strconv.FormatUint(streamID, 10)
+		OnToolUseInput: func(toolCallID string, input json.RawMessage, historyID uint64) error {
+			id := strconv.FormatUint(historyID, 10)
 			data, _ := json.Marshal(stream.ToolUseData{ID: toolCallID, Input: input})               //nolint:errcheck
 			_ = stream.WriteTLV(s.Output, stream.TagAssistantF, stream.WrapDelta(id, string(data))) //nolint:errcheck
 			return nil
 		},
-		OnToolUseOutput: func(toolCallID string, content []llm.ContentPart, err error, streamID uint64) error {
+		OnToolUseOutput: func(toolCallID string, content []llm.ContentPart, err error, historyID uint64) error {
 			contentJSON, err2 := serializeContentParts(content)
 			if err2 != nil {
 				contentJSON = []byte(`[{"type":"text","text":"(serialization error)"}]`)
 			}
-			id := strconv.FormatUint(streamID, 10)
+			id := strconv.FormatUint(historyID, 10)
 			data, _ := json.Marshal(stream.ToolResultData{ //nolint:errcheck
 				ID:      toolCallID,
 				Output:  contentJSON,

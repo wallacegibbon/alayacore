@@ -56,18 +56,18 @@ func NewAgent(config AgentConfig) *Agent {
 
 // StreamCallbacks receives streaming events
 type StreamCallbacks struct {
-	OnTextDelta      func(delta string, streamID uint64) error
-	OnReasoningDelta func(delta string, streamID uint64) error
+	OnTextDelta      func(delta string, historyID uint64) error
+	OnReasoningDelta func(delta string, historyID uint64) error
 	// OnToolUseStart fires when a tool name and ID are known (before args stream).
-	OnToolUseStart func(toolCallID, toolName string, streamID uint64) error
+	OnToolUseStart func(toolCallID, toolName string, historyID uint64) error
 	// OnToolUseInput fires when tool arguments finish streaming.
-	OnToolUseInput  func(toolCallID string, input json.RawMessage, streamID uint64) error
+	OnToolUseInput  func(toolCallID string, input json.RawMessage, historyID uint64) error
 	OnToolConfirm   func(requests []ToolConfirmRequest) <-chan ToolConfirmResponse
-	OnToolUseOutput func(toolCallID string, content []ContentPart, err error, streamID uint64) error
+	OnToolUseOutput func(toolCallID string, content []ContentPart, err error, historyID uint64) error
 	OnStepStart     func(step int) error
 	OnStepFinish    func(messages []Message, usage Usage) error
 
-	// IDGen provides unique stream IDs. Called once per content block
+	// IDGen provides unique history IDs. Called once per content block
 	// (first delta for AT/AR, once for each AF/UF). The returned ID is
 	// passed to callbacks and stored on the ContentPart.
 	IDGen func() uint64
@@ -190,7 +190,7 @@ func (a *Agent) executeStep(ctx context.Context, step int, allMessages []Message
 }
 
 // streamEvents iterates streaming events, firing callbacks and collecting
-// tool calls. Assigns unique stream IDs via IDGen on first touch of each
+// tool calls. Assigns unique history IDs via IDGen on first touch of each
 // content block, passes them to callbacks, and stores them on ContentParts.
 //
 //nolint:gocyclo // 16 is borderline; extracting further would harm readability.
@@ -212,7 +212,7 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 	resultCh := make(chan ContentPart, 16)
 	execCount := 0
 
-	// Track stream IDs for content blocks (keyed by index for AT/AR/AF).
+	// Track history IDs for content blocks (keyed by index for AT/AR/AF).
 	idByIndex := make(map[int]uint64)
 
 	for event, err := range events {
@@ -295,13 +295,13 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 // and sends the result through resultCh. Otherwise, it's deferred.
 func (a *Agent) handleStreamedToolUse(ctx context.Context, tc ToolUsePart, callbacks StreamCallbacks, deferred []ToolUsePart, resultCh chan<- ContentPart) []ToolUsePart {
 	if callbacks.OnToolConfirm == nil {
-		streamID := uint64(0)
+		historyID := uint64(0)
 		if callbacks.IDGen != nil {
-			streamID = callbacks.IDGen()
+			historyID = callbacks.IDGen()
 		}
-		go func(tc ToolUsePart, streamID uint64) {
-			resultCh <- a.executeTool(ctx, tc, callbacks, streamID)
-		}(tc, streamID)
+		go func(tc ToolUsePart, historyID uint64) {
+			resultCh <- a.executeTool(ctx, tc, callbacks, historyID)
+		}(tc, historyID)
 	} else {
 		deferred = append(deferred, tc)
 	}
@@ -339,31 +339,31 @@ func (a *Agent) executeDeferredTools(ctx context.Context, deferred []ToolUsePart
 		pendingConfirm--
 
 		if resp.Error != "" {
-			streamID := uint64(0)
+			historyID := uint64(0)
 			if callbacks.IDGen != nil {
-				streamID = callbacks.IDGen()
+				historyID = callbacks.IDGen()
 			}
-			resultCh <- newToolResult(callbacks, resp.ID, nil, fmt.Errorf("denied: %s", resp.Error), streamID)
+			resultCh <- newToolResult(callbacks, resp.ID, nil, fmt.Errorf("denied: %s", resp.Error), historyID)
 			continue
 		}
 		if !resp.Allowed {
-			streamID := uint64(0)
+			historyID := uint64(0)
 			if callbacks.IDGen != nil {
-				streamID = callbacks.IDGen()
+				historyID = callbacks.IDGen()
 			}
-			resultCh <- newToolResult(callbacks, resp.ID, nil, fmt.Errorf("Tool execution denied by user"), streamID)
+			resultCh <- newToolResult(callbacks, resp.ID, nil, fmt.Errorf("Tool execution denied by user"), historyID)
 			continue
 		}
 
 		// Confirmed — execute concurrently.
 		tc := deferred[idToIdx[resp.ID]]
-		streamID := uint64(0)
+		historyID := uint64(0)
 		if callbacks.IDGen != nil {
-			streamID = callbacks.IDGen()
+			historyID = callbacks.IDGen()
 		}
-		go func(tc ToolUsePart, streamID uint64) {
-			resultCh <- a.executeTool(ctx, tc, callbacks, streamID)
-		}(tc, streamID)
+		go func(tc ToolUsePart, historyID uint64) {
+			resultCh <- a.executeTool(ctx, tc, callbacks, historyID)
+		}(tc, historyID)
 	}
 }
 
@@ -387,9 +387,9 @@ func (a *Agent) toolDefinitions() []ToolDefinition {
 }
 
 // fireOnReasoningDelta invokes the OnReasoningDelta callback if set.
-func fireOnReasoningDelta(callbacks StreamCallbacks, e ReasoningDeltaEvent, streamID uint64) error {
+func fireOnReasoningDelta(callbacks StreamCallbacks, e ReasoningDeltaEvent, historyID uint64) error {
 	if callbacks.OnReasoningDelta != nil {
-		if err := callbacks.OnReasoningDelta(e.Delta, streamID); err != nil {
+		if err := callbacks.OnReasoningDelta(e.Delta, historyID); err != nil {
 			return fmt.Errorf("OnReasoningDelta callback failed: %w", err)
 		}
 	}
@@ -397,9 +397,9 @@ func fireOnReasoningDelta(callbacks StreamCallbacks, e ReasoningDeltaEvent, stre
 }
 
 // fireOnTextDelta invokes the OnTextDelta callback if set.
-func fireOnTextDelta(callbacks StreamCallbacks, e TextDeltaEvent, streamID uint64) error {
+func fireOnTextDelta(callbacks StreamCallbacks, e TextDeltaEvent, historyID uint64) error {
 	if callbacks.OnTextDelta != nil {
-		if err := callbacks.OnTextDelta(e.Delta, streamID); err != nil {
+		if err := callbacks.OnTextDelta(e.Delta, historyID); err != nil {
 			return fmt.Errorf("OnTextDelta callback failed: %w", err)
 		}
 	}
@@ -407,9 +407,9 @@ func fireOnTextDelta(callbacks StreamCallbacks, e TextDeltaEvent, streamID uint6
 }
 
 // fireOnToolUseStart invokes the OnToolUseStart callback if set.
-func (a *Agent) fireOnToolUseStart(callbacks StreamCallbacks, e ToolUseStartEvent, streamID uint64) error {
+func (a *Agent) fireOnToolUseStart(callbacks StreamCallbacks, e ToolUseStartEvent, historyID uint64) error {
 	if callbacks.OnToolUseStart != nil {
-		if err := callbacks.OnToolUseStart(e.ID, e.ToolName, streamID); err != nil {
+		if err := callbacks.OnToolUseStart(e.ID, e.ToolName, historyID); err != nil {
 			return fmt.Errorf("OnToolUseStart callback failed: %w", err)
 		}
 	}
@@ -417,9 +417,9 @@ func (a *Agent) fireOnToolUseStart(callbacks StreamCallbacks, e ToolUseStartEven
 }
 
 // fireOnToolUseInput invokes the OnToolUseInput callback if set.
-func (a *Agent) fireOnToolUseInput(callbacks StreamCallbacks, e ToolUseDeltaEvent, streamID uint64) error {
+func (a *Agent) fireOnToolUseInput(callbacks StreamCallbacks, e ToolUseDeltaEvent, historyID uint64) error {
 	if callbacks.OnToolUseInput != nil {
-		if err := callbacks.OnToolUseInput(e.ID, e.Input, streamID); err != nil {
+		if err := callbacks.OnToolUseInput(e.ID, e.Input, historyID); err != nil {
 			return fmt.Errorf("OnToolUseInput callback failed: %w", err)
 		}
 	}
@@ -437,7 +437,7 @@ func fireOnStepFinish(callbacks StreamCallbacks, messages []Message, usage Usage
 }
 
 // executeTool executes a single tool call and returns the result.
-func (a *Agent) executeTool(ctx context.Context, tc ToolUsePart, callbacks StreamCallbacks, streamID uint64) ContentPart {
+func (a *Agent) executeTool(ctx context.Context, tc ToolUsePart, callbacks StreamCallbacks, historyID uint64) ContentPart {
 	var tool *Tool
 	for _, t := range a.config.Tools {
 		if t.Definition.Name == tc.ToolName {
@@ -447,11 +447,11 @@ func (a *Agent) executeTool(ctx context.Context, tc ToolUsePart, callbacks Strea
 	}
 
 	if tool == nil {
-		return newToolResult(callbacks, tc.ID, nil, fmt.Errorf("unknown tool: %s", tc.ToolName), streamID)
+		return newToolResult(callbacks, tc.ID, nil, fmt.Errorf("unknown tool: %s", tc.ToolName), historyID)
 	}
 
 	content, err := tool.Execute(ctx, tc.Input)
-	return newToolResult(callbacks, tc.ID, content, err, streamID)
+	return newToolResult(callbacks, tc.ID, content, err, historyID)
 }
 
 // newToolResult creates a ToolResultPart and fires the OnToolUseOutput callback
@@ -459,7 +459,7 @@ func (a *Agent) executeTool(ctx context.Context, tc ToolUsePart, callbacks Strea
 //
 // Note: content is processed (nil → empty, error → TextPart) BEFORE the
 // callback fires, so the callback always receives meaningful display text.
-func newToolResult(callbacks StreamCallbacks, id string, content []ContentPart, err error, streamID uint64) *ToolResultPart {
+func newToolResult(callbacks StreamCallbacks, id string, content []ContentPart, err error, historyID uint64) *ToolResultPart {
 	if content == nil {
 		content = []ContentPart{}
 	}
@@ -468,9 +468,9 @@ func newToolResult(callbacks StreamCallbacks, id string, content []ContentPart, 
 		content = []ContentPart{&TextPart{Text: err.Error()}}
 	}
 	if callbacks.OnToolUseOutput != nil {
-		callbacks.OnToolUseOutput(id, content, err, streamID) //nolint:errcheck
+		callbacks.OnToolUseOutput(id, content, err, historyID) //nolint:errcheck
 	}
-	return &ToolResultPart{ID: id, Content: content, IsError: isError, HistoryID: streamID, Role: RoleTool}
+	return &ToolResultPart{ID: id, Content: content, IsError: isError, HistoryID: historyID, Role: RoleTool}
 }
 
 // extractToolUses extracts ToolUseParts from message content.// Results are collected in the same order as toolUses.
