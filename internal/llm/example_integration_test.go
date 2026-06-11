@@ -70,15 +70,15 @@ func TestFullIntegration(t *testing.T) {
 
 	// 5. Stream with callbacks
 	result, err := agent.Stream(context.Background(), messages, llm.StreamCallbacks{
-		OnTextDelta: func(delta string, _ int, _ uint64) error {
+		OnTextDelta: func(delta string, _ uint64) error {
 			fmt.Print(delta)
 			return nil
 		},
-		OnReasoningDelta: func(delta string, _ int, _ uint64) error {
+		OnReasoningDelta: func(delta string, _ uint64) error {
 			fmt.Printf("[Thinking] %s", delta)
 			return nil
 		},
-		OnToolUseInput: func(_ string, _ json.RawMessage, _ int, _ uint64) error {
+		OnToolUseInput: func(_ string, _ json.RawMessage, _ uint64) error {
 			fmt.Printf("\n[Calling tool]\n")
 			return nil
 		},

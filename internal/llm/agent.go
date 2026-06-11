@@ -56,14 +56,12 @@ func NewAgent(config AgentConfig) *Agent {
 
 // StreamCallbacks receives streaming events
 type StreamCallbacks struct {
-	OnTextDelta      func(delta string, index int, streamID uint64) error
-	OnReasoningDelta func(delta string, index int, streamID uint64) error
+	OnTextDelta      func(delta string, streamID uint64) error
+	OnReasoningDelta func(delta string, streamID uint64) error
 	// OnToolUseStart fires when a tool name and ID are known (before args stream).
-	// index is the content block position within the step.
-	OnToolUseStart func(toolCallID, toolName string, index int, streamID uint64) error
+	OnToolUseStart func(toolCallID, toolName string, streamID uint64) error
 	// OnToolUseInput fires when tool arguments finish streaming.
-	// index is the content block position within the step.
-	OnToolUseInput  func(toolCallID string, input json.RawMessage, index int, streamID uint64) error
+	OnToolUseInput  func(toolCallID string, input json.RawMessage, streamID uint64) error
 	OnToolConfirm   func(requests []ToolConfirmRequest) <-chan ToolConfirmResponse
 	OnToolUseOutput func(toolCallID string, content []ContentPart, err error, streamID uint64) error
 	OnStepStart     func(step int) error
@@ -391,7 +389,7 @@ func (a *Agent) toolDefinitions() []ToolDefinition {
 // fireOnReasoningDelta invokes the OnReasoningDelta callback if set.
 func fireOnReasoningDelta(callbacks StreamCallbacks, e ReasoningDeltaEvent, streamID uint64) error {
 	if callbacks.OnReasoningDelta != nil {
-		if err := callbacks.OnReasoningDelta(e.Delta, e.Index, streamID); err != nil {
+		if err := callbacks.OnReasoningDelta(e.Delta, streamID); err != nil {
 			return fmt.Errorf("OnReasoningDelta callback failed: %w", err)
 		}
 	}
@@ -401,7 +399,7 @@ func fireOnReasoningDelta(callbacks StreamCallbacks, e ReasoningDeltaEvent, stre
 // fireOnTextDelta invokes the OnTextDelta callback if set.
 func fireOnTextDelta(callbacks StreamCallbacks, e TextDeltaEvent, streamID uint64) error {
 	if callbacks.OnTextDelta != nil {
-		if err := callbacks.OnTextDelta(e.Delta, e.Index, streamID); err != nil {
+		if err := callbacks.OnTextDelta(e.Delta, streamID); err != nil {
 			return fmt.Errorf("OnTextDelta callback failed: %w", err)
 		}
 	}
@@ -411,7 +409,7 @@ func fireOnTextDelta(callbacks StreamCallbacks, e TextDeltaEvent, streamID uint6
 // fireOnToolUseStart invokes the OnToolUseStart callback if set.
 func (a *Agent) fireOnToolUseStart(callbacks StreamCallbacks, e ToolUseStartEvent, streamID uint64) error {
 	if callbacks.OnToolUseStart != nil {
-		if err := callbacks.OnToolUseStart(e.ID, e.ToolName, e.Index, streamID); err != nil {
+		if err := callbacks.OnToolUseStart(e.ID, e.ToolName, streamID); err != nil {
 			return fmt.Errorf("OnToolUseStart callback failed: %w", err)
 		}
 	}
@@ -421,7 +419,7 @@ func (a *Agent) fireOnToolUseStart(callbacks StreamCallbacks, e ToolUseStartEven
 // fireOnToolUseInput invokes the OnToolUseInput callback if set.
 func (a *Agent) fireOnToolUseInput(callbacks StreamCallbacks, e ToolUseDeltaEvent, streamID uint64) error {
 	if callbacks.OnToolUseInput != nil {
-		if err := callbacks.OnToolUseInput(e.ID, e.Input, e.Index, streamID); err != nil {
+		if err := callbacks.OnToolUseInput(e.ID, e.Input, streamID); err != nil {
 			return fmt.Errorf("OnToolUseInput callback failed: %w", err)
 		}
 	}

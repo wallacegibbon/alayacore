@@ -106,23 +106,23 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 	var newEntries []llm.ContentPart
 
 	_, err := s.agent.Load().Stream(ctx, history, llm.StreamCallbacks{
-		OnTextDelta: func(delta string, _ int, streamID uint64) error {
+		OnTextDelta: func(delta string, streamID uint64) error {
 			id := strconv.FormatUint(streamID, 10)
 			_ = stream.WriteTLV(s.Output, stream.TagAssistantT, stream.WrapDelta(id, delta)) //nolint:errcheck
 			return nil
 		},
-		OnReasoningDelta: func(delta string, _ int, streamID uint64) error {
+		OnReasoningDelta: func(delta string, streamID uint64) error {
 			id := strconv.FormatUint(streamID, 10)
 			_ = stream.WriteTLV(s.Output, stream.TagAssistantR, stream.WrapDelta(id, delta)) //nolint:errcheck
 			return nil
 		},
-		OnToolUseStart: func(toolCallID, toolName string, _ int, streamID uint64) error {
+		OnToolUseStart: func(toolCallID, toolName string, streamID uint64) error {
 			id := strconv.FormatUint(streamID, 10)
 			data, _ := json.Marshal(stream.ToolUseData{ID: toolCallID, Name: toolName})             //nolint:errcheck
 			_ = stream.WriteTLV(s.Output, stream.TagAssistantF, stream.WrapDelta(id, string(data))) //nolint:errcheck
 			return nil
 		},
-		OnToolUseInput: func(toolCallID string, input json.RawMessage, _ int, streamID uint64) error {
+		OnToolUseInput: func(toolCallID string, input json.RawMessage, streamID uint64) error {
 			id := strconv.FormatUint(streamID, 10)
 			data, _ := json.Marshal(stream.ToolUseData{ID: toolCallID, Input: input})               //nolint:errcheck
 			_ = stream.WriteTLV(s.Output, stream.TagAssistantF, stream.WrapDelta(id, string(data))) //nolint:errcheck

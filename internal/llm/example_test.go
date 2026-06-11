@@ -48,11 +48,11 @@ func Example_usage() {
 	}
 
 	result, err := agent.Stream(context.Background(), messages, llm.StreamCallbacks{
-		OnTextDelta: func(delta string, _ int, _ uint64) error {
+		OnTextDelta: func(delta string, _ uint64) error {
 			fmt.Print(delta)
 			return nil
 		},
-		OnToolUseInput: func(_ string, input json.RawMessage, _ int, _ uint64) error {
+		OnToolUseInput: func(_ string, input json.RawMessage, _ uint64) error {
 			fmt.Printf("\n[Tool input: %s]\n", string(input))
 			return nil
 		},
