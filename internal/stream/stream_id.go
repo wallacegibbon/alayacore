@@ -1,7 +1,6 @@
 package stream
 
 import (
-	"strconv"
 	"strings"
 )
 
@@ -15,15 +14,7 @@ import (
 // The NUL byte (\x00) is used as the delimiter because it can never appear
 // in normal UTF-8 text content, making the split unambiguous regardless of
 // what the LLM generates.
-//
 // The id is a decimal number from the session's history counter.
-
-// NewStreamID constructs a stream ID string from components.
-func NewStreamID(promptID uint64, step int, index int) string {
-	return strconv.FormatUint(promptID, 10) + "|" +
-		strconv.FormatInt(int64(step), 10) + "|" +
-		strconv.FormatInt(int64(index), 10)
-}
 
 // WrapDelta prepends the NUL-delimited stream ID prefix to content.
 // Result: \x00<id>\x00<content>
