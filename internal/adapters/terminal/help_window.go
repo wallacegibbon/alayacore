@@ -84,6 +84,7 @@ func buildHelpItems() []HelpItem {
 		{ID: nextID(), Key: ":model_set <id>", Description: "Switch model by ID", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":model_load", Description: "Reload model config", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":save [filename]", Description: "Save session", Type: HelpItemCommand},
+		{ID: nextID(), Key: ":fork <id> <filename>", Description: "Fork session up to content", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":suspend", Description: "Suspend process", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":quit", Description: "Exit application", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":help", Description: "Open help window", Type: HelpItemCommand},
@@ -121,6 +122,7 @@ func buildHelpItems() []HelpItem {
 		{ID: nextID(), Key: "f/b", Description: "Next/prev prompt", Type: HelpItemKey},
 		{ID: nextID(), Key: ":", Description: "Enter command mode", Type: HelpItemKey},
 		{ID: nextID(), Key: "Space", Description: "Toggle window fold", Type: HelpItemKey},
+		{ID: nextID(), Key: "Ctrl+F", Description: "Fork session from cursor", Type: HelpItemKey},
 	}
 	for i := range items {
 		if !items[i].IsSection {

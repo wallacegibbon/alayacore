@@ -5,6 +5,7 @@ package terminal
 // virtual rendering (only visible windows are rendered) for performance.
 
 import (
+	"strconv"
 	"strings"
 	"sync"
 
@@ -121,13 +122,15 @@ func (wb *WindowBuffer) AppendOrUpdate(tag string, id string, content string) {
 
 	// Create new window
 	folded := tag != stream.TagUserT && tag != stream.TagAssistantT
+	historyID := parseHistoryID(id)
 	w := &Window{
-		ID:      id,
-		Tag:     tag,
-		Content: content,
-		Folded:  folded,
-		Visible: hasVisibleContent(content),
-		styles:  wb.styles,
+		ID:        id,
+		HistoryID: historyID,
+		Tag:       tag,
+		Content:   content,
+		Folded:    folded,
+		Visible:   hasVisibleContent(content),
+		styles:    wb.styles,
 	}
 	wb.windows = append(wb.windows, w)
 	wb.idIndex[id] = len(wb.windows) - 1
@@ -139,7 +142,7 @@ func (wb *WindowBuffer) AppendOrUpdate(tag string, id string, content string) {
 // the tool name. All other frames carry actual tool arguments.
 // Status defaults to "pending" when a tool window is created —
 // the final status arrives via HandleToolResult (UF).
-func (wb *WindowBuffer) HandleToolUseEvent(data stream.ToolUseData) {
+func (wb *WindowBuffer) HandleToolUseEvent(data stream.ToolUseData, historyID uint64) {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 
@@ -156,6 +159,9 @@ func (wb *WindowBuffer) HandleToolUseEvent(data stream.ToolUseData) {
 			}
 			w.ToolInput = string(data.Input)
 		}
+		if historyID > w.HistoryID {
+			w.HistoryID = historyID
+		}
 		if w.Status == ToolStatusNone {
 			w.Status = ToolStatusPending
 		}
@@ -168,6 +174,7 @@ func (wb *WindowBuffer) HandleToolUseEvent(data stream.ToolUseData) {
 	// update it to success/error when it arrives.
 	w := &Window{
 		ID:        data.ID,
+		HistoryID: historyID,
 		Tag:       stream.TagAssistantF,
 		ToolName:  data.Name,
 		ToolInput: string(data.Input),
@@ -183,13 +190,16 @@ func (wb *WindowBuffer) HandleToolUseEvent(data stream.ToolUseData) {
 
 // HandleToolResult processes a TagUserF (UF) frame.
 // Sets ToolOutput and updates Status from the result.
-func (wb *WindowBuffer) HandleToolResult(id, output string, isError bool) {
+func (wb *WindowBuffer) HandleToolResult(id, output string, isError bool, historyID uint64) {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 
 	if idx, ok := wb.idIndex[id]; ok {
 		w := wb.windows[idx]
 		w.ToolOutput = output
+		if historyID > w.HistoryID {
+			w.HistoryID = historyID
+		}
 		if isError {
 			w.Status = ToolStatusError
 		} else {
@@ -207,6 +217,7 @@ func (wb *WindowBuffer) HandleToolResult(id, output string, isError bool) {
 	}
 	w := &Window{
 		ID:         id,
+		HistoryID:  historyID,
 		Tag:        stream.TagUserF,
 		ToolOutput: output,
 		Status:     status,
@@ -736,4 +747,17 @@ func (wb *WindowBuffer) RenderWindowContent(w *Window, innerWidth int) string {
 		return w.renderGenericContent(innerWidth, wb.styles, w.ToolInput)
 	}
 	return w.renderGenericContent(innerWidth, wb.styles, w.Content)
+}
+
+// parseHistoryID parses a history ID string (from the wire format) to uint64.
+// Returns 0 if the string is not a valid number.
+func parseHistoryID(id string) uint64 {
+	if id == "" {
+		return 0
+	}
+	n, err := strconv.ParseUint(id, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return n
 }

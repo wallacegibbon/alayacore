@@ -167,6 +167,19 @@ func (m *DisplayModel) GetCursorWindowContent() string {
 	return m.windowBuffer.GetWindowContent(m.windowCursor)
 }
 
+// GetCursorWindowHistoryID returns the history ID of the currently selected window.
+// Returns 0 if no window is selected.
+func (m *DisplayModel) GetCursorWindowHistoryID() uint64 {
+	if m.windowCursor < 0 {
+		return 0
+	}
+	w := m.windowBuffer.WindowAt(m.windowCursor)
+	if w == nil {
+		return 0
+	}
+	return w.HistoryID
+}
+
 // setCursor sets the window cursor and disables auto-follow.
 // Only SetCursorToLastWindow re-enables auto-follow afterwards.
 func (m *DisplayModel) setCursor(i int) {

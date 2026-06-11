@@ -152,7 +152,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 	// Function lifecycle (JSON: id, type, name, input, status)
 	// May carry NUL-delimited historyID prefix
 	case stream.TagAssistantF:
-		_, payload, ok := stream.UnwrapDelta(value)
+		id, payload, ok := stream.UnwrapDelta(value)
 		if !ok {
 			payload = value
 		}
@@ -176,12 +176,12 @@ func (to *outputWriter) writeColored(tag string, value string) {
 			fd.Input = json.RawMessage(handler.FormatCall(fd.Input, to.styles.Load()))
 		}
 
-		to.windowBuffer.HandleToolUseEvent(fd)
+		to.windowBuffer.HandleToolUseEvent(fd, parseHistoryID(id))
 
 	// Function result (JSON: id, content, is_error)
 	// May carry NUL-delimited historyID prefix
 	case stream.TagUserF:
-		_, payload, ok := stream.UnwrapDelta(value)
+		id, payload, ok := stream.UnwrapDelta(value)
 		if !ok {
 			payload = value
 		}
@@ -191,7 +191,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 		}
 		// Extract display text from the content JSON array
 		displayText := extractToolResultDisplayText(tr.Output)
-		to.windowBuffer.HandleToolResult(tr.ID, displayText, tr.IsError)
+		to.windowBuffer.HandleToolResult(tr.ID, displayText, tr.IsError, parseHistoryID(id))
 
 	// System tags
 	case stream.TagSystemMsg:

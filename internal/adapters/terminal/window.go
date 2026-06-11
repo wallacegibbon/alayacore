@@ -62,6 +62,7 @@ import (
 // is needed (resize, style change, etc.).
 type Window struct {
 	ID         string     // stream ID or generated unique ID
+	HistoryID  uint64     // numeric history ID from the stream
 	Tag        string     // TLV tag that created this window
 	ToolName   string     // tool name (for AF/UF tags)
 	ToolInput  string     // tool call input (formatted, for AF windows)

@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/alayacore/alayacore/internal/config"
 	domainerrors "github.com/alayacore/alayacore/internal/errors"
@@ -502,6 +503,58 @@ func (s *Session) handleInputUserText(value string, pendingImages *[]string, msg
 		msg.isCmd = true
 	}
 	msgCh <- msg
+}
+
+// handleFork saves all content from the start of the session up to (and
+// including) the content identified by history ID to a session file.
+// Usage: :fork <history_id> <filename>
+func (s *Session) handleFork(args []string) {
+	if len(args) < 2 {
+		s.writeError("usage: :fork <history_id> <filename>")
+		return
+	}
+
+	id, err := strconv.ParseUint(args[0], 10, 64)
+	if err != nil {
+		s.writeError(fmt.Sprintf("invalid history ID: %s", args[0]))
+		return
+	}
+
+	// Find the index of the content with this history ID.
+	var endIdx = -1
+	for i, part := range s.Content {
+		if part.GetHistoryID() == id {
+			endIdx = i
+			break
+		}
+	}
+	if endIdx < 0 {
+		s.writeError(fmt.Sprintf("no content found with history ID %d", id))
+		return
+	}
+
+	format := &SessionData{
+		SessionMeta: SessionMeta{
+			MessageVersion: MessageVersion,
+			CreatedAt:      s.CreatedAt,
+			UpdatedAt:      time.Now(),
+			ActiveModel:    s.activeModelName(),
+		},
+		Content: s.Content[:endIdx+1],
+	}
+
+	raw, err := formatSessionMarkdown(format)
+	if err != nil {
+		s.writeError(fmt.Sprintf("failed to format session: %v", err))
+		return
+	}
+
+	path := config.ExpandPath(args[1])
+	if err := os.WriteFile(path, raw, 0600); err != nil {
+		s.writeError(fmt.Sprintf("failed to write file: %v", err))
+		return
+	}
+	s.writeNotifyf("Session forked to %s (up to content ID %d)", path, id)
 }
 
 // handleConfirmCommand processes a `:confirm <id> yes|no` command from the user.

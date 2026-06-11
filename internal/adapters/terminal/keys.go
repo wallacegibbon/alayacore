@@ -53,6 +53,7 @@ const (
 	// Ctrl combinations
 	keyCtrlC = "ctrl+c"
 	keyCtrlD = "ctrl+d"
+	keyCtrlF = "ctrl+f"
 	keyCtrlG = "ctrl+g"
 	keyCtrlH = "ctrl+h"
 	keyCtrlL = "ctrl+l"

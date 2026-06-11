@@ -22,6 +22,7 @@ const (
 	CommandNameReason          = "reason"
 	CommandNameThemeSet        = "theme_set"
 	CommandNameConfirm         = "confirm"
+	CommandNameFork            = "fork"
 )
 
 // CommandHandler is a function that handles a colon-command.
@@ -63,6 +64,8 @@ var commandDefs = []Command{
 		func(s *Session, _ context.Context, args []string) { s.handleThemeSet(args) }},
 	{CommandNameConfirm, "Confirm or deny a pending tool execution", "yes|no", true,
 		func(s *Session, _ context.Context, args []string) { s.handleConfirmCommand(args) }},
+	{CommandNameFork, "Fork session up to content ID and save to file", "<id> <filename>", true,
+		func(s *Session, _ context.Context, args []string) { s.handleFork(args) }},
 }
 
 // LookupCommand returns the command metadata for name, or (nil, false).

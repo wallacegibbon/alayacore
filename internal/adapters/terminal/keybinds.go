@@ -459,6 +459,15 @@ var displayKeyHandlers = map[string]DisplayKeyHandler{
 		}
 		return nil
 	},
+	keyCtrlF: func(m *Terminal) tea.Cmd {
+		if historyID := m.display.GetCursorWindowHistoryID(); historyID > 0 {
+			m.focusInput()
+			m.input.SetValue(fmt.Sprintf(":fork %d ", historyID))
+			m.input.CursorEnd()
+			m.display.updateContent()
+		}
+		return nil
+	},
 }
 
 // handleDisplayKeys handles key events when display window is focused.
