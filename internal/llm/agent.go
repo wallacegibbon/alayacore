@@ -222,37 +222,22 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 
 		switch e := event.(type) {
 		case TextDeltaEvent:
-			id := idByIndex[e.Index]
-			if id == 0 && callbacks.IDGen != nil {
-				id = callbacks.IDGen()
-				idByIndex[e.Index] = id
-			}
-			if err := fireOnTextDelta(callbacks, e, id); err != nil {
+			if err := fireOnTextDelta(callbacks, e, getOrAssignID(callbacks, idByIndex, e.Index)); err != nil {
 				return Message{}, Usage{}, false, nil, err
 			}
 
 		case ReasoningDeltaEvent:
-			id := idByIndex[e.Index]
-			if id == 0 && callbacks.IDGen != nil {
-				id = callbacks.IDGen()
-				idByIndex[e.Index] = id
-			}
-			if err := fireOnReasoningDelta(callbacks, e, id); err != nil {
+			if err := fireOnReasoningDelta(callbacks, e, getOrAssignID(callbacks, idByIndex, e.Index)); err != nil {
 				return Message{}, Usage{}, false, nil, err
 			}
 
 		case ToolUseStartEvent:
-			id := idByIndex[e.Index]
-			if id == 0 && callbacks.IDGen != nil {
-				id = callbacks.IDGen()
-				idByIndex[e.Index] = id
-			}
-			if err := a.fireOnToolUseStart(callbacks, e, id); err != nil {
+			if err := a.fireOnToolUseStart(callbacks, e, getOrAssignID(callbacks, idByIndex, e.Index)); err != nil {
 				return Message{}, Usage{}, false, nil, err
 			}
 
 		case ToolUseDeltaEvent:
-			id := idByIndex[e.Index]
+			id := getOrAssignID(callbacks, idByIndex, e.Index)
 			if err := a.fireOnToolUseInput(callbacks, e, id); err != nil {
 				return Message{}, Usage{}, false, nil, err
 			}
@@ -384,6 +369,20 @@ func (a *Agent) toolDefinitions() []ToolDefinition {
 		defs[i] = tool.Definition
 	}
 	return defs
+}
+
+// getOrAssignID returns the history ID for the given content block index.
+// If no ID has been assigned yet and IDGen is available, it generates one.
+func getOrAssignID(callbacks StreamCallbacks, idByIndex map[int]uint64, index int) uint64 {
+	if id, ok := idByIndex[index]; ok && id != 0 {
+		return id
+	}
+	if callbacks.IDGen != nil {
+		id := callbacks.IDGen()
+		idByIndex[index] = id
+		return id
+	}
+	return 0
 }
 
 // fireOnReasoningDelta invokes the OnReasoningDelta callback if set.
