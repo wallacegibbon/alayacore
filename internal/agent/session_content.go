@@ -9,14 +9,16 @@ import (
 	"github.com/alayacore/alayacore/internal/llm"
 )
 
+// contentItem is the JSON representation of a ContentPart for TLV framing.
+type contentItem struct {
+	Type    string `json:"type"`
+	Text    string `json:"text,omitempty"`
+	DataURL string `json:"data_url,omitempty"`
+}
+
 // serializeContentParts serializes []ContentPart to JSON for TLV framing.
 // Supports TextPart and ImagePart. Other types are rejected as unsupported.
 func serializeContentParts(parts []llm.ContentPart) (json.RawMessage, error) {
-	type contentItem struct {
-		Type    string `json:"type"`
-		Text    string `json:"text,omitempty"`
-		DataURL string `json:"data_url,omitempty"`
-	}
 	items := make([]contentItem, 0, len(parts))
 	for _, p := range parts {
 		switch v := p.(type) {
@@ -33,19 +35,6 @@ func serializeContentParts(parts []llm.ContentPart) (json.RawMessage, error) {
 		return nil, err
 	}
 	return data, nil
-}
-
-// FindContentByID looks up a ContentPart by its history/stream ID.
-// Searches from the end (most recent first) since adapter commands
-// typically reference the latest content.
-// Returns nil if not found.
-func (s *Session) FindContentByID(id uint64) *llm.ContentPart {
-	for i := len(s.Content) - 1; i >= 0; i-- {
-		if s.Content[i].GetHistoryID() == id {
-			return &s.Content[i]
-		}
-	}
-	return nil
 }
 
 // contentToMessages groups consecutive ContentParts with the same role into
@@ -71,11 +60,7 @@ func deserializeContentParts(data json.RawMessage) ([]llm.ContentPart, error) {
 	if len(data) == 0 {
 		return []llm.ContentPart{}, nil
 	}
-	var items []struct {
-		Type    string `json:"type"`
-		Text    string `json:"text,omitempty"`
-		DataURL string `json:"data_url,omitempty"`
-	}
+	var items []contentItem
 	if err := json.Unmarshal(data, &items); err != nil {
 		return nil, err
 	}

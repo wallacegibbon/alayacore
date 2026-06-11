@@ -80,9 +80,8 @@ type Session struct {
 
 	nextQueueID uint64 // goroutine-local (run() goroutine)
 
-	// history ID generator — single goroutine owns the counter.
-	histIncCh chan<- uint64
-	histGetCh chan<- chan<- uint64
+	// history ID generator — atomic counter, safe for concurrent access.
+	histCounter atomic.Uint64
 
 	// stateCh carries state mutations from the task goroutine to run().
 	stateCh chan TaskEvent
@@ -170,7 +169,6 @@ func LoadOrNewSession(cfg SessionConfig) (*Session, string, error) {
 // call Start() to begin processing input.
 func NewSession(cfg SessionConfig) *Session {
 	sessionCtx, sessionCancel := context.WithCancel(context.Background())
-	incCh, getCh := newHistoryIDGenerator()
 	s := &Session{
 		Content:        make([]llm.ContentPart, 0),
 		Messages:       make([]llm.Message, 0),
@@ -183,8 +181,6 @@ func NewSession(cfg SessionConfig) *Session {
 		stateCh:        make(chan TaskEvent, 64),
 		taskResult:     make(chan TaskResult, 1),
 		infoUpdateCh:   make(chan string, 1),
-		histIncCh:      incCh,
-		histGetCh:      getCh,
 		sessionCtx:     sessionCtx,
 		sessionCancel:  sessionCancel,
 		runDone:        make(chan struct{}),
@@ -204,7 +200,6 @@ func NewSession(cfg SessionConfig) *Session {
 // Does NOT start goroutines — call Start() to begin processing input.
 func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 	sessionCtx, sessionCancel := context.WithCancel(context.Background())
-	incCh, getCh := newHistoryIDGenerator()
 	s := &Session{
 		Content:        data.Content,
 		Messages:       contentToMessages(data.Content),
@@ -217,8 +212,6 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 		stateCh:        make(chan TaskEvent, 64),
 		taskResult:     make(chan TaskResult, 1),
 		infoUpdateCh:   make(chan string, 1),
-		histIncCh:      incCh,
-		histGetCh:      getCh,
 		sessionCtx:     sessionCtx,
 		sessionCancel:  sessionCancel,
 		runDone:        make(chan struct{}),
@@ -247,14 +240,30 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 	// Send session content to adapter with IDs so the adapter can reference
 	// content by ID even after session reload.
 	for _, part := range s.Content {
-		role := part.GetRole()
-		tag, content, err := contentPartToTLV(role, part)
+		tag, content, err := contentPartToTLV(part)
 		if err != nil {
 			continue
 		}
 		_ = stream.WriteTLV(s.Output, tag, stream.WrapDelta(strconv.FormatUint(part.GetHistoryID(), 10), content)) //nolint:errcheck
 	}
 	return s
+}
+
+// histIncAndGet increments the history counter by 1 and returns the new value.
+func (s *Session) histIncAndGet() uint64 {
+	return s.histCounter.Add(1)
+}
+
+// histSyncAfterLoad advances the history counter past the highest Content ID
+// so that new streaming IDs don't collide with IDs from the loaded session.
+func (s *Session) histSyncAfterLoad() {
+	var maxID uint64
+	for _, item := range s.Content {
+		if item.GetHistoryID() > maxID {
+			maxID = item.GetHistoryID()
+		}
+	}
+	s.histCounter.Store(maxID)
 }
 
 // Start begins processing input in a single goroutine.

@@ -49,8 +49,7 @@ func TestSessionSavePreservesTextWithToolCalls(t *testing.T) {
 		SessionMeta: SessionMeta{
 			MessageVersion: MessageVersion,
 		},
-		Messages: msgs,
-		Content:  contentFromMessagesForTest(msgs),
+		Content: contentFromMessagesForTest(msgs),
 	}
 
 	// Format to markdown (TLV format)
@@ -66,15 +65,16 @@ func TestSessionSavePreservesTextWithToolCalls(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to parse session: %v", err)
 	}
-	loaded.Messages = contentToMessages(loaded.Content)
+
+	loadedMsgs := contentToMessages(loaded.Content)
 
 	// Verify all messages are preserved
-	if len(loaded.Messages) != len(data.Messages) {
-		t.Fatalf("Message count mismatch: got %d, want %d", len(loaded.Messages), len(data.Messages))
+	if len(loadedMsgs) != len(msgs) {
+		t.Fatalf("Message count mismatch: got %d, want %d", len(loadedMsgs), len(msgs))
 	}
 
 	// Check first assistant message (index 1) - should have BOTH text and tool call
-	assistantMsg := loaded.Messages[1]
+	assistantMsg := loadedMsgs[1]
 	if assistantMsg.Role != llm.RoleAssistant {
 		t.Fatalf("Expected assistant message at index 1, got %s", assistantMsg.Role)
 	}
@@ -105,7 +105,7 @@ func TestSessionSavePreservesTextWithToolCalls(t *testing.T) {
 	}
 
 	// Check second assistant message (index 3) - should have only text
-	finalAssistantMsg := loaded.Messages[3]
+	finalAssistantMsg := loadedMsgs[3]
 	if finalAssistantMsg.Role != llm.RoleAssistant {
 		t.Fatalf("Expected assistant message at index 3, got %s", finalAssistantMsg.Role)
 	}

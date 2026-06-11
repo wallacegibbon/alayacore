@@ -42,15 +42,10 @@ func LoadSession(path string) (*SessionData, error) {
 	if err != nil {
 		return nil, err
 	}
-	sd.Messages = contentToMessages(sd.Content)
 	return sd, nil
 }
 
 func (s *Session) saveSessionToFile(path string) error {
-	return s.saveSessionToFileWith(s.Messages, path)
-}
-
-func (s *Session) saveSessionToFileWith(messages []llm.Message, path string) error {
 	data := SessionData{
 		SessionMeta: SessionMeta{
 			MessageVersion: MessageVersion,
@@ -60,8 +55,7 @@ func (s *Session) saveSessionToFileWith(messages []llm.Message, path string) err
 			ActiveModel:    s.activeModelName(),
 			ContextTokens:  s.ContextTokens.Load(),
 		},
-		Content:  s.Content,
-		Messages: messages,
+		Content: s.Content,
 	}
 
 	raw, err := formatSessionMarkdown(&data)
@@ -84,21 +78,19 @@ func formatFrontmatter(meta *SessionMeta) string {
 	return "---\n" + config.FormatKeyValue(meta) + "---\n"
 }
 
-// formatSessionMarkdown serializes Messages to TLV (without history IDs). Content
-// is not serialized — IDs are ephemeral and rebuilt on load.
+// formatSessionMarkdown serializes Content to TLV (without history IDs).
+// History IDs are ephemeral and rebuilt on load.
 func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 	var buf, tlvBuf strings.Builder
 	buf.WriteString(formatFrontmatter(&data.SessionMeta))
 
-	for _, msg := range data.Messages {
-		for _, part := range msg.Content {
-			tag, content, err := contentPartToTLV(msg.Role, part)
-			if err != nil {
-				return nil, domainerrors.Wrap(CommandNameSave, err)
-			}
-			tlvBuf.WriteString("\n\n")
-			tlvBuf.Write(stream.EncodeTLV(tag, content))
+	for _, part := range data.Content {
+		tag, content, err := contentPartToTLV(part)
+		if err != nil {
+			return nil, domainerrors.Wrap(CommandNameSave, err)
 		}
+		tlvBuf.WriteString("\n\n")
+		tlvBuf.Write(stream.EncodeTLV(tag, content))
 	}
 
 	buf.WriteString(tlvBuf.String())
@@ -168,24 +160,22 @@ func parseSessionData(data []byte) (*SessionData, error) {
 	}
 
 	if len(body) > 0 {
-		content, chunks, err := parseMessagesTLV(body)
+		content, err := parseMessagesTLV(body)
 		if err != nil {
 			return nil, err
 		}
 		sd.Content = content
-		sd.TLVChunks = chunks
 	}
 
 	return sd, nil
 }
 
-func parseMessagesTLV(body string) ([]llm.ContentPart, []TLVChunk, error) {
+func parseMessagesTLV(body string) ([]llm.ContentPart, error) {
 	est := len(body) / 64
 	if est < 8 {
 		est = 8
 	}
 	content := make([]llm.ContentPart, 0, est)
-	chunks := make([]TLVChunk, 0, est)
 
 	reader := newTLVReader(body)
 	var seqID uint64
@@ -193,17 +183,15 @@ func parseMessagesTLV(body string) ([]llm.ContentPart, []TLVChunk, error) {
 	for {
 		tag, raw, err := reader.read()
 		if err == io.EOF {
-			return content, chunks, nil
+			return content, nil
 		}
 		if err != nil {
-			return content, chunks, fmt.Errorf("read error at chunk %d: %w", len(chunks), err)
+			return content, fmt.Errorf("read error at chunk %d: %w", len(content), err)
 		}
-
-		chunks = append(chunks, TLVChunk{Tag: tag, Value: string(raw)})
 
 		msgPart, err := contentPartFromTLV(tag, raw)
 		if err != nil {
-			return content, chunks, fmt.Errorf("parse error at chunk %d (tag %q): %w", len(chunks)-1, tag, err)
+			return content, fmt.Errorf("parse error at chunk %d (tag %q): %w", len(content), tag, err)
 		}
 		if msgPart == nil {
 			continue
@@ -216,10 +204,10 @@ func parseMessagesTLV(body string) ([]llm.ContentPart, []TLVChunk, error) {
 }
 
 // contentPartToTLV serializes a ContentPart as a TLV tag and value string (without history ID).
-func contentPartToTLV(msgRole llm.MessageRole, part llm.ContentPart) (tag string, content string, err error) {
+func contentPartToTLV(part llm.ContentPart) (tag string, content string, err error) {
 	switch p := part.(type) {
 	case *llm.TextPart:
-		if msgRole == llm.RoleAssistant {
+		if part.GetRole() == llm.RoleAssistant {
 			return stream.TagAssistantT, p.Text, nil
 		}
 		return stream.TagUserT, p.Text, nil

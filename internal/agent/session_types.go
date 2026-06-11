@@ -128,15 +128,7 @@ type TaskResult struct {
 // SessionData is the persisted form of a Session.
 type SessionData struct {
 	SessionMeta
-	Content   []llm.ContentPart // source of truth on reload
-	Messages  []llm.Message     // derived from Content for API use
-	TLVChunks []TLVChunk        // Parsed TLV for direct display (avoids reconstruction)
-}
-
-// TLVChunk represents a single TLV message for display.
-type TLVChunk struct {
-	Tag   string
-	Value string
+	Content []llm.ContentPart // source of truth on reload
 }
 
 // SessionConfig bundles all configuration for creating or restoring a session.

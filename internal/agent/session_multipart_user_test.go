@@ -47,28 +47,30 @@ func TestMultiPartUserMessageRoundtrip(t *testing.T) {
 		t.Fatalf("LoadSession failed: %v", err)
 	}
 
+	loadedMsgs := contentToMessages(loaded.Content)
+
 	// Should be 2 messages: user (with 2 parts), assistant
-	if len(loaded.Messages) != 2 {
-		t.Fatalf("Expected 2 messages, got %d", len(loaded.Messages))
+	if len(loadedMsgs) != 2 {
+		t.Fatalf("Expected 2 messages, got %d", len(loadedMsgs))
 	}
 
 	// User message should have both text parts in one message
-	if loaded.Messages[0].Role != llm.RoleUser {
-		t.Errorf("First message should be user, got %s", loaded.Messages[0].Role)
+	if loadedMsgs[0].Role != llm.RoleUser {
+		t.Errorf("First message should be user, got %s", loadedMsgs[0].Role)
 	}
-	if len(loaded.Messages[0].Content) != 2 {
-		t.Fatalf("User message should have 2 content parts, got %d", len(loaded.Messages[0].Content))
+	if len(loadedMsgs[0].Content) != 2 {
+		t.Fatalf("User message should have 2 content parts, got %d", len(loadedMsgs[0].Content))
 	}
-	if tp, ok := loaded.Messages[0].Content[0].(*llm.TextPart); !ok || tp.Text != "First part" {
-		t.Errorf("First part mismatch: %v", loaded.Messages[0].Content[0])
+	if tp, ok := loadedMsgs[0].Content[0].(*llm.TextPart); !ok || tp.Text != "First part" {
+		t.Errorf("First part mismatch: %v", loadedMsgs[0].Content[0])
 	}
-	if tp, ok := loaded.Messages[0].Content[1].(*llm.TextPart); !ok || tp.Text != "Second part" {
-		t.Errorf("Second part mismatch: %v", loaded.Messages[0].Content[1])
+	if tp, ok := loadedMsgs[0].Content[1].(*llm.TextPart); !ok || tp.Text != "Second part" {
+		t.Errorf("Second part mismatch: %v", loadedMsgs[0].Content[1])
 	}
 
 	// Assistant message should be intact
-	if loaded.Messages[1].Role != llm.RoleAssistant {
-		t.Errorf("Second message should be assistant, got %s", loaded.Messages[1].Role)
+	if loadedMsgs[1].Role != llm.RoleAssistant {
+		t.Errorf("Second message should be assistant, got %s", loadedMsgs[1].Role)
 	}
 }
 
@@ -90,32 +92,33 @@ func TestConsecutiveUserChunksGrouped(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseSessionData failed: %v", err)
 	}
-	loaded.Messages = contentToMessages(loaded.Content)
+
+	msgs := contentToMessages(loaded.Content)
 
 	// Should be 2 messages: user (with 2 parts), assistant
-	if len(loaded.Messages) != 2 {
-		t.Fatalf("Expected 2 messages, got %d", len(loaded.Messages))
+	if len(msgs) != 2 {
+		t.Fatalf("Expected 2 messages, got %d", len(msgs))
 	}
 
 	// User message should have both text parts
-	if loaded.Messages[0].Role != llm.RoleUser {
-		t.Errorf("First message should be user, got %s", loaded.Messages[0].Role)
+	if msgs[0].Role != llm.RoleUser {
+		t.Errorf("First message should be user, got %s", msgs[0].Role)
 	}
-	if len(loaded.Messages[0].Content) != 2 {
-		t.Fatalf("User message should have 2 content parts, got %d", len(loaded.Messages[0].Content))
+	if len(msgs[0].Content) != 2 {
+		t.Fatalf("User message should have 2 content parts, got %d", len(msgs[0].Content))
 	}
-	tp0, ok := loaded.Messages[0].Content[0].(*llm.TextPart)
+	tp0, ok := msgs[0].Content[0].(*llm.TextPart)
 	if !ok || tp0.Text != "Hello" {
-		t.Errorf("First part mismatch: %v", loaded.Messages[0].Content[0])
+		t.Errorf("First part mismatch: %v", msgs[0].Content[0])
 	}
-	tp1, ok := loaded.Messages[0].Content[1].(*llm.TextPart)
+	tp1, ok := msgs[0].Content[1].(*llm.TextPart)
 	if !ok || tp1.Text != " world" {
-		t.Errorf("Second part mismatch: %v", loaded.Messages[0].Content[1])
+		t.Errorf("Second part mismatch: %v", msgs[0].Content[1])
 	}
 
 	// Assistant message
-	if loaded.Messages[1].Role != llm.RoleAssistant {
-		t.Errorf("Second message should be assistant, got %s", loaded.Messages[1].Role)
+	if msgs[1].Role != llm.RoleAssistant {
+		t.Errorf("Second message should be assistant, got %s", msgs[1].Role)
 	}
 }
 
