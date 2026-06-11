@@ -38,8 +38,8 @@ func TestSaveAndLoadSession(t *testing.T) {
 	}
 
 	// Save session
-	if err := session.saveSessionToFile(sessionPath); err != nil {
-		t.Fatalf("saveSessionToFile failed: %v", err)
+	if err := session.saveContentToFile(sessionPath, session.Content); err != nil {
+		t.Fatalf("saveContentToFile failed: %v", err)
 	}
 
 	// Verify file exists
@@ -90,7 +90,7 @@ func TestLoadOrNewSession(t *testing.T) {
 
 	// Test manual save to a specific file
 	testFile := "/tmp/test-session.md"
-	if err := session.saveSessionToFile(testFile); err != nil {
+	if err := session.saveContentToFile(testFile, session.Content); err != nil {
 		t.Errorf("Failed to save session: %v", err)
 	}
 	defer os.Remove(testFile) // Clean up test file
@@ -163,8 +163,8 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 	}
 
 	// Save
-	if err := session.saveSessionToFile(sessionPath); err != nil {
-		t.Fatalf("saveSessionToFile failed: %v", err)
+	if err := session.saveContentToFile(sessionPath, session.Content); err != nil {
+		t.Fatalf("saveContentToFile failed: %v", err)
 	}
 
 	// Load
@@ -250,8 +250,8 @@ func TestMarkdownFormat_HumanReadable(t *testing.T) {
 		taskQueue: make([]QueueItem, 0),
 	}
 
-	if err := session.saveSessionToFile(sessionPath); err != nil {
-		t.Fatalf("saveSessionToFile failed: %v", err)
+	if err := session.saveContentToFile(sessionPath, session.Content); err != nil {
+		t.Fatalf("saveContentToFile failed: %v", err)
 	}
 
 	// Read raw file content
@@ -299,8 +299,8 @@ func TestReasoningOnlyMessage(t *testing.T) {
 		taskQueue: make([]QueueItem, 0),
 	}
 
-	if err := session.saveSessionToFile(sessionPath); err != nil {
-		t.Fatalf("saveSessionToFile failed: %v", err)
+	if err := session.saveContentToFile(sessionPath, session.Content); err != nil {
+		t.Fatalf("saveContentToFile failed: %v", err)
 	}
 
 	// Load and verify
@@ -361,8 +361,8 @@ func TestTextAndReasoningInSameMessage(t *testing.T) {
 		taskQueue: make([]QueueItem, 0),
 	}
 
-	if err := session.saveSessionToFile(sessionPath); err != nil {
-		t.Fatalf("saveSessionToFile failed: %v", err)
+	if err := session.saveContentToFile(sessionPath, session.Content); err != nil {
+		t.Fatalf("saveContentToFile failed: %v", err)
 	}
 
 	// Load and verify
@@ -725,8 +725,8 @@ func TestTLVFormatRecursionProtection(t *testing.T) {
 	}
 
 	// Save
-	if err := session.saveSessionToFile(sessionPath); err != nil {
-		t.Fatalf("saveSessionToFile failed: %v", err)
+	if err := session.saveContentToFile(sessionPath, session.Content); err != nil {
+		t.Fatalf("saveContentToFile failed: %v", err)
 	}
 
 	// Load

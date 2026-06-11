@@ -14,7 +14,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/alayacore/alayacore/internal/config"
 	domainerrors "github.com/alayacore/alayacore/internal/errors"
@@ -201,7 +200,7 @@ func (s *Session) saveSession(args []string) {
 		return
 	}
 
-	if err := s.saveSessionToFile(path); err != nil {
+	if err := s.saveContentToFile(path, s.Content); err != nil {
 		s.writeError(domainerrors.Wrap(CommandNameSave, fmt.Errorf("%w: %v", domainerrors.ErrFailedToSaveSession, err)).Error())
 	} else {
 		s.writeNotifyf("Session saved to %s", path)
@@ -533,25 +532,9 @@ func (s *Session) handleFork(args []string) {
 		return
 	}
 
-	format := &SessionData{
-		SessionMeta: SessionMeta{
-			MessageVersion: MessageVersion,
-			CreatedAt:      s.CreatedAt,
-			UpdatedAt:      time.Now(),
-			ActiveModel:    s.activeModelName(),
-		},
-		Content: s.Content[:endIdx+1],
-	}
-
-	raw, err := formatSessionMarkdown(format)
-	if err != nil {
-		s.writeError(fmt.Sprintf("failed to format session: %v", err))
-		return
-	}
-
 	path := config.ExpandPath(args[1])
-	if err := os.WriteFile(path, raw, 0600); err != nil {
-		s.writeError(fmt.Sprintf("failed to write file: %v", err))
+	if err := s.saveContentToFile(path, s.Content[:endIdx+1]); err != nil {
+		s.writeError(fmt.Sprintf("failed to fork: %v", err))
 		return
 	}
 	s.writeNotifyf("Session forked to %s (up to content ID %d)", path, id)

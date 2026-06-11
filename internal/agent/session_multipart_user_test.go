@@ -38,8 +38,8 @@ func TestMultiPartUserMessageRoundtrip(t *testing.T) {
 		taskQueue: make([]QueueItem, 0),
 	}
 
-	if err := session.saveSessionToFile(sessionPath); err != nil {
-		t.Fatalf("saveSessionToFile failed: %v", err)
+	if err := session.saveContentToFile(sessionPath, session.Content); err != nil {
+		t.Fatalf("saveContentToFile failed: %v", err)
 	}
 
 	loaded, err := LoadSession(sessionPath)

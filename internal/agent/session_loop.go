@@ -153,7 +153,7 @@ func (s *Session) handleTaskDone(result TaskResult) {
 
 	// Auto-save if configured
 	if s.SessionFile != "" {
-		if err := s.saveSessionToFile(s.SessionFile); err != nil {
+		if err := s.saveContentToFile(s.SessionFile, s.Content); err != nil {
 			s.writeNotifyf("Auto-save failed: %v", err)
 		}
 	}

@@ -45,7 +45,7 @@ func LoadSession(path string) (*SessionData, error) {
 	return sd, nil
 }
 
-func (s *Session) saveSessionToFile(path string) error {
+func (s *Session) saveContentToFile(path string, content []llm.ContentPart) error {
 	data := SessionData{
 		SessionMeta: SessionMeta{
 			MessageVersion: MessageVersion,
@@ -55,7 +55,7 @@ func (s *Session) saveSessionToFile(path string) error {
 			ActiveModel:    s.activeModelName(),
 			ContextTokens:  s.ContextTokens.Load(),
 		},
-		Content: s.Content,
+		Content: content,
 	}
 
 	raw, err := formatSessionMarkdown(&data)
