@@ -7,7 +7,7 @@ package agent
 // the run() goroutine — no mutex needed.
 //
 // The task goroutine communicates state changes (step progress, new
-// ContentItems, token counts) back to run() via stateCh.
+// ContentParts, token counts) back to run() via stateCh.
 
 import (
 	"context"
@@ -79,7 +79,7 @@ func (s *Session) enqueueTask(item QueueItem, front bool) {
 // counts) are sent to run() via stateCh. The task goroutine never writes
 // to s.Content or s.Messages directly.
 func (s *Session) runTask(ctx context.Context, item QueueItem, taskMessages []llm.Message) {
-	var entries []ContentItem // accumulated ContentItems for this task
+	var entries []llm.ContentPart // accumulated ContentParts for this task
 
 	defer func() {
 		// Return the final state to run() so it can update
@@ -95,18 +95,18 @@ func (s *Session) runTask(ctx context.Context, item QueueItem, taskMessages []ll
 	if item.Type == TaskTypePrompt {
 		for _, img := range item.Images {
 			id := s.histIncAndGet()
-			entries = append(entries, ContentItem{
-				ID:   id,
-				Tag:  stream.TagUserI,
-				Part: llm.ImagePart{DataURL: img},
+			entries = append(entries, &llm.ImagePart{
+				DataURL:   img,
+				HistoryID: id,
+				Role:      llm.RoleUser,
 			})
 			s.writeTLVStr(stream.TagUserI, stream.WrapDelta(strconv.FormatUint(id, 10), img))
 		}
 		id := s.histIncAndGet()
-		entries = append(entries, ContentItem{
-			ID:   id,
-			Tag:  stream.TagUserT,
-			Part: llm.TextPart{Text: item.Content},
+		entries = append(entries, &llm.TextPart{
+			Text:      item.Content,
+			HistoryID: id,
+			Role:      llm.RoleUser,
 		})
 		s.writeTLVStr(stream.TagUserT, stream.WrapDelta(strconv.FormatUint(id, 10), item.Content))
 	}
@@ -130,7 +130,7 @@ func (s *Session) runTask(ctx context.Context, item QueueItem, taskMessages []ll
 // runTaskCommand handles a deferred command in the task goroutine.
 // Unlike immediate commands (handled by handleCommand in run()'s goroutine),
 // deferred commands operate on the task's local message copy and return it.
-func (s *Session) runTaskCommand(ctx context.Context, messages []llm.Message, entries []ContentItem, cmd string) ([]llm.Message, []ContentItem) {
+func (s *Session) runTaskCommand(ctx context.Context, messages []llm.Message, entries []llm.ContentPart, cmd string) ([]llm.Message, []llm.ContentPart) {
 	parts := strings.Fields(cmd)
 	if len(parts) == 0 {
 		return messages, entries
@@ -150,16 +150,16 @@ func (s *Session) runTaskCommand(ctx context.Context, messages []llm.Message, en
 // message window when a task is canceled by the user.
 const cancelMessage = "Canceled"
 
-func (s *Session) appendCancelMessage(messages []llm.Message, entries []ContentItem) ([]llm.Message, []ContentItem) {
+func (s *Session) appendCancelMessage(messages []llm.Message, entries []llm.ContentPart) ([]llm.Message, []llm.ContentPart) {
 	messages = append(messages, llm.Message{
 		Role:    llm.RoleAssistant,
-		Content: []llm.ContentPart{llm.TextPart{Text: cancelMessage}},
+		Content: []llm.ContentPart{&llm.TextPart{Text: cancelMessage}},
 	})
 	id := s.histIncAndGet()
-	entries = append(entries, ContentItem{
-		ID:   id,
-		Tag:  stream.TagAssistantT,
-		Part: llm.TextPart{Text: cancelMessage},
+	entries = append(entries, &llm.TextPart{
+		Text:      cancelMessage,
+		HistoryID: id,
+		Role:      llm.RoleAssistant,
 	})
 	s.writeTLVStr(stream.TagAssistantT, stream.WrapDelta(strconv.FormatUint(id, 10), cancelMessage))
 	return messages, entries

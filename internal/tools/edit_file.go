@@ -230,5 +230,5 @@ func replaceFile(tempPath string, path string, fileInfo os.FileInfo) ([]llm.Cont
 		return nil, fmt.Errorf("failed to restore file permissions: %v", err)
 	}
 
-	return []llm.ContentPart{llm.TextPart{Text: "File edited successfully"}}, nil
+	return []llm.ContentPart{&llm.TextPart{Text: "File edited successfully"}}, nil
 }

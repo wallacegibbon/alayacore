@@ -1,17 +1,12 @@
 package agent
 
-// Content part serialization, tag mapping, and ContentItem helpers.
-//
-// serializeContentParts and deserializeContentParts convert between
-// domain ContentPart slices (TextPart, ImagePart) and the JSON array
-// format used in UF (tool result) TLV frames and session file storage.
+// Content part serialization, tag mapping, and ContentPart helpers.
 
 import (
 	"encoding/json"
 	"fmt"
 
 	"github.com/alayacore/alayacore/internal/llm"
-	"github.com/alayacore/alayacore/internal/stream"
 )
 
 // serializeContentParts serializes []ContentPart to JSON for TLV framing.
@@ -25,9 +20,9 @@ func serializeContentParts(parts []llm.ContentPart) (json.RawMessage, error) {
 	items := make([]contentItem, 0, len(parts))
 	for _, p := range parts {
 		switch v := p.(type) {
-		case llm.TextPart:
+		case *llm.TextPart:
 			items = append(items, contentItem{Type: "text", Text: v.Text})
-		case llm.ImagePart:
+		case *llm.ImagePart:
 			items = append(items, contentItem{Type: "image", DataURL: v.DataURL})
 		default:
 			return nil, fmt.Errorf("unsupported content part type in tool result: %T", p)
@@ -40,69 +35,33 @@ func serializeContentParts(parts []llm.ContentPart) (json.RawMessage, error) {
 	return data, nil
 }
 
-// tagForPart returns the TLV tag for a content part given its message role.
-// This is the inverse of contentPartFromTLV's tag→role mapping.
-func tagForPart(role llm.MessageRole, part llm.ContentPart) string {
-	switch part.(type) {
-	case llm.TextPart:
-		if role == llm.RoleAssistant {
-			return stream.TagAssistantT
-		}
-		return stream.TagUserT
-	case llm.ImagePart:
-		return stream.TagUserI
-	case llm.ReasoningPart:
-		return stream.TagAssistantR
-	case llm.ToolUsePart:
-		return stream.TagAssistantF
-	case llm.ToolResultPart:
-		return stream.TagUserF
-	default:
-		return stream.TagAssistantT
-	}
-}
-
-// FindContentByID looks up a ContentItem by its history/stream ID.
+// FindContentByID looks up a ContentPart by its history/stream ID.
 // Searches from the end (most recent first) since adapter commands
 // typically reference the latest content.
 // Returns nil if not found.
-func (s *Session) FindContentByID(id uint64) *ContentItem {
+func (s *Session) FindContentByID(id uint64) *llm.ContentPart {
 	for i := len(s.Content) - 1; i >= 0; i-- {
-		if s.Content[i].ID == id {
+		if s.Content[i].GetHistoryID() == id {
 			return &s.Content[i]
 		}
 	}
 	return nil
 }
 
-// roleFromTag returns the llm.MessageRole corresponding to a TLV tag.
-func roleFromTag(tag string) llm.MessageRole {
-	switch tag {
-	case stream.TagUserT, stream.TagUserI:
-		return llm.RoleUser
-	case stream.TagAssistantT, stream.TagAssistantR, stream.TagAssistantF:
-		return llm.RoleAssistant
-	case stream.TagUserF:
-		return llm.RoleTool
-	default:
-		return llm.RoleAssistant
-	}
-}
-
-// contentToMessages groups consecutive ContentItems with the same role into
+// contentToMessages groups consecutive ContentParts with the same role into
 // []llm.Message for API calls. Content is the source of truth — Messages is
 // always derived from it.
-func contentToMessages(content []ContentItem) []llm.Message {
+func contentToMessages(content []llm.ContentPart) []llm.Message {
 	if len(content) == 0 {
 		return nil
 	}
 	msgs := make([]llm.Message, 0)
-	for _, item := range content {
-		role := roleFromTag(item.Tag)
+	for _, part := range content {
+		role := part.GetRole()
 		if len(msgs) == 0 || msgs[len(msgs)-1].Role != role {
 			msgs = append(msgs, llm.Message{Role: role})
 		}
-		msgs[len(msgs)-1].Content = append(msgs[len(msgs)-1].Content, item.Part)
+		msgs[len(msgs)-1].Content = append(msgs[len(msgs)-1].Content, part)
 	}
 	return msgs
 }
@@ -124,9 +83,9 @@ func deserializeContentParts(data json.RawMessage) ([]llm.ContentPart, error) {
 	for _, item := range items {
 		switch item.Type {
 		case "text":
-			parts = append(parts, llm.TextPart{Text: item.Text})
+			parts = append(parts, &llm.TextPart{Text: item.Text})
 		case "image":
-			parts = append(parts, llm.ImagePart{DataURL: item.DataURL})
+			parts = append(parts, &llm.ImagePart{DataURL: item.DataURL})
 		default:
 			return nil, fmt.Errorf("unknown content part type in tool result: %s", item.Type)
 		}

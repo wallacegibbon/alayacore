@@ -389,15 +389,15 @@ func (s *anthropicStreamState) finishBlock(index int) {
 	}
 	switch block.blockType {
 	case anthropicBlockTypeText:
-		s.contentParts[index] = llm.TextPart{
+		s.contentParts[index] = &llm.TextPart{
 			Text: block.buffer.String(),
 		}
 	case anthropicBlockTypeThinking:
-		s.contentParts[index] = llm.ReasoningPart{
+		s.contentParts[index] = &llm.ReasoningPart{
 			Text: block.buffer.String(),
 		}
 	case anthropicBlockTypeToolUse:
-		s.contentParts[index] = llm.ToolUsePart{
+		s.contentParts[index] = &llm.ToolUsePart{
 			ID:       block.id,
 			ToolName: block.name,
 			Input:    json.RawMessage(block.buffer.String()),
@@ -711,12 +711,12 @@ func anthropicConvertMessages(messages []llm.Message, reasoningLevel int) []anth
 // tool_result.content is an array of content blocks (text, image, etc.).
 func anthropicPartToBlock(part llm.ContentPart) *anthropicContentBlock {
 	switch v := part.(type) {
-	case llm.TextPart:
+	case *llm.TextPart:
 		return &anthropicContentBlock{
 			Type: anthropicBlockTypeText,
 			Text: v.Text,
 		}
-	case llm.ImagePart:
+	case *llm.ImagePart:
 		mediaType, b64, ok := parseDataURI(v.DataURL)
 		if !ok {
 			return nil
@@ -729,20 +729,20 @@ func anthropicPartToBlock(part llm.ContentPart) *anthropicContentBlock {
 				Data:      b64,
 			},
 		}
-	case llm.ReasoningPart:
+	case *llm.ReasoningPart:
 		text := v.Text
 		return &anthropicContentBlock{
 			Type:     anthropicBlockTypeThinking,
 			Thinking: &text,
 		}
-	case llm.ToolUsePart:
+	case *llm.ToolUsePart:
 		return &anthropicContentBlock{
 			Type:  anthropicBlockTypeToolUse,
 			ID:    v.ID,
 			Name:  v.ToolName,
 			Input: v.Input,
 		}
-	case llm.ToolResultPart:
+	case *llm.ToolResultPart:
 		block := &anthropicContentBlock{
 			Type:      anthropicBlockTypeToolResult,
 			ToolUseID: v.ID,

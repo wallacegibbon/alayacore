@@ -29,13 +29,6 @@ func (s *Session) histInc(n uint64) {
 	s.histIncCh <- n
 }
 
-// histGet returns the current value of the history counter.
-func (s *Session) histGet() uint64 {
-	reply := make(chan uint64, 1)
-	s.histGetCh <- reply
-	return <-reply
-}
-
 // histIncAndGet increments the counter by 1 and returns the new value.
 func (s *Session) histIncAndGet() uint64 {
 	reply := make(chan uint64, 1)
@@ -49,8 +42,8 @@ func (s *Session) histIncAndGet() uint64 {
 func (s *Session) histSyncAfterLoad() {
 	var maxID uint64
 	for _, item := range s.Content {
-		if item.ID > maxID {
-			maxID = item.ID
+		if item.GetHistoryID() > maxID {
+			maxID = item.GetHistoryID()
 		}
 	}
 	if maxID > 0 {

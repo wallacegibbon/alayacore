@@ -104,15 +104,15 @@ func handleCommandOutput(stdout, stderr *bytes.Buffer, exitCode int, execErr err
 
 	if execErr != nil {
 		if output != "" {
-			return []llm.ContentPart{llm.TextPart{Text: output}}, execErr
+			return []llm.ContentPart{&llm.TextPart{Text: output}}, execErr
 		}
 		return nil, execErr
 	}
 
 	if output == "" {
-		return []llm.ContentPart{llm.TextPart{Text: "Command completed successfully (no output)"}}, nil
+		return []llm.ContentPart{&llm.TextPart{Text: "Command completed successfully (no output)"}}, nil
 	}
-	return []llm.ContentPart{llm.TextPart{Text: output}}, nil
+	return []llm.ContentPart{&llm.TextPart{Text: output}}, nil
 }
 
 func handleLargeCommandOutput(output string, exitCode int, execErr error) ([]llm.ContentPart, error) {
@@ -134,9 +134,9 @@ func handleLargeCommandOutput(output string, exitCode int, execErr error) ([]llm
 	)
 
 	if execErr != nil {
-		return []llm.ContentPart{llm.TextPart{Text: msg}}, execErr
+		return []llm.ContentPart{&llm.TextPart{Text: msg}}, execErr
 	}
-	return []llm.ContentPart{llm.TextPart{Text: msg}}, nil
+	return []llm.ContentPart{&llm.TextPart{Text: msg}}, nil
 }
 
 func countLines(s string) int {

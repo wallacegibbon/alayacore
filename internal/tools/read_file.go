@@ -103,7 +103,7 @@ func executeReadFile(ctx context.Context, args ReadFileInput) ([]llm.ContentPart
 		if err != nil {
 			return nil, err
 		}
-		return []llm.ContentPart{llm.TextPart{Text: string(content)}}, nil
+		return []llm.ContentPart{&llm.TextPart{Text: string(content)}}, nil
 	}
 
 	// Line range case: stream from file to avoid loading entire file into memory
@@ -118,7 +118,7 @@ func executeReadFile(ctx context.Context, args ReadFileInput) ([]llm.ContentPart
 		return nil, err
 	}
 
-	return []llm.ContentPart{llm.TextPart{Text: strings.Join(lines, "\n")}}, nil
+	return []llm.ContentPart{&llm.TextPart{Text: strings.Join(lines, "\n")}}, nil
 }
 
 // readImageFile reads an image file and returns an ImagePart with base64-encoded data.
@@ -133,8 +133,8 @@ func readImageFile(path, mimeType string) ([]llm.ContentPart, error) {
 	sizeKB := float64(len(data)) / 1024
 
 	return []llm.ContentPart{
-		llm.TextPart{Text: fmt.Sprintf("Read %s (%.1fKB)", filepath.Base(path), sizeKB)},
-		llm.ImagePart{DataURL: dataURL},
+		&llm.TextPart{Text: fmt.Sprintf("Read %s (%.1fKB)", filepath.Base(path), sizeKB)},
+		&llm.ImagePart{DataURL: dataURL},
 	}, nil
 }
 
@@ -193,7 +193,7 @@ func readLargeFileTruncated(path string, totalSize int64) ([]llm.ContentPart, er
 		float64(bytesRead)/1024, float64(totalSize)/1024,
 	)
 
-	return []llm.ContentPart{llm.TextPart{Text: header + "\n" + content}}, nil
+	return []llm.ContentPart{&llm.TextPart{Text: header + "\n" + content}}, nil
 }
 
 func validateLineRange(startLine, endLine int) error {

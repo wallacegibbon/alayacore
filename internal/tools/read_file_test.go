@@ -307,7 +307,7 @@ func itoa(i int) string {
 
 func extractFirstText(parts []llm.ContentPart) string {
 	for _, p := range parts {
-		if tp, ok := p.(llm.TextPart); ok {
+		if tp, ok := p.(*llm.TextPart); ok {
 			return tp.Text
 		}
 	}

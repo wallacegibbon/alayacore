@@ -69,7 +69,7 @@ func handleSearchContentResult(execErr error, stdout, stderr *bytes.Buffer, maxL
 		// rg exits with code 1 when no matches found — that's not an error for us
 		if exitErr, ok := execErr.(*exec.ExitError); ok {
 			if exitErr.ExitCode() == 1 && stderr.Len() == 0 {
-				return []llm.ContentPart{llm.TextPart{Text: "No matches found"}}, nil
+				return []llm.ContentPart{&llm.TextPart{Text: "No matches found"}}, nil
 			}
 		}
 		// Real error (bad regex, permission denied, etc.)
@@ -87,7 +87,7 @@ func handleSearchContentResult(execErr error, stdout, stderr *bytes.Buffer, maxL
 
 	output := stdout.String()
 	if output == "" {
-		return []llm.ContentPart{llm.TextPart{Text: "No matches found"}}, nil
+		return []llm.ContentPart{&llm.TextPart{Text: "No matches found"}}, nil
 	}
 
 	// Count total lines in output
@@ -98,7 +98,7 @@ func handleSearchContentResult(execErr error, stdout, stderr *bytes.Buffer, maxL
 		return handleLargeSearchResult(output, totalLines)
 	}
 
-	return []llm.ContentPart{llm.TextPart{Text: output}}, nil
+	return []llm.ContentPart{&llm.TextPart{Text: output}}, nil
 }
 
 func handleLargeSearchResult(output string, totalLines int) ([]llm.ContentPart, error) {
@@ -107,7 +107,7 @@ func handleLargeSearchResult(output string, totalLines int) ([]llm.ContentPart, 
 		return nil, fmt.Errorf("failed to save large search results: %w", err)
 	}
 
-	return []llm.ContentPart{llm.TextPart{Text: fmt.Sprintf(
+	return []llm.ContentPart{&llm.TextPart{Text: fmt.Sprintf(
 		"Search found %d matching lines. Results saved to: %s\nUse read_file to access specific matches.",
 		totalLines, filePath,
 	)}}, nil

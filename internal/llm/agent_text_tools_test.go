@@ -30,7 +30,7 @@ func TestAgentPreservesTextWithToolCalls(t *testing.T) {
 			{
 				Definition: ToolDefinition{Name: "get_weather", Description: "Get weather", Schema: []byte(`{"type":"object"}`)},
 				Execute: func(_ context.Context, _ json.RawMessage) ([]ContentPart, error) {
-					return []ContentPart{TextPart{Text: "Sunny, 72F"}}, nil
+					return []ContentPart{&TextPart{Text: "Sunny, 72F"}}, nil
 				},
 			},
 		},
@@ -40,7 +40,7 @@ func TestAgentPreservesTextWithToolCalls(t *testing.T) {
 	// Track messages received via OnStepFinish callback
 	var allStepMessages [][]Message
 	_, err := agent.Stream(context.Background(), []Message{
-		{Role: RoleUser, Content: []ContentPart{TextPart{Text: "What's the weather?"}}},
+		{Role: RoleUser, Content: []ContentPart{&TextPart{Text: "What's the weather?"}}},
 	}, StreamCallbacks{
 		OnStepFinish: func(messages []Message, _ Usage) error {
 			allStepMessages = append(allStepMessages, messages)
@@ -73,12 +73,12 @@ func TestAgentPreservesTextWithToolCalls(t *testing.T) {
 	hasToolCall := false
 	for _, part := range assistantMsg.Content {
 		switch p := part.(type) {
-		case TextPart:
+		case *TextPart:
 			hasText = true
 			if p.Text != "Let me check that for you." {
 				t.Errorf("Text content mismatch: %q", p.Text)
 			}
-		case ToolUsePart:
+		case *ToolUsePart:
 			hasToolCall = true
 			if p.ToolName != "get_weather" {
 				t.Errorf("Tool name mismatch: %s", p.ToolName)
@@ -132,10 +132,10 @@ func (m *mockProviderWithTextAndTools) StreamMessages(_ context.Context, _ []Mes
 		// Send step complete with message containing BOTH text and tool calls
 		content := []ContentPart{}
 		if resp.text != "" {
-			content = append(content, TextPart{Text: resp.text})
+			content = append(content, &TextPart{Text: resp.text})
 		}
 		for _, tc := range resp.toolCalls {
-			content = append(content, ToolUsePart{
+			content = append(content, &ToolUsePart{
 				ID:       tc.ID,
 				ToolName: tc.ToolName,
 				Input:    tc.Input,

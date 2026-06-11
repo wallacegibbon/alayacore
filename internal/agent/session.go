@@ -14,7 +14,7 @@ package agent
 //        info. Processes input messages and task events.
 //     3. task goroutine — spawned by run() to execute each task. It
 //        receives a snapshot of Messages (derived from Content) at task
-//        start and sends state mutations (step progress, new ContentItems,
+//        start and sends state mutations (step progress, new ContentParts,
 //        token counts) back to run() via stateCh.
 //
 //   Cross-goroutine communication:
@@ -48,8 +48,8 @@ import (
 
 // Session manages conversation state and task execution.
 type Session struct {
-	Content        []ContentItem // source of truth — flat, ordered, 1:1 with TLV
-	Messages       []llm.Message // derived from Content for API calls (rebuilt after each task)
+	Content        []llm.ContentPart // source of truth — flat, ordered, 1:1 with TLV
+	Messages       []llm.Message     // derived from Content for API calls (rebuilt after each task)
 	CreatedAt      time.Time
 	ContextTokens  atomic.Int64 // read by both goroutines (shouldAutoSummarize, sendSystemInfo)
 	ContextLimit   int64        // immutable after construction
@@ -172,7 +172,7 @@ func NewSession(cfg SessionConfig) *Session {
 	sessionCtx, sessionCancel := context.WithCancel(context.Background())
 	incCh, getCh := newHistoryIDGenerator()
 	s := &Session{
-		Content:        make([]ContentItem, 0),
+		Content:        make([]llm.ContentPart, 0),
 		Messages:       make([]llm.Message, 0),
 		CreatedAt:      time.Now(),
 		ModelManager:   NewModelManager(cfg.ModelConfigPath),
@@ -246,12 +246,13 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 
 	// Send session content to adapter with IDs so the adapter can reference
 	// content by ID even after session reload.
-	for _, item := range s.Content {
-		tag, content, err := contentPartToTLV(roleFromTag(item.Tag), item.Part)
+	for _, part := range s.Content {
+		role := part.GetRole()
+		tag, content, err := contentPartToTLV(role, part)
 		if err != nil {
-			continue // skip malformed items
+			continue
 		}
-		_ = stream.WriteTLV(s.Output, tag, stream.WrapDelta(strconv.FormatUint(item.ID, 10), content)) //nolint:errcheck // best-effort write to adapter
+		_ = stream.WriteTLV(s.Output, tag, stream.WrapDelta(strconv.FormatUint(part.GetHistoryID(), 10), content)) //nolint:errcheck
 	}
 	return s
 }

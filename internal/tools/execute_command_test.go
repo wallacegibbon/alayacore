@@ -156,7 +156,7 @@ func TestHandleCommandCompletion(t *testing.T) {
 // extractText is a test helper to get the text from a ContentPart slice.
 func extractText(content []llm.ContentPart) string {
 	for _, p := range content {
-		if tp, ok := p.(llm.TextPart); ok {
+		if tp, ok := p.(*llm.TextPart); ok {
 			return tp.Text
 		}
 	}

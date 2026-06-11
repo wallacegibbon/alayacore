@@ -16,7 +16,7 @@ func TestWriteToolOutput(t *testing.T) {
 		SessionConfig: SessionConfig{Output: output},
 	}
 
-	session.writeToolUseOutput("tool123", []llm.ContentPart{llm.TextPart{Text: "output text"}}, false)
+	session.writeToolUseOutput("tool123", []llm.ContentPart{&llm.TextPart{Text: "output text"}}, false)
 
 	tag, value := parseTLVFromBytes(output.data)
 	if tag != stream.TagUserF {
@@ -34,7 +34,7 @@ func TestWriteToolOutput(t *testing.T) {
 	checkToolResultContent(t, got.Output, "output text")
 
 	output.data = nil
-	session.writeToolUseOutput("tool456", []llm.ContentPart{llm.TextPart{Text: "error message"}}, true)
+	session.writeToolUseOutput("tool456", []llm.ContentPart{&llm.TextPart{Text: "error message"}}, true)
 
 	tag, value = parseTLVFromBytes(output.data)
 	if tag != stream.TagUserF {
@@ -61,7 +61,7 @@ func TestOnToolUseOutputCallback(t *testing.T) {
 	callback := func(id string, content []llm.ContentPart, err error) {
 		session.Messages = append(session.Messages, llm.Message{
 			Role: llm.RoleTool,
-			Content: []llm.ContentPart{llm.ToolResultPart{
+			Content: []llm.ContentPart{&llm.ToolResultPart{
 				ID:      id,
 				Content: content,
 				IsError: err != nil,
@@ -75,7 +75,7 @@ func TestOnToolUseOutputCallback(t *testing.T) {
 		}
 	}
 
-	callback("call1", []llm.ContentPart{llm.TextPart{Text: "success output"}}, nil)
+	callback("call1", []llm.ContentPart{&llm.TextPart{Text: "success output"}}, nil)
 
 	if len(session.Messages) != 1 {
 		t.Fatalf("Expected 1 message, got %d", len(session.Messages))
@@ -95,7 +95,7 @@ func TestOnToolUseOutputCallback(t *testing.T) {
 	}
 
 	output.data = nil
-	callback("call2", []llm.ContentPart{llm.TextPart{Text: "something failed"}}, errors.New("something failed"))
+	callback("call2", []llm.ContentPart{&llm.TextPart{Text: "something failed"}}, errors.New("something failed"))
 
 	tag, value = parseTLVFromBytes(output.data)
 	if tag != stream.TagUserF {

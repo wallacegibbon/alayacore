@@ -32,7 +32,7 @@ const (
 
 // handleUserPrompt processes a user prompt through the agent loop.
 // Takes the current messages and entries, returns the updated values after processing.
-func (s *Session) handleUserPrompt(ctx context.Context, messages []llm.Message, entries []ContentItem, prompt string, images []string) ([]llm.Message, []ContentItem) {
+func (s *Session) handleUserPrompt(ctx context.Context, messages []llm.Message, entries []llm.ContentPart, prompt string, images []string) ([]llm.Message, []llm.ContentPart) {
 	if s.shouldAutoSummarize() {
 		messages, entries = s.doAutoSummarize(ctx, messages, entries)
 	}
@@ -40,9 +40,9 @@ func (s *Session) handleUserPrompt(ctx context.Context, messages []llm.Message, 
 	// Build content parts: images first, then text
 	content := make([]llm.ContentPart, 0, 1+len(images))
 	for _, img := range images {
-		content = append(content, llm.ImagePart{DataURL: img})
+		content = append(content, &llm.ImagePart{DataURL: img})
 	}
-	content = append(content, llm.TextPart{Text: prompt})
+	content = append(content, &llm.TextPart{Text: prompt})
 
 	if len(messages) > 0 && messages[len(messages)-1].Role == llm.RoleUser {
 		messages[len(messages)-1].Content = append(
@@ -87,7 +87,7 @@ func (s *Session) shouldAutoSummarize() bool {
 }
 
 // doAutoSummarize logs a notification and triggers summarization.
-func (s *Session) doAutoSummarize(ctx context.Context, messages []llm.Message, entries []ContentItem) ([]llm.Message, []ContentItem) {
+func (s *Session) doAutoSummarize(ctx context.Context, messages []llm.Message, entries []llm.ContentPart) ([]llm.Message, []llm.ContentPart) {
 	usage := float64(s.ContextTokens.Load()) * AutoSummarizePctBase / float64(s.ContextLimit)
 	s.writeNotifyf("Context usage at %d/%d tokens (%.0f%%). Auto-summarizing...",
 		s.ContextTokens.Load(), s.ContextLimit, usage)
@@ -99,71 +99,47 @@ func (s *Session) doAutoSummarize(ctx context.Context, messages []llm.Message, e
 // ============================================================================
 
 //nolint:gocyclo // callback-heavy; extracting harms readability.
-func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]llm.Message, []ContentItem, int64, error) {
+func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]llm.Message, []llm.ContentPart, int64, error) {
 	var outputTokens int64
 
-	// processResult captures the final message state from the agent.
 	var processResult []llm.Message
-
-	// newEntries accumulates ContentItems for new content produced in this step.
-	var newEntries []ContentItem
-
-	// maxIndex tracks the highest content block index in the current step.
-	var maxIndex int
-
-	// toolResultCount counts tool results emitted in this step.
-	var toolResultCount int
+	var newEntries []llm.ContentPart
 
 	_, err := s.agent.Load().Stream(ctx, history, llm.StreamCallbacks{
-		OnTextDelta: func(delta string, index int) error {
-			if index > maxIndex {
-				maxIndex = index
-			}
-			base := s.histGet()
-			id := strconv.FormatUint(base+uint64(index), 10)                                 //nolint:gosec // G115: index is non-negative small int
-			_ = stream.WriteTLV(s.Output, stream.TagAssistantT, stream.WrapDelta(id, delta)) //nolint:errcheck // best-effort write to adapter
+		OnTextDelta: func(delta string, _ int, streamID uint64) error {
+			id := strconv.FormatUint(streamID, 10)
+			_ = stream.WriteTLV(s.Output, stream.TagAssistantT, stream.WrapDelta(id, delta)) //nolint:errcheck
 			return nil
 		},
-		OnReasoningDelta: func(delta string, index int) error {
-			if index > maxIndex {
-				maxIndex = index
-			}
-			base := s.histGet()
-			id := strconv.FormatUint(base+uint64(index), 10)                                 //nolint:gosec // G115: index is non-negative small int
-			_ = stream.WriteTLV(s.Output, stream.TagAssistantR, stream.WrapDelta(id, delta)) //nolint:errcheck // best-effort write to adapter
+		OnReasoningDelta: func(delta string, _ int, streamID uint64) error {
+			id := strconv.FormatUint(streamID, 10)
+			_ = stream.WriteTLV(s.Output, stream.TagAssistantR, stream.WrapDelta(id, delta)) //nolint:errcheck
 			return nil
 		},
-		OnToolUseStart: func(id, toolName string, index int) error {
-			if index > maxIndex {
-				maxIndex = index
-			}
-			base := s.histGet()
-			wid := strconv.FormatUint(base+uint64(index), 10)                                        //nolint:gosec // G115: index is non-negative small int
-			data, _ := json.Marshal(stream.ToolUseData{ID: id, Name: toolName})                      //nolint:errcheck // simple struct can't fail
-			_ = stream.WriteTLV(s.Output, stream.TagAssistantF, stream.WrapDelta(wid, string(data))) //nolint:errcheck // best-effort write to adapter
+		OnToolUseStart: func(toolCallID, toolName string, _ int, streamID uint64) error {
+			id := strconv.FormatUint(streamID, 10)
+			data, _ := json.Marshal(stream.ToolUseData{ID: toolCallID, Name: toolName})             //nolint:errcheck
+			_ = stream.WriteTLV(s.Output, stream.TagAssistantF, stream.WrapDelta(id, string(data))) //nolint:errcheck
 			return nil
 		},
-		OnToolUseInput: func(id string, input json.RawMessage, index int) error {
-			base := s.histGet()
-			wid := strconv.FormatUint(base+uint64(index), 10)                                        //nolint:gosec // G115: index is non-negative small int
-			data, _ := json.Marshal(stream.ToolUseData{ID: id, Input: input})                        //nolint:errcheck // simple struct can't fail
-			_ = stream.WriteTLV(s.Output, stream.TagAssistantF, stream.WrapDelta(wid, string(data))) //nolint:errcheck // best-effort write to adapter
+		OnToolUseInput: func(toolCallID string, input json.RawMessage, _ int, streamID uint64) error {
+			id := strconv.FormatUint(streamID, 10)
+			data, _ := json.Marshal(stream.ToolUseData{ID: toolCallID, Input: input})               //nolint:errcheck
+			_ = stream.WriteTLV(s.Output, stream.TagAssistantF, stream.WrapDelta(id, string(data))) //nolint:errcheck
 			return nil
 		},
-		OnToolUseOutput: func(id string, content []llm.ContentPart, err error) error {
+		OnToolUseOutput: func(toolCallID string, content []llm.ContentPart, err error, streamID uint64) error {
 			contentJSON, err2 := serializeContentParts(content)
 			if err2 != nil {
 				contentJSON = []byte(`[{"type":"text","text":"(serialization error)"}]`)
 			}
-			base := s.histGet()
-			wid := strconv.FormatUint(base+uint64(maxIndex+1+toolResultCount), 10) //nolint:gosec // G115: small non-negative ints
-			toolResultCount++
-			data, _ := json.Marshal(stream.ToolResultData{ //nolint:errcheck // simple struct can't fail
-				ID:      id,
+			id := strconv.FormatUint(streamID, 10)
+			data, _ := json.Marshal(stream.ToolResultData{ //nolint:errcheck
+				ID:      toolCallID,
 				Output:  contentJSON,
 				IsError: err != nil,
 			})
-			_ = stream.WriteTLV(s.Output, stream.TagUserF, stream.WrapDelta(wid, string(data))) //nolint:errcheck // best-effort write to adapter
+			_ = stream.WriteTLV(s.Output, stream.TagUserF, stream.WrapDelta(id, string(data))) //nolint:errcheck
 			return nil
 		},
 		OnToolConfirm: func(requests []llm.ToolConfirmRequest) <-chan llm.ToolConfirmResponse {
@@ -185,10 +161,6 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 			return ch
 		},
 		OnStepStart: func(step int) error {
-			s.histInc(1)
-			maxIndex = 0
-			toolResultCount = 0
-
 			s.sendEvent(StepStartEvent{Step: step})
 
 			if s.reasoningDirty.Load() {
@@ -206,24 +178,10 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 				processResult = messages
 			}
 
-			// Build ContentItems for the NEW content (after the initial history).
-			// IDs match what was sent during streaming: base + content block index.
-			base := s.histGet()
+			// New content parts already have HistoryID and Role set by llm agent.
 			newMsgs := messages[len(history):]
-
 			for _, msg := range newMsgs {
-				for ci, part := range msg.Content {
-					var id uint64
-					var tag string
-					if msg.Role == llm.RoleTool {
-						id = base + uint64(maxIndex+1+ci) //nolint:gosec // G115: small non-negative ints
-						tag = stream.TagUserF
-					} else {
-						id = base + uint64(ci) //nolint:gosec // G115: small non-negative ints
-						tag = tagForPart(msg.Role, part)
-					}
-					newEntries = append(newEntries, ContentItem{ID: id, Tag: tag, Part: part})
-				}
+				newEntries = append(newEntries, msg.Content...)
 			}
 
 			s.sendEvent(StepFinishEvent{
@@ -234,15 +192,10 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 			})
 
 			outputTokens += usage.OutputTokens
-
-			padding := uint64(maxIndex + toolResultCount) //nolint:gosec // G115: small non-negative ints
-			if padding > 0 {
-				s.histInc(padding)
-			}
-
 			s.requestSystemInfo()
 			return nil
 		},
+		IDGen: s.histIncAndGet,
 	})
 
 	if err != nil {
@@ -273,7 +226,7 @@ func cleanIncompleteToolUses(messages []llm.Message) []llm.Message {
 	// only stops after executing all tool calls from a completed step.
 	filtered := make([]llm.ContentPart, 0, len(last.Content))
 	for _, part := range last.Content {
-		if _, ok := part.(llm.ToolUsePart); ok {
+		if _, ok := part.(*llm.ToolUsePart); ok {
 			continue
 		}
 		filtered = append(filtered, part)

@@ -13,14 +13,14 @@ func TestSessionSavePreservesTextWithToolCalls(t *testing.T) {
 		{
 			Role: llm.RoleUser,
 			Content: []llm.ContentPart{
-				llm.TextPart{Text: "What's the weather?"},
+				&llm.TextPart{Text: "What's the weather?"},
 			},
 		},
 		{
 			Role: llm.RoleAssistant,
 			Content: []llm.ContentPart{
-				llm.TextPart{Text: "Let me check that for you."},
-				llm.ToolUsePart{
+				&llm.TextPart{Text: "Let me check that for you."},
+				&llm.ToolUsePart{
 					ID:       "call_123",
 					ToolName: "get_weather",
 					Input:    []byte(`{"location":"SF"}`),
@@ -30,16 +30,16 @@ func TestSessionSavePreservesTextWithToolCalls(t *testing.T) {
 		{
 			Role: llm.RoleTool,
 			Content: []llm.ContentPart{
-				llm.ToolResultPart{
+				&llm.ToolResultPart{
 					ID:      "call_123",
-					Content: []llm.ContentPart{llm.TextPart{Text: "Sunny, 72F"}},
+					Content: []llm.ContentPart{&llm.TextPart{Text: "Sunny, 72F"}},
 				},
 			},
 		},
 		{
 			Role: llm.RoleAssistant,
 			Content: []llm.ContentPart{
-				llm.TextPart{Text: "The weather in SF is sunny and 72F."},
+				&llm.TextPart{Text: "The weather in SF is sunny and 72F."},
 			},
 		},
 	}
@@ -83,12 +83,12 @@ func TestSessionSavePreservesTextWithToolCalls(t *testing.T) {
 	hasToolCall := false
 	for _, part := range assistantMsg.Content {
 		switch p := part.(type) {
-		case llm.TextPart:
+		case *llm.TextPart:
 			hasText = true
 			if p.Text != "Let me check that for you." {
 				t.Errorf("Assistant text mismatch: %q", p.Text)
 			}
-		case llm.ToolUsePart:
+		case *llm.ToolUsePart:
 			hasToolCall = true
 			if p.ToolName != "get_weather" {
 				t.Errorf("Tool name mismatch: %s", p.ToolName)
@@ -114,7 +114,7 @@ func TestSessionSavePreservesTextWithToolCalls(t *testing.T) {
 		t.Errorf("Expected 1 content part in final assistant message, got %d", len(finalAssistantMsg.Content))
 	}
 
-	if textPart, ok := finalAssistantMsg.Content[0].(llm.TextPart); ok {
+	if textPart, ok := finalAssistantMsg.Content[0].(*llm.TextPart); ok {
 		if textPart.Text != "The weather in SF is sunny and 72F." {
 			t.Errorf("Final assistant text mismatch: %q", textPart.Text)
 		}
@@ -128,17 +128,13 @@ func TestSessionSavePreservesTextWithToolCalls(t *testing.T) {
 }
 
 // contentFromMessagesForTest builds Content from Messages for test setup.
-func contentFromMessagesForTest(msgs []llm.Message) []ContentItem {
-	var items []ContentItem
+func contentFromMessagesForTest(msgs []llm.Message) []llm.ContentPart {
+	var items []llm.ContentPart
 	var id uint64
 	for _, msg := range msgs {
 		for _, part := range msg.Content {
 			id++
-			items = append(items, ContentItem{
-				ID:   id,
-				Tag:  tagForPart(msg.Role, part),
-				Part: part,
-			})
+			items = append(items, part.UpdateContentPartMeta(id, msg.Role))
 		}
 	}
 	return items

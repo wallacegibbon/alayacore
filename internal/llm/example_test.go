@@ -31,7 +31,7 @@ func Example_usage() {
 			if unmarshalErr := json.Unmarshal(input, &params); unmarshalErr != nil {
 				return nil, fmt.Errorf("invalid input: %w", unmarshalErr)
 			}
-			return []llm.ContentPart{llm.TextPart{Text: fmt.Sprintf("Echo: %s", params.Message)}}, nil
+			return []llm.ContentPart{&llm.TextPart{Text: fmt.Sprintf("Echo: %s", params.Message)}}, nil
 		}).
 		Build()
 
@@ -48,11 +48,11 @@ func Example_usage() {
 	}
 
 	result, err := agent.Stream(context.Background(), messages, llm.StreamCallbacks{
-		OnTextDelta: func(delta string, _ int) error {
+		OnTextDelta: func(delta string, _ int, _ uint64) error {
 			fmt.Print(delta)
 			return nil
 		},
-		OnToolUseInput: func(_ string, input json.RawMessage, _ int) error {
+		OnToolUseInput: func(_ string, input json.RawMessage, _ int, _ uint64) error {
 			fmt.Printf("\n[Tool input: %s]\n", string(input))
 			return nil
 		},

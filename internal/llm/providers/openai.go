@@ -386,17 +386,17 @@ func (s *openAIStreamState) getMessage() llm.Message {
 	tcs := s.getToolCalls()
 	content := make([]llm.ContentPart, 0, 2+len(tcs))
 	if s.reasoningBuilder.Len() > 0 {
-		content = append(content, llm.ReasoningPart{
+		content = append(content, &llm.ReasoningPart{
 			Text: s.reasoningBuilder.String(),
 		})
 	}
 	if s.textBuilder.Len() > 0 {
-		content = append(content, llm.TextPart{
+		content = append(content, &llm.TextPart{
 			Text: s.textBuilder.String(),
 		})
 	}
 	for _, tc := range tcs {
-		content = append(content, llm.ToolUsePart{
+		content = append(content, &llm.ToolUsePart{
 			ID:       tc.ID,
 			ToolName: tc.ToolName,
 			Input:    tc.Input,
@@ -543,7 +543,7 @@ func openaiConvertMessages(messages []llm.Message, reasoningLevel int) []openAIM
 func openaiConvertToolResults(content []llm.ContentPart) []openAIMessage {
 	results := make([]openAIMessage, 0, len(content))
 	for _, part := range content {
-		tr, ok := part.(llm.ToolResultPart)
+		tr, ok := part.(*llm.ToolResultPart)
 		if !ok {
 			continue
 		}
@@ -557,9 +557,9 @@ func openaiConvertToolResults(content []llm.ContentPart) []openAIMessage {
 		var textParts []string
 		for _, cp := range tr.Content {
 			switch v := cp.(type) {
-			case llm.TextPart:
+			case *llm.TextPart:
 				textParts = append(textParts, v.Text)
-			case llm.ImagePart:
+			case *llm.ImagePart:
 				textParts = append(textParts, v.DataURL)
 			}
 		}
@@ -578,7 +578,7 @@ func openaiConvertToolResults(content []llm.ContentPart) []openAIMessage {
 // openaiHasToolCalls checks if content contains tool calls
 func openaiHasToolCalls(content []llm.ContentPart) bool {
 	for _, part := range content {
-		if _, ok := part.(llm.ToolUsePart); ok {
+		if _, ok := part.(*llm.ToolUsePart); ok {
 			return true
 		}
 	}
@@ -589,7 +589,7 @@ func openaiHasToolCalls(content []llm.ContentPart) bool {
 func openaiExtractReasoning(content []llm.ContentPart) string {
 	var text string
 	for _, part := range content {
-		if r, ok := part.(llm.ReasoningPart); ok {
+		if r, ok := part.(*llm.ReasoningPart); ok {
 			text += r.Text
 		}
 	}
@@ -602,7 +602,7 @@ func openaiConvertToolCalls(apiMsg *openAIMessage, content []llm.ContentPart) {
 	var textParts []string
 	for _, part := range content {
 		switch v := part.(type) {
-		case llm.ToolUsePart:
+		case *llm.ToolUsePart:
 			argsStr, err := json.Marshal(string(v.Input))
 			if err != nil {
 				argsStr = []byte("{}")
@@ -615,7 +615,7 @@ func openaiConvertToolCalls(apiMsg *openAIMessage, content []llm.ContentPart) {
 					Arguments: argsStr,
 				},
 			})
-		case llm.TextPart:
+		case *llm.TextPart:
 			textParts = append(textParts, v.Text)
 		}
 	}
@@ -629,12 +629,12 @@ func openaiConvertRegularContent(apiMsg *openAIMessage, content []llm.ContentPar
 	var contentParts []map[string]any
 	for _, part := range content {
 		switch v := part.(type) {
-		case llm.TextPart:
+		case *llm.TextPart:
 			contentParts = append(contentParts, map[string]any{
 				"type": "text",
 				"text": v.Text,
 			})
-		case llm.ImagePart:
+		case *llm.ImagePart:
 			contentParts = append(contentParts, map[string]any{
 				"type": "image_url",
 				"image_url": map[string]string{

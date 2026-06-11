@@ -25,7 +25,7 @@ import (
 // totals, etc.). It runs in a single goroutine (started by Start()).
 //
 // s.Content is the single source of truth for the conversation history,
-// a flat ordered slice of ContentItem where each item has a stable ID
+// a flat ordered slice of ContentPart where each item has a stable ID
 // that matches the adapter's TLV stream IDs. s.Messages is derived from
 // s.Content for API calls and rebuilt after each task completes.
 // When a task starts, a snapshot of s.Messages (derived from Content)
@@ -44,7 +44,7 @@ func (s *Session) run() {
 
 	// Initialize Content for fresh sessions.
 	if s.Content == nil {
-		s.Content = make([]ContentItem, 0)
+		s.Content = make([]llm.ContentPart, 0)
 		s.Messages = make([]llm.Message, 0)
 	}
 
@@ -138,13 +138,13 @@ func (s *Session) tryStartNextTask() bool {
 }
 
 // handleTaskDone processes a task completion signal from the task goroutine.
-// result carries the final message state and new ContentItems.
+// result carries the final message state and new ContentParts.
 func (s *Session) handleTaskDone(result TaskResult) {
 	// Mark the task as finished so the next queue item can start.
 	s.inProgress.Store(false)
 	s.taskCancel.Store((context.CancelFunc)(nil))
 
-	// Append new ContentItems.
+	// Append new ContentParts.
 	if len(result.Entries) > 0 {
 		s.Content = append(s.Content, result.Entries...)
 		// Rebuild Messages from Content.

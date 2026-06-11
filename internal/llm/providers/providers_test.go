@@ -59,7 +59,7 @@ func TestAnthropicProvider(t *testing.T) {
 
 	// Stream messages
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Hi"}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
 	}
 
 	events, err := provider.StreamMessages(context.Background(), messages, nil, "You are helpful", "")
@@ -129,7 +129,7 @@ func TestOpenAIProvider(t *testing.T) {
 
 	// Stream messages
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Hi"}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
 	}
 
 	events, err := provider.StreamMessages(context.Background(), messages, nil, "You are helpful", "")
@@ -200,7 +200,7 @@ func TestToolCallStreaming(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "test"}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "test"}}},
 	}
 
 	events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
@@ -269,7 +269,7 @@ func TestToolCallStreamingChunked(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Run uname -a"}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Run uname -a"}}},
 	}
 
 	events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
@@ -334,7 +334,7 @@ func TestToolCallStreamingWithNullArguments(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Read README"}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Read README"}}},
 	}
 
 	events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
@@ -397,7 +397,7 @@ func TestAnthropicToolCallStreaming(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "What's the weather?"}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "What's the weather?"}}},
 	}
 
 	events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
@@ -477,7 +477,7 @@ func TestToolUseStartEventOpenAI(t *testing.T) {
 	}
 
 	events, err := provider.StreamMessages(context.Background(), []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "test"}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "test"}}},
 	}, nil, "", "")
 	if err != nil {
 		t.Fatal(err)
@@ -534,7 +534,7 @@ func TestToolUseStartEventAnthropic(t *testing.T) {
 	}
 
 	events, err := provider.StreamMessages(context.Background(), []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "test"}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "test"}}},
 	}, nil, "", "")
 	if err != nil {
 		t.Fatal(err)
@@ -593,7 +593,7 @@ func TestAnthropicReasoningStreaming(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "What is the answer?"}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "What is the answer?"}}},
 	}
 
 	events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
@@ -634,14 +634,14 @@ func TestAnthropicReasoningStreaming(t *testing.T) {
 	}
 
 	// First should be reasoning
-	if reasonPart, ok := msg.Content[0].(llm.ReasoningPart); !ok {
+	if reasonPart, ok := msg.Content[0].(*llm.ReasoningPart); !ok {
 		t.Error("First content part should be ReasoningPart")
 	} else if reasonPart.Text != "Let me think..." {
 		t.Errorf("Reasoning text mismatch: %s", reasonPart.Text)
 	}
 
 	// Second should be text
-	if textPart, ok := msg.Content[1].(llm.TextPart); !ok {
+	if textPart, ok := msg.Content[1].(*llm.TextPart); !ok {
 		t.Error("Second content part should be TextPart")
 	} else if textPart.Text != "The answer is 42." {
 		t.Errorf("Text mismatch: %s", textPart.Text)
@@ -683,7 +683,7 @@ func TestAnthropicThinkingOmittedMode(t *testing.T) {
 	}
 
 	events, err := provider.StreamMessages(context.Background(), []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "GCD of 1071 and 462?"}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "GCD of 1071 and 462?"}}},
 	}, nil, "", "")
 	if err != nil {
 		t.Fatal(err)
@@ -697,10 +697,10 @@ func TestAnthropicThinkingOmittedMode(t *testing.T) {
 		if e, ok := event.(llm.StepCompleteEvent); ok {
 			for _, part := range e.Message.Content {
 				switch p := part.(type) {
-				case llm.ReasoningPart:
+				case *llm.ReasoningPart:
 					reasoningParts++
 					_ = p
-				case llm.TextPart:
+				case *llm.TextPart:
 					textParts++
 				}
 			}
@@ -732,7 +732,7 @@ func TestAnthropicAPIError(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Hi"}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
 	}
 
 	_, err = provider.StreamMessages(context.Background(), messages, nil, "", "")
@@ -768,7 +768,7 @@ func TestAnthropicRefusalStopReason(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Hi"}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
 	}
 
 	events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
@@ -816,7 +816,7 @@ func TestAnthropicUnknownStopReason(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Hi"}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
 	}
 
 	events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
@@ -870,7 +870,7 @@ func TestAnthropicValidStopReasons(t *testing.T) {
 			}
 
 			messages := []llm.Message{
-				{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Hi"}}},
+				{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
 			}
 
 			events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
@@ -929,7 +929,7 @@ func TestOpenAIContentFilter(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Hi"}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
 	}
 
 	events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
@@ -972,7 +972,7 @@ func TestOpenAILengthFinishReason(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Hi"}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
 	}
 
 	events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
@@ -1022,7 +1022,7 @@ func TestOpenAIAPIError(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Hi"}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
 	}
 
 	_, err = provider.StreamMessages(context.Background(), messages, nil, "", "")
@@ -1055,7 +1055,7 @@ func TestOpenAINetworkError(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Hi"}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
 	}
 
 	events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
@@ -1119,7 +1119,7 @@ func TestOpenAIWithSystemPrompt(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Hi"}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
 	}
 
 	events, err := provider.StreamMessages(context.Background(), messages, nil, "You are helpful", "")
@@ -1174,7 +1174,7 @@ func TestAnthropicWithTools(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Use the tool"}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Use the tool"}}},
 	}
 
 	tools := []llm.ToolDefinition{
@@ -1223,7 +1223,7 @@ func TestOpenAIWithReasoning(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Calculate"}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Calculate"}}},
 	}
 
 	events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
@@ -1264,14 +1264,14 @@ func TestOpenAIWithReasoning(t *testing.T) {
 	}
 
 	// First should be reasoning
-	if rp, ok := msg.Content[0].(llm.ReasoningPart); !ok {
+	if rp, ok := msg.Content[0].(*llm.ReasoningPart); !ok {
 		t.Error("First content part should be ReasoningPart")
 	} else if rp.Text != "Analyzing... computing..." {
 		t.Errorf("Reasoning text mismatch: %s", rp.Text)
 	}
 
 	// Second should be text
-	if tp, ok := msg.Content[1].(llm.TextPart); !ok {
+	if tp, ok := msg.Content[1].(*llm.TextPart); !ok {
 		t.Error("Second content part should be TextPart")
 	} else if tp.Text != "Result: 123." {
 		t.Errorf("Text mismatch: %s", tp.Text)
@@ -1344,13 +1344,13 @@ func TestOpenAITextWithToolCallsConversion(t *testing.T) {
 
 	// Simulate a multi-turn conversation where assistant returned text + tool call
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Check the weather"}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Check the weather"}}},
 		{Role: llm.RoleAssistant, Content: []llm.ContentPart{
-			llm.TextPart{Text: "Let me check that."},
-			llm.ToolUsePart{ID: "call_123", ToolName: "get_weather", Input: json.RawMessage(`{"location":"SF"}`)},
+			&llm.TextPart{Text: "Let me check that."},
+			&llm.ToolUsePart{ID: "call_123", ToolName: "get_weather", Input: json.RawMessage(`{"location":"SF"}`)},
 		}},
 		{Role: llm.RoleTool, Content: []llm.ContentPart{
-			llm.ToolResultPart{ID: "call_123", Content: []llm.ContentPart{llm.TextPart{Text: "Sunny, 72°F"}}},
+			&llm.ToolResultPart{ID: "call_123", Content: []llm.ContentPart{&llm.TextPart{Text: "Sunny, 72°F"}}},
 		}},
 	}
 
@@ -1433,15 +1433,15 @@ func TestAnthropicToolResultMessageFormat(t *testing.T) {
 
 	// Simulate a conversation with tool call and result
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Use the tool"}}},
-		{Role: llm.RoleAssistant, Content: []llm.ContentPart{llm.ToolUsePart{
+		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Use the tool"}}},
+		{Role: llm.RoleAssistant, Content: []llm.ContentPart{&llm.ToolUsePart{
 			ID:       "tool-123",
 			ToolName: "test_tool",
 			Input:    json.RawMessage(`{"input": "value"}`),
 		}}},
-		{Role: llm.RoleTool, Content: []llm.ContentPart{llm.ToolResultPart{
+		{Role: llm.RoleTool, Content: []llm.ContentPart{&llm.ToolResultPart{
 			ID:      "tool-123",
-			Content: []llm.ContentPart{llm.TextPart{Text: "Tool executed successfully"}},
+			Content: []llm.ContentPart{&llm.TextPart{Text: "Tool executed successfully"}},
 		}}},
 	}
 
@@ -1491,7 +1491,7 @@ func TestAnthropicMultiToolCall(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Get weather for NYC and LA"}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Get weather for NYC and LA"}}},
 	}
 
 	events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
@@ -1586,15 +1586,15 @@ func TestOpenAIToolResultMessageFormat(t *testing.T) {
 
 	// Simulate a conversation with tool call and result
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Use the tool"}}},
-		{Role: llm.RoleAssistant, Content: []llm.ContentPart{llm.ToolUsePart{
+		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Use the tool"}}},
+		{Role: llm.RoleAssistant, Content: []llm.ContentPart{&llm.ToolUsePart{
 			ID:       "call-123",
 			ToolName: "test_tool",
 			Input:    json.RawMessage(`{"input": "value"}`),
 		}}},
-		{Role: llm.RoleTool, Content: []llm.ContentPart{llm.ToolResultPart{
+		{Role: llm.RoleTool, Content: []llm.ContentPart{&llm.ToolResultPart{
 			ID:      "call-123",
-			Content: []llm.ContentPart{llm.TextPart{Text: "Tool executed successfully"}},
+			Content: []llm.ContentPart{&llm.TextPart{Text: "Tool executed successfully"}},
 		}}},
 	}
 
@@ -1695,27 +1695,27 @@ func TestOpenAIMultiToolResultMessageFormat(t *testing.T) {
 
 	// Simulate a conversation with 2 tool calls and 2 results in a single tool message
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Run two tools"}}},
+		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Run two tools"}}},
 		{Role: llm.RoleAssistant, Content: []llm.ContentPart{
-			llm.ToolUsePart{
+			&llm.ToolUsePart{
 				ID:       "call-1",
 				ToolName: "tool_a",
 				Input:    json.RawMessage(`{}`),
 			},
-			llm.ToolUsePart{
+			&llm.ToolUsePart{
 				ID:       "call-2",
 				ToolName: "tool_b",
 				Input:    json.RawMessage(`{}`),
 			},
 		}},
 		{Role: llm.RoleTool, Content: []llm.ContentPart{
-			llm.ToolResultPart{
+			&llm.ToolResultPart{
 				ID:      "call-1",
-				Content: []llm.ContentPart{llm.TextPart{Text: "Result A"}},
+				Content: []llm.ContentPart{&llm.TextPart{Text: "Result A"}},
 			},
-			llm.ToolResultPart{
+			&llm.ToolResultPart{
 				ID:      "call-2",
-				Content: []llm.ContentPart{llm.TextPart{Text: "Result B"}},
+				Content: []llm.ContentPart{&llm.TextPart{Text: "Result B"}},
 			},
 		}},
 	}
@@ -1791,15 +1791,15 @@ func TestAnthropicToolResultError(t *testing.T) {
 
 	// Conversation with error tool result
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{llm.TextPart{Text: "Use the tool"}}},
-		{Role: llm.RoleAssistant, Content: []llm.ContentPart{llm.ToolUsePart{
+		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Use the tool"}}},
+		{Role: llm.RoleAssistant, Content: []llm.ContentPart{&llm.ToolUsePart{
 			ID:       "tool-123",
 			ToolName: "test_tool",
 			Input:    json.RawMessage(`{}`),
 		}}},
-		{Role: llm.RoleTool, Content: []llm.ContentPart{llm.ToolResultPart{
+		{Role: llm.RoleTool, Content: []llm.ContentPart{&llm.ToolResultPart{
 			ID:      "tool-123",
-			Content: []llm.ContentPart{llm.TextPart{Text: "Something went wrong"}},
+			Content: []llm.ContentPart{&llm.TextPart{Text: "Something went wrong"}},
 			IsError: true,
 		}}},
 	}

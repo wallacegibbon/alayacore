@@ -36,5 +36,5 @@ func executeWriteFile(_ context.Context, args WriteFileInput) ([]llm.ContentPart
 	if err := os.WriteFile(args.Path, []byte(args.Content), 0600); err != nil {
 		return nil, err
 	}
-	return []llm.ContentPart{llm.TextPart{Text: "File written successfully"}}, nil
+	return []llm.ContentPart{&llm.TextPart{Text: "File written successfully"}}, nil
 }

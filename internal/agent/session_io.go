@@ -78,7 +78,7 @@ func (s *Session) cancelAllTasks() {
 	s.requestSystemInfo()
 }
 
-func (s *Session) handleContinue(ctx context.Context, messages []llm.Message, entries []ContentItem, args []string) ([]llm.Message, []ContentItem) {
+func (s *Session) handleContinue(ctx context.Context, messages []llm.Message, entries []llm.ContentPart, args []string) ([]llm.Message, []llm.ContentPart) {
 	// Validate arguments before doing anything.
 	if len(args) > 0 && args[0] != "skip" {
 		s.writeError("usage: :continue [skip]")
@@ -104,7 +104,7 @@ func (s *Session) handleContinue(ctx context.Context, messages []llm.Message, en
 	return messages, entries
 }
 
-func (s *Session) summarize(ctx context.Context, messages []llm.Message, entries []ContentItem) ([]llm.Message, []ContentItem) {
+func (s *Session) summarize(ctx context.Context, messages []llm.Message, entries []llm.ContentPart) ([]llm.Message, []llm.ContentPart) {
 	prompt := `Summarize the conversation for continuation. The resuming instance has no prior context.
 
 Provide:
@@ -145,7 +145,7 @@ Rules:
 	filtered := make([]llm.ContentPart, 0, len(lastAssistantMsg.Content))
 	for _, part := range lastAssistantMsg.Content {
 		switch part.(type) {
-		case llm.ReasoningPart:
+		case *llm.ReasoningPart:
 			continue
 		default:
 			filtered = append(filtered, part)
@@ -160,30 +160,19 @@ Rules:
 	// Rebuild entries to match the new message structure:
 	// [UserMessage("Continue"), filteredAssistantMsg]
 	// Assign new IDs since the old entries are being replaced.
-	entries = entries[:0] // Keep the slice, discard old entries
+	entries = entries[:0]
 	continueID := s.histIncAndGet()
-	entries = append(entries, ContentItem{
-		ID:   continueID,
-		Tag:  stream.TagUserT,
-		Part: llm.TextPart{Text: "Continue"},
+	entries = append(entries, &llm.TextPart{
+		Text:      "Continue",
+		HistoryID: continueID,
+		Role:      llm.RoleUser,
 	})
-	// The assistant message keeps its original entry IDs from newEntries,
-	// but we need to filter out reasoning parts. Since we rebuilt result
-	// from scratch, just regenerate entries from the new result.
-	// For simplicity, assign fresh IDs for the filtered summary.
 	summaryID := s.histIncAndGet()
-	entries = append(entries, ContentItem{
-		ID:   summaryID,
-		Tag:  stream.TagAssistantT,
-		Part: lastAssistantMsg.Content[0], // first non-reasoning part
-	})
+	firstPart := lastAssistantMsg.Content[0]
+	entries = append(entries, firstPart.UpdateContentPartMeta(summaryID, llm.RoleAssistant))
 	for i := 1; i < len(lastAssistantMsg.Content); i++ {
-		id := s.histIncAndGet()
-		entries = append(entries, ContentItem{
-			ID:   id,
-			Tag:  tagForPart(llm.RoleAssistant, lastAssistantMsg.Content[i]),
-			Part: lastAssistantMsg.Content[i],
-		})
+		part := lastAssistantMsg.Content[i]
+		entries = append(entries, part.UpdateContentPartMeta(s.histIncAndGet(), llm.RoleAssistant))
 	}
 
 	if outputTokens > 0 {
@@ -396,7 +385,7 @@ func (s *Session) handleThemeSet(args []string) {
 //  3. Latest message is an assistant message → the API partially succeeded
 //     or was canceled. A "Continue" user message is appended so the
 //     model picks up where it left off.
-func (s *Session) resendPrompt(ctx context.Context, messages []llm.Message, entries []ContentItem) ([]llm.Message, []ContentItem) {
+func (s *Session) resendPrompt(ctx context.Context, messages []llm.Message, entries []llm.ContentPart) ([]llm.Message, []llm.ContentPart) {
 	if len(messages) == 0 {
 		s.writeError("No messages to resend")
 		return messages, entries
@@ -407,10 +396,10 @@ func (s *Session) resendPrompt(ctx context.Context, messages []llm.Message, entr
 	if lastMsg.Role == llm.RoleAssistant {
 		messages = append(messages, llm.NewUserMessage("Continue"))
 		id := s.histIncAndGet()
-		entries = append(entries, ContentItem{
-			ID:   id,
-			Tag:  stream.TagUserT,
-			Part: llm.TextPart{Text: "Continue"},
+		entries = append(entries, &llm.TextPart{
+			Text:      "Continue",
+			HistoryID: id,
+			Role:      llm.RoleUser,
 		})
 		s.writeTLVStr(stream.TagUserT, stream.WrapDelta(strconv.FormatUint(id, 10), "Continue"))
 	} else {

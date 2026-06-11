@@ -10,7 +10,7 @@ func NewUserMessage(text string) Message {
 	return Message{
 		Role: RoleUser,
 		Content: []ContentPart{
-			TextPart{Text: text},
+			&TextPart{Text: text},
 		},
 	}
 }
