@@ -143,8 +143,10 @@ func (a *Agent) Stream(ctx context.Context, messages []Message, callbacks Stream
 // Tools are confirmed and executed as soon as their arguments finish streaming
 // (on ToolUsePart event), overlapping with other tools still being streamed.
 func (a *Agent) executeStep(ctx context.Context, step int, allMessages []Message, callbacks StreamCallbacks) ([]Message, Usage, bool, bool, error) {
-	if err := a.invokeStepStart(callbacks, step); err != nil {
-		return nil, Usage{}, false, false, err
+	if callbacks.OnStepStart != nil {
+		if err := callbacks.OnStepStart(step); err != nil {
+			return nil, Usage{}, false, false, err
+		}
 	}
 
 	events, err := a.config.Provider.StreamMessages(ctx, allMessages, a.toolDefinitions(), a.config.SystemPrompt, a.config.ExtraSystemPrompt)
@@ -181,8 +183,10 @@ func (a *Agent) executeStep(ctx context.Context, step int, allMessages []Message
 		allMessages = append(allMessages, Message{Role: RoleTool, Content: finalResults})
 	}
 
-	if err := fireOnStepFinish(callbacks, allMessages, stepUsage); err != nil {
-		return nil, Usage{}, false, false, err
+	if callbacks.OnStepFinish != nil {
+		if err := callbacks.OnStepFinish(allMessages, stepUsage); err != nil {
+			return nil, Usage{}, false, false, err
+		}
 	}
 
 	taskDone := truncated || len(toolUses) == 0
@@ -222,24 +226,32 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 
 		switch e := event.(type) {
 		case TextDeltaEvent:
-			if err := fireOnTextDelta(callbacks, e, getOrAssignID(callbacks, idByIndex, e.Index)); err != nil {
-				return Message{}, Usage{}, false, nil, err
+			if callbacks.OnTextDelta != nil {
+				if err := callbacks.OnTextDelta(e.Delta, getOrAssignID(callbacks, idByIndex, e.Index)); err != nil {
+					return Message{}, Usage{}, false, nil, err
+				}
 			}
 
 		case ReasoningDeltaEvent:
-			if err := fireOnReasoningDelta(callbacks, e, getOrAssignID(callbacks, idByIndex, e.Index)); err != nil {
-				return Message{}, Usage{}, false, nil, err
+			if callbacks.OnReasoningDelta != nil {
+				if err := callbacks.OnReasoningDelta(e.Delta, getOrAssignID(callbacks, idByIndex, e.Index)); err != nil {
+					return Message{}, Usage{}, false, nil, err
+				}
 			}
 
 		case ToolUseStartEvent:
-			if err := a.fireOnToolUseStart(callbacks, e, getOrAssignID(callbacks, idByIndex, e.Index)); err != nil {
-				return Message{}, Usage{}, false, nil, err
+			if callbacks.OnToolUseStart != nil {
+				if err := callbacks.OnToolUseStart(e.ID, e.ToolName, getOrAssignID(callbacks, idByIndex, e.Index)); err != nil {
+					return Message{}, Usage{}, false, nil, err
+				}
 			}
 
 		case ToolUseDeltaEvent:
 			id := getOrAssignID(callbacks, idByIndex, e.Index)
-			if err := a.fireOnToolUseInput(callbacks, e, id); err != nil {
-				return Message{}, Usage{}, false, nil, err
+			if callbacks.OnToolUseInput != nil {
+				if err := callbacks.OnToolUseInput(e.ID, e.Input, id); err != nil {
+					return Message{}, Usage{}, false, nil, err
+				}
 			}
 			execCount++
 			tc := &ToolUsePart{
@@ -352,16 +364,6 @@ func (a *Agent) executeDeferredTools(ctx context.Context, deferred []ToolUsePart
 	}
 }
 
-// invokeStepStart fires the OnStepStart callback if set.
-func (a *Agent) invokeStepStart(callbacks StreamCallbacks, step int) error {
-	if callbacks.OnStepStart != nil {
-		if err := callbacks.OnStepStart(step); err != nil {
-			return fmt.Errorf("OnStepStart callback failed: %w", err)
-		}
-	}
-	return nil
-}
-
 // toolDefinitions returns the tool definitions from the agent config.
 func (a *Agent) toolDefinitions() []ToolDefinition {
 	defs := make([]ToolDefinition, len(a.config.Tools))
@@ -383,56 +385,6 @@ func getOrAssignID(callbacks StreamCallbacks, idByIndex map[int]uint64, index in
 		return id
 	}
 	return 0
-}
-
-// fireOnReasoningDelta invokes the OnReasoningDelta callback if set.
-func fireOnReasoningDelta(callbacks StreamCallbacks, e ReasoningDeltaEvent, historyID uint64) error {
-	if callbacks.OnReasoningDelta != nil {
-		if err := callbacks.OnReasoningDelta(e.Delta, historyID); err != nil {
-			return fmt.Errorf("OnReasoningDelta callback failed: %w", err)
-		}
-	}
-	return nil
-}
-
-// fireOnTextDelta invokes the OnTextDelta callback if set.
-func fireOnTextDelta(callbacks StreamCallbacks, e TextDeltaEvent, historyID uint64) error {
-	if callbacks.OnTextDelta != nil {
-		if err := callbacks.OnTextDelta(e.Delta, historyID); err != nil {
-			return fmt.Errorf("OnTextDelta callback failed: %w", err)
-		}
-	}
-	return nil
-}
-
-// fireOnToolUseStart invokes the OnToolUseStart callback if set.
-func (a *Agent) fireOnToolUseStart(callbacks StreamCallbacks, e ToolUseStartEvent, historyID uint64) error {
-	if callbacks.OnToolUseStart != nil {
-		if err := callbacks.OnToolUseStart(e.ID, e.ToolName, historyID); err != nil {
-			return fmt.Errorf("OnToolUseStart callback failed: %w", err)
-		}
-	}
-	return nil
-}
-
-// fireOnToolUseInput invokes the OnToolUseInput callback if set.
-func (a *Agent) fireOnToolUseInput(callbacks StreamCallbacks, e ToolUseDeltaEvent, historyID uint64) error {
-	if callbacks.OnToolUseInput != nil {
-		if err := callbacks.OnToolUseInput(e.ID, e.Input, historyID); err != nil {
-			return fmt.Errorf("OnToolUseInput callback failed: %w", err)
-		}
-	}
-	return nil
-}
-
-// fireOnStepFinish invokes the OnStepFinish callback if set.
-func fireOnStepFinish(callbacks StreamCallbacks, messages []Message, usage Usage) error {
-	if callbacks.OnStepFinish != nil {
-		if err := callbacks.OnStepFinish(messages, usage); err != nil {
-			return fmt.Errorf("OnStepFinish callback failed: %w", err)
-		}
-	}
-	return nil
 }
 
 // executeTool executes a single tool call and returns the result.
