@@ -779,8 +779,8 @@ func TestTLVFormatRecursionProtection(t *testing.T) {
 // to 1 (normal) rather than 0 (off).
 func TestLoadSessionMissingReasoningLevel(t *testing.T) {
 	// Frontmatter without reasoning_level, mimicking an older session file.
-	// Must include message_version: 4 for the version check to pass.
-	raw := []byte("---\nmessage_version: 4\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\n---\n")
+	// Must include message_version: 5 for the version check to pass.
+	raw := []byte("---\nmessage_version: 5\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\n---\n")
 
 	data, err := parseSessionData(raw)
 	if err != nil {
@@ -792,7 +792,7 @@ func TestLoadSessionMissingReasoningLevel(t *testing.T) {
 	}
 
 	// Also verify that an explicit reasoning_level: 0 is preserved.
-	raw2 := []byte("---\nmessage_version: 4\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\nreasoning_level: 0\n---\n")
+	raw2 := []byte("---\nmessage_version: 5\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\nreasoning_level: 0\n---\n")
 
 	data2, err := parseSessionData(raw2)
 	if err != nil {
@@ -824,7 +824,7 @@ func TestLoadSessionInvalidReasoningLevel(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			raw := []byte("---\nmessage_version: 4\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\n" + tt.value + "\n---\n")
+			raw := []byte("---\nmessage_version: 5\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\n" + tt.value + "\n---\n")
 
 			data, err := parseSessionData(raw)
 			if err != nil {
@@ -874,15 +874,15 @@ func TestLoadSessionVersionMismatch(t *testing.T) {
 // TestLoadSessionVersionValid verifies that a session file with a valid version
 // loads successfully.
 func TestLoadSessionVersionValid(t *testing.T) {
-	raw := []byte("---\nmessage_version: 4\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\n---\n")
+	raw := []byte("---\nmessage_version: 5\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\n---\n")
 
 	data, err := parseSessionData(raw)
 	if err != nil {
 		t.Fatalf("parseSessionData failed: %v", err)
 	}
 
-	if data.MessageVersion != 4 {
-		t.Errorf("expected MessageVersion=4, got %d", data.MessageVersion)
+	if data.MessageVersion != 5 {
+		t.Errorf("expected MessageVersion=5, got %d", data.MessageVersion)
 	}
 }
 

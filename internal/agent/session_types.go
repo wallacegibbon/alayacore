@@ -104,7 +104,7 @@ func (MessageVersionMsg) SystemMsgType() string { return "version" }
 // used in session files and TagSystemMsg broadcasts.
 // Increment when making backward-incompatible changes to the TLV
 // message format within the session body.
-const MessageVersion = 4
+const MessageVersion = 5
 
 // SessionMeta is the frontmatter metadata.
 type SessionMeta struct {
