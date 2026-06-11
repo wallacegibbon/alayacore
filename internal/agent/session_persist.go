@@ -84,41 +84,6 @@ func formatFrontmatter(meta *SessionMeta) string {
 	return "---\n" + config.FormatKeyValue(meta) + "---\n"
 }
 
-// contentPartToTLV serializes a ContentPart as a TLV tag and value string (without history ID).
-func contentPartToTLV(msgRole llm.MessageRole, part llm.ContentPart) (tag string, content string, err error) {
-	switch p := part.(type) {
-	case *llm.TextPart:
-		if msgRole == llm.RoleAssistant {
-			return stream.TagAssistantT, p.Text, nil
-		}
-		return stream.TagUserT, p.Text, nil
-	case *llm.ImagePart:
-		return stream.TagUserI, p.DataURL, nil
-	case *llm.ReasoningPart:
-		return stream.TagAssistantR, p.Text, nil
-	case *llm.ToolUsePart:
-		fd := stream.ToolUseData{ID: p.ID, Name: p.ToolName, Input: p.Input}
-		jsonData, err := json.Marshal(fd)
-		if err != nil {
-			return "", "", err
-		}
-		return stream.TagAssistantF, string(jsonData), nil
-	case *llm.ToolResultPart:
-		contentJSON, err := serializeContentParts(p.Content)
-		if err != nil {
-			return "", "", fmt.Errorf("failed to serialize tool result content: %w", err)
-		}
-		tr := stream.ToolResultData{ID: p.ID, Output: contentJSON, IsError: p.IsError}
-		jsonData, err := json.Marshal(tr)
-		if err != nil {
-			return "", "", err
-		}
-		return stream.TagUserF, string(jsonData), nil
-	default:
-		return "", "", fmt.Errorf("unknown content part type: %T", part)
-	}
-}
-
 // formatSessionMarkdown serializes Messages to TLV (without history IDs). Content
 // is not serialized — IDs are ephemeral and rebuilt on load.
 func formatSessionMarkdown(data *SessionData) ([]byte, error) {
@@ -214,52 +179,78 @@ func parseSessionData(data []byte) (*SessionData, error) {
 	return sd, nil
 }
 
-// tlvReader reads sequential TLV records from a string.
-type tlvReader struct {
-	reader *strings.Reader
-}
+func parseMessagesTLV(body string) ([]llm.ContentPart, []TLVChunk, error) {
+	est := len(body) / 64
+	if est < 8 {
+		est = 8
+	}
+	content := make([]llm.ContentPart, 0, est)
+	chunks := make([]TLVChunk, 0, est)
 
-func newTLVReader(body string) *tlvReader {
-	return &tlvReader{reader: strings.NewReader(body)}
-}
+	reader := newTLVReader(body)
+	var seqID uint64
 
-// read advances to the next TLV record. Returns io.EOF when exhausted.
-func (r *tlvReader) read() (tag string, content []byte, err error) {
-	// Skip whitespace/newlines between records.
 	for {
-		b, err := r.reader.ReadByte()
+		tag, raw, err := reader.read()
+		if err == io.EOF {
+			return content, chunks, nil
+		}
 		if err != nil {
-			return "", nil, err
+			return content, chunks, fmt.Errorf("read error at chunk %d: %w", len(chunks), err)
 		}
-		if b != '\n' && b != '\r' && b != ' ' && b != '\t' {
-			r.reader.UnreadByte() //nolint:errcheck
-			break
+
+		chunks = append(chunks, TLVChunk{Tag: tag, Value: string(raw)})
+
+		msgPart, err := contentPartFromTLV(tag, raw)
+		if err != nil {
+			return content, chunks, fmt.Errorf("parse error at chunk %d (tag %q): %w", len(chunks)-1, tag, err)
 		}
-	}
+		if msgPart == nil {
+			continue
+		}
 
-	tagBytes := make([]byte, 2)
-	if _, err := io.ReadFull(r.reader, tagBytes); err != nil {
-		return "", nil, err
+		seqID++
+		msgPart.SetHistoryID(seqID)
+		content = append(content, msgPart)
 	}
-
-	var length int32
-	if err := binary.Read(r.reader, binary.BigEndian, &length); err != nil {
-		return "", nil, fmt.Errorf("failed to read length: %w", err)
-	}
-	if length < 0 || length > maxTLVContentSize {
-		return "", nil, fmt.Errorf("invalid length: %d", length)
-	}
-
-	content = make([]byte, length)
-	if _, err := io.ReadFull(r.reader, content); err != nil {
-		return "", nil, fmt.Errorf("failed to read content: %w", err)
-	}
-
-	return string(tagBytes), content, nil
 }
 
-// contentPartFromTLV converts a TLV record into a ContentPart.
-// Returns the message role and the content part.
+// contentPartToTLV serializes a ContentPart as a TLV tag and value string (without history ID).
+func contentPartToTLV(msgRole llm.MessageRole, part llm.ContentPart) (tag string, content string, err error) {
+	switch p := part.(type) {
+	case *llm.TextPart:
+		if msgRole == llm.RoleAssistant {
+			return stream.TagAssistantT, p.Text, nil
+		}
+		return stream.TagUserT, p.Text, nil
+	case *llm.ImagePart:
+		return stream.TagUserI, p.DataURL, nil
+	case *llm.ReasoningPart:
+		return stream.TagAssistantR, p.Text, nil
+	case *llm.ToolUsePart:
+		fd := stream.ToolUseData{ID: p.ID, Name: p.ToolName, Input: p.Input}
+		jsonData, err := json.Marshal(fd)
+		if err != nil {
+			return "", "", err
+		}
+		return stream.TagAssistantF, string(jsonData), nil
+	case *llm.ToolResultPart:
+		contentJSON, err := serializeContentParts(p.Content)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to serialize tool result content: %w", err)
+		}
+		tr := stream.ToolResultData{ID: p.ID, Output: contentJSON, IsError: p.IsError}
+		jsonData, err := json.Marshal(tr)
+		if err != nil {
+			return "", "", err
+		}
+		return stream.TagUserF, string(jsonData), nil
+	default:
+		return "", "", fmt.Errorf("unknown content part type: %T", part)
+	}
+}
+
+// contentPartFromTLV converts a TLV record into a ContentPart with Role set.
 // History IDs in the TLV value are stripped — they are ephemeral and
 // rebuilt when the session is loaded.
 func contentPartFromTLV(tag string, content []byte) (llm.ContentPart, error) {
@@ -303,38 +294,46 @@ func contentPartFromTLV(tag string, content []byte) (llm.ContentPart, error) {
 	}
 }
 
-func parseMessagesTLV(body string) ([]llm.ContentPart, []TLVChunk, error) {
-	est := len(body) / 64
-	if est < 8 {
-		est = 8
-	}
-	content := make([]llm.ContentPart, 0, est)
-	chunks := make([]TLVChunk, 0, est)
+// tlvReader reads sequential TLV records from a string.
+type tlvReader struct {
+	reader *strings.Reader
+}
 
-	reader := newTLVReader(body)
-	var seqID uint64
+func newTLVReader(body string) *tlvReader {
+	return &tlvReader{reader: strings.NewReader(body)}
+}
 
+// read advances to the next TLV record. Returns io.EOF when exhausted.
+func (r *tlvReader) read() (tag string, content []byte, err error) {
+	// Skip whitespace/newlines between records.
 	for {
-		tag, raw, err := reader.read()
-		if err == io.EOF {
-			return content, chunks, nil
-		}
+		b, err := r.reader.ReadByte()
 		if err != nil {
-			return content, chunks, fmt.Errorf("read error at chunk %d: %w", len(chunks), err)
+			return "", nil, err
 		}
-
-		chunks = append(chunks, TLVChunk{Tag: tag, Value: string(raw)})
-
-		msgPart, err := contentPartFromTLV(tag, raw)
-		if err != nil {
-			return content, chunks, fmt.Errorf("parse error at chunk %d (tag %q): %w", len(chunks)-1, tag, err)
+		if b != '\n' && b != '\r' && b != ' ' && b != '\t' {
+			r.reader.UnreadByte() //nolint:errcheck
+			break
 		}
-		if msgPart == nil {
-			continue
-		}
-
-		seqID++
-		msgPart.SetHistoryID(seqID)
-		content = append(content, msgPart)
 	}
+
+	tagBytes := make([]byte, 2)
+	if _, err := io.ReadFull(r.reader, tagBytes); err != nil {
+		return "", nil, err
+	}
+
+	var length int32
+	if err := binary.Read(r.reader, binary.BigEndian, &length); err != nil {
+		return "", nil, fmt.Errorf("failed to read length: %w", err)
+	}
+	if length < 0 || length > maxTLVContentSize {
+		return "", nil, fmt.Errorf("invalid length: %d", length)
+	}
+
+	content = make([]byte, length)
+	if _, err := io.ReadFull(r.reader, content); err != nil {
+		return "", nil, fmt.Errorf("failed to read content: %w", err)
+	}
+
+	return string(tagBytes), content, nil
 }
