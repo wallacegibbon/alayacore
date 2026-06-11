@@ -16,15 +16,7 @@ import (
 // in normal UTF-8 text content, making the split unambiguous regardless of
 // what the LLM generates.
 //
-// The id is a decimal number derived from historyCount + blockIndex:
-//   - User content (UT, UI, cancel): historyCount (incremented on echo)
-//   - Delta content (AT, AR, AF): historyCount + index
-//   - Tool results (UF): historyCount (incremented on result)
-//
-// The blockIndex uniquely identifies each content block within a step.
-// For Anthropic, blocks can interleave (e.g., thinking[0], text[1],
-// thinking[2], tool_use[3]), so the index is critical for the adapter
-// to route deltas to the correct window.
+// The id is a decimal number from the session's history counter.
 
 // NewStreamID constructs a stream ID string from components.
 func NewStreamID(promptID uint64, step int, index int) string {
@@ -39,14 +31,14 @@ func WrapDelta(id string, content string) string {
 	return "\x00" + id + "\x00" + content
 }
 
-// UnwrapDelta splits a NUL-delimited TLV value into (streamID, content).
+// UnwrapDelta splits a NUL-delimited TLV value into (historyID, content).
 //
 // It expects the format \x00<id>\x00<content>. If the value does not start
 // with \x00 or the closing \x00 is not found, it returns ("", value, false).
 //
 // Callers must handle the ok=false case: it occurs when messages are
 // replayed from a saved session file (which stores plain text without
-// stream IDs) or when the value is empty/malformed.
+// history IDs) or when the value is empty/malformed.
 //
 // The returned id is guaranteed to be non-empty when ok is true.
 func UnwrapDelta(value string) (id string, content string, ok bool) {
