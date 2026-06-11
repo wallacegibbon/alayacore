@@ -262,8 +262,7 @@ func (r *tlvReader) read() (tag string, content []byte, err error) {
 // Returns the message role and the content part.
 // History IDs in the TLV value are stripped — they are ephemeral and
 // rebuilt when the session is loaded.
-func contentPartFromTLV(tag string, content []byte) (llm.MessageRole, llm.ContentPart, error) {
-	// Strip NUL-delimited historyID prefix if present (added during live streaming).
+func contentPartFromTLV(tag string, content []byte) (llm.ContentPart, error) {
 	cleanContent := string(content)
 	if _, stripped, ok := stream.UnwrapDelta(cleanContent); ok {
 		cleanContent = stripped
@@ -271,36 +270,36 @@ func contentPartFromTLV(tag string, content []byte) (llm.MessageRole, llm.Conten
 
 	switch tag {
 	case stream.TagUserT:
-		return llm.RoleUser, &llm.TextPart{Text: cleanContent}, nil
+		return &llm.TextPart{Text: cleanContent, Role: llm.RoleUser}, nil
 	case stream.TagUserI:
-		return llm.RoleUser, &llm.ImagePart{DataURL: cleanContent}, nil
+		return &llm.ImagePart{DataURL: cleanContent, Role: llm.RoleUser}, nil
 	case stream.TagAssistantT:
-		return llm.RoleAssistant, &llm.TextPart{Text: cleanContent}, nil
+		return &llm.TextPart{Text: cleanContent, Role: llm.RoleAssistant}, nil
 	case stream.TagAssistantR:
-		return llm.RoleAssistant, &llm.ReasoningPart{Text: cleanContent}, nil
+		return &llm.ReasoningPart{Text: cleanContent, Role: llm.RoleAssistant}, nil
 	case stream.TagAssistantF:
 		var fd stream.ToolUseData
 		if err := json.Unmarshal([]byte(cleanContent), &fd); err != nil {
-			return "", nil, fmt.Errorf("failed to parse function data: %w", err)
+			return nil, fmt.Errorf("failed to parse function data: %w", err)
 		}
 		if fd.Name == "" {
-			return "", nil, nil // skip malformed
+			return nil, nil
 		}
-		return llm.RoleAssistant, &llm.ToolUsePart{
-			ID: fd.ID, ToolName: fd.Name, Input: fd.Input,
+		return &llm.ToolUsePart{
+			ID: fd.ID, ToolName: fd.Name, Input: fd.Input, Role: llm.RoleAssistant,
 		}, nil
 	case stream.TagUserF:
 		var tr stream.ToolResultData
 		if err := json.Unmarshal([]byte(cleanContent), &tr); err != nil {
-			return "", nil, fmt.Errorf("failed to parse tool result: %w", err)
+			return nil, fmt.Errorf("failed to parse tool result: %w", err)
 		}
 		contentParts, err := deserializeContentParts(tr.Output)
 		if err != nil {
-			return "", nil, fmt.Errorf("failed to parse tool result content: %w", err)
+			return nil, fmt.Errorf("failed to parse tool result content: %w", err)
 		}
-		return llm.RoleTool, &llm.ToolResultPart{ID: tr.ID, Content: contentParts, IsError: tr.IsError}, nil
+		return &llm.ToolResultPart{ID: tr.ID, Content: contentParts, IsError: tr.IsError, Role: llm.RoleTool}, nil
 	default:
-		return "", nil, fmt.Errorf("unknown tag: %s", tag)
+		return nil, fmt.Errorf("unknown tag: %s", tag)
 	}
 }
 
@@ -326,7 +325,7 @@ func parseMessagesTLV(body string) ([]llm.ContentPart, []TLVChunk, error) {
 
 		chunks = append(chunks, TLVChunk{Tag: tag, Value: string(raw)})
 
-		msgRole, msgPart, err := contentPartFromTLV(tag, raw)
+		msgPart, err := contentPartFromTLV(tag, raw)
 		if err != nil {
 			return content, chunks, fmt.Errorf("parse error at chunk %d (tag %q): %w", len(chunks)-1, tag, err)
 		}
@@ -335,8 +334,7 @@ func parseMessagesTLV(body string) ([]llm.ContentPart, []TLVChunk, error) {
 		}
 
 		seqID++
-
-		msgPart.UpdateContentPartMeta(seqID, msgRole)
+		msgPart.SetHistoryID(seqID)
 		content = append(content, msgPart)
 	}
 }
