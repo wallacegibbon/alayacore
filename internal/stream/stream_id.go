@@ -4,8 +4,8 @@ import (
 	"strings"
 )
 
-// StreamID identifies a delta stream across multiple TLV frames.
-// Used by AT, AR, UT, UI, AF, and UF to carry a historyCount-based ID.
+// The stream_id file provides the wire format for embedding a history ID
+// into TLV values so the adapter can route deltas to the correct content block.
 //
 // Wire format within a TLV value:
 //

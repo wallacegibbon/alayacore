@@ -138,7 +138,7 @@ func TestToolCallResetsStreamPrefix(t *testing.T) {
 	o.Write(msg3)
 
 	got := buf.String()
-	// After tool call, lastStreamID is "" so the new ID doesn't trigger separator
+	// After tool call, lastHistoryID is "" so the new ID doesn't trigger separator
 	if !contains(got, "hello") || !contains(got, "result") {
 		t.Errorf("output = %q", got)
 	}

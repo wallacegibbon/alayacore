@@ -19,15 +19,15 @@ import (
 // so a mutex protects the buffer, tag/stream-ID state, and the close-once
 // guard for errorCh. See stream/doc.go for the full contract.
 type stdoutOutput struct {
-	writer       io.Writer
-	mu           sync.Mutex // protects buf, lastTag, lastStreamID, errorClosed
-	buf          []byte
-	inProgress   atomic.Bool
-	hasError     atomic.Bool
-	errorClosed  atomic.Bool // true once errorCh has been closed
-	errorCh      chan struct{}
-	lastTag      string
-	lastStreamID string
+	writer        io.Writer
+	mu            sync.Mutex // protects buf, lastTag, lastHistoryID, errorClosed
+	buf           []byte
+	inProgress    atomic.Bool
+	hasError      atomic.Bool
+	errorClosed   atomic.Bool // true once errorCh has been closed
+	errorCh       chan struct{}
+	lastTag       string
+	lastHistoryID string
 }
 
 func newStdoutOutput() *stdoutOutput {
@@ -100,7 +100,7 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 			fmt.Fprintln(o.writer)
 		}
 		o.lastTag = tag
-		o.lastStreamID = ""
+		o.lastHistoryID = ""
 		// Show complete tool call JSON.
 		fmt.Fprintf(o.writer, "%s\n", payload)
 
@@ -114,7 +114,7 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 			fmt.Fprintln(o.writer)
 		}
 		o.lastTag = tag
-		o.lastStreamID = ""
+		o.lastHistoryID = ""
 		fmt.Fprintf(o.writer, "%s\n", payload)
 
 	case stream.TagUserI:
@@ -135,15 +135,15 @@ func (o *stdoutOutput) handleTextDelta(tag, value string) {
 	id, content, _ := stream.UnwrapDelta(value)
 	// When id is "" (replayed from session file, no NUL prefix),
 	// we just track it as-is — no stream transition to detect.
-	if o.lastStreamID != "" && o.lastTag != tag {
+	if o.lastHistoryID != "" && o.lastTag != tag {
 		// Transitioning from a different tag → separator
 		fmt.Fprintln(o.writer)
-	} else if o.lastStreamID != "" && id != o.lastStreamID {
+	} else if o.lastHistoryID != "" && id != o.lastHistoryID {
 		// Same tag but different stream → separator
 		fmt.Fprintln(o.writer)
 	}
 	o.lastTag = tag
-	o.lastStreamID = id
+	o.lastHistoryID = id
 	fmt.Fprint(o.writer, content)
 	if id == "" {
 		fmt.Fprintln(o.writer)
@@ -154,11 +154,11 @@ func (o *stdoutOutput) handleTextDelta(tag, value string) {
 // new tag and the previous frame was streamed (had a non-empty stream ID).
 // It updates lastTag to the new tag.
 func (o *stdoutOutput) emitSeparator(tag string) {
-	if o.lastStreamID != "" && o.lastTag != "" && o.lastTag != tag {
+	if o.lastHistoryID != "" && o.lastTag != "" && o.lastTag != tag {
 		fmt.Fprintln(o.writer)
 	}
 	o.lastTag = tag
-	o.lastStreamID = ""
+	o.lastHistoryID = ""
 }
 
 // handleSystemMsg processes a TagSystemMsg frame.
@@ -180,7 +180,7 @@ func (o *stdoutOutput) handleSystemMsg(value string) {
 		if json.Unmarshal(env.Data, &m) == nil {
 			fmt.Fprintf(o.writer, "\n[error: %s]\n", m.Text)
 			o.lastTag = ""
-			o.lastStreamID = ""
+			o.lastHistoryID = ""
 			o.hasError.Store(true)
 			if o.errorClosed.CompareAndSwap(false, true) {
 				close(o.errorCh)
@@ -193,7 +193,7 @@ func (o *stdoutOutput) handleSystemMsg(value string) {
 		if json.Unmarshal(env.Data, &m) == nil {
 			fmt.Fprintf(o.writer, "\n[%s]\n", m.Text)
 			o.lastTag = ""
-			o.lastStreamID = ""
+			o.lastHistoryID = ""
 		}
 	case "task":
 		var m struct {
@@ -203,7 +203,7 @@ func (o *stdoutOutput) handleSystemMsg(value string) {
 			if o.inProgress.Load() && !m.InProgress {
 				fmt.Fprintln(o.writer)
 				o.lastTag = ""
-				o.lastStreamID = ""
+				o.lastHistoryID = ""
 			}
 			o.inProgress.Store(m.InProgress)
 		}
@@ -216,6 +216,6 @@ func (o *stdoutOutput) handleSystemMsg(value string) {
 		}
 		fmt.Fprintf(o.writer, "\n[tool_confirm: allow tool %q to run?]\n", m.ID)
 		o.lastTag = ""
-		o.lastStreamID = ""
+		o.lastHistoryID = ""
 	}
 }
