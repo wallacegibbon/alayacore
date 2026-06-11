@@ -246,8 +246,8 @@ func BenchmarkStreamingUpdateWithIncremental(b *testing.B) {
 	_ = wb.GetTotalLines()
 
 	// Create streaming window with initial content
-	streamID := "stream-current"
-	wb.AppendOrUpdate("AT", streamID, "Starting...")
+	historyID := "stream-current"
+	wb.AppendOrUpdate("AT", historyID, "Starting...")
 
 	// Pre-render to populate wrappedLines cache
 	_ = wb.GetTotalLines()
@@ -256,7 +256,7 @@ func BenchmarkStreamingUpdateWithIncremental(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Simulate streaming delta - this should use incremental wrapping
-		wb.AppendOrUpdate("AT", streamID, " more")
+		wb.AppendOrUpdate("AT", historyID, " more")
 		_ = wb.GetTotalLines()
 		_ = wb.GetAll(-1)
 	}
@@ -279,8 +279,8 @@ func BenchmarkStreamingUpdateWithoutIncremental(b *testing.B) {
 	_ = wb.GetTotalLines()
 
 	// Create streaming window
-	streamID := "stream-current"
-	wb.AppendOrUpdate("AT", streamID, "Starting...")
+	historyID := "stream-current"
+	wb.AppendOrUpdate("AT", historyID, "Starting...")
 	_ = wb.GetTotalLines()
 	_ = wb.GetAll(-1)
 
@@ -288,12 +288,12 @@ func BenchmarkStreamingUpdateWithoutIncremental(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		// Force full re-wrap by invalidating wrappedLines BEFORE append
 		wb.mu.Lock()
-		if idx, ok := wb.idIndex[streamID]; ok {
+		if idx, ok := wb.idIndex[historyID]; ok {
 			wb.WindowAt(idx).cache.wrappedLines = nil
 		}
 		wb.mu.Unlock()
 
-		wb.AppendOrUpdate("AT", streamID, " more")
+		wb.AppendOrUpdate("AT", historyID, " more")
 		_ = wb.GetTotalLines()
 		_ = wb.GetAll(-1)
 	}
@@ -314,13 +314,13 @@ func BenchmarkStreamingSmallDelta(b *testing.B) {
 	wb.SetViewportPosition(0, 30)
 	_ = wb.GetTotalLines()
 
-	streamID := "stream"
-	wb.AppendOrUpdate("AT", streamID, "")
+	historyID := "stream"
+	wb.AppendOrUpdate("AT", historyID, "")
 	_ = wb.GetTotalLines()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		wb.AppendOrUpdate("AT", streamID, "word ")
+		wb.AppendOrUpdate("AT", historyID, "word ")
 		_ = wb.GetTotalLines()
 	}
 }
@@ -337,12 +337,12 @@ func BenchmarkJustAppendUpdate(b *testing.B) {
 		wb.AppendOrUpdate("AT", id, content)
 	}
 
-	streamID := "stream"
-	wb.AppendOrUpdate("AT", streamID, "")
+	historyID := "stream"
+	wb.AppendOrUpdate("AT", historyID, "")
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		wb.AppendOrUpdate("AT", streamID, "word ")
+		wb.AppendOrUpdate("AT", historyID, "word ")
 	}
 }
 
@@ -358,16 +358,16 @@ func BenchmarkJustEnsureLineHeights(b *testing.B) {
 		wb.AppendOrUpdate("AT", id, content)
 	}
 
-	streamID := "stream"
-	wb.AppendOrUpdate("AT", streamID, "initial")
+	historyID := "stream"
+	wb.AppendOrUpdate("AT", historyID, "initial")
 	_ = wb.GetTotalLines()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		wb.AppendOrUpdate("AT", streamID, " word")
+		wb.AppendOrUpdate("AT", historyID, " word")
 		wb.dirty = true
-		wb.dirtyIndex = wb.idIndex[streamID]
+		wb.dirtyIndex = wb.idIndex[historyID]
 		b.StartTimer()
 
 		_ = wb.GetTotalLines()
@@ -379,8 +379,8 @@ func BenchmarkStreamingDebug(_ *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
-	streamID := "stream"
-	wb.AppendOrUpdate("AT", streamID, strings.Repeat("Line ", 10))
+	historyID := "stream"
+	wb.AppendOrUpdate("AT", historyID, strings.Repeat("Line ", 10))
 	_ = wb.GetTotalLines()
 
 	w := wb.WindowAt(0)
@@ -388,7 +388,7 @@ func BenchmarkStreamingDebug(_ *testing.B) {
 		len(w.cache.wrappedLines), len(w.Content), w.cache.contentLen)
 
 	for i := 0; i < 3; i++ {
-		wb.AppendOrUpdate("AT", streamID, " more")
+		wb.AppendOrUpdate("AT", historyID, " more")
 		fmt.Printf("\nAfter AppendOrUpdate %d:\n", i+1)
 		fmt.Printf("  Content=%d, cache.contentLen=%d, cache.valid=%v\n",
 			len(w.Content), w.cache.contentLen, w.cache.valid)
@@ -409,13 +409,13 @@ func BenchmarkSingleWindowStreaming(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
-	streamID := "stream"
-	wb.AppendOrUpdate("AT", streamID, "initial content")
+	historyID := "stream"
+	wb.AppendOrUpdate("AT", historyID, "initial content")
 	_ = wb.GetTotalLines()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		wb.AppendOrUpdate("AT", streamID, " word")
+		wb.AppendOrUpdate("AT", historyID, " word")
 		_ = wb.GetTotalLines()
 	}
 }
@@ -425,8 +425,8 @@ func BenchmarkSingleWindowStreamingDebug(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
-	streamID := "stream"
-	wb.AppendOrUpdate("AT", streamID, "initial content")
+	historyID := "stream"
+	wb.AppendOrUpdate("AT", historyID, "initial content")
 	_ = wb.GetTotalLines()
 
 	// Check initial state
@@ -435,7 +435,7 @@ func BenchmarkSingleWindowStreamingDebug(b *testing.B) {
 		len(w.cache.wrappedLines), w.Content, w.cache.valid)
 
 	for i := 0; i < 3; i++ {
-		wb.AppendOrUpdate("AT", streamID, " word")
+		wb.AppendOrUpdate("AT", historyID, " word")
 		fmt.Printf("After append %d: wrappedLines=%d, content=%q, cache.valid=%v\n",
 			i+1, len(w.cache.wrappedLines), w.Content, w.cache.valid)
 
@@ -454,7 +454,7 @@ func BenchmarkSingleWindowStreamingDebug(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		wb.AppendOrUpdate("AT", streamID, " word")
+		wb.AppendOrUpdate("AT", historyID, " word")
 		_ = wb.GetTotalLines()
 	}
 }
@@ -464,9 +464,9 @@ func BenchmarkLongContentStreaming(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
-	streamID := "stream"
+	historyID := "stream"
 	// Start with content long enough to wrap
-	wb.AppendOrUpdate("AT", streamID, strings.Repeat("This is a line that will wrap. ", 10))
+	wb.AppendOrUpdate("AT", historyID, strings.Repeat("This is a line that will wrap. ", 10))
 	_ = wb.GetTotalLines()
 
 	w := wb.WindowAt(0)
@@ -475,7 +475,7 @@ func BenchmarkLongContentStreaming(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		wb.AppendOrUpdate("AT", streamID, " more text")
+		wb.AppendOrUpdate("AT", historyID, " more text")
 		_ = wb.GetTotalLines()
 	}
 }
