@@ -36,33 +36,15 @@ AlayaCore's terminal UI is built with [Bubble Tea](https://github.com/charmbrace
 | `Ctrl+G` | Cancel current task (with confirmation) |
 | `Ctrl+Z` | Suspend process |
 | `Ctrl+C` | Clear text |
+| `Ctrl+F` | Fork session from cursor position |
 | `:` | Switch to input with `:` prefix (command mode) |
 | `Space` | Toggle window fold (expand/collapse) |
 
 ## Session Commands
 
-Commands are split into two categories:
+## Session Commands
 
-**Immediate commands** — run synchronously in the main event loop, no queuing:
-| Command | Action |
-|---------|--------|
-| `:cancel` | Cancel current task (with confirmation) |
-| `:cancel_all` | Cancel current task and clear the task queue |
-| `:save [filename]` | Save session. Uses `--session` path if no filename given. |
-| `:model_set <id>` | Switch to a model by numeric ID |
-| `:model_load` | Reload model configs from the config file |
-| `:theme_set <name>` | Switch to a different theme (applied visually via session broadcast) |
-| `:reason [0\|1\|2]` | Set reasoning level (0=off, 1=normal, 2=max). Default: 1 |
-| `:suspend` | Suspend the process (Ctrl+Z) |
-| `:taskqueue_get_all` | List all queued tasks (used by queue manager UI) |
-| `:taskqueue_del <id>` | Delete a queued task by ID (used by queue manager UI) |
-| `:taskqueue_edit <id> <content>` | Edit a queued task's content by ID (used by queue manager UI) |
-
-**Deferred commands** — enqueued at the front of the task queue; run in a task goroutine when no task is running. They can be canceled with `:cancel` while executing:
-| Command | Action |
-|---------|--------|
-| `:continue [skip]` | Retry last prompt, or skip it with `skip` and resume the queue |
-| `:summarize` | Summarize conversation to reduce token usage ⚠️ **Replaces entire conversation history with a summary** — see [context-tracking.md](context-tracking.md) |
+See [commands.md](commands.md) for the full list of session commands (`:save`, `:cancel`, `:fork`, etc.).
 
 Note: `:quit` / `:q`, `:help`, and `:suspend` are handled directly by each adapter (terminal shows a confirmation dialog for quit, opens help window for help, suspends the process for suspend; plainio exits immediately for quit and help, and does not support suspend; rawio passes all commands through to the session since it doesn't interpret frame payloads) and never reaches the session command dispatch.
 

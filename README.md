@@ -2,7 +2,7 @@
 
 [English](README.md) | [中文](README.zh-CN.md)
 
-[![Go Version](https://img.shields.io/badge/Go-1.26-blue?logo=go)]()
+[![Go Version](https://img.shields.io/badge/Go-1.26.1-blue?logo=go)]()
 [![License](https://img.shields.io/badge/license-MIT-green)]()
 [![Release](https://img.shields.io/github/v/release/alayacore/alayacore?logo=github)](https://github.com/alayacore/alayacore/releases)
 
@@ -58,8 +58,8 @@ On first run, AlayaCore auto-creates a default model config at `~/.alayacore/mod
 - 🌐 **Cross-platform** — Runs on Linux, macOS, and Windows. The `execute_command` tool auto-detects the shell (bash/zsh/sh on Unix, PowerShell/cmd on Windows).
 - 🧠 **Any LLM provider** — OpenAI, Anthropic, DeepSeek, Qwen, Ollama, LM Studio. Multiple models in one config, switch at runtime.
 - 🖥️ **Streaming TUI** — Real-time output with virtual scrolling, foldable windows, and vim-like keybindings.
-- 🔌 **Plain IO mode** — `--plainio` for scripting and piping. No TUI, just stdin/stdout.
-- ⚡ **Raw IO mode** — `--rawio` for programmatic control. Raw TLV frames on stdin/stdout.
+- 📟 **Plain IO mode** — `--plainio` for scripting and piping. No TUI, just stdin/stdout.
+- 🔌 **Raw IO mode** — `--rawio` for programmatic control. Raw TLV frames on stdin/stdout.
 - 💾 **Session persistence** — Save and resume conversations automatically when `--session` is specified.
 - 🎯 **Skills system** — Extend the agent with instruction packages following the [Agent Skills](https://agentskills.io) spec.
 - 🎨 **Themes** — Customizable color schemes with live switching.
@@ -72,7 +72,7 @@ On first run, AlayaCore auto-creates a default model config at `~/.alayacore/mod
 
 ## Building from Source
 
-**Prerequisites**: [Go 1.26+](https://go.dev/dl/)
+**Prerequisites**: [Go 1.26.1+](https://go.dev/dl/)
 
 ```sh
 git clone https://github.com/alayacore/alayacore.git
@@ -99,6 +99,7 @@ See [providers.md](docs/providers.md) for provider-specific details.
 | Document | Description |
 |----------|-------------|
 | [Getting Started](docs/getting-started.md) | Installation, CLI flags, and usage examples |
+| [Commands](docs/commands.md) | All session commands (`:save`, `:cancel`, `:fork`, etc.) |
 | [Configuration](docs/configuration.md) | Model config, runtime config, and themes |
 | [Terminal UI](docs/tui.md) | Keybindings, commands, windows, task queue |
 | [Plain IO Mode](docs/plainio.md) | stdin/stdout for scripts and pipes |
