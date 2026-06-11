@@ -235,7 +235,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 
 	s.sendSystemInfo("all")
 
-	s.histSyncAfterLoad()
+	s.histCounter.Store(uint64(len(s.Content)))
 
 	// Send session content to adapter with IDs so the adapter can reference
 	// content by ID even after session reload.
@@ -252,18 +252,6 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 // histIncAndGet increments the history counter by 1 and returns the new value.
 func (s *Session) histIncAndGet() uint64 {
 	return s.histCounter.Add(1)
-}
-
-// histSyncAfterLoad advances the history counter past the highest Content ID
-// so that new streaming IDs don't collide with IDs from the loaded session.
-func (s *Session) histSyncAfterLoad() {
-	var maxID uint64
-	for _, item := range s.Content {
-		if item.GetHistoryID() > maxID {
-			maxID = item.GetHistoryID()
-		}
-	}
-	s.histCounter.Store(maxID)
 }
 
 // Start begins processing input in a single goroutine.
