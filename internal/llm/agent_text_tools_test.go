@@ -15,7 +15,7 @@ func TestAgentPreservesTextWithToolCalls(t *testing.T) {
 		responses: []mockResponse{
 			{
 				text:      "Let me check that for you.",
-				toolCalls: []ToolUseDeltaEvent{{ID: "call_123", ToolName: "get_weather", Input: []byte(`{"location":"SF"}`)}},
+				toolCalls: []ToolUseCompleteEvent{{ID: "call_123", ToolName: "get_weather", Input: []byte(`{"location":"SF"}`)}},
 			},
 			{
 				text: "The weather in SF is sunny.",
@@ -107,7 +107,7 @@ type mockProviderWithTextAndTools struct {
 
 type mockResponse struct {
 	text      string
-	toolCalls []ToolUseDeltaEvent
+	toolCalls []ToolUseCompleteEvent
 }
 
 func (m *mockProviderWithTextAndTools) StreamMessages(_ context.Context, _ []Message, _ []ToolDefinition, _, _ string) (iter.Seq2[StreamEvent, error], error) {

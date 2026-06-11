@@ -359,16 +359,16 @@ func (s *openAIStreamState) setToolCallName(index int, id, name string) {
 	acc.name = name
 }
 
-func (s *openAIStreamState) getToolCalls() []llm.ToolUseDeltaEvent {
+func (s *openAIStreamState) getToolCalls() []llm.ToolUseCompleteEvent {
 	indices := make([]int, 0, len(s.toolAccumulators))
 	for i := range s.toolAccumulators {
 		indices = append(indices, i)
 	}
 	sort.Ints(indices)
-	result := make([]llm.ToolUseDeltaEvent, len(indices))
+	result := make([]llm.ToolUseCompleteEvent, len(indices))
 	for pos, i := range indices {
 		acc := s.toolAccumulators[i]
-		result[pos] = llm.ToolUseDeltaEvent{
+		result[pos] = llm.ToolUseCompleteEvent{
 			ID:       acc.id,
 			ToolName: acc.name,
 			Input:    json.RawMessage(acc.args.String()),

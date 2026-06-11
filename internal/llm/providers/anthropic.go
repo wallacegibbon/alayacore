@@ -556,7 +556,7 @@ func (p *AnthropicProvider) handleContentBlockStop(index int, yield func(llm.Str
 	tc := state.toolUsePart(index)
 	state.finishBlock(index)
 	if tc != nil {
-		if !yield(llm.ToolUseDeltaEvent{
+		if !yield(llm.ToolUseCompleteEvent{
 			ID:       tc.ID,
 			ToolName: tc.ToolName,
 			Input:    tc.Input,

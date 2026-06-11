@@ -196,7 +196,7 @@ func TestAnthropicRealToolCall(t *testing.T) {
 	for event := range events {
 		if e, ok := event.(llm.TextDeltaEvent); ok {
 			textReceived += e.Delta
-		} else if e, ok := event.(llm.ToolUseDeltaEvent); ok {
+		} else if e, ok := event.(llm.ToolUseCompleteEvent); ok {
 			toolCalls = append(toolCalls, llm.ToolUsePart{ID: e.ID, ToolName: e.ToolName, Input: e.Input})
 		}
 	}

@@ -179,15 +179,15 @@ type ToolUseStartEvent struct {
 
 func (ToolUseStartEvent) isStreamEvent() {}
 
-// ToolUseDeltaEvent signals that a tool use's arguments have finished streaming
-type ToolUseDeltaEvent struct {
+// ToolUseCompleteEvent signals that a tool use's arguments have finished streaming
+type ToolUseCompleteEvent struct {
 	ID       string
 	ToolName string
 	Input    json.RawMessage
 	Index    int
 }
 
-func (ToolUseDeltaEvent) isStreamEvent() {}
+func (ToolUseCompleteEvent) isStreamEvent() {}
 
 // StepCompleteEvent represents completion of an agentic step.
 type StepCompleteEvent struct {

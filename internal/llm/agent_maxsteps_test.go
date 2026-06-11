@@ -18,7 +18,7 @@ func (m *mockProviderAlwaysToolCalls) StreamMessages(_ context.Context, _ []Mess
 	m.callCount++
 	return func(yield func(StreamEvent, error) bool) {
 		// Always emit a tool call, never a text-only response
-		yield(ToolUseDeltaEvent{
+		yield(ToolUseCompleteEvent{
 			ID:    "call_1",
 			Input: []byte(`{}`),
 		}, nil)
@@ -80,7 +80,7 @@ func TestAgentCompletesWithinMaxSteps(t *testing.T) {
 	provider := &mockProviderWithTextAndTools{
 		responses: []mockResponse{
 			{
-				toolCalls: []ToolUseDeltaEvent{{ID: "call_1", ToolName: "ping", Input: []byte(`{}`)}},
+				toolCalls: []ToolUseCompleteEvent{{ID: "call_1", ToolName: "ping", Input: []byte(`{}`)}},
 			},
 			{
 				text: "Done!",

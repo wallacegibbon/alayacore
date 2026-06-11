@@ -141,7 +141,7 @@ func (a *Agent) Stream(ctx context.Context, messages []Message, callbacks Stream
 // done, whether the response was truncated, and any fatal error.
 //
 // Tools are confirmed and executed as soon as their arguments finish streaming
-// (on ToolUsePart event), overlapping with other tools still being streamed.
+// (on ToolUseCompleteEvent), overlapping with other tools still being streamed.
 func (a *Agent) executeStep(ctx context.Context, step int, allMessages []Message, callbacks StreamCallbacks) ([]Message, Usage, bool, bool, error) {
 	if callbacks.OnStepStart != nil {
 		if err := callbacks.OnStepStart(step); err != nil {
@@ -154,7 +154,7 @@ func (a *Agent) executeStep(ctx context.Context, step int, allMessages []Message
 		return nil, Usage{}, false, false, fmt.Errorf("provider stream failed: %w", err)
 	}
 
-	stepMessage, stepUsage, truncated, results, err := a.streamEvents(ctx, events, callbacks)
+	stepMessage, stepUsage, results, truncated, err := a.streamEvents(ctx, events, callbacks)
 	if err != nil {
 		return nil, Usage{}, false, false, err
 	}
@@ -197,13 +197,13 @@ func (a *Agent) executeStep(ctx context.Context, step int, allMessages []Message
 // tool calls. Assigns unique history IDs via IDGen on first touch of each
 // content block, passes them to callbacks, and stores them on ContentParts.
 //
-//nolint:gocyclo // 16 is borderline; extracting further would harm readability.
-func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, error], callbacks StreamCallbacks) (Message, Usage, bool, []ContentPart, error) {
+//nolint:gocyclo // extracting further would harm readability
+func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, error], callbacks StreamCallbacks) (Message, Usage, []ContentPart, bool, error) {
 	var (
 		stepMessage Message
 		stepUsage   Usage
 		truncated   bool
-		deferred    []ToolUsePart
+		deferred    []*ToolUsePart
 		results     []ContentPart
 	)
 
@@ -221,46 +221,41 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 
 	for event, err := range events {
 		if err != nil {
-			return Message{}, Usage{}, false, nil, err
+			return Message{}, Usage{}, nil, false, err
 		}
 
 		switch e := event.(type) {
 		case TextDeltaEvent:
 			if callbacks.OnTextDelta != nil {
 				if err := callbacks.OnTextDelta(e.Delta, getOrAssignID(callbacks, idByIndex, e.Index)); err != nil {
-					return Message{}, Usage{}, false, nil, err
+					return Message{}, Usage{}, nil, false, err
 				}
 			}
 
 		case ReasoningDeltaEvent:
 			if callbacks.OnReasoningDelta != nil {
 				if err := callbacks.OnReasoningDelta(e.Delta, getOrAssignID(callbacks, idByIndex, e.Index)); err != nil {
-					return Message{}, Usage{}, false, nil, err
+					return Message{}, Usage{}, nil, false, err
 				}
 			}
 
 		case ToolUseStartEvent:
 			if callbacks.OnToolUseStart != nil {
 				if err := callbacks.OnToolUseStart(e.ID, e.ToolName, getOrAssignID(callbacks, idByIndex, e.Index)); err != nil {
-					return Message{}, Usage{}, false, nil, err
+					return Message{}, Usage{}, nil, false, err
 				}
 			}
 
-		case ToolUseDeltaEvent:
+		case ToolUseCompleteEvent:
 			id := getOrAssignID(callbacks, idByIndex, e.Index)
 			if callbacks.OnToolUseInput != nil {
 				if err := callbacks.OnToolUseInput(e.ID, e.Input, id); err != nil {
-					return Message{}, Usage{}, false, nil, err
+					return Message{}, Usage{}, nil, false, err
 				}
 			}
 			execCount++
-			tc := &ToolUsePart{
-				ID:        e.ID,
-				ToolName:  e.ToolName,
-				Input:     e.Input,
-				HistoryID: id,
-			}
-			deferred = a.handleStreamedToolUse(ctx, *tc, callbacks, deferred, resultCh)
+			tc := toolUseEventToPart(e, id)
+			deferred = a.handleStreamedToolUse(ctx, tc, callbacks, deferred, resultCh)
 
 		case StepCompleteEvent:
 			stepMessage = e.Message
@@ -283,19 +278,19 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 		results = append(results, <-resultCh)
 	}
 
-	return stepMessage, stepUsage, truncated, results, nil
+	return stepMessage, stepUsage, results, truncated, nil
 }
 
 // handleStreamedToolUse processes a completed tool use during streaming.
 // If no confirmation is needed, the tool executes immediately in a goroutine
 // and sends the result through resultCh. Otherwise, it's deferred.
-func (a *Agent) handleStreamedToolUse(ctx context.Context, tc ToolUsePart, callbacks StreamCallbacks, deferred []ToolUsePart, resultCh chan<- ContentPart) []ToolUsePart {
+func (a *Agent) handleStreamedToolUse(ctx context.Context, tc *ToolUsePart, callbacks StreamCallbacks, deferred []*ToolUsePart, resultCh chan<- ContentPart) []*ToolUsePart {
 	if callbacks.OnToolConfirm == nil {
 		historyID := uint64(0)
 		if callbacks.IDGen != nil {
 			historyID = callbacks.IDGen()
 		}
-		go func(tc ToolUsePart, historyID uint64) {
+		go func(tc *ToolUsePart, historyID uint64) {
 			resultCh <- a.executeTool(ctx, tc, callbacks, historyID)
 		}(tc, historyID)
 	} else {
@@ -308,7 +303,7 @@ func (a *Agent) handleStreamedToolUse(ctx context.Context, tc ToolUsePart, callb
 // confirmed tools concurrently as confirm responses arrive.
 // Results (errors, denials, and successful executions) are all sent through resultCh.
 // Exactly len(deferred) items are sent to the channel.
-func (a *Agent) executeDeferredTools(ctx context.Context, deferred []ToolUsePart, callbacks StreamCallbacks, resultCh chan<- ContentPart) {
+func (a *Agent) executeDeferredTools(ctx context.Context, deferred []*ToolUsePart, callbacks StreamCallbacks, resultCh chan<- ContentPart) {
 	if len(deferred) == 0 {
 		return
 	}
@@ -357,7 +352,7 @@ func (a *Agent) executeDeferredTools(ctx context.Context, deferred []ToolUsePart
 		if callbacks.IDGen != nil {
 			historyID = callbacks.IDGen()
 		}
-		go func(tc ToolUsePart, historyID uint64) {
+		go func(tc *ToolUsePart, historyID uint64) {
 			resultCh <- a.executeTool(ctx, tc, callbacks, historyID)
 		}(tc, historyID)
 	}
@@ -386,8 +381,19 @@ func getOrAssignID(callbacks StreamCallbacks, idByIndex map[int]uint64, index in
 	return 0
 }
 
+// toolUseEventToPart converts a ToolUseCompleteEvent to a ToolUsePart,
+// carrying over the history ID assigned during streaming.
+func toolUseEventToPart(e ToolUseCompleteEvent, historyID uint64) *ToolUsePart {
+	return &ToolUsePart{
+		ID:        e.ID,
+		ToolName:  e.ToolName,
+		Input:     e.Input,
+		HistoryID: historyID,
+	}
+}
+
 // executeTool executes a single tool call and returns the result.
-func (a *Agent) executeTool(ctx context.Context, tc ToolUsePart, callbacks StreamCallbacks, historyID uint64) ContentPart {
+func (a *Agent) executeTool(ctx context.Context, tc *ToolUsePart, callbacks StreamCallbacks, historyID uint64) ContentPart {
 	var tool *Tool
 	for _, t := range a.config.Tools {
 		if t.Definition.Name == tc.ToolName {
@@ -423,7 +429,6 @@ func newToolResult(callbacks StreamCallbacks, id string, content []ContentPart, 
 	return &ToolResultPart{ID: id, Content: content, IsError: isError, HistoryID: historyID, Role: RoleTool}
 }
 
-// extractToolUses extracts ToolUseParts from message content.// Results are collected in the same order as toolUses.
 // extractToolUses extracts ToolUseParts from message content.
 func extractToolUses(content []ContentPart) []ToolUsePart {
 	var uses []ToolUsePart
