@@ -332,7 +332,7 @@ func TestAutoFollow_JNoOpWhenNewWindowBetweenTicks(t *testing.T) {
 	moved = display.MoveWindowCursorDown()
 	if moved {
 		t.Errorf("j with autoFollow should be no-op even after new window; cursor=%d, windowCount=%d",
-			display.GetWindowCursor(), wb.GetWindowCount())
+			display.GetWindowCursor(), wb.WindowCount())
 	}
 	if !display.autoFollow {
 		t.Error("autoFollow should NOT be disabled by j when a new window was appended between ticks")

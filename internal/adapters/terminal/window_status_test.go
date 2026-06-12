@@ -19,29 +19,29 @@ func TestHandleToolUseEvent(t *testing.T) {
 	}, 0)
 
 	// Verify window was created
-	if wb.GetWindowCount() != 1 {
-		t.Fatalf("Expected 1 window, got %d", wb.GetWindowCount())
+	if wb.WindowCount() != 1 {
+		t.Fatalf("Expected 1 window, got %d", wb.WindowCount())
 	}
 
 	// Status defaults to pending (inferred from window creation)
-	if wb.GetWindow(0).Status != ToolStatusPending {
-		t.Errorf("Expected ToolStatusPending, got %v", wb.GetWindow(0).Status)
+	if wb.WindowAt(0).Status != ToolStatusPending {
+		t.Errorf("Expected ToolStatusPending, got %v", wb.WindowAt(0).Status)
 	}
 
 	// Send a result
 	wb.HandleToolResult("tool123", "output text", false, 0)
 
 	// Check status was updated
-	if wb.GetWindow(0).Status != ToolStatusSuccess {
-		t.Errorf("Expected ToolStatusSuccess, got %v", wb.GetWindow(0).Status)
+	if wb.WindowAt(0).Status != ToolStatusSuccess {
+		t.Errorf("Expected ToolStatusSuccess, got %v", wb.WindowAt(0).Status)
 	}
 
 	// Send a result with error
 	wb.HandleToolResult("tool123", "error output", true, 0)
 
 	// Check status was updated
-	if wb.GetWindow(0).Status != ToolStatusError {
-		t.Errorf("Expected ToolStatusError, got %v", wb.GetWindow(0).Status)
+	if wb.WindowAt(0).Status != ToolStatusError {
+		t.Errorf("Expected ToolStatusError, got %v", wb.WindowAt(0).Status)
 	}
 
 	// Try to update non-existent window (should not crash)
@@ -59,7 +59,7 @@ func TestRenderWindowContentWithStatus(t *testing.T) {
 	}, 0)
 
 	// Test rendering with pending status (default on creation)
-	w := wb.GetWindow(0)
+	w := wb.WindowAt(0)
 	content := wb.RenderWindowContent(w, 76)
 	if content == "" {
 		t.Error("Expected non-empty content")
@@ -135,10 +135,10 @@ func TestOutputWriterToolCallStartThenFull(t *testing.T) {
 	}
 
 	wb := out.WindowBuffer()
-	if wb.GetWindowCount() != 1 {
-		t.Fatalf("Expected 1 window after start event, got %d", wb.GetWindowCount())
+	if wb.WindowCount() != 1 {
+		t.Fatalf("Expected 1 window after start event, got %d", wb.WindowCount())
 	}
-	w := wb.GetWindow(0)
+	w := wb.WindowAt(0)
 	if w.ToolName != "write_file" {
 		t.Errorf("Expected tool name 'write_file', got %q", w.ToolName)
 	}
@@ -149,10 +149,10 @@ func TestOutputWriterToolCallStartThenFull(t *testing.T) {
 		t.Fatalf("Write failed: %v", err)
 	}
 
-	if wb.GetWindowCount() != 1 {
-		t.Fatalf("Expected still 1 window, got %d", wb.GetWindowCount())
+	if wb.WindowCount() != 1 {
+		t.Fatalf("Expected still 1 window, got %d", wb.WindowCount())
 	}
-	w = wb.GetWindow(0)
+	w = wb.WindowAt(0)
 	if w.ToolInput != "write_file: /tmp/f.txt\nhello world" {
 		t.Errorf("Expected full input, got %q", w.ToolInput)
 	}

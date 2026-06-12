@@ -197,7 +197,7 @@ func (m *DisplayModel) clearCursor() {
 // If the index points to an invisible window, the nearest visible window is chosen instead.
 // Disables auto-follow only if the cursor actually moves; only G re-enables it.
 func (m *DisplayModel) SetWindowCursor(index int) {
-	if index < 0 || m.windowBuffer.GetWindowCount() == 0 {
+	if index < 0 || m.windowBuffer.WindowCount() == 0 {
 		m.clearCursor()
 		return
 	}
@@ -223,7 +223,7 @@ func (m *DisplayModel) MoveWindowCursorDown() bool {
 	if m.autoFollow {
 		return false
 	}
-	if m.windowBuffer.GetWindowCount() == 0 {
+	if m.windowBuffer.WindowCount() == 0 {
 		return false
 	}
 
@@ -249,12 +249,12 @@ func (m *DisplayModel) MoveWindowCursorDown() bool {
 
 // MoveWindowCursorUp moves the window cursor up, skipping invisible windows.
 func (m *DisplayModel) MoveWindowCursorUp() bool {
-	if m.windowBuffer.GetWindowCount() == 0 {
+	if m.windowBuffer.WindowCount() == 0 {
 		return false
 	}
 
 	// If cursor is unset or below the last window, start at the last visible window
-	if m.windowCursor < 0 || m.windowCursor >= m.windowBuffer.GetWindowCount() {
+	if m.windowCursor < 0 || m.windowCursor >= m.windowBuffer.WindowCount() {
 		i := m.windowBuffer.LastVisibleIndex()
 		if i >= 0 {
 			if m.windowCursor == i {
@@ -329,7 +329,7 @@ func (m *DisplayModel) ScrollCursorToTop() {
 // Uses partial visibility check to avoid jarring scroll jumps on resize.
 func (m *DisplayModel) ValidateCursor() {
 	m.ClampCursor()
-	if m.windowCursor >= 0 && m.windowBuffer.GetWindowCount() > 0 {
+	if m.windowCursor >= 0 && m.windowBuffer.WindowCount() > 0 {
 		m.EnsureCursorVisible()
 	}
 }
@@ -339,7 +339,7 @@ func (m *DisplayModel) ValidateCursor() {
 // the user's scroll position. Use this on resize events where only bounds
 // correction is needed.
 func (m *DisplayModel) ClampCursor() {
-	if m.windowBuffer.GetWindowCount() == 0 {
+	if m.windowBuffer.WindowCount() == 0 {
 		m.windowCursor = -1
 		return
 	}
@@ -376,7 +376,7 @@ func (m *DisplayModel) ToggleWindowFold() bool {
 
 // MoveWindowCursorToTop moves cursor to top visible window.
 func (m *DisplayModel) MoveWindowCursorToTop() bool {
-	if m.windowBuffer.GetWindowCount() == 0 {
+	if m.windowBuffer.WindowCount() == 0 {
 		return false
 	}
 
@@ -409,7 +409,7 @@ func (m *DisplayModel) MoveWindowCursorToBottom() bool {
 	if m.autoFollow {
 		return false
 	}
-	if m.windowBuffer.GetWindowCount() == 0 {
+	if m.windowBuffer.WindowCount() == 0 {
 		return false
 	}
 
@@ -441,7 +441,7 @@ func (m *DisplayModel) MoveWindowCursorToBottom() bool {
 // It finds the window that contains the center line of the visible viewport.
 // If no window contains the center line, it finds the window closest to the center.
 func (m *DisplayModel) MoveWindowCursorToCenter() bool {
-	if m.windowBuffer.GetWindowCount() == 0 {
+	if m.windowBuffer.WindowCount() == 0 {
 		return false
 	}
 
@@ -520,7 +520,7 @@ func (m *DisplayModel) findClosestVisibleWindow(viewportTop, viewportBottom, vie
 // the next visible window whose tag is TagUserT ("UT"). Returns false if
 // no such window exists below the current cursor.
 func (m *DisplayModel) MoveWindowCursorToNextUserPrompt() bool {
-	if m.windowBuffer.GetWindowCount() == 0 {
+	if m.windowBuffer.WindowCount() == 0 {
 		return false
 	}
 
@@ -541,7 +541,7 @@ func (m *DisplayModel) MoveWindowCursorToNextUserPrompt() bool {
 // the previous visible window whose tag is TagUserT ("UT"). Returns false
 // if no such window exists above the current cursor.
 func (m *DisplayModel) MoveWindowCursorToPrevUserPrompt() bool {
-	if m.windowBuffer.GetWindowCount() == 0 {
+	if m.windowBuffer.WindowCount() == 0 {
 		return false
 	}
 

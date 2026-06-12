@@ -259,7 +259,7 @@ func (m *Terminal) handleTick() (tea.Model, tea.Cmd) {
 
 	// Check if display needs refresh (dirty flag)
 	if m.out.DrainDirty() {
-		if m.out.WindowBuffer().GetWindowCount() > 0 {
+		if m.out.WindowBuffer().WindowCount() > 0 {
 			m.updateStatus()
 			m.updateDisplayHeight()
 			if m.display.shouldFollow() {

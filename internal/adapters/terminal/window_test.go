@@ -65,18 +65,18 @@ func TestWindowBuffer(t *testing.T) {
 
 	t.Run("get window count", func(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
-		if wb.GetWindowCount() != 0 {
-			t.Errorf("GetWindowCount() = %d, want 0", wb.GetWindowCount())
+		if wb.WindowCount() != 0 {
+			t.Errorf("WindowCount() = %d, want 0", wb.WindowCount())
 		}
 
 		wb.AppendOrUpdate(stream.TagAssistantT, "window-1", "First")
-		if wb.GetWindowCount() != 1 {
-			t.Errorf("GetWindowCount() = %d, want 1", wb.GetWindowCount())
+		if wb.WindowCount() != 1 {
+			t.Errorf("WindowCount() = %d, want 1", wb.WindowCount())
 		}
 
 		wb.AppendOrUpdate(stream.TagAssistantT, "window-2", "Second")
-		if wb.GetWindowCount() != 2 {
-			t.Errorf("GetWindowCount() = %d, want 2", wb.GetWindowCount())
+		if wb.WindowCount() != 2 {
+			t.Errorf("WindowCount() = %d, want 2", wb.WindowCount())
 		}
 	})
 

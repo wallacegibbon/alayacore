@@ -265,16 +265,11 @@ func (wb *WindowBuffer) Clear() {
 	wb.dirtyIndex = dirtyClean
 }
 
-// GetWindowCount returns the number of windows.
-func (wb *WindowBuffer) GetWindowCount() int {
+// WindowCount returns the number of windows.
+func (wb *WindowBuffer) WindowCount() int {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 	return len(wb.windows)
-}
-
-// WindowCount returns the number of windows (alias for GetWindowCount).
-func (wb *WindowBuffer) WindowCount() int {
-	return wb.GetWindowCount()
 }
 
 // WindowAt returns the window at the given index, or nil if out of bounds.
@@ -313,17 +308,6 @@ func (wb *WindowBuffer) GetVisibleWindowCount() int {
 		}
 	}
 	return count
-}
-
-// GetWindow returns the window at the given index (for testing).
-func (wb *WindowBuffer) GetWindow(index int) *Window {
-	wb.mu.Lock()
-	defer wb.mu.Unlock()
-	if index < 0 || index >= len(wb.windows) {
-		return nil
-	}
-	wb.windows[index].ensureContent()
-	return wb.windows[index]
 }
 
 // ToggleFold toggles the fold state of a window.
