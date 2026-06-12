@@ -56,27 +56,25 @@ func (s *Session) handleUserPrompt(ctx context.Context, messages []llm.Message, 
 		})
 	}
 
-	result, newEntries, _, err := s.processPrompt(ctx, messages)
+	updatedMessages, newEntries, _, err := s.processPrompt(ctx, messages)
 
 	entries = append(entries, newEntries...)
-
-	result = cleanIncompleteToolUses(result)
 
 	if err != nil {
 		s.writeError(err.Error())
 		s.pausedOnError.Store(true)
 		s.requestSystemInfo()
-		// When cancel or error occurs before OnStepFinish sets processResult,
-		// result is nil/empty and the user prompt would be lost on save.
+		// When cancel or error occurs before OnStepFinish sets updatedMessages,
+		// updatedMessages is nil/empty and the user prompt would be lost on save.
 		// Fall back to messages (which has the user prompt appended above)
 		// so the UT is preserved in the session file alongside the cancel AT.
-		if len(result) == 0 {
+		if len(updatedMessages) == 0 {
 			return messages, entries
 		}
-		return result, entries
+		return updatedMessages, entries
 	}
 
-	return result, entries
+	return updatedMessages, entries
 }
 
 // shouldAutoSummarize returns true when auto-summarization is enabled and
@@ -108,7 +106,7 @@ func (s *Session) writeTLVWithID(tag string, historyID uint64, data string) {
 func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]llm.Message, []llm.ContentPart, int64, error) {
 	var outputTokens int64
 
-	var processResult []llm.Message
+	var updatedMessages []llm.Message
 	var newEntries []llm.ContentPart
 
 	lastProcessed := len(history) // track where the last step ended
@@ -177,8 +175,12 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 			return nil
 		},
 		OnStepFinish: func(messages []llm.Message, usage llm.Usage) error {
+			// Remove orphaned tool uses from the last message before capturing
+			// new entries. This keeps both Messages and Content free of tool
+			// calls that were emitted but never executed (cancel/error).
+			messages = cleanIncompleteToolUses(messages)
 			if len(messages) > 0 {
-				processResult = messages
+				updatedMessages = messages
 			}
 
 			// Only capture messages added since the last step to avoid
@@ -204,10 +206,10 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 	})
 
 	if err != nil {
-		return processResult, newEntries, 0, err
+		return updatedMessages, newEntries, 0, err
 	}
 
-	return processResult, newEntries, outputTokens, nil
+	return updatedMessages, newEntries, outputTokens, nil
 }
 
 // cleanIncompleteToolUses removes orphaned tool uses from the last
@@ -227,8 +229,9 @@ func cleanIncompleteToolUses(messages []llm.Message) []llm.Message {
 		return messages
 	}
 
-	// Tool calls in the last message are always orphaned — the agent
-	// only stops after executing all tool calls from a completed step.
+	// All tool uses in the last assistant message are orphaned — the agent
+	// only completes a step after executing all tools. If the last message
+	// has tool uses, the step was interrupted (cancel/error).
 	filtered := make([]llm.ContentPart, 0, len(last.Content))
 	for _, part := range last.Content {
 		if _, ok := part.(*llm.ToolUsePart); ok {
