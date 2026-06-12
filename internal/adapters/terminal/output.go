@@ -79,19 +79,19 @@ func (to *outputWriter) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-// WriteError adds an error message to the display buffer with error styling
+// WriteError adds an error message to the display buffer with error styling.
+// Styling is stored raw — it's applied during render by styleContent.
 func (to *outputWriter) WriteError(format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	id := to.generateWindowID()
-	styles := to.styles.Load()
-	to.windowBuffer.AppendOrUpdate(TagWindowSE, id, styles.Error.Render(msg))
+	to.windowBuffer.AppendOrUpdate(TagWindowSE, id, msg)
 }
 
-// WriteNotify writes a notification message to the display
+// WriteNotify writes a notification message to the display.
+// Styling is stored raw — it's applied during render by styleContent.
 func (to *outputWriter) WriteNotify(msg string) {
 	id := to.generateWindowID()
-	styles := to.styles.Load()
-	to.windowBuffer.AppendOrUpdate(TagWindowSN, id, styles.System.Render(msg))
+	to.windowBuffer.AppendOrUpdate(TagWindowSN, id, msg)
 	to.triggerUpdateForTag(TagWindowSN)
 }
 
@@ -258,8 +258,7 @@ func (to *outputWriter) handleSystemError(data json.RawMessage) {
 		return
 	}
 	id := to.generateWindowID()
-	styles := to.styles.Load()
-	to.windowBuffer.AppendOrUpdate(TagWindowSE, id, styles.Error.Render(m.Text))
+	to.windowBuffer.AppendOrUpdate(TagWindowSE, id, m.Text)
 }
 
 func (to *outputWriter) handleSystemNotify(data json.RawMessage) {
@@ -270,8 +269,7 @@ func (to *outputWriter) handleSystemNotify(data json.RawMessage) {
 		return
 	}
 	id := to.generateWindowID()
-	styles := to.styles.Load()
-	to.windowBuffer.AppendOrUpdate(TagWindowSN, id, styles.System.Render(m.Text))
+	to.windowBuffer.AppendOrUpdate(TagWindowSN, id, m.Text)
 }
 
 func (to *outputWriter) handleSystemTask(data json.RawMessage) {
