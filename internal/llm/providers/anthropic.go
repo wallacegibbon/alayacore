@@ -196,14 +196,28 @@ type AnthropicProvider struct {
 	baseProvider
 }
 
-// AnthropicOption configures the provider
+// AnthropicOption configures the provider (kept for test ergonomics).
 type AnthropicOption func(*AnthropicProvider)
 
-// NewAnthropic creates a new Anthropic provider
-func NewAnthropic(opts ...AnthropicOption) (*AnthropicProvider, error) {
-	p := &AnthropicProvider{
-		baseProvider: newBaseProvider("", "https://api.anthropic.com", "claude-3-5-sonnet-20241022", llm.DefaultMaxTokens),
+// NewAnthropicWithConfig creates an Anthropic provider from a BaseConfig.
+// This is the primary constructor used by the provider factory.
+func NewAnthropicWithConfig(cfg BaseConfig) (*AnthropicProvider, error) {
+	if cfg.BaseURL == "" {
+		cfg.BaseURL = "https://api.anthropic.com"
 	}
+	p := &AnthropicProvider{}
+	p.setBaseConfig(cfg, "claude-3-5-sonnet-20241022", llm.DefaultMaxTokens)
+	if p.apiKey == "" {
+		return nil, fmt.Errorf("API key is required")
+	}
+	return p, nil
+}
+
+// NewAnthropic creates a new Anthropic provider via functional options.
+func NewAnthropic(opts ...AnthropicOption) (*AnthropicProvider, error) {
+	p := &AnthropicProvider{}
+	p.setBaseConfig(BaseConfig{}, "claude-3-5-sonnet-20241022", llm.DefaultMaxTokens)
+	p.baseURL = "https://api.anthropic.com"
 	for _, opt := range opts {
 		opt(p)
 	}

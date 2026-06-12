@@ -129,14 +129,28 @@ type OpenAIProvider struct {
 	baseProvider
 }
 
-// OpenAIOption configures the provider
+// OpenAIOption configures the provider (kept for test ergonomics).
 type OpenAIOption func(*OpenAIProvider)
 
-// NewOpenAI creates a new OpenAI provider
-func NewOpenAI(opts ...OpenAIOption) (*OpenAIProvider, error) {
-	p := &OpenAIProvider{
-		baseProvider: newBaseProvider("", "https://api.openai.com/v1", "gpt-4o", llm.DefaultMaxTokens),
+// NewOpenAIWithConfig creates an OpenAI provider from a BaseConfig.
+// This is the primary constructor used by the provider factory.
+func NewOpenAIWithConfig(cfg BaseConfig) (*OpenAIProvider, error) {
+	if cfg.BaseURL == "" {
+		cfg.BaseURL = "https://api.openai.com/v1"
 	}
+	p := &OpenAIProvider{}
+	p.setBaseConfig(cfg, "gpt-4o", llm.DefaultMaxTokens)
+	if p.apiKey == "" {
+		return nil, fmt.Errorf("API key is required")
+	}
+	return p, nil
+}
+
+// NewOpenAI creates a new OpenAI provider via functional options.
+func NewOpenAI(opts ...OpenAIOption) (*OpenAIProvider, error) {
+	p := &OpenAIProvider{}
+	p.setBaseConfig(BaseConfig{}, "gpt-4o", llm.DefaultMaxTokens)
+	p.baseURL = "https://api.openai.com/v1"
 	for _, opt := range opts {
 		opt(p)
 	}

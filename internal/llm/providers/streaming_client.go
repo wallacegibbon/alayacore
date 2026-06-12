@@ -25,6 +25,15 @@ import (
 // Shared Provider Boilerplate
 // ============================================================================
 
+// BaseConfig holds the common configuration shared by all LLM providers.
+type BaseConfig struct {
+	APIKey     string
+	BaseURL    string
+	Model      string
+	HTTPClient *http.Client
+	MaxTokens  int // 0 means use provider default
+}
+
 // baseProvider holds the common fields shared by all LLM providers.
 // Embedded by AnthropicProvider and OpenAIProvider.
 type baseProvider struct {
@@ -36,14 +45,21 @@ type baseProvider struct {
 	reasoningLevel int // 0=off, 1=normal, 2=max
 }
 
-// newBaseProvider initializes common provider fields with defaults.
-func newBaseProvider(apiKey, baseURL, defaultModel string, maxTokens int) baseProvider {
-	return baseProvider{
-		apiKey:    apiKey,
-		baseURL:   strings.TrimSuffix(baseURL, "/"),
-		client:    &http.Client{},
-		model:     defaultModel,
-		maxTokens: maxTokens,
+// setBaseConfig applies the common config to a baseProvider.
+func (b *baseProvider) setBaseConfig(cfg BaseConfig, defaultModel string, defaultMaxTokens int) {
+	b.apiKey = cfg.APIKey
+	b.baseURL = strings.TrimSuffix(cfg.BaseURL, "/")
+	b.model = cfg.Model
+	if b.model == "" {
+		b.model = defaultModel
+	}
+	b.client = cfg.HTTPClient
+	if b.client == nil {
+		b.client = &http.Client{}
+	}
+	b.maxTokens = cfg.MaxTokens
+	if b.maxTokens == 0 {
+		b.maxTokens = defaultMaxTokens
 	}
 }
 

@@ -21,43 +21,19 @@ type ProviderConfig struct {
 
 // NewProvider creates a provider based on configuration
 func NewProvider(config ProviderConfig) (llm.Provider, error) {
+	cfg := providers.BaseConfig{
+		APIKey:     config.APIKey,
+		BaseURL:    config.BaseURL,
+		Model:      config.Model,
+		HTTPClient: config.HTTPClient,
+		MaxTokens:  config.MaxTokens,
+	}
+
 	switch strings.ToLower(config.Type) {
 	case "anthropic":
-		opts := []providers.AnthropicOption{
-			providers.WithAPIKey(config.APIKey),
-		}
-		if config.BaseURL != "" {
-			opts = append(opts, providers.WithBaseURL(config.BaseURL))
-		}
-		if config.HTTPClient != nil {
-			opts = append(opts, providers.WithHTTPClient(config.HTTPClient))
-		}
-		if config.Model != "" {
-			opts = append(opts, providers.WithAnthropicModel(config.Model))
-		}
-		if config.MaxTokens > 0 {
-			opts = append(opts, providers.WithMaxTokens(config.MaxTokens))
-		}
-		return providers.NewAnthropic(opts...)
-
+		return providers.NewAnthropicWithConfig(cfg)
 	case "openai":
-		opts := []providers.OpenAIOption{
-			providers.WithOpenAIAPIKey(config.APIKey),
-		}
-		if config.BaseURL != "" {
-			opts = append(opts, providers.WithOpenAIBaseURL(config.BaseURL))
-		}
-		if config.HTTPClient != nil {
-			opts = append(opts, providers.WithOpenAIHTTPClient(config.HTTPClient))
-		}
-		if config.Model != "" {
-			opts = append(opts, providers.WithOpenAIModel(config.Model))
-		}
-		if config.MaxTokens > 0 {
-			opts = append(opts, providers.WithOpenAIMaxTokens(config.MaxTokens))
-		}
-		return providers.NewOpenAI(opts...)
-
+		return providers.NewOpenAIWithConfig(cfg)
 	default:
 		return nil, errors.Wrapf("provider", errors.ErrProviderCreationFailed, "unknown provider type: %s", config.Type)
 	}
