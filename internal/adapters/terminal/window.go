@@ -97,11 +97,6 @@ type windowCache struct {
 	wrappedLines []string   // wrapped lines for incremental update
 }
 
-// IsDiffWindow returns true if the window is a diff window
-func (w *Window) IsDiffWindow() bool {
-	return w.ToolName == "edit_file"
-}
-
 // IsToolWindow returns true if the window is a tool call/result window
 func (w *Window) IsToolWindow() bool {
 	return w.ToolName != ""
@@ -190,32 +185,36 @@ func (w *Window) rebuildCache(width int, styles *Styles, borderStyle lipgloss.St
 
 // renderToolContent renders the tool call input (and output if present).
 // ToolInput and ToolOutput are separate typed fields — no sentinel parsing needed.
-// Only content-heavy tools (write_file, edit_file) show the "OUTPUT:" separator.
+// Rendering is delegated to the tool's ToolRenderer.
 func (w *Window) renderToolContent(innerWidth int, styles *Styles) string {
-	// Render the call input portion
-	var call string
-	if w.IsDiffWindow() {
-		call = RenderDiffContent(w.ToolInput, w.Status, styles, innerWidth)
-	} else {
-		call = w.renderGenericContent(innerWidth, styles, w.ToolInput)
+	var r ToolRenderer
+	switch w.ToolName {
+	case "edit_file":
+		r = diffRenderer{}
+	case "write_file":
+		r = outputSeparatorRenderer{}
+	default:
+		r = defaultRenderer{}
 	}
 
-	// If a tool result exists, append it
-	if w.ToolOutput != "" {
-		result := styleMultiline(prepareContent(w.ToolOutput), styles.Text)
-		if innerWidth > 0 {
-			result = wrapContent(result, innerWidth)
-		}
-		// Only write_file and edit_file show a separator between input and output
-		if w.ToolName == "write_file" || w.ToolName == "edit_file" {
-			sep := styles.System.Render("OUTPUT:")
-			return call + "\n" + sep + "\n" + result
-		}
-		// Other tools (execute_command, read_file, search_content) just append.
-		// The call content already ends with \n, so no extra separator needed.
-		return call + result
+	// Render the call input portion using the tool-specific renderer
+	call := r.RenderInput(w.ToolInput, w.Status, styles, innerWidth)
+
+	// No tool result — just the call input
+	if w.ToolOutput == "" {
+		return call
 	}
-	return call
+
+	// Append tool result with optional separator
+	result := styleMultiline(prepareContent(w.ToolOutput), styles.Text)
+	if innerWidth > 0 {
+		result = wrapContent(result, innerWidth)
+	}
+	if r.ShowOutputSeparator() {
+		sep := styles.System.Render("OUTPUT:")
+		return call + "\n" + sep + "\n" + result
+	}
+	return call + result
 }
 
 // renderGenericContent renders content using applyTagStyle with tag-based styling.

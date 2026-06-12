@@ -200,4 +200,46 @@ func escapeNewlines(s string) string {
 	return s
 }
 
+// ============================================================================
+// Tool Renderer — per-tool rendering of tool call input
+// ============================================================================
 
+// ToolRenderer handles rendering a tool call's input for display.
+// Most tools use the default renderer; only edit_file needs special diff rendering.
+type ToolRenderer interface {
+	// RenderInput renders the tool call input with status indicator and wrapping.
+	RenderInput(input string, status ToolStatus, styles *Styles, innerWidth int) string
+	// ShowOutputSeparator returns true if a visual separator should be shown
+	// between the tool input and its output.
+	ShowOutputSeparator() bool
+}
+
+// defaultRenderer is the standard renderer used by most tools.
+type defaultRenderer struct{}
+
+func (defaultRenderer) RenderInput(input string, status ToolStatus, styles *Styles, innerWidth int) string {
+	content := prepareContent(input)
+	content = status.Indicator(styles) + ColorizeTool(content, styles)
+	if innerWidth > 0 {
+		content = wrapContent(content, innerWidth)
+	}
+	return content
+}
+
+func (defaultRenderer) ShowOutputSeparator() bool { return false }
+
+// diffRenderer handles edit_file with diff-aware coloring.
+type diffRenderer struct{}
+
+func (diffRenderer) RenderInput(input string, status ToolStatus, styles *Styles, innerWidth int) string {
+	return RenderDiffContent(input, status, styles, innerWidth)
+}
+
+func (diffRenderer) ShowOutputSeparator() bool { return true }
+
+// outputSeparatorRenderer is like the default but shows an OUTPUT: separator.
+type outputSeparatorRenderer struct {
+	defaultRenderer
+}
+
+func (outputSeparatorRenderer) ShowOutputSeparator() bool { return true }
