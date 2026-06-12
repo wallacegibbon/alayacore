@@ -202,12 +202,7 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 				newEntries = append(newEntries, msg.Content...)
 			}
 
-			s.sendEvent(StepFinishEvent{
-				InputTokens:         usage.InputTokens,
-				OutputTokens:        usage.OutputTokens,
-				CacheReadTokens:     usage.CacheReadTokens,
-				CacheCreationTokens: usage.CacheCreationTokens,
-			})
+			s.sendEvent(usageToStepFinishEvent(usage))
 
 			outputTokens += usage.OutputTokens
 			s.requestSystemInfo()
@@ -221,6 +216,16 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 	}
 
 	return updatedMessages, newEntries, outputTokens, nil
+}
+
+// usageToStepFinishEvent converts an llm.Usage to a StepFinishEvent.
+func usageToStepFinishEvent(usage llm.Usage) StepFinishEvent {
+	return StepFinishEvent{
+		InputTokens:         usage.InputTokens,
+		OutputTokens:        usage.OutputTokens,
+		CacheReadTokens:     usage.CacheReadTokens,
+		CacheCreationTokens: usage.CacheCreationTokens,
+	}
 }
 
 // cleanIncompleteToolUses removes orphaned tool uses from the last
