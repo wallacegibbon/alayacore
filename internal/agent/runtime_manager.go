@@ -30,7 +30,7 @@ type RuntimeManager struct {
 }
 
 // NewRuntimeManager creates a new runtime manager
-func NewRuntimeManager(runtimePath, _ string) *RuntimeManager {
+func NewRuntimeManager(runtimePath string) *RuntimeManager {
 	rm := &RuntimeManager{}
 	rm.path = runtimePath
 

@@ -17,10 +17,9 @@ func TestRuntimeManager(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	runtimePath := filepath.Join(tmpDir, "runtime.conf")
-	modelConfigPath := filepath.Join(tmpDir, "model.conf")
 
 	// Test creating a new RuntimeManager with empty path
-	rm := NewRuntimeManager(runtimePath, modelConfigPath)
+	rm := NewRuntimeManager(runtimePath)
 	if rm.GetActiveModel() != "" {
 		t.Errorf("Expected empty active model, got: %s", rm.GetActiveModel())
 	}
@@ -40,7 +39,7 @@ func TestRuntimeManager(t *testing.T) {
 	}
 
 	// Test loading from existing file
-	rm2 := NewRuntimeManager(runtimePath, modelConfigPath)
+	rm2 := NewRuntimeManager(runtimePath)
 	if rm2.GetActiveModel() != "Test Model" {
 		t.Errorf("Expected 'Test Model' after reload, got: %s", rm2.GetActiveModel())
 	}
@@ -124,7 +123,6 @@ func TestRuntimeManagerCreatesFileOnLoad(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	runtimePath := filepath.Join(tmpDir, "runtime.conf")
-	modelConfigPath := filepath.Join(tmpDir, "model.conf")
 
 	// Verify file doesn't exist initially
 	if _, err := os.Stat(runtimePath); !os.IsNotExist(err) {
@@ -132,7 +130,7 @@ func TestRuntimeManagerCreatesFileOnLoad(t *testing.T) {
 	}
 
 	// Create RuntimeManager - this should create the file
-	rm := NewRuntimeManager(runtimePath, modelConfigPath)
+	rm := NewRuntimeManager(runtimePath)
 
 	// Verify file was created
 	if _, err := os.Stat(runtimePath); os.IsNotExist(err) {
