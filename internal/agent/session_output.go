@@ -21,39 +21,67 @@ import (
 
 // ============================================================================
 // TLV Write Helpers
+//
+// All writes check for a previously broken output stream.  On the first
+// write error the session context is canceled, which stops the agent
+// loop and prevents wasted API calls on a dead adapter.
 // ============================================================================
 
+// markOutputBroken sets the broken flag and cancels the session context.
+// Idempotent — only the first call has any effect.
+func (s *Session) markOutputBroken() {
+	if s.outputBroken.CompareAndSwap(false, true) {
+		s.sessionCancel()
+	}
+}
+
+// writeTLV writes a TLV frame. On error, marks output as broken.
+func (s *Session) writeTLV(tag string, value string) {
+	if s.outputBroken.Load() || s.Output == nil {
+		return
+	}
+	if err := stream.WriteTLV(s.Output, tag, value); err != nil {
+		s.markOutputBroken()
+	}
+}
+
+// writeSystemMsg writes a TagSystemMsg frame. On error, marks output as broken.
+func (s *Session) writeSystemMsg(msg stream.SystemMsg) {
+	if s.outputBroken.Load() || s.Output == nil {
+		return
+	}
+	if err := stream.WriteSystemMsg(s.Output, msg); err != nil {
+		s.markOutputBroken()
+	}
+}
+
 func (s *Session) writeError(msg string) {
-	_ = stream.WriteSystemMsg(s.Output, stream.ErrorMsg{Text: msg}) //nolint:errcheck
+	s.writeSystemMsg(stream.ErrorMsg{Text: msg})
 }
 
 func (s *Session) writeNotify(msg string) {
-	_ = stream.WriteSystemMsg(s.Output, stream.NotifyMsg{Text: msg}) //nolint:errcheck
+	s.writeSystemMsg(stream.NotifyMsg{Text: msg})
 }
 
 func (s *Session) writeNotifyf(format string, args ...any) {
 	s.writeNotify(fmt.Sprintf(format, args...))
 }
 
-// writeTLVStr writes a string TLV frame and flushes. Best effort — errors are ignored.
-//
-//nolint:errcheck
+// writeTLVStr writes a string TLV frame.
 func (s *Session) writeTLVStr(tag string, msg string) {
-	if s.Output == nil {
-		return
-	}
-	_ = stream.WriteTLV(s.Output, tag, msg) //nolint:errcheck // best-effort write to adapter
+	s.writeTLV(tag, msg)
 }
 
-// writeTLVJSON marshals a value to JSON and writes it as a TLV frame. Best effort.
-//
-//nolint:errcheck
+// writeTLVJSON marshals a value to JSON and writes it as a TLV frame.
 func (s *Session) writeTLVJSON(tag string, v any) {
-	if s.Output == nil {
+	if s.outputBroken.Load() || s.Output == nil {
 		return
 	}
-	data, _ := json.Marshal(v)
-	_ = stream.WriteTLV(s.Output, tag, string(data)) //nolint:errcheck // best-effort write to adapter
+	data, err := json.Marshal(v)
+	if err != nil {
+		return
+	}
+	s.writeTLV(tag, string(data))
 }
 
 func (s *Session) writeToolUseInput(input json.RawMessage, id string) {
@@ -95,10 +123,6 @@ func (s *Session) requestSystemInfo() {
 // "reasoning", or "all".
 // Must only be called from the run() goroutine.
 func (s *Session) sendSystemInfo(kind string) {
-	if s.Output == nil {
-		return
-	}
-
 	switch kind {
 	case "all":
 		s.sendMessageVersionMsg()
@@ -120,11 +144,11 @@ func (s *Session) sendSystemInfo(kind string) {
 }
 
 func (s *Session) sendMessageVersionMsg() {
-	_ = stream.WriteSystemMsg(s.Output, MessageVersionMsg{MessageVersion: MessageVersion}) //nolint:errcheck
+	s.writeSystemMsg(MessageVersionMsg{MessageVersion: MessageVersion})
 }
 
 func (s *Session) sendTaskMsg() {
-	_ = stream.WriteSystemMsg(s.Output, TaskMsg{ //nolint:errcheck
+	s.writeSystemMsg(TaskMsg{
 		InProgress:  s.inProgress.Load(),
 		CurrentStep: int(s.currentStep.Load()),
 		MaxSteps:    s.MaxSteps,
@@ -143,7 +167,7 @@ func (s *Session) sendModelMsg() {
 	if activeModel := s.ModelManager.GetActive(); activeModel != nil {
 		activeName = activeModel.Name
 	}
-	_ = stream.WriteSystemMsg(s.Output, ModelMsg{ //nolint:errcheck
+	s.writeSystemMsg(ModelMsg{
 		ActiveModelID:   activeID,
 		ActiveModelName: activeName,
 		ContextLimit:    s.ContextLimit,
@@ -156,7 +180,7 @@ func (s *Session) sendModelListMsg() {
 	if s.ModelManager == nil {
 		return
 	}
-	_ = stream.WriteSystemMsg(s.Output, ModelListMsg{ //nolint:errcheck
+	s.writeSystemMsg(ModelListMsg{
 		Models:          s.ModelManager.GetModels(),
 		ModelConfigPath: s.ModelManager.GetFilePath(),
 	})
@@ -167,7 +191,7 @@ func (s *Session) sendThemeMsg() {
 		return
 	}
 	name := s.RuntimeManager.GetActiveTheme()
-	_ = stream.WriteSystemMsg(s.Output, ThemeMsg{Name: name}) //nolint:errcheck
+	s.writeSystemMsg(ThemeMsg{Name: name})
 }
 
 // sendThemeListMsg sends the full list of available themes with content.
@@ -199,10 +223,10 @@ func (s *Session) sendThemeListMsg() {
 		}
 	}
 	if len(infos) > 0 {
-		_ = stream.WriteSystemMsg(s.Output, ThemeListMsg{Themes: infos}) //nolint:errcheck
+		s.writeSystemMsg(ThemeListMsg{Themes: infos})
 	}
 }
 
 func (s *Session) sendReasoningMsg() {
-	_ = stream.WriteSystemMsg(s.Output, ReasoningMsg{Level: int(s.reasoningLevel.Load())}) //nolint:errcheck
+	s.writeSystemMsg(ReasoningMsg{Level: int(s.reasoningLevel.Load())})
 }

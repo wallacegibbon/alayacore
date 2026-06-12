@@ -112,7 +112,12 @@ type Session struct {
 	// Only one task can run at a time, so a single slot is sufficient.
 	taskCancel atomic.Value
 
-	sessionCtx    context.Context    // canceled when input is exhausted
+	// outputBroken is set on the first write error to the output stream.
+	// Once true, all subsequent writes are skipped and the session context
+	// is canceled so we stop wasting API calls on a dead adapter.
+	outputBroken atomic.Bool
+
+	sessionCtx    context.Context    // canceled when input is exhausted or output breaks
 	sessionCancel context.CancelFunc // idempotent cancel
 	runDone       chan struct{}      // closed when run() exits
 }
@@ -243,7 +248,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 		if err != nil {
 			continue
 		}
-		_ = stream.WriteTLV(s.Output, tag, stream.WrapDelta(strconv.FormatUint(part.GetHistoryID(), 10), content)) //nolint:errcheck
+		s.writeTLV(tag, stream.WrapDelta(strconv.FormatUint(part.GetHistoryID(), 10), content))
 	}
 	return s
 }

@@ -99,7 +99,7 @@ func (s *Session) doAutoSummarize(ctx context.Context, messages []llm.Message, e
 // writeTLVWithID formats the historyID and writes a TLV entry to the output stream.
 func (s *Session) writeTLVWithID(tag string, historyID uint64, data string) {
 	id := strconv.FormatUint(historyID, 10)
-	_ = stream.WriteTLV(s.Output, tag, stream.WrapDelta(id, data)) //nolint:errcheck
+	s.writeTLV(tag, stream.WrapDelta(id, data))
 }
 
 //nolint:gocyclo // callback-heavy; extracting harms readability.
@@ -151,7 +151,12 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 			for _, req := range requests {
 				if s.toolConfirmSet != nil {
 					if _, ok := s.toolConfirmSet[req.ToolName]; ok {
-						if err := stream.WriteSystemMsg(s.Output, stream.ToolConfirmMsg{ID: req.ID}); err != nil {
+						// Must guarantee a response on ch even if output
+						// is broken, otherwise the agent blocks forever.
+						if s.outputBroken.Load() {
+							ch <- llm.ToolConfirmResponse{ID: req.ID, Error: "output broken"}
+						} else if err := stream.WriteSystemMsg(s.Output, stream.ToolConfirmMsg{ID: req.ID}); err != nil {
+							s.markOutputBroken()
 							ch <- llm.ToolConfirmResponse{ID: req.ID, Error: domainerrors.Wrap("tool", err).Error()}
 						}
 						continue
