@@ -92,9 +92,8 @@ type Session struct {
 
 	// confirmCh receives confirm responses from the input pump when the
 	// async OnToolConfirm callback is used. Set by the callback, read by
-	// handleConfirmCommand. No synchronization needed — the Output/Input
-	// channel chain establishes happens-before.
-	confirmCh chan<- llm.ToolConfirmResponse
+	// handleConfirmCommand. Atomic pointer for safe concurrent access.
+	confirmCh atomic.Pointer[chan<- llm.ToolConfirmResponse]
 
 	// toolConfirmSet contains tool names that require user confirmation
 	// before execution. If nil, no confirmation is needed for any tool.

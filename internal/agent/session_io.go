@@ -550,7 +550,8 @@ func (s *Session) handleConfirmCommand(args []string) {
 	}
 
 	id := args[0]
-	if s.confirmCh == nil {
+	p := s.confirmCh.Load()
+	if p == nil {
 		s.writeError("No pending tool confirmation")
 		return
 	}
@@ -566,7 +567,7 @@ func (s *Session) handleConfirmCommand(args []string) {
 		return
 	}
 
-	s.confirmCh <- llm.ToolConfirmResponse{ID: id, Allowed: allowed}
+	*p <- llm.ToolConfirmResponse{ID: id, Allowed: allowed}
 }
 
 // handleInputMsg processes a parsed input message. Called from run() goroutine.
