@@ -173,7 +173,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 			fd.Input = json.RawMessage(name + ": \n")
 		} else {
 			handler := GetHandler(name)
-			fd.Input = json.RawMessage(handler.FormatCall(fd.Input, to.styles.Load()))
+			fd.Input = json.RawMessage(handler.FormatCall(fd.Input))
 		}
 
 		to.windowBuffer.HandleToolUseEvent(fd, parseHistoryID(id))

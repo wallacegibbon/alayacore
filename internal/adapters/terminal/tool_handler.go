@@ -15,7 +15,7 @@ import (
 type ToolDisplayHandler interface {
 	// FormatCall formats the tool call for display.
 	// Returns the formatted string (may contain diff markers for edit_file).
-	FormatCall(input json.RawMessage, styles *Styles) string
+	FormatCall(input json.RawMessage) string
 }
 
 // ============================================================================
@@ -27,7 +27,7 @@ type GenericHandler struct {
 	name string
 }
 
-func (h *GenericHandler) FormatCall(input json.RawMessage, _ *Styles) string {
+func (h *GenericHandler) FormatCall(input json.RawMessage) string {
 	// Add newline at end so output starts on new line
 	return fmt.Sprintf("%s: %s\n", h.name, string(input))
 }
@@ -35,7 +35,7 @@ func (h *GenericHandler) FormatCall(input json.RawMessage, _ *Styles) string {
 // ExecuteCommandHandler handles execute_command calls.
 type ExecuteCommandHandler struct{}
 
-func (h *ExecuteCommandHandler) FormatCall(input json.RawMessage, _ *Styles) string {
+func (h *ExecuteCommandHandler) FormatCall(input json.RawMessage) string {
 	var args struct {
 		Command string `json:"command"`
 	}
@@ -49,7 +49,7 @@ func (h *ExecuteCommandHandler) FormatCall(input json.RawMessage, _ *Styles) str
 // ReadFileHandler handles read_file calls.
 type ReadFileHandler struct{}
 
-func (h *ReadFileHandler) FormatCall(input json.RawMessage, _ *Styles) string {
+func (h *ReadFileHandler) FormatCall(input json.RawMessage) string {
 	var args tools.ReadFileInput
 	if err := json.Unmarshal(input, &args); err != nil {
 		return "read_file: <parse error>"
@@ -69,7 +69,7 @@ func (h *ReadFileHandler) FormatCall(input json.RawMessage, _ *Styles) string {
 // WriteFileHandler handles write_file calls.
 type WriteFileHandler struct{}
 
-func (h *WriteFileHandler) FormatCall(input json.RawMessage, _ *Styles) string {
+func (h *WriteFileHandler) FormatCall(input json.RawMessage) string {
 	var args tools.WriteFileInput
 	if err := json.Unmarshal(input, &args); err != nil {
 		return "write_file: <parse error>"
@@ -85,7 +85,7 @@ func (h *WriteFileHandler) FormatCall(input json.RawMessage, _ *Styles) string {
 // EditFileHandler handles edit_file calls with diff display.
 type EditFileHandler struct{}
 
-func (h *EditFileHandler) FormatCall(input json.RawMessage, _ *Styles) string {
+func (h *EditFileHandler) FormatCall(input json.RawMessage) string {
 	var args tools.EditFileInput
 	if err := json.Unmarshal(input, &args); err != nil {
 		return "edit_file: <parse error>"
@@ -131,7 +131,7 @@ func (h *EditFileHandler) FormatCall(input json.RawMessage, _ *Styles) string {
 // SearchContentHandler handles search_content calls.
 type SearchContentHandler struct{}
 
-func (h *SearchContentHandler) FormatCall(input json.RawMessage, _ *Styles) string {
+func (h *SearchContentHandler) FormatCall(input json.RawMessage) string {
 	var args tools.SearchContentInput
 	if err := json.Unmarshal(input, &args); err != nil {
 		return "search_content: <parse error>"
