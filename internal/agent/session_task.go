@@ -147,6 +147,7 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 		},
 		OnToolConfirm: func(requests []llm.ToolConfirmRequest) <-chan llm.ToolConfirmResponse {
 			ch := make(chan llm.ToolConfirmResponse, len(requests))
+			s.confirmCh = ch // set before the loop so the input pump can write immediately
 
 			for _, req := range requests {
 				if s.toolConfirmSet != nil {
@@ -160,7 +161,6 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 				ch <- llm.ToolConfirmResponse{ID: req.ID, Allowed: true}
 			}
 
-			s.confirmCh = ch
 			return ch
 		},
 		OnStepStart: func(step int) error {
