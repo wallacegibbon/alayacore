@@ -85,17 +85,12 @@ func parseRuntimeConfig(content string) RuntimeConfig {
 }
 
 // formatRuntimeConfig formats the runtime config as key-value text
-func formatRuntimeConfig(config RuntimeConfig) string {
+func formatRuntimeConfig(cfg RuntimeConfig) string {
 	var sb strings.Builder
 	sb.WriteString("# AlayaCore runtime configuration\n")
 	sb.WriteString("# This file is automatically updated when you switch models or themes\n")
 	sb.WriteString("\n")
-	sb.WriteString("active_model: \"")
-	sb.WriteString(escapeQuoted(config.ActiveModel))
-	sb.WriteString("\"\n")
-	sb.WriteString("active_theme: \"")
-	sb.WriteString(escapeQuoted(config.ActiveTheme))
-	sb.WriteString("\"\n")
+	sb.WriteString(config.FormatKeyValue(cfg))
 	return sb.String()
 }
 

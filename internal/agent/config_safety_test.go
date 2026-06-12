@@ -4,9 +4,11 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/alayacore/alayacore/internal/config"
 )
 
-// --- escapeQuoted tests ---
+// --- EscapeQuoted tests ---
 
 func TestEscapeQuoted(t *testing.T) {
 	tests := []struct {
@@ -23,9 +25,9 @@ func TestEscapeQuoted(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := escapeQuoted(tt.input)
+			got := config.EscapeQuoted(tt.input)
 			if got != tt.want {
-				t.Errorf("escapeQuoted(%q) = %q, want %q", tt.input, got, tt.want)
+				t.Errorf("EscapeQuoted(%q) = %q, want %q", tt.input, got, tt.want)
 			}
 		})
 	}
