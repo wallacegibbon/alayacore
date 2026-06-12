@@ -100,10 +100,9 @@ func RenderDiffContent(content string, status ToolStatus, styles *Styles, innerW
 	result := make([]string, 0, len(lines))
 	for i, line := range lines {
 		if i == 0 {
-			// Header line: "edit_file: /path"
-			// Need to re-render with status indicator
-			path := strings.TrimPrefix(line, "edit_file: ")
-			header := status.Indicator(styles) + styles.Tool.Render("edit_file") + styles.ToolContent.Render(": "+path)
+			// Header line: "tool_name: args"
+			// Re-render with status indicator prefix
+			header := status.Indicator(styles) + colorizeSingleLineTool(line, styles)
 			if innerWidth > 0 {
 				header = wrapContent(header, innerWidth)
 			}
