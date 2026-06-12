@@ -115,8 +115,8 @@ func (s *Session) tryStartNextTask() bool {
 	// Ensure agent is initialized before spawning the task goroutine.
 	// This avoids calling ModelManager from the task goroutine and keeps
 	// all model state access in the run() goroutine.
-	if errMsg := s.ensureAgentInitialized(); errMsg != "" {
-		s.writeError(errMsg)
+	if err := s.ensureAgentInitialized(); err != nil {
+		s.writeError(err.Error())
 		s.inProgress.Store(false)
 		s.sendSystemInfo("task")
 		return false

@@ -50,7 +50,8 @@ func (a *Adapter) Start() int {
 	go func() {
 		err := readPrompts(inputWriter, os.Stdin)
 		if err != nil {
-			stream.WriteTLV(inputWriter, stream.TagUserT, ":cancel_all") //nolint:errcheck
+			// Best-effort cancellation; Close() below signals EOF regardless.
+			_ = stream.WriteTLV(inputWriter, stream.TagUserT, ":cancel_all")
 		}
 		inputWriter.Close()
 		if err != nil {

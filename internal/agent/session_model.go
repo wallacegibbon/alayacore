@@ -103,23 +103,23 @@ func (s *Session) createProviderAndAgent(modelConfig *ModelConfig) (llm.Provider
 	return provider, agent, nil
 }
 
-func (s *Session) ensureAgentInitialized() string {
+func (s *Session) ensureAgentInitialized() error {
 	// Fast path: both agent and provider are ready.
 	if s.agent.Load() != nil && s.provider.Load() != nil {
-		return ""
+		return nil
 	}
 
 	if s.ModelManager == nil {
-		return "Model manager not initialized"
+		return fmt.Errorf("model manager not initialized")
 	}
 	activeModel := s.ModelManager.GetActive()
 	if activeModel == nil {
-		return "No model configured. Please add a model to ~/.alayacore/model.conf"
+		return fmt.Errorf("no model configured; please add a model to model.conf")
 	}
 
 	provider, agent, err := s.createProviderAndAgent(activeModel)
 	if err != nil {
-		return "Failed to create provider: " + err.Error()
+		return fmt.Errorf("failed to create provider: %w", err)
 	}
 
 	s.agent.Store(agent)
@@ -130,7 +130,7 @@ func (s *Session) ensureAgentInitialized() string {
 	if p := s.provider.Load(); p != nil {
 		(*p).SetReasoningLevel(int(s.reasoningLevel.Load()))
 	}
-	return ""
+	return nil
 }
 
 func (s *Session) initAgentFromConfig(modelConfig *ModelConfig) error {
