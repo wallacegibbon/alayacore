@@ -15,7 +15,7 @@ import (
 //	key: "quoted value"
 //
 // Supported types: string, int*, uint*, bool, float*, time.Time.
-//   - Strings are double-quoted and escaped (via escapeQuoted).
+//   - Strings are double-quoted and escaped (via escapeQuotedStr).
 //   - time.Time is formatted as RFC3339.
 //   - All other types use their default fmt/strconv formatting.
 //

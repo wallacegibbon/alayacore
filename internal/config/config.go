@@ -1,3 +1,4 @@
+// Package config parses CLI flags and configuration files.
 package config
 
 import (

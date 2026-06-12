@@ -1,3 +1,4 @@
+// Package skills discovers and loads AI skill definitions from SKILL.md files.
 package skills
 
 // Metadata represents the frontmatter of a SKILL.md file

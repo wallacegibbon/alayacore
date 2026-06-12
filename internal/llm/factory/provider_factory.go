@@ -1,3 +1,4 @@
+// Package factory creates LLM providers from configuration.
 package factory
 
 import (
