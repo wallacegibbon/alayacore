@@ -266,6 +266,9 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 					stepMessage.Content[i].UpdateContentPartMeta(id, RoleAssistant)
 				}
 			}
+			// Strip empty placeholders that providers may have inserted
+			// to keep delta indices aligned with content positions.
+			stepMessage.Content = stripEmptyPlaceholders(stepMessage.Content)
 			if e.StopReason == "max_tokens" || e.StopReason == "length" {
 				truncated = true
 			}
@@ -379,6 +382,28 @@ func getOrAssignID(callbacks StreamCallbacks, idByIndex map[int]uint64, index in
 		return id
 	}
 	return 0
+}
+
+// stripEmptyPlaceholders removes empty ReasoningPart and TextPart placeholders
+// from the content array. OpenAI emits these slots at fixed indices (0 and 1)
+// to keep delta indices aligned with content positions, even when absent.
+func stripEmptyPlaceholders(content []ContentPart) []ContentPart {
+	filtered := make([]ContentPart, 0, len(content))
+	for _, part := range content {
+		switch p := part.(type) {
+		case *ReasoningPart:
+			if p.Text != "" {
+				filtered = append(filtered, part)
+			}
+		case *TextPart:
+			if p.Text != "" {
+				filtered = append(filtered, part)
+			}
+		default:
+			filtered = append(filtered, part)
+		}
+	}
+	return filtered
 }
 
 // toolUseEventToPart converts a ToolUseCompleteEvent to a ToolUsePart,

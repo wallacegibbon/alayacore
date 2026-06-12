@@ -33,6 +33,13 @@ package providers
 //    text content alongside tool calls in the same assistant message.
 //    openaiConvertToolCalls preserves text content when present, so
 //    multi-turn tool call chains don't lose the assistant's commentary.
+//
+// 7. CONTENT BLOCK INDEXING: Delta event indices always use fixed positions:
+//    reasoning=0, text=1, tools=2+wire_index. The final message always includes
+//    reasoning and text content blocks (even if empty) so that indices match
+//    content array positions. The agent strips empty placeholders in
+//    StepCompleteEvent after assigning history IDs. This avoids the need for
+//    dynamic index computation and works regardless of streaming order.
 
 import (
 	"context"
@@ -382,19 +389,21 @@ func (s *openAIStreamState) getToolCalls() []llm.ToolUseCompleteEvent {
 // OpenAI delivers reasoning, text, and tool calls as separate flat delta fields.
 // This function merges them into a single domain Message with a unified ContentPart array,
 // matching the Anthropic-inspired content block model used by the rest of the codebase.
+//
+// Reasoning and text are always included as content blocks (even when empty) so that
+// their fixed indices (0 and 1) match the delta event indices used during streaming.
+// The agent strips empty placeholders after assigning history IDs via StepCompleteEvent.
 func (s *openAIStreamState) getMessage() llm.Message {
 	tcs := s.getToolCalls()
 	content := make([]llm.ContentPart, 0, 2+len(tcs))
-	if s.reasoningBuilder.Len() > 0 {
-		content = append(content, &llm.ReasoningPart{
-			Text: s.reasoningBuilder.String(),
-		})
-	}
-	if s.textBuilder.Len() > 0 {
-		content = append(content, &llm.TextPart{
-			Text: s.textBuilder.String(),
-		})
-	}
+	// Always add reasoning slot (index 0), may be empty placeholder.
+	content = append(content, &llm.ReasoningPart{
+		Text: s.reasoningBuilder.String(),
+	})
+	// Always add text slot (index 1), may be empty placeholder.
+	content = append(content, &llm.TextPart{
+		Text: s.textBuilder.String(),
+	})
 	for _, tc := range tcs {
 		content = append(content, &llm.ToolUsePart{
 			ID:       tc.ID,
