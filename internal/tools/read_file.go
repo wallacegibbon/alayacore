@@ -138,8 +138,9 @@ func readImageFile(path, mimeType string) ([]llm.ContentPart, error) {
 	}, nil
 }
 
-// readLargeFileTruncated reads a large file up to maxTextReadSize and returns
-// the content with metadata about the truncation.
+// readLargeFileTruncated reads a large file and returns up to maxTextReadSize
+// bytes of content with a metadata header showing total line count and size.
+// Single-pass: collects lines until the byte limit, then continues counting.
 func readLargeFileTruncated(path string, totalSize int64) ([]llm.ContentPart, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -147,39 +148,27 @@ func readLargeFileTruncated(path string, totalSize int64) ([]llm.ContentPart, er
 	}
 	defer file.Close()
 
-	// First pass: count total lines
-	totalLines := 0
 	scanner := bufio.NewScanner(file)
 	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
-	for scanner.Scan() {
-		totalLines++
-	}
-	if err := scanner.Err(); err != nil {
-		return nil, err
-	}
 
-	// Reset file position for second pass
-	if _, err := file.Seek(0, 0); err != nil {
-		return nil, err
-	}
-
-	// Second pass: read lines up to maxTextReadSize
 	var lines []string
 	var bytesRead int64
-	scanner = bufio.NewScanner(file)
-	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
+	totalLines := 0
+	collecting := true
 
 	for scanner.Scan() {
-		line := scanner.Text()
-		lineBytes := int64(len(line)) + 1 // +1 for newline
+		totalLines++
+		if collecting {
+			line := scanner.Text()
+			lineBytes := int64(len(line)) + 1 // +1 for newline
 
-		// Stop if adding this line would exceed limit (but always include at least one line)
-		if bytesRead+lineBytes > maxTextReadSize && len(lines) > 0 {
-			break
+			if bytesRead+lineBytes > maxTextReadSize && len(lines) > 0 {
+				collecting = false
+				continue
+			}
+			lines = append(lines, line)
+			bytesRead += lineBytes
 		}
-
-		lines = append(lines, line)
-		bytesRead += lineBytes
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, err
