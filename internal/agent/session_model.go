@@ -104,12 +104,9 @@ func (s *Session) createProviderAndAgent(modelConfig *ModelConfig) (llm.Provider
 }
 
 func (s *Session) ensureAgentInitialized() string {
-	// Fast path: already initialized.
-	if s.agent.Load() != nil {
-		if s.provider.Load() != nil {
-			// provider is set — agent is ready
-			return ""
-		}
+	// Fast path: both agent and provider are ready.
+	if s.agent.Load() != nil && s.provider.Load() != nil {
+		return ""
 	}
 
 	if s.ModelManager == nil {
