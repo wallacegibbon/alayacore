@@ -30,34 +30,40 @@ const (
 // User Prompt
 // ============================================================================
 
-// handleUserPrompt processes a user prompt through the agent loop.
-// Takes the current messages and entries, returns the updated values after processing.
+// handleUserPrompt echoes the user prompt to output, appends it to
+// both messages and entries, then runs the agent loop.  It returns
+// the updated messages and entries (including assistant response).
 func (s *Session) handleUserPrompt(ctx context.Context, messages []llm.Message, entries []llm.ContentPart, prompt string, images []string) ([]llm.Message, []llm.ContentPart) {
 	if s.shouldAutoSummarize() {
 		messages, entries = s.doAutoSummarize(ctx, messages, entries)
 	}
 
-	// Build content parts: images first, then text
+	// Build content parts with history IDs and echo to output.
+	// ContentParts are shared between messages and entries so both
+	// representations refer to the same objects.
 	content := make([]llm.ContentPart, 0, 1+len(images))
 	for _, img := range images {
-		content = append(content, &llm.ImagePart{DataURL: img})
+		id := s.histIncAndGet()
+		part := &llm.ImagePart{DataURL: img, HistoryID: id, Role: llm.RoleUser}
+		content = append(content, part)
+		entries = append(entries, part)
+		s.writeTLVStr(stream.TagUserI, stream.WrapDelta(strconv.FormatUint(id, 10), img))
 	}
-	content = append(content, &llm.TextPart{Text: prompt})
+	id := s.histIncAndGet()
+	part := &llm.TextPart{Text: prompt, HistoryID: id, Role: llm.RoleUser}
+	content = append(content, part)
+	entries = append(entries, part)
+	s.writeTLVStr(stream.TagUserT, stream.WrapDelta(strconv.FormatUint(id, 10), prompt))
 
+	// Append to messages for the LLM request.  If the preceding message
+	// is also from the user, merge to avoid duplicate user messages.
 	if len(messages) > 0 && messages[len(messages)-1].Role == llm.RoleUser {
-		messages[len(messages)-1].Content = append(
-			messages[len(messages)-1].Content,
-			content...,
-		)
+		messages[len(messages)-1].Content = append(messages[len(messages)-1].Content, content...)
 	} else {
-		messages = append(messages, llm.Message{
-			Role:    llm.RoleUser,
-			Content: content,
-		})
+		messages = append(messages, llm.Message{Role: llm.RoleUser, Content: content})
 	}
 
 	updatedMessages, newEntries, _, err := s.processPrompt(ctx, messages)
-
 	entries = append(entries, newEntries...)
 
 	if err != nil {

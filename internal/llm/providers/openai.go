@@ -139,7 +139,7 @@ func NewOpenAIWithConfig(cfg BaseConfig) (*OpenAIProvider, error) {
 		cfg.BaseURL = "https://api.openai.com/v1"
 	}
 	p := &OpenAIProvider{}
-	p.setBaseConfig(cfg, "gpt-4o", llm.DefaultMaxTokens)
+	p.setBaseConfig(cfg, "gpt-4o")
 	if p.apiKey == "" {
 		return nil, fmt.Errorf("API key is required")
 	}
@@ -149,7 +149,7 @@ func NewOpenAIWithConfig(cfg BaseConfig) (*OpenAIProvider, error) {
 // NewOpenAI creates a new OpenAI provider via functional options.
 func NewOpenAI(opts ...OpenAIOption) (*OpenAIProvider, error) {
 	p := &OpenAIProvider{}
-	p.setBaseConfig(BaseConfig{}, "gpt-4o", llm.DefaultMaxTokens)
+	p.setBaseConfig(BaseConfig{}, "gpt-4o")
 	p.baseURL = "https://api.openai.com/v1"
 	for _, opt := range opts {
 		opt(p)

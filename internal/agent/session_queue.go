@@ -90,27 +90,6 @@ func (s *Session) runTask(ctx context.Context, item QueueItem, taskMessages []ll
 		}
 	}()
 
-	// Echo user prompts before any work so output ordering is correct even if
-	// the task is canceled during initialization.
-	if item.Type == TaskTypePrompt {
-		for _, img := range item.Images {
-			id := s.histIncAndGet()
-			entries = append(entries, &llm.ImagePart{
-				DataURL:   img,
-				HistoryID: id,
-				Role:      llm.RoleUser,
-			})
-			s.writeTLVStr(stream.TagUserI, stream.WrapDelta(strconv.FormatUint(id, 10), img))
-		}
-		id := s.histIncAndGet()
-		entries = append(entries, &llm.TextPart{
-			Text:      item.Content,
-			HistoryID: id,
-			Role:      llm.RoleUser,
-		})
-		s.writeTLVStr(stream.TagUserT, stream.WrapDelta(strconv.FormatUint(id, 10), item.Content))
-	}
-
 	s.requestSystemInfo()
 
 	s.currentStep.Store(0)

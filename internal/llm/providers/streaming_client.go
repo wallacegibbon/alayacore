@@ -20,6 +20,8 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/alayacore/alayacore/internal/llm"
 )
 
 // ============================================================================
@@ -47,7 +49,7 @@ type baseProvider struct {
 }
 
 // setBaseConfig applies the common config to a baseProvider.
-func (b *baseProvider) setBaseConfig(cfg BaseConfig, defaultModel string, defaultMaxTokens int) {
+func (b *baseProvider) setBaseConfig(cfg BaseConfig, defaultModel string) {
 	b.apiKey = cfg.APIKey
 	b.baseURL = strings.TrimSuffix(cfg.BaseURL, "/")
 	b.model = cfg.Model
@@ -60,7 +62,7 @@ func (b *baseProvider) setBaseConfig(cfg BaseConfig, defaultModel string, defaul
 	}
 	b.maxTokens = cfg.MaxTokens
 	if b.maxTokens == 0 {
-		b.maxTokens = defaultMaxTokens
+		b.maxTokens = llm.DefaultMaxTokens
 	}
 }
 

@@ -206,7 +206,7 @@ func NewAnthropicWithConfig(cfg BaseConfig) (*AnthropicProvider, error) {
 		cfg.BaseURL = "https://api.anthropic.com"
 	}
 	p := &AnthropicProvider{}
-	p.setBaseConfig(cfg, "claude-3-5-sonnet-20241022", llm.DefaultMaxTokens)
+	p.setBaseConfig(cfg, "claude-3-5-sonnet-20241022")
 	if p.apiKey == "" {
 		return nil, fmt.Errorf("API key is required")
 	}
@@ -216,7 +216,7 @@ func NewAnthropicWithConfig(cfg BaseConfig) (*AnthropicProvider, error) {
 // NewAnthropic creates a new Anthropic provider via functional options.
 func NewAnthropic(opts ...AnthropicOption) (*AnthropicProvider, error) {
 	p := &AnthropicProvider{}
-	p.setBaseConfig(BaseConfig{}, "claude-3-5-sonnet-20241022", llm.DefaultMaxTokens)
+	p.setBaseConfig(BaseConfig{}, "claude-3-5-sonnet-20241022")
 	p.baseURL = "https://api.anthropic.com"
 	for _, opt := range opts {
 		opt(p)
