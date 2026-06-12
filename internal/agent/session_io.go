@@ -577,7 +577,7 @@ func (s *Session) handleInputMsg(msg inputMsg) {
 		// Immediate commands are handled directly; deferred commands
 		// go through the task queue.
 		if IsImmediate(cmd) {
-			s.handleCommand(context.Background(), cmd)
+			s.handleCommand(s.sessionCtx, cmd)
 		} else {
 			s.submitDeferredCommand(cmd)
 		}
