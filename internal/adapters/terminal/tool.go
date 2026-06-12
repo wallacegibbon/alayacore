@@ -32,9 +32,10 @@ func (s ToolStatus) Indicator(styles *Styles) string {
 		return lipgloss.NewStyle().Foreground(styles.ColorError).Render("• ")
 	case ToolStatusPending:
 		return lipgloss.NewStyle().Foreground(styles.ColorDim).Render("• ")
-	default:
+	case ToolStatusNone:
 		return lipgloss.NewStyle().Foreground(styles.ColorDim).Render("· ")
 	}
+	return ""
 }
 
 // ============================================================================
