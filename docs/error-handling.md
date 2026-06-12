@@ -85,7 +85,7 @@ if stopReason != "" && stopReason != "end_turn" && stopReason != "max_tokens" &&
 
 Truncation (`max_tokens` / `length`) is **not** an error at the provider level — the response is valid, just incomplete. The provider includes the stop reason in `StepCompleteEvent.StopReason`.
 
-The agent detects truncation in `streamEvents` and returns `ErrResponseTruncated` via `executeStep`. Partial messages are still included in the `StreamResult` so the caller can inspect what was generated before the cutoff.
+The agent detects truncation in `streamEvents` and checks for it in `Stream()`. Partial messages are still included in the `StreamResult` so the caller can inspect what was generated before the cutoff.
 
 ```go
 // In streamEvents:

@@ -11,7 +11,7 @@ When a `ToolUsePart` event arrives during streaming, the agent checks whether co
 
 All results are collected and then re-ordered by tool call ID to match the original `stepMessage.Content` order.
 
-See `internal/llm/agent.go` → `executeStep()`, `streamEvents()`, and `executeDeferredTools()`.
+See `internal/llm/agent.go` → `Stream()`, `streamEvents()`, and `executeDeferredTools()`.
 
 ## Execution Strategy
 

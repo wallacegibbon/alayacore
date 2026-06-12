@@ -58,14 +58,12 @@ func NewAgent(config AgentConfig) *Agent {
 type StreamCallbacks struct {
 	OnTextDelta      func(delta string, historyID uint64) error
 	OnReasoningDelta func(delta string, historyID uint64) error
-	// OnToolUseStart fires when a tool name and ID are known (before args stream).
-	OnToolUseStart func(toolCallID, toolName string, historyID uint64) error
-	// OnToolUseInput fires when tool arguments finish streaming.
-	OnToolUseInput  func(toolCallID string, input json.RawMessage, historyID uint64) error
-	OnToolConfirm   func(requests []ToolConfirmRequest) <-chan ToolConfirmResponse
-	OnToolUseOutput func(toolCallID string, content []ContentPart, err error, historyID uint64) error
-	OnStepStart     func(step int) error
-	OnStepFinish    func(messages []Message, usage Usage) error
+	OnToolUseStart   func(toolCallID, toolName string, historyID uint64) error
+	OnToolUseInput   func(toolCallID string, input json.RawMessage, historyID uint64) error
+	OnToolUseOutput  func(toolCallID string, content []ContentPart, err error, historyID uint64) error
+	OnToolConfirm    func(requests []ToolConfirmRequest) <-chan ToolConfirmResponse
+	OnStepStart      func(step int) error
+	OnStepFinish     func(messages []Message, usage Usage) error
 
 	// IDGen provides unique history IDs. Called once per content block
 	// (first delta for AT/AR, once for each AF/UF). The returned ID is
@@ -101,7 +99,9 @@ type StreamResult struct {
 	Usage    Usage
 }
 
-// Stream executes the agent with streaming callbacks
+// Stream executes the agent with streaming callbacks.
+// Tools are confirmed and executed as soon as their arguments finish streaming
+// (on ToolUseCompleteEvent), overlapping with other tools still being streamed.
 func (a *Agent) Stream(ctx context.Context, messages []Message, callbacks StreamCallbacks) (*StreamResult, error) {
 	allMessages := make([]Message, len(messages))
 	copy(allMessages, messages)
@@ -115,16 +115,35 @@ func (a *Agent) Stream(ctx context.Context, messages []Message, callbacks Stream
 	}
 
 	for step := 1; step <= maxSteps; step++ {
-		updated, stepUsage, taskDone, truncated, err := a.executeStep(ctx, step, allMessages, callbacks)
+		if callbacks.OnStepStart != nil {
+			if err := callbacks.OnStepStart(step); err != nil {
+				return nil, err
+			}
+		}
+
+		events, err := a.config.Provider.StreamMessages(ctx, allMessages, a.toolDefinitions(), a.config.SystemPrompt, a.config.ExtraSystemPrompt)
+		if err != nil {
+			return nil, fmt.Errorf("provider stream failed: %w", err)
+		}
+
+		stepMessages, stepUsage, truncated, err := a.streamEvents(ctx, events, callbacks)
 		if err != nil {
 			return nil, err
 		}
-		allMessages = updated
+
+		allMessages = append(allMessages, stepMessages...)
+
+		if callbacks.OnStepFinish != nil {
+			if err := callbacks.OnStepFinish(allMessages, stepUsage); err != nil {
+				return nil, err
+			}
+		}
 
 		totalUsage.InputTokens += stepUsage.InputTokens
 		totalUsage.OutputTokens += stepUsage.OutputTokens
 
-		if taskDone {
+		// len(stepMessages) == 1 means no more tooluse.
+		if truncated || len(stepMessages) == 1 {
 			result := &StreamResult{Messages: allMessages, Usage: totalUsage}
 			if truncated {
 				return result, ErrResponseTruncated
@@ -136,69 +155,14 @@ func (a *Agent) Stream(ctx context.Context, messages []Message, callbacks Stream
 	return &StreamResult{Messages: allMessages, Usage: totalUsage}, ErrMaxStepsExceeded
 }
 
-// executeStep runs one iteration of the agent loop.
-// step is 1-indexed. Returns updated allMessages, stepUsage, whether the task is
-// done, whether the response was truncated, and any fatal error.
-//
-// Tools are confirmed and executed as soon as their arguments finish streaming
-// (on ToolUseCompleteEvent), overlapping with other tools still being streamed.
-func (a *Agent) executeStep(ctx context.Context, step int, allMessages []Message, callbacks StreamCallbacks) ([]Message, Usage, bool, bool, error) {
-	if callbacks.OnStepStart != nil {
-		if err := callbacks.OnStepStart(step); err != nil {
-			return nil, Usage{}, false, false, err
-		}
-	}
-
-	events, err := a.config.Provider.StreamMessages(ctx, allMessages, a.toolDefinitions(), a.config.SystemPrompt, a.config.ExtraSystemPrompt)
-	if err != nil {
-		return nil, Usage{}, false, false, fmt.Errorf("provider stream failed: %w", err)
-	}
-
-	stepMessage, stepUsage, results, truncated, err := a.streamEvents(ctx, events, callbacks)
-	if err != nil {
-		return nil, Usage{}, false, false, err
-	}
-
-	// Re-order results by tool call ID to match the LLM's intended order.
-	// toolUses are extracted from stepMessage.Content, which preserves the
-	// SSE index order (0, 1, 2...) from the streaming response. Each result
-	// carries its tool call ID, so we place them at the correct position
-	// regardless of execution or collection order.
-	toolUses := extractToolUses(stepMessage.Content)
-	finalResults := make([]ContentPart, len(toolUses))
-	idToTool := make(map[string]int, len(toolUses))
-	for i, tc := range toolUses {
-		idToTool[tc.ID] = i
-	}
-	for _, r := range results {
-		if tr, ok := r.(*ToolResultPart); ok {
-			if idx, ok := idToTool[tr.ID]; ok {
-				finalResults[idx] = r
-			}
-		}
-	}
-
-	allMessages = append(allMessages, stepMessage)
-	if len(finalResults) > 0 && !truncated {
-		allMessages = append(allMessages, Message{Role: RoleTool, Content: finalResults})
-	}
-
-	if callbacks.OnStepFinish != nil {
-		if err := callbacks.OnStepFinish(allMessages, stepUsage); err != nil {
-			return nil, Usage{}, false, false, err
-		}
-	}
-
-	taskDone := truncated || len(toolUses) == 0
-	return allMessages, stepUsage, taskDone, truncated, nil
-}
-
 // streamEvents iterates streaming events, firing callbacks and collecting
-// tool calls. Assigns unique history IDs via IDGen on first touch of each
-// content block, passes them to callbacks, and stores them on ContentParts.
+// tool calls. Returns the assembled messages (assistant response + optional
+// tool results), usage, and whether the response was truncated.
+// Assigns unique history IDs via IDGen on first touch of each content block,
+// passes them to callbacks, and stores them on ContentParts.
 //
 //nolint:gocyclo // extracting further would harm readability
-func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, error], callbacks StreamCallbacks) (Message, Usage, []ContentPart, bool, error) {
+func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, error], callbacks StreamCallbacks) ([]Message, Usage, bool, error) {
 	var (
 		stepMessage Message
 		stepUsage   Usage
@@ -221,28 +185,28 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 
 	for event, err := range events {
 		if err != nil {
-			return Message{}, Usage{}, nil, false, err
+			return nil, Usage{}, false, err
 		}
 
 		switch e := event.(type) {
 		case TextDeltaEvent:
 			if callbacks.OnTextDelta != nil {
 				if err := callbacks.OnTextDelta(e.Delta, getOrAssignID(callbacks, idByIndex, e.Index)); err != nil {
-					return Message{}, Usage{}, nil, false, err
+					return nil, Usage{}, false, err
 				}
 			}
 
 		case ReasoningDeltaEvent:
 			if callbacks.OnReasoningDelta != nil {
 				if err := callbacks.OnReasoningDelta(e.Delta, getOrAssignID(callbacks, idByIndex, e.Index)); err != nil {
-					return Message{}, Usage{}, nil, false, err
+					return nil, Usage{}, false, err
 				}
 			}
 
 		case ToolUseStartEvent:
 			if callbacks.OnToolUseStart != nil {
 				if err := callbacks.OnToolUseStart(e.ID, e.ToolName, getOrAssignID(callbacks, idByIndex, e.Index)); err != nil {
-					return Message{}, Usage{}, nil, false, err
+					return nil, Usage{}, false, err
 				}
 			}
 
@@ -250,7 +214,7 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 			id := getOrAssignID(callbacks, idByIndex, e.Index)
 			if callbacks.OnToolUseInput != nil {
 				if err := callbacks.OnToolUseInput(e.ID, e.Input, id); err != nil {
-					return Message{}, Usage{}, nil, false, err
+					return nil, Usage{}, false, err
 				}
 			}
 			execCount++
@@ -281,7 +245,31 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 		results = append(results, <-resultCh)
 	}
 
-	return stepMessage, stepUsage, results, truncated, nil
+	// Re-order results by tool call ID to match the LLM's intended order.
+	// toolUses are extracted from stepMessage.Content, which preserves the
+	// SSE index order (0, 1, 2...) from the streaming response. Each result
+	// carries its tool call ID, so we place them at the correct position
+	// regardless of execution or collection order.
+	toolUses := extractToolUses(stepMessage.Content)
+	finalResults := make([]ContentPart, len(toolUses))
+	idToTool := make(map[string]int, len(toolUses))
+	for i, tc := range toolUses {
+		idToTool[tc.ID] = i
+	}
+	for _, r := range results {
+		if tr, ok := r.(*ToolResultPart); ok {
+			if idx, ok := idToTool[tr.ID]; ok {
+				finalResults[idx] = r
+			}
+		}
+	}
+
+	stepMessages := []Message{stepMessage}
+	if len(finalResults) > 0 && !truncated {
+		stepMessages = append(stepMessages, Message{Role: RoleTool, Content: finalResults})
+	}
+
+	return stepMessages, stepUsage, truncated, nil
 }
 
 // handleStreamedToolUse processes a completed tool use during streaming.
