@@ -218,15 +218,16 @@ func (w *Window) renderToolContent(innerWidth int, styles *Styles) string {
 	return call
 }
 
-// renderGenericContent renders content using styleContent with tag-based styling.
+// renderGenericContent renders content using applyTagStyle with tag-based styling.
 // Wraps and caches wrappedLines so that AppendContent can update them
 // incrementally (O(delta) per append instead of O(n) full re-wrap).
 // Do NOT move wrapping out of this function — see "Wrapping Strategy" above.
 func (w *Window) renderGenericContent(innerWidth int, styles *Styles, content string) string {
 	innerWidth = max(0, innerWidth)
 
-	// FAST PATH: Use cached wrapped lines if width matches
-	// This avoids re-styling and re-wrapping the entire content
+	// FAST PATH: Use cached wrapped lines if inner width matches.
+	// cache.width stores the outer (border-inclusive) width, so subtract
+	// BorderInnerPadding to compare against the requested inner width.
 	if len(w.cache.wrappedLines) > 0 && w.cache.width-BorderInnerPadding == innerWidth && innerWidth > 0 {
 		return strings.Join(w.cache.wrappedLines, "\n")
 	}
@@ -237,7 +238,7 @@ func (w *Window) renderGenericContent(innerWidth int, styles *Styles, content st
 	content = prepareContent(content)
 
 	// Apply styling based on tag
-	content = w.styleContent(content, styles)
+	content = w.applyTagStyle(content, styles)
 
 	// Wrap content
 	if innerWidth <= 0 {
@@ -351,7 +352,7 @@ func (w *Window) AppendContent(delta string, innerWidth int) {
 	if len(w.cache.wrappedLines) > 0 && innerWidth > 0 && w.styles != nil {
 		// Prepare delta before styling (strip input ANSI, expand tabs)
 		preparedDelta := prepareContent(delta)
-		styledDelta := w.styleContent(preparedDelta, w.styles)
+		styledDelta := w.applyTagStyle(preparedDelta, w.styles)
 		w.cache.wrappedLines = appendDeltaToLines(w.cache.wrappedLines, styledDelta, innerWidth)
 		// Mark cache as needing rebuild for rendered output, but wrappedLines is updated
 		// The rebuild will use cached wrappedLines instead of re-wrapping
@@ -363,8 +364,8 @@ func (w *Window) AppendContent(delta string, innerWidth int) {
 	}
 }
 
-// styleContent applies styling to content based on window tag
-func (w *Window) styleContent(content string, styles *Styles) string {
+// applyTagStyle applies styling to content based on window tag
+func (w *Window) applyTagStyle(content string, styles *Styles) string {
 	if styles == nil {
 		return content
 	}
