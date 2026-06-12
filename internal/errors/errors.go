@@ -5,45 +5,46 @@ package errors
 import "fmt"
 
 // ============================================================================
-// Sentinel Errors (SessionError with default operation context)
+// Sentinel Errors (message templates without operation context)
 //
-// These carry a default Op so they work standalone. Use Wrap() or
-// NewSessionError() to override the operation at the call site.
+// These carry an empty Op. Operation context is added by Wrap(), Wrapf(),
+// or NewSessionErrorf() at the call site. This way Error() never produces
+// duplicated "op: op: message" strings when sentinels are wrapped.
 // ============================================================================
 
 // Model errors
 var (
-	ErrModelNotFound              = &SessionError{Op: "model_set", Err: fmt.Errorf("model not found")}
-	ErrModelManagerNotInitialized = &SessionError{Op: "model", Err: fmt.Errorf("model manager not initialized")}
-	ErrNoModelFilePath            = &SessionError{Op: "model_load", Err: fmt.Errorf("no model file path configured")}
-	ErrFailedToLoadModels         = &SessionError{Op: "model_load", Err: fmt.Errorf("failed to load models")}
+	ErrModelNotFound              = &SessionError{Err: fmt.Errorf("model not found")}
+	ErrModelManagerNotInitialized = &SessionError{Err: fmt.Errorf("model manager not initialized")}
+	ErrNoModelFilePath            = &SessionError{Err: fmt.Errorf("no model file path configured")}
+	ErrFailedToLoadModels         = &SessionError{Err: fmt.Errorf("failed to load models")}
 )
 
 // Queue errors
 var (
-	ErrQueueItemNotFound = &SessionError{Op: "taskqueue_del", Err: fmt.Errorf("queue item not found")}
+	ErrQueueItemNotFound = &SessionError{Err: fmt.Errorf("queue item not found")}
 )
 
 // Session errors
 var (
-	ErrNoSessionFile       = &SessionError{Op: "save", Err: fmt.Errorf("no session file set")}
-	ErrFailedToSaveSession = &SessionError{Op: "save", Err: fmt.Errorf("failed to save session")}
+	ErrNoSessionFile       = &SessionError{Err: fmt.Errorf("no session file set")}
+	ErrFailedToSaveSession = &SessionError{Err: fmt.Errorf("failed to save session")}
 )
 
 // Command errors
 var (
-	ErrEmptyCommand    = &SessionError{Op: "command", Err: fmt.Errorf("empty command")}
-	ErrNothingToCancel = &SessionError{Op: "cancel", Err: fmt.Errorf("nothing to cancel")}
+	ErrEmptyCommand    = &SessionError{Err: fmt.Errorf("empty command")}
+	ErrNothingToCancel = &SessionError{Err: fmt.Errorf("nothing to cancel")}
 )
 
 // Input errors
 var (
-	ErrInvalidInputTag = &SessionError{Op: "input", Err: fmt.Errorf("invalid input tag")}
+	ErrInvalidInputTag = &SessionError{Err: fmt.Errorf("invalid input tag")}
 )
 
 // Provider errors
 var (
-	ErrProviderCreationFailed = &SessionError{Op: "provider", Err: fmt.Errorf("provider creation failed")}
+	ErrProviderCreationFailed = &SessionError{Err: fmt.Errorf("provider creation failed")}
 )
 
 // ============================================================================
@@ -58,9 +59,13 @@ type SessionError struct {
 }
 
 // Error implements the error interface.
+// Includes the operation context (Op) when set, producing "<op>: <message>".
 func (e *SessionError) Error() string {
 	if e.Err == nil {
 		return e.Op
+	}
+	if e.Op != "" {
+		return e.Op + ": " + e.Err.Error()
 	}
 	return e.Err.Error()
 }

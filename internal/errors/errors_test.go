@@ -6,10 +6,10 @@ import (
 )
 
 func TestSessionError(t *testing.T) {
-	t.Run("Error returns message", func(t *testing.T) {
+	t.Run("Error includes Op prefix", func(t *testing.T) {
 		err := &SessionError{Op: "test", Err: errors.New("underlying error")}
-		if err.Error() != "underlying error" {
-			t.Errorf("Error() = %q, want %q", err.Error(), "underlying error")
+		if err.Error() != "test: underlying error" {
+			t.Errorf("Error() = %q, want %q", err.Error(), "test: underlying error")
 		}
 	})
 
@@ -17,6 +17,13 @@ func TestSessionError(t *testing.T) {
 		err := &SessionError{Op: "test", Err: nil}
 		if err.Error() != "test" {
 			t.Errorf("Error() = %q, want %q", err.Error(), "test")
+		}
+	})
+
+	t.Run("Error without Op returns message only", func(t *testing.T) {
+		err := &SessionError{Op: "", Err: errors.New("something failed")}
+		if err.Error() != "something failed" {
+			t.Errorf("Error() = %q, want %q", err.Error(), "something failed")
 		}
 	})
 
@@ -41,8 +48,8 @@ func TestNewSessionError(t *testing.T) {
 	if err.Op != "save" {
 		t.Errorf("Op = %q, want %q", err.Op, "save")
 	}
-	if err.Error() != "disk full" {
-		t.Errorf("Error() = %q, want %q", err.Error(), "disk full")
+	if err.Error() != "save: disk full" {
+		t.Errorf("Error() = %q, want %q", err.Error(), "save: disk full")
 	}
 }
 
@@ -51,8 +58,8 @@ func TestNewSessionErrorf(t *testing.T) {
 	if err.Op != "model_set" {
 		t.Errorf("Op = %q, want %q", err.Op, "model_set")
 	}
-	if err.Error() != "model gpt-4 not found" {
-		t.Errorf("Error() = %q, want %q", err.Error(), "model gpt-4 not found")
+	if err.Error() != "model_set: model gpt-4 not found" {
+		t.Errorf("Error() = %q, want %q", err.Error(), "model_set: model gpt-4 not found")
 	}
 }
 
@@ -85,20 +92,19 @@ func TestWrapf(t *testing.T) {
 }
 
 func TestDomainErrors(t *testing.T) {
-	// Test that domain errors are properly defined
+	// Sentinel errors carry no Op — operation context is added by Wrap/Wrapf.
 	tests := []struct {
 		name string
 		err  error
-		op   string
 	}{
-		{"ErrModelNotFound", ErrModelNotFound, "model_set"},
-		{"ErrModelManagerNotInitialized", ErrModelManagerNotInitialized, "model"},
-		{"ErrNoModelFilePath", ErrNoModelFilePath, "model_load"},
-		{"ErrQueueItemNotFound", ErrQueueItemNotFound, "taskqueue_del"},
-		{"ErrNoSessionFile", ErrNoSessionFile, "save"},
-		{"ErrEmptyCommand", ErrEmptyCommand, "command"},
-		{"ErrNothingToCancel", ErrNothingToCancel, "cancel"},
-		{"ErrInvalidInputTag", ErrInvalidInputTag, "input"},
+		{"ErrModelNotFound", ErrModelNotFound},
+		{"ErrModelManagerNotInitialized", ErrModelManagerNotInitialized},
+		{"ErrNoModelFilePath", ErrNoModelFilePath},
+		{"ErrQueueItemNotFound", ErrQueueItemNotFound},
+		{"ErrNoSessionFile", ErrNoSessionFile},
+		{"ErrEmptyCommand", ErrEmptyCommand},
+		{"ErrNothingToCancel", ErrNothingToCancel},
+		{"ErrInvalidInputTag", ErrInvalidInputTag},
 	}
 
 	for _, tt := range tests {
@@ -107,8 +113,11 @@ func TestDomainErrors(t *testing.T) {
 			if !ok {
 				t.Fatalf("expected *SessionError, got %T", tt.err)
 			}
-			if sessionErr.Operation() != tt.op {
-				t.Errorf("Operation() = %q, want %q", sessionErr.Operation(), tt.op)
+			if sessionErr.Operation() != "" {
+				t.Errorf("sentinel %s should have empty Op, got %q", tt.name, sessionErr.Operation())
+			}
+			if sessionErr.Error() == "" {
+				t.Errorf("sentinel %s Error() should not be empty", tt.name)
 			}
 		})
 	}
