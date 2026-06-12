@@ -105,6 +105,8 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 	var processResult []llm.Message
 	var newEntries []llm.ContentPart
 
+	lastProcessed := len(history) // track where the last step ended
+
 	_, err := s.agent.Load().Stream(ctx, history, llm.StreamCallbacks{
 		OnTextDelta: func(delta string, historyID uint64) error {
 			id := strconv.FormatUint(historyID, 10)
@@ -178,8 +180,10 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 				processResult = messages
 			}
 
-			// New content parts already have HistoryID and Role set by llm agent.
-			newMsgs := messages[len(history):]
+			// Only capture messages added since the last step to avoid
+			// duplicating content across multi-step conversations.
+			newMsgs := messages[lastProcessed:]
+			lastProcessed = len(messages)
 			for _, msg := range newMsgs {
 				newEntries = append(newEntries, msg.Content...)
 			}
