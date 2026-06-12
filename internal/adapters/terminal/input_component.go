@@ -1,8 +1,6 @@
 package terminal
 
 import (
-	"strings"
-
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -49,7 +47,8 @@ func (m InputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.input, _ = m.input.Update(msg)
 	newValue := m.input.Value()
 
-	if m.editorContent != "" && oldValue != newValue && !strings.HasPrefix(oldValue, "[") {
+	// Clear editor content if user manually edits the input field
+	if m.editorContent != "" && oldValue != newValue {
 		m.editorContent = ""
 	}
 
@@ -181,7 +180,9 @@ func (m *InputModel) updateFromMsg(msg tea.Msg) {
 	m.input, _ = m.input.Update(msg)
 	newValue := m.input.Value()
 
-	if m.editorContent != "" && oldValue != newValue && !strings.HasPrefix(oldValue, "[") {
+	// Clear editor content if user manually edits the input field.
+	// This ensures manual input takes precedence over editor-sourced content.
+	if m.editorContent != "" && oldValue != newValue {
 		m.editorContent = ""
 	}
 }

@@ -538,14 +538,7 @@ func (m *Terminal) handleInputKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	oldValue := m.input.Value()
 	m.input.updateFromMsg(msg)
-	newValue := m.input.Value()
-
-	// Clear editor content if user manually edits the input
-	if m.input.editorContent != "" && oldValue != newValue && !hasEditorPrefix(oldValue) {
-		m.input.editorContent = ""
-	}
 
 	return m, nil
 }

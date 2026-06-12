@@ -283,8 +283,3 @@ func splitEditorCmd(editorCmd string) (string, []string) {
 	}
 	return parts[0], parts[1:]
 }
-
-// hasEditorPrefix checks if the value has an editor content prefix.
-func hasEditorPrefix(value string) bool {
-	return len(value) > 0 && value[0] == '['
-}
