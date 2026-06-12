@@ -15,6 +15,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -116,7 +117,9 @@ const (
 	// sseScannerInitBuf is the initial buffer size for the SSE scanner.
 	sseScannerInitBuf = 64 * 1024 // 64KB
 
-	// sseScannerMaxBuf is the maximum token size the SSE scanner can handle.
+	// sseScannerMaxBuf is the maximum SSE line size.  Lines exceeding this
+	// (e.g. a provider sending an unusually large tool call atomically)
+	// will terminate the stream with a descriptive error.
 	sseScannerMaxBuf = 1024 * 1024 // 1MB
 )
 
@@ -186,8 +189,13 @@ func (s *sseScanner) Next() bool {
 }
 
 // Err returns any error encountered during scanning.
+// Wraps bufio.ErrTooLong with a descriptive message.
 func (s *sseScanner) Err() error {
-	return s.scanner.Err()
+	err := s.scanner.Err()
+	if errors.Is(err, bufio.ErrTooLong) {
+		return fmt.Errorf("SSE line exceeded %dMB limit — the model may have generated an oversized tool call", sseScannerMaxBuf/(1024*1024))
+	}
+	return err
 }
 
 // Event returns the current event's type and data payload.
