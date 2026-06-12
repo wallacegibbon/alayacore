@@ -200,12 +200,6 @@ func (StepCompleteEvent) isStreamEvent() {}
 
 // Provider defines the interface for LLM providers
 type Provider interface {
-	StreamMessages(
-		ctx context.Context,
-		messages []Message,
-		tools []ToolDefinition,
-		systemPrompt string,
-		extraSystemPrompt string,
-	) (iter.Seq2[StreamEvent, error], error)
+	StreamMessages(ctx context.Context, messages []Message, tools []ToolDefinition, systemPrompt string, extraSystemPrompt string) (iter.Seq2[StreamEvent, error], error)
 	SetReasoningLevel(level int)
 }

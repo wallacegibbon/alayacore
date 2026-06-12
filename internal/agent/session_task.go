@@ -98,6 +98,12 @@ func (s *Session) doAutoSummarize(ctx context.Context, messages []llm.Message, e
 // Prompt Processing
 // ============================================================================
 
+// writeTLVWithID formats the historyID and writes a TLV entry to the output stream.
+func (s *Session) writeTLVWithID(tag string, historyID uint64, data string) {
+	id := strconv.FormatUint(historyID, 10)
+	_ = stream.WriteTLV(s.Output, tag, stream.WrapDelta(id, data)) //nolint:errcheck
+}
+
 //nolint:gocyclo // callback-heavy; extracting harms readability.
 func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]llm.Message, []llm.ContentPart, int64, error) {
 	var outputTokens int64
@@ -109,25 +115,21 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 
 	_, err := s.agent.Load().Stream(ctx, history, llm.StreamCallbacks{
 		OnTextDelta: func(delta string, historyID uint64) error {
-			id := strconv.FormatUint(historyID, 10)
-			_ = stream.WriteTLV(s.Output, stream.TagAssistantT, stream.WrapDelta(id, delta)) //nolint:errcheck
+			s.writeTLVWithID(stream.TagAssistantT, historyID, delta)
 			return nil
 		},
 		OnReasoningDelta: func(delta string, historyID uint64) error {
-			id := strconv.FormatUint(historyID, 10)
-			_ = stream.WriteTLV(s.Output, stream.TagAssistantR, stream.WrapDelta(id, delta)) //nolint:errcheck
+			s.writeTLVWithID(stream.TagAssistantR, historyID, delta)
 			return nil
 		},
 		OnToolUseStart: func(toolCallID, toolName string, historyID uint64) error {
-			id := strconv.FormatUint(historyID, 10)
-			data, _ := json.Marshal(stream.ToolUseData{ID: toolCallID, Name: toolName})             //nolint:errcheck
-			_ = stream.WriteTLV(s.Output, stream.TagAssistantF, stream.WrapDelta(id, string(data))) //nolint:errcheck
+			data, _ := json.Marshal(stream.ToolUseData{ID: toolCallID, Name: toolName}) //nolint:errcheck
+			s.writeTLVWithID(stream.TagAssistantF, historyID, string(data))
 			return nil
 		},
 		OnToolUseInput: func(toolCallID string, input json.RawMessage, historyID uint64) error {
-			id := strconv.FormatUint(historyID, 10)
-			data, _ := json.Marshal(stream.ToolUseData{ID: toolCallID, Input: input})               //nolint:errcheck
-			_ = stream.WriteTLV(s.Output, stream.TagAssistantF, stream.WrapDelta(id, string(data))) //nolint:errcheck
+			data, _ := json.Marshal(stream.ToolUseData{ID: toolCallID, Input: input}) //nolint:errcheck
+			s.writeTLVWithID(stream.TagAssistantF, historyID, string(data))
 			return nil
 		},
 		OnToolUseOutput: func(toolCallID string, content []llm.ContentPart, err error, historyID uint64) error {
@@ -135,13 +137,12 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 			if err2 != nil {
 				contentJSON = []byte(`[{"type":"text","text":"(serialization error)"}]`)
 			}
-			id := strconv.FormatUint(historyID, 10)
 			data, _ := json.Marshal(stream.ToolResultData{ //nolint:errcheck
 				ID:      toolCallID,
 				Output:  contentJSON,
 				IsError: err != nil,
 			})
-			_ = stream.WriteTLV(s.Output, stream.TagUserF, stream.WrapDelta(id, string(data))) //nolint:errcheck
+			s.writeTLVWithID(stream.TagUserF, historyID, string(data))
 			return nil
 		},
 		OnToolConfirm: func(requests []llm.ToolConfirmRequest) <-chan llm.ToolConfirmResponse {
