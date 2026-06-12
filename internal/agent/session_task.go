@@ -152,26 +152,25 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 		OnToolConfirm: func(requests []llm.ToolConfirmRequest) <-chan llm.ToolConfirmResponse {
 			ch := make(chan llm.ToolConfirmResponse, len(requests))
 			sc := chan<- llm.ToolConfirmResponse(ch)
-			s.confirmCh.Store(&sc) // visible to input pump immediately
+			s.confirmCh.Store(&sc)
 
 			for _, req := range requests {
-				if s.toolConfirmSet != nil {
-					if _, ok := s.toolConfirmSet[req.ToolName]; ok {
-						// Must guarantee a response on ch even if output
-						// is broken, otherwise the agent blocks forever.
-						if s.outputBroken.Load() {
-							ch <- llm.ToolConfirmResponse{ID: req.ID, Error: "output broken"}
-						} else if err := stream.WriteSystemMsg(s.Output, stream.ToolConfirmMsg{ID: req.ID}); err != nil {
-							s.markOutputBroken()
-							ch <- llm.ToolConfirmResponse{ID: req.ID, Error: domainerrors.Wrap("tool", err).Error()}
-						}
-						continue
-					}
+				if s.outputBroken.Load() {
+					ch <- llm.ToolConfirmResponse{ID: req.ID, Error: "output broken"}
+				} else if err := stream.WriteSystemMsg(s.Output, stream.ToolConfirmMsg{ID: req.ID}); err != nil {
+					s.markOutputBroken()
+					ch <- llm.ToolConfirmResponse{ID: req.ID, Error: domainerrors.Wrap("tool", err).Error()}
 				}
-				ch <- llm.ToolConfirmResponse{ID: req.ID, Allowed: true}
 			}
 
 			return ch
+		},
+		ToolNeedsConfirm: func(toolName string) bool {
+			if s.toolConfirmSet == nil {
+				return false
+			}
+			_, ok := s.toolConfirmSet[toolName]
+			return ok
 		},
 		OnStepStart: func(step int) error {
 			s.sendEvent(StepStartEvent{Step: step})

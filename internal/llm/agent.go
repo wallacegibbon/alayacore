@@ -61,9 +61,17 @@ type StreamCallbacks struct {
 	OnToolUseStart   func(toolCallID, toolName string, historyID uint64) error
 	OnToolUseInput   func(toolCallID string, input json.RawMessage, historyID uint64) error
 	OnToolUseOutput  func(toolCallID string, content []ContentPart, err error, historyID uint64) error
-	OnToolConfirm    func(requests []ToolConfirmRequest) <-chan ToolConfirmResponse
-	OnStepStart      func(step int) error
-	OnStepFinish     func(messages []Message, usage Usage) error
+
+	// OnToolConfirm is called with tools that require user confirmation.
+	// Only tools for which ToolNeedsConfirm returned true are included.
+	OnToolConfirm func(requests []ToolConfirmRequest) <-chan ToolConfirmResponse
+
+	// ToolNeedsConfirm reports whether a tool requires user confirmation.
+	// If nil, no tools are deferred — they all execute immediately.
+	ToolNeedsConfirm func(toolName string) bool
+
+	OnStepStart  func(step int) error
+	OnStepFinish func(messages []Message, usage Usage) error
 
 	// IDGen provides unique history IDs. Called once per content block
 	// (first delta for AT/AR, once for each AF/UF). The returned ID is
@@ -273,20 +281,21 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 }
 
 // handleStreamedToolUse processes a completed tool use during streaming.
-// If no confirmation is needed, the tool executes immediately in a goroutine
-// and sends the result through resultCh. Otherwise, it's deferred.
+// If the tool requires confirmation (per ToolNeedsConfirm), it is deferred.
+// Otherwise it executes immediately in a goroutine.
 func (a *Agent) handleStreamedToolUse(ctx context.Context, tc *ToolUsePart, callbacks StreamCallbacks, deferred []*ToolUsePart, resultCh chan<- ContentPart) []*ToolUsePart {
-	if callbacks.OnToolConfirm == nil {
-		historyID := uint64(0)
-		if callbacks.IDGen != nil {
-			historyID = callbacks.IDGen()
-		}
-		go func(tc *ToolUsePart, historyID uint64) {
-			resultCh <- a.executeTool(ctx, tc, callbacks, historyID)
-		}(tc, historyID)
-	} else {
+	if callbacks.ToolNeedsConfirm != nil && callbacks.ToolNeedsConfirm(tc.ToolName) {
 		deferred = append(deferred, tc)
+		return deferred
 	}
+
+	historyID := uint64(0)
+	if callbacks.IDGen != nil {
+		historyID = callbacks.IDGen()
+	}
+	go func(tc *ToolUsePart, historyID uint64) {
+		resultCh <- a.executeTool(ctx, tc, callbacks, historyID)
+	}(tc, historyID)
 	return deferred
 }
 
