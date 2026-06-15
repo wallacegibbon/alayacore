@@ -85,7 +85,11 @@ var commandDefs = []Command{
 	{CommandNameThemeSet, "Set the active theme", "<name>", ScheduleImmediate,
 		func(s *Session, _ context.Context, args []string) { s.handleThemeSet(args) }},
 	{CommandNameConfirm, "Confirm or deny a pending tool execution", "yes|no", ScheduleImmediate,
-		func(s *Session, _ context.Context, args []string) { s.handleConfirmCommand(args) }},
+		func(s *Session, _ context.Context, args []string) {
+			if errText := s.handleConfirmCommand(args); errText != "" {
+				s.writeError(errText)
+			}
+		}},
 	{CommandNameFork, "Fork session up to content ID and save to file", "<id> <filename>", ScheduleImmediate,
 		func(s *Session, _ context.Context, args []string) { s.handleFork(args) }},
 }

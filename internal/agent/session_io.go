@@ -420,15 +420,18 @@ func (s *Session) resendPrompt(ctx context.Context, messages []llm.Message, entr
 
 // inputMsg carries a parsed input message from the I/O pump to run().
 type inputMsg struct {
-	text   string   // the raw user text or command text (without ':')
-	images []string // image DataURIs from preceding UI tags
-	isCmd  bool     // true if text starts with ':'
+	text    string   // the raw user text or command text (without ':')
+	images  []string // image DataURIs from preceding UI tags
+	isCmd   bool     // true if text starts with ':'
+	errText string   // non-empty when the input pump hit a validation error
 }
 
 // inputPump runs in its own goroutine and reads TLV frames from the
 // input stream. It sends parsed messages to msgCh. It does NOT access
-// any session state directly; for :cancel / :cancel_all commands it calls
-// cancelRunningTask() which cancels the task via its per-task context.
+// any session state directly except for :cancel / :cancel_all (which
+// call cancelRunningTask) and :confirm (which writes to the confirm
+// channel).  All output-stream writes are deferred to the run()
+// goroutine via errText on inputMsg.
 func (s *Session) inputPump(msgCh chan<- inputMsg) {
 	var pendingImages []string
 
@@ -449,11 +452,11 @@ func (s *Session) inputPump(msgCh chan<- inputMsg) {
 		default:
 			if len(pendingImages) > 0 {
 				pendingImages = nil
-				s.writeError(domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
-					"image tag must be followed by another image or text, got: %s", tag).Error())
+				msgCh <- inputMsg{errText: domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
+					"image tag must be followed by another image or text, got: %s", tag).Error()}
 			} else {
-				s.writeError(domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
-					"invalid input tag: %s", tag).Error())
+				msgCh <- inputMsg{errText: domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
+					"invalid input tag: %s", tag).Error()}
 			}
 		}
 	}
@@ -467,8 +470,8 @@ func (s *Session) handleInputUserText(value string, pendingImages *[]string, msg
 	if len(*pendingImages) > 0 && len(value) > 0 && value[0] == ':' {
 		// Images followed by a command is not allowed.
 		*pendingImages = nil
-		s.writeError(domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
-			"command can not attach images").Error())
+		msgCh <- inputMsg{errText: domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
+			"command can not attach images").Error()}
 		return
 	}
 
@@ -488,7 +491,9 @@ func (s *Session) handleInputUserText(value string, pendingImages *[]string, msg
 		}
 		parts := strings.Fields(cmd)
 		if len(parts) > 0 && parts[0] == CommandNameConfirm {
-			s.handleConfirmCommand(parts[1:])
+			if errText := s.handleConfirmCommand(parts[1:]); errText != "" {
+				msgCh <- inputMsg{errText: errText}
+			}
 			return
 		}
 		msg.text = cmd
@@ -535,18 +540,17 @@ func (s *Session) handleFork(args []string) {
 
 // handleConfirmCommand processes a `:confirm <id> yes|no` command from the user.
 // It routes the response to the task goroutine's pending confirmation channel.
-// Called from the input pump goroutine.
-func (s *Session) handleConfirmCommand(args []string) {
+// Called from the input pump goroutine.  Returns a non-empty error string
+// for invalid usage; the caller is responsible for delivering it to the user.
+func (s *Session) handleConfirmCommand(args []string) string {
 	if len(args) != 2 {
-		s.writeError("usage: :confirm <id> yes|no")
-		return
+		return "usage: :confirm <id> yes|no"
 	}
 
 	id := args[0]
 	p := s.confirmCh.Load()
 	if p == nil {
-		s.writeError("No pending tool confirmation")
-		return
+		return "No pending tool confirmation"
 	}
 
 	var allowed bool
@@ -556,15 +560,20 @@ func (s *Session) handleConfirmCommand(args []string) {
 	case "no", "n":
 		allowed = false
 	default:
-		s.writeError("usage: :confirm <id> yes|no")
-		return
+		return "usage: :confirm <id> yes|no"
 	}
 
 	*p <- llm.ToolConfirmResponse{ID: id, Allowed: allowed}
+	return ""
 }
 
 // handleInputMsg processes a parsed input message. Called from run() goroutine.
 func (s *Session) handleInputMsg(msg inputMsg) {
+	// Deliver any validation error from the input pump first.
+	if msg.errText != "" {
+		s.writeError(msg.errText)
+		return
+	}
 	if msg.isCmd {
 		cmd := msg.text
 		switch LookupSchedule(cmd) {
