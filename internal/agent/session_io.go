@@ -52,18 +52,17 @@ func (s *Session) cancelAllTasks() {
 	queueLen := len(s.taskQueue)
 	s.taskQueue = make([]QueueItem, 0)
 
-	currentCanceled := false
-	if s.inProgress.Load() {
-		if s.cancelRunningTask() {
-			currentCanceled = true
-		}
-	}
+	// The task cancel itself was already issued by the input pump's
+	// fast path for :cancel_all.  inProgress stays true until the
+	// task goroutine exits and handleTaskDone clears it, so we can
+	// still use it for the notification below.
+	taskWasRunning := s.inProgress.Load()
 
 	// Send notification
 	switch {
-	case currentCanceled && queueLen > 0:
+	case taskWasRunning && queueLen > 0:
 		s.writeNotifyf("Canceled current task and cleared %d queued tasks", queueLen)
-	case currentCanceled:
+	case taskWasRunning:
 		s.writeNotify("Canceled current task")
 	case queueLen > 0:
 		s.writeNotifyf("Cleared %d queued tasks", queueLen)
@@ -441,9 +440,14 @@ type inputMsg struct {
 
 // inputPump runs in its own goroutine and reads TLV frames from the
 // input stream. It sends parsed messages to msgCh. It does NOT access
-// any session state directly except for :cancel (which calls
-// cancelRunningTask for immediate cancellation) and :confirm (which
-// writes to the confirm channel to unblock the task goroutine).
+// any session state directly with two exceptions:
+//
+//   - :cancel / :cancel_all — call cancelRunningTask() immediately
+//     so the task context is canceled without waiting for queued
+//     messages to drain.
+//   - :confirm — writes to the confirm channel to unblock the task
+//     goroutine.
+//
 // All output-stream writes are deferred to the run() goroutine via
 // errText on inputMsg.
 func (s *Session) inputPump(msgCh chan<- inputMsg) {
@@ -497,18 +501,24 @@ func (s *Session) handleInputUserText(value string, pendingImages *[]string, msg
 
 	if len(value) > 0 && value[0] == ':' {
 		cmd := value[1:]
-		// :cancel is handled immediately in the input pump so the
-		// task context is canceled without waiting for queued
-		// messages to drain.  On success it returns early and run()
-		// never sees the command.  Prefix-match so that ":cancel"
-		// with trailing text (":cancel please") still gets the
-		// fast path.
+		// :cancel — cancel the task immediately in the input pump
+		// without waiting for msgCh to drain.  On success it returns
+		// early; run() never sees it.
+		//
+		// Guard with prefix+delimiter so ":cancel" and ":cancel "
+		// match but ":cancel_all" and ":cancel_foo" do not.
 		if strings.HasPrefix(cmd, CommandNameCancel) {
-			// Guard against matching "cancel_all" or "cancel_foo".
 			if rest := cmd[len(CommandNameCancel):]; rest == "" || rest[0] == ' ' {
 				if s.cancelRunningTask() {
 					return
 				}
+			}
+		}
+		// :cancel_all — also cancel immediately (same reason), but
+		// fall through to msgCh so run() can clear the queue.
+		if strings.HasPrefix(cmd, CommandNameCancelAll) {
+			if rest := cmd[len(CommandNameCancelAll):]; rest == "" || rest[0] == ' ' {
+				s.cancelRunningTask()
 			}
 		}
 		parts := strings.Fields(cmd)
