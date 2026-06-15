@@ -2,27 +2,11 @@ package agent
 
 // Session I/O: input pump, command handling, prompt processing.
 //
-// These methods are called from either the run() goroutine (for immediate
-// commands) or the task goroutine (for deferred commands). The task
-// goroutine sends state mutations via stateCh, and the run() goroutine
-// owns taskQueue and s.Messages directly.
-//
-// === :cancel / :cancel_all split design ===
-//
-// :cancel only needs to cancel the running task (thread-safe via
-// atomic.Value + context), so the input pump can handle it entirely
-// and return early — run() never sees it.
-//
-// :cancel_all must BOTH cancel the task AND clear the queue.  The
-// queue is owned by run(), so the input pump cannot touch it without
-// a data race.  Therefore :cancel_all is split:
-//
-//   input pump:  cancelRunningTask()       (immediate, no queue wait)
-//   run():        clear queue + notify      (safe access to taskQueue)
-//
-// DO NOT "simplify" this by dropping the input-pump fast path — the
-// point is to cancel the task context without waiting for msgCh to
-// drain.  DO NOT add queue manipulation to the input pump either.
+// All command dispatching happens in the run() goroutine via
+// handleInputMsg.  The input pump is a pure TLV parser — it has no
+// knowledge of command names and never touches session state.
+// This keeps the design simple: one goroutine owns everything,
+// no split-path exceptions for :cancel / :confirm / etc.
 
 import (
 	"context"
@@ -69,19 +53,20 @@ func (s *Session) cancelAllTasks() {
 	queueLen := len(s.taskQueue)
 	s.taskQueue = make([]QueueItem, 0)
 
-	// The task context was already canceled by the input pump's
-	// fast path for :cancel_all.  We must NOT call cancelRunningTask()
-	// here — that would be a duplicate (the first call in the input
-	// pump already canceled the context).  inProgress stays true
-	// until handleTaskDone clears it, so it's still valid for the
-	// notification below.
-	taskWasRunning := s.inProgress.Load()
+	// Cancel the running task (if any) and clear the queue in one
+	// place.  Everything runs in the run() goroutine — no split.
+	currentCanceled := false
+	if s.inProgress.Load() {
+		if s.cancelRunningTask() {
+			currentCanceled = true
+		}
+	}
 
 	// Send notification
 	switch {
-	case taskWasRunning && queueLen > 0:
+	case currentCanceled && queueLen > 0:
 		s.writeNotifyf("Canceled current task and cleared %d queued tasks", queueLen)
-	case taskWasRunning:
+	case currentCanceled:
 		s.writeNotify("Canceled current task")
 	case queueLen > 0:
 		s.writeNotifyf("Cleared %d queued tasks", queueLen)
@@ -457,18 +442,10 @@ type inputMsg struct {
 	errText string   // non-empty when the input pump hit a validation error
 }
 
-// inputPump runs in its own goroutine and reads TLV frames from the
-// input stream. It sends parsed messages to msgCh. It does NOT access
-// any session state directly with two exceptions:
-//
-//   - :cancel / :cancel_all — call cancelRunningTask() immediately
-//     so the task context is canceled without waiting for queued
-//     messages to drain.
-//   - :confirm — writes to the confirm channel to unblock the task
-//     goroutine.
-//
-// All output-stream writes are deferred to the run() goroutine via
-// errText on inputMsg.
+// inputPump runs in its own goroutine.  It reads TLV frames from the
+// input stream, builds inputMsg values, and sends them to msgCh.
+// It does NOT interpret commands or access session state — all of
+// that lives in the run() goroutine.
 func (s *Session) inputPump(msgCh chan<- inputMsg) {
 	var pendingImages []string
 
@@ -499,10 +476,11 @@ func (s *Session) inputPump(msgCh chan<- inputMsg) {
 	}
 }
 
-// handleInputUserText processes a TagUserT (UT) frame: builds an inputMsg
-// from the text and any preceding images, detects commands, and sends the
-// result to msgCh.  pendingImages is the accumulator for preceding UI tags;
-// it is cleared when consumed or on error.
+// handleInputUserText builds an inputMsg from the text value and any
+// preceding images.  It strips the ':' prefix for commands and sets
+// isCmd so run() can dispatch them.  The only validation is rejecting
+// images followed by a command (attaching images to a command makes
+// no sense).
 func (s *Session) handleInputUserText(value string, pendingImages *[]string, msgCh chan<- inputMsg) {
 	if len(*pendingImages) > 0 && len(value) > 0 && value[0] == ':' {
 		// Images followed by a command is not allowed.
@@ -518,44 +496,12 @@ func (s *Session) handleInputUserText(value string, pendingImages *[]string, msg
 	}
 	*pendingImages = nil
 
+	// Strip the colon prefix; run() uses isCmd to route to dispatchCommand.
 	if len(value) > 0 && value[0] == ':' {
-		cmd := value[1:]
-		// :cancel — cancel the task immediately in the input pump
-		// without waiting for msgCh to drain.  On success it returns
-		// early; run() never sees it.
-		//
-		// Guard with prefix+delimiter so ":cancel" and ":cancel "
-		// match but ":cancel_all" and ":cancel_foo" do not.
-		if strings.HasPrefix(cmd, CommandNameCancel) {
-			if rest := cmd[len(CommandNameCancel):]; rest == "" || rest[0] == ' ' {
-				if s.cancelRunningTask() {
-					return
-				}
-			}
-		}
-		// :cancel_all — cancel the task immediately (same reason as
-		// :cancel), but MUST fall through to msgCh so run() can clear
-		// the queue.  The queue is owned by run(); touching it here
-		// in the input pump would be a data race.
-		//
-		// cancelAllTasks() in run() handles the queue clear and
-		// notification.  It MUST NOT call cancelRunningTask() again
-		// — that is already done here.
-		if strings.HasPrefix(cmd, CommandNameCancelAll) {
-			if rest := cmd[len(CommandNameCancelAll):]; rest == "" || rest[0] == ' ' {
-				s.cancelRunningTask()
-			}
-		}
-		parts := strings.Fields(cmd)
-		if len(parts) > 0 && parts[0] == CommandNameConfirm {
-			if errText := s.handleConfirmCommand(parts[1:]); errText != "" {
-				msgCh <- inputMsg{errText: errText}
-			}
-			return
-		}
-		msg.text = cmd
+		msg.text = value[1:]
 		msg.isCmd = true
 	}
+
 	msgCh <- msg
 }
 
@@ -595,19 +541,20 @@ func (s *Session) handleFork(args []string) {
 	s.writeNotifyf("Session forked to %s (up to content ID %d)", path, id)
 }
 
-// handleConfirmCommand processes a `:confirm <id> yes|no` command from the user.
-// It routes the response to the task goroutine's pending confirmation channel.
-// Called from the input pump goroutine.  Returns a non-empty error string
-// for invalid usage; the caller is responsible for delivering it to the user.
-func (s *Session) handleConfirmCommand(args []string) string {
+// handleConfirmCommand processes a `:confirm <id> yes|no` command.
+// It writes the response to the task goroutine's pending confirmation
+// channel.  Called from the run() goroutine via dispatchCommand.
+func (s *Session) handleConfirmCommand(args []string) {
 	if len(args) != 2 {
-		return "usage: :confirm <id> yes|no"
+		s.writeError("usage: :confirm <id> yes|no")
+		return
 	}
 
 	id := args[0]
 	p := s.confirmCh.Load()
 	if p == nil {
-		return "No pending tool confirmation"
+		s.writeError("No pending tool confirmation")
+		return
 	}
 
 	var allowed bool
@@ -617,11 +564,11 @@ func (s *Session) handleConfirmCommand(args []string) string {
 	case "no", "n":
 		allowed = false
 	default:
-		return "usage: :confirm <id> yes|no"
+		s.writeError("usage: :confirm <id> yes|no")
+		return
 	}
 
 	*p <- llm.ToolConfirmResponse{ID: id, Allowed: allowed}
-	return ""
 }
 
 // handleInputMsg processes a parsed input message. Called from run() goroutine.

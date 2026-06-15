@@ -85,16 +85,8 @@ var commandDefs = []Command{
 		func(s *Session, _ context.Context, args []string) { s.handleReason(args) }},
 	{CommandNameThemeSet, "Set the active theme", "<name>", ScheduleImmediate,
 		func(s *Session, _ context.Context, args []string) { s.handleThemeSet(args) }},
-	// :confirm is normally intercepted in handleInputUserText
-	// (input pump goroutine) to write to the confirm channel
-	// directly.  This entry is a fallback in case the early
-	// interception is ever removed.
 	{CommandNameConfirm, "Confirm or deny a pending tool execution", "yes|no", ScheduleImmediate,
-		func(s *Session, _ context.Context, args []string) {
-			if errText := s.handleConfirmCommand(args); errText != "" {
-				s.writeError(errText)
-			}
-		}},
+		func(s *Session, _ context.Context, args []string) { s.handleConfirmCommand(args) }},
 	{CommandNameFork, "Fork session up to content ID and save to file", "<id> <filename>", ScheduleImmediate,
 		func(s *Session, _ context.Context, args []string) { s.handleFork(args) }},
 	{CommandNameClearQueue, "Clear all queued tasks without canceling the current task", "", ScheduleImmediate,

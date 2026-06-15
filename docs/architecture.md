@@ -77,12 +77,10 @@ stdin EOF ──▶ inputPump closes msgCh ──▶ run() detects closed channe
 **State ownership:**
 - The `run()` goroutine is the sole owner of session state. It reads/writes `taskQueue`, `inProgress`, `pausedOnError`, `reasoningLevel`, `reasoningDirty`, and all command-handling logic. ModelManager and RuntimeManager are also accessed only from `run()`.
 - The task goroutine communicates state changes via typed events on `stateCh` (step progress, token counts) and reads atomic fields (`agent`, `provider`, `ContextTokens`, `currentStep`, `reasoningLevel`, `reasoningDirty`, `pausedOnError`) for lock-free access. The final message state is returned via `taskResult` on completion.
-- The input pump goroutine reads TLV frames from the input stream and sends parsed messages to `run()` via `msgCh`. It has limited, read-only access to session state for two latency-critical operations:
-  - `:cancel` / `:cancel_all` — calls `cancelRunningTask()` (thread-safe: atomic + context) to cancel the task immediately without waiting for `msgCh` to drain. `:cancel` returns early; `:cancel_all` falls through so `run()` can safely clear the queue it owns.
-  - `:confirm` — writes to `confirmCh` to unblock the task goroutine's tool-confirmation callback.
+- The input pump goroutine is a pure TLV parser. It reads frames from the input stream, builds inputMsg values, and sends them to `run()` via `msgCh`. It has zero knowledge of commands and never touches session state — not even for `:cancel` or `:confirm`. All command dispatch, cancellation, and output writing happens in `run()`.
 - `sendSystemInfo` runs only in the `run()` goroutine; the task goroutine requests updates via `infoUpdateCh`.
 
-**Gotcha — input pump cannot touch taskQueue:** Only `run()` owns the queue. The input pump cancels the task context for `:cancel_all` but must not clear the queue itself — that would be a data race. The queue clear and notification happen in `cancelAllTasks()` which runs in `run()`.
+**Gotcha — everything is in run():** There is no "fast path" in the input pump for latency-critical commands. The `msgCh` buffer is cap 100 but each message is processed in microseconds — the queue drains orders of magnitude faster than a human can type or an LLM can stream. If you're tempted to add a special case to the input pump, ask: is the latency measurable? If not, keep it in `run()` where it belongs.
 
 **Design rationale:** Tasks must run in a separate goroutine because LLM streaming is blocking (3-10s per step). If tasks ran synchronously in `run()`, the main loop could not process user input (`:cancel`, new prompts, immediate commands) during task execution. The per-task goroutine pattern keeps the main loop responsive while avoiding a persistent worker goroutine that would sit idle between tasks.
 
