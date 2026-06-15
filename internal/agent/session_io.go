@@ -483,9 +483,14 @@ func (s *Session) handleInputUserText(value string, pendingImages *[]string, msg
 
 	if len(value) > 0 && value[0] == ':' {
 		cmd := value[1:]
-		if cmd == CommandNameCancel || cmd == CommandNameCancelAll {
-			canceled := s.cancelRunningTask()
-			if canceled && cmd == CommandNameCancel {
+		// :cancel is handled immediately in the input pump so the
+		// task context is canceled without waiting for queued
+		// messages to drain.  On success it returns early and run()
+		// never sees the command.  :cancel_all goes through the
+		// normal msgCh path — cancelAllTasks() in run() handles
+		// both the cancel and the queue clear.
+		if cmd == CommandNameCancel {
+			if s.cancelRunningTask() {
 				return
 			}
 		}
