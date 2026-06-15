@@ -78,6 +78,19 @@ func (s *Session) cancelAllTasks() {
 	s.requestSystemInfo()
 }
 
+// clearQueue removes all queued tasks without affecting the currently
+// running task.  If the queue is already empty it reports an error.
+func (s *Session) clearQueue() {
+	if len(s.taskQueue) == 0 {
+		s.writeError("Task queue is already empty")
+		return
+	}
+	count := len(s.taskQueue)
+	s.taskQueue = make([]QueueItem, 0)
+	s.writeNotifyf("Cleared %d queued tasks", count)
+	s.requestSystemInfo()
+}
+
 func (s *Session) handleContinue(ctx context.Context, messages []llm.Message, entries []llm.ContentPart, args []string) ([]llm.Message, []llm.ContentPart) {
 	// Validate arguments before doing anything.
 	if len(args) > 0 && args[0] != "skip" {

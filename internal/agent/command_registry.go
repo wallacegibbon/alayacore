@@ -23,6 +23,7 @@ const (
 	CommandNameThemeSet        = "theme_set"
 	CommandNameConfirm         = "confirm"
 	CommandNameFork            = "fork"
+	CommandNameClearQueue      = "clear_queue"
 )
 
 // SchedulePolicy specifies how and when a command is dispatched.
@@ -92,6 +93,8 @@ var commandDefs = []Command{
 		}},
 	{CommandNameFork, "Fork session up to content ID and save to file", "<id> <filename>", ScheduleImmediate,
 		func(s *Session, _ context.Context, args []string) { s.handleFork(args) }},
+	{CommandNameClearQueue, "Clear all queued tasks without canceling the current task", "", ScheduleImmediate,
+		func(s *Session, _ context.Context, _ []string) { s.clearQueue() }},
 }
 
 // LookupCommand returns the command metadata for name, or (nil, false).

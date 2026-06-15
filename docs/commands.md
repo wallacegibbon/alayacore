@@ -2,20 +2,19 @@
 
 AlayaCore provides colon-prefixed commands (`:command`) that work across all adapters — TUI, Plain IO, and Raw IO.
 
-Commands fall into two categories:
+Commands fall into three scheduling categories:
 
-- **Immediate commands** — run synchronously, no task queuing
+- **Immediate commands** — run synchronously in the main loop, always allowed
+- **When-idle commands** — run synchronously, but rejected while a task is in progress
 - **Deferred commands** — enqueued at the front of the task queue; run when no task is active and can be canceled with `:cancel`
 
 ## Immediate Commands
 
 | Command | Action |
 |---------|--------|
-| `:cancel` | Cancel current task (with confirmation) |
+| `:cancel` | Cancel current task |
 | `:cancel_all` | Cancel current task and clear the task queue |
 | `:save [filename]` | Save session. Uses `--session` path if no filename given. |
-| `:model_set <id>` | Switch to a model by numeric ID |
-| `:model_load` | Reload model configs from the config file |
 | `:reason [0\|1\|2]` | Set reasoning level (0=off, 1=normal, 2=max). Default: 1 |
 | `:theme_set <name>` | Switch to a different theme |
 | `:confirm <id> yes\|no` | Confirm or deny a pending tool execution |
@@ -23,6 +22,16 @@ Commands fall into two categories:
 | `:taskqueue_get_all` | List all queued tasks |
 | `:taskqueue_del <queue_id>` | Delete a queued task by ID |
 | `:taskqueue_edit <queue_id> <content>` | Edit a queued task's content by ID |
+| `:clear_queue` | Clear all queued tasks without canceling the current task |
+
+## When-Idle Commands
+
+These commands are rejected with an error if a task is currently running:
+
+| Command | Action |
+|---------|--------|
+| `:model_set <id>` | Switch to a model by numeric ID |
+| `:model_load` | Reload model configs from the config file |
 
 ## Deferred Commands
 
