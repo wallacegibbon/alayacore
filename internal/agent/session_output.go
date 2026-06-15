@@ -170,7 +170,7 @@ func (s *Session) sendModelMsg() {
 	s.writeSystemMsg(ModelMsg{
 		ActiveModelID:   activeID,
 		ActiveModelName: activeName,
-		ContextLimit:    s.ContextLimit,
+		ContextLimit:    s.ContextLimit.Load(),
 	})
 }
 

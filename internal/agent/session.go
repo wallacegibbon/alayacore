@@ -52,7 +52,7 @@ type Session struct {
 	Messages       []llm.Message     // derived from Content for API calls (rebuilt after each task)
 	CreatedAt      time.Time
 	ContextTokens  atomic.Int64 // read by both goroutines (shouldAutoSummarize, sendSystemInfo)
-	ContextLimit   int64        // immutable after construction
+	ContextLimit   atomic.Int64 // maximum context window size (input+output); set from model config
 	ModelManager   *ModelManager
 	RuntimeManager *RuntimeManager
 	SkillsManager  *skills.Manager

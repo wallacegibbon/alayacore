@@ -86,15 +86,17 @@ func (s *Session) handleUserPrompt(ctx context.Context, messages []llm.Message, 
 // shouldAutoSummarize returns true when auto-summarization is enabled and
 // the current context tokens exceed AutoSummarizeThreshold of the configured limit.
 func (s *Session) shouldAutoSummarize() bool {
-	return s.AutoSummarize && s.ContextLimit > 0 && s.ContextTokens.Load() > 0 &&
-		s.ContextTokens.Load() >= s.ContextLimit*AutoSummarizeThreshold/AutoSummarizePctBase
+	limit := s.ContextLimit.Load()
+	return s.AutoSummarize && limit > 0 && s.ContextTokens.Load() > 0 &&
+		s.ContextTokens.Load() >= limit*AutoSummarizeThreshold/AutoSummarizePctBase
 }
 
 // doAutoSummarize logs a notification and triggers summarization.
 func (s *Session) doAutoSummarize(ctx context.Context, messages []llm.Message, entries []llm.ContentPart) ([]llm.Message, []llm.ContentPart) {
-	usage := float64(s.ContextTokens.Load()) * AutoSummarizePctBase / float64(s.ContextLimit)
+	limit := s.ContextLimit.Load()
+	usage := float64(s.ContextTokens.Load()) * AutoSummarizePctBase / float64(limit)
 	s.writeNotifyf("Context usage at %d/%d tokens (%.0f%%). Auto-summarizing...",
-		s.ContextTokens.Load(), s.ContextLimit, usage)
+		s.ContextTokens.Load(), limit, usage)
 	return s.summarize(ctx, messages, entries)
 }
 

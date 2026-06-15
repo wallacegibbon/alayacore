@@ -125,7 +125,7 @@ func (s *Session) ensureAgentInitialized() error {
 	s.agent.Store(agent)
 	s.provider.Store(&provider)
 	if activeModel.ContextLimit > 0 {
-		s.ContextLimit = int64(activeModel.ContextLimit)
+		s.ContextLimit.Store(int64(activeModel.ContextLimit))
 	}
 	if p := s.provider.Load(); p != nil {
 		(*p).SetReasoningLevel(int(s.reasoningLevel.Load()))
@@ -151,7 +151,7 @@ func (s *Session) applyModelContextLimit(model *ModelConfig) {
 	if model == nil || model.ContextLimit <= 0 {
 		return
 	}
-	s.ContextLimit = int64(model.ContextLimit)
+	s.ContextLimit.Store(int64(model.ContextLimit))
 }
 
 // SetReasoningLevel sets the reasoning level.
