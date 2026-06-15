@@ -107,8 +107,9 @@ func (s *Session) runTask(ctx context.Context, item QueueItem, taskMessages []ll
 }
 
 // runTaskCommand handles a deferred command in the task goroutine.
-// Unlike immediate commands (handled by handleCommand in run()'s goroutine),
-// deferred commands operate on the task's local message copy and return it.
+// Unlike commands dispatched directly by handleInputMsg in run(),
+// deferred commands operate on the task's local message copy and return
+// updated messages.
 func (s *Session) runTaskCommand(ctx context.Context, messages []llm.Message, entries []llm.ContentPart, cmd string) ([]llm.Message, []llm.ContentPart) {
 	parts := strings.Fields(cmd)
 	if len(parts) == 0 {

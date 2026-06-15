@@ -43,7 +43,7 @@ The session uses three goroutines for concurrent operation:
 | Mechanism | From | To | Purpose |
 |-----------|------|----|---------|
 | `msgCh` (buffered, cap 100) | inputPump | run() | Parsed user input messages |
-| `taskCancel` (atomic.Value) | inputPump | task worker | Cancel the running task |
+| `taskCancel` (atomic.Value) | run() | task worker | Cancel the running task |
 | `taskResult` (buffered, cap 1) | task worker | run() | Return final messages and signal task completion |
 | `stateCh` (buffered, cap 64) | task worker | run() | Step progress, token counts, paused state |
 | `infoUpdateCh` (buffered, cap 1) | task worker | run() | Request system-info broadcast |
