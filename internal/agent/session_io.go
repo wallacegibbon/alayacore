@@ -6,6 +6,23 @@ package agent
 // commands) or the task goroutine (for deferred commands). The task
 // goroutine sends state mutations via stateCh, and the run() goroutine
 // owns taskQueue and s.Messages directly.
+//
+// === :cancel / :cancel_all split design ===
+//
+// :cancel only needs to cancel the running task (thread-safe via
+// atomic.Value + context), so the input pump can handle it entirely
+// and return early — run() never sees it.
+//
+// :cancel_all must BOTH cancel the task AND clear the queue.  The
+// queue is owned by run(), so the input pump cannot touch it without
+// a data race.  Therefore :cancel_all is split:
+//
+//   input pump:  cancelRunningTask()       (immediate, no queue wait)
+//   run():        clear queue + notify      (safe access to taskQueue)
+//
+// DO NOT "simplify" this by dropping the input-pump fast path — the
+// point is to cancel the task context without waiting for msgCh to
+// drain.  DO NOT add queue manipulation to the input pump either.
 
 import (
 	"context"
@@ -52,10 +69,12 @@ func (s *Session) cancelAllTasks() {
 	queueLen := len(s.taskQueue)
 	s.taskQueue = make([]QueueItem, 0)
 
-	// The task cancel itself was already issued by the input pump's
-	// fast path for :cancel_all.  inProgress stays true until the
-	// task goroutine exits and handleTaskDone clears it, so we can
-	// still use it for the notification below.
+	// The task context was already canceled by the input pump's
+	// fast path for :cancel_all.  We must NOT call cancelRunningTask()
+	// here — that would be a duplicate (the first call in the input
+	// pump already canceled the context).  inProgress stays true
+	// until handleTaskDone clears it, so it's still valid for the
+	// notification below.
 	taskWasRunning := s.inProgress.Load()
 
 	// Send notification
@@ -514,8 +533,14 @@ func (s *Session) handleInputUserText(value string, pendingImages *[]string, msg
 				}
 			}
 		}
-		// :cancel_all — also cancel immediately (same reason), but
-		// fall through to msgCh so run() can clear the queue.
+		// :cancel_all — cancel the task immediately (same reason as
+		// :cancel), but MUST fall through to msgCh so run() can clear
+		// the queue.  The queue is owned by run(); touching it here
+		// in the input pump would be a data race.
+		//
+		// cancelAllTasks() in run() handles the queue clear and
+		// notification.  It MUST NOT call cancelRunningTask() again
+		// — that is already done here.
 		if strings.HasPrefix(cmd, CommandNameCancelAll) {
 			if rest := cmd[len(CommandNameCancelAll):]; rest == "" || rest[0] == ' ' {
 				s.cancelRunningTask()
