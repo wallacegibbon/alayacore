@@ -218,13 +218,6 @@ func (s *Session) handleModelSet(args []string) {
 		return
 	}
 
-	inProg := s.inProgress.Load()
-
-	if inProg {
-		s.writeError("Cannot switch model while a task is running. Please wait or cancel the current task.")
-		return
-	}
-
 	modelIDStr := args[0]
 	modelID, err := strconv.Atoi(modelIDStr)
 	if err != nil {
@@ -262,11 +255,6 @@ func (s *Session) handleModelSet(args []string) {
 func (s *Session) handleModelLoad() {
 	if s.ModelManager == nil {
 		s.writeError(domainerrors.ErrModelManagerNotInitialized.Error())
-		return
-	}
-
-	if s.inProgress.Load() {
-		s.writeError("Cannot reload models while a task is running. Please wait or cancel the current task.")
 		return
 	}
 
@@ -579,11 +567,16 @@ func (s *Session) handleConfirmCommand(args []string) {
 func (s *Session) handleInputMsg(msg inputMsg) {
 	if msg.isCmd {
 		cmd := msg.text
-		// Immediate commands are handled directly; deferred commands
-		// go through the task queue.
-		if IsImmediate(cmd) {
+		switch LookupSchedule(cmd) {
+		case ScheduleImmediate:
 			s.handleCommand(s.sessionCtx, cmd)
-		} else {
+		case ScheduleWhenIdle:
+			if s.inProgress.Load() {
+				s.writeError("Cannot run this command while a task is in progress. Please wait or cancel the current task.")
+				return
+			}
+			s.handleCommand(s.sessionCtx, cmd)
+		default:
 			s.submitDeferredCommand(cmd)
 		}
 	} else {

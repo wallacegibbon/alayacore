@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
@@ -405,6 +406,8 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 	output := &MockOutput{}
 
 	// Create a session with a model manager
+	sessionCtx, sessionCancel := context.WithCancel(context.Background())
+	defer sessionCancel()
 	session := &Session{
 		SessionConfig: SessionConfig{
 			Input:  &stream.NopInput{},
@@ -412,6 +415,7 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 		},
 		taskQueue:    make([]QueueItem, 0),
 		ModelManager: NewModelManager(""),
+		sessionCtx:   sessionCtx,
 	}
 
 	// Add a test model to the manager
@@ -425,10 +429,12 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 	}
 	session.ModelManager.models = append(session.ModelManager.models, testModel)
 
-	// Test 1: model_set should work when no task is running
-	session.handleModelSet([]string{"1"})
+	// Test 1: model_set should work when no task is running.
+	// Dispatch through handleInputMsg (the real entry point) so the
+	// ScheduleWhenIdle policy is enforced.
+	output.Messages = nil
+	session.handleInputMsg(inputMsg{text: "model_set 1", isCmd: true})
 
-	// Check that the model was switched (no error should be in output)
 	foundError := false
 	for _, msg := range output.Messages {
 		if strings.Contains(msg, `"type":"error"`) {
@@ -440,12 +446,11 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 		t.Error("model_set should succeed when no task is running, but got error")
 	}
 
-	// Test 2: model_set should fail when task is running
-	output.Messages = nil // Clear previous messages
+	// Test 2: model_set should fail when task is running.
+	output.Messages = nil
 	session.inProgress.Store(true)
-	session.handleModelSet([]string{"1"})
+	session.handleInputMsg(inputMsg{text: "model_set 1", isCmd: true})
 
-	// Check that the model was NOT switched (error should be in output)
 	foundError = false
 	for _, msg := range output.Messages {
 		if strings.Contains(msg, `"type":"error"`) {
@@ -457,12 +462,11 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 		t.Error("model_set should fail when task is running, but no error was found")
 	}
 
-	// Test 3: model_set should work again after task completes
-	output.Messages = nil // Clear previous messages
+	// Test 3: model_set should work again after task completes.
+	output.Messages = nil
 	session.inProgress.Store(false)
-	session.handleModelSet([]string{"1"})
+	session.handleInputMsg(inputMsg{text: "model_set 1", isCmd: true})
 
-	// Check that the model was switched (no error should be in output)
 	foundError = false
 	for _, msg := range output.Messages {
 		if strings.Contains(msg, `"type":"error"`) {
