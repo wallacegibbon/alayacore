@@ -265,6 +265,11 @@ func (s *Session) handleModelLoad() {
 		return
 	}
 
+	if s.inProgress.Load() {
+		s.writeError("Cannot reload models while a task is running. Please wait or cancel the current task.")
+		return
+	}
+
 	path := s.ModelManager.GetFilePath()
 	if path == "" {
 		s.writeError(domainerrors.ErrNoModelFilePath.Error())
