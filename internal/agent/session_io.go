@@ -441,10 +441,11 @@ type inputMsg struct {
 
 // inputPump runs in its own goroutine and reads TLV frames from the
 // input stream. It sends parsed messages to msgCh. It does NOT access
-// any session state directly except for :cancel / :cancel_all (which
-// call cancelRunningTask) and :confirm (which writes to the confirm
-// channel).  All output-stream writes are deferred to the run()
-// goroutine via errText on inputMsg.
+// any session state directly except for :cancel (which calls
+// cancelRunningTask for immediate cancellation) and :confirm (which
+// writes to the confirm channel to unblock the task goroutine).
+// All output-stream writes are deferred to the run() goroutine via
+// errText on inputMsg.
 func (s *Session) inputPump(msgCh chan<- inputMsg) {
 	var pendingImages []string
 
@@ -499,12 +500,15 @@ func (s *Session) handleInputUserText(value string, pendingImages *[]string, msg
 		// :cancel is handled immediately in the input pump so the
 		// task context is canceled without waiting for queued
 		// messages to drain.  On success it returns early and run()
-		// never sees the command.  :cancel_all goes through the
-		// normal msgCh path — cancelAllTasks() in run() handles
-		// both the cancel and the queue clear.
-		if cmd == CommandNameCancel {
-			if s.cancelRunningTask() {
-				return
+		// never sees the command.  Prefix-match so that ":cancel"
+		// with trailing text (":cancel please") still gets the
+		// fast path.
+		if strings.HasPrefix(cmd, CommandNameCancel) {
+			// Guard against matching "cancel_all" or "cancel_foo".
+			if rest := cmd[len(CommandNameCancel):]; rest == "" || rest[0] == ' ' {
+				if s.cancelRunningTask() {
+					return
+				}
 			}
 		}
 		parts := strings.Fields(cmd)

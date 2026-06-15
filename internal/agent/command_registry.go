@@ -85,6 +85,10 @@ var commandDefs = []Command{
 		func(s *Session, _ context.Context, args []string) { s.handleReason(args) }},
 	{CommandNameThemeSet, "Set the active theme", "<name>", ScheduleImmediate,
 		func(s *Session, _ context.Context, args []string) { s.handleThemeSet(args) }},
+	// :confirm is normally intercepted in handleInputUserText
+	// (input pump goroutine) to write to the confirm channel
+	// directly.  This entry is a fallback in case the early
+	// interception is ever removed.
 	{CommandNameConfirm, "Confirm or deny a pending tool execution", "yes|no", ScheduleImmediate,
 		func(s *Session, _ context.Context, args []string) {
 			if errText := s.handleConfirmCommand(args); errText != "" {
