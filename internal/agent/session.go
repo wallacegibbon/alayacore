@@ -38,6 +38,7 @@ package agent
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"sync/atomic"
 	"time"
@@ -157,7 +158,11 @@ func LoadOrNewSession(cfg SessionConfig) (*Session, string, error) {
 	cfg.SessionFile = config.ExpandPath(cfg.SessionFile)
 	if cfg.SessionFile != "" {
 		if data, err := LoadSession(cfg.SessionFile); err == nil {
-			return RestoreFromSession(cfg, data), cfg.SessionFile, nil
+			s := RestoreFromSession(cfg, data)
+			if replayErr := s.replayContentToAdapter(); replayErr != nil {
+				s.initError = replayErr
+			}
+			return s, cfg.SessionFile, nil
 		} else if errors.Is(err, ErrSessionVersionMismatch) {
 			return nil, "", err
 		}
@@ -195,9 +200,11 @@ func NewSession(cfg SessionConfig) *Session {
 	s.initToolConfirmSet(cfg.ToolConfirmTools)
 	s.setActiveFromRuntimeConfig()
 	s.setActiveFromCliFlag()
+
 	if model := s.ModelManager.GetActive(); model != nil {
 		s.applyModelContextLimit(model)
 	}
+
 	s.sendSystemInfo("all")
 	return s
 }
@@ -231,6 +238,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 	}
 	s.reasoningLevel = data.ReasoningLevel
 	s.ContextTokens = data.ContextTokens
+	s.histCounter = uint64(len(s.Content))
 
 	s.initToolConfirmSet(cfg.ToolConfirmTools)
 	s.setActiveFromRuntimeConfig()
@@ -246,19 +254,20 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 	}
 
 	s.sendSystemInfo("all")
+	return s
+}
 
-	s.histCounter = uint64(len(s.Content))
-
-	// Send session content to adapter with IDs so the adapter can reference
-	// content by ID even after session reload.
+// replayContentToAdapter sends all content parts to the adapter with history IDs,
+// so the adapter can reference them by ID even after session reload.
+func (s *Session) replayContentToAdapter() error {
 	for _, part := range s.Content {
 		tag, content, err := contentPartToTLV(part)
 		if err != nil {
-			continue
+			return fmt.Errorf("corrupt session file: failed to serialize content part (HistoryID=%d): %w", part.GetHistoryID(), err)
 		}
 		s.writeTLV(tag, stream.WrapDelta(strconv.FormatUint(part.GetHistoryID(), 10), content))
 	}
-	return s
+	return nil
 }
 
 // histIncAndGet increments the history counter by 1 and returns the new value.

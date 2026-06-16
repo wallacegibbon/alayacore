@@ -88,18 +88,14 @@ func (s *Session) tryStartNextTask() bool {
 		}
 	}
 
-	s.taskQueue = s.taskQueue[1:]
-	s.inProgress = true
-
-	// Ensure agent is initialized before spawning the task goroutine.
-	// This avoids calling ModelManager from the task goroutine and keeps
-	// all model state access in the run() goroutine.
+	// Fail before mutating state if agent is not available.
 	if err := s.ensureAgentInitialized(); err != nil {
 		s.writeError(err.Error())
-		s.inProgress = false
-		s.sendSystemInfo("task")
 		return false
 	}
+
+	s.taskQueue = s.taskQueue[1:]
+	s.inProgress = true
 
 	// Create a snapshot of Messages for the task goroutine.
 	// Messages is always derived from Content, so this is in sync.
