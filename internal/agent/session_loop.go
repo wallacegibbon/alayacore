@@ -20,20 +20,7 @@ import (
 // Main Event Loop
 // ============================================================================
 
-// run is the main loop that owns input processing, task queue management,
-// and the authoritative copy of session state (s.Content, taskQueue,
-// totals, etc.). It runs in a single goroutine (started by Start()).
-//
-// s.Content is the single source of truth for the conversation history,
-// a flat ordered slice of ContentPart where each item has a stable ID
-// that matches the adapter's TLV stream IDs. s.Messages is derived from
-// s.Content for API calls and rebuilt after each task completes.
-// When a task starts, a snapshot of s.Messages (derived from Content)
-// is passed to the task goroutine as its local working copy.
-// The task goroutine never writes to s.Content directly — it returns the
-// final state via taskResultCh channel on completion.
-//
-// The loop processes four kinds of events:
+// run is the main event loop. It processes four kinds of events:
 //   - Input messages from the user (via inputPump → inputMsgCh)
 //   - Task state changes (via task goroutine → taskEventCh)
 //   - Task completion signals (via taskResultCh)
@@ -135,9 +122,7 @@ func (s *Session) tryStartNextTask() bool {
 // handleTaskDone processes a task completion signal from the task goroutine.
 // result carries the final message state and new ContentParts.
 func (s *Session) handleTaskDone(result TaskResult) {
-	// Commit state events from the just-finished task before
-	// the next task starts. All taskEventCh events are sent before
-	// taskResultCh (in defer), so remaining events belong to this task.
+	// Commit remaining state events before the next task starts.
 	s.flushPendingEvents()
 
 	// Mark the task as finished so the next queue item can start.
@@ -161,11 +146,8 @@ func (s *Session) handleTaskDone(result TaskResult) {
 	s.sendSystemInfo("task")
 }
 
-// flushPendingEvents non-blocking drains all remaining events from taskEventCh.
-// The task goroutine sends all events before taskResultCh (sent in defer),
-// so any events still in the buffer belong to the just-finished task.
-// Processing them here ensures state (e.g. ContextTokens) is committed
-// before the next task starts.
+// flushPendingEvents drains remaining taskEventCh events from the
+// just-finished task before the next one starts.
 func (s *Session) flushPendingEvents() {
 	for {
 		select {
