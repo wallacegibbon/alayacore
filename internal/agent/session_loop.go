@@ -189,6 +189,7 @@ func (s *Session) handleTaskEvent(ev TaskEvent) {
 	switch e := ev.(type) {
 	case StepStartEvent:
 		s.currentStep = e.Step
+		s.sendSystemInfo("task")
 
 	case StepFinishEvent:
 		// Anthropic's input_tokens excludes cached tokens; sum all
