@@ -22,7 +22,7 @@ package agent
 //   Cross-goroutine communication:
 //     msgCh (inputMsg channel)  — inputPump → run()
 //     stateCh (taskEvent)        — task → run()
-//     taskCancel                 — run() → task (cancellation via cancelRunningTask)
+//     taskCancel (func call)     — run() → task (cancellation via cancelRunningTask)
 //     taskResult                 — task → run (TaskResult with messages + entries)
 //     infoUpdateCh               — task → run() (system-info refresh)
 //
@@ -73,11 +73,11 @@ type Session struct {
 	agent          atomic.Pointer[llm.Agent]
 	provider       atomic.Pointer[llm.Provider]
 	taskQueue      []QueueItem
-	currentStep    atomic.Int64
+	currentStep    int          // set by handleTaskEvent (StepStartEvent); read by sendTaskMsg
 	reasoningLevel atomic.Int64
 	reasoningDirty atomic.Bool // true if reasoningLevel changed during task execution
 
-	inProgress    atomic.Bool // set/cleared by run() goroutine only; readable by input pump via cancelRunningTask
+	inProgress    bool // set/cleared by tryStartNextTask / handleTaskDone; all access from run() goroutine
 	pausedOnError atomic.Bool // set by task goroutine via event
 
 	nextQueueID uint64 // goroutine-local (run() goroutine)
@@ -109,10 +109,9 @@ type Session struct {
 	infoUpdateCh chan string
 
 	// taskCancel holds the cancel function for the currently running task.
-	// Set by run() before spawning the task goroutine, cleared by handleTaskDone().
-	// Read by cancelRunningTask() via atomic.Value (gated by inProgress atomic).
-	// Only one task can run at a time, so a single slot is sufficient.
-	taskCancel atomic.Value
+	// Set by tryStartNextTask before spawning the task goroutine, cleared
+	// by handleTaskDone. All access from the run() goroutine.
+	taskCancel context.CancelFunc
 
 	// outputBroken is set on the first write error to the output stream.
 	// Once true, all subsequent writes are skipped and the session context
@@ -269,11 +268,11 @@ func (s *Session) Start() {
 // cancelRunningTask cancels the currently running task via its per-task
 // context. Returns true if a task was actually running and was canceled.
 func (s *Session) cancelRunningTask() bool {
-	if !s.inProgress.Load() {
+	if !s.inProgress {
 		return false
 	}
-	if cancel, ok := s.taskCancel.Load().(context.CancelFunc); ok && cancel != nil {
-		cancel()
+	if s.taskCancel != nil {
+		s.taskCancel()
 		return true
 	}
 	return false

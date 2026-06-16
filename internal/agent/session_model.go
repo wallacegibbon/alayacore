@@ -161,7 +161,7 @@ func (s *Session) applyModelContextLimit(model *ModelConfig) {
 // See config.ReasoningLevelOff, config.ReasoningLevelNormal, config.ReasoningLevelMax.
 func (s *Session) SetReasoningLevel(level int) {
 	s.reasoningLevel.Store(int64(level))
-	if s.inProgress.Load() {
+	if s.inProgress {
 		// Defer provider sync to next step boundary
 		s.reasoningDirty.Store(true)
 	} else {

@@ -41,7 +41,7 @@ func (s *Session) handleCommand(ctx context.Context, cmd string) {
 }
 
 func (s *Session) cancelTask() {
-	if s.inProgress.Load() {
+	if s.inProgress {
 		if s.cancelRunningTask() {
 			return
 		}
@@ -56,7 +56,7 @@ func (s *Session) cancelAllTasks() {
 	// Cancel the running task (if any) and clear the queue in one
 	// place.  Everything runs in the run() goroutine — no split.
 	currentCanceled := false
-	if s.inProgress.Load() {
+	if s.inProgress {
 		if s.cancelRunningTask() {
 			currentCanceled = true
 		}
@@ -588,7 +588,7 @@ func (s *Session) handleInputMsg(msg inputMsg) {
 		case ScheduleImmediate:
 			s.handleCommand(s.sessionCtx, cmd)
 		case ScheduleIdle:
-			if s.inProgress.Load() {
+			if s.inProgress {
 				s.writeError("Cannot run this command while a task is in progress. Please wait or cancel the current task.")
 				return
 			}

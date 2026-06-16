@@ -49,9 +49,8 @@ func (s *Session) run() {
 	}
 
 	// Start the I/O pump goroutine — it reads TLV from the input and
-	// sends parsed messages to run() for processing. It has NO access
-	// to session state except the per-task cancel function (via
-	// cancelRunningTask() for :cancel commands).
+	// sends parsed messages to run() for processing. It has no access
+	// to session state and communicates solely via msgCh.
 	msgCh := make(chan inputMsg, 100)
 	go s.inputPump(msgCh)
 
@@ -69,7 +68,7 @@ func (s *Session) run() {
 			if !ok {
 				// Input is closed (EOF on stdin). Drain the currently
 				// running task, then process any remaining queued tasks.
-				for s.inProgress.Load() || s.tryStartNextTask() {
+				for s.inProgress || s.tryStartNextTask() {
 					s.drainUntilTaskDone()
 				}
 				return
@@ -96,7 +95,7 @@ func (s *Session) run() {
 // allowed to run — user prompts must wait for explicit recovery via :continue.
 // Returns true if a task was started.
 func (s *Session) tryStartNextTask() bool {
-	if len(s.taskQueue) == 0 || s.inProgress.Load() || s.sessionCtx.Err() != nil {
+	if len(s.taskQueue) == 0 || s.inProgress || s.sessionCtx.Err() != nil {
 		return false
 	}
 
@@ -110,14 +109,14 @@ func (s *Session) tryStartNextTask() bool {
 	}
 
 	s.taskQueue = s.taskQueue[1:]
-	s.inProgress.Store(true)
+	s.inProgress = true
 
 	// Ensure agent is initialized before spawning the task goroutine.
 	// This avoids calling ModelManager from the task goroutine and keeps
 	// all model state access in the run() goroutine.
 	if err := s.ensureAgentInitialized(); err != nil {
 		s.writeError(err.Error())
-		s.inProgress.Store(false)
+		s.inProgress = false
 		s.sendSystemInfo("task")
 		return false
 	}
@@ -128,10 +127,10 @@ func (s *Session) tryStartNextTask() bool {
 	copy(taskMessages, s.Messages)
 
 	// Create a per-task context derived from sessionCtx. The cancel
-	// function is stored in s.taskCancel so cancelRunningTask() (called
-	// from inputPump) can cancel the task. Cleared in handleTaskDone().
+	// function is stored in s.taskCancel so cancelRunningTask() can
+	// cancel the task. Cleared in handleTaskDone().
 	taskCtx, taskCancel := context.WithCancel(s.sessionCtx)
-	s.taskCancel.Store(taskCancel)
+	s.taskCancel = taskCancel
 
 	go s.runTask(taskCtx, item, taskMessages)
 	return true
@@ -141,8 +140,8 @@ func (s *Session) tryStartNextTask() bool {
 // result carries the final message state and new ContentParts.
 func (s *Session) handleTaskDone(result TaskResult) {
 	// Mark the task as finished so the next queue item can start.
-	s.inProgress.Store(false)
-	s.taskCancel.Store((context.CancelFunc)(nil))
+	s.inProgress = false
+	s.taskCancel = nil
 
 	// Append new ContentParts.
 	if len(result.Entries) > 0 {
@@ -186,7 +185,7 @@ func (s *Session) drainUntilTaskDone() {
 func (s *Session) handleTaskEvent(ev TaskEvent) {
 	switch e := ev.(type) {
 	case StepStartEvent:
-		s.currentStep.Store(int64(e.Step))
+		s.currentStep = e.Step
 
 	case StepFinishEvent:
 		// Anthropic's input_tokens excludes cached tokens; sum all

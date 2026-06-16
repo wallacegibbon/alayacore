@@ -41,7 +41,7 @@ func (s *Session) submitTask(item QueueItem) {
 // means inProgress is false — the task goroutine has returned).
 // They are placed at the front so they run ahead of any accumulated user prompts.
 func (s *Session) submitTaskCommand(cmd string) {
-	if s.inProgress.Load() {
+	if s.inProgress {
 		s.writeError("Cannot run command while a task is running. Please wait or cancel first.")
 		return
 	}
@@ -93,7 +93,7 @@ func (s *Session) runTask(ctx context.Context, item QueueItem, taskMessages []ll
 
 	s.requestSystemInfo()
 
-	s.currentStep.Store(0)
+	s.currentStep = 0
 
 	switch item.Type {
 	case TaskTypePrompt:
