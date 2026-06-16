@@ -132,6 +132,9 @@ func (s *Session) tryStartNextTask() bool {
 	taskCtx, taskCancel := context.WithCancel(s.sessionCtx)
 	s.taskCancel = taskCancel
 
+	// Reset step counter before starting the task.
+	s.currentStep = 0
+
 	go s.runTask(taskCtx, item, taskMessages)
 	return true
 }

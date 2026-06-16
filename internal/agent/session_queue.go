@@ -93,8 +93,6 @@ func (s *Session) runTask(ctx context.Context, item QueueItem, taskMessages []ll
 
 	s.requestSystemInfo()
 
-	s.currentStep = 0
-
 	switch item.Type {
 	case TaskTypePrompt:
 		taskMessages, entries = s.handleUserPrompt(ctx, taskMessages, entries, item.Content, item.Images)
