@@ -39,7 +39,7 @@ import (
 //   - Task completion signals (via taskResultCh)
 //   - System info refresh requests (via taskRefreshCh)
 func (s *Session) run() {
-	defer close(s.runDone)
+	defer close(s.runDoneCh)
 	defer s.sessionCancel()
 
 	// Start the I/O pump goroutine — it reads TLV from the input and

@@ -213,7 +213,7 @@ func TestCancelAllTasks(t *testing.T) {
 				runState: runState{
 					taskQueue: make([]QueueItem, 0),
 				},
-				runDone: make(chan struct{}),
+				runDoneCh: make(chan struct{}),
 				sessionConfig: sessionConfig{
 					SessionConfig: SessionConfig{
 						Input:  &stream.SliceBuffer{},

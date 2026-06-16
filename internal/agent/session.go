@@ -114,13 +114,13 @@ type Session struct {
 	runState
 	sharedState
 
-	runDone   chan struct{} // closed when run() exits
+	runDoneCh chan struct{} // closed when run() exits
 	CreatedAt time.Time
 }
 
 // Done returns a channel that is closed when run() has exited.
 func (s *Session) Done() <-chan struct{} {
-	return s.runDone
+	return s.runDoneCh
 }
 
 // TaskError reports whether the last task ended with an error.
@@ -188,7 +188,7 @@ func NewSession(cfg SessionConfig) *Session {
 			sessionCtx:    ctx,
 			sessionCancel: cancel,
 		},
-		runDone:   make(chan struct{}),
+		runDoneCh: make(chan struct{}),
 		CreatedAt: time.Now(),
 	}
 	s.reasoningLevel = config.DefaultReasoningLevel
@@ -226,7 +226,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 			sessionCtx:    ctx,
 			sessionCancel: cancel,
 		},
-		runDone:   make(chan struct{}),
+		runDoneCh: make(chan struct{}),
 		CreatedAt: data.CreatedAt,
 	}
 	s.reasoningLevel = data.ReasoningLevel
