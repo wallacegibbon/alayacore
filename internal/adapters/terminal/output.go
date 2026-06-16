@@ -220,11 +220,8 @@ func (to *outputWriter) triggerUpdateForTag(tag string) {
 // handleSystemMsg processes a TagSystemMsg frame.
 // Called from processBuffer which holds outputWriter.mu.
 func (to *outputWriter) handleSystemMsg(value string) {
-	var env struct {
-		Type string          `json:"type"`
-		Data json.RawMessage `json:"data"`
-	}
-	if err := json.Unmarshal([]byte(value), &env); err != nil {
+	env, err := stream.ParseSystemMsg(value)
+	if err != nil {
 		return
 	}
 	switch env.Type {

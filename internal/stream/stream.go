@@ -169,9 +169,26 @@ type SystemMsg interface {
 }
 
 // systemMsgEnvelope is the wire format for TagSystemMsg.
-type systemMsgEnvelope struct {
+type SystemMsgEnvelope struct {
 	Type string          `json:"type"`
 	Data json.RawMessage `json:"data"`
+}
+
+// ParseSystemMsg parses a TagSystemMsg value into its type and payload.
+// Returns the envelope on success, or an error if the JSON is malformed.
+func ParseSystemMsg(value string) (SystemMsgEnvelope, error) {
+	var env SystemMsgEnvelope
+	if err := json.Unmarshal([]byte(value), &env); err != nil {
+		return SystemMsgEnvelope{}, err
+	}
+	return env, nil
+}
+
+// ParseSystemMsgType extracts just the type from a TagSystemMsg value.
+// Returns the type string and whether parsing succeeded.
+func ParseSystemMsgType(value string) (string, bool) {
+	env, err := ParseSystemMsg(value)
+	return env.Type, err == nil
 }
 
 // WriteSystemMsg marshals msg as a TagSystemMsg TLV frame.
@@ -180,7 +197,7 @@ func WriteSystemMsg(w io.Writer, msg SystemMsg) error {
 	if err != nil {
 		return err
 	}
-	env, err := json.Marshal(systemMsgEnvelope{Type: msg.SystemMsgType(), Data: data})
+	env, err := json.Marshal(SystemMsgEnvelope{Type: msg.SystemMsgType(), Data: data})
 	if err != nil {
 		return err
 	}

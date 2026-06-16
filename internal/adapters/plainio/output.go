@@ -165,11 +165,8 @@ func (o *stdoutOutput) emitSeparator(tag string) {
 // Handles error, notify, task, and tool_confirm system messages.
 // Task completion transitions print a trailing blank line between tasks.
 func (o *stdoutOutput) handleSystemMsg(value string) {
-	var env struct {
-		Type string          `json:"type"`
-		Data json.RawMessage `json:"data"`
-	}
-	if err := json.Unmarshal([]byte(value), &env); err != nil {
+	env, err := stream.ParseSystemMsg(value)
+	if err != nil {
 		return
 	}
 	switch env.Type {
