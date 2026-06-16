@@ -86,6 +86,15 @@ type ToolConfirmRequest struct {
 	Input    json.RawMessage `json:"input"`
 }
 
+// ToConfirmRequest builds a ToolConfirmRequest from a ToolUsePart.
+func (tc *ToolUsePart) ToConfirmRequest() ToolConfirmRequest {
+	return ToolConfirmRequest{
+		ID:       tc.ID,
+		ToolName: tc.ToolName,
+		Input:    tc.Input,
+	}
+}
+
 // ToolConfirmResponse represents the user's decision for a specific tool call.
 // If Error is non-empty, the tool result is recorded as failed with that reason.
 // If Allowed is false (and Error is empty), the tool is recorded as denied by user.
@@ -226,7 +235,7 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 				}
 			}
 			execCount++
-			tc := toolUseEventToPart(e, id)
+			tc := e.ToPart(id)
 			deferred = a.handleStreamedToolUse(ctx, tc, callbacks, deferred, resultCh)
 
 		case StepCompleteEvent:
@@ -289,10 +298,7 @@ func (a *Agent) handleStreamedToolUse(ctx context.Context, tc *ToolUsePart, call
 		return deferred
 	}
 
-	historyID := uint64(0)
-	if callbacks.IDGen != nil {
-		historyID = callbacks.IDGen()
-	}
+	historyID := getHistoryID(callbacks)
 	go func(tc *ToolUsePart, historyID uint64) {
 		resultCh <- a.executeTool(ctx, tc, callbacks, historyID)
 	}(tc, historyID)
@@ -311,11 +317,7 @@ func (a *Agent) executeDeferredTools(ctx context.Context, deferred []*ToolUsePar
 	requests := make([]ToolConfirmRequest, len(deferred))
 	idToIdx := make(map[string]int, len(deferred))
 	for i, tc := range deferred {
-		requests[i] = ToolConfirmRequest{
-			ID:       tc.ID,
-			ToolName: tc.ToolName,
-			Input:    tc.Input,
-		}
+		requests[i] = tc.ToConfirmRequest()
 		idToIdx[tc.ID] = i
 	}
 
@@ -330,28 +332,17 @@ func (a *Agent) executeDeferredTools(ctx context.Context, deferred []*ToolUsePar
 		pendingConfirm--
 
 		if resp.Error != "" {
-			historyID := uint64(0)
-			if callbacks.IDGen != nil {
-				historyID = callbacks.IDGen()
-			}
-			resultCh <- newToolResult(callbacks, resp.ID, nil, fmt.Errorf("denied: %s", resp.Error), historyID)
+			resultCh <- newToolResult(callbacks, resp.ID, nil, fmt.Errorf("denied: %s", resp.Error), getHistoryID(callbacks))
 			continue
 		}
 		if !resp.Allowed {
-			historyID := uint64(0)
-			if callbacks.IDGen != nil {
-				historyID = callbacks.IDGen()
-			}
-			resultCh <- newToolResult(callbacks, resp.ID, nil, fmt.Errorf("Tool execution denied by user"), historyID)
+			resultCh <- newToolResult(callbacks, resp.ID, nil, fmt.Errorf("Tool execution denied by user"), getHistoryID(callbacks))
 			continue
 		}
 
 		// Confirmed — execute concurrently.
 		tc := deferred[idToIdx[resp.ID]]
-		historyID := uint64(0)
-		if callbacks.IDGen != nil {
-			historyID = callbacks.IDGen()
-		}
+		historyID := getHistoryID(callbacks)
 		go func(tc *ToolUsePart, historyID uint64) {
 			resultCh <- a.executeTool(ctx, tc, callbacks, historyID)
 		}(tc, historyID)
@@ -373,10 +364,17 @@ func getOrAssignID(callbacks StreamCallbacks, idByIndex map[int]uint64, index in
 	if id, ok := idByIndex[index]; ok && id != 0 {
 		return id
 	}
-	if callbacks.IDGen != nil {
-		id := callbacks.IDGen()
+	id := getHistoryID(callbacks)
+	if id != 0 {
 		idByIndex[index] = id
-		return id
+	}
+	return id
+}
+
+// getHistoryID generates a new history ID using the callback's IDGen if available.
+func getHistoryID(callbacks StreamCallbacks) uint64 {
+	if callbacks.IDGen != nil {
+		return callbacks.IDGen()
 	}
 	return 0
 }
@@ -403,9 +401,9 @@ func stripEmptyPlaceholders(content []ContentPart) []ContentPart {
 	return filtered
 }
 
-// toolUseEventToPart converts a ToolUseCompleteEvent to a ToolUsePart,
+// ToPart converts a ToolUseCompleteEvent to a ToolUsePart,
 // carrying over the history ID assigned during streaming.
-func toolUseEventToPart(e ToolUseCompleteEvent, historyID uint64) *ToolUsePart {
+func (e ToolUseCompleteEvent) ToPart(historyID uint64) *ToolUsePart {
 	return &ToolUsePart{
 		ID:       e.ID,
 		ToolName: e.ToolName,
