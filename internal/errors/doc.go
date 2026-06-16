@@ -33,10 +33,9 @@
 //
 // Helper Functions:
 //
-//   - NewSessionError(op, err): Create new error with operation
-//   - NewSessionErrorf(op, format, args...): Create with formatted message
-//   - Wrap(op, err): Wrap existing error with operation
-//   - Wrapf(op, err, format, args...): Wrap with formatted message
+//   - NewSessionErrorf(op, format, args...): Create error with operation context
+//   - Wrap(op, err): Wrap existing error with operation context
+//   - Wrapf(op, err, format, args...): Wrap with formatted message and operation context
 //
 // Usage:
 //
