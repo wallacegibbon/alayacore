@@ -92,7 +92,8 @@ func TestWrapf(t *testing.T) {
 }
 
 func TestDomainErrors(t *testing.T) {
-	// Sentinel errors carry no Op — operation context is added by Wrap/Wrapf.
+	// Sentinels are plain errors (not SessionError) — operation context
+	// is added by Wrap/Wrapf at the call site.
 	tests := []struct {
 		name string
 		err  error
@@ -109,15 +110,13 @@ func TestDomainErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sessionErr, ok := tt.err.(*SessionError)
-			if !ok {
-				t.Fatalf("expected *SessionError, got %T", tt.err)
-			}
-			if sessionErr.Operation() != "" {
-				t.Errorf("sentinel %s should have empty Op, got %q", tt.name, sessionErr.Operation())
-			}
-			if sessionErr.Error() == "" {
+			if tt.err.Error() == "" {
 				t.Errorf("sentinel %s Error() should not be empty", tt.name)
+			}
+			// Sentinels should be usable with errors.Is after wrapping.
+			wrapped := Wrapf("test", tt.err, "context")
+			if !errors.Is(wrapped, tt.err) {
+				t.Errorf("errors.Is(Wrapf(%q), %s) should be true", "test", tt.name)
 			}
 		})
 	}

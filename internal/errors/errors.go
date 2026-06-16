@@ -5,46 +5,46 @@ package errors
 import "fmt"
 
 // ============================================================================
-// Sentinel Errors (message templates without operation context)
+// Sentinel Errors
 //
-// These carry an empty Op. Operation context is added by Wrap(), Wrapf(),
-// or NewSessionErrorf() at the call site. This way Error() never produces
-// duplicated "op: op: message" strings when sentinels are wrapped.
+// Standard Go sentinels created with errors.New(). Operation context is added
+// by Wrap(), Wrapf(), or NewSessionErrorf() at the call site.
+// Use errors.Is(err, ErrFoo) to check for a specific sentinel.
 // ============================================================================
 
 // Model errors
 var (
-	ErrModelNotFound              = &SessionError{Err: fmt.Errorf("model not found")}
-	ErrModelManagerNotInitialized = &SessionError{Err: fmt.Errorf("model manager not initialized")}
-	ErrNoModelFilePath            = &SessionError{Err: fmt.Errorf("no model file path configured")}
-	ErrFailedToLoadModels         = &SessionError{Err: fmt.Errorf("failed to load models")}
+	ErrModelNotFound              = fmt.Errorf("model not found")
+	ErrModelManagerNotInitialized = fmt.Errorf("model manager not initialized")
+	ErrNoModelFilePath            = fmt.Errorf("no model file path configured")
+	ErrFailedToLoadModels         = fmt.Errorf("failed to load models")
 )
 
 // Queue errors
 var (
-	ErrQueueItemNotFound = &SessionError{Err: fmt.Errorf("queue item not found")}
+	ErrQueueItemNotFound = fmt.Errorf("queue item not found")
 )
 
 // Session errors
 var (
-	ErrNoSessionFile       = &SessionError{Err: fmt.Errorf("no session file set")}
-	ErrFailedToSaveSession = &SessionError{Err: fmt.Errorf("failed to save session")}
+	ErrNoSessionFile       = fmt.Errorf("no session file set")
+	ErrFailedToSaveSession = fmt.Errorf("failed to save session")
 )
 
 // Command errors
 var (
-	ErrEmptyCommand    = &SessionError{Err: fmt.Errorf("empty command")}
-	ErrNothingToCancel = &SessionError{Err: fmt.Errorf("nothing to cancel")}
+	ErrEmptyCommand    = fmt.Errorf("empty command")
+	ErrNothingToCancel = fmt.Errorf("nothing to cancel")
 )
 
 // Input errors
 var (
-	ErrInvalidInputTag = &SessionError{Err: fmt.Errorf("invalid input tag")}
+	ErrInvalidInputTag = fmt.Errorf("invalid input tag")
 )
 
 // Provider errors
 var (
-	ErrProviderCreationFailed = &SessionError{Err: fmt.Errorf("provider creation failed")}
+	ErrProviderCreationFailed = fmt.Errorf("provider creation failed")
 )
 
 // ============================================================================

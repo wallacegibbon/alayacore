@@ -219,7 +219,7 @@ func (s *Session) saveSession(args []string) {
 	}
 
 	if err := s.saveContentToFile(path, s.Content); err != nil {
-		s.writeError(domainerrors.Wrap(CommandNameSave, fmt.Errorf("%w: %v", domainerrors.ErrFailedToSaveSession, err)).Error())
+		s.writeError(domainerrors.Wrapf(CommandNameSave, domainerrors.ErrFailedToSaveSession, "%v", err).Error())
 	} else {
 		s.writeNotifyf("Session saved to %s", path)
 	}
@@ -283,7 +283,7 @@ func (s *Session) handleModelLoad() {
 	}
 
 	if err := s.ModelManager.LoadFromFile(path); err != nil {
-		s.writeError(domainerrors.Wrap(CommandNameModelLoad, fmt.Errorf("%w: %v", domainerrors.ErrFailedToLoadModels, err)).Error())
+		s.writeError(domainerrors.Wrapf(CommandNameModelLoad, domainerrors.ErrFailedToLoadModels, "%v", err).Error())
 		return
 	}
 
