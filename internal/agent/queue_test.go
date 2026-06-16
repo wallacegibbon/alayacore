@@ -11,10 +11,14 @@ import (
 func TestQueueItemUniqueIDs(t *testing.T) {
 	// Create a minimal session
 	session := &Session{
-		taskQueue: make([]QueueItem, 0),
-		SessionConfig: SessionConfig{
-			Input:  &stream.SliceBuffer{},
-			Output: &MockOutput{},
+		runState: runState{
+			taskQueue: make([]QueueItem, 0),
+		},
+		sessionConfig: sessionConfig{
+			SessionConfig: SessionConfig{
+				Input:  &stream.SliceBuffer{},
+				Output: &MockOutput{},
+			},
 		},
 	}
 
@@ -54,10 +58,14 @@ func TestQueueItemUniqueIDs(t *testing.T) {
 
 func TestDeleteQueueItem(t *testing.T) {
 	session := &Session{
-		taskQueue: make([]QueueItem, 0),
-		SessionConfig: SessionConfig{
-			Input:  &stream.SliceBuffer{},
-			Output: &MockOutput{},
+		runState: runState{
+			taskQueue: make([]QueueItem, 0),
+		},
+		sessionConfig: sessionConfig{
+			SessionConfig: SessionConfig{
+				Input:  &stream.SliceBuffer{},
+				Output: &MockOutput{},
+			},
 		},
 	}
 
@@ -95,10 +103,14 @@ func TestDeleteQueueItem(t *testing.T) {
 
 func TestQueueItemTypes(t *testing.T) {
 	session := &Session{
-		taskQueue: make([]QueueItem, 0),
-		SessionConfig: SessionConfig{
-			Input:  &stream.SliceBuffer{},
-			Output: &MockOutput{},
+		runState: runState{
+			taskQueue: make([]QueueItem, 0),
+		},
+		sessionConfig: sessionConfig{
+			SessionConfig: SessionConfig{
+				Input:  &stream.SliceBuffer{},
+				Output: &MockOutput{},
+			},
 		},
 	}
 
@@ -129,10 +141,14 @@ func TestQueueItemTypes(t *testing.T) {
 
 func TestQueueTimestamps(t *testing.T) {
 	session := &Session{
-		taskQueue: make([]QueueItem, 0),
-		SessionConfig: SessionConfig{
-			Input:  &stream.SliceBuffer{},
-			Output: &MockOutput{},
+		runState: runState{
+			taskQueue: make([]QueueItem, 0),
+		},
+		sessionConfig: sessionConfig{
+			SessionConfig: SessionConfig{
+				Input:  &stream.SliceBuffer{},
+				Output: &MockOutput{},
+			},
 		},
 	}
 
@@ -194,11 +210,15 @@ func TestCancelAllTasks(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			output := &MockOutput{}
 			session := &Session{
-				taskQueue: make([]QueueItem, 0),
-				runDone:   make(chan struct{}),
-				SessionConfig: SessionConfig{
-					Input:  &stream.SliceBuffer{},
-					Output: output,
+				runState: runState{
+					taskQueue: make([]QueueItem, 0),
+				},
+				runDone: make(chan struct{}),
+				sessionConfig: sessionConfig{
+					SessionConfig: SessionConfig{
+						Input:  &stream.SliceBuffer{},
+						Output: output,
+					},
 				},
 			}
 			session.inProgress = tt.inProgress
@@ -243,10 +263,14 @@ func TestCancelAllTasks(t *testing.T) {
 
 func TestPausedOnError(t *testing.T) {
 	session := &Session{
-		taskQueue: make([]QueueItem, 0),
-		SessionConfig: SessionConfig{
-			Input:  &stream.SliceBuffer{},
-			Output: &MockOutput{},
+		runState: runState{
+			taskQueue: make([]QueueItem, 0),
+		},
+		sessionConfig: sessionConfig{
+			SessionConfig: SessionConfig{
+				Input:  &stream.SliceBuffer{},
+				Output: &MockOutput{},
+			},
 		},
 	}
 
@@ -274,10 +298,14 @@ func TestPausedOnError(t *testing.T) {
 
 func TestSubmitTaskFront(t *testing.T) {
 	session := &Session{
-		taskQueue: make([]QueueItem, 0),
-		SessionConfig: SessionConfig{
-			Input:  &stream.SliceBuffer{},
-			Output: &MockOutput{},
+		runState: runState{
+			taskQueue: make([]QueueItem, 0),
+		},
+		sessionConfig: sessionConfig{
+			SessionConfig: SessionConfig{
+				Input:  &stream.SliceBuffer{},
+				Output: &MockOutput{},
+			},
 		},
 	}
 
@@ -327,10 +355,14 @@ func TestPausedOnErrorBlocksDequeue(t *testing.T) {
 
 func TestCommandCanRunWhilePaused(t *testing.T) {
 	session := &Session{
-		taskQueue: make([]QueueItem, 0),
-		SessionConfig: SessionConfig{
-			Input:  &stream.SliceBuffer{},
-			Output: &MockOutput{},
+		runState: runState{
+			taskQueue: make([]QueueItem, 0),
+		},
+		sessionConfig: sessionConfig{
+			SessionConfig: SessionConfig{
+				Input:  &stream.SliceBuffer{},
+				Output: &MockOutput{},
+			},
 		},
 	}
 
@@ -374,10 +406,14 @@ func TestCommandBehindUserPromptWhilePaused(t *testing.T) {
 	// This test verifies that submitTaskCommand places the command
 	// at the front.
 	session := &Session{
-		taskQueue: make([]QueueItem, 0),
-		SessionConfig: SessionConfig{
-			Input:  &stream.SliceBuffer{},
-			Output: &MockOutput{},
+		runState: runState{
+			taskQueue: make([]QueueItem, 0),
+		},
+		sessionConfig: sessionConfig{
+			SessionConfig: SessionConfig{
+				Input:  &stream.SliceBuffer{},
+				Output: &MockOutput{},
+			},
 		},
 	}
 
@@ -407,10 +443,14 @@ func TestCommandBehindUserPromptWhilePaused(t *testing.T) {
 
 func TestSubmitTaskDoesNotClearPauseWhenQueueNotEmpty(t *testing.T) {
 	session := &Session{
-		taskQueue: make([]QueueItem, 0),
-		SessionConfig: SessionConfig{
-			Input:  &stream.SliceBuffer{},
-			Output: &MockOutput{},
+		runState: runState{
+			taskQueue: make([]QueueItem, 0),
+		},
+		sessionConfig: sessionConfig{
+			SessionConfig: SessionConfig{
+				Input:  &stream.SliceBuffer{},
+				Output: &MockOutput{},
+			},
 		},
 	}
 

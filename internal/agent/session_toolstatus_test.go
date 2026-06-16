@@ -13,7 +13,9 @@ import (
 func TestWriteToolOutput(t *testing.T) {
 	output := &mockOutput{}
 	session := &Session{
-		SessionConfig: SessionConfig{Output: output},
+		sessionConfig: sessionConfig{
+			SessionConfig: SessionConfig{Output: output},
+		},
 	}
 
 	session.writeToolUseOutput("tool123", []llm.ContentPart{&llm.TextPart{Text: "output text"}}, false)
@@ -53,8 +55,12 @@ func TestWriteToolOutput(t *testing.T) {
 func TestOnToolUseOutputCallback(t *testing.T) {
 	output := &mockOutput{}
 	session := &Session{
-		SessionConfig: SessionConfig{Output: output},
-		Messages:      []llm.Message{},
+		runState: runState{
+			Messages: []llm.Message{},
+		},
+		sessionConfig: sessionConfig{
+			SessionConfig: SessionConfig{Output: output},
+		},
 	}
 
 	// Simulate the OnToolUseOutput callback from processPrompt
@@ -113,7 +119,9 @@ func TestOnToolUseOutputCallback(t *testing.T) {
 func TestWriteToolCallWithPending(t *testing.T) {
 	output := &mockOutput{}
 	session := &Session{
-		SessionConfig: SessionConfig{Output: output},
+		sessionConfig: sessionConfig{
+			SessionConfig: SessionConfig{Output: output},
+		},
 	}
 
 	session.writeToolUseInput(json.RawMessage(`{"command":"ls"}`), "tool123")

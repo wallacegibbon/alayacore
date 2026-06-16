@@ -48,79 +48,62 @@ import (
 	"github.com/alayacore/alayacore/internal/stream"
 )
 
-// Session manages conversation state and task execution.
-type Session struct {
-	Content        []llm.ContentPart // source of truth — flat, ordered, 1:1 with TLV
-	Messages       []llm.Message     // derived from Content for API calls (rebuilt after each task)
-	CreatedAt      time.Time
-	ContextTokens  atomic.Int64 // read by both goroutines (shouldAutoSummarize, sendSystemInfo)
-	ContextLimit   atomic.Int64 // maximum context window size (input+output); set from model config
+// sessionConfig groups fields that are set once at construction and
+// never modified thereafter.
+type sessionConfig struct {
 	ModelManager   *ModelManager
 	RuntimeManager *RuntimeManager
 	SkillsManager  *skills.Manager
-	SessionConfig        // embedded — immutable config set once at construction
-	initError      error // Set during construction if --model refers to a non-existent model
+	SessionConfig
+	initError        error  // set during construction if --model refers to a non-existent model
+	sessionMetaModel string // model name from session file frontmatter
+	toolConfirmSet   map[string]struct{}
+}
 
-	// sessionMetaModel is the model name stored in the session file's
-	// active_model frontmatter. Set by RestoreFromSession; empty for
-	// fresh sessions. Updated by handleModelSet whenever the user switches
-	// models in a file-backed session (SessionFile != ""). Used by
-	// setActiveFromSessionMeta() on reload to re-apply the session's model
-	// preference.
-	sessionMetaModel string
+// runState groups fields owned exclusively by the run() goroutine.
+// All reads and writes happen in the run() event loop.
+type runState struct {
+	Content       []llm.ContentPart // source of truth — flat, ordered, 1:1 with TLV
+	Messages      []llm.Message     // derived from Content for API calls (rebuilt after each task)
+	taskQueue     []QueueItem
+	currentStep   int // set by handleTaskEvent (StepStartEvent); read by sendTaskMsg
+	inProgress    bool
+	nextQueueID   uint64
+	taskCancel    context.CancelFunc
+	stateCh       chan TaskEvent
+	taskResult    chan TaskResult
+	taskRefreshCh chan struct{}
+}
 
-	// === State owned by run() goroutine, updated via task events ===
+// sharedState groups fields accessed from multiple goroutines,
+// synchronized via atomics or channels.
+type sharedState struct {
+	ContextTokens  atomic.Int64 // read by both goroutines (shouldAutoSummarize, sendSystemInfo)
+	ContextLimit   atomic.Int64 // maximum context window size (input+output); set from model config
 	agent          atomic.Pointer[llm.Agent]
 	provider       atomic.Pointer[llm.Provider]
-	taskQueue      []QueueItem
-	currentStep    int // set by handleTaskEvent (StepStartEvent); read by sendTaskMsg
 	reasoningLevel atomic.Int64
-	reasoningDirty atomic.Bool // true if reasoningLevel changed during task execution
+	reasoningDirty atomic.Bool
+	pausedOnError  atomic.Bool
+	outputBroken   atomic.Bool
+	histCounter    atomic.Uint64
+	confirmCh      atomic.Pointer[chan<- llm.ToolConfirmResponse]
+	sessionCtx     context.Context
+	sessionCancel  context.CancelFunc
+}
 
-	inProgress    bool        // set/cleared by tryStartNextTask / handleTaskDone; all access from run() goroutine
-	pausedOnError atomic.Bool // set by task goroutine via event
+// Session manages conversation state and task execution.
+// Fields are grouped into embedded sub-structs by ownership:
+//   - sessionConfig — immutable after construction
+//   - runState      — owned by the run() goroutine
+//   - sharedState   — cross-goroutine, synchronized via atomics/channels
+type Session struct {
+	sessionConfig
+	runState
+	sharedState
 
-	nextQueueID uint64 // goroutine-local (run() goroutine)
-
-	// history ID generator — atomic counter, safe for concurrent access.
-	histCounter atomic.Uint64
-
-	// stateCh carries state mutations from the task goroutine to run().
-	stateCh chan TaskEvent
-
-	// taskResult carries the final state from the task goroutine
-	// back to run() on completion. Buffered (capacity 1).
-	taskResult chan TaskResult
-
-	// confirmCh receives confirm responses from the input pump when the
-	// async OnToolConfirm callback is used. Set by the callback, read by
-	// handleConfirmCommand. Atomic pointer for safe concurrent access.
-	confirmCh atomic.Pointer[chan<- llm.ToolConfirmResponse]
-
-	// toolConfirmSet contains tool names that require user confirmation
-	// before execution. If nil, no confirmation is needed for any tool.
-	toolConfirmSet map[string]struct{}
-
-	// taskRefreshCh is a buffered channel (capacity 1) used by the task
-	// goroutine to request a best-effort system-info broadcast from the
-	// run() goroutine. Non-blocking send — the update is a responsiveness
-	// optimization only; critical state transitions (step, task completion)
-	// are guaranteed by direct sendSystemInfo calls from run().
-	taskRefreshCh chan struct{}
-
-	// taskCancel holds the cancel function for the currently running task.
-	// Set by tryStartNextTask before spawning the task goroutine, cleared
-	// by handleTaskDone. All access from the run() goroutine.
-	taskCancel context.CancelFunc
-
-	// outputBroken is set on the first write error to the output stream.
-	// Once true, all subsequent writes are skipped and the session context
-	// is canceled so we stop wasting API calls on a dead adapter.
-	outputBroken atomic.Bool
-
-	sessionCtx    context.Context    // canceled when input is exhausted or output breaks
-	sessionCancel context.CancelFunc // idempotent cancel
-	runDone       chan struct{}      // closed when run() exits
+	runDone   chan struct{} // closed when run() exits
+	CreatedAt time.Time
 }
 
 // Done returns a channel that is closed when run() has exited.
@@ -173,22 +156,28 @@ func LoadOrNewSession(cfg SessionConfig) (*Session, string, error) {
 // NewSession creates a fresh session. Does NOT start goroutines —
 // call Start() to begin processing input.
 func NewSession(cfg SessionConfig) *Session {
-	sessionCtx, sessionCancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 	s := &Session{
-		Content:        make([]llm.ContentPart, 0),
-		Messages:       make([]llm.Message, 0),
-		CreatedAt:      time.Now(),
-		ModelManager:   NewModelManager(cfg.ModelConfigPath),
-		RuntimeManager: NewRuntimeManager(cfg.RuntimeConfigPath),
-		SkillsManager:  cfg.SkillsMgr,
-		SessionConfig:  cfg,
-		taskQueue:      make([]QueueItem, 0),
-		stateCh:        make(chan TaskEvent, 64),
-		taskResult:     make(chan TaskResult, 1),
-		taskRefreshCh:  make(chan struct{}, 1),
-		sessionCtx:     sessionCtx,
-		sessionCancel:  sessionCancel,
-		runDone:        make(chan struct{}),
+		sessionConfig: sessionConfig{
+			ModelManager:   NewModelManager(cfg.ModelConfigPath),
+			RuntimeManager: NewRuntimeManager(cfg.RuntimeConfigPath),
+			SkillsManager:  cfg.SkillsMgr,
+			SessionConfig:  cfg,
+		},
+		runState: runState{
+			Content:       make([]llm.ContentPart, 0),
+			Messages:      make([]llm.Message, 0),
+			taskQueue:     make([]QueueItem, 0),
+			stateCh:       make(chan TaskEvent, 64),
+			taskResult:    make(chan TaskResult, 1),
+			taskRefreshCh: make(chan struct{}, 1),
+		},
+		sharedState: sharedState{
+			sessionCtx:    ctx,
+			sessionCancel: cancel,
+		},
+		runDone:   make(chan struct{}),
+		CreatedAt: time.Now(),
 	}
 	s.reasoningLevel.Store(int64(config.DefaultReasoningLevel))
 	s.initToolConfirmSet(cfg.ToolConfirmTools)
@@ -204,28 +193,34 @@ func NewSession(cfg SessionConfig) *Session {
 // RestoreFromSession creates a session from saved data.
 // Does NOT start goroutines — call Start() to begin processing input.
 func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
-	sessionCtx, sessionCancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 	s := &Session{
-		Content:        data.Content,
-		Messages:       contentToMessages(data.Content),
-		CreatedAt:      data.CreatedAt,
-		ModelManager:   NewModelManager(cfg.ModelConfigPath),
-		RuntimeManager: NewRuntimeManager(cfg.RuntimeConfigPath),
-		SkillsManager:  cfg.SkillsMgr,
-		SessionConfig:  cfg,
-		taskQueue:      make([]QueueItem, 0),
-		stateCh:        make(chan TaskEvent, 64),
-		taskResult:     make(chan TaskResult, 1),
-		taskRefreshCh:  make(chan struct{}, 1),
-		sessionCtx:     sessionCtx,
-		sessionCancel:  sessionCancel,
-		runDone:        make(chan struct{}),
+		sessionConfig: sessionConfig{
+			ModelManager:     NewModelManager(cfg.ModelConfigPath),
+			RuntimeManager:   NewRuntimeManager(cfg.RuntimeConfigPath),
+			SkillsManager:    cfg.SkillsMgr,
+			SessionConfig:    cfg,
+			sessionMetaModel: data.ActiveModel,
+		},
+		runState: runState{
+			Content:       data.Content,
+			Messages:      contentToMessages(data.Content),
+			taskQueue:     make([]QueueItem, 0),
+			stateCh:       make(chan TaskEvent, 64),
+			taskResult:    make(chan TaskResult, 1),
+			taskRefreshCh: make(chan struct{}, 1),
+		},
+		sharedState: sharedState{
+			sessionCtx:    ctx,
+			sessionCancel: cancel,
+		},
+		runDone:   make(chan struct{}),
+		CreatedAt: data.CreatedAt,
 	}
 	s.reasoningLevel.Store(int64(data.ReasoningLevel))
 	s.ContextTokens.Store(data.ContextTokens)
 
 	s.initToolConfirmSet(cfg.ToolConfirmTools)
-	s.sessionMetaModel = data.ActiveModel // used by setActiveFromSessionMeta
 	s.setActiveFromRuntimeConfig()
 	s.setActiveFromSessionMeta()
 

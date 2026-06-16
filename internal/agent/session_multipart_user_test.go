@@ -29,13 +29,17 @@ func TestMultiPartUserMessageRoundtrip(t *testing.T) {
 		},
 	}
 	session := &Session{
-		Content:  contentFromMessagesForTest(msgs),
-		Messages: msgs,
-		SessionConfig: SessionConfig{
-			Input:  &stream.NopInput{},
-			Output: &stream.NopOutput{},
+		runState: runState{
+			Content:   contentFromMessagesForTest(msgs),
+			Messages:  msgs,
+			taskQueue: make([]QueueItem, 0),
 		},
-		taskQueue: make([]QueueItem, 0),
+		sessionConfig: sessionConfig{
+			SessionConfig: SessionConfig{
+				Input:  &stream.NopInput{},
+				Output: &stream.NopOutput{},
+			},
+		},
 	}
 
 	if err := session.saveContentToFile(sessionPath, session.Content); err != nil {
@@ -128,13 +132,17 @@ func TestConsecutiveUserChunksGrouped(t *testing.T) {
 func TestHandleUserPromptAppendsToExistingUserMessage(t *testing.T) {
 	output := &mockOutput{}
 	session := &Session{
-		Messages: []llm.Message{},
-		SessionConfig: SessionConfig{
-			Input:  &stream.NopInput{},
-			Output: output,
+		runState: runState{
+			Messages:  []llm.Message{},
+			taskQueue: make([]QueueItem, 0),
 		},
-		taskQueue:    make([]QueueItem, 0),
-		ModelManager: NewModelManager(""),
+		sessionConfig: sessionConfig{
+			ModelManager: NewModelManager(""),
+			SessionConfig: SessionConfig{
+				Input:  &stream.NopInput{},
+				Output: output,
+			},
+		},
 	}
 
 	// Simulate a failed prompt: add a user message but no assistant response
@@ -185,11 +193,13 @@ func TestHandleUserPromptAppendsToExistingUserMessage(t *testing.T) {
 // a new user message is created when the previous message is from the assistant.
 func TestHandleUserPromptCreatesNewMessageWhenPreviousIsAssistant(t *testing.T) {
 	session := &Session{
-		Messages: []llm.Message{
-			{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Hello"}}},
-			{Role: llm.RoleAssistant, Content: []llm.ContentPart{&llm.TextPart{Text: "Hi!"}}},
+		runState: runState{
+			Messages: []llm.Message{
+				{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Hello"}}},
+				{Role: llm.RoleAssistant, Content: []llm.ContentPart{&llm.TextPart{Text: "Hi!"}}},
+			},
+			taskQueue: make([]QueueItem, 0),
 		},
-		taskQueue: make([]QueueItem, 0),
 	}
 
 	// Simulate new prompt submission

@@ -31,11 +31,15 @@ func TestSaveAndLoadSession(t *testing.T) {
 
 	// Create a minimal session for testing
 	session := &Session{
-		SessionConfig: SessionConfig{
-			Input:  &stream.NopInput{},
-			Output: &stream.NopOutput{},
+		runState: runState{
+			taskQueue: make([]QueueItem, 0),
 		},
-		taskQueue: make([]QueueItem, 0),
+		sessionConfig: sessionConfig{
+			SessionConfig: SessionConfig{
+				Input:  &stream.NopInput{},
+				Output: &stream.NopOutput{},
+			},
+		},
 	}
 
 	// Save session
@@ -155,12 +159,16 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 		},
 	}
 	session := &Session{
-		Content: contentFromMessagesForTest(msgs),
-		SessionConfig: SessionConfig{
-			Input:  &stream.NopInput{},
-			Output: &stream.NopOutput{},
+		runState: runState{
+			Content:   contentFromMessagesForTest(msgs),
+			taskQueue: make([]QueueItem, 0),
 		},
-		taskQueue: make([]QueueItem, 0),
+		sessionConfig: sessionConfig{
+			SessionConfig: SessionConfig{
+				Input:  &stream.NopInput{},
+				Output: &stream.NopOutput{},
+			},
+		},
 	}
 
 	// Save
@@ -243,12 +251,16 @@ func TestMarkdownFormat_HumanReadable(t *testing.T) {
 		},
 	}
 	session := &Session{
-		Content: contentFromMessagesForTest(msgs),
-		SessionConfig: SessionConfig{
-			Input:  &stream.NopInput{},
-			Output: &stream.NopOutput{},
+		runState: runState{
+			Content:   contentFromMessagesForTest(msgs),
+			taskQueue: make([]QueueItem, 0),
 		},
-		taskQueue: make([]QueueItem, 0),
+		sessionConfig: sessionConfig{
+			SessionConfig: SessionConfig{
+				Input:  &stream.NopInput{},
+				Output: &stream.NopOutput{},
+			},
+		},
 	}
 
 	if err := session.saveContentToFile(sessionPath, session.Content); err != nil {
@@ -292,12 +304,16 @@ func TestReasoningOnlyMessage(t *testing.T) {
 		},
 	}
 	session := &Session{
-		Content: contentFromMessagesForTest(msgs),
-		SessionConfig: SessionConfig{
-			Input:  &stream.NopInput{},
-			Output: &stream.NopOutput{},
+		runState: runState{
+			Content:   contentFromMessagesForTest(msgs),
+			taskQueue: make([]QueueItem, 0),
 		},
-		taskQueue: make([]QueueItem, 0),
+		sessionConfig: sessionConfig{
+			SessionConfig: SessionConfig{
+				Input:  &stream.NopInput{},
+				Output: &stream.NopOutput{},
+			},
+		},
 	}
 
 	if err := session.saveContentToFile(sessionPath, session.Content); err != nil {
@@ -354,12 +370,16 @@ func TestTextAndReasoningInSameMessage(t *testing.T) {
 		},
 	}
 	session := &Session{
-		Content: contentFromMessagesForTest(msgs),
-		SessionConfig: SessionConfig{
-			Input:  &stream.NopInput{},
-			Output: &stream.NopOutput{},
+		runState: runState{
+			Content:   contentFromMessagesForTest(msgs),
+			taskQueue: make([]QueueItem, 0),
 		},
-		taskQueue: make([]QueueItem, 0),
+		sessionConfig: sessionConfig{
+			SessionConfig: SessionConfig{
+				Input:  &stream.NopInput{},
+				Output: &stream.NopOutput{},
+			},
+		},
 	}
 
 	if err := session.saveContentToFile(sessionPath, session.Content); err != nil {
@@ -409,13 +429,19 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 	sessionCtx, sessionCancel := context.WithCancel(context.Background())
 	defer sessionCancel()
 	session := &Session{
-		SessionConfig: SessionConfig{
-			Input:  &stream.NopInput{},
-			Output: output,
+		runState: runState{
+			taskQueue: make([]QueueItem, 0),
 		},
-		taskQueue:    make([]QueueItem, 0),
-		ModelManager: NewModelManager(""),
-		sessionCtx:   sessionCtx,
+		sessionConfig: sessionConfig{
+			ModelManager: NewModelManager(""),
+			SessionConfig: SessionConfig{
+				Input:  &stream.NopInput{},
+				Output: output,
+			},
+		},
+		sharedState: sharedState{
+			sessionCtx: sessionCtx,
+		},
 	}
 
 	// Add a test model to the manager
@@ -720,12 +746,16 @@ func TestTLVFormatRecursionProtection(t *testing.T) {
 		},
 	}
 	session := &Session{
-		Content: contentFromMessagesForTest(msgs),
-		SessionConfig: SessionConfig{
-			Input:  &stream.NopInput{},
-			Output: &stream.NopOutput{},
+		runState: runState{
+			Content:   contentFromMessagesForTest(msgs),
+			taskQueue: make([]QueueItem, 0),
 		},
-		taskQueue: make([]QueueItem, 0),
+		sessionConfig: sessionConfig{
+			SessionConfig: SessionConfig{
+				Input:  &stream.NopInput{},
+				Output: &stream.NopOutput{},
+			},
+		},
 	}
 
 	// Save
