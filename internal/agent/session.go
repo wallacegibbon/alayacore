@@ -73,11 +73,11 @@ type Session struct {
 	agent          atomic.Pointer[llm.Agent]
 	provider       atomic.Pointer[llm.Provider]
 	taskQueue      []QueueItem
-	currentStep    int          // set by handleTaskEvent (StepStartEvent); read by sendTaskMsg
+	currentStep    int // set by handleTaskEvent (StepStartEvent); read by sendTaskMsg
 	reasoningLevel atomic.Int64
 	reasoningDirty atomic.Bool // true if reasoningLevel changed during task execution
 
-	inProgress    bool // set/cleared by tryStartNextTask / handleTaskDone; all access from run() goroutine
+	inProgress    bool        // set/cleared by tryStartNextTask / handleTaskDone; all access from run() goroutine
 	pausedOnError atomic.Bool // set by task goroutine via event
 
 	nextQueueID uint64 // goroutine-local (run() goroutine)
@@ -106,9 +106,7 @@ type Session struct {
 	// run() goroutine. Non-blocking send — the update is a responsiveness
 	// optimization only; critical state transitions (step, task completion)
 	// are guaranteed by direct sendSystemInfo calls from run().
-	// The value ("task", "model", "theme", "reasoning", "all") selects
-	// which messages to send, centralizing all sendSystemInfo calls.
-	infoUpdateCh chan string
+	infoUpdateCh chan struct{}
 
 	// taskCancel holds the cancel function for the currently running task.
 	// Set by tryStartNextTask before spawning the task goroutine, cleared
@@ -187,7 +185,7 @@ func NewSession(cfg SessionConfig) *Session {
 		taskQueue:      make([]QueueItem, 0),
 		stateCh:        make(chan TaskEvent, 64),
 		taskResult:     make(chan TaskResult, 1),
-		infoUpdateCh:   make(chan string, 1),
+		infoUpdateCh:   make(chan struct{}, 1),
 		sessionCtx:     sessionCtx,
 		sessionCancel:  sessionCancel,
 		runDone:        make(chan struct{}),
@@ -218,7 +216,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 		taskQueue:      make([]QueueItem, 0),
 		stateCh:        make(chan TaskEvent, 64),
 		taskResult:     make(chan TaskResult, 1),
-		infoUpdateCh:   make(chan string, 1),
+		infoUpdateCh:   make(chan struct{}, 1),
 		sessionCtx:     sessionCtx,
 		sessionCancel:  sessionCancel,
 		runDone:        make(chan struct{}),

@@ -81,8 +81,8 @@ func (s *Session) run() {
 		case result := <-s.taskResult:
 			s.handleTaskDone(result)
 
-		case kind := <-s.infoUpdateCh:
-			s.sendSystemInfo(kind)
+		case <-s.infoUpdateCh:
+			s.sendSystemInfo("task")
 
 		case <-s.sessionCtx.Done():
 			return
@@ -175,8 +175,8 @@ func (s *Session) drainUntilTaskDone() {
 		case result := <-s.taskResult:
 			s.handleTaskDone(result)
 			return
-		case kind := <-s.infoUpdateCh:
-			s.sendSystemInfo(kind)
+		case <-s.infoUpdateCh:
+			s.sendSystemInfo("task")
 		case <-s.sessionCtx.Done():
 			return
 		}

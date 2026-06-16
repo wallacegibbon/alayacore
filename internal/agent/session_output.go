@@ -130,7 +130,7 @@ func (s *Session) writeToolUseOutput(id string, content []llm.ContentPart, isErr
 // reflected in the UI (step boundaries, errors, etc.).
 func (s *Session) requestSystemInfo() {
 	select {
-	case s.infoUpdateCh <- "task":
+	case s.infoUpdateCh <- struct{}{}:
 	default:
 	}
 }
