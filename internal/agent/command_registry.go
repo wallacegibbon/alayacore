@@ -30,22 +30,22 @@ const (
 type SchedulePolicy int
 
 const (
-	// ScheduleDeferred commands are enqueued as tasks and executed
+	// ScheduleTask commands are enqueued as tasks and executed
 	// in the task goroutine.  Unknown commands also receive this
-	// policy so they fall through to the deferred path where
+	// policy so they fall through to the task path where
 	// runTaskCommand handles summarize and continue.
-	ScheduleDeferred SchedulePolicy = iota
+	ScheduleTask SchedulePolicy = iota
 
 	// ScheduleImmediate commands run synchronously in the run()
 	// goroutine.  They are safe to execute even while a task is
 	// streaming (e.g. :cancel, :save, :reason).
 	ScheduleImmediate
 
-	// ScheduleWhenIdle commands run synchronously in the run()
+	// ScheduleIdle commands run synchronously in the run()
 	// goroutine but are rejected when a task is in progress
 	// because they mutate state that the task goroutine reads
 	// (model configuration, agent/provider pointers).
-	ScheduleWhenIdle
+	ScheduleIdle
 )
 
 // CommandHandler is a function that handles a colon-command.
@@ -71,9 +71,9 @@ var commandDefs = []Command{
 		func(s *Session, _ context.Context, _ []string) { s.cancelAllTasks() }},
 	{CommandNameSave, "Save the current session", "[filename]", ScheduleImmediate,
 		func(s *Session, _ context.Context, args []string) { s.saveSession(args) }},
-	{CommandNameModelSet, "Switch to a different model", "<id>", ScheduleWhenIdle,
+	{CommandNameModelSet, "Switch to a different model", "<id>", ScheduleIdle,
 		func(s *Session, _ context.Context, args []string) { s.handleModelSet(args) }},
-	{CommandNameModelLoad, "Reload models from configuration file", "", ScheduleWhenIdle,
+	{CommandNameModelLoad, "Reload models from configuration file", "", ScheduleIdle,
 		func(s *Session, _ context.Context, _ []string) { s.handleModelLoad() }},
 	{CommandNameTaskQueueGetAll, "List all queued tasks", "", ScheduleImmediate,
 		func(s *Session, _ context.Context, _ []string) { s.handleTaskQueueGetAll() }},
@@ -104,8 +104,8 @@ func LookupCommand(name string) (*Command, bool) {
 }
 
 // LookupSchedule returns the SchedulePolicy for the given command string.
-// Returns ScheduleDeferred for unknown commands so they fall through to
-// the deferred-command path (handles :summarize and :continue).
+// Returns ScheduleTask for unknown commands so they fall through to
+// the task-command path (handles :summarize and :continue).
 func LookupSchedule(cmd string) SchedulePolicy {
 	name := cmd
 	if idx := strings.IndexByte(cmd, ' '); idx >= 0 {
@@ -114,7 +114,7 @@ func LookupSchedule(cmd string) SchedulePolicy {
 	if c, ok := LookupCommand(name); ok {
 		return c.Schedule
 	}
-	return ScheduleDeferred
+	return ScheduleTask
 }
 
 // DispatchCommand dispatches a colon-command to its registered handler.

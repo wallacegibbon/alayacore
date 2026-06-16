@@ -86,7 +86,7 @@ Note that `ContextTokens` now includes `OutputTokens`, so the values differ from
 
 ## Manual Summarization (`:summarize`)
 
-The `:summarize` command is a **deferred command** — it runs in a task goroutine and can be canceled with `:cancel`. It is the only way to reduce context usage manually when auto-summarize is disabled.
+The `:summarize` command is a **task command** — it runs in a task goroutine and can be canceled with `:cancel`. It is the only way to reduce context usage manually when auto-summarize is disabled.
 
 ### What it does
 

@@ -285,7 +285,7 @@ func TestSubmitTaskFront(t *testing.T) {
 	session.submitTask(QueueItem{Type: TaskTypePrompt, Content: "first"})
 	session.submitTask(QueueItem{Type: TaskTypePrompt, Content: "second"})
 
-	// Submit at front (simulates a deferred command like :continue)
+	// Submit at front (simulates a task command like :continue)
 	session.enqueueTask(QueueItem{Type: TaskTypeCommand, Content: CommandNameContinue}, true)
 
 	items := session.taskQueue
@@ -341,10 +341,10 @@ func TestCommandCanRunWhilePaused(t *testing.T) {
 	session.pausedOnError.Store(true)
 	session.inProgress.Store(true)
 
-	// Add a command to the front of the queue (simulates submitDeferredCommand)
+	// Add a command to the front of the queue (simulates submitTaskCommand)
 	session.enqueueTask(QueueItem{Type: TaskTypeCommand, Content: CommandNameSave}, true)
 
-	// In the single-goroutine design, submitDeferredCommand always places
+	// In the single-goroutine design, submitTaskCommand always places
 	// the command at the front, and the run() goroutine checks pausedOnError
 	// before running non-command tasks. The command runs regardless.
 	items := session.taskQueue
@@ -371,7 +371,7 @@ func TestCommandBehindUserPromptWhilePaused(t *testing.T) {
 	// In the single-goroutine design, commands at the front always run
 	// regardless of pausedOnError. So a command behind a user prompt
 	// will be reached when the front task is dequeued.
-	// This test verifies that submitDeferredCommand places the command
+	// This test verifies that submitTaskCommand places the command
 	// at the front.
 	session := &Session{
 		taskQueue: make([]QueueItem, 0),

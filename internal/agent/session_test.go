@@ -431,7 +431,7 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 
 	// Test 1: model_set should work when no task is running.
 	// Dispatch through handleInputMsg (the real entry point) so the
-	// ScheduleWhenIdle policy is enforced.
+	// ScheduleIdle policy is enforced.
 	output.Messages = nil
 	session.handleInputMsg(inputMsg{text: "model_set 1", isCmd: true})
 

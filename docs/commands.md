@@ -5,8 +5,8 @@ AlayaCore provides colon-prefixed commands (`:command`) that work across all ada
 Commands fall into three scheduling categories:
 
 - **Immediate commands** — run synchronously in the main loop, always allowed
-- **When-idle commands** — run synchronously, but rejected while a task is in progress
-- **Deferred commands** — enqueued at the front of the task queue; run when no task is active and can be canceled with `:cancel`
+- **Idle commands** — run synchronously, but rejected while a task is in progress
+- **Task commands** — enqueued at the front of the task queue; run when no task is active and can be canceled with `:cancel`
 
 ## Immediate Commands
 
@@ -24,7 +24,7 @@ Commands fall into three scheduling categories:
 | `:taskqueue_edit <queue_id> <content>` | Edit a queued task's content by ID |
 | `:clear_queue` | Clear all queued tasks without canceling the current task |
 
-## When-Idle Commands
+## Idle Commands
 
 These commands are rejected with an error if a task is currently running:
 
@@ -33,9 +33,9 @@ These commands are rejected with an error if a task is currently running:
 | `:model_set <id>` | Switch to a model by numeric ID |
 | `:model_load` | Reload model configs from the config file |
 
-## Deferred Commands
+## Task Commands
 
-Deferred commands run in a task goroutine and can be canceled with `:cancel` while executing:
+Task commands run in a task goroutine and can be canceled with `:cancel` while executing:
 
 | Command | Action |
 |---------|--------|

@@ -130,7 +130,7 @@ Without pausing, a network outage would cause every queued prompt to fail in seq
 
 `internal/agent/session_loop.go`:
 - `tryStartNextTask()` checks `s.pausedOnError.Load()` — when true and the front task is a user prompt (not a command), returns false without dequeuing
-- `submitDeferredCommand` guards: rejects if `inProgress && !pausedOnError`, then calls `enqueueTask`
+- `submitTaskCommand` guards: rejects if `inProgress && !pausedOnError`, then calls `enqueueTask`
 - `submitTask` clears `pausedOnError` when the queue was empty (before `enqueueTask` signals, so task runner sees consistent state)
 
 `internal/agent/session_io.go`:
@@ -144,7 +144,7 @@ Without pausing, a network outage would cause every queued prompt to fail in seq
 `internal/agent/command_registry.go`:
 - `:continue` is dispatched via `dispatchCommand` → `handleContinue`
 
-**Deferred execution:** `:continue` is a deferred command — it is enqueued at the front of the task queue and runs in a task goroutine. This means it can be canceled with `:cancel` while the LLM call is in progress. See [architecture.md](architecture.md) for details on the task goroutine model.
+**Task execution:** `:continue` is a task command — it is enqueued at the front of the task queue and runs in a task goroutine. This means it can be canceled with `:cancel` while the LLM call is in progress. See [architecture.md](architecture.md) for details on the task goroutine model.
 
 ## Testing
 

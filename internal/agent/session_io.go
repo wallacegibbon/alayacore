@@ -583,14 +583,14 @@ func (s *Session) handleInputMsg(msg inputMsg) {
 		switch LookupSchedule(cmd) {
 		case ScheduleImmediate:
 			s.handleCommand(s.sessionCtx, cmd)
-		case ScheduleWhenIdle:
+		case ScheduleIdle:
 			if s.inProgress.Load() {
 				s.writeError("Cannot run this command while a task is in progress. Please wait or cancel the current task.")
 				return
 			}
 			s.handleCommand(s.sessionCtx, cmd)
 		default:
-			s.submitDeferredCommand(cmd)
+			s.submitTaskCommand(cmd)
 		}
 	} else {
 		s.submitTask(QueueItem{Type: TaskTypePrompt, Content: msg.text, Images: msg.images})

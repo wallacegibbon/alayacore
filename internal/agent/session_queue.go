@@ -35,12 +35,12 @@ func (s *Session) submitTask(item QueueItem) {
 	s.enqueueTask(item, false)
 }
 
-// submitDeferredCommand enqueues a deferred command at the front of the task queue.
-// Deferred commands (e.g. :continue, :summarize) can only run when no task is
+// submitTaskCommand enqueues a task command at the front of the task queue.
+// Task commands (e.g. :continue, :summarize) can only run when no task is
 // currently in progress, or when the current task is paused on error (which also
 // means inProgress is false — the task goroutine has returned).
 // They are placed at the front so they run ahead of any accumulated user prompts.
-func (s *Session) submitDeferredCommand(cmd string) {
+func (s *Session) submitTaskCommand(cmd string) {
 	if s.inProgress.Load() {
 		s.writeError("Cannot run command while a task is running. Please wait or cancel first.")
 		return
@@ -107,9 +107,9 @@ func (s *Session) runTask(ctx context.Context, item QueueItem, taskMessages []ll
 	}
 }
 
-// runTaskCommand handles a deferred command in the task goroutine.
+// runTaskCommand handles a task command in the task goroutine.
 // Unlike commands dispatched directly by handleInputMsg in run(),
-// deferred commands operate on the task's local message copy and return
+// task commands operate on the task's local message copy and return
 // updated messages.
 func (s *Session) runTaskCommand(ctx context.Context, messages []llm.Message, entries []llm.ContentPart, cmd string) ([]llm.Message, []llm.ContentPart) {
 	parts := strings.Fields(cmd)
