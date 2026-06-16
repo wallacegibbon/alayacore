@@ -3,10 +3,24 @@ package agent
 // Session output helpers: writing TLV messages to the adapter output,
 // tracking token usage, and broadcasting system info.
 //
-// sendSystemInfo is called from the run() goroutine only; the task
-// goroutine requests updates via requestSystemInfo(), which sends on
-// infoUpdateCh. All state reads are from fields owned by run() or
-// from atomic fields — no mutex needed.
+// Broadcasting overview:
+//
+//   Guaranteed broadcasts (critical state transitions):
+//     handleTaskEvent(StepStartEvent)  → sendSystemInfo("task")  — step counter
+//     handleTaskDone()                 → sendSystemInfo("task")  — task completion
+//     handleModelSet/ModelLoad         → sendSystemInfo("model") — model switch
+//     SetReasoningLevel()              → sendSystemInfo("reasoning")
+//     handleThemeSet()                 → sendSystemInfo("theme")
+//
+//   Best-effort broadcasts (UI responsiveness optimization):
+//     The task goroutine calls requestSystemInfo() which sends on
+//     infoUpdateCh (non-blocking). The run() goroutine picks it up
+//     and calls sendSystemInfo("task"). If the send is dropped
+//     (buffer full), the TUI misses a transient update but catches
+//     up at the next guaranteed broadcast above.
+//
+// All state reads in sendSystemInfo are from fields owned by run()
+// or from atomic fields — no mutex needed.
 
 import (
 	"encoding/json"
@@ -109,8 +123,9 @@ func (s *Session) writeToolUseOutput(id string, content []llm.ContentPart, isErr
 
 // requestSystemInfo signals the run() goroutine to broadcast task info.
 // Non-blocking — if a signal is already pending, this is a no-op.
-// Only the latest state matters, and the critical step update is sent
-// directly from handleTaskEvent, so dropping a redundant request is safe.
+// Only the latest state matters, and critical state transitions
+// (step counter, task completion) are sent directly from run(), so
+// dropping a redundant request is harmless.
 // Called from the task goroutine whenever state changes that should be
 // reflected in the UI (step boundaries, errors, etc.).
 func (s *Session) requestSystemInfo() {

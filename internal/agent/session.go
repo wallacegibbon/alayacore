@@ -24,7 +24,7 @@ package agent
 //     stateCh (taskEvent)        — task → run()
 //     taskCancel (func call)     — run() → task (cancellation via cancelRunningTask)
 //     taskResult                 — task → run (TaskResult with messages + entries)
-//     infoUpdateCh               — task → run() (system-info refresh)
+//     infoUpdateCh               — task → run() (best-effort system-info refresh; see session_output.go)
 //
 // Related files:
 //   - session_types.go — type definitions (Task, SessionConfig, etc.)
@@ -102,10 +102,12 @@ type Session struct {
 	toolConfirmSet map[string]struct{}
 
 	// infoUpdateCh is a buffered channel (capacity 1) used by the task
-	// goroutine to request a system-info update from the run() goroutine.
-	// The value ("task", "model", "theme", "reasoning", "all") tells the
-	// run goroutine which messages to send, avoiding redundant broadcasts.
-	// This centralizes all sendSystemInfo calls in one place.
+	// goroutine to request a best-effort system-info broadcast from the
+	// run() goroutine. Non-blocking send — the update is a responsiveness
+	// optimization only; critical state transitions (step, task completion)
+	// are guaranteed by direct sendSystemInfo calls from run().
+	// The value ("task", "model", "theme", "reasoning", "all") selects
+	// which messages to send, centralizing all sendSystemInfo calls.
 	infoUpdateCh chan string
 
 	// taskCancel holds the cancel function for the currently running task.
