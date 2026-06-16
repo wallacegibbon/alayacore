@@ -45,10 +45,8 @@ type SetContextTokensEvent struct {
 func (SetContextTokensEvent) taskEvent() {}
 
 // sendEvent sends a task event to the run() goroutine.
-// Non-blocking if the channel buffer is full — the event is dropped.
+// Blocks until the event is received. The buffered channel (capacity 64)
+// means this only blocks when run() is seriously backed up.
 func (s *Session) sendEvent(ev TaskEvent) {
-	select {
-	case s.stateCh <- ev:
-	default:
-	}
+	s.stateCh <- ev
 }
