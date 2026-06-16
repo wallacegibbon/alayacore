@@ -12,6 +12,15 @@ import (
 	"github.com/alayacore/alayacore/internal/theme"
 )
 
+// taskCtx holds the working copies of Messages and Entries that the
+// task goroutine passes through its processing pipeline. Using a
+// pointer avoids threading ([]llm.Message, []llm.ContentPart) pairs
+// through every function signature.
+type taskCtx struct {
+	Messages []llm.Message
+	Entries  []llm.ContentPart
+}
+
 // QueueItem represents a queued task with metadata.
 type QueueItem struct {
 	QueueID   string    `json:"queue_id"`

@@ -31,11 +31,10 @@ const (
 // ============================================================================
 
 // handleUserPrompt echoes the user prompt to output, appends it to
-// both messages and entries, then runs the agent loop.  It returns
-// the updated messages and entries (including assistant response).
-func (s *Session) handleUserPrompt(ctx context.Context, messages []llm.Message, entries []llm.ContentPart, prompt string, images []string) ([]llm.Message, []llm.ContentPart) {
+// both tc.Messages and tc.Entries, then runs the agent loop.
+func (s *Session) handleUserPrompt(ctx context.Context, tc *taskCtx, prompt string, images []string) {
 	if s.shouldAutoSummarize() {
-		messages, entries = s.doAutoSummarize(ctx, messages, entries)
+		s.doAutoSummarize(ctx, tc)
 	}
 
 	// Build content parts with history IDs and echo to output.
@@ -46,25 +45,25 @@ func (s *Session) handleUserPrompt(ctx context.Context, messages []llm.Message, 
 		id := s.histIncAndGet()
 		part := &llm.ImagePart{DataURL: img, ContentMeta: llm.ContentMeta{HistoryID: id, Role: llm.RoleUser}}
 		content = append(content, part)
-		entries = append(entries, part)
+		tc.Entries = append(tc.Entries, part)
 		s.writeTLVStr(stream.TagUserI, stream.WrapDelta(strconv.FormatUint(id, 10), img))
 	}
 	id := s.histIncAndGet()
 	part := &llm.TextPart{Text: prompt, ContentMeta: llm.ContentMeta{HistoryID: id, Role: llm.RoleUser}}
 	content = append(content, part)
-	entries = append(entries, part)
+	tc.Entries = append(tc.Entries, part)
 	s.writeTLVStr(stream.TagUserT, stream.WrapDelta(strconv.FormatUint(id, 10), prompt))
 
 	// Append to messages for the LLM request.  If the preceding message
 	// is also from the user, merge to avoid duplicate user messages.
-	if len(messages) > 0 && messages[len(messages)-1].Role == llm.RoleUser {
-		messages[len(messages)-1].Content = append(messages[len(messages)-1].Content, content...)
+	if len(tc.Messages) > 0 && tc.Messages[len(tc.Messages)-1].Role == llm.RoleUser {
+		tc.Messages[len(tc.Messages)-1].Content = append(tc.Messages[len(tc.Messages)-1].Content, content...)
 	} else {
-		messages = append(messages, llm.Message{Role: llm.RoleUser, Content: content})
+		tc.Messages = append(tc.Messages, llm.Message{Role: llm.RoleUser, Content: content})
 	}
 
-	updatedMessages, newEntries, _, err := s.processPrompt(ctx, messages)
-	entries = append(entries, newEntries...)
+	updatedMessages, newEntries, _, err := s.processPrompt(ctx, tc.Messages)
+	tc.Entries = append(tc.Entries, newEntries...)
 
 	if err != nil {
 		s.writeError(err.Error())
@@ -72,15 +71,15 @@ func (s *Session) handleUserPrompt(ctx context.Context, messages []llm.Message, 
 		s.requestSystemInfo()
 		// When cancel or error occurs before OnStepFinish sets updatedMessages,
 		// updatedMessages is nil/empty and the user prompt would be lost on save.
-		// Fall back to messages (which has the user prompt appended above)
+		// Fall back to tc.Messages (which has the user prompt appended above)
 		// so the UT is preserved in the session file alongside the cancel AT.
-		if len(updatedMessages) == 0 {
-			return messages, entries
+		if len(updatedMessages) > 0 {
+			tc.Messages = updatedMessages
 		}
-		return updatedMessages, entries
+		return
 	}
 
-	return updatedMessages, entries
+	tc.Messages = updatedMessages
 }
 
 // shouldAutoSummarize returns true when auto-summarization is enabled and
@@ -92,12 +91,12 @@ func (s *Session) shouldAutoSummarize() bool {
 }
 
 // doAutoSummarize logs a notification and triggers summarization.
-func (s *Session) doAutoSummarize(ctx context.Context, messages []llm.Message, entries []llm.ContentPart) ([]llm.Message, []llm.ContentPart) {
+func (s *Session) doAutoSummarize(ctx context.Context, tc *taskCtx) {
 	limit := s.ContextLimit.Load()
 	usage := float64(s.ContextTokens.Load()) * AutoSummarizePctBase / float64(limit)
 	s.writeNotifyf("Context usage at %d/%d tokens (%.0f%%). Auto-summarizing...",
 		s.ContextTokens.Load(), limit, usage)
-	return s.summarize(ctx, messages, entries)
+	s.summarize(ctx, tc)
 }
 
 // ============================================================================

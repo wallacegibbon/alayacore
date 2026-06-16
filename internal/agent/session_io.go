@@ -94,33 +94,33 @@ func (s *Session) clearQueue() {
 	s.requestSystemInfo()
 }
 
-func (s *Session) handleContinue(ctx context.Context, messages []llm.Message, entries []llm.ContentPart, args []string) ([]llm.Message, []llm.ContentPart) {
+func (s *Session) handleContinue(ctx context.Context, tc *taskCtx, args []string) {
 	// Validate arguments before doing anything.
 	if len(args) > 0 && args[0] != "skip" {
 		s.writeError("usage: :continue [skip]")
-		return messages, entries
+		return
 	}
 
 	s.pausedOnError.Store(false)
 
 	// With no arguments, resend the last prompt.
 	if len(args) == 0 {
-		return s.resendPrompt(ctx, messages, entries)
+		s.resendPrompt(ctx, tc)
+		return
 	}
 
 	// "skip" — skip the failed prompt and resume the remaining queue.
 	qLen := len(s.taskQueue)
 	if qLen == 0 {
 		s.writeNotify("Queue is empty")
-		return messages, entries
+		return
 	}
 
 	s.writeNotify("Resuming queue...")
 	s.requestSystemInfo()
-	return messages, entries
 }
 
-func (s *Session) summarize(ctx context.Context, messages []llm.Message, entries []llm.ContentPart) ([]llm.Message, []llm.ContentPart) {
+func (s *Session) summarize(ctx context.Context, tc *taskCtx) {
 	prompt := `Summarize the conversation for continuation. The resuming instance has no prior context.
 
 Provide:
@@ -135,19 +135,20 @@ Rules:
 - Include error messages verbatim
 - Skip completed exploration; only preserve findings that affect next steps`
 
-	messages = append(messages, llm.NewUserMessage(prompt))
-	beforeCount := len(messages)
+	tc.Messages = append(tc.Messages, llm.NewUserMessage(prompt))
+	beforeCount := len(tc.Messages)
 
 	s.writeNotify("Summarizing conversation...")
 
-	result, newEntries, outputTokens, err := s.processPrompt(ctx, messages)
-	entries = append(entries, newEntries...)
+	result, newEntries, outputTokens, err := s.processPrompt(ctx, tc.Messages)
+	tc.Entries = append(tc.Entries, newEntries...)
 
 	if err != nil {
 		s.writeError(err.Error())
 		s.pausedOnError.Store(true)
 		s.requestSystemInfo()
-		return result, entries
+		tc.Messages = result
+		return
 	}
 
 	var lastAssistantMsg llm.Message
@@ -176,9 +177,9 @@ Rules:
 	// Rebuild entries to match the new message structure:
 	// [UserMessage("Continue"), filteredAssistantMsg]
 	// Assign new IDs since the old entries are being replaced.
-	entries = entries[:0]
+	tc.Entries = tc.Entries[:0]
 	continueID := s.histIncAndGet()
-	entries = append(entries, &llm.TextPart{
+	tc.Entries = append(tc.Entries, &llm.TextPart{
 		Text: "Continue",
 		ContentMeta: llm.ContentMeta{
 			HistoryID: continueID,
@@ -187,19 +188,19 @@ Rules:
 	})
 	summaryID := s.histIncAndGet()
 	firstPart := lastAssistantMsg.Content[0]
-	entries = append(entries, firstPart.UpdateContentPartMeta(summaryID, llm.RoleAssistant))
+	tc.Entries = append(tc.Entries, firstPart.UpdateContentPartMeta(summaryID, llm.RoleAssistant))
 	for i := 1; i < len(lastAssistantMsg.Content); i++ {
 		part := lastAssistantMsg.Content[i]
-		entries = append(entries, part.UpdateContentPartMeta(s.histIncAndGet(), llm.RoleAssistant))
+		tc.Entries = append(tc.Entries, part.UpdateContentPartMeta(s.histIncAndGet(), llm.RoleAssistant))
 	}
 
 	if outputTokens > 0 {
 		s.sendEvent(SetContextTokensEvent{Tokens: outputTokens})
 	}
 
+	tc.Messages = result
 	s.writeNotify("Summarized conversation")
 	s.requestSystemInfo()
-	return result, entries
 }
 
 func (s *Session) saveSession(args []string) {
@@ -396,18 +397,18 @@ func (s *Session) handleThemeSet(args []string) {
 //  3. Latest message is an assistant message → the API partially succeeded
 //     or was canceled. A "Continue" user message is appended so the
 //     model picks up where it left off.
-func (s *Session) resendPrompt(ctx context.Context, messages []llm.Message, entries []llm.ContentPart) ([]llm.Message, []llm.ContentPart) {
-	if len(messages) == 0 {
+func (s *Session) resendPrompt(ctx context.Context, tc *taskCtx) {
+	if len(tc.Messages) == 0 {
 		s.writeError("No messages to resend")
-		return messages, entries
+		return
 	}
 
-	msgCount := len(messages)
-	lastMsg := messages[msgCount-1]
+	msgCount := len(tc.Messages)
+	lastMsg := tc.Messages[msgCount-1]
 	if lastMsg.Role == llm.RoleAssistant {
-		messages = append(messages, llm.NewUserMessage("Continue"))
+		tc.Messages = append(tc.Messages, llm.NewUserMessage("Continue"))
 		id := s.histIncAndGet()
-		entries = append(entries, &llm.TextPart{
+		tc.Entries = append(tc.Entries, &llm.TextPart{
 			Text: "Continue",
 			ContentMeta: llm.ContentMeta{
 				HistoryID: id,
@@ -419,19 +420,20 @@ func (s *Session) resendPrompt(ctx context.Context, messages []llm.Message, entr
 		s.writeNotify("Resending...")
 	}
 
-	result, newEntries, _, err := s.processPrompt(ctx, messages)
-	entries = append(entries, newEntries...)
+	result, newEntries, _, err := s.processPrompt(ctx, tc.Messages)
+	tc.Entries = append(tc.Entries, newEntries...)
 
 	result = cleanIncompleteToolUses(result)
 	if err != nil {
 		s.writeError(err.Error())
 		s.pausedOnError.Store(true)
 		s.requestSystemInfo()
-		return result, entries
+		tc.Messages = result
+		return
 	}
 
+	tc.Messages = result
 	s.requestSystemInfo()
-	return result, entries
 }
 
 // ============================================================================
