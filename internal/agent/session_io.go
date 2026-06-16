@@ -449,7 +449,7 @@ type inputMsg struct {
 }
 
 // inputPump runs in its own goroutine.  It reads TLV frames from the
-// input stream, builds inputMsg values, and sends them to msgCh.
+// input stream, builds inputMsg values, and sends them to inputMsgCh.
 // It does NOT interpret commands or access session state — all of
 // that lives in the run() goroutine.
 func (s *Session) inputPump() {
@@ -458,7 +458,7 @@ func (s *Session) inputPump() {
 	for {
 		tag, value, err := stream.ReadTLV(s.Input)
 		if err != nil {
-			close(s.msgCh)
+			close(s.inputMsgCh)
 			return
 		}
 
@@ -472,10 +472,10 @@ func (s *Session) inputPump() {
 		default:
 			if len(pendingImages) > 0 {
 				pendingImages = nil
-				s.msgCh <- inputMsg{errText: domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
+				s.inputMsgCh <- inputMsg{errText: domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
 					"image tag must be followed by another image or text, got: %s", tag).Error()}
 			} else {
-				s.msgCh <- inputMsg{errText: domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
+				s.inputMsgCh <- inputMsg{errText: domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
 					"invalid input tag: %s", tag).Error()}
 			}
 		}
@@ -491,7 +491,7 @@ func (s *Session) handleInputUserText(value string, pendingImages *[]string) {
 	if len(*pendingImages) > 0 && len(value) > 0 && value[0] == ':' {
 		// Images followed by a command is not allowed.
 		*pendingImages = nil
-		s.msgCh <- inputMsg{errText: domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
+		s.inputMsgCh <- inputMsg{errText: domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
 			"command can not attach images").Error()}
 		return
 	}
@@ -508,7 +508,7 @@ func (s *Session) handleInputUserText(value string, pendingImages *[]string) {
 		msg.isCmd = true
 	}
 
-	s.msgCh <- msg
+	s.inputMsgCh <- msg
 }
 
 // handleFork saves all content from the start of the session up to (and

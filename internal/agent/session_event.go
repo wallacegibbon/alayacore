@@ -5,7 +5,7 @@ package agent
 // Session actor model: channel-based state communication between the
 // task goroutine and the run() goroutine.
 //
-// The task goroutine sends state mutations as typed events on stateCh.
+// The task goroutine sends state mutations as typed events on taskEventCh.
 // The run() goroutine processes them by type-switching in its main loop.
 // This keeps all cross-goroutine communication explicit and auditable
 // — the entire package uses channels and atomics for synchronization.
@@ -25,7 +25,7 @@ func (StepStartEvent) taskEvent() {}
 
 // StepFinishEvent signals that an agent step has completed.
 // Carries only token usage metadata. The final message state and
-// ContentParts are returned together via taskResult on task completion.
+// ContentParts are returned together via taskResultCh on task completion.
 type StepFinishEvent struct {
 	InputTokens         int64
 	OutputTokens        int64
@@ -48,5 +48,5 @@ func (SetContextTokensEvent) taskEvent() {}
 // Blocks until the event is received. The buffered channel (capacity 64)
 // means this only blocks when run() is seriously backed up.
 func (s *Session) sendEvent(ev TaskEvent) {
-	s.stateCh <- ev
+	s.taskEventCh <- ev
 }

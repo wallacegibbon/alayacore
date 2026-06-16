@@ -5,11 +5,11 @@ package agent
 // ARCHITECTURE:
 //   Session uses an actor model: the run() goroutine owns all mutable
 //   state, and the task goroutine communicates state changes via typed
-//   events on stateCh. All cross-goroutine communication is channel-based.
+//   events on taskEventCh. All cross-goroutine communication is channel-based.
 //
 //   Three goroutines:
 //     1. inputPump — reads TLV frames from input, sends parsed messages
-//        to the main loop via s.msgCh.  It has no knowledge of commands
+//        to the main loop via s.inputMsgCh.  It has no knowledge of commands
 //        and never touches session state.
 //     2. run() — main loop that owns Content, task queue, and system
 //        info. Processes input messages, dispatches commands, manages
@@ -17,13 +17,13 @@ package agent
 //     3. task goroutine — spawned by run() to execute each task. It
 //        receives a taskCtx with a snapshot of Messages at task start,
 //        accumulates new Entries, and sends the final state back to
-//        run() via taskResult on completion.
+//        run() via taskResultCh on completion.
 //
 //   Cross-goroutine communication:
-//     msgCh (inputMsg channel)  — inputPump → run()
-//     stateCh (taskEvent)        — task → run()
+//     inputMsgCh (inputMsg channel)  — inputPump → run()
+//     taskEventCh (taskEvent)        — task → run()
 //     taskCancel (func call)     — run() → task (cancellation via cancelRunningTask)
-//     taskResult                 — task → run (TaskResult with messages + entries)
+//     taskResultCh                 — task → run (TaskResult with messages + entries)
 //     taskRefreshCh               — task → run() (best-effort system-info refresh; see session_output.go)
 //
 // Related files:
@@ -54,7 +54,9 @@ type sessionConfig struct {
 	ModelManager   *ModelManager
 	RuntimeManager *RuntimeManager
 	SkillsManager  *skills.Manager
+
 	SessionConfig
+
 	initError        error  // set during construction if --model refers to a non-existent model
 	sessionMetaModel string // model name from session file frontmatter
 	toolConfirmSet   map[string]struct{}
@@ -63,34 +65,43 @@ type sessionConfig struct {
 // runState groups fields owned exclusively by the run() goroutine.
 // All reads and writes happen in the run() event loop.
 type runState struct {
-	Content       []llm.ContentPart // source of truth — flat, ordered, 1:1 with TLV
-	Messages      []llm.Message     // derived from Content for API calls (rebuilt after each task)
-	taskQueue     []QueueItem
-	currentStep   int // set by handleTaskEvent (StepStartEvent); read by sendTaskMsg
-	inProgress    bool
-	nextQueueID   uint64
-	taskCancel    context.CancelFunc
-	stateCh       chan TaskEvent
-	taskResult    chan TaskResult
+	Content  []llm.ContentPart // source of truth — flat, ordered, 1:1 with TLV
+	Messages []llm.Message     // derived from Content for API calls (rebuilt after each task)
+
+	taskQueue []QueueItem
+
+	currentStep int // set by handleTaskEvent (StepStartEvent); read by sendTaskMsg
+	inProgress  bool
+	nextQueueID uint64
+
+	taskCancel context.CancelFunc
+
+	inputMsgCh    chan inputMsg // inputPump → run: parsed TLV messages
+	taskEventCh   chan TaskEvent
+	taskResultCh  chan TaskResult
 	taskRefreshCh chan struct{}
-	msgCh         chan inputMsg // inputPump → run: parsed TLV messages
 }
 
 // sharedState groups fields that are either genuinely cross-goroutine
 // (synchronized via atomics) or owned by a single goroutine with
 // design guarantees that prevent concurrent access.
 type sharedState struct {
-	ContextTokens  int64 // last-known context token count; updated by run() from task events
-	ContextLimit   int64 // maximum context window size (input+output); set from model config
-	agent          *llm.Agent
-	provider       llm.Provider
+	ContextTokens int64 // last-known context token count; updated by run() from task events
+	ContextLimit  int64 // maximum context window size (input+output); set from model config
+
 	reasoningLevel int
 	histCounter    uint64
-	sessionCtx     context.Context
-	sessionCancel  context.CancelFunc
-	confirmCh      atomic.Pointer[chan<- llm.ToolConfirmResponse]
-	pausedOnError  atomic.Bool
-	outputBroken   atomic.Bool
+
+	sessionCtx    context.Context
+	sessionCancel context.CancelFunc
+
+	agent    *llm.Agent
+	provider llm.Provider
+
+	confirmCh atomic.Pointer[chan<- llm.ToolConfirmResponse]
+
+	pausedOnError atomic.Bool
+	outputBroken  atomic.Bool
 }
 
 // Session manages conversation state and task execution.
@@ -169,8 +180,8 @@ func NewSession(cfg SessionConfig) *Session {
 			Content:       make([]llm.ContentPart, 0),
 			Messages:      make([]llm.Message, 0),
 			taskQueue:     make([]QueueItem, 0),
-			stateCh:       make(chan TaskEvent, 64),
-			taskResult:    make(chan TaskResult, 1),
+			taskEventCh:   make(chan TaskEvent, 64),
+			taskResultCh:  make(chan TaskResult, 1),
 			taskRefreshCh: make(chan struct{}, 1),
 		},
 		sharedState: sharedState{
@@ -207,8 +218,8 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 			Content:       data.Content,
 			Messages:      contentToMessages(data.Content),
 			taskQueue:     make([]QueueItem, 0),
-			stateCh:       make(chan TaskEvent, 64),
-			taskResult:    make(chan TaskResult, 1),
+			taskEventCh:   make(chan TaskEvent, 64),
+			taskResultCh:  make(chan TaskResult, 1),
 			taskRefreshCh: make(chan struct{}, 1),
 		},
 		sharedState: sharedState{

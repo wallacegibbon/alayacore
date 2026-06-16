@@ -7,7 +7,7 @@ package agent
 // the run() goroutine — no mutex needed.
 //
 // The task goroutine communicates state changes (step progress, new
-// ContentParts, token counts) back to run() via stateCh.
+// ContentParts, token counts) back to run() via taskEventCh.
 
 import (
 	"context"
@@ -73,11 +73,11 @@ func (s *Session) enqueueTask(item QueueItem, front bool) {
 
 // runTask executes a single task in its own goroutine. It is called from
 // run() via "go s.runTask(ctx, item, taskMessages)". On completion it sends
-// the result on taskResult so the main loop can update s.Content and s.Messages.
+// the result on taskResultCh so the main loop can update s.Content and s.Messages.
 //
 // The task goroutine wraps the message snapshot in a taskCtx and passes it
 // through the processing pipeline. All state mutations during execution
-// (step progress, new messages, token counts) are sent to run() via stateCh.
+// (step progress, new messages, token counts) are sent to run() via taskEventCh.
 // The task goroutine never writes to s.Content or s.Messages directly.
 func (s *Session) runTask(ctx context.Context, item QueueItem, taskMessages []llm.Message) {
 	tc := &taskCtx{Messages: taskMessages}
@@ -86,7 +86,7 @@ func (s *Session) runTask(ctx context.Context, item QueueItem, taskMessages []ll
 		// Return the final state to run() so it can update
 		// s.Content and s.Messages. Buffered channel (capacity 1),
 		// only blocks if run() is backlogged on task results.
-		s.taskResult <- TaskResult{Messages: tc.Messages, Entries: tc.Entries}
+		s.taskResultCh <- TaskResult{Messages: tc.Messages, Entries: tc.Entries}
 	}()
 
 	s.requestSystemInfo()

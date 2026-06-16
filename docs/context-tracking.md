@@ -33,12 +33,12 @@ case StepFinishEvent:
 ```
 
 Note: `StepFinishEvent` carries only token usage metadata. The final message
-state is returned separately via `taskResult` on task completion.
+state is returned separately via `taskResultCh` on task completion.
 
 - **Overwrite (`Store`), not accumulate (`Add`).** Each API call's `InputTokens` already represents the *entire conversation history* sent in that request. Accumulating would double-count. `OutputTokens` is included because the model's `ContextLimit` is a combined input+output window, and the latest output is part of the conversation that will be sent in the next request.
 - **Guard against zero reports.** Some OpenAI-compatible providers (e.g. GLM-5.1) may omit the `usage` field from SSE chunks entirely — they simply never send a chunk containing `"usage": {"prompt_tokens": N, ...}`. Go's `json.Unmarshal` leaves absent fields at their zero values, so the parsed `Usage` struct arrives as all zeros. Without the guard, this would reset `ContextTokens` to 0, breaking auto-summarization and the status bar display. The `if newContext > 0` check preserves the last known good value.
 - **Only the last step's value matters.** For multi-step tool call loops, each step re-sends the full history (plus new messages). The last step has the most complete count.
-- **Cross-goroutine communication.** The task goroutine sends usage via typed events on `stateCh`; the `run()` goroutine owns the authoritative copy and updates it via `handleTaskEvent`. The task goroutine reads `ContextTokens` in `shouldAutoSummarize` — since the stateCh drain in `handleTaskDone` commits all pending events before the next task starts, no atomic is needed.
+- **Cross-goroutine communication.** The task goroutine sends usage via typed events on `taskEventCh`; the `run()` goroutine owns the authoritative copy and updates it via `handleTaskEvent`. The task goroutine reads `ContextTokens` in `shouldAutoSummarize` — since the taskEventCh drain in `handleTaskDone` commits all pending events before the next task starts, no atomic is needed.
 - **Cache tokens are additive.** Anthropic reports `InputTokens` as the non-cached portion; `CacheReadTokens` and `CacheCreationTokens` are separate. The sum gives the true context size.
 
 ## Multi-Step Tool Calls

@@ -36,16 +36,16 @@ The session uses three goroutines for concurrent operation:
 |-----------|--------|------|
 | **Main loop** (`run()`) | `Session.Start()` | Owns all mutable state, manages the task queue, processes commands |
 | **Input pump** (`inputPump()`) | launched by `run()` | Reads TLV frames from the input stream, sends parsed messages to the main loop |
-| **Task worker** (`runTask()`) | spawned by `run()` per task | Executes a single task (LLM streaming + tool calls), returns final messages via `taskResult` |
+| **Task worker** (`runTask()`) | spawned by `run()` per task | Executes a single task (LLM streaming + tool calls), returns final messages via `taskResultCh` |
 
 **Cross-goroutine communication:**
 
 | Mechanism | From | To | Purpose |
 |-----------|------|----|---------|
-| `msgCh` (buffered, cap 100) | inputPump | run() | Parsed user input messages |
+| `inputMsgCh` (buffered, cap 100) | inputPump | run() | Parsed user input messages |
 | `taskCancel` (atomic.Value) | run() | task worker | Cancel the running task |
-| `taskResult` (buffered, cap 1) | task worker | run() | Return final messages and signal task completion |
-| `stateCh` (buffered, cap 64) | task worker | run() | Step progress, token counts, paused state |
+| `taskResultCh` (buffered, cap 1) | task worker | run() | Return final messages and signal task completion |
+| `taskEventCh` (buffered, cap 64) | task worker | run() | Step progress, token counts, paused state |
 | `infoUpdateCh` (buffered, cap 1) | task worker | run() | Request system-info broadcast |
 | `pausedOnError` (atomic.Bool) | both | — | Paused state (written by task goroutine, read by run()) |
 | `outputBroken` (atomic.Bool) | both | — | Output stream failure flag (any goroutine can set) |
@@ -54,7 +54,7 @@ The session uses three goroutines for concurrent operation:
 **Lifecycle — drain on EOF:**
 
 When the input stream reaches EOF (e.g. a piped `echo` command closes stdin),
-the inputPump closes `msgCh` and exits. If a task is still running, `run()`
+the inputPump closes `inputMsgCh` and exits. If a task is still running, `run()`
 enters `drainUntilTaskDone()` to process state events and the task completion
 signal. After the current task finishes, any remaining queued tasks are
 processed one by one before the session exits. This ensures that all output
@@ -62,7 +62,7 @@ processed one by one before the session exits. This ensures that all output
 prompts are abandoned.
 
 ```
-stdin EOF ──▶ inputPump closes msgCh ──▶ run() detects closed channel
+stdin EOF ──▶ inputPump closes inputMsgCh ──▶ run() detects closed channel
                                                 │
                                     ┌───────────┴───────────┐
                                     │  drain running task   │
@@ -75,11 +75,11 @@ stdin EOF ──▶ inputPump closes msgCh ──▶ run() detects closed channe
 
 **State ownership:**
 - The `run()` goroutine is the sole owner of session state. It reads/writes `taskQueue`, `inProgress`, `pausedOnError`, and all command-handling logic. ModelManager and RuntimeManager are also accessed only from `run()`.
-- The task goroutine communicates state changes via typed events on `stateCh` (step progress, token counts) and reads three atomic fields (`pausedOnError`, `outputBroken`, `confirmCh`) for lock-free access. All other state (agent, provider, ContextTokens, reasoningLevel, histCounter) is either passed as snapshots at task start or read from plain fields that are stable during task execution. The final message state is returned via `taskResult` on completion.
-- The input pump goroutine is a pure TLV parser. It reads frames from the input stream, builds inputMsg values, and sends them to `run()` via `msgCh`. It has zero knowledge of commands and never touches session state — not even for `:cancel` or `:confirm`. All command dispatch, cancellation, and output writing happens in `run()`.
+- The task goroutine communicates state changes via typed events on `taskEventCh` (step progress, token counts) and reads three atomic fields (`pausedOnError`, `outputBroken`, `confirmCh`) for lock-free access. All other state (agent, provider, ContextTokens, reasoningLevel, histCounter) is either passed as snapshots at task start or read from plain fields that are stable during task execution. The final message state is returned via `taskResultCh` on completion.
+- The input pump goroutine is a pure TLV parser. It reads frames from the input stream, builds inputMsg values, and sends them to `run()` via `inputMsgCh`. It has zero knowledge of commands and never touches session state — not even for `:cancel` or `:confirm`. All command dispatch, cancellation, and output writing happens in `run()`.
 - `sendSystemInfo` runs only in the `run()` goroutine; the task goroutine requests updates via `infoUpdateCh`.
 
-**Gotcha — everything is in run():** There is no "fast path" in the input pump for latency-critical commands. The `msgCh` buffer is cap 100 but each message is processed in microseconds — the queue drains orders of magnitude faster than a human can type or an LLM can stream. If you're tempted to add a special case to the input pump, ask: is the latency measurable? If not, keep it in `run()` where it belongs.
+**Gotcha — everything is in run():** There is no "fast path" in the input pump for latency-critical commands. The `inputMsgCh` buffer is cap 100 but each message is processed in microseconds — the queue drains orders of magnitude faster than a human can type or an LLM can stream. If you're tempted to add a special case to the input pump, ask: is the latency measurable? If not, keep it in `run()` where it belongs.
 
 **Design rationale:** Tasks must run in a separate goroutine because LLM streaming is blocking (3-10s per step). If tasks ran synchronously in `run()`, the main loop could not process user input (`:cancel`, new prompts, immediate commands) during task execution. The per-task goroutine pattern keeps the main loop responsive while avoiding a persistent worker goroutine that would sit idle between tasks.
 

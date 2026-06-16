@@ -27,9 +27,9 @@
 //	     it drains remaining events until the task completes before
 //	     exiting (see drainUntilTaskDone).
 //	  2. task goroutine — spawned per task, runs in background, sends
-//	     state mutations via typed channel events (stateCh) to run().
+//	     state mutations via typed channel events (taskEventCh) to run().
 //	     On completion it sends a TaskResult with the final messages
-//	     and new ContentParts back via taskResult.
+//	     and new ContentParts back via taskResultCh.
 //	  3. inputPump — reads TLV frames from input, forwards to run()
 //	     via a message channel.
 //

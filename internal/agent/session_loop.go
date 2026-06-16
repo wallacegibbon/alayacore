@@ -31,26 +31,20 @@ import (
 // When a task starts, a snapshot of s.Messages (derived from Content)
 // is passed to the task goroutine as its local working copy.
 // The task goroutine never writes to s.Content directly — it returns the
-// final state via taskResult channel on completion.
+// final state via taskResultCh channel on completion.
 //
 // The loop processes four kinds of events:
-//   - Input messages from the user (via inputPump → msgCh)
-//   - Task state changes (via task goroutine → stateCh)
-//   - Task completion signals (via taskResult)
+//   - Input messages from the user (via inputPump → inputMsgCh)
+//   - Task state changes (via task goroutine → taskEventCh)
+//   - Task completion signals (via taskResultCh)
 //   - System info refresh requests (via taskRefreshCh)
 func (s *Session) run() {
 	defer close(s.runDone)
 	defer s.sessionCancel()
 
-	// Initialize Content for fresh sessions.
-	if s.Content == nil {
-		s.Content = make([]llm.ContentPart, 0)
-		s.Messages = make([]llm.Message, 0)
-	}
-
 	// Start the I/O pump goroutine — it reads TLV from the input and
-	// sends parsed messages to run() for processing via msgCh.
-	s.msgCh = make(chan inputMsg, 100)
+	// sends parsed messages to run() for processing via inputMsgCh.
+	s.inputMsgCh = make(chan inputMsg, 100)
 	go s.inputPump()
 
 	for {
@@ -63,7 +57,7 @@ func (s *Session) run() {
 
 		// Wait for new input, task events, task completion, or info requests
 		select {
-		case msg, ok := <-s.msgCh:
+		case msg, ok := <-s.inputMsgCh:
 			if !ok {
 				// Input is closed (EOF on stdin). Drain the currently
 				// running task, then process any remaining queued tasks.
@@ -74,10 +68,10 @@ func (s *Session) run() {
 			}
 			s.handleInputMsg(msg)
 
-		case ev := <-s.stateCh:
+		case ev := <-s.taskEventCh:
 			s.handleTaskEvent(ev)
 
-		case result := <-s.taskResult:
+		case result := <-s.taskResultCh:
 			s.handleTaskDone(result)
 
 		case <-s.taskRefreshCh:
@@ -141,20 +135,10 @@ func (s *Session) tryStartNextTask() bool {
 // handleTaskDone processes a task completion signal from the task goroutine.
 // result carries the final message state and new ContentParts.
 func (s *Session) handleTaskDone(result TaskResult) {
-	// Drain remaining state events from the just-finished task before
-	// the next task starts. The task goroutine sends all stateCh events
-	// before taskResult (sent in defer), so any remaining events are
-	// from this task. This ensures ContextTokens and other state are
-	// committed before a new task goroutine reads them.
-drainLoop:
-	for {
-		select {
-		case ev := <-s.stateCh:
-			s.handleTaskEvent(ev)
-		default:
-			break drainLoop
-		}
-	}
+	// Commit state events from the just-finished task before
+	// the next task starts. All taskEventCh events are sent before
+	// taskResultCh (in defer), so remaining events belong to this task.
+	s.flushPendingEvents()
 
 	// Mark the task as finished so the next queue item can start.
 	s.inProgress = false
@@ -177,6 +161,22 @@ drainLoop:
 	s.sendSystemInfo("task")
 }
 
+// flushPendingEvents non-blocking drains all remaining events from taskEventCh.
+// The task goroutine sends all events before taskResultCh (sent in defer),
+// so any events still in the buffer belong to the just-finished task.
+// Processing them here ensures state (e.g. ContextTokens) is committed
+// before the next task starts.
+func (s *Session) flushPendingEvents() {
+	for {
+		select {
+		case ev := <-s.taskEventCh:
+			s.handleTaskEvent(ev)
+		default:
+			return
+		}
+	}
+}
+
 // drainUntilTaskDone processes task events and completion signals until the
 // currently running task finishes. Called when input is closed but a task is
 // still in progress, ensuring final output (prompt echo, assistant response)
@@ -184,9 +184,9 @@ drainLoop:
 func (s *Session) drainUntilTaskDone() {
 	for {
 		select {
-		case ev := <-s.stateCh:
+		case ev := <-s.taskEventCh:
 			s.handleTaskEvent(ev)
-		case result := <-s.taskResult:
+		case result := <-s.taskResultCh:
 			s.handleTaskDone(result)
 			return
 		case <-s.taskRefreshCh:
