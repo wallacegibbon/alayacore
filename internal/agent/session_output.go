@@ -14,7 +14,7 @@ package agent
 //
 //   Best-effort broadcasts (UI responsiveness optimization):
 //     The task goroutine calls requestSystemInfo() which sends on
-//     infoUpdateCh (non-blocking). The run() goroutine picks it up
+//     taskRefreshCh (non-blocking). The run() goroutine picks it up
 //     and calls sendSystemInfo("task"). If the send is dropped
 //     (buffer full), the TUI misses a transient update but catches
 //     up at the next guaranteed broadcast above.
@@ -130,7 +130,7 @@ func (s *Session) writeToolUseOutput(id string, content []llm.ContentPart, isErr
 // reflected in the UI (step boundaries, errors, etc.).
 func (s *Session) requestSystemInfo() {
 	select {
-	case s.infoUpdateCh <- struct{}{}:
+	case s.taskRefreshCh <- struct{}{}:
 	default:
 	}
 }

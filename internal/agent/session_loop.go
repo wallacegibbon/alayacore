@@ -37,7 +37,7 @@ import (
 //   - Input messages from the user (via inputPump → msgCh)
 //   - Task state changes (via task goroutine → stateCh)
 //   - Task completion signals (via taskResult)
-//   - System info refresh requests (via infoUpdateCh)
+//   - System info refresh requests (via taskRefreshCh)
 func (s *Session) run() {
 	defer close(s.runDone)
 	defer s.sessionCancel()
@@ -81,7 +81,7 @@ func (s *Session) run() {
 		case result := <-s.taskResult:
 			s.handleTaskDone(result)
 
-		case <-s.infoUpdateCh:
+		case <-s.taskRefreshCh:
 			s.sendSystemInfo("task")
 
 		case <-s.sessionCtx.Done():
@@ -175,7 +175,7 @@ func (s *Session) drainUntilTaskDone() {
 		case result := <-s.taskResult:
 			s.handleTaskDone(result)
 			return
-		case <-s.infoUpdateCh:
+		case <-s.taskRefreshCh:
 			s.sendSystemInfo("task")
 		case <-s.sessionCtx.Done():
 			return
