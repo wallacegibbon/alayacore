@@ -138,9 +138,11 @@ func (s *Session) appendCancelMessage(messages []llm.Message, entries []llm.Cont
 	})
 	id := s.histIncAndGet()
 	entries = append(entries, &llm.TextPart{
-		Text:      cancelMessage,
-		HistoryID: id,
-		Role:      llm.RoleAssistant,
+		Text: cancelMessage,
+		ContentMeta: llm.ContentMeta{
+			HistoryID: id,
+			Role:      llm.RoleAssistant,
+		},
 	})
 	s.writeTLVStr(stream.TagAssistantT, stream.WrapDelta(strconv.FormatUint(id, 10), cancelMessage))
 	return messages, entries

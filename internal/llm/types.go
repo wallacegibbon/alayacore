@@ -22,6 +22,19 @@ const (
 	RoleTool      MessageRole = "tool"
 )
 
+// ContentMeta holds the metadata common to all ContentPart types.
+// Embedded in each concrete ContentPart to avoid duplicating
+// the HistoryID/Role fields and their accessor methods.
+type ContentMeta struct {
+	HistoryID uint64      `json:"-"`
+	Role      MessageRole `json:"-"`
+}
+
+func (m *ContentMeta) GetHistoryID() uint64   { return m.HistoryID }
+func (m *ContentMeta) SetHistoryID(id uint64) { m.HistoryID = id }
+func (m *ContentMeta) GetRole() MessageRole   { return m.Role }
+func (m *ContentMeta) SetRole(r MessageRole)  { m.Role = r }
+
 // ContentPart represents a part of message content
 type ContentPart interface {
 	GetHistoryID() uint64
@@ -41,15 +54,10 @@ const (
 
 // TextPart represents text content
 type TextPart struct {
-	Text      string      `json:"text"`
-	HistoryID uint64      `json:"-"`
-	Role      MessageRole `json:"-"`
+	ContentMeta
+	Text string `json:"text"`
 }
 
-func (p *TextPart) GetHistoryID() uint64   { return p.HistoryID }
-func (p *TextPart) SetHistoryID(id uint64) { p.HistoryID = id }
-func (p *TextPart) GetRole() MessageRole   { return p.Role }
-func (p *TextPart) SetRole(r MessageRole)  { p.Role = r }
 func (p *TextPart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart {
 	p.HistoryID = id
 	p.Role = r
@@ -58,15 +66,10 @@ func (p *TextPart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart {
 
 // ImagePart represents an image content (DataURI: data:image/...;base64,...)
 type ImagePart struct {
-	DataURL   string      `json:"data_url"`
-	HistoryID uint64      `json:"-"`
-	Role      MessageRole `json:"-"`
+	ContentMeta
+	DataURL string `json:"data_url"`
 }
 
-func (p *ImagePart) GetHistoryID() uint64   { return p.HistoryID }
-func (p *ImagePart) SetHistoryID(id uint64) { p.HistoryID = id }
-func (p *ImagePart) GetRole() MessageRole   { return p.Role }
-func (p *ImagePart) SetRole(r MessageRole)  { p.Role = r }
 func (p *ImagePart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart {
 	p.HistoryID = id
 	p.Role = r
@@ -75,15 +78,10 @@ func (p *ImagePart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart 
 
 // ReasoningPart represents reasoning/thinking content.
 type ReasoningPart struct {
-	Text      string      `json:"text"`
-	HistoryID uint64      `json:"-"`
-	Role      MessageRole `json:"-"`
+	ContentMeta
+	Text string `json:"text"`
 }
 
-func (p *ReasoningPart) GetHistoryID() uint64   { return p.HistoryID }
-func (p *ReasoningPart) SetHistoryID(id uint64) { p.HistoryID = id }
-func (p *ReasoningPart) GetRole() MessageRole   { return p.Role }
-func (p *ReasoningPart) SetRole(r MessageRole)  { p.Role = r }
 func (p *ReasoningPart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart {
 	p.HistoryID = id
 	p.Role = r
@@ -92,17 +90,12 @@ func (p *ReasoningPart) UpdateContentPartMeta(id uint64, r MessageRole) ContentP
 
 // ToolUsePart represents a tool call stored in conversation history.
 type ToolUsePart struct {
-	ID        string          `json:"id"`
-	ToolName  string          `json:"tool_name"`
-	Input     json.RawMessage `json:"input"`
-	HistoryID uint64          `json:"-"`
-	Role      MessageRole     `json:"-"`
+	ContentMeta
+	ID       string          `json:"id"`
+	ToolName string          `json:"tool_name"`
+	Input    json.RawMessage `json:"input"`
 }
 
-func (p *ToolUsePart) GetHistoryID() uint64   { return p.HistoryID }
-func (p *ToolUsePart) SetHistoryID(id uint64) { p.HistoryID = id }
-func (p *ToolUsePart) GetRole() MessageRole   { return p.Role }
-func (p *ToolUsePart) SetRole(r MessageRole)  { p.Role = r }
 func (p *ToolUsePart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart {
 	p.HistoryID = id
 	p.Role = r
@@ -111,17 +104,12 @@ func (p *ToolUsePart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPar
 
 // ToolResultPart represents a tool execution result.
 type ToolResultPart struct {
-	ID        string        `json:"id"`
-	Content   []ContentPart `json:"content"`
-	IsError   bool          `json:"is_error"`
-	HistoryID uint64        `json:"-"`
-	Role      MessageRole   `json:"-"`
+	ContentMeta
+	ID      string        `json:"id"`
+	Content []ContentPart `json:"content"`
+	IsError bool          `json:"is_error"`
 }
 
-func (p *ToolResultPart) GetHistoryID() uint64   { return p.HistoryID }
-func (p *ToolResultPart) SetHistoryID(id uint64) { p.HistoryID = id }
-func (p *ToolResultPart) GetRole() MessageRole   { return p.Role }
-func (p *ToolResultPart) SetRole(r MessageRole)  { p.Role = r }
 func (p *ToolResultPart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart {
 	p.HistoryID = id
 	p.Role = r

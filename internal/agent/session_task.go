@@ -44,13 +44,13 @@ func (s *Session) handleUserPrompt(ctx context.Context, messages []llm.Message, 
 	content := make([]llm.ContentPart, 0, 1+len(images))
 	for _, img := range images {
 		id := s.histIncAndGet()
-		part := &llm.ImagePart{DataURL: img, HistoryID: id, Role: llm.RoleUser}
+		part := &llm.ImagePart{DataURL: img, ContentMeta: llm.ContentMeta{HistoryID: id, Role: llm.RoleUser}}
 		content = append(content, part)
 		entries = append(entries, part)
 		s.writeTLVStr(stream.TagUserI, stream.WrapDelta(strconv.FormatUint(id, 10), img))
 	}
 	id := s.histIncAndGet()
-	part := &llm.TextPart{Text: prompt, HistoryID: id, Role: llm.RoleUser}
+	part := &llm.TextPart{Text: prompt, ContentMeta: llm.ContentMeta{HistoryID: id, Role: llm.RoleUser}}
 	content = append(content, part)
 	entries = append(entries, part)
 	s.writeTLVStr(stream.TagUserT, stream.WrapDelta(strconv.FormatUint(id, 10), prompt))

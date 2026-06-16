@@ -407,10 +407,12 @@ func stripEmptyPlaceholders(content []ContentPart) []ContentPart {
 // carrying over the history ID assigned during streaming.
 func toolUseEventToPart(e ToolUseCompleteEvent, historyID uint64) *ToolUsePart {
 	return &ToolUsePart{
-		ID:        e.ID,
-		ToolName:  e.ToolName,
-		Input:     e.Input,
-		HistoryID: historyID,
+		ID:       e.ID,
+		ToolName: e.ToolName,
+		Input:    e.Input,
+		ContentMeta: ContentMeta{
+			HistoryID: historyID,
+		},
 	}
 }
 
@@ -448,7 +450,7 @@ func newToolResult(callbacks StreamCallbacks, id string, content []ContentPart, 
 	if callbacks.OnToolUseOutput != nil {
 		callbacks.OnToolUseOutput(id, content, err, historyID) //nolint:errcheck
 	}
-	return &ToolResultPart{ID: id, Content: content, IsError: isError, HistoryID: historyID, Role: RoleTool}
+	return &ToolResultPart{ID: id, Content: content, IsError: isError, ContentMeta: ContentMeta{HistoryID: historyID, Role: RoleTool}}
 }
 
 // extractToolUses extracts ToolUseParts from message content.

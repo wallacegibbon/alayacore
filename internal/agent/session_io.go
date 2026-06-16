@@ -179,9 +179,11 @@ Rules:
 	entries = entries[:0]
 	continueID := s.histIncAndGet()
 	entries = append(entries, &llm.TextPart{
-		Text:      "Continue",
-		HistoryID: continueID,
-		Role:      llm.RoleUser,
+		Text: "Continue",
+		ContentMeta: llm.ContentMeta{
+			HistoryID: continueID,
+			Role:      llm.RoleUser,
+		},
 	})
 	summaryID := s.histIncAndGet()
 	firstPart := lastAssistantMsg.Content[0]
@@ -406,9 +408,11 @@ func (s *Session) resendPrompt(ctx context.Context, messages []llm.Message, entr
 		messages = append(messages, llm.NewUserMessage("Continue"))
 		id := s.histIncAndGet()
 		entries = append(entries, &llm.TextPart{
-			Text:      "Continue",
-			HistoryID: id,
-			Role:      llm.RoleUser,
+			Text: "Continue",
+			ContentMeta: llm.ContentMeta{
+				HistoryID: id,
+				Role:      llm.RoleUser,
+			},
 		})
 		s.writeTLVStr(stream.TagUserT, stream.WrapDelta(strconv.FormatUint(id, 10), "Continue"))
 	} else {
