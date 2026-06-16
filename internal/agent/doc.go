@@ -34,10 +34,13 @@
 //	     via a message channel.
 //
 //	The only mutable state accessed from more than one goroutine are:
-//	  - sync/atomic fields for lock-free reads by the task goroutine
-//	    (agent pointer, provider, reasoning level, context tokens, etc.)
+//	  - atomic fields for pausedOnError, outputBroken, and confirmCh
 //	  - A few buffered channels for cancellation, completion signaling,
 //	    and system-info refresh requests.
+//
+//	All other session state (agent, provider, ContextTokens, ContextLimit,
+//	reasoningLevel, histCounter) is owned by a single goroutine and
+//	accessed without synchronization.
 //
 //	Cross-goroutine
 //	communication is exclusively through channels and atomics.

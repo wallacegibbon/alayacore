@@ -76,8 +76,9 @@ type runState struct {
 	msgCh         chan inputMsg // inputPump → run: parsed TLV messages
 }
 
-// sharedState groups fields accessed from multiple goroutines,
-// synchronized via atomics or channels.
+// sharedState groups fields that are either genuinely cross-goroutine
+// (synchronized via atomics) or owned by a single goroutine with
+// design guarantees that prevent concurrent access.
 type sharedState struct {
 	ContextTokens  int64 // last-known context token count; updated by run() from task events
 	ContextLimit   int64 // maximum context window size (input+output); set from model config

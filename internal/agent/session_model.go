@@ -5,8 +5,9 @@ package agent
 // Session, ModelManager, and the LLM provider.
 //
 // The run() goroutine owns provider/agent creation (via SwitchModel,
-// model_set command) and all ModelManager/RuntimeManager access. The task
-// goroutine reads agent and provider via atomic pointers. Cross-goroutine
+// model_set command) and all ModelManager/RuntimeManager access. Model
+// switching is ScheduleIdle, so agent/provider are stable during a task;
+// the task goroutine reads them as plain fields. Cross-goroutine
 // communication is channel-based (see session_event.go).
 
 import (

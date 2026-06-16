@@ -47,10 +47,9 @@ The session uses three goroutines for concurrent operation:
 | `taskResult` (buffered, cap 1) | task worker | run() | Return final messages and signal task completion |
 | `stateCh` (buffered, cap 64) | task worker | run() | Step progress, token counts, paused state |
 | `infoUpdateCh` (buffered, cap 1) | task worker | run() | Request system-info broadcast |
-| `atomic.Pointer[Agent]` | both | — | Lock-free agent pointer for task goroutine |
-| `atomic.Pointer[llm.Provider]` | both | — | Lock-free provider pointer for task goroutine |
-| `atomic.Int64` | both | — | ContextTokens, currentStep, reasoningLevel |
-| `atomic.Bool` | both | — | pausedOnError (written by task goroutine) |
+| `pausedOnError` (atomic.Bool) | both | — | Paused state (written by task goroutine, read by run()) |
+| `outputBroken` (atomic.Bool) | both | — | Output stream failure flag (any goroutine can set) |
+| `confirmCh` (atomic.Pointer) | both | — | Tool-confirmation channel handoff |
 
 **Lifecycle — drain on EOF:**
 
@@ -75,8 +74,8 @@ stdin EOF ──▶ inputPump closes msgCh ──▶ run() detects closed channe
 ```
 
 **State ownership:**
-- The `run()` goroutine is the sole owner of session state. It reads/writes `taskQueue`, `inProgress`, `pausedOnError`, `reasoningLevel`, `reasoningDirty`, and all command-handling logic. ModelManager and RuntimeManager are also accessed only from `run()`.
-- The task goroutine communicates state changes via typed events on `stateCh` (step progress, token counts) and reads atomic fields (`agent`, `provider`, `ContextTokens`, `currentStep`, `reasoningLevel`, `reasoningDirty`, `pausedOnError`) for lock-free access. The final message state is returned via `taskResult` on completion.
+- The `run()` goroutine is the sole owner of session state. It reads/writes `taskQueue`, `inProgress`, `pausedOnError`, and all command-handling logic. ModelManager and RuntimeManager are also accessed only from `run()`.
+- The task goroutine communicates state changes via typed events on `stateCh` (step progress, token counts) and reads three atomic fields (`pausedOnError`, `outputBroken`, `confirmCh`) for lock-free access. All other state (agent, provider, ContextTokens, reasoningLevel, histCounter) is either passed as snapshots at task start or read from plain fields that are stable during task execution. The final message state is returned via `taskResult` on completion.
 - The input pump goroutine is a pure TLV parser. It reads frames from the input stream, builds inputMsg values, and sends them to `run()` via `msgCh`. It has zero knowledge of commands and never touches session state — not even for `:cancel` or `:confirm`. All command dispatch, cancellation, and output writing happens in `run()`.
 - `sendSystemInfo` runs only in the `run()` goroutine; the task goroutine requests updates via `infoUpdateCh`.
 
@@ -84,7 +83,7 @@ stdin EOF ──▶ inputPump closes msgCh ──▶ run() detects closed channe
 
 **Design rationale:** Tasks must run in a separate goroutine because LLM streaming is blocking (3-10s per step). If tasks ran synchronously in `run()`, the main loop could not process user input (`:cancel`, new prompts, immediate commands) during task execution. The per-task goroutine pattern keeps the main loop responsive while avoiding a persistent worker goroutine that would sit idle between tasks.
 
-**Gotcha — atomic flags must use Load/Store:** `pausedOnError` is an `atomic.Bool`. Always use `.Load()` to read and `.Store()` to write. Direct assignment will not compile.
+**Gotcha — atomic fields use Load/Store:** `pausedOnError`, `outputBroken`, and `confirmCh` are atomic. Always use `.Load()` to read and `.Store()` to write. Direct assignment will not compile.
 
 ### Session Persistence
 
