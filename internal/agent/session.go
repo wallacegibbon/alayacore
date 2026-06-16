@@ -9,7 +9,7 @@ package agent
 //
 //   Three goroutines:
 //     1. inputPump — reads TLV frames from input, sends parsed messages
-//        to the main loop via msgCh.  It has no knowledge of commands
+//        to the main loop via s.msgCh.  It has no knowledge of commands
 //        and never touches session state.
 //     2. run() — main loop that owns Content, task queue, and system
 //        info. Processes input messages, dispatches commands, manages
@@ -73,6 +73,7 @@ type runState struct {
 	stateCh       chan TaskEvent
 	taskResult    chan TaskResult
 	taskRefreshCh chan struct{}
+	msgCh         chan inputMsg // inputPump → run: parsed TLV messages
 }
 
 // sharedState groups fields accessed from multiple goroutines,

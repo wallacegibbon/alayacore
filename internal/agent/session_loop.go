@@ -49,10 +49,9 @@ func (s *Session) run() {
 	}
 
 	// Start the I/O pump goroutine — it reads TLV from the input and
-	// sends parsed messages to run() for processing. It has no access
-	// to session state and communicates solely via msgCh.
-	msgCh := make(chan inputMsg, 100)
-	go s.inputPump(msgCh)
+	// sends parsed messages to run() for processing via msgCh.
+	s.msgCh = make(chan inputMsg, 100)
+	go s.inputPump()
 
 	for {
 		// Check for context cancellation (input closed externally)
@@ -64,7 +63,7 @@ func (s *Session) run() {
 
 		// Wait for new input, task events, task completion, or info requests
 		select {
-		case msg, ok := <-msgCh:
+		case msg, ok := <-s.msgCh:
 			if !ok {
 				// Input is closed (EOF on stdin). Drain the currently
 				// running task, then process any remaining queued tasks.
