@@ -109,6 +109,8 @@ func (s *Session) writeToolUseOutput(id string, content []llm.ContentPart, isErr
 
 // requestSystemInfo signals the run() goroutine to broadcast task info.
 // Non-blocking — if a signal is already pending, this is a no-op.
+// Only the latest state matters, and the critical step update is sent
+// directly from handleTaskEvent, so dropping a redundant request is safe.
 // Called from the task goroutine whenever state changes that should be
 // reflected in the UI (step boundaries, errors, etc.).
 func (s *Session) requestSystemInfo() {

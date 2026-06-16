@@ -84,11 +84,9 @@ func (s *Session) runTask(ctx context.Context, item QueueItem, taskMessages []ll
 
 	defer func() {
 		// Return the final state to run() so it can update
-		// s.Content and s.Messages.
-		select {
-		case s.taskResult <- TaskResult{Messages: taskMessages, Entries: entries}:
-		default:
-		}
+		// s.Content and s.Messages. Buffered channel (capacity 1),
+		// only blocks if run() is backlogged on task results.
+		s.taskResult <- TaskResult{Messages: taskMessages, Entries: entries}
 	}()
 
 	s.requestSystemInfo()
