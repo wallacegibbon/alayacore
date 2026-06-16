@@ -105,7 +105,7 @@ func (s *Session) createProviderAndAgent(modelConfig *ModelConfig) (llm.Provider
 
 func (s *Session) ensureAgentInitialized() error {
 	// Fast path: both agent and provider are ready.
-	if s.agent.Load() != nil && s.provider.Load() != nil {
+	if s.agent != nil && s.provider != nil {
 		return nil
 	}
 
@@ -122,13 +122,13 @@ func (s *Session) ensureAgentInitialized() error {
 		return fmt.Errorf("failed to create provider: %w", err)
 	}
 
-	s.agent.Store(agent)
-	s.provider.Store(&provider)
+	s.agent = agent
+	s.provider = provider
 	if activeModel.ContextLimit > 0 {
-		s.ContextLimit.Store(int64(activeModel.ContextLimit))
+		s.ContextLimit = int64(activeModel.ContextLimit)
 	}
-	if p := s.provider.Load(); p != nil {
-		(*p).SetReasoningLevel(int(s.reasoningLevel.Load()))
+	if s.provider != nil {
+		s.provider.SetReasoningLevel(s.reasoningLevel)
 	}
 	return nil
 }
@@ -139,10 +139,10 @@ func (s *Session) initAgentFromConfig(modelConfig *ModelConfig) error {
 		return err
 	}
 
-	s.agent.Store(agent)
-	s.provider.Store(&provider)
-	if p := s.provider.Load(); p != nil {
-		(*p).SetReasoningLevel(int(s.reasoningLevel.Load()))
+	s.agent = agent
+	s.provider = provider
+	if s.provider != nil {
+		s.provider.SetReasoningLevel(s.reasoningLevel)
 	}
 	return nil
 }
@@ -151,23 +151,16 @@ func (s *Session) applyModelContextLimit(model *ModelConfig) {
 	if model == nil || model.ContextLimit <= 0 {
 		return
 	}
-	s.ContextLimit.Store(int64(model.ContextLimit))
+	s.ContextLimit = int64(model.ContextLimit)
 }
 
 // SetReasoningLevel sets the reasoning level.
-// If a task is currently running, the provider is not synced immediately
-// (to avoid races). Instead, reasoningDirty is set and the sync happens at
-// the next step boundary in the task goroutine.
-// See config.ReasoningLevelOff, config.ReasoningLevelNormal, config.ReasoningLevelMax.
+// :reason is ScheduleIdle so this is only called when no task is running.
+// The provider is synced immediately.
 func (s *Session) SetReasoningLevel(level int) {
-	s.reasoningLevel.Store(int64(level))
-	if s.inProgress {
-		// Defer provider sync to next step boundary
-		s.reasoningDirty.Store(true)
-	} else {
-		if p := s.provider.Load(); p != nil {
-			(*p).SetReasoningLevel(level)
-		}
+	s.reasoningLevel = level
+	if s.provider != nil {
+		s.provider.SetReasoningLevel(level)
 	}
 	s.sendSystemInfo("reasoning")
 }

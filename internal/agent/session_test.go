@@ -101,7 +101,7 @@ func TestLoadOrNewSession(t *testing.T) {
 	defer os.Remove(testFile) // Clean up test file
 
 	// Agent is lazily initialized, so it should be nil at startup
-	if session.agent.Load() != nil {
+	if session.agent != nil {
 		t.Error("Session agent should be nil at startup (lazy initialization)")
 	}
 }

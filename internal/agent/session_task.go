@@ -85,17 +85,17 @@ func (s *Session) handleUserPrompt(ctx context.Context, tc *taskCtx, prompt stri
 // shouldAutoSummarize returns true when auto-summarization is enabled and
 // the current context tokens exceed AutoSummarizeThreshold of the configured limit.
 func (s *Session) shouldAutoSummarize() bool {
-	limit := s.ContextLimit.Load()
-	return s.AutoSummarize && limit > 0 && s.ContextTokens.Load() > 0 &&
-		s.ContextTokens.Load() >= limit*AutoSummarizeThreshold/AutoSummarizePctBase
+	limit := s.ContextLimit
+	return s.AutoSummarize && limit > 0 && s.ContextTokens > 0 &&
+		s.ContextTokens >= limit*AutoSummarizeThreshold/AutoSummarizePctBase
 }
 
 // doAutoSummarize logs a notification and triggers summarization.
 func (s *Session) doAutoSummarize(ctx context.Context, tc *taskCtx) {
-	limit := s.ContextLimit.Load()
-	usage := float64(s.ContextTokens.Load()) * AutoSummarizePctBase / float64(limit)
+	limit := s.ContextLimit
+	usage := float64(s.ContextTokens) * AutoSummarizePctBase / float64(limit)
 	s.writeNotifyf("Context usage at %d/%d tokens (%.0f%%). Auto-summarizing...",
-		s.ContextTokens.Load(), limit, usage)
+		s.ContextTokens, limit, usage)
 	s.summarize(ctx, tc)
 }
 
@@ -118,7 +118,7 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 
 	lastProcessed := len(history) // track where the last step ended
 
-	_, err := s.agent.Load().Stream(ctx, history, llm.StreamCallbacks{
+	_, err := s.agent.Stream(ctx, history, llm.StreamCallbacks{
 		OnTextDelta: func(delta string, historyID uint64) error {
 			s.writeTLVWithID(stream.TagAssistantT, historyID, delta)
 			return nil
@@ -175,14 +175,6 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 		},
 		OnStepStart: func(step int) error {
 			s.sendEvent(StepStartEvent{Step: step})
-
-			if s.reasoningDirty.Load() {
-				if p := s.provider.Load(); p != nil {
-					(*p).SetReasoningLevel(int(s.reasoningLevel.Load()))
-				}
-				s.reasoningDirty.Store(false)
-			}
-
 			s.requestSystemInfo()
 			return nil
 		},

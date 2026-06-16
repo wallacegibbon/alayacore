@@ -141,6 +141,21 @@ func (s *Session) tryStartNextTask() bool {
 // handleTaskDone processes a task completion signal from the task goroutine.
 // result carries the final message state and new ContentParts.
 func (s *Session) handleTaskDone(result TaskResult) {
+	// Drain remaining state events from the just-finished task before
+	// the next task starts. The task goroutine sends all stateCh events
+	// before taskResult (sent in defer), so any remaining events are
+	// from this task. This ensures ContextTokens and other state are
+	// committed before a new task goroutine reads them.
+drainLoop:
+	for {
+		select {
+		case ev := <-s.stateCh:
+			s.handleTaskEvent(ev)
+		default:
+			break drainLoop
+		}
+	}
+
 	// Mark the task as finished so the next queue item can start.
 	s.inProgress = false
 	s.taskCancel = nil
@@ -201,14 +216,14 @@ func (s *Session) handleTaskEvent(ev TaskEvent) {
 		// will be sent in the next request.
 		newContext := e.InputTokens + e.OutputTokens + e.CacheReadTokens + e.CacheCreationTokens
 		if newContext > 0 {
-			s.ContextTokens.Store(newContext)
+			s.ContextTokens = newContext
 		}
 
 	case SetContextTokensEvent:
 		// Corrects ContextTokens after summarize() to the summary size
 		// instead of the full old-context token count.
 		if e.Tokens > 0 {
-			s.ContextTokens.Store(e.Tokens)
+			s.ContextTokens = e.Tokens
 		}
 	}
 }

@@ -169,7 +169,7 @@ func (s *Session) sendTaskMsg() {
 		InProgress:  s.inProgress,
 		CurrentStep: s.currentStep,
 		MaxSteps:    s.MaxSteps,
-		Context:     s.ContextTokens.Load(),
+		Context:     s.ContextTokens,
 		TaskError:   s.pausedOnError.Load(),
 		QueueItems:  s.taskQueue,
 	})
@@ -187,7 +187,7 @@ func (s *Session) sendModelMsg() {
 	s.writeSystemMsg(ModelMsg{
 		ActiveModelID:   activeID,
 		ActiveModelName: activeName,
-		ContextLimit:    s.ContextLimit.Load(),
+		ContextLimit:    s.ContextLimit,
 	})
 }
 
@@ -245,5 +245,5 @@ func (s *Session) sendThemeListMsg() {
 }
 
 func (s *Session) sendReasoningMsg() {
-	s.writeSystemMsg(ReasoningMsg{Level: int(s.reasoningLevel.Load())})
+	s.writeSystemMsg(ReasoningMsg{Level: s.reasoningLevel})
 }

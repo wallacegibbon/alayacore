@@ -79,18 +79,17 @@ type runState struct {
 // sharedState groups fields accessed from multiple goroutines,
 // synchronized via atomics or channels.
 type sharedState struct {
-	ContextTokens  atomic.Int64 // read by both goroutines (shouldAutoSummarize, sendSystemInfo)
-	ContextLimit   atomic.Int64 // maximum context window size (input+output); set from model config
-	agent          atomic.Pointer[llm.Agent]
-	provider       atomic.Pointer[llm.Provider]
-	reasoningLevel atomic.Int64
-	reasoningDirty atomic.Bool
-	pausedOnError  atomic.Bool
-	outputBroken   atomic.Bool
-	histCounter    atomic.Uint64
-	confirmCh      atomic.Pointer[chan<- llm.ToolConfirmResponse]
+	ContextTokens  int64 // last-known context token count; updated by run() from task events
+	ContextLimit   int64 // maximum context window size (input+output); set from model config
+	agent          *llm.Agent
+	provider       llm.Provider
+	reasoningLevel int
+	histCounter    uint64
 	sessionCtx     context.Context
 	sessionCancel  context.CancelFunc
+	confirmCh      atomic.Pointer[chan<- llm.ToolConfirmResponse]
+	pausedOnError  atomic.Bool
+	outputBroken   atomic.Bool
 }
 
 // Session manages conversation state and task execution.
@@ -180,7 +179,7 @@ func NewSession(cfg SessionConfig) *Session {
 		runDone:   make(chan struct{}),
 		CreatedAt: time.Now(),
 	}
-	s.reasoningLevel.Store(int64(config.DefaultReasoningLevel))
+	s.reasoningLevel = config.DefaultReasoningLevel
 	s.initToolConfirmSet(cfg.ToolConfirmTools)
 	s.setActiveFromRuntimeConfig()
 	s.setActiveFromCliFlag()
@@ -218,8 +217,8 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 		runDone:   make(chan struct{}),
 		CreatedAt: data.CreatedAt,
 	}
-	s.reasoningLevel.Store(int64(data.ReasoningLevel))
-	s.ContextTokens.Store(data.ContextTokens)
+	s.reasoningLevel = data.ReasoningLevel
+	s.ContextTokens = data.ContextTokens
 
 	s.initToolConfirmSet(cfg.ToolConfirmTools)
 	s.setActiveFromRuntimeConfig()
@@ -236,7 +235,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 
 	s.sendSystemInfo("all")
 
-	s.histCounter.Store(uint64(len(s.Content)))
+	s.histCounter = uint64(len(s.Content))
 
 	// Send session content to adapter with IDs so the adapter can reference
 	// content by ID even after session reload.
@@ -252,7 +251,8 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 
 // histIncAndGet increments the history counter by 1 and returns the new value.
 func (s *Session) histIncAndGet() uint64 {
-	return s.histCounter.Add(1)
+	s.histCounter++
+	return s.histCounter
 }
 
 // Start begins processing input in a single goroutine.

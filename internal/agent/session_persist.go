@@ -51,9 +51,9 @@ func (s *Session) saveContentToFile(path string, content []llm.ContentPart) erro
 			MessageVersion: MessageVersion,
 			CreatedAt:      s.CreatedAt,
 			UpdatedAt:      time.Now(),
-			ReasoningLevel: int(s.reasoningLevel.Load()),
+			ReasoningLevel: s.reasoningLevel,
 			ActiveModel:    s.activeModelName(),
-			ContextTokens:  s.ContextTokens.Load(),
+			ContextTokens:  s.ContextTokens,
 		},
 		Content: content,
 	}

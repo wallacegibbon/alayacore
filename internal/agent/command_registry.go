@@ -81,7 +81,7 @@ var commandDefs = []Command{
 		func(s *Session, _ context.Context, args []string) { s.handleTaskQueueDel(args) }},
 	{CommandNameTaskQueueEdit, "Edit a queued task's content", "<queue_id> <new_content>", ScheduleImmediate,
 		func(s *Session, _ context.Context, args []string) { s.handleTaskQueueEdit(args) }},
-	{CommandNameReason, "Set reasoning level (0=off, 1=normal, 2=max)", "[0|1|2]", ScheduleImmediate,
+	{CommandNameReason, "Set reasoning level (0=off, 1=normal, 2=max)", "[0|1|2]", ScheduleIdle,
 		func(s *Session, _ context.Context, args []string) { s.handleReason(args) }},
 	{CommandNameThemeSet, "Set the active theme", "<name>", ScheduleImmediate,
 		func(s *Session, _ context.Context, args []string) { s.handleThemeSet(args) }},
