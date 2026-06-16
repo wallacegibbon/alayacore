@@ -75,10 +75,10 @@ func (s *Session) enqueueTask(item QueueItem, front bool) {
 // run() via "go s.runTask(ctx, item, taskMessages)". On completion it sends
 // the result on taskResult so the main loop can update s.Content and s.Messages.
 //
-// The task goroutine receives a snapshot of messages at task start. All
-// state mutations during execution (step progress, new messages, token
-// counts) are sent to run() via stateCh. The task goroutine never writes
-// to s.Content or s.Messages directly.
+// The task goroutine wraps the message snapshot in a taskCtx and passes it
+// through the processing pipeline. All state mutations during execution
+// (step progress, new messages, token counts) are sent to run() via stateCh.
+// The task goroutine never writes to s.Content or s.Messages directly.
 func (s *Session) runTask(ctx context.Context, item QueueItem, taskMessages []llm.Message) {
 	tc := &taskCtx{Messages: taskMessages}
 

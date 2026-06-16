@@ -15,9 +15,9 @@ package agent
 //        info. Processes input messages, dispatches commands, manages
 //        cancellation.
 //     3. task goroutine — spawned by run() to execute each task. It
-//        receives a snapshot of Messages (derived from Content) at task
-//        start and sends state mutations (step progress, new ContentParts,
-//        token counts) back to run() via stateCh.
+//        receives a taskCtx with a snapshot of Messages at task start,
+//        accumulates new Entries, and sends the final state back to
+//        run() via taskResult on completion.
 //
 //   Cross-goroutine communication:
 //     msgCh (inputMsg channel)  — inputPump → run()
