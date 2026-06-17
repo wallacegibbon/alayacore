@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green)]()
 [![Release](https://img.shields.io/github/v/release/alayacore/alayacore?logo=github)](https://github.com/alayacore/alayacore/releases)
 
-A fast, minimal AI Agent that runs in your terminal.
+A fast, minimal AI Agent for your terminal, scripts, and programmatic control.
 
 ## Table of Contents
 
@@ -33,7 +33,7 @@ A fast, minimal AI Agent that runs in your terminal.
 
 ![AlayaCore rawio demo](misc/alayacore-demo-rawio.gif)
 
-AlayaCore connects to any OpenAI-compatible or Anthropic-compatible LLM and gives it the tools to read, write, and edit files, and execute commands — all from an interactive TUI with streaming output, session persistence, and multi-step agentic tool-calling loops.
+AlayaCore connects to any OpenAI-compatible or Anthropic-compatible LLM and gives it the tools to read, write, and edit files, and execute commands — with session persistence and multi-step agentic tool-calling loops. The same agent core powers all three modes: **TUI** (interactive terminal interface), **Plain IO** (stdin/stdout for scripting), and **Raw IO** (raw TLV frames for programmatic control).
 
 ## Quick Start
 

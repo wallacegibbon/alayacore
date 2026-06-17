@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green)]()
 [![Release](https://img.shields.io/github/v/release/alayacore/alayacore?logo=github)](https://github.com/alayacore/alayacore/releases)
 
-一个快速、极简的 AI Agent，运行在终端中。
+一个快速、极简的 AI Agent，适用于终端、脚本和程序化控制。
 
 ## 目录
 
@@ -33,7 +33,7 @@
 
 ![AlayaCore rawio demo](misc/alayacore-demo-rawio.gif)
 
-AlayaCore 可连接任何兼容 OpenAI 或 Anthropic 的 LLM，并为其提供读取、写入、编辑文件和执行命令的能力——全部通过支持流式输出、会话持久化和多步骤智能工具调用循环的交互式 TUI 完成。
+AlayaCore 可连接任何兼容 OpenAI 或 Anthropic 的 LLM，并为其提供读取、写入、编辑文件和执行命令的能力——支持会话持久化和多步骤智能工具调用循环。相同的 Agent 核心驱动所有三种模式：**TUI**（交互式终端界面）、**Plain IO**（stdin/stdout 脚本模式）和 **Raw IO**（原始 TLV 帧程序化控制模式）。
 
 ## 快速开始
 
