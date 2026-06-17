@@ -14,7 +14,6 @@ import (
 	"github.com/alayacore/alayacore/internal/tools/shell"
 )
 
-const defaultCommandTimeout = 2 * time.Minute
 const maxCommandOutput = 64 * 1024 // 64KB
 
 type executeCommandInput struct {
@@ -24,7 +23,7 @@ type executeCommandInput struct {
 func NewExecuteCommandTool() llm.Tool {
 	return llm.NewTool(
 		"execute_command",
-		shell.Detect().PromptFragment,
+		shell.Detect().Description(),
 	).
 		WithSchema(llm.MustGenerateSchema(executeCommandInput{})).
 		WithExecute(llm.TypedExecute(executeCommand)).
@@ -38,7 +37,7 @@ func executeCommand(ctx context.Context, args executeCommandInput) ([]llm.Conten
 	}
 
 	detectedShell := shell.Detect()
-	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, defaultCommandTimeout)
+	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, shell.DefaultCommandTimeout)
 	defer timeoutCancel()
 
 	baseCmd := detectedShell.BuildCmd(detectedShell.ResolvedBinary(), args.Command)

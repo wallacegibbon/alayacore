@@ -5,9 +5,14 @@
 // A Shell describes how to invoke a specific shell binary (bash, zsh, sh,
 // pwsh, powershell).  Each shell carries:
 //   - a binary name / path  (e.g. "/bin/bash", "pwsh")
-//   - a prompt fragment     (the text injected into the tool description so
-//     the LLM knows what syntax is available)
+//   - a prompt fragment     (the syntax info injected into the tool
+//     description so the LLM knows what features are available)
 //   - an invocation builder (how to run "<shell> <flags> <command>")
+//
+// [DefaultCommandTimeout] defines a global limit on command execution time;
+// it is referenced both by the execute_command implementation and by
+// [Shell.Description], which composes the prompt fragment with the timeout
+// information into the LLM-facing tool description.
 //
 // On startup the package probes the OS environment for available shells and
 // selects the best candidate via [Detect].  The caller can override the
@@ -15,11 +20,18 @@
 package shell
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 	"sync"
+	"time"
 )
+
+// DefaultCommandTimeout is the maximum duration a shell command may run
+// before being killed. Both execute_command and the LLM-facing description
+// reference this value.
+const DefaultCommandTimeout = 2 * time.Minute
 
 // Shell represents a command shell that can execute commands.
 type Shell struct {
@@ -30,13 +42,32 @@ type Shell struct {
 	// name that must be resolvable via PATH.
 	Binary string
 
-	// PromptFragment is appended to the execute_command tool description so
-	// the LLM knows which syntax features are available.
+	// PromptFragment describes the shell syntax available. This is embedded
+	// in the LLM-facing tool description via Description().
 	PromptFragment string
 
 	// BuildCmd returns an *exec.Cmd that executes the given command string
 	// inside this shell.
 	BuildCmd func(binary, command string) *exec.Cmd
+}
+
+// Description returns the full tool description, combining the syntax
+// fragment with the command timeout information.
+func (s *Shell) Description() string {
+	return fmt.Sprintf(
+		"%s All commands are killed after %s.",
+		s.PromptFragment,
+		formatDuration(DefaultCommandTimeout),
+	)
+}
+
+// formatDuration formats a duration in a human-readable way for LLM prompts.
+func formatDuration(d time.Duration) string {
+	m := d.Minutes()
+	if m == 1 {
+		return "1 minute"
+	}
+	return fmt.Sprintf("%.0f minutes", m)
 }
 
 // detection stores the result of the one-time shell detection.

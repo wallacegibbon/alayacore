@@ -10,7 +10,7 @@ var (
 	shellPwsh = &Shell{
 		Name:           "PowerShell Core",
 		Binary:         "pwsh",
-		PromptFragment: "Execute a command using PowerShell (pwsh). Commands run without TTY; interactive programs will timeout.",
+		PromptFragment: "Execute a command using PowerShell (pwsh). Commands run non-interactively. Programs expecting user input will hang.",
 		BuildCmd: func(binary, command string) *exec.Cmd {
 			return exec.Command(binary, "-NoLogo", "-NonInteractive", "-Command", command)
 		},
@@ -19,7 +19,7 @@ var (
 	shellPowerShell = &Shell{
 		Name:           "Windows PowerShell",
 		Binary:         "powershell",
-		PromptFragment: "Execute a command using Windows PowerShell. Commands run without TTY; interactive programs will timeout.",
+		PromptFragment: "Execute a command using Windows PowerShell. Commands run non-interactively. Programs expecting user input will hang.",
 		BuildCmd: func(binary, command string) *exec.Cmd {
 			return exec.Command(binary, "-NoLogo", "-NonInteractive", "-Command", command)
 		},
@@ -28,7 +28,7 @@ var (
 	shellCmd = &Shell{
 		Name:           "cmd",
 		Binary:         "cmd",
-		PromptFragment: "Execute a command using cmd.exe. No PowerShell cmdlets. Commands run without TTY; interactive programs will timeout.",
+		PromptFragment: "Execute a command using cmd.exe. No PowerShell cmdlets. Commands run non-interactively. Programs expecting user input will hang.",
 		BuildCmd: func(binary, command string) *exec.Cmd {
 			return exec.Command(binary, "/C", command)
 		},

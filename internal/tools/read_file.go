@@ -27,7 +27,7 @@ type ReadFileInput struct {
 func NewReadFileTool() llm.Tool {
 	return llm.NewTool(
 		"read_file",
-		`Read file contents. For image files (PNG, JPEG, etc.), returns the image directly for you to see. For text files, supports optional line range using start_line and end_line parameters (1-indexed).`,
+		`Read file contents. For image files, returns the image directly for you to see. For text files, supports optional line range using start_line and end_line parameters (1-indexed).`,
 	).
 		WithSchema(llm.MustGenerateSchema(ReadFileInput{})).
 		WithExecute(llm.TypedExecute(executeReadFile)).
