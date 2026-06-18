@@ -12,10 +12,13 @@ All providers eat different wire formats and emit the same domain types:
 type ContentPart interface { isContentPart() }
 
 // Implementations:
-type TextPart      struct { Text string }
-type ReasoningPart struct { Text string }
-type ImagePart     struct { DataURL string }
-type ToolUsePart   struct { ID, ToolName string; Input json.RawMessage }
+type TextPart       struct { Text string }
+type ReasoningPart  struct { Text string }
+type ImagePart      struct { DataURL string }
+type AudioPart      struct { DataURL string }
+type VideoPart      struct { DataURL string }
+type DocumentPart   struct { DataURL string }
+type ToolUsePart    struct { ID, ToolName string; Input json.RawMessage }
 type ToolResultPart struct { ID string; Content []ContentPart; IsError bool }
 
 type Message struct {
@@ -118,6 +121,10 @@ And on receive, both providers use the same pattern: accumulate content by `inde
 |---|---|---|
 | `TextPart` | `content` (top-level field) | `content[]` array: `{type:"text", text:"..."}` |
 | `ReasoningPart` | `reasoning_content` (top-level field) | `content[]` array: `{type:"thinking", thinking:"..."}` |
+| `ImagePart` | `content[]` array: `{type:"image_url", image_url:{url:"data:image/...;base64,..."}}` | `content[]` array: `{type:"image", source:{type:"base64", media_type:"image/jpeg", data:"..."}}` |
+| `AudioPart` | `content[]` array: `{type:"input_audio", input_audio:{data:"data:audio/...;base64,..."}}` | `content[]` array: `{type:"audio", source:{type:"base64", media_type:"audio/mpeg", data:"..."}}` |
+| `VideoPart` | `content[]` array: `{type:"video_url", video_url:{url:"data:video/...;base64,..."}, fps:2, media_resolution:"default"}` | `content[]` array: `{type:"video", source:{type:"base64", media_type:"video/mp4", data:"..."}}` |
+| `DocumentPart` | ❌ Not supported | `content[]` array: `{type:"document", source:{type:"base64", media_type:"application/pdf", data:"..."}}` |
 | `ToolUsePart` | `tool_calls[]` (top-level array) | `content[]` array: `{type:"tool_use", id, name, input}` |
 | `ToolResultPart` | Separate message: `{role:"tool", tool_call_id, content}` (content is JSON-wrapped with `"status"` field — see note below) | `content[]` array: `{type:"tool_result", tool_use_id, content, is_error}`, **role remapped to "user"**. `content` can be a string or an array of content blocks (text, image, etc.) |
 
@@ -316,6 +323,53 @@ Message{
     ]
 }
 ```
+
+### Example 5: Multimodal user message (image + audio + video)
+
+**Domain input:**
+```go
+Message{
+    Role: "user",
+    Content: []ContentPart{
+        TextPart{Text: "Describe this multimedia"},
+        ImagePart{DataURL: "data:image/jpeg;base64,/9j/4AAQ..."},
+        AudioPart{DataURL: "data:audio/wav;base64,UklGR..."},
+        VideoPart{DataURL: "data:video/mp4;base64,AAAA..."},
+    },
+}
+```
+
+**OpenAI wire output** (content array with typed blocks):
+```json
+{
+    "role": "user",
+    "content": [
+        {"type": "text", "text": "Describe this multimedia"},
+        {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,/9j/4AAQ..."}},
+        {"type": "input_audio", "input_audio": {"data": "data:audio/wav;base64,UklGR..."}},
+        {"type": "video_url", "video_url": {"url": "data:video/mp4;base64,AAAA..."},
+         "fps": 2, "media_resolution": "default"}
+    ]
+}
+```
+
+**Anthropic wire output** (content array with source blocks):
+```json
+{
+    "role": "user",
+    "content": [
+        {"type": "text", "text": "Describe this multimedia"},
+        {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": "/9j/4AAQ..."}},
+        {"type": "audio", "source": {"type": "base64", "media_type": "audio/wav", "data": "UklGR..."}},
+        {"type": "video", "source": {"type": "base64", "media_type": "video/mp4", "data": "AAAA..."}}
+    ]
+}
+```
+
+> **Note:** All media content parts store data as **DataURI** (`data:{mime};base64,...`) in the domain layer. Each provider extracts or passes through the format it needs:
+> - OpenAI `image_url` / `video_url`: passes DataURI directly as the `url` field
+> - OpenAI `input_audio`: passes DataURI directly as the `data` field
+> - Anthropic: parses the DataURI to extract `media_type` and raw base64 `data` separately
 
 ### Wire Format Differences (Anthropic vs OpenAI)
 
