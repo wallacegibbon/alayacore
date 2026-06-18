@@ -79,13 +79,13 @@ func (s *Session) enqueueTask(item QueueItem, front bool) {
 // through the processing pipeline. All state mutations during execution
 // (step progress, new messages, token counts) are sent to run() via taskEventCh.
 // The task goroutine never writes to s.Content or s.Messages directly.
-func (s *Session) runTask(ctx context.Context, item QueueItem, taskMessages []llm.Message) {
-	tc := &taskCtx{Messages: taskMessages}
+func (s *Session) runTask(ctx context.Context, item QueueItem, taskMessages []llm.Message, taskContent []llm.ContentPart) {
+	tc := &taskCtx{
+		Messages: taskMessages,
+		Entries:  taskContent,
+	}
 
 	defer func() {
-		// Return the final state to run() so it can update
-		// s.Content and s.Messages. Buffered channel (capacity 1),
-		// only blocks if run() is backlogged on task results.
 		s.taskResultCh <- TaskResult{Messages: tc.Messages, Entries: tc.Entries}
 	}()
 

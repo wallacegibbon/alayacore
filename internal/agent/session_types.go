@@ -127,8 +127,8 @@ type SessionMeta struct {
 
 // TaskResult carries the final state from the task goroutine back to run().
 // Messages is the grouped API format (for provider compatibility).
-// Entries are the new ContentParts produced during this task, with HistoryID
-// and Role already set by the llm agent.
+// Entries is the flattened ContentParts list representing the full content
+// (seeded from s.Content at task start, accumulated during processing).
 type TaskResult struct {
 	Messages []llm.Message
 	Entries  []llm.ContentPart

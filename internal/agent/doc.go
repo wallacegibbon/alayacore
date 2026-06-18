@@ -29,7 +29,7 @@
 //	  2. task goroutine — spawned per task, runs in background, sends
 //	     state mutations via typed channel events (taskEventCh) to run().
 //	     On completion it sends a TaskResult with the final messages
-//	     and new ContentParts back via taskResultCh.
+//	     and full ContentParts list back via taskResultCh.
 //	  3. inputPump — reads TLV frames from input, forwards to run()
 //	     via a message channel.
 //

@@ -102,6 +102,13 @@ func (s *Session) tryStartNextTask() bool {
 	taskMessages := make([]llm.Message, len(s.Messages))
 	copy(taskMessages, s.Messages)
 
+	// Create a snapshot of Content for the task goroutine, seeded as
+	// the starting Entries. Task processing appends new entries as they're
+	// produced. handleTaskDone replaces s.Content with result.Entries,
+	// keeping both in sync.
+	taskContent := make([]llm.ContentPart, len(s.Content))
+	copy(taskContent, s.Content)
+
 	// Create a per-task context derived from sessionCtx. The cancel
 	// function is stored in s.taskCancel so cancelRunningTask() can
 	// cancel the task. Cleared in handleTaskDone().
@@ -111,12 +118,12 @@ func (s *Session) tryStartNextTask() bool {
 	// Reset step counter before starting the task.
 	s.currentStep = 0
 
-	go s.runTask(taskCtx, item, taskMessages)
+	go s.runTask(taskCtx, item, taskMessages, taskContent)
 	return true
 }
 
 // handleTaskDone processes a task completion signal from the task goroutine.
-// result carries the final message state and new ContentParts.
+// result carries the final message state and the full ContentParts list.
 func (s *Session) handleTaskDone(result TaskResult) {
 	// Commit remaining state events before the next task starts.
 	s.flushPendingEvents()
@@ -125,10 +132,11 @@ func (s *Session) handleTaskDone(result TaskResult) {
 	s.inProgress = false
 	s.taskCancel = nil
 
-	// Append new ContentParts.
+	// Replace both s.Content and s.Messages with the final task state.
+	// Entries is seeded from s.Content at task start and accumulated
+	// during processing, so it always represents the full content.
 	if len(result.Entries) > 0 {
-		s.Content = append(s.Content, result.Entries...)
-		// Rebuild Messages from Content.
+		s.Content = result.Entries
 		s.Messages = result.Messages
 	}
 
