@@ -14,8 +14,8 @@ import (
 // ThemeEntry holds a cached theme with its full content, received from the
 // session via ThemeListMsg on startup.
 type ThemeEntry struct {
-	Name  string       `json:"name"`
-	Theme *theme.Theme `json:"theme"`
+	Name  string
+	Theme *theme.Theme
 }
 
 // StatusSnapshot holds a consistent point-in-time view of session status.

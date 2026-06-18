@@ -58,7 +58,7 @@ const (
 // TextPart represents text content
 type TextPart struct {
 	ContentMeta
-	Text string `json:"text"`
+	Text string
 }
 
 func (p *TextPart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart {
@@ -70,7 +70,7 @@ func (p *TextPart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart {
 // ImagePart represents an image content (DataURI: data:image/...;base64,...)
 type ImagePart struct {
 	ContentMeta
-	DataURI string `json:"data_uri"`
+	DataURI string
 }
 
 func (p *ImagePart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart {
@@ -82,7 +82,7 @@ func (p *ImagePart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart 
 // VideoPart represents a video content (DataURI: data:video/...;base64,...)
 type VideoPart struct {
 	ContentMeta
-	DataURI string `json:"data_uri"`
+	DataURI string
 }
 
 func (p *VideoPart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart {
@@ -94,7 +94,7 @@ func (p *VideoPart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart 
 // AudioPart represents an audio content (DataURI: data:audio/...;base64,...)
 type AudioPart struct {
 	ContentMeta
-	DataURI string `json:"data_uri"`
+	DataURI string
 }
 
 func (p *AudioPart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart {
@@ -106,7 +106,7 @@ func (p *AudioPart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart 
 // DocumentPart represents a document content (DataURI: data:application/...;base64,...)
 type DocumentPart struct {
 	ContentMeta
-	DataURI string `json:"data_uri"`
+	DataURI string
 }
 
 func (p *DocumentPart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart {
@@ -118,7 +118,7 @@ func (p *DocumentPart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPa
 // ReasoningPart represents reasoning/thinking content.
 type ReasoningPart struct {
 	ContentMeta
-	Text string `json:"text"`
+	Text string
 }
 
 func (p *ReasoningPart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart {
@@ -130,9 +130,9 @@ func (p *ReasoningPart) UpdateContentPartMeta(id uint64, r MessageRole) ContentP
 // ToolUsePart represents a tool call stored in conversation history.
 type ToolUsePart struct {
 	ContentMeta
-	ID       string          `json:"id"`
-	ToolName string          `json:"tool_name"`
-	Input    json.RawMessage `json:"input"`
+	ID       string
+	ToolName string
+	Input    json.RawMessage
 }
 
 func (p *ToolUsePart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart {
@@ -144,9 +144,9 @@ func (p *ToolUsePart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPar
 // ToolResultPart represents a tool execution result.
 type ToolResultPart struct {
 	ContentMeta
-	ID      string        `json:"id"`
-	Content []ContentPart `json:"content"`
-	IsError bool          `json:"is_error"`
+	ID      string
+	Content []ContentPart
+	IsError bool
 }
 
 func (p *ToolResultPart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart {
@@ -157,23 +157,23 @@ func (p *ToolResultPart) UpdateContentPartMeta(id uint64, r MessageRole) Content
 
 // Message represents a single message in the conversation
 type Message struct {
-	Role    MessageRole   `json:"role"`
-	Content []ContentPart `json:"content"`
+	Role    MessageRole
+	Content []ContentPart
 }
 
 // ToolDefinition defines a tool that can be called
 type ToolDefinition struct {
-	Name        string          `json:"name"`
-	Description string          `json:"description"`
-	Schema      json.RawMessage `json:"schema"`
+	Name        string
+	Description string
+	Schema      json.RawMessage
 }
 
 // Usage tracks token usage.
 type Usage struct {
-	CacheCreationTokens int64 `json:"cache_creation_input_tokens,omitempty"`
-	CacheReadTokens     int64 `json:"cache_read_input_tokens,omitempty"`
-	InputTokens         int64 `json:"input_tokens"`
-	OutputTokens        int64 `json:"output_tokens"`
+	CacheCreationTokens int64
+	CacheReadTokens     int64
+	InputTokens         int64
+	OutputTokens        int64
 }
 
 // StreamEvent represents a streaming event

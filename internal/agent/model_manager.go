@@ -22,14 +22,14 @@ import (
 
 // ModelConfig represents a model configuration
 type ModelConfig struct {
-	ID           int    `json:"id"`                                   // Runtime ID (generated, not persisted)
-	Name         string `json:"name" config:"name"`                   // Display name
-	ProtocolType string `json:"protocol_type" config:"protocol_type"` // "openai" or "anthropic"
-	BaseURL      string `json:"base_url" config:"base_url"`           // API server URL
-	APIKey       string `json:"api_key,omitempty" config:"api_key"`   // API key (omitted in JSON responses for security)
-	ModelName    string `json:"model_name" config:"model_name"`       // Model identifier
-	ContextLimit int    `json:"context_limit" config:"context_limit"` // Maximum context length (0 means unlimited)
-	MaxTokens    int    `json:"max_tokens" config:"max_tokens"`       // Maximum output tokens (0 means use provider default)
+	ID           int    // Runtime ID (generated, not persisted)
+	Name         string `config:"name"`          // Display name
+	ProtocolType string `config:"protocol_type"` // "openai" or "anthropic"
+	BaseURL      string `config:"base_url"`      // API server URL
+	APIKey       string `config:"api_key"`       // API key
+	ModelName    string `config:"model_name"`    // Model identifier
+	ContextLimit int    `config:"context_limit"` // Maximum context length (0 means unlimited)
+	MaxTokens    int    `config:"max_tokens"`    // Maximum output tokens (0 means use provider default)
 }
 
 // ModelInfo is the safe version for JSON responses (no API key)

@@ -81,9 +81,9 @@ type StreamCallbacks struct {
 
 // ToolConfirmRequest represents a single tool call awaiting user confirmation.
 type ToolConfirmRequest struct {
-	ID       string          `json:"id"`
-	ToolName string          `json:"tool_name"`
-	Input    json.RawMessage `json:"input"`
+	ID       string
+	ToolName string
+	Input    json.RawMessage
 }
 
 // ToConfirmRequest builds a ToolConfirmRequest from a ToolUsePart.
@@ -99,9 +99,9 @@ func (tc *ToolUsePart) ToConfirmRequest() ToolConfirmRequest {
 // If Error is non-empty, the tool result is recorded as failed with that reason.
 // If Allowed is false (and Error is empty), the tool is recorded as denied by user.
 type ToolConfirmResponse struct {
-	ID      string `json:"id"`
-	Allowed bool   `json:"allowed"`
-	Error   string `json:"error,omitempty"`
+	ID      string
+	Allowed bool
+	Error   string
 }
 
 // StreamResult is the final result of streaming.
