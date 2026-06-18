@@ -734,13 +734,13 @@ func anthropicPartToBlock(part llm.ContentPart) *anthropicContentBlock {
 			Text: v.Text,
 		}
 	case *llm.ImagePart:
-		return anthropicMediaBlock(anthropicBlockTypeImage, v.DataURL)
+		return anthropicMediaBlock(anthropicBlockTypeImage, v.DataURI)
 	case *llm.VideoPart:
-		return anthropicMediaBlock(anthropicBlockTypeVideo, v.DataURL)
+		return anthropicMediaBlock(anthropicBlockTypeVideo, v.DataURI)
 	case *llm.AudioPart:
-		return anthropicMediaBlock(anthropicBlockTypeAudio, v.DataURL)
+		return anthropicMediaBlock(anthropicBlockTypeAudio, v.DataURI)
 	case *llm.DocumentPart:
-		return anthropicMediaBlock(anthropicBlockTypeDocument, v.DataURL)
+		return anthropicMediaBlock(anthropicBlockTypeDocument, v.DataURI)
 	case *llm.ReasoningPart:
 		text := v.Text
 		return &anthropicContentBlock{
@@ -806,8 +806,8 @@ func parseDataURI(uri string) (mediaType, data string, ok bool) {
 
 // anthropicMediaBlock builds an anthropicContentBlock for media types
 // (image, video, audio, document) that use a base64 data URI source.
-func anthropicMediaBlock(blockType, dataURL string) *anthropicContentBlock {
-	mediaType, b64, ok := parseDataURI(dataURL)
+func anthropicMediaBlock(blockType, dataURI string) *anthropicContentBlock {
+	mediaType, b64, ok := parseDataURI(dataURI)
 	if !ok {
 		return nil
 	}

@@ -14,10 +14,10 @@ type ContentPart interface { isContentPart() }
 // Implementations:
 type TextPart       struct { Text string }
 type ReasoningPart  struct { Text string }
-type ImagePart      struct { DataURL string }
-type AudioPart      struct { DataURL string }
-type VideoPart      struct { DataURL string }
-type DocumentPart   struct { DataURL string }
+type ImagePart      struct { DataURI string }
+type AudioPart      struct { DataURI string }
+type VideoPart      struct { DataURI string }
+type DocumentPart   struct { DataURI string }
 type ToolUsePart    struct { ID, ToolName string; Input json.RawMessage }
 type ToolResultPart struct { ID string; Content []ContentPart; IsError bool }
 
@@ -332,9 +332,9 @@ Message{
     Role: "user",
     Content: []ContentPart{
         TextPart{Text: "Describe this multimedia"},
-        ImagePart{DataURL: "data:image/jpeg;base64,/9j/4AAQ..."},
-        AudioPart{DataURL: "data:audio/wav;base64,UklGR..."},
-        VideoPart{DataURL: "data:video/mp4;base64,AAAA..."},
+        ImagePart{DataURI: "data:image/jpeg;base64,/9j/4AAQ..."},
+        AudioPart{DataURI: "data:audio/wav;base64,UklGR..."},
+        VideoPart{DataURI: "data:video/mp4;base64,AAAA..."},
     },
 }
 ```

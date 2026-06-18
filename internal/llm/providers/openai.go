@@ -583,7 +583,7 @@ func openaiConvertToolResults(content []llm.ContentPart) []openAIMessage {
 			case *llm.TextPart:
 				textParts = append(textParts, v.Text)
 			case *llm.ImagePart:
-				textParts = append(textParts, v.DataURL)
+				textParts = append(textParts, v.DataURI)
 			}
 		}
 		combined := strings.Join(textParts, "\n")
@@ -661,21 +661,21 @@ func openaiConvertRegularContent(apiMsg *openAIMessage, content []llm.ContentPar
 			contentParts = append(contentParts, map[string]any{
 				"type": "image_url",
 				"image_url": map[string]string{
-					"url": v.DataURL,
+					"url": v.DataURI,
 				},
 			})
 		case *llm.AudioPart:
 			contentParts = append(contentParts, map[string]any{
 				"type": "input_audio",
 				"input_audio": map[string]string{
-					"data": v.DataURL,
+					"data": v.DataURI,
 				},
 			})
 		case *llm.VideoPart:
 			contentParts = append(contentParts, map[string]any{
 				"type": "video_url",
 				"video_url": map[string]string{
-					"url": v.DataURL,
+					"url": v.DataURI,
 				},
 				"fps":              2,
 				"media_resolution": "default",

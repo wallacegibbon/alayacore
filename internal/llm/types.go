@@ -70,7 +70,7 @@ func (p *TextPart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart {
 // ImagePart represents an image content (DataURI: data:image/...;base64,...)
 type ImagePart struct {
 	ContentMeta
-	DataURL string `json:"data_url"`
+	DataURI string `json:"data_uri"`
 }
 
 func (p *ImagePart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart {
@@ -82,7 +82,7 @@ func (p *ImagePart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart 
 // VideoPart represents a video content (DataURI: data:video/...;base64,...)
 type VideoPart struct {
 	ContentMeta
-	DataURL string `json:"data_url"`
+	DataURI string `json:"data_uri"`
 }
 
 func (p *VideoPart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart {
@@ -94,7 +94,7 @@ func (p *VideoPart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart 
 // AudioPart represents an audio content (DataURI: data:audio/...;base64,...)
 type AudioPart struct {
 	ContentMeta
-	DataURL string `json:"data_url"`
+	DataURI string `json:"data_uri"`
 }
 
 func (p *AudioPart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart {
@@ -106,7 +106,7 @@ func (p *AudioPart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart 
 // DocumentPart represents a document content (DataURI: data:application/...;base64,...)
 type DocumentPart struct {
 	ContentMeta
-	DataURL string `json:"data_url"`
+	DataURI string `json:"data_uri"`
 }
 
 func (p *DocumentPart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart {

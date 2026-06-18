@@ -13,7 +13,7 @@ import (
 type contentItem struct {
 	Type    string `json:"type"`
 	Text    string `json:"text,omitempty"`
-	DataURL string `json:"data_url,omitempty"`
+	DataURI string `json:"data_uri,omitempty"`
 }
 
 // serializeContentParts serializes []ContentPart to JSON for TLV framing.
@@ -24,13 +24,13 @@ func serializeContentParts(parts []llm.ContentPart) (json.RawMessage, error) {
 		case *llm.TextPart:
 			items = append(items, contentItem{Type: "text", Text: v.Text})
 		case *llm.ImagePart:
-			items = append(items, contentItem{Type: "image", DataURL: v.DataURL})
+			items = append(items, contentItem{Type: "image", DataURI: v.DataURI})
 		case *llm.VideoPart:
-			items = append(items, contentItem{Type: "video", DataURL: v.DataURL})
+			items = append(items, contentItem{Type: "video", DataURI: v.DataURI})
 		case *llm.AudioPart:
-			items = append(items, contentItem{Type: "audio", DataURL: v.DataURL})
+			items = append(items, contentItem{Type: "audio", DataURI: v.DataURI})
 		case *llm.DocumentPart:
-			items = append(items, contentItem{Type: "document", DataURL: v.DataURL})
+			items = append(items, contentItem{Type: "document", DataURI: v.DataURI})
 		default:
 			return nil, fmt.Errorf("unsupported content part type in tool result: %T", p)
 		}
@@ -75,13 +75,13 @@ func deserializeContentParts(data json.RawMessage) ([]llm.ContentPart, error) {
 		case "text":
 			parts = append(parts, &llm.TextPart{Text: item.Text})
 		case "image":
-			parts = append(parts, &llm.ImagePart{DataURL: item.DataURL})
+			parts = append(parts, &llm.ImagePart{DataURI: item.DataURI})
 		case "video":
-			parts = append(parts, &llm.VideoPart{DataURL: item.DataURL})
+			parts = append(parts, &llm.VideoPart{DataURI: item.DataURI})
 		case "audio":
-			parts = append(parts, &llm.AudioPart{DataURL: item.DataURL})
+			parts = append(parts, &llm.AudioPart{DataURI: item.DataURI})
 		case "document":
-			parts = append(parts, &llm.DocumentPart{DataURL: item.DataURL})
+			parts = append(parts, &llm.DocumentPart{DataURI: item.DataURI})
 		default:
 			return nil, fmt.Errorf("unknown content part type in tool result: %s", item.Type)
 		}
