@@ -98,7 +98,9 @@ func (s *Session) tryStartNextTask() bool {
 	s.inProgress = true
 
 	// Create a snapshot of Messages for the task goroutine.
-	// Messages is always derived from Content, so this is in sync.
+	// Messages and Contents are both copied from their authoritative
+	// sources; they stay in sync because both are set from the same
+	// task result in handleTaskDone.
 	taskMessages := make([]llm.Message, len(s.Messages))
 	copy(taskMessages, s.Messages)
 

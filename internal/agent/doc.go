@@ -21,7 +21,7 @@
 // Concurrency Model:
 //
 //	The session uses an actor model with three goroutines:
-//	  1. run() — owns all mutable session state (Content, task queue,
+//	  1. run() — owns all mutable session state (Contents, task queue,
 //	     token counts). Processes input messages and task events.
 //	     When the input stream reaches EOF while a task is in progress,
 //	     it drains remaining events until the task completes before

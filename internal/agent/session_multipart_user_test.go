@@ -30,7 +30,7 @@ func TestMultiPartUserMessageRoundtrip(t *testing.T) {
 	}
 	session := &Session{
 		runState: runState{
-			Contents: contentFromMessagesForTest(msgs),
+			Contents:  contentsFromMessagesForTest(msgs),
 			Messages:  msgs,
 			taskQueue: make([]QueueItem, 0),
 		},
@@ -51,7 +51,7 @@ func TestMultiPartUserMessageRoundtrip(t *testing.T) {
 		t.Fatalf("LoadSession failed: %v", err)
 	}
 
-	loadedMsgs := contentToMessages(loaded.Contents)
+	loadedMsgs := contentsToMessages(loaded.Contents)
 
 	// Should be 2 messages: user (with 2 parts), assistant
 	if len(loadedMsgs) != 2 {
@@ -97,7 +97,7 @@ func TestConsecutiveUserChunksGrouped(t *testing.T) {
 		t.Fatalf("parseSessionData failed: %v", err)
 	}
 
-	msgs := contentToMessages(loaded.Contents)
+	msgs := contentsToMessages(loaded.Contents)
 
 	// Should be 2 messages: user (with 2 parts), assistant
 	if len(msgs) != 2 {

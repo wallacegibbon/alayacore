@@ -11,7 +11,7 @@ package agent
 //     1. inputPump — reads TLV frames from input, sends parsed messages
 //        to the main loop via s.inputMsgCh.  It has no knowledge of commands
 //        and never touches session state.
-//     2. run() — main loop that owns Content, task queue, and system
+//     2. run() — main loop that owns Contents, task queue, and system
 //        info. Processes input messages, dispatches commands, manages
 //        cancellation.
 //     3. task goroutine — spawned by run() to execute each task. It
@@ -66,8 +66,8 @@ type sessionConfig struct {
 // runState groups fields owned exclusively by the run() goroutine.
 // All reads and writes happen in the run() event loop.
 type runState struct {
-	Contents []llm.ContentPart // source of truth — flat, ordered, 1:1 with TLV
-	Messages []llm.Message     // derived from Contents for API calls (rebuilt after each task)
+	Contents []llm.ContentPart // flat, ordered, 1:1 with TLV — set from task result Entries
+	Messages []llm.Message     // grouped by role for API calls — set from task result Messages
 
 	taskQueue []QueueItem
 
@@ -159,7 +159,7 @@ func LoadOrNewSession(cfg SessionConfig) (*Session, string, error) {
 	if cfg.SessionFile != "" {
 		if data, err := LoadSession(cfg.SessionFile); err == nil {
 			s := RestoreFromSession(cfg, data)
-			if replayErr := s.replayContentToAdapter(); replayErr != nil {
+			if replayErr := s.replayContentsToAdapter(); replayErr != nil {
 				s.initError = replayErr
 			}
 			return s, cfg.SessionFile, nil
@@ -223,7 +223,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 		},
 		runState: runState{
 			Contents:      data.Contents,
-			Messages:      contentToMessages(data.Contents),
+			Messages:      contentsToMessages(data.Contents),
 			taskQueue:     make([]QueueItem, 0),
 			taskEventCh:   make(chan TaskEvent, 64),
 			taskResultCh:  make(chan TaskResult, 1),
@@ -257,9 +257,9 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 	return s
 }
 
-// replayContentToAdapter sends all content parts to the adapter with history IDs,
+// replayContentsToAdapter sends all content parts to the adapter with history IDs,
 // so the adapter can reference them by ID even after session reload.
-func (s *Session) replayContentToAdapter() error {
+func (s *Session) replayContentsToAdapter() error {
 	for _, part := range s.Contents {
 		tag, content, err := contentPartToTLV(part)
 		if err != nil {

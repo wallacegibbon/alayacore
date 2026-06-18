@@ -160,7 +160,7 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 	}
 	session := &Session{
 		runState: runState{
-			Contents: contentFromMessagesForTest(msgs),
+			Contents:  contentsFromMessagesForTest(msgs),
 			taskQueue: make([]QueueItem, 0),
 		},
 		sessionConfig: sessionConfig{
@@ -184,55 +184,55 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 
 	// Verify messages - TLV format preserves message structure
 	// 4 messages: user, assistant(reasoning+text+toolcall), tool(result), assistant(reasoning+text)
-	if len(contentToMessages(loaded.Contents)) != 4 {
-		t.Fatalf("Message count mismatch: got %d, want 4", len(contentToMessages(loaded.Contents)))
+	if len(contentsToMessages(loaded.Contents)) != 4 {
+		t.Fatalf("Message count mismatch: got %d, want 4", len(contentsToMessages(loaded.Contents)))
 	}
 
 	// Check first user message
-	if contentToMessages(loaded.Contents)[0].Role != llm.RoleUser {
-		t.Errorf("First message role mismatch: got %s", contentToMessages(loaded.Contents)[0].Role)
+	if contentsToMessages(loaded.Contents)[0].Role != llm.RoleUser {
+		t.Errorf("First message role mismatch: got %s", contentsToMessages(loaded.Contents)[0].Role)
 	}
-	if len(contentToMessages(loaded.Contents)[0].Content) != 1 {
-		t.Fatalf("First message content parts: got %d", len(contentToMessages(loaded.Contents)[0].Content))
+	if len(contentsToMessages(loaded.Contents)[0].Content) != 1 {
+		t.Fatalf("First message content parts: got %d", len(contentsToMessages(loaded.Contents)[0].Content))
 	}
-	if tp, ok := contentToMessages(loaded.Contents)[0].Content[0].(*llm.TextPart); !ok || tp.Text != "Hello, world!" {
-		t.Errorf("First message content mismatch: got %v", contentToMessages(loaded.Contents)[0].Content[0])
+	if tp, ok := contentsToMessages(loaded.Contents)[0].Content[0].(*llm.TextPart); !ok || tp.Text != "Hello, world!" {
+		t.Errorf("First message content mismatch: got %v", contentsToMessages(loaded.Contents)[0].Content[0])
 	}
 
 	// Check second message (assistant with reasoning + text + tool call)
-	if contentToMessages(loaded.Contents)[1].Role != llm.RoleAssistant {
-		t.Errorf("Second message role mismatch: got %s", contentToMessages(loaded.Contents)[1].Role)
+	if contentsToMessages(loaded.Contents)[1].Role != llm.RoleAssistant {
+		t.Errorf("Second message role mismatch: got %s", contentsToMessages(loaded.Contents)[1].Role)
 	}
-	if len(contentToMessages(loaded.Contents)[1].Content) != 3 {
-		t.Fatalf("Second message should have 3 parts (reasoning + text + toolcall), got %d", len(contentToMessages(loaded.Contents)[1].Content))
+	if len(contentsToMessages(loaded.Contents)[1].Content) != 3 {
+		t.Fatalf("Second message should have 3 parts (reasoning + text + toolcall), got %d", len(contentsToMessages(loaded.Contents)[1].Content))
 	}
-	if _, ok := contentToMessages(loaded.Contents)[1].Content[0].(*llm.ReasoningPart); !ok {
-		t.Errorf("Second message first part should be ReasoningPart, got %T", contentToMessages(loaded.Contents)[1].Content[0])
+	if _, ok := contentsToMessages(loaded.Contents)[1].Content[0].(*llm.ReasoningPart); !ok {
+		t.Errorf("Second message first part should be ReasoningPart, got %T", contentsToMessages(loaded.Contents)[1].Content[0])
 	}
-	if tp, ok := contentToMessages(loaded.Contents)[1].Content[1].(*llm.TextPart); !ok || tp.Text != "Let me help you." {
-		t.Errorf("Second message text part mismatch: got %v", contentToMessages(loaded.Contents)[1].Content[1])
+	if tp, ok := contentsToMessages(loaded.Contents)[1].Content[1].(*llm.TextPart); !ok || tp.Text != "Let me help you." {
+		t.Errorf("Second message text part mismatch: got %v", contentsToMessages(loaded.Contents)[1].Content[1])
 	}
-	if _, ok := contentToMessages(loaded.Contents)[1].Content[2].(*llm.ToolUsePart); !ok {
-		t.Errorf("Second message third part should be ToolUsePart, got %T", contentToMessages(loaded.Contents)[1].Content[2])
+	if _, ok := contentsToMessages(loaded.Contents)[1].Content[2].(*llm.ToolUsePart); !ok {
+		t.Errorf("Second message third part should be ToolUsePart, got %T", contentsToMessages(loaded.Contents)[1].Content[2])
 	}
 
 	// Check third message (tool result)
-	if contentToMessages(loaded.Contents)[2].Role != llm.RoleTool {
-		t.Errorf("Third message role mismatch: got %s", contentToMessages(loaded.Contents)[2].Role)
+	if contentsToMessages(loaded.Contents)[2].Role != llm.RoleTool {
+		t.Errorf("Third message role mismatch: got %s", contentsToMessages(loaded.Contents)[2].Role)
 	}
 
 	// Check fourth message (assistant with reasoning + text)
-	if contentToMessages(loaded.Contents)[3].Role != llm.RoleAssistant {
-		t.Errorf("Fourth message role mismatch: got %s", contentToMessages(loaded.Contents)[3].Role)
+	if contentsToMessages(loaded.Contents)[3].Role != llm.RoleAssistant {
+		t.Errorf("Fourth message role mismatch: got %s", contentsToMessages(loaded.Contents)[3].Role)
 	}
-	if len(contentToMessages(loaded.Contents)[3].Content) != 2 {
-		t.Fatalf("Fourth message should have 2 parts (reasoning + text), got %d", len(contentToMessages(loaded.Contents)[3].Content))
+	if len(contentsToMessages(loaded.Contents)[3].Content) != 2 {
+		t.Fatalf("Fourth message should have 2 parts (reasoning + text), got %d", len(contentsToMessages(loaded.Contents)[3].Content))
 	}
-	if _, ok := contentToMessages(loaded.Contents)[3].Content[0].(*llm.ReasoningPart); !ok {
-		t.Errorf("Fourth message first part should be ReasoningPart, got %T", contentToMessages(loaded.Contents)[3].Content[0])
+	if _, ok := contentsToMessages(loaded.Contents)[3].Content[0].(*llm.ReasoningPart); !ok {
+		t.Errorf("Fourth message first part should be ReasoningPart, got %T", contentsToMessages(loaded.Contents)[3].Content[0])
 	}
-	if tp, ok := contentToMessages(loaded.Contents)[3].Content[1].(*llm.TextPart); !ok || tp.Text != "Here is the file." {
-		t.Errorf("Fourth message text part mismatch: got %v", contentToMessages(loaded.Contents)[3].Content[1])
+	if tp, ok := contentsToMessages(loaded.Contents)[3].Content[1].(*llm.TextPart); !ok || tp.Text != "Here is the file." {
+		t.Errorf("Fourth message text part mismatch: got %v", contentsToMessages(loaded.Contents)[3].Content[1])
 	}
 }
 
@@ -252,7 +252,7 @@ func TestMarkdownFormat_HumanReadable(t *testing.T) {
 	}
 	session := &Session{
 		runState: runState{
-			Contents: contentFromMessagesForTest(msgs),
+			Contents:  contentsFromMessagesForTest(msgs),
 			taskQueue: make([]QueueItem, 0),
 		},
 		sessionConfig: sessionConfig{
@@ -305,7 +305,7 @@ func TestReasoningOnlyMessage(t *testing.T) {
 	}
 	session := &Session{
 		runState: runState{
-			Contents: contentFromMessagesForTest(msgs),
+			Contents:  contentsFromMessagesForTest(msgs),
 			taskQueue: make([]QueueItem, 0),
 		},
 		sessionConfig: sessionConfig{
@@ -326,23 +326,23 @@ func TestReasoningOnlyMessage(t *testing.T) {
 		t.Fatalf("LoadSession failed: %v", err)
 	}
 
-	if len(contentToMessages(loaded.Contents)) != 2 {
-		t.Fatalf("Expected 2 messages, got %d", len(contentToMessages(loaded.Contents)))
+	if len(contentsToMessages(loaded.Contents)) != 2 {
+		t.Fatalf("Expected 2 messages, got %d", len(contentsToMessages(loaded.Contents)))
 	}
 
 	// Check first message
-	if contentToMessages(loaded.Contents)[0].Role != llm.RoleUser {
-		t.Errorf("First message should be user, got %s", contentToMessages(loaded.Contents)[0].Role)
+	if contentsToMessages(loaded.Contents)[0].Role != llm.RoleUser {
+		t.Errorf("First message should be user, got %s", contentsToMessages(loaded.Contents)[0].Role)
 	}
 
 	// Check second message (reasoning only)
-	if contentToMessages(loaded.Contents)[1].Role != llm.RoleAssistant {
-		t.Errorf("Second message should be assistant, got %s", contentToMessages(loaded.Contents)[1].Role)
+	if contentsToMessages(loaded.Contents)[1].Role != llm.RoleAssistant {
+		t.Errorf("Second message should be assistant, got %s", contentsToMessages(loaded.Contents)[1].Role)
 	}
-	if len(contentToMessages(loaded.Contents)[1].Content) != 1 {
-		t.Fatalf("Second message should have 1 part, got %d", len(contentToMessages(loaded.Contents)[1].Content))
+	if len(contentsToMessages(loaded.Contents)[1].Content) != 1 {
+		t.Fatalf("Second message should have 1 part, got %d", len(contentsToMessages(loaded.Contents)[1].Content))
 	}
-	if rp, ok := contentToMessages(loaded.Contents)[1].Content[0].(*llm.ReasoningPart); !ok {
+	if rp, ok := contentsToMessages(loaded.Contents)[1].Content[0].(*llm.ReasoningPart); !ok {
 		t.Errorf("Second message part should be ReasoningPart")
 	} else if !strings.Contains(rp.Text, "asking about Lisp") {
 		t.Errorf("Reasoning text mismatch: %s", rp.Text)
@@ -371,7 +371,7 @@ func TestTextAndReasoningInSameMessage(t *testing.T) {
 	}
 	session := &Session{
 		runState: runState{
-			Contents: contentFromMessagesForTest(msgs),
+			Contents:  contentsFromMessagesForTest(msgs),
 			taskQueue: make([]QueueItem, 0),
 		},
 		sessionConfig: sessionConfig{
@@ -393,29 +393,29 @@ func TestTextAndReasoningInSameMessage(t *testing.T) {
 	}
 
 	// Reasoning and text must stay in the same assistant message
-	if len(contentToMessages(loaded.Contents)) != 2 {
-		t.Fatalf("Expected 2 messages (user, assistant with reasoning+text), got %d", len(contentToMessages(loaded.Contents)))
+	if len(contentsToMessages(loaded.Contents)) != 2 {
+		t.Fatalf("Expected 2 messages (user, assistant with reasoning+text), got %d", len(contentsToMessages(loaded.Contents)))
 	}
 
 	// Check first message is user
-	if contentToMessages(loaded.Contents)[0].Role != llm.RoleUser {
-		t.Errorf("First message should be user, got %s", contentToMessages(loaded.Contents)[0].Role)
+	if contentsToMessages(loaded.Contents)[0].Role != llm.RoleUser {
+		t.Errorf("First message should be user, got %s", contentsToMessages(loaded.Contents)[0].Role)
 	}
 
 	// Check second message is assistant with reasoning + text in one message
-	if contentToMessages(loaded.Contents)[1].Role != llm.RoleAssistant {
-		t.Errorf("Second message should be assistant, got %s", contentToMessages(loaded.Contents)[1].Role)
+	if contentsToMessages(loaded.Contents)[1].Role != llm.RoleAssistant {
+		t.Errorf("Second message should be assistant, got %s", contentsToMessages(loaded.Contents)[1].Role)
 	}
-	if len(contentToMessages(loaded.Contents)[1].Content) != 2 {
-		t.Fatalf("Second message should have 2 parts (reasoning + text), got %d", len(contentToMessages(loaded.Contents)[1].Content))
+	if len(contentsToMessages(loaded.Contents)[1].Content) != 2 {
+		t.Fatalf("Second message should have 2 parts (reasoning + text), got %d", len(contentsToMessages(loaded.Contents)[1].Content))
 	}
-	if rp, ok := contentToMessages(loaded.Contents)[1].Content[0].(*llm.ReasoningPart); !ok {
-		t.Errorf("Second message first part should be ReasoningPart, got %T", contentToMessages(loaded.Contents)[1].Content[0])
+	if rp, ok := contentsToMessages(loaded.Contents)[1].Content[0].(*llm.ReasoningPart); !ok {
+		t.Errorf("Second message first part should be ReasoningPart, got %T", contentsToMessages(loaded.Contents)[1].Content[0])
 	} else if rp.Text != "Let me explain Lisp." {
 		t.Errorf("Reasoning text mismatch: %s", rp.Text)
 	}
-	if tp, ok := contentToMessages(loaded.Contents)[1].Content[1].(*llm.TextPart); !ok {
-		t.Errorf("Second message second part should be TextPart, got %T", contentToMessages(loaded.Contents)[1].Content[1])
+	if tp, ok := contentsToMessages(loaded.Contents)[1].Content[1].(*llm.TextPart); !ok {
+		t.Errorf("Second message second part should be TextPart, got %T", contentsToMessages(loaded.Contents)[1].Content[1])
 	} else if tp.Text != "Lisp is a family of programming languages." {
 		t.Errorf("Text mismatch: %s", tp.Text)
 	}
@@ -542,7 +542,7 @@ func TestDisplayMessagesWithToolCalls(t *testing.T) {
 
 	// Create session data with Content (source of truth)
 	sessionData := &SessionData{
-		Contents: contentFromMessagesForTest(msgs),
+		Contents: contentsFromMessagesForTest(msgs),
 		SessionMeta: SessionMeta{
 			MessageVersion: MessageVersion,
 			UpdatedAt:      time.Now(),
@@ -747,7 +747,7 @@ func TestTLVFormatRecursionProtection(t *testing.T) {
 	}
 	session := &Session{
 		runState: runState{
-			Contents: contentFromMessagesForTest(msgs),
+			Contents:  contentsFromMessagesForTest(msgs),
 			taskQueue: make([]QueueItem, 0),
 		},
 		sessionConfig: sessionConfig{
@@ -770,18 +770,18 @@ func TestTLVFormatRecursionProtection(t *testing.T) {
 	}
 
 	// Verify we still have 4 messages (not more due to false parsing)
-	if len(contentToMessages(loaded.Contents)) != 4 {
-		t.Errorf("expected 4 messages, got %d - recursion protection failed!", len(contentToMessages(loaded.Contents)))
-		for i, msg := range contentToMessages(loaded.Contents) {
+	if len(contentsToMessages(loaded.Contents)) != 4 {
+		t.Errorf("expected 4 messages, got %d - recursion protection failed!", len(contentsToMessages(loaded.Contents)))
+		for i, msg := range contentsToMessages(loaded.Contents) {
 			t.Logf("msg[%d]: role=%s, parts=%d", i, msg.Role, len(msg.Content))
 		}
 		return
 	}
 
 	// Verify the tool result still contains the fake markers
-	tr, ok := contentToMessages(loaded.Contents)[2].Content[0].(*llm.ToolResultPart)
+	tr, ok := contentsToMessages(loaded.Contents)[2].Content[0].(*llm.ToolResultPart)
 	if !ok {
-		t.Fatalf("expected ToolResultPart, got %T", contentToMessages(loaded.Contents)[2].Content[0])
+		t.Fatalf("expected ToolResultPart, got %T", contentsToMessages(loaded.Contents)[2].Content[0])
 	}
 	if len(tr.Content) == 0 {
 		t.Fatalf("expected non-empty tool result content")

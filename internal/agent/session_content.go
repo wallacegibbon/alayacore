@@ -42,10 +42,10 @@ func serializeContentParts(parts []llm.ContentPart) (json.RawMessage, error) {
 	return data, nil
 }
 
-// contentToMessages groups consecutive ContentParts with the same role into
-// []llm.Message for API calls. Content is the source of truth — Messages is
-// always derived from it.
-func contentToMessages(content []llm.ContentPart) []llm.Message {
+// contentsToMessages groups consecutive ContentParts with the same role into
+// []llm.Message for API calls. Used on session load — during runtime both
+// s.Contents and s.Messages are set together from the task result.
+func contentsToMessages(content []llm.ContentPart) []llm.Message {
 	if len(content) == 0 {
 		return nil
 	}

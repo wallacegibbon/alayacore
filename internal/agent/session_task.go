@@ -184,7 +184,7 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 		},
 		OnStepFinish: func(messages []llm.Message, usage llm.Usage) error {
 			// Remove orphaned tool uses from the last message before capturing
-			// new entries. This keeps both Messages and Content free of tool
+			// new entries. This keeps both Messages and Contents free of tool
 			// calls that were emitted but never executed (cancel/error).
 			messages = cleanIncompleteToolUses(messages)
 			if len(messages) > 0 {
