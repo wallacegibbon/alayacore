@@ -43,7 +43,7 @@
 //
 // Delta Messages:
 //
-// All content tags (UT, UI, AT, AR, AF, UF) may carry a NUL-delimited
+// All content tags (UT, UI, UV, UA, UD, AT, AR, AF, UF) may carry a NUL-delimited
 // historyCount-based ID for live streaming. The adapter uses this ID to
 // route content to the correct window. When messages are replayed from a
 // saved session file the ID is absent and the adapter falls back to

@@ -27,8 +27,9 @@ const (
 )
 
 // SliceBuffer is an io.ReadWriteCloser that bridges slice-at-a-time writes
-// with byte-at-a-time reads. Write sends each slice atomically via a
-// channel; Read uses an internal buffer to reassemble slices into a
+// with byte-at-a-time reads. Write copies each slice and sends it
+// atomically via a channel (the caller, e.g. io.Copy, may reuse its
+// buffer); Read uses an internal buffer to reassemble slices into a
 // byte stream so callers like io.ReadFull get continuous byte access
 // without losing slice boundaries.
 type SliceBuffer struct {
