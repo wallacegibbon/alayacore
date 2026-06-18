@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/alayacore/alayacore/internal/config"
 	domainerrors "github.com/alayacore/alayacore/internal/errors"
@@ -121,6 +122,20 @@ func (s *Session) handleContinue(ctx context.Context, tc *taskCtx, args []string
 }
 
 func (s *Session) summarize(ctx context.Context, tc *taskCtx) {
+	// Save a timestamped backup before the destructive summarization
+	// replaces the conversation history.  This preserves the full context
+	// for recovery if the summary omits important details.
+	if s.SessionFile != "" {
+		ext := filepath.Ext(s.SessionFile)
+		base := strings.TrimSuffix(s.SessionFile, ext)
+		backupPath := fmt.Sprintf("%s-%s%s", base, time.Now().Format("20060102150405"), ext)
+		if err := s.saveContentToFile(backupPath, s.Content); err != nil {
+			s.writeNotifyf("Failed to create pre-summarize backup: %v", err)
+		} else {
+			s.writeNotifyf("Pre-summarize backup saved to %s", backupPath)
+		}
+	}
+
 	prompt := `Summarize the conversation for continuation. The resuming instance has no prior context.
 
 Provide:
