@@ -27,28 +27,46 @@ type ReadFileInput struct {
 func NewReadFileTool() llm.Tool {
 	return llm.NewTool(
 		"read_file",
-		`Read file contents. For image files, returns the image directly for you to see. For text files, supports optional line range using start_line and end_line parameters (1-indexed).`,
+		`Read file contents. For media files (image, video, audio, document/PDF), returns the content directly for you to see. For text files, supports optional line range using start_line and end_line parameters (1-indexed).`,
 	).
 		WithSchema(llm.MustGenerateSchema(ReadFileInput{})).
 		WithExecute(llm.TypedExecute(executeReadFile)).
 		Build()
 }
 
-// imageMimePrefixes are MIME type prefixes that indicate an image file.
-var imageMimePrefixes = []string{"image/"}
+// mediaMimePrefixes maps MIME type prefixes to the corresponding ContentPart constructor.
+// Each entry defines what prefix to match and a function that creates the right part.
+type mediaTypeEntry struct {
+	prefix  string
+	newPart func(dataURL string) llm.ContentPart
+}
 
-// isImageFile checks whether the file at path is an image by examining
-// the extension and content. Returns the MIME type if it's an image.
-func isImageFile(path string) (mimeType string, ok bool) {
-	// First try extension-based detection
+var mediaMimePrefixes = []mediaTypeEntry{
+	{prefix: "image/", newPart: func(u string) llm.ContentPart { return &llm.ImagePart{DataURL: u} }},
+	{prefix: "video/", newPart: func(u string) llm.ContentPart { return &llm.VideoPart{DataURL: u} }},
+	{prefix: "audio/", newPart: func(u string) llm.ContentPart { return &llm.AudioPart{DataURL: u} }},
+}
+
+// documentMimePrefixes are MIME type prefixes for document files (PDF, Office, etc.).
+// These use DocumentPart instead of the generic fallback.
+// Text files are excluded — they are read as plain text, not as media.
+var documentMimePrefixes = []string{
+	"application/pdf",
+	"application/vnd.openxmlformats-officedocument",
+	"application/vnd.ms-",
+	"application/msword",
+}
+
+// isMediaFile checks whether the file at path is a supported media type
+// (image, video, audio, document) by examining the extension and content.
+// Returns the MIME type and a constructor for the appropriate ContentPart.
+func isMediaFile(path string) (mimeType string, newPart func(dataURL string) llm.ContentPart, ok bool) {
 	ext := strings.ToLower(filepath.Ext(path))
 	if ext != "" {
 		mimeType = mime.TypeByExtension(ext)
 		if mimeType != "" {
-			for _, prefix := range imageMimePrefixes {
-				if strings.HasPrefix(mimeType, prefix) {
-					return mimeType, true
-				}
+			if part, ok := matchMediaType(mimeType); ok {
+				return mimeType, part, true
 			}
 		}
 	}
@@ -56,23 +74,37 @@ func isImageFile(path string) (mimeType string, ok bool) {
 	// Extension didn't match — sniff content (first 512 bytes)
 	f, err := os.Open(path)
 	if err != nil {
-		return "", false
+		return "", nil, false
 	}
 	defer f.Close()
 
 	buf := make([]byte, 512)
 	n, _ := f.Read(buf) //nolint:errcheck // partial read is fine for sniffing
 	if n == 0 {
-		return "", false
+		return "", nil, false
 	}
 
 	mimeType = http.DetectContentType(buf[:n])
-	for _, prefix := range imageMimePrefixes {
-		if strings.HasPrefix(mimeType, prefix) {
-			return mimeType, true
+	if part, ok := matchMediaType(mimeType); ok {
+		return mimeType, part, true
+	}
+	return "", nil, false
+}
+
+// matchMediaType checks if a MIME type matches any supported media prefix
+// and returns the appropriate ContentPart constructor.
+func matchMediaType(mimeType string) (func(dataURL string) llm.ContentPart, bool) {
+	for _, entry := range mediaMimePrefixes {
+		if strings.HasPrefix(mimeType, entry.prefix) {
+			return entry.newPart, true
 		}
 	}
-	return "", false
+	for _, prefix := range documentMimePrefixes {
+		if strings.HasPrefix(mimeType, prefix) {
+			return func(u string) llm.ContentPart { return &llm.DocumentPart{DataURL: u} }, true
+		}
+	}
+	return nil, false
 }
 
 func executeReadFile(ctx context.Context, args ReadFileInput) ([]llm.ContentPart, error) {
@@ -86,10 +118,10 @@ func executeReadFile(ctx context.Context, args ReadFileInput) ([]llm.ContentPart
 		return nil, valErr
 	}
 
-	// Detect image files — return image content directly
+	// Detect media files — return content directly
 	if args.StartLine == 0 && args.EndLine == 0 {
-		if mimeType, ok := isImageFile(args.Path); ok {
-			return readImageFile(args.Path, mimeType)
+		if mimeType, newPart, ok := isMediaFile(args.Path); ok {
+			return readMediaFile(args.Path, mimeType, newPart)
 		}
 	}
 
@@ -121,8 +153,9 @@ func executeReadFile(ctx context.Context, args ReadFileInput) ([]llm.ContentPart
 	return []llm.ContentPart{&llm.TextPart{Text: strings.Join(lines, "\n")}}, nil
 }
 
-// readImageFile reads an image file and returns an ImagePart with base64-encoded data.
-func readImageFile(path, mimeType string) ([]llm.ContentPart, error) {
+// readMediaFile reads a media file and returns a ContentPart with base64-encoded data.
+// Supported types: image, video, audio, document (PDF, etc.).
+func readMediaFile(path, mimeType string, newPart func(dataURL string) llm.ContentPart) ([]llm.ContentPart, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -134,7 +167,7 @@ func readImageFile(path, mimeType string) ([]llm.ContentPart, error) {
 
 	return []llm.ContentPart{
 		&llm.TextPart{Text: fmt.Sprintf("Read %s (%.1fKB)", filepath.Base(path), sizeKB)},
-		&llm.ImagePart{DataURL: dataURL},
+		newPart(dataURL),
 	}, nil
 }
 
