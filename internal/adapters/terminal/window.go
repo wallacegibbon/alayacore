@@ -382,6 +382,12 @@ func (w *Window) applyTagStyle(content string, styles *Styles) string {
 		return styleMultiline(content, styles.Reasoning)
 	case stream.TagUserI:
 		return styleMultiline(content, styles.Attachment)
+	case stream.TagUserV:
+		return styleMultiline(content, styles.Attachment)
+	case stream.TagUserA:
+		return styleMultiline(content, styles.Attachment)
+	case stream.TagUserD:
+		return styleMultiline(content, styles.Attachment)
 	case stream.TagUserT:
 		return styles.Prompt.Render("> ") + styles.UserInput.Render(content)
 	case TagWindowSE:

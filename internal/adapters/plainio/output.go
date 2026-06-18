@@ -117,10 +117,8 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 		o.lastHistoryID = ""
 		fmt.Fprintf(o.writer, "%s\n", payload)
 
-	case stream.TagUserI:
-		stream.UnwrapDelta(value)
-		o.emitSeparator(tag)
-		fmt.Fprintf(o.writer, "[image]\n")
+	case stream.TagUserI, stream.TagUserV, stream.TagUserA, stream.TagUserD:
+		o.handleMediaTag(tag, value)
 
 	default:
 		o.emitSeparator(tag)
@@ -153,6 +151,19 @@ func (o *stdoutOutput) handleTextDelta(tag, value string) {
 // emitSeparator prints a newline if the previous visible tag differs from the
 // new tag and the previous frame was streamed (had a non-empty stream ID).
 // It updates lastTag to the new tag.
+// handleMediaTag prints a media attachment label (image/video/audio/document).
+func (o *stdoutOutput) handleMediaTag(tag, value string) {
+	stream.UnwrapDelta(value)
+	o.emitSeparator(tag)
+	label := map[string]string{
+		stream.TagUserI: "image",
+		stream.TagUserV: "video",
+		stream.TagUserA: "audio",
+		stream.TagUserD: "document",
+	}[tag]
+	fmt.Fprintf(o.writer, "[%s]\n", label)
+}
+
 func (o *stdoutOutput) emitSeparator(tag string) {
 	if o.lastHistoryID != "" && o.lastTag != "" && o.lastTag != tag {
 		fmt.Fprintln(o.writer)

@@ -23,11 +23,11 @@ type taskCtx struct {
 
 // QueueItem represents a queued task with metadata.
 type QueueItem struct {
-	QueueID   string    `json:"queue_id"`
-	Type      string    `json:"type"` // "prompt" or "command"
-	Content   string    `json:"content"`
-	Images    []string  `json:"images,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
+	QueueID     string            `json:"queue_id"`
+	Type        string            `json:"type"` // "prompt" or "command"
+	Content     string            `json:"content"`
+	Attachments []llm.ContentPart `json:"-"` // carried to handleUserPrompt; not serialized to adapter
+	CreatedAt   time.Time         `json:"created_at"`
 }
 
 // Task type constants for QueueItem.Type.

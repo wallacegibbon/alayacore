@@ -60,7 +60,7 @@ Inspect the raw TLV output with `tlvcat`:
 
 ```sh
 # Pipe the output through tlvcat to see tags and values
-printf 'UT\x00\x00\x00\x05helloUT\x00\x00\x00\x06my os?' | alayacore --rawio | misc/tlvcat
+printf 'UT\x00\x00\x00\x05helloUT\x00\x00\x00\x06my os?' | alayacore --rawio | go run ./misc/tlvcat.go
 ```
 
 Or generate a TLV request with images and inspect the result:
@@ -69,7 +69,7 @@ Or generate a TLV request with images and inspect the result:
 # Generate a request with 2 images
 go run misc/gen_tlv_request.go \
   "What's in these images?" image1.jpg image2.jpg \
-  | alayacore --rawio | misc/tlvcat
+  | alayacore --rawio | go run ./misc/tlvcat.go
 ```
 
 ## Use Cases

@@ -36,6 +36,9 @@ import (
 const (
 	anthropicBlockTypeText       = "text"
 	anthropicBlockTypeImage      = "image"
+	anthropicBlockTypeVideo      = "video"
+	anthropicBlockTypeAudio      = "audio"
+	anthropicBlockTypeDocument   = "document"
 	anthropicBlockTypeThinking   = "thinking"
 	anthropicBlockTypeToolResult = "tool_result"
 	anthropicBlockTypeToolUse    = "tool_use"
@@ -731,18 +734,13 @@ func anthropicPartToBlock(part llm.ContentPart) *anthropicContentBlock {
 			Text: v.Text,
 		}
 	case *llm.ImagePart:
-		mediaType, b64, ok := parseDataURI(v.DataURL)
-		if !ok {
-			return nil
-		}
-		return &anthropicContentBlock{
-			Type: anthropicBlockTypeImage,
-			Source: &anthropicImageSource{
-				Type:      "base64",
-				MediaType: mediaType,
-				Data:      b64,
-			},
-		}
+		return anthropicMediaBlock(anthropicBlockTypeImage, v.DataURL)
+	case *llm.VideoPart:
+		return anthropicMediaBlock(anthropicBlockTypeVideo, v.DataURL)
+	case *llm.AudioPart:
+		return anthropicMediaBlock(anthropicBlockTypeAudio, v.DataURL)
+	case *llm.DocumentPart:
+		return anthropicMediaBlock(anthropicBlockTypeDocument, v.DataURL)
 	case *llm.ReasoningPart:
 		text := v.Text
 		return &anthropicContentBlock{
@@ -804,4 +802,21 @@ func parseDataURI(uri string) (mediaType, data string, ok bool) {
 		return "", "", false
 	}
 	return mediaType, rest[len(b64Prefix):], true
+}
+
+// anthropicMediaBlock builds an anthropicContentBlock for media types
+// (image, video, audio, document) that use a base64 data URI source.
+func anthropicMediaBlock(blockType, dataURL string) *anthropicContentBlock {
+	mediaType, b64, ok := parseDataURI(dataURL)
+	if !ok {
+		return nil
+	}
+	return &anthropicContentBlock{
+		Type: blockType,
+		Source: &anthropicImageSource{
+			Type:      "base64",
+			MediaType: mediaType,
+			Data:      b64,
+		},
+	}
 }

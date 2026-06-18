@@ -17,7 +17,6 @@ type contentItem struct {
 }
 
 // serializeContentParts serializes []ContentPart to JSON for TLV framing.
-// Supports TextPart and ImagePart. Other types are rejected as unsupported.
 func serializeContentParts(parts []llm.ContentPart) (json.RawMessage, error) {
 	items := make([]contentItem, 0, len(parts))
 	for _, p := range parts {
@@ -26,6 +25,12 @@ func serializeContentParts(parts []llm.ContentPart) (json.RawMessage, error) {
 			items = append(items, contentItem{Type: "text", Text: v.Text})
 		case *llm.ImagePart:
 			items = append(items, contentItem{Type: "image", DataURL: v.DataURL})
+		case *llm.VideoPart:
+			items = append(items, contentItem{Type: "video", DataURL: v.DataURL})
+		case *llm.AudioPart:
+			items = append(items, contentItem{Type: "audio", DataURL: v.DataURL})
+		case *llm.DocumentPart:
+			items = append(items, contentItem{Type: "document", DataURL: v.DataURL})
 		default:
 			return nil, fmt.Errorf("unsupported content part type in tool result: %T", p)
 		}
@@ -71,6 +76,12 @@ func deserializeContentParts(data json.RawMessage) ([]llm.ContentPart, error) {
 			parts = append(parts, &llm.TextPart{Text: item.Text})
 		case "image":
 			parts = append(parts, &llm.ImagePart{DataURL: item.DataURL})
+		case "video":
+			parts = append(parts, &llm.VideoPart{DataURL: item.DataURL})
+		case "audio":
+			parts = append(parts, &llm.AudioPart{DataURL: item.DataURL})
+		case "document":
+			parts = append(parts, &llm.DocumentPart{DataURL: item.DataURL})
 		default:
 			return nil, fmt.Errorf("unknown content part type in tool result: %s", item.Type)
 		}

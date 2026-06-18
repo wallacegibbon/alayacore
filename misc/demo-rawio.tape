@@ -29,7 +29,7 @@ Enter
 Sleep 500ms
 Show
 
-Type "printf 'UT\x00\x00\x00\x0ccurrent time' | ./alayacore --rawio | ./misc/tlvcat"
+Type "printf 'UT\x00\x00\x00\x0ccurrent time' | ./alayacore --rawio | go run ./misc/tlvcat.go"
 Enter
 
 Sleep 4s

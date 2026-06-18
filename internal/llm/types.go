@@ -47,6 +47,9 @@ type ContentPart interface {
 const (
 	ContentPartText       = "text"
 	ContentPartImage      = "image"
+	ContentPartVideo      = "video"
+	ContentPartAudio      = "audio"
+	ContentPartDocument   = "document"
 	ContentPartReasoning  = "reasoning"
 	ContentPartToolUse    = "tool_use"
 	ContentPartToolResult = "tool_result"
@@ -71,6 +74,42 @@ type ImagePart struct {
 }
 
 func (p *ImagePart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart {
+	p.HistoryID = id
+	p.Role = r
+	return p
+}
+
+// VideoPart represents a video content (DataURI: data:video/...;base64,...)
+type VideoPart struct {
+	ContentMeta
+	DataURL string `json:"data_url"`
+}
+
+func (p *VideoPart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart {
+	p.HistoryID = id
+	p.Role = r
+	return p
+}
+
+// AudioPart represents an audio content (DataURI: data:audio/...;base64,...)
+type AudioPart struct {
+	ContentMeta
+	DataURL string `json:"data_url"`
+}
+
+func (p *AudioPart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart {
+	p.HistoryID = id
+	p.Role = r
+	return p
+}
+
+// DocumentPart represents a document content (DataURI: data:application/...;base64,...)
+type DocumentPart struct {
+	ContentMeta
+	DataURL string `json:"data_url"`
+}
+
+func (p *DocumentPart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart {
 	p.HistoryID = id
 	p.Role = r
 	return p

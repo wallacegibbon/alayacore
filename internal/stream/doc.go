@@ -16,6 +16,9 @@
 //	Tag values are 2-character strings:
 //	  - TagUserT (UT): User text input
 //	  - TagUserI (UI): User image (DataURI: data:image/...;base64,...)
+//	  - TagUserV (UV): User video (DataURI: data:video/...;base64,...)
+//	  - TagUserA (UA): User audio (DataURI: data:audio/...;base64,...)
+//	  - TagUserD (UD): User document (DataURI: data:application/...;base64,...)
 //	  - TagAssistantT (AT): Assistant text output
 //	  - TagAssistantR (AR): Reasoning/thinking content
 //	  - TagAssistantF (AF): Function lifecycle (JSON: id, name, input)

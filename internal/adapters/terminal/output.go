@@ -149,6 +149,30 @@ func (to *outputWriter) writeColored(tag string, value string) {
 		}
 		to.windowBuffer.AppendOrUpdate(stream.TagUserI, id, "📎 Image")
 
+	// User video tag
+	case stream.TagUserV:
+		id, _, ok := stream.UnwrapDelta(value)
+		if !ok {
+			id = to.generateWindowID()
+		}
+		to.windowBuffer.AppendOrUpdate(stream.TagUserV, id, "📎 Video")
+
+	// User audio tag
+	case stream.TagUserA:
+		id, _, ok := stream.UnwrapDelta(value)
+		if !ok {
+			id = to.generateWindowID()
+		}
+		to.windowBuffer.AppendOrUpdate(stream.TagUserA, id, "📎 Audio")
+
+	// User document tag
+	case stream.TagUserD:
+		id, _, ok := stream.UnwrapDelta(value)
+		if !ok {
+			id = to.generateWindowID()
+		}
+		to.windowBuffer.AppendOrUpdate(stream.TagUserD, id, "📎 Document")
+
 	// Function lifecycle (JSON: id, type, name, input, status)
 	// May carry NUL-delimited historyID prefix
 	case stream.TagAssistantF:
@@ -212,7 +236,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 // Bubble Tea goroutine sees dirty=true but pendingQueueItems has not been set yet.
 func (to *outputWriter) triggerUpdateForTag(tag string) {
 	switch tag {
-	case stream.TagAssistantT, stream.TagAssistantR, stream.TagAssistantF, stream.TagUserT, stream.TagUserF, stream.TagUserI:
+	case stream.TagAssistantT, stream.TagAssistantR, stream.TagAssistantF, stream.TagUserT, stream.TagUserF, stream.TagUserI, stream.TagUserV, stream.TagUserA, stream.TagUserD:
 		to.dirty.Store(true)
 	}
 }

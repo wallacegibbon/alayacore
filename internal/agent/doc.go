@@ -73,7 +73,8 @@
 // Communication Protocol:
 //
 //	Adapters communicate with Session via TLV (Tag-Length-Value) streams:
-//	  - Input: TagUserT for prompts and commands, TagUserI for images
+//	  - Input: TagUserT for prompts and commands, TagUserI for images,
+//	    TagUserV for videos, TagUserA for audio, TagUserD for documents
 //	  - Output: TagAssistantT, TagAssistantR, TagAssistantF, etc.
 //
 //	Each TLV frame carries a NUL-delimited history ID prefix that the

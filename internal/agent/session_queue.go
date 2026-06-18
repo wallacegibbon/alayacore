@@ -93,7 +93,7 @@ func (s *Session) runTask(ctx context.Context, item QueueItem, taskMessages []ll
 
 	switch item.Type {
 	case TaskTypePrompt:
-		s.handleUserPrompt(ctx, tc, item.Content, item.Images)
+		s.handleUserPrompt(ctx, tc, item.Content, item.Attachments)
 	case TaskTypeCommand:
 		s.runTaskCommand(ctx, tc, item.Content)
 	}

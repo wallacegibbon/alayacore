@@ -12,7 +12,10 @@ Sample TLV messages for `alayacore --rawio`.
 
 ```
 UT  → stdin   User text
-UI  → stdin   User image (DataURI)
+UI  → stdin   User image (DataURI: data:image/...;base64,...)
+UV  → stdin   User video (DataURI: data:video/...;base64,...)
+UA  → stdin   User audio (DataURI: data:audio/...;base64,...)
+UD  → stdin   User document (DataURI: data:application/...;base64,...)
 AT  ← stdout  Assistant text (delta: \x00<id>\x00<content>)
 AR  ← stdout  Assistant reasoning (delta: \x00<id>\x00<content>)
 AF  ← stdout  Function/tool lifecycle (JSON)
@@ -77,6 +80,19 @@ Adapter writes → stdin:        UI data:image/jpeg;base64,...
 ```
 
 UI frames must precede the UT frame they belong to.
+
+## Example: Media Prompt Flow
+
+```
+Adapter writes → stdin:        UI data:image/jpeg;base64,...
+                               UA data:audio/mpeg;base64,...
+                               UV data:video/mp4;base64,...
+                               UD data:application/pdf;base64,...
+                               UT "Analyze these files"
+```
+
+Media frames (UI, UA, UV, UD) must precede the UT frame they belong to.
+Multiple media frames of different types can be combined in any order.
 
 ## Samples by Tool
 
@@ -159,8 +175,8 @@ sm-tool-confirm.bin            SM {"type":"tool_confirm","data":{"id":"t1"}}
 
 ```sh
 cat tlv-samples/ut-read-file.bin | alayacore --rawio
-cat tlv-samples/ut-read-file.bin | alayacore --rawio | misc/tlvcat
-cat tlv-samples/af-read-file-start.bin | misc/tlvcat
+cat tlv-samples/ut-read-file.bin | alayacore --rawio | go run ./misc/tlvcat.go
+cat tlv-samples/af-read-file-start.bin | go run ./misc/tlvcat.go
 ```
 
 ## Generate Image Requests (Go)
@@ -168,5 +184,3 @@ cat tlv-samples/af-read-file-start.bin | misc/tlvcat
 ```sh
 go run misc/gen_tlv_request.go "question" image1.jpg [image2.jpg ...]
 ```
-
-Pre-built image samples at `misc/samples/tlv-requests/image/req-1`.

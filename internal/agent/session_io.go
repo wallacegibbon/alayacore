@@ -442,10 +442,10 @@ func (s *Session) resendPrompt(ctx context.Context, tc *taskCtx) {
 
 // inputMsg carries a parsed input message from the I/O pump to run().
 type inputMsg struct {
-	text    string   // the raw user text or command text (without ':')
-	images  []string // image DataURIs from preceding UI tags
-	isCmd   bool     // true if text starts with ':'
-	errText string   // non-empty when the input pump hit a validation error
+	text        string            // the raw user text or command text (without ':')
+	attachments []llm.ContentPart // media attachments from preceding UI/UV/UA/UD tags
+	isCmd       bool              // true if text starts with ':'
+	errText     string            // non-empty when the input pump hit a validation error
 }
 
 // inputPump runs in its own goroutine.  It reads TLV frames from the
@@ -453,7 +453,7 @@ type inputMsg struct {
 // It does NOT interpret commands or access session state — all of
 // that lives in the run() goroutine.
 func (s *Session) inputPump() {
-	var pendingImages []string
+	var pendingAttachments []llm.ContentPart
 
 	for {
 		tag, value, err := stream.ReadTLV(s.Input)
@@ -464,16 +464,21 @@ func (s *Session) inputPump() {
 
 		switch tag {
 		case stream.TagUserI:
-			pendingImages = append(pendingImages, value)
-
+			pendingAttachments = append(pendingAttachments, &llm.ImagePart{DataURL: value})
+		case stream.TagUserV:
+			pendingAttachments = append(pendingAttachments, &llm.VideoPart{DataURL: value})
+		case stream.TagUserA:
+			pendingAttachments = append(pendingAttachments, &llm.AudioPart{DataURL: value})
+		case stream.TagUserD:
+			pendingAttachments = append(pendingAttachments, &llm.DocumentPart{DataURL: value})
 		case stream.TagUserT:
-			s.handleInputUserText(value, &pendingImages)
+			s.handleInputUserText(value, &pendingAttachments)
 
 		default:
-			if len(pendingImages) > 0 {
-				pendingImages = nil
+			if len(pendingAttachments) > 0 {
+				pendingAttachments = nil
 				s.inputMsgCh <- inputMsg{errText: domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
-					"image tag must be followed by another image or text, got: %s", tag).Error()}
+					"media tag must be followed by another media or text, got: %s", tag).Error()}
 			} else {
 				s.inputMsgCh <- inputMsg{errText: domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
 					"invalid input tag: %s", tag).Error()}
@@ -483,24 +488,24 @@ func (s *Session) inputPump() {
 }
 
 // handleInputUserText builds an inputMsg from the text value and any
-// preceding images.  It strips the ':' prefix for commands and sets
+// preceding attachments.  It strips the ':' prefix for commands and sets
 // isCmd so run() can dispatch them.  The only validation is rejecting
-// images followed by a command (attaching images to a command makes
+// attachments followed by a command (attaching media to a command makes
 // no sense).
-func (s *Session) handleInputUserText(value string, pendingImages *[]string) {
-	if len(*pendingImages) > 0 && len(value) > 0 && value[0] == ':' {
-		// Images followed by a command is not allowed.
-		*pendingImages = nil
+func (s *Session) handleInputUserText(value string, pendingAttachments *[]llm.ContentPart) {
+	if len(*pendingAttachments) > 0 && len(value) > 0 && value[0] == ':' {
+		// Attachments followed by a command is not allowed.
+		*pendingAttachments = nil
 		s.inputMsgCh <- inputMsg{errText: domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
-			"command can not attach images").Error()}
+			"command can not attach media").Error()}
 		return
 	}
 
 	msg := inputMsg{
-		text:   value,
-		images: *pendingImages,
+		text:        value,
+		attachments: *pendingAttachments,
 	}
-	*pendingImages = nil
+	*pendingAttachments = nil
 
 	// Strip the colon prefix; run() uses isCmd to route to dispatchCommand.
 	if len(value) > 0 && value[0] == ':' {
@@ -599,6 +604,6 @@ func (s *Session) handleInputMsg(msg inputMsg) {
 			s.submitTaskCommand(cmd)
 		}
 	} else {
-		s.submitTask(QueueItem{Type: TaskTypePrompt, Content: msg.text, Images: msg.images})
+		s.submitTask(QueueItem{Type: TaskTypePrompt, Content: msg.text, Attachments: msg.attachments})
 	}
 }

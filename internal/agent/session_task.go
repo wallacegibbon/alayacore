@@ -32,7 +32,7 @@ const (
 
 // handleUserPrompt echoes the user prompt to output, appends it to
 // both tc.Messages and tc.Entries, then runs the agent loop.
-func (s *Session) handleUserPrompt(ctx context.Context, tc *taskCtx, prompt string, images []string) {
+func (s *Session) handleUserPrompt(ctx context.Context, tc *taskCtx, prompt string, attachments []llm.ContentPart) {
 	if s.shouldAutoSummarize() {
 		s.doAutoSummarize(ctx, tc)
 	}
@@ -40,13 +40,17 @@ func (s *Session) handleUserPrompt(ctx context.Context, tc *taskCtx, prompt stri
 	// Build content parts with history IDs and echo to output.
 	// ContentParts are shared between messages and entries so both
 	// representations refer to the same objects.
-	content := make([]llm.ContentPart, 0, 1+len(images))
-	for _, img := range images {
+	content := make([]llm.ContentPart, 0, 1+len(attachments))
+	for _, att := range attachments {
 		id := s.histIncAndGet()
-		part := &llm.ImagePart{DataURL: img, ContentMeta: llm.ContentMeta{HistoryID: id, Role: llm.RoleUser}}
-		content = append(content, part)
-		tc.Entries = append(tc.Entries, part)
-		s.writeTLVStr(stream.TagUserI, stream.WrapDelta(strconv.FormatUint(id, 10), img))
+		att.SetHistoryID(id)
+		att.SetRole(llm.RoleUser)
+		content = append(content, att)
+		tc.Entries = append(tc.Entries, att)
+		// Echo back using the correct TLV tag for the attachment type
+		if tag, val, err := contentPartToTLV(att); err == nil && tag != "" {
+			s.writeTLVStr(tag, stream.WrapDelta(strconv.FormatUint(id, 10), val))
+		}
 	}
 	id := s.histIncAndGet()
 	part := &llm.TextPart{Text: prompt, ContentMeta: llm.ContentMeta{HistoryID: id, Role: llm.RoleUser}}

@@ -19,6 +19,9 @@ const (
 	TagUserT      = "UT" // User text input
 	TagUserF      = "UF" // JSON: id, output, status (function result)
 	TagUserI      = "UI" // User image — DataURI: data:image/...;base64,...
+	TagUserV      = "UV" // User video — DataURI: data:video/...;base64,...
+	TagUserA      = "UA" // User audio — DataURI: data:audio/...;base64,...
+	TagUserD      = "UD" // User document — DataURI: data:application/...;base64,...
 
 	TagSystemMsg = "SM" // System message JSON: {"type":"...","data":{...}}
 )
@@ -69,10 +72,15 @@ func (b *SliceBuffer) Read(p []byte) (n int, err error) {
 	return n, nil
 }
 
-// Write implements io.Writer. Each call sends p as a single atomic slice
-// to the channel. Safe for concurrent use.
+// Write implements io.Writer. Each call sends a copy of p as a single
+// atomic slice to the channel. Safe for concurrent use.
+// A copy is required because the caller (e.g. io.Copy) may reuse the
+// underlying buffer on subsequent writes, and the data must remain valid
+// until the reader goroutine consumes it from the channel.
 func (b *SliceBuffer) Write(p []byte) (int, error) {
-	b.ch <- p
+	buf := make([]byte, len(p))
+	copy(buf, p)
+	b.ch <- buf
 	return len(p), nil
 }
 

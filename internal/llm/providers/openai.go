@@ -664,6 +664,31 @@ func openaiConvertRegularContent(apiMsg *openAIMessage, content []llm.ContentPar
 					"url": v.DataURL,
 				},
 			})
+		case *llm.AudioPart:
+			mediaType, b64, ok := parseDataURI(v.DataURL)
+			if !ok {
+				continue
+			}
+			audioFormat := openaiAudioFormatFromMediaType(mediaType)
+			if audioFormat == "" {
+				continue
+			}
+			contentParts = append(contentParts, map[string]any{
+				"type": "input_audio",
+				"input_audio": map[string]string{
+					"data":   b64,
+					"format": audioFormat,
+				},
+			})
+		case *llm.VideoPart:
+			// Video is not directly supported by OpenAI Chat Completions API.
+			// The protocol supports VideoPart, but this provider cannot handle it natively.
+			// Consider extracting frames client-side and sending as ImagePart(s).
+			continue
+		case *llm.DocumentPart:
+			// Document (PDF) is not supported by OpenAI Chat Completions API.
+			// The protocol supports DocumentPart, but this provider cannot handle it.
+			continue
 		}
 	}
 	switch len(contentParts) {
@@ -673,5 +698,21 @@ func openaiConvertRegularContent(apiMsg *openAIMessage, content []llm.ContentPar
 		// No content parts
 	default:
 		apiMsg.Content = contentParts
+	}
+}
+
+// openaiAudioFormatFromMediaType maps a media type from a Data URI to
+// the audio format expected by OpenAI's input_audio content block.
+// Returns empty string if the media type is not supported.
+//
+// Supported formats: wav, mp3 (per OpenAI API documentation).
+func openaiAudioFormatFromMediaType(mediaType string) string {
+	switch mediaType {
+	case "audio/wav", "audio/wave", "audio/x-wav":
+		return "wav"
+	case "audio/mpeg", "audio/mp3", "audio/mpg":
+		return "mp3"
+	default:
+		return ""
 	}
 }
