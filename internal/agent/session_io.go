@@ -129,7 +129,7 @@ func (s *Session) summarize(ctx context.Context, tc *taskCtx) {
 		ext := filepath.Ext(s.SessionFile)
 		base := strings.TrimSuffix(s.SessionFile, ext)
 		backupPath := fmt.Sprintf("%s-%s%s", base, time.Now().Format("20060102150405"), ext)
-		if err := s.saveContentToFile(backupPath, s.Content); err != nil {
+		if err := s.saveContentToFile(backupPath, s.Contents); err != nil {
 			s.writeNotifyf("Failed to create pre-summarize backup: %v", err)
 		} else {
 			s.writeNotifyf("Pre-summarize backup saved to %s", backupPath)
@@ -234,7 +234,7 @@ func (s *Session) saveSession(args []string) {
 		return
 	}
 
-	if err := s.saveContentToFile(path, s.Content); err != nil {
+	if err := s.saveContentToFile(path, s.Contents); err != nil {
 		s.writeError(domainerrors.Wrapf(CommandNameSave, domainerrors.ErrFailedToSaveSession, "%v", err).Error())
 	} else {
 		s.writeNotifyf("Session saved to %s", path)
@@ -548,7 +548,7 @@ func (s *Session) handleFork(args []string) {
 
 	// Find the index of the content with this history ID.
 	var endIdx = -1
-	for i, part := range s.Content {
+	for i, part := range s.Contents {
 		if part.GetHistoryID() == id {
 			endIdx = i
 			break
@@ -560,7 +560,7 @@ func (s *Session) handleFork(args []string) {
 	}
 
 	path := config.ExpandPath(args[1])
-	if err := s.saveContentToFile(path, s.Content[:endIdx+1]); err != nil {
+	if err := s.saveContentToFile(path, s.Contents[:endIdx+1]); err != nil {
 		s.writeError(fmt.Sprintf("failed to fork: %v", err))
 		return
 	}

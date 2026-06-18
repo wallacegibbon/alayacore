@@ -104,10 +104,10 @@ func (s *Session) tryStartNextTask() bool {
 
 	// Create a snapshot of Content for the task goroutine, seeded as
 	// the starting Entries. Task processing appends new entries as they're
-	// produced. handleTaskDone replaces s.Content with result.Entries,
+	// produced. handleTaskDone replaces s.Contents with result.Entries,
 	// keeping both in sync.
-	taskContent := make([]llm.ContentPart, len(s.Content))
-	copy(taskContent, s.Content)
+	taskContent := make([]llm.ContentPart, len(s.Contents))
+	copy(taskContent, s.Contents)
 
 	// Create a per-task context derived from sessionCtx. The cancel
 	// function is stored in s.taskCancel so cancelRunningTask() can
@@ -132,17 +132,17 @@ func (s *Session) handleTaskDone(result TaskResult) {
 	s.inProgress = false
 	s.taskCancel = nil
 
-	// Replace both s.Content and s.Messages with the final task state.
-	// Entries is seeded from s.Content at task start and accumulated
+	// Replace both s.Contents and s.Messages with the final task state.
+	// Entries is seeded from s.Contents at task start and accumulated
 	// during processing, so it always represents the full content.
 	if len(result.Entries) > 0 {
-		s.Content = result.Entries
+		s.Contents = result.Entries
 		s.Messages = result.Messages
 	}
 
 	// Auto-save if configured
 	if s.SessionFile != "" {
-		if err := s.saveContentToFile(s.SessionFile, s.Content); err != nil {
+		if err := s.saveContentToFile(s.SessionFile, s.Contents); err != nil {
 			s.writeNotifyf("Auto-save failed: %v", err)
 		}
 	}

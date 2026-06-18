@@ -30,7 +30,7 @@ func TestMultiPartUserMessageRoundtrip(t *testing.T) {
 	}
 	session := &Session{
 		runState: runState{
-			Content:   contentFromMessagesForTest(msgs),
+			Contents: contentFromMessagesForTest(msgs),
 			Messages:  msgs,
 			taskQueue: make([]QueueItem, 0),
 		},
@@ -42,7 +42,7 @@ func TestMultiPartUserMessageRoundtrip(t *testing.T) {
 		},
 	}
 
-	if err := session.saveContentToFile(sessionPath, session.Content); err != nil {
+	if err := session.saveContentToFile(sessionPath, session.Contents); err != nil {
 		t.Fatalf("saveContentToFile failed: %v", err)
 	}
 
@@ -51,7 +51,7 @@ func TestMultiPartUserMessageRoundtrip(t *testing.T) {
 		t.Fatalf("LoadSession failed: %v", err)
 	}
 
-	loadedMsgs := contentToMessages(loaded.Content)
+	loadedMsgs := contentToMessages(loaded.Contents)
 
 	// Should be 2 messages: user (with 2 parts), assistant
 	if len(loadedMsgs) != 2 {
@@ -97,7 +97,7 @@ func TestConsecutiveUserChunksGrouped(t *testing.T) {
 		t.Fatalf("parseSessionData failed: %v", err)
 	}
 
-	msgs := contentToMessages(loaded.Content)
+	msgs := contentToMessages(loaded.Contents)
 
 	// Should be 2 messages: user (with 2 parts), assistant
 	if len(msgs) != 2 {

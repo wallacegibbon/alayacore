@@ -66,8 +66,8 @@ type sessionConfig struct {
 // runState groups fields owned exclusively by the run() goroutine.
 // All reads and writes happen in the run() event loop.
 type runState struct {
-	Content  []llm.ContentPart // source of truth — flat, ordered, 1:1 with TLV
-	Messages []llm.Message     // derived from Content for API calls (rebuilt after each task)
+	Contents []llm.ContentPart // source of truth — flat, ordered, 1:1 with TLV
+	Messages []llm.Message     // derived from Contents for API calls (rebuilt after each task)
 
 	taskQueue []QueueItem
 
@@ -182,7 +182,7 @@ func NewSession(cfg SessionConfig) *Session {
 			SessionConfig:  cfg,
 		},
 		runState: runState{
-			Content:       make([]llm.ContentPart, 0),
+			Contents:      make([]llm.ContentPart, 0),
 			Messages:      make([]llm.Message, 0),
 			taskQueue:     make([]QueueItem, 0),
 			taskEventCh:   make(chan TaskEvent, 64),
@@ -222,8 +222,8 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 			sessionMetaModel: data.ActiveModel,
 		},
 		runState: runState{
-			Content:       data.Content,
-			Messages:      contentToMessages(data.Content),
+			Contents:      data.Contents,
+			Messages:      contentToMessages(data.Contents),
 			taskQueue:     make([]QueueItem, 0),
 			taskEventCh:   make(chan TaskEvent, 64),
 			taskResultCh:  make(chan TaskResult, 1),
@@ -238,7 +238,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 	}
 	s.reasoningLevel = data.ReasoningLevel
 	s.ContextTokens = data.ContextTokens
-	s.histCounter = uint64(len(s.Content))
+	s.histCounter = uint64(len(s.Contents))
 
 	s.initToolConfirmSet(cfg.ToolConfirmTools)
 	s.setActiveFromRuntimeConfig()
@@ -260,7 +260,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 // replayContentToAdapter sends all content parts to the adapter with history IDs,
 // so the adapter can reference them by ID even after session reload.
 func (s *Session) replayContentToAdapter() error {
-	for _, part := range s.Content {
+	for _, part := range s.Contents {
 		tag, content, err := contentPartToTLV(part)
 		if err != nil {
 			return fmt.Errorf("corrupt session file: failed to serialize content part (HistoryID=%d): %w", part.GetHistoryID(), err)

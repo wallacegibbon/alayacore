@@ -49,7 +49,7 @@ func TestSessionSavePreservesTextWithToolCalls(t *testing.T) {
 		SessionMeta: SessionMeta{
 			MessageVersion: MessageVersion,
 		},
-		Content: contentFromMessagesForTest(msgs),
+		Contents: contentFromMessagesForTest(msgs),
 	}
 
 	// Format to markdown (TLV format)
@@ -66,7 +66,7 @@ func TestSessionSavePreservesTextWithToolCalls(t *testing.T) {
 		t.Fatalf("Failed to parse session: %v", err)
 	}
 
-	loadedMsgs := contentToMessages(loaded.Content)
+	loadedMsgs := contentToMessages(loaded.Contents)
 
 	// Verify all messages are preserved
 	if len(loadedMsgs) != len(msgs) {

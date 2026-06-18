@@ -128,7 +128,7 @@ type SessionMeta struct {
 // TaskResult carries the final state from the task goroutine back to run().
 // Messages is the grouped API format (for provider compatibility).
 // Entries is the flattened ContentParts list representing the full content
-// (seeded from s.Content at task start, accumulated during processing).
+// (seeded from s.Contents at task start, accumulated during processing).
 type TaskResult struct {
 	Messages []llm.Message
 	Entries  []llm.ContentPart
@@ -137,7 +137,7 @@ type TaskResult struct {
 // SessionData is the persisted form of a Session.
 type SessionData struct {
 	SessionMeta
-	Content []llm.ContentPart // source of truth on reload
+	Contents []llm.ContentPart // source of truth on reload
 }
 
 // SessionConfig bundles all configuration for creating or restoring a session.

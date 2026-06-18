@@ -55,7 +55,7 @@ func (s *Session) saveContentToFile(path string, content []llm.ContentPart) erro
 			ActiveModel:    s.activeModelName(),
 			ContextTokens:  s.ContextTokens,
 		},
-		Content: content,
+		Contents: content,
 	}
 
 	raw, err := formatSessionMarkdown(&data)
@@ -84,7 +84,7 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 	var buf, tlvBuf strings.Builder
 	buf.WriteString(formatFrontmatter(&data.SessionMeta))
 
-	for _, part := range data.Content {
+	for _, part := range data.Contents {
 		tag, content, err := contentPartToTLV(part)
 		if err != nil {
 			return nil, domainerrors.Wrap(CommandNameSave, err)
@@ -164,7 +164,7 @@ func parseSessionData(data []byte) (*SessionData, error) {
 		if err != nil {
 			return nil, err
 		}
-		sd.Content = content
+		sd.Contents = content
 	}
 
 	return sd, nil
