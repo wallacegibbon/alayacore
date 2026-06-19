@@ -32,7 +32,7 @@ The TUI adapter processes confirmations sequentially (one dialog at a time). Oth
 Results from both phases are merged and re-ordered by ID:
 
 ```go
-toolUses := extractToolUses(stepMessage.Contents) // original order from LLM
+toolInputs := extractToolInputs(stepMessage.Contents) // original order from LLM
 idToTool := map ID → index
 for _, r := range results {
     finalResults[idToTool[r.ID]] = r

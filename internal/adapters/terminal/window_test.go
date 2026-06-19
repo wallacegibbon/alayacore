@@ -132,7 +132,7 @@ func TestWindowBufferDiff(t *testing.T) {
 	t.Run("append diff content", func(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
 		content := "edit_file: test.txt\n- old line\n+ new line\n"
-		wb.HandleToolUseEvent(stream.ToolUseData{ID: "diff-1", Name: "edit_file", Input: json.RawMessage(content)}, 0)
+		wb.HandleToolInputEvent(stream.ToolInputData{ID: "diff-1", Name: "edit_file", Input: json.RawMessage(content)}, 0)
 
 		if wb.WindowCount() != 1 {
 			t.Fatalf("len(Windows) = %d, want 1", wb.WindowCount())
@@ -156,7 +156,7 @@ func TestWindowBufferDiff(t *testing.T) {
 			content.WriteString("\n")
 		}
 
-		wb.HandleToolUseEvent(stream.ToolUseData{ID: "diff-1", Name: "edit_file", Input: json.RawMessage(content.String())}, 0)
+		wb.HandleToolInputEvent(stream.ToolInputData{ID: "diff-1", Name: "edit_file", Input: json.RawMessage(content.String())}, 0)
 
 		// Verify window is folded by default
 		if !wb.WindowAt(0).Folded {
@@ -194,7 +194,7 @@ func TestWindowBufferDiff(t *testing.T) {
 			content.WriteString("\n")
 		}
 
-		wb.HandleToolUseEvent(stream.ToolUseData{ID: "diff-1", Name: "edit_file", Input: json.RawMessage(content.String())}, 0)
+		wb.HandleToolInputEvent(stream.ToolInputData{ID: "diff-1", Name: "edit_file", Input: json.RawMessage(content.String())}, 0)
 
 		// Unfold the window
 		wb.ToggleFold(0)
@@ -221,7 +221,7 @@ func TestWindowBufferDiff(t *testing.T) {
 			"- removed line\n" +
 			"+ added line\n"
 
-		wb.HandleToolUseEvent(stream.ToolUseData{ID: "diff-1", Name: "edit_file", Input: json.RawMessage(content)}, 0)
+		wb.HandleToolInputEvent(stream.ToolInputData{ID: "diff-1", Name: "edit_file", Input: json.RawMessage(content)}, 0)
 
 		// Unfold to see all lines
 		wb.ToggleFold(0)
@@ -269,7 +269,7 @@ func TestWindowBufferDiff(t *testing.T) {
 			content.WriteString("\n")
 		}
 
-		wb.HandleToolUseEvent(stream.ToolUseData{ID: "diff-1", Name: "edit_file", Input: json.RawMessage(content.String())}, 0)
+		wb.HandleToolInputEvent(stream.ToolInputData{ID: "diff-1", Name: "edit_file", Input: json.RawMessage(content.String())}, 0)
 
 		// First render - should be folded (Folded=true)
 		rendered1 := wb.GetAll(-1)
@@ -305,7 +305,7 @@ func TestWindowBufferDiff(t *testing.T) {
 		// Create windows for different tag types
 		wb.AppendOrUpdate(stream.TagUserT, "user-1", "User message")
 		wb.AppendOrUpdate(stream.TagAssistantT, "assistant-1", "Assistant message")
-		wb.HandleToolUseEvent(stream.ToolUseData{ID: "tool-1", Name: "test_tool", Input: json.RawMessage("Tool output")}, 0)
+		wb.HandleToolInputEvent(stream.ToolInputData{ID: "tool-1", Name: "test_tool", Input: json.RawMessage("Tool output")}, 0)
 		wb.AppendOrUpdate(stream.TagAssistantR, "reasoning-1", "Reasoning content")
 
 		// User and Assistant should NOT be folded (show full content)
@@ -330,7 +330,7 @@ func TestWindowBufferDiff(t *testing.T) {
 func TestWindowBufferVisibility(t *testing.T) {
 	t.Run("tool windows are always visible", func(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
-		wb.HandleToolUseEvent(stream.ToolUseData{ID: "tool-1", Name: "execute_command", Input: json.RawMessage("")}, 0)
+		wb.HandleToolInputEvent(stream.ToolInputData{ID: "tool-1", Name: "execute_command", Input: json.RawMessage("")}, 0)
 
 		if wb.WindowCount() != 1 {
 			t.Fatalf("len(Windows) = %d, want 1", wb.WindowCount())

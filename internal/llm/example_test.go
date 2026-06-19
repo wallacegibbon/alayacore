@@ -52,7 +52,7 @@ func Example_usage() {
 			fmt.Print(delta)
 			return nil
 		},
-		OnToolUseInput: func(_ string, input json.RawMessage, _ uint64) error {
+		OnToolInputComplete: func(_ string, input json.RawMessage, _ uint64) error {
 			fmt.Printf("\n[Tool input: %s]\n", string(input))
 			return nil
 		},

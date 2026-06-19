@@ -5,7 +5,7 @@ package llm
 // 1. ONSTEPFINISH RECEIVES FULL HISTORY: OnStepFinish callback receives
 //    the complete allMessages slice (full conversation history), not just
 //    the current step's messages. The session layer replaces its state
-//    from this rather than appending increments. OnToolUseOutput should only
+//    from this rather than appending increments. OnToolOutput should only
 //    send UI notifications, not append to session messages.
 //
 // 2. INCOMPLETE TOOL CALLS ON CANCEL: When user cancels mid-tool-call, messages may have
@@ -56,11 +56,11 @@ func NewAgent(config AgentConfig) *Agent {
 
 // StreamCallbacks receives streaming events
 type StreamCallbacks struct {
-	OnTextDelta      func(delta string, historyID uint64) error
-	OnReasoningDelta func(delta string, historyID uint64) error
-	OnToolUseStart   func(toolCallID, toolName string, historyID uint64) error
-	OnToolUseInput   func(toolCallID string, input json.RawMessage, historyID uint64) error
-	OnToolUseOutput  func(toolCallID string, contents []ContentPart, err error, historyID uint64) error
+	OnTextDelta         func(delta string, historyID uint64) error
+	OnReasoningDelta    func(delta string, historyID uint64) error
+	OnToolInputStart    func(toolCallID, toolName string, historyID uint64) error
+	OnToolInputComplete func(toolCallID string, input json.RawMessage, historyID uint64) error
+	OnToolOutput        func(toolCallID string, contents []ContentPart, err error, historyID uint64) error
 
 	// OnToolConfirm is called with tools that require user confirmation.
 	// Only tools for which ToolNeedsConfirm returned true are included.
@@ -224,8 +224,8 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 			}
 
 		case ToolInputStartEvent:
-			if callbacks.OnToolUseStart != nil {
-				if err := callbacks.OnToolUseStart(e.ID, e.ToolName, getOrAssignID(callbacks, idByIndex, e.Index)); err != nil {
+			if callbacks.OnToolInputStart != nil {
+				if err := callbacks.OnToolInputStart(e.ID, e.ToolName, getOrAssignID(callbacks, idByIndex, e.Index)); err != nil {
 					return nil, Usage{}, false, err
 				}
 			}
@@ -233,14 +233,14 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 
 		case ToolInputCompleteEvent:
 			id := getOrAssignID(callbacks, idByIndex, e.Index)
-			if callbacks.OnToolUseInput != nil {
-				if err := callbacks.OnToolUseInput(e.ID, e.Input, id); err != nil {
+			if callbacks.OnToolInputComplete != nil {
+				if err := callbacks.OnToolInputComplete(e.ID, e.Input, id); err != nil {
 					return nil, Usage{}, false, err
 				}
 			}
 			execCount++
 			tc := e.ToPart(id, toolNameByIndex[e.Index])
-			deferred = a.handleStreamedToolUse(ctx, tc, callbacks, deferred, resultCh)
+			deferred = a.handleStreamedToolInput(ctx, tc, callbacks, deferred, resultCh)
 
 		case StepCompleteEvent:
 			stepMessage = e.Message
@@ -267,14 +267,14 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 	}
 
 	// Re-order results by tool call ID to match the LLM's intended order.
-	// toolUses are extracted from stepMessage.Contents, which preserves the
+	// toolInputs are extracted from stepMessage.Contents, which preserves the
 	// SSE index order (0, 1, 2...) from the streaming response. Each result
 	// carries its tool call ID, so we place them at the correct position
 	// regardless of execution or collection order.
-	toolUses := extractToolUses(stepMessage.Contents)
-	finalResults := make([]ContentPart, len(toolUses))
-	idToTool := make(map[string]int, len(toolUses))
-	for i, tc := range toolUses {
+	toolInputs := extractToolInputs(stepMessage.Contents)
+	finalResults := make([]ContentPart, len(toolInputs))
+	idToTool := make(map[string]int, len(toolInputs))
+	for i, tc := range toolInputs {
 		idToTool[tc.ID] = i
 	}
 	for _, r := range results {
@@ -293,10 +293,10 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 	return stepMessages, stepUsage, truncated, nil
 }
 
-// handleStreamedToolUse processes a completed tool use during streaming.
+// handleStreamedToolInput processes a completed tool use during streaming.
 // If the tool requires confirmation (per ToolNeedsConfirm), it is deferred.
 // Otherwise it executes immediately in a goroutine.
-func (a *Agent) handleStreamedToolUse(ctx context.Context, tc *ToolInputPart, callbacks StreamCallbacks, deferred []*ToolInputPart, resultCh chan<- ContentPart) []*ToolInputPart {
+func (a *Agent) handleStreamedToolInput(ctx context.Context, tc *ToolInputPart, callbacks StreamCallbacks, deferred []*ToolInputPart, resultCh chan<- ContentPart) []*ToolInputPart {
 	if callbacks.ToolNeedsConfirm != nil && callbacks.ToolNeedsConfirm(tc.ToolName) {
 		deferred = append(deferred, tc)
 		return deferred
@@ -336,11 +336,11 @@ func (a *Agent) executeDeferredTools(ctx context.Context, deferred []*ToolInputP
 		pendingConfirm--
 
 		if resp.Error != "" {
-			resultCh <- newToolResult(callbacks, resp.ID, nil, fmt.Errorf("denied: %s", resp.Error), getHistoryID(callbacks))
+			resultCh <- newToolOutput(callbacks, resp.ID, nil, fmt.Errorf("denied: %s", resp.Error), getHistoryID(callbacks))
 			continue
 		}
 		if !resp.Allowed {
-			resultCh <- newToolResult(callbacks, resp.ID, nil, fmt.Errorf("Tool execution denied by user"), getHistoryID(callbacks))
+			resultCh <- newToolOutput(callbacks, resp.ID, nil, fmt.Errorf("Tool execution denied by user"), getHistoryID(callbacks))
 			continue
 		}
 
@@ -429,19 +429,19 @@ func (a *Agent) executeTool(ctx context.Context, tc *ToolInputPart, callbacks St
 	}
 
 	if tool == nil {
-		return newToolResult(callbacks, tc.ID, nil, fmt.Errorf("unknown tool: %s", tc.ToolName), historyID)
+		return newToolOutput(callbacks, tc.ID, nil, fmt.Errorf("unknown tool: %s", tc.ToolName), historyID)
 	}
 
 	content, err := tool.Execute(ctx, tc.Input)
-	return newToolResult(callbacks, tc.ID, content, err, historyID)
+	return newToolOutput(callbacks, tc.ID, content, err, historyID)
 }
 
-// newToolResult creates a ToolOutputPart and fires the OnToolUseOutput callback
+// newToolOutput creates a ToolOutputPart and fires the OnToolOutput callback
 // so the UI is notified immediately as each tool finishes.
 //
 // Note: content is processed (nil → empty, error → TextPart) BEFORE the
 // callback fires, so the callback always receives meaningful display text.
-func newToolResult(callbacks StreamCallbacks, id string, contents []ContentPart, err error, historyID uint64) *ToolOutputPart {
+func newToolOutput(callbacks StreamCallbacks, id string, contents []ContentPart, err error, historyID uint64) *ToolOutputPart {
 	if contents == nil {
 		contents = []ContentPart{}
 	}
@@ -449,14 +449,14 @@ func newToolResult(callbacks StreamCallbacks, id string, contents []ContentPart,
 	if isError && len(contents) == 0 {
 		contents = []ContentPart{&TextPart{Text: err.Error()}}
 	}
-	if callbacks.OnToolUseOutput != nil {
-		callbacks.OnToolUseOutput(id, contents, err, historyID) //nolint:errcheck
+	if callbacks.OnToolOutput != nil {
+		callbacks.OnToolOutput(id, contents, err, historyID) //nolint:errcheck
 	}
 	return &ToolOutputPart{ID: id, Output: contents, IsError: isError, ContentMeta: ContentMeta{HistoryID: historyID, Role: RoleTool}}
 }
 
-// extractToolUses extracts ToolInputParts from message content.
-func extractToolUses(contents []ContentPart) []ToolInputPart {
+// extractToolInputs extracts ToolInputParts from message content.
+func extractToolInputs(contents []ContentPart) []ToolInputPart {
 	var uses []ToolInputPart
 	for _, part := range contents {
 		if tc, ok := part.(*ToolInputPart); ok {

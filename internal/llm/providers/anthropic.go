@@ -452,8 +452,8 @@ func (s *anthropicStreamState) getMessage() llm.Message {
 	}
 }
 
-// toolUsePart returns a complete ToolInputPart if the block at the given index is a tool_use.
-func (s *anthropicStreamState) toolUsePart(index int) *llm.ToolInputPart {
+// toolInputPart returns a complete ToolInputPart if the block at the given index is a tool_use.
+func (s *anthropicStreamState) toolInputPart(index int) *llm.ToolInputPart {
 	block, ok := s.blocks[index]
 	if !ok || block.blockType != anthropicBlockTypeToolUse {
 		return nil
@@ -570,7 +570,7 @@ func (p *AnthropicProvider) handleContentDelta(index int, delta anthropicSSEDelt
 
 // handleContentBlockStop handles content_block_stop events
 func (p *AnthropicProvider) handleContentBlockStop(index int, yield func(llm.StreamEvent, error) bool, state *anthropicStreamState) bool {
-	tc := state.toolUsePart(index)
+	tc := state.toolInputPart(index)
 	state.finishBlock(index)
 	if tc != nil {
 		if !yield(llm.ToolInputCompleteEvent{

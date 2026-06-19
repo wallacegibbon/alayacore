@@ -148,20 +148,20 @@ func (n *NopOutput) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// ToolUseData is the JSON payload for TagAssistantF (AF).
+// ToolInputData is the JSON payload for TagAssistantF (AF).
 // A frame with a non-empty Name and empty Input is a preliminary
 // "start" frame that announces the tool name. All other frames
 // carry the actual tool arguments.
-type ToolUseData struct {
+type ToolInputData struct {
 	ID    string          `json:"id"`
 	Name  string          `json:"name,omitempty"`
 	Input json.RawMessage `json:"input,omitempty"`
 }
 
-// ToolResultData is the JSON payload for TagUserF (UF).
+// ToolOutputData is the JSON payload for TagUserF (UF).
 // Output is a JSON array of content blocks (text, image, etc.).
 // IsError indicates whether the tool completed with an error.
-type ToolResultData struct {
+type ToolOutputData struct {
 	ID      string          `json:"id"`
 	Output  json.RawMessage `json:"output"`
 	IsError bool            `json:"is_error,omitempty"`

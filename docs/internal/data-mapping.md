@@ -253,7 +253,7 @@ Chunk 6: {"choices":[{"delta":{"tool_calls":[
 ReasoningDeltaEvent{Delta: "Read file"}
 ToolInputStartEvent{ID: "call_abc", ToolName: "read_file"}
 ReasoningDeltaEvent{Delta: " to check"}
-// (no more ReasoningDelta or ToolUseStart — just args accumulating)
+// (no more ReasoningDelta or ToolInputStart — just args accumulating)
 
 ToolInputPart{
     ID: "call_abc",

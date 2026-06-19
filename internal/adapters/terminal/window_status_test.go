@@ -8,11 +8,11 @@ import (
 	"github.com/alayacore/alayacore/internal/theme"
 )
 
-func TestHandleToolUseEvent(t *testing.T) {
+func TestHandleToolInputEvent(t *testing.T) {
 	wb := NewWindowBuffer(80, DefaultStyles())
 
 	// Send a "call" type event (creates the window with Name set = start frame)
-	wb.HandleToolUseEvent(stream.ToolUseData{
+	wb.HandleToolInputEvent(stream.ToolInputData{
 		ID:    "tool123",
 		Name:  "execute_command",
 		Input: json.RawMessage("execute_command: git status"),
@@ -29,7 +29,7 @@ func TestHandleToolUseEvent(t *testing.T) {
 	}
 
 	// Send a result
-	wb.HandleToolResult("tool123", "output text", false, 0)
+	wb.HandleToolOutput("tool123", "output text", false, 0)
 
 	// Check status was updated
 	if wb.WindowAt(0).Status != ToolStatusSuccess {
@@ -37,7 +37,7 @@ func TestHandleToolUseEvent(t *testing.T) {
 	}
 
 	// Send a result with error
-	wb.HandleToolResult("tool123", "error output", true, 0)
+	wb.HandleToolOutput("tool123", "error output", true, 0)
 
 	// Check status was updated
 	if wb.WindowAt(0).Status != ToolStatusError {
@@ -45,14 +45,14 @@ func TestHandleToolUseEvent(t *testing.T) {
 	}
 
 	// Try to update non-existent window (should not crash)
-	wb.HandleToolResult("nonexistent", "output", false, 0)
+	wb.HandleToolOutput("nonexistent", "output", false, 0)
 }
 
 func TestRenderWindowContentWithStatus(t *testing.T) {
 	wb := NewWindowBuffer(80, DefaultStyles())
 
 	// Create a tool window (Name set = start frame)
-	wb.HandleToolUseEvent(stream.ToolUseData{
+	wb.HandleToolInputEvent(stream.ToolInputData{
 		ID:    "tool123",
 		Name:  "execute_command",
 		Input: json.RawMessage("execute_command: git status"),
@@ -70,7 +70,7 @@ func TestRenderWindowContentWithStatus(t *testing.T) {
 	}
 
 	// Send result with success
-	wb.HandleToolResult("tool123", "output", false, 0)
+	wb.HandleToolOutput("tool123", "output", false, 0)
 
 	// Test rendering with success status
 	content = wb.RenderWindowContent(w, 76)
@@ -83,7 +83,7 @@ func TestRenderWindowContentWithStatus(t *testing.T) {
 	}
 
 	// Send result with error
-	wb.HandleToolResult("tool123", "error output", true, 0)
+	wb.HandleToolOutput("tool123", "error output", true, 0)
 
 	// Test rendering with error status
 	content = wb.RenderWindowContent(w, 76)
@@ -108,12 +108,12 @@ func contains(s, substr string) bool {
 
 func TestOutputWriterToolCallStartThenFull(t *testing.T) {
 	// End-to-end test: write TagAssistantF TLVs through the actual
-	// outputWriter pipeline (Write → processBuffer → writeColored → HandleToolUseEvent).
+	// outputWriter pipeline (Write → processBuffer → writeColored → HandleToolInputEvent).
 	out := NewTerminalOutput(NewStyles(theme.DefaultTheme()))
 	out.SetWindowWidth(80)
 
 	makeStartFD := func(id, name string) []byte {
-		fd, _ := json.Marshal(stream.ToolUseData{
+		fd, _ := json.Marshal(stream.ToolInputData{
 			ID:   id,
 			Name: name,
 		})
@@ -121,7 +121,7 @@ func TestOutputWriterToolCallStartThenFull(t *testing.T) {
 	}
 
 	makeInputFD := func(id, input string) []byte {
-		fd, _ := json.Marshal(stream.ToolUseData{
+		fd, _ := json.Marshal(stream.ToolInputData{
 			ID:    id,
 			Input: json.RawMessage(input),
 		})

@@ -29,7 +29,7 @@ Tool arguments arrive in chunks across multiple delta events:
 - First chunk: has `id` and `name`
 - Subsequent chunks: `id: ""` but correct `index`
 - **Must use `index` (not `id`) to associate chunks** — see `openAIStreamState.appendToolCallArgs()`
-- When sending back in history, arguments must be JSON-string (not raw JSON) — see `openaiConvertToolCalls()`
+- When sending back in history, arguments must be JSON-string (not raw JSON) — see `openaiConvertToolInputs()`
 
 ## Null arguments in tool call chunks
 

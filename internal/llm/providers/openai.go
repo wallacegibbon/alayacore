@@ -10,7 +10,7 @@ package providers
 //
 // 2. TOOL CALL ARGUMENTS IN REQUESTS: When sending tool calls back in conversation
 //    history, arguments must be marshaled to a JSON string (not raw JSON).
-//    See `openaiConvertToolCalls()`.
+//    See `openaiConvertToolInputs()`.
 //
 // 3. REASONING SUPPORT: OpenAI-compatible APIs (DeepSeek, Qwen, etc.) use
 //    `reasoning_content` field for thinking tokens. Handled in `handleEvent()`.
@@ -31,7 +31,7 @@ package providers
 //
 // 6. TEXT CONTENT WITH TOOL CALLS: Some providers (DeepSeek, Qwen) return
 //    text content alongside tool calls in the same assistant message.
-//    openaiConvertToolCalls preserves text content when present, so
+//    openaiConvertToolInputs preserves text content when present, so
 //    multi-turn tool call chains don't lose the assistant's commentary.
 //
 // 7. CONTENT BLOCK INDEXING: Delta event indices always use fixed positions:
@@ -308,7 +308,7 @@ func (p *OpenAIProvider) parseStream(reader io.Reader) iter.Seq2[llm.StreamEvent
 		}
 
 		// Emit tool call events from accumulators
-		for _, tc := range state.getToolCalls() {
+		for _, tc := range state.getToolCompleteEvents() {
 			if !yield(tc, nil) {
 				return
 			}
@@ -390,7 +390,7 @@ func (s *openAIStreamState) toolIndices() []int {
 	return indices
 }
 
-func (s *openAIStreamState) getToolCalls() []llm.ToolInputCompleteEvent {
+func (s *openAIStreamState) getToolCompleteEvents() []llm.ToolInputCompleteEvent {
 	indices := s.toolIndices()
 	result := make([]llm.ToolInputCompleteEvent, len(indices))
 	for pos, i := range indices {
@@ -537,14 +537,14 @@ func openaiConvertMessages(messages []llm.Message, reasoningLevel int) []openAIM
 	apiMessages := make([]openAIMessage, 0, len(messages))
 	for _, msg := range messages {
 		if msg.Role == llm.RoleTool {
-			apiMessages = append(apiMessages, openaiConvertToolResults(msg.Contents)...)
+			apiMessages = append(apiMessages, openaiConvertToolOutputs(msg.Contents)...)
 			continue
 		}
 
 		apiMsg := openAIMessage{Role: string(msg.Role)}
 
-		if msg.Role == llm.RoleAssistant && openaiHasToolCalls(msg.Contents) {
-			openaiConvertToolCalls(&apiMsg, msg.Contents)
+		if msg.Role == llm.RoleAssistant && openaiHasToolInputs(msg.Contents) {
+			openaiConvertToolInputs(&apiMsg, msg.Contents)
 		} else {
 			openaiConvertRegularContent(&apiMsg, msg.Contents)
 		}
@@ -564,12 +564,12 @@ func openaiConvertMessages(messages []llm.Message, reasoningLevel int) []openAIM
 	return apiMessages
 }
 
-// openaiConvertToolResults converts tool result content to multiple OpenAI messages.
+// openaiConvertToolOutputs converts tool result content to multiple OpenAI messages.
 //
 // Since OpenAI's API has no native is_error field (unlike Anthropic), tool
 // results are JSON-wrapped with a "status" field so the model can distinguish
 // success from failure structurally rather than guessing from text content.
-func openaiConvertToolResults(contents []llm.ContentPart) []openAIMessage {
+func openaiConvertToolOutputs(contents []llm.ContentPart) []openAIMessage {
 	results := make([]openAIMessage, 0, len(contents))
 	for _, part := range contents {
 		tr, ok := part.(*llm.ToolOutputPart)
@@ -604,8 +604,8 @@ func openaiConvertToolResults(contents []llm.ContentPart) []openAIMessage {
 	return results
 }
 
-// openaiHasToolCalls checks if content contains tool calls
-func openaiHasToolCalls(contents []llm.ContentPart) bool {
+// openaiHasToolInputs checks if content contains tool calls
+func openaiHasToolInputs(contents []llm.ContentPart) bool {
 	for _, part := range contents {
 		if _, ok := part.(*llm.ToolInputPart); ok {
 			return true
@@ -625,8 +625,8 @@ func openaiExtractReasoning(contents []llm.ContentPart) string {
 	return text
 }
 
-// openaiConvertToolCalls handles conversion of assistant messages with tool calls.
-func openaiConvertToolCalls(apiMsg *openAIMessage, contents []llm.ContentPart) {
+// openaiConvertToolInputs handles conversion of assistant messages with tool calls.
+func openaiConvertToolInputs(apiMsg *openAIMessage, contents []llm.ContentPart) {
 	apiMsg.ToolCalls = make([]openAIToolCall, 0)
 	var textParts []string
 	for _, part := range contents {

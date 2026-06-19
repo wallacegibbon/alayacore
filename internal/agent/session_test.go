@@ -694,13 +694,13 @@ func TestCleanIncompleteToolCalls(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// cleanIncompleteToolUses mutates in place — make a copy to avoid
+			// cleanIncompleteToolInputs mutates in place — make a copy to avoid
 			// cross-test contamination.
 			msgs := make([]llm.Message, len(tt.messages))
 			copy(msgs, tt.messages)
-			got := cleanIncompleteToolUses(msgs)
+			got := cleanIncompleteToolInputs(msgs)
 			if len(got) != tt.wantLen {
-				t.Errorf("cleanIncompleteToolUses() returned %d messages, want %d", len(got), tt.wantLen)
+				t.Errorf("cleanIncompleteToolInputs() returned %d messages, want %d", len(got), tt.wantLen)
 				for i, msg := range got {
 					t.Logf("  msg[%d]: role=%s, parts=%d", i, msg.Role, len(msg.Contents))
 				}

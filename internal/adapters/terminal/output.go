@@ -180,7 +180,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 		if !ok {
 			payload = value
 		}
-		var fd stream.ToolUseData
+		var fd stream.ToolInputData
 		if err := json.Unmarshal([]byte(payload), &fd); err != nil {
 			return
 		}
@@ -200,7 +200,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 			fd.Input = json.RawMessage(handler.FormatCall(fd.Input))
 		}
 
-		to.windowBuffer.HandleToolUseEvent(fd, parseHistoryID(id))
+		to.windowBuffer.HandleToolInputEvent(fd, parseHistoryID(id))
 
 	// Function result (JSON: id, content, is_error)
 	// May carry NUL-delimited historyID prefix
@@ -209,13 +209,13 @@ func (to *outputWriter) writeColored(tag string, value string) {
 		if !ok {
 			payload = value
 		}
-		var tr stream.ToolResultData
+		var tr stream.ToolOutputData
 		if err := json.Unmarshal([]byte(payload), &tr); err != nil {
 			return
 		}
 		// Extract display text from the content JSON array
-		displayText := extractToolResultDisplayText(tr.Output)
-		to.windowBuffer.HandleToolResult(tr.ID, displayText, tr.IsError, parseHistoryID(id))
+		displayText := extractToolOutputDisplayText(tr.Output)
+		to.windowBuffer.HandleToolOutput(tr.ID, displayText, tr.IsError, parseHistoryID(id))
 
 	// System tags
 	case stream.TagSystemMsg:
@@ -419,9 +419,9 @@ func (to *outputWriter) SetWindowWidth(width int) {
 	to.windowBuffer.SetWidth(width)
 }
 
-// extractToolResultDisplayText extracts display text from a tool result content JSON array.
+// extractToolOutputDisplayText extracts display text from a tool result content JSON array.
 // The content is a JSON array of {"type":"text","text":"..."} items.
-func extractToolResultDisplayText(content json.RawMessage) string {
+func extractToolOutputDisplayText(content json.RawMessage) string {
 	if len(content) == 0 {
 		return ""
 	}

@@ -131,22 +131,22 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 			s.writeTLVWithID(stream.TagAssistantR, historyID, delta)
 			return nil
 		},
-		OnToolUseStart: func(toolCallID, toolName string, historyID uint64) error {
-			data, _ := json.Marshal(stream.ToolUseData{ID: toolCallID, Name: toolName}) //nolint:errcheck
+		OnToolInputStart: func(toolCallID, toolName string, historyID uint64) error {
+			data, _ := json.Marshal(stream.ToolInputData{ID: toolCallID, Name: toolName}) //nolint:errcheck
 			s.writeTLVWithID(stream.TagAssistantF, historyID, string(data))
 			return nil
 		},
-		OnToolUseInput: func(toolCallID string, input json.RawMessage, historyID uint64) error {
-			data, _ := json.Marshal(stream.ToolUseData{ID: toolCallID, Input: input}) //nolint:errcheck
+		OnToolInputComplete: func(toolCallID string, input json.RawMessage, historyID uint64) error {
+			data, _ := json.Marshal(stream.ToolInputData{ID: toolCallID, Input: input}) //nolint:errcheck
 			s.writeTLVWithID(stream.TagAssistantF, historyID, string(data))
 			return nil
 		},
-		OnToolUseOutput: func(toolCallID string, contents []llm.ContentPart, err error, historyID uint64) error {
+		OnToolOutput: func(toolCallID string, contents []llm.ContentPart, err error, historyID uint64) error {
 			contentJSON, err2 := serializeContentParts(contents)
 			if err2 != nil {
 				contentJSON = []byte(`[{"type":"text","text":"(serialization error)"}]`)
 			}
-			data, _ := json.Marshal(stream.ToolResultData{ //nolint:errcheck
+			data, _ := json.Marshal(stream.ToolOutputData{ //nolint:errcheck
 				ID:      toolCallID,
 				Output:  contentJSON,
 				IsError: err != nil,
@@ -186,7 +186,7 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 			// Remove orphaned tool uses from the last message before capturing
 			// new entries. This keeps both Messages and Contents free of tool
 			// calls that were emitted but never executed (cancel/error).
-			messages = cleanIncompleteToolUses(messages)
+			messages = cleanIncompleteToolInputs(messages)
 			if len(messages) > 0 {
 				updatedMessages = messages
 			}
@@ -225,12 +225,12 @@ func usageToStepFinishEvent(usage llm.Usage) StepFinishEvent {
 	}
 }
 
-// cleanIncompleteToolUses removes orphaned tool uses from the last
+// cleanIncompleteToolInputs removes orphaned tool uses from the last
 // message. This happens when the user cancels mid-cycle: the model
 // emitted tool uses but the agent never executed them. Only the last
 // message can have orphaned uses — earlier steps are already complete.
 // If the last message becomes empty after stripping, it is removed.
-func cleanIncompleteToolUses(messages []llm.Message) []llm.Message {
+func cleanIncompleteToolInputs(messages []llm.Message) []llm.Message {
 	if len(messages) == 0 {
 		return messages
 	}

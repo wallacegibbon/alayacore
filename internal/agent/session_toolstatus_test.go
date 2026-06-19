@@ -18,14 +18,14 @@ func TestWriteToolOutput(t *testing.T) {
 		},
 	}
 
-	session.writeToolUseOutput("tool123", []llm.ContentPart{&llm.TextPart{Text: "output text"}}, false)
+	session.writeToolOutput("tool123", []llm.ContentPart{&llm.TextPart{Text: "output text"}}, false)
 
 	tag, value := parseTLVFromBytes(output.data)
 	if tag != stream.TagUserF {
 		t.Errorf("Expected tag %s, got %s", stream.TagUserF, tag)
 	}
 
-	var got stream.ToolResultData
+	var got stream.ToolOutputData
 	if err := json.Unmarshal([]byte(value), &got); err != nil {
 		t.Fatalf("Failed to parse UF JSON: %v", err)
 	}
@@ -36,7 +36,7 @@ func TestWriteToolOutput(t *testing.T) {
 	checkToolResultContent(t, got.Output, "output text")
 
 	output.data = nil
-	session.writeToolUseOutput("tool456", []llm.ContentPart{&llm.TextPart{Text: "error message"}}, true)
+	session.writeToolOutput("tool456", []llm.ContentPart{&llm.TextPart{Text: "error message"}}, true)
 
 	tag, value = parseTLVFromBytes(output.data)
 	if tag != stream.TagUserF {
@@ -52,7 +52,7 @@ func TestWriteToolOutput(t *testing.T) {
 	checkToolResultContent(t, got.Output, "error message")
 }
 
-func TestOnToolUseOutputCallback(t *testing.T) {
+func TestOnToolOutputCallback(t *testing.T) {
 	output := &mockOutput{}
 	session := &Session{
 		runState: runState{
@@ -63,7 +63,7 @@ func TestOnToolUseOutputCallback(t *testing.T) {
 		},
 	}
 
-	// Simulate the OnToolUseOutput callback from processPrompt
+	// Simulate the OnToolOutput callback from processPrompt
 	callback := func(id string, content []llm.ContentPart, err error) {
 		session.Messages = append(session.Messages, llm.Message{
 			Role: llm.RoleTool,
@@ -75,9 +75,9 @@ func TestOnToolUseOutputCallback(t *testing.T) {
 		})
 
 		if err != nil {
-			session.writeToolUseOutput(id, content, true)
+			session.writeToolOutput(id, content, true)
 		} else {
-			session.writeToolUseOutput(id, content, false)
+			session.writeToolOutput(id, content, false)
 		}
 	}
 
@@ -92,7 +92,7 @@ func TestOnToolUseOutputCallback(t *testing.T) {
 		t.Errorf("Expected tag %s, got %s", stream.TagUserF, tag)
 	}
 
-	var got stream.ToolResultData
+	var got stream.ToolOutputData
 	if err := json.Unmarshal([]byte(value), &got); err != nil {
 		t.Fatalf("Failed to parse UF JSON: %v", err)
 	}
@@ -124,14 +124,14 @@ func TestWriteToolCallWithPending(t *testing.T) {
 		},
 	}
 
-	session.writeToolUseInput(json.RawMessage(`{"command":"ls"}`), "tool123")
+	session.writeToolInput(json.RawMessage(`{"command":"ls"}`), "tool123")
 
 	tag1, value1 := parseTLVFromBytes(output.data)
 	if tag1 != stream.TagAssistantF {
 		t.Errorf("Expected tag %s, got %s", stream.TagAssistantF, tag1)
 	}
 
-	var fd1 stream.ToolUseData
+	var fd1 stream.ToolInputData
 	if err := json.Unmarshal([]byte(value1), &fd1); err != nil {
 		t.Fatalf("Failed to parse AF JSON: %v", err)
 	}

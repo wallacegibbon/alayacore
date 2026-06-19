@@ -440,7 +440,7 @@ func (s *Session) resendPrompt(ctx context.Context, tc *taskCtx) {
 	result, newEntries, _, err := s.processPrompt(ctx, tc.Messages)
 	tc.Entries = append(tc.Entries, newEntries...)
 
-	result = cleanIncompleteToolUses(result)
+	result = cleanIncompleteToolInputs(result)
 	if err != nil {
 		s.writeError(err.Error())
 		s.pausedOnError.Store(true)

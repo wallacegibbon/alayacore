@@ -98,19 +98,19 @@ func (s *Session) writeTLVJSON(tag string, v any) {
 	s.writeTLV(tag, string(data))
 }
 
-func (s *Session) writeToolUseInput(input json.RawMessage, id string) {
-	s.writeTLVJSON(stream.TagAssistantF, stream.ToolUseData{
+func (s *Session) writeToolInput(input json.RawMessage, id string) {
+	s.writeTLVJSON(stream.TagAssistantF, stream.ToolInputData{
 		ID:    id,
 		Input: input,
 	})
 }
 
-func (s *Session) writeToolUseOutput(id string, contents []llm.ContentPart, isError bool) {
+func (s *Session) writeToolOutput(id string, contents []llm.ContentPart, isError bool) {
 	contentJSON, err := serializeContentParts(contents)
 	if err != nil {
 		contentJSON = []byte(`[{"type":"text","text":"(serialization error)"}]`)
 	}
-	s.writeTLVJSON(stream.TagUserF, stream.ToolResultData{
+	s.writeTLVJSON(stream.TagUserF, stream.ToolOutputData{
 		ID:      id,
 		Output:  contentJSON,
 		IsError: isError,
