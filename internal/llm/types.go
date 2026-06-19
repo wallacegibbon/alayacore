@@ -34,6 +34,10 @@ func (m *ContentMeta) GetHistoryID() uint64   { return m.HistoryID }
 func (m *ContentMeta) SetHistoryID(id uint64) { m.HistoryID = id }
 func (m *ContentMeta) GetRole() MessageRole   { return m.Role }
 func (m *ContentMeta) SetRole(r MessageRole)  { m.Role = r }
+func (m *ContentMeta) UpdateContentPartMeta(id uint64, r MessageRole) {
+	m.HistoryID = id
+	m.Role = r
+}
 
 // ContentPart represents a part of message content
 type ContentPart interface {
@@ -41,7 +45,7 @@ type ContentPart interface {
 	SetHistoryID(uint64)
 	GetRole() MessageRole
 	SetRole(MessageRole)
-	UpdateContentPartMeta(historyID uint64, role MessageRole) ContentPart
+	UpdateContentPartMeta(historyID uint64, role MessageRole)
 }
 
 const (
@@ -61,22 +65,10 @@ type TextPart struct {
 	Text string
 }
 
-func (p *TextPart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart {
-	p.HistoryID = id
-	p.Role = r
-	return p
-}
-
 // ImagePart represents an image content (DataURI: data:image/...;base64,...)
 type ImagePart struct {
 	ContentMeta
 	DataURI string
-}
-
-func (p *ImagePart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart {
-	p.HistoryID = id
-	p.Role = r
-	return p
 }
 
 // VideoPart represents a video content (DataURI: data:video/...;base64,...)
@@ -85,22 +77,10 @@ type VideoPart struct {
 	DataURI string
 }
 
-func (p *VideoPart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart {
-	p.HistoryID = id
-	p.Role = r
-	return p
-}
-
 // AudioPart represents an audio content (DataURI: data:audio/...;base64,...)
 type AudioPart struct {
 	ContentMeta
 	DataURI string
-}
-
-func (p *AudioPart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart {
-	p.HistoryID = id
-	p.Role = r
-	return p
 }
 
 // DocumentPart represents a document content (DataURI: data:application/...;base64,...)
@@ -109,22 +89,10 @@ type DocumentPart struct {
 	DataURI string
 }
 
-func (p *DocumentPart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart {
-	p.HistoryID = id
-	p.Role = r
-	return p
-}
-
 // ReasoningPart represents reasoning/thinking content.
 type ReasoningPart struct {
 	ContentMeta
 	Text string
-}
-
-func (p *ReasoningPart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart {
-	p.HistoryID = id
-	p.Role = r
-	return p
 }
 
 // ToolUsePart represents a tool call stored in conversation history.
@@ -135,24 +103,12 @@ type ToolUsePart struct {
 	Input    json.RawMessage
 }
 
-func (p *ToolUsePart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart {
-	p.HistoryID = id
-	p.Role = r
-	return p
-}
-
 // ToolResultPart represents a tool execution result.
 type ToolResultPart struct {
 	ContentMeta
 	ID      string
 	Content []ContentPart
 	IsError bool
-}
-
-func (p *ToolResultPart) UpdateContentPartMeta(id uint64, r MessageRole) ContentPart {
-	p.HistoryID = id
-	p.Role = r
-	return p
 }
 
 // Message represents a single message in the conversation

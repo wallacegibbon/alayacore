@@ -134,7 +134,8 @@ func contentsFromMessagesForTest(msgs []llm.Message) []llm.ContentPart {
 	for _, msg := range msgs {
 		for _, part := range msg.Content {
 			id++
-			items = append(items, part.UpdateContentPartMeta(id, msg.Role))
+			part.UpdateContentPartMeta(id, msg.Role)
+			items = append(items, part)
 		}
 	}
 	return items

@@ -203,10 +203,12 @@ Rules:
 	})
 	summaryID := s.histIncAndGet()
 	firstPart := lastAssistantMsg.Content[0]
-	tc.Entries = append(tc.Entries, firstPart.UpdateContentPartMeta(summaryID, llm.RoleAssistant))
+	firstPart.UpdateContentPartMeta(summaryID, llm.RoleAssistant)
+	tc.Entries = append(tc.Entries, firstPart)
 	for i := 1; i < len(lastAssistantMsg.Content); i++ {
 		part := lastAssistantMsg.Content[i]
-		tc.Entries = append(tc.Entries, part.UpdateContentPartMeta(s.histIncAndGet(), llm.RoleAssistant))
+		part.UpdateContentPartMeta(s.histIncAndGet(), llm.RoleAssistant)
+		tc.Entries = append(tc.Entries, part)
 	}
 
 	if outputTokens > 0 {
