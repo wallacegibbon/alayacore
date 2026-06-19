@@ -60,7 +60,7 @@ type StreamCallbacks struct {
 	OnReasoningDelta func(delta string, historyID uint64) error
 	OnToolUseStart   func(toolCallID, toolName string, historyID uint64) error
 	OnToolUseInput   func(toolCallID string, input json.RawMessage, historyID uint64) error
-	OnToolUseOutput  func(toolCallID string, content []ContentPart, err error, historyID uint64) error
+	OnToolUseOutput  func(toolCallID string, contents []ContentPart, err error, historyID uint64) error
 
 	// OnToolConfirm is called with tools that require user confirmation.
 	// Only tools for which ToolNeedsConfirm returned true are included.
@@ -199,6 +199,9 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 
 	// Track history IDs for content blocks (keyed by index for AT/AR/AF).
 	idByIndex := make(map[int]uint64)
+	// Track tool names by index so ToolInputCompleteEvent can look up the name
+	// it received earlier from ToolInputStartEvent.
+	toolNameByIndex := make(map[int]string)
 
 	for event, err := range events {
 		if err != nil {
@@ -226,6 +229,7 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 					return nil, Usage{}, false, err
 				}
 			}
+			toolNameByIndex[e.Index] = e.ToolName
 
 		case ToolInputCompleteEvent:
 			id := getOrAssignID(callbacks, idByIndex, e.Index)
@@ -235,7 +239,7 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 				}
 			}
 			execCount++
-			tc := e.ToPart(id)
+			tc := e.ToPart(id, toolNameByIndex[e.Index])
 			deferred = a.handleStreamedToolUse(ctx, tc, callbacks, deferred, resultCh)
 
 		case StepCompleteEvent:
@@ -382,9 +386,9 @@ func getHistoryID(callbacks StreamCallbacks) uint64 {
 // stripEmptyPlaceholders removes empty ReasoningPart and TextPart placeholders
 // from the content array. OpenAI emits these slots at fixed indices (0 and 1)
 // to keep delta indices aligned with content positions, even when absent.
-func stripEmptyPlaceholders(content []ContentPart) []ContentPart {
-	filtered := make([]ContentPart, 0, len(content))
-	for _, part := range content {
+func stripEmptyPlaceholders(contents []ContentPart) []ContentPart {
+	filtered := make([]ContentPart, 0, len(contents))
+	for _, part := range contents {
 		switch p := part.(type) {
 		case *ReasoningPart:
 			if p.Text != "" {
@@ -403,10 +407,10 @@ func stripEmptyPlaceholders(content []ContentPart) []ContentPart {
 
 // ToPart converts a ToolInputCompleteEvent to a ToolInputPart,
 // carrying over the history ID assigned during streaming.
-func (e ToolInputCompleteEvent) ToPart(historyID uint64) *ToolInputPart {
+func (e ToolInputCompleteEvent) ToPart(historyID uint64, toolName string) *ToolInputPart {
 	return &ToolInputPart{
 		ID:       e.ID,
-		ToolName: e.ToolName,
+		ToolName: toolName,
 		Input:    e.Input,
 		ContentMeta: ContentMeta{
 			HistoryID: historyID,
@@ -437,24 +441,24 @@ func (a *Agent) executeTool(ctx context.Context, tc *ToolInputPart, callbacks St
 //
 // Note: content is processed (nil → empty, error → TextPart) BEFORE the
 // callback fires, so the callback always receives meaningful display text.
-func newToolResult(callbacks StreamCallbacks, id string, content []ContentPart, err error, historyID uint64) *ToolOutputPart {
-	if content == nil {
-		content = []ContentPart{}
+func newToolResult(callbacks StreamCallbacks, id string, contents []ContentPart, err error, historyID uint64) *ToolOutputPart {
+	if contents == nil {
+		contents = []ContentPart{}
 	}
 	isError := err != nil
-	if isError && len(content) == 0 {
-		content = []ContentPart{&TextPart{Text: err.Error()}}
+	if isError && len(contents) == 0 {
+		contents = []ContentPart{&TextPart{Text: err.Error()}}
 	}
 	if callbacks.OnToolUseOutput != nil {
-		callbacks.OnToolUseOutput(id, content, err, historyID) //nolint:errcheck
+		callbacks.OnToolUseOutput(id, contents, err, historyID) //nolint:errcheck
 	}
-	return &ToolOutputPart{ID: id, Output: content, IsError: isError, ContentMeta: ContentMeta{HistoryID: historyID, Role: RoleTool}}
+	return &ToolOutputPart{ID: id, Output: contents, IsError: isError, ContentMeta: ContentMeta{HistoryID: historyID, Role: RoleTool}}
 }
 
 // extractToolUses extracts ToolInputParts from message content.
-func extractToolUses(content []ContentPart) []ToolInputPart {
+func extractToolUses(contents []ContentPart) []ToolInputPart {
 	var uses []ToolInputPart
-	for _, part := range content {
+	for _, part := range contents {
 		if tc, ok := part.(*ToolInputPart); ok {
 			uses = append(uses, *tc)
 		}

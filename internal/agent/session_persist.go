@@ -45,7 +45,7 @@ func LoadSession(path string) (*SessionData, error) {
 	return sd, nil
 }
 
-func (s *Session) saveContentToFile(path string, content []llm.ContentPart) error {
+func (s *Session) saveContentToFile(path string, contents []llm.ContentPart) error {
 	data := SessionData{
 		SessionMeta: SessionMeta{
 			MessageVersion: MessageVersion,
@@ -55,7 +55,7 @@ func (s *Session) saveContentToFile(path string, content []llm.ContentPart) erro
 			ActiveModel:    s.activeModelName(),
 			ContextTokens:  s.ContextTokens,
 		},
-		Contents: content,
+		Contents: contents,
 	}
 
 	raw, err := formatSessionMarkdown(&data)
@@ -175,7 +175,7 @@ func parseMessagesTLV(body string) ([]llm.ContentPart, error) {
 	if est < 8 {
 		est = 8
 	}
-	content := make([]llm.ContentPart, 0, est)
+	contents := make([]llm.ContentPart, 0, est)
 
 	reader := newTLVReader(body)
 	var seqID uint64
@@ -183,15 +183,15 @@ func parseMessagesTLV(body string) ([]llm.ContentPart, error) {
 	for {
 		tag, raw, err := reader.read()
 		if err == io.EOF {
-			return content, nil
+			return contents, nil
 		}
 		if err != nil {
-			return content, fmt.Errorf("read error at chunk %d: %w", len(content), err)
+			return contents, fmt.Errorf("read error at chunk %d: %w", len(contents), err)
 		}
 
 		msgPart, err := contentPartFromTLV(tag, raw)
 		if err != nil {
-			return content, fmt.Errorf("parse error at chunk %d (tag %q): %w", len(content), tag, err)
+			return contents, fmt.Errorf("parse error at chunk %d (tag %q): %w", len(contents), tag, err)
 		}
 		if msgPart == nil {
 			continue
@@ -199,7 +199,7 @@ func parseMessagesTLV(body string) ([]llm.ContentPart, error) {
 
 		seqID++
 		msgPart.SetHistoryID(seqID)
-		content = append(content, msgPart)
+		contents = append(contents, msgPart)
 	}
 }
 

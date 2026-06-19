@@ -164,10 +164,9 @@ func (ToolInputStartEvent) isStreamEvent() {}
 
 // ToolInputCompleteEvent signals that a tool use's arguments have finished streaming
 type ToolInputCompleteEvent struct {
-	ID       string
-	ToolName string
-	Input    json.RawMessage
-	Index    int
+	ID    string
+	Input json.RawMessage
+	Index int
 }
 
 func (ToolInputCompleteEvent) isStreamEvent() {}

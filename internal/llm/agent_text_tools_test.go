@@ -14,8 +14,10 @@ func TestAgentPreservesTextWithToolCalls(t *testing.T) {
 	provider := &mockProviderWithTextAndTools{
 		responses: []mockResponse{
 			{
-				text:      "Let me check that for you.",
-				toolCalls: []ToolInputCompleteEvent{{ID: "call_123", ToolName: "get_weather", Input: []byte(`{"location":"SF"}`)}},
+				text: "Let me check that for you.",
+				toolCalls: []ToolInputPart{
+					{ID: "call_123", ToolName: "get_weather", Input: []byte(`{"location":"SF"}`)},
+				},
 			},
 			{
 				text: "The weather in SF is sunny.",
@@ -107,7 +109,7 @@ type mockProviderWithTextAndTools struct {
 
 type mockResponse struct {
 	text      string
-	toolCalls []ToolInputCompleteEvent
+	toolCalls []ToolInputPart
 }
 
 func (m *mockProviderWithTextAndTools) StreamMessages(_ context.Context, _ []Message, _ []ToolDefinition, _, _ string) (iter.Seq2[StreamEvent, error], error) {
@@ -122,9 +124,14 @@ func (m *mockProviderWithTextAndTools) StreamMessages(_ context.Context, _ []Mes
 			}
 		}
 
-		// Send tool call events
+		// Send tool call events — emit start event first, then complete.
+		// Real providers send ToolInputStartEvent with the name, then
+		// ToolInputCompleteEvent without the name (looked up by index).
 		for _, tc := range resp.toolCalls {
-			if !yield(tc, nil) {
+			if !yield(ToolInputStartEvent{ID: tc.ID, ToolName: tc.ToolName, Index: 0}, nil) {
+				return
+			}
+			if !yield(ToolInputCompleteEvent{ID: tc.ID, Input: tc.Input, Index: 0}, nil) {
 				return
 			}
 		}

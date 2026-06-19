@@ -380,20 +380,25 @@ func (s *openAIStreamState) setToolCallName(index int, id, name string) {
 	acc.name = name
 }
 
-func (s *openAIStreamState) getToolCalls() []llm.ToolInputCompleteEvent {
+// toolIndices returns sorted accumulator indices.
+func (s *openAIStreamState) toolIndices() []int {
 	indices := make([]int, 0, len(s.toolAccumulators))
 	for i := range s.toolAccumulators {
 		indices = append(indices, i)
 	}
 	sort.Ints(indices)
+	return indices
+}
+
+func (s *openAIStreamState) getToolCalls() []llm.ToolInputCompleteEvent {
+	indices := s.toolIndices()
 	result := make([]llm.ToolInputCompleteEvent, len(indices))
 	for pos, i := range indices {
 		acc := s.toolAccumulators[i]
 		result[pos] = llm.ToolInputCompleteEvent{
-			ID:       acc.id,
-			ToolName: acc.name,
-			Input:    json.RawMessage(acc.args.String()),
-			Index:    2 + i, // content block: 0=reasoning, 1=text, 2+=tools
+			ID:    acc.id,
+			Input: json.RawMessage(acc.args.String()),
+			Index: 2 + i, // content block: 0=reasoning, 1=text, 2+=tools
 		}
 	}
 	return result
@@ -408,26 +413,27 @@ func (s *openAIStreamState) getToolCalls() []llm.ToolInputCompleteEvent {
 // their fixed indices (0 and 1) match the delta event indices used during streaming.
 // The agent strips empty placeholders after assigning history IDs via StepCompleteEvent.
 func (s *openAIStreamState) getMessage() llm.Message {
-	tcs := s.getToolCalls()
-	content := make([]llm.ContentPart, 0, 2+len(tcs))
+	indices := s.toolIndices()
+	contents := make([]llm.ContentPart, 0, 2+len(indices))
 	// Always add reasoning slot (index 0), may be empty placeholder.
-	content = append(content, &llm.ReasoningPart{
+	contents = append(contents, &llm.ReasoningPart{
 		Text: s.reasoningBuilder.String(),
 	})
 	// Always add text slot (index 1), may be empty placeholder.
-	content = append(content, &llm.TextPart{
+	contents = append(contents, &llm.TextPart{
 		Text: s.textBuilder.String(),
 	})
-	for _, tc := range tcs {
-		content = append(content, &llm.ToolInputPart{
-			ID:       tc.ID,
-			ToolName: tc.ToolName,
-			Input:    tc.Input,
+	for _, i := range indices {
+		acc := s.toolAccumulators[i]
+		contents = append(contents, &llm.ToolInputPart{
+			ID:       acc.id,
+			ToolName: acc.name,
+			Input:    json.RawMessage(acc.args.String()),
 		})
 	}
 	return llm.Message{
 		Role:     llm.RoleAssistant,
-		Contents: content,
+		Contents: contents,
 	}
 }
 
@@ -563,9 +569,9 @@ func openaiConvertMessages(messages []llm.Message, reasoningLevel int) []openAIM
 // Since OpenAI's API has no native is_error field (unlike Anthropic), tool
 // results are JSON-wrapped with a "status" field so the model can distinguish
 // success from failure structurally rather than guessing from text content.
-func openaiConvertToolResults(content []llm.ContentPart) []openAIMessage {
-	results := make([]openAIMessage, 0, len(content))
-	for _, part := range content {
+func openaiConvertToolResults(contents []llm.ContentPart) []openAIMessage {
+	results := make([]openAIMessage, 0, len(contents))
+	for _, part := range contents {
 		tr, ok := part.(*llm.ToolOutputPart)
 		if !ok {
 			continue
@@ -599,8 +605,8 @@ func openaiConvertToolResults(content []llm.ContentPart) []openAIMessage {
 }
 
 // openaiHasToolCalls checks if content contains tool calls
-func openaiHasToolCalls(content []llm.ContentPart) bool {
-	for _, part := range content {
+func openaiHasToolCalls(contents []llm.ContentPart) bool {
+	for _, part := range contents {
 		if _, ok := part.(*llm.ToolInputPart); ok {
 			return true
 		}
@@ -609,9 +615,9 @@ func openaiHasToolCalls(content []llm.ContentPart) bool {
 }
 
 // openaiExtractReasoning returns the concatenated text of all ReasoningParts.
-func openaiExtractReasoning(content []llm.ContentPart) string {
+func openaiExtractReasoning(contents []llm.ContentPart) string {
 	var text string
-	for _, part := range content {
+	for _, part := range contents {
 		if r, ok := part.(*llm.ReasoningPart); ok {
 			text += r.Text
 		}
@@ -620,10 +626,10 @@ func openaiExtractReasoning(content []llm.ContentPart) string {
 }
 
 // openaiConvertToolCalls handles conversion of assistant messages with tool calls.
-func openaiConvertToolCalls(apiMsg *openAIMessage, content []llm.ContentPart) {
+func openaiConvertToolCalls(apiMsg *openAIMessage, contents []llm.ContentPart) {
 	apiMsg.ToolCalls = make([]openAIToolCall, 0)
 	var textParts []string
-	for _, part := range content {
+	for _, part := range contents {
 		switch v := part.(type) {
 		case *llm.ToolInputPart:
 			argsStr, err := json.Marshal(string(v.Input))
@@ -648,9 +654,9 @@ func openaiConvertToolCalls(apiMsg *openAIMessage, content []llm.ContentPart) {
 }
 
 // openaiConvertRegularContent handles conversion of regular text content.
-func openaiConvertRegularContent(apiMsg *openAIMessage, content []llm.ContentPart) {
+func openaiConvertRegularContent(apiMsg *openAIMessage, contents []llm.ContentPart) {
 	var contentParts []map[string]any
-	for _, part := range content {
+	for _, part := range contents {
 		switch v := part.(type) {
 		case *llm.TextPart:
 			contentParts = append(contentParts, map[string]any{

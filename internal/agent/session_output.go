@@ -105,8 +105,8 @@ func (s *Session) writeToolUseInput(input json.RawMessage, id string) {
 	})
 }
 
-func (s *Session) writeToolUseOutput(id string, content []llm.ContentPart, isError bool) {
-	contentJSON, err := serializeContentParts(content)
+func (s *Session) writeToolUseOutput(id string, contents []llm.ContentPart, isError bool) {
+	contentJSON, err := serializeContentParts(contents)
 	if err != nil {
 		contentJSON = []byte(`[{"type":"text","text":"(serialization error)"}]`)
 	}

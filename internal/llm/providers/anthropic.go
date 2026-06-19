@@ -442,13 +442,13 @@ func (s *anthropicStreamState) getMessage() llm.Message {
 		indices = append(indices, i)
 	}
 	sort.Ints(indices)
-	content := make([]llm.ContentPart, len(indices))
+	contents := make([]llm.ContentPart, len(indices))
 	for pos, i := range indices {
-		content[pos] = s.contentParts[i]
+		contents[pos] = s.contentParts[i]
 	}
 	return llm.Message{
 		Role:     llm.RoleAssistant,
-		Contents: content,
+		Contents: contents,
 	}
 }
 
@@ -574,10 +574,9 @@ func (p *AnthropicProvider) handleContentBlockStop(index int, yield func(llm.Str
 	state.finishBlock(index)
 	if tc != nil {
 		if !yield(llm.ToolInputCompleteEvent{
-			ID:       tc.ID,
-			ToolName: tc.ToolName,
-			Input:    tc.Input,
-			Index:    index,
+			ID:    tc.ID,
+			Input: tc.Input,
+			Index: index,
 		}, nil) {
 			return false
 		}

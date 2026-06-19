@@ -209,9 +209,13 @@ func TestToolCallStreaming(t *testing.T) {
 	}
 
 	var toolCalls []llm.ToolInputPart
+	toolNames := make(map[string]string)
 	for event := range events {
+		if e, ok := event.(llm.ToolInputStartEvent); ok {
+			toolNames[e.ID] = e.ToolName
+		}
 		if tc, ok := event.(llm.ToolInputCompleteEvent); ok {
-			toolCalls = append(toolCalls, llm.ToolInputPart{ID: tc.ID, ToolName: tc.ToolName, Input: tc.Input})
+			toolCalls = append(toolCalls, llm.ToolInputPart{ID: tc.ID, ToolName: toolNames[tc.ID], Input: tc.Input})
 		}
 	}
 
@@ -278,9 +282,13 @@ func TestToolCallStreamingChunked(t *testing.T) {
 	}
 
 	var toolCalls []llm.ToolInputPart
+	toolNames := make(map[string]string)
 	for event := range events {
+		if e, ok := event.(llm.ToolInputStartEvent); ok {
+			toolNames[e.ID] = e.ToolName
+		}
 		if tc, ok := event.(llm.ToolInputCompleteEvent); ok {
-			toolCalls = append(toolCalls, llm.ToolInputPart{ID: tc.ID, ToolName: tc.ToolName, Input: tc.Input})
+			toolCalls = append(toolCalls, llm.ToolInputPart{ID: tc.ID, ToolName: toolNames[tc.ID], Input: tc.Input})
 		}
 	}
 
@@ -343,9 +351,13 @@ func TestToolCallStreamingWithNullArguments(t *testing.T) {
 	}
 
 	var toolCalls []llm.ToolInputPart
+	toolNames := make(map[string]string)
 	for event := range events {
+		if e, ok := event.(llm.ToolInputStartEvent); ok {
+			toolNames[e.ID] = e.ToolName
+		}
 		if tc, ok := event.(llm.ToolInputCompleteEvent); ok {
-			toolCalls = append(toolCalls, llm.ToolInputPart{ID: tc.ID, ToolName: tc.ToolName, Input: tc.Input})
+			toolCalls = append(toolCalls, llm.ToolInputPart{ID: tc.ID, ToolName: toolNames[tc.ID], Input: tc.Input})
 		}
 	}
 
@@ -407,9 +419,13 @@ func TestAnthropicToolCallStreaming(t *testing.T) {
 
 	var toolCalls []llm.ToolInputPart
 	var stepComplete *llm.StepCompleteEvent
+	toolNames := make(map[string]string)
 	for event := range events {
+		if e, ok := event.(llm.ToolInputStartEvent); ok {
+			toolNames[e.ID] = e.ToolName
+		}
 		if e, ok := event.(llm.ToolInputCompleteEvent); ok {
-			toolCalls = append(toolCalls, llm.ToolInputPart{ID: e.ID, ToolName: e.ToolName, Input: e.Input})
+			toolCalls = append(toolCalls, llm.ToolInputPart{ID: e.ID, ToolName: toolNames[e.ID], Input: e.Input})
 		} else if e, ok := event.(llm.StepCompleteEvent); ok {
 			stepComplete = &e
 		}
@@ -484,12 +500,14 @@ func TestToolInputStartEventOpenAI(t *testing.T) {
 	}
 
 	var order []string
+	toolNames := make(map[string]string)
 	for event := range events {
 		switch e := event.(type) {
 		case llm.ToolInputStartEvent:
+			toolNames[e.ID] = e.ToolName
 			order = append(order, fmt.Sprintf("start(%s)", e.ToolName))
 		case llm.ToolInputCompleteEvent:
-			order = append(order, fmt.Sprintf("complete(%s)", e.ToolName))
+			order = append(order, fmt.Sprintf("complete(%s)", toolNames[e.ID]))
 		}
 	}
 
@@ -541,12 +559,14 @@ func TestToolInputStartEventAnthropic(t *testing.T) {
 	}
 
 	var order []string
+	toolNames := make(map[string]string)
 	for event := range events {
 		switch e := event.(type) {
 		case llm.ToolInputStartEvent:
+			toolNames[e.ID] = e.ToolName
 			order = append(order, fmt.Sprintf("start(%s)", e.ToolName))
 		case llm.ToolInputCompleteEvent:
-			order = append(order, fmt.Sprintf("complete(%s)", e.ToolName))
+			order = append(order, fmt.Sprintf("complete(%s)", toolNames[e.ID]))
 		}
 	}
 
@@ -1500,9 +1520,13 @@ func TestAnthropicMultiToolCall(t *testing.T) {
 	}
 
 	var toolCalls []llm.ToolInputPart
+	toolNames := make(map[string]string)
 	for event := range events {
+		if e, ok := event.(llm.ToolInputStartEvent); ok {
+			toolNames[e.ID] = e.ToolName
+		}
 		if e, ok := event.(llm.ToolInputCompleteEvent); ok {
-			toolCalls = append(toolCalls, llm.ToolInputPart{ID: e.ID, ToolName: e.ToolName, Input: e.Input})
+			toolCalls = append(toolCalls, llm.ToolInputPart{ID: e.ID, ToolName: toolNames[e.ID], Input: e.Input})
 		}
 	}
 

@@ -40,12 +40,12 @@ func (s *Session) handleUserPrompt(ctx context.Context, tc *taskCtx, prompt stri
 	// Build content parts with history IDs and echo to output.
 	// ContentParts are shared between messages and entries so both
 	// representations refer to the same objects.
-	content := make([]llm.ContentPart, 0, 1+len(attachments))
+	contents := make([]llm.ContentPart, 0, 1+len(attachments))
 	for _, att := range attachments {
 		id := s.histIncAndGet()
 		att.SetHistoryID(id)
 		att.SetRole(llm.RoleUser)
-		content = append(content, att)
+		contents = append(contents, att)
 		tc.Entries = append(tc.Entries, att)
 		// Echo back using the correct TLV tag for the attachment type
 		if tag, val, err := contentPartToTLV(att); err == nil && tag != "" {
@@ -54,16 +54,16 @@ func (s *Session) handleUserPrompt(ctx context.Context, tc *taskCtx, prompt stri
 	}
 	id := s.histIncAndGet()
 	part := &llm.TextPart{Text: prompt, ContentMeta: llm.ContentMeta{HistoryID: id, Role: llm.RoleUser}}
-	content = append(content, part)
+	contents = append(contents, part)
 	tc.Entries = append(tc.Entries, part)
 	s.writeTLVStr(stream.TagUserT, stream.WrapDelta(strconv.FormatUint(id, 10), prompt))
 
 	// Append to messages for the LLM request.  If the preceding message
 	// is also from the user, merge to avoid duplicate user messages.
 	if len(tc.Messages) > 0 && tc.Messages[len(tc.Messages)-1].Role == llm.RoleUser {
-		tc.Messages[len(tc.Messages)-1].Contents = append(tc.Messages[len(tc.Messages)-1].Contents, content...)
+		tc.Messages[len(tc.Messages)-1].Contents = append(tc.Messages[len(tc.Messages)-1].Contents, contents...)
 	} else {
-		tc.Messages = append(tc.Messages, llm.Message{Role: llm.RoleUser, Contents: content})
+		tc.Messages = append(tc.Messages, llm.Message{Role: llm.RoleUser, Contents: contents})
 	}
 
 	updatedMessages, newEntries, _, err := s.processPrompt(ctx, tc.Messages)
@@ -141,8 +141,8 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 			s.writeTLVWithID(stream.TagAssistantF, historyID, string(data))
 			return nil
 		},
-		OnToolUseOutput: func(toolCallID string, content []llm.ContentPart, err error, historyID uint64) error {
-			contentJSON, err2 := serializeContentParts(content)
+		OnToolUseOutput: func(toolCallID string, contents []llm.ContentPart, err error, historyID uint64) error {
+			contentJSON, err2 := serializeContentParts(contents)
 			if err2 != nil {
 				contentJSON = []byte(`[{"type":"text","text":"(serialization error)"}]`)
 			}

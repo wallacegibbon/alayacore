@@ -17,10 +17,13 @@ type mockProviderAlwaysToolCalls struct {
 func (m *mockProviderAlwaysToolCalls) StreamMessages(_ context.Context, _ []Message, _ []ToolDefinition, _, _ string) (iter.Seq2[StreamEvent, error], error) {
 	m.callCount++
 	return func(yield func(StreamEvent, error) bool) {
-		// Always emit a tool call, never a text-only response
+		// Always emit a tool call, never a text-only response.
+		// Must emit ToolInputStartEvent first so the agent can track the name by index.
+		yield(ToolInputStartEvent{ID: "call_1", ToolName: "repeat", Index: 0}, nil)
 		yield(ToolInputCompleteEvent{
 			ID:    "call_1",
 			Input: []byte(`{}`),
+			Index: 0,
 		}, nil)
 		yield(StepCompleteEvent{
 			Message: Message{
@@ -80,7 +83,7 @@ func TestAgentCompletesWithinMaxSteps(t *testing.T) {
 	provider := &mockProviderWithTextAndTools{
 		responses: []mockResponse{
 			{
-				toolCalls: []ToolInputCompleteEvent{{ID: "call_1", ToolName: "ping", Input: []byte(`{}`)}},
+				toolCalls: []ToolInputPart{{ID: "call_1", ToolName: "ping", Input: []byte(`{}`)}},
 			},
 			{
 				text: "Done!",
