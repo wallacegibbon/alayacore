@@ -32,7 +32,7 @@ type StreamEvent interface { isStreamEvent() }
 type TextDeltaEvent         struct { Delta string; Index int }
 type ReasoningDeltaEvent    struct { Delta string; Index int }
 type ToolInputStartEvent    struct { ID, ToolName string; Index int }
-type ToolInputCompleteEvent struct { ID, ToolName string; Input json.RawMessage; Index int }
+type ToolInputCompleteEvent struct { ID string; Input json.RawMessage; Index int }
 type StepCompleteEvent      struct { Message; Usage; StopReason string }
 ```
 
