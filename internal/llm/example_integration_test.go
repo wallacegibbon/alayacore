@@ -200,7 +200,7 @@ func TestAgentMultiTurnWithTools(t *testing.T) {
 
 	// First query - will trigger tool call
 	allMessages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Use echo"}}},
+		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "Use echo"}}},
 	}
 
 	result, err := agent.Stream(context.Background(), allMessages, llm.StreamCallbacks{})
@@ -234,8 +234,8 @@ func TestAgentMultiTurnWithTools(t *testing.T) {
 	// Now use result.Messages for a second query (simulating session behavior)
 	allMessages = result.Messages
 	allMessages = append(allMessages, llm.Message{
-		Role:    llm.RoleUser,
-		Content: []llm.ContentPart{&llm.TextPart{Text: "Thanks!"}},
+		Role:     llm.RoleUser,
+		Contents: []llm.ContentPart{&llm.TextPart{Text: "Thanks!"}},
 	})
 
 	// Second query - should NOT fail with "tool call result does not follow tool call"
@@ -306,7 +306,7 @@ func TestAgentMultiTurnSequentialTools(t *testing.T) {
 
 	// First query
 	allMessages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Query 1"}}},
+		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "Query 1"}}},
 	}
 
 	result, err := agent.Stream(context.Background(), allMessages, llm.StreamCallbacks{})
@@ -317,8 +317,8 @@ func TestAgentMultiTurnSequentialTools(t *testing.T) {
 	// Second query using accumulated messages
 	allMessages = result.Messages
 	allMessages = append(allMessages, llm.Message{
-		Role:    llm.RoleUser,
-		Content: []llm.ContentPart{&llm.TextPart{Text: "Query 2"}}},
+		Role:     llm.RoleUser,
+		Contents: []llm.ContentPart{&llm.TextPart{Text: "Query 2"}}},
 	)
 
 	result, err = agent.Stream(context.Background(), allMessages, llm.StreamCallbacks{})
@@ -329,8 +329,8 @@ func TestAgentMultiTurnSequentialTools(t *testing.T) {
 	// Third query
 	allMessages = result.Messages
 	allMessages = append(allMessages, llm.Message{
-		Role:    llm.RoleUser,
-		Content: []llm.ContentPart{&llm.TextPart{Text: "Query 3"}}},
+		Role:     llm.RoleUser,
+		Contents: []llm.ContentPart{&llm.TextPart{Text: "Query 3"}}},
 	)
 
 	_, err = agent.Stream(context.Background(), allMessages, llm.StreamCallbacks{})
@@ -427,7 +427,7 @@ func TestOpenAIMultiTurnWithTools(t *testing.T) {
 
 	// First query - will trigger tool call
 	allMessages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Use echo"}}},
+		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "Use echo"}}},
 	}
 
 	result, err := agent.Stream(context.Background(), allMessages, llm.StreamCallbacks{})
@@ -461,8 +461,8 @@ func TestOpenAIMultiTurnWithTools(t *testing.T) {
 	// Now use result.Messages for a second query (simulating session behavior)
 	allMessages = result.Messages
 	allMessages = append(allMessages, llm.Message{
-		Role:    llm.RoleUser,
-		Content: []llm.ContentPart{&llm.TextPart{Text: "Thanks!"}},
+		Role:     llm.RoleUser,
+		Contents: []llm.ContentPart{&llm.TextPart{Text: "Thanks!"}},
 	})
 
 	// Second query - should NOT fail with message order errors
@@ -526,7 +526,7 @@ func TestOpenAISequentialQueriesWithTools(t *testing.T) {
 
 	// First query
 	allMessages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Query 1"}}},
+		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "Query 1"}}},
 	}
 
 	result, err := agent.Stream(context.Background(), allMessages, llm.StreamCallbacks{})
@@ -537,8 +537,8 @@ func TestOpenAISequentialQueriesWithTools(t *testing.T) {
 	// Second query using accumulated messages
 	allMessages = result.Messages
 	allMessages = append(allMessages, llm.Message{
-		Role:    llm.RoleUser,
-		Content: []llm.ContentPart{&llm.TextPart{Text: "Query 2"}},
+		Role:     llm.RoleUser,
+		Contents: []llm.ContentPart{&llm.TextPart{Text: "Query 2"}},
 	})
 
 	result, err = agent.Stream(context.Background(), allMessages, llm.StreamCallbacks{})
@@ -549,8 +549,8 @@ func TestOpenAISequentialQueriesWithTools(t *testing.T) {
 	// Third query
 	allMessages = result.Messages
 	allMessages = append(allMessages, llm.Message{
-		Role:    llm.RoleUser,
-		Content: []llm.ContentPart{&llm.TextPart{Text: "Query 3"}},
+		Role:     llm.RoleUser,
+		Contents: []llm.ContentPart{&llm.TextPart{Text: "Query 3"}},
 	})
 
 	_, err = agent.Stream(context.Background(), allMessages, llm.StreamCallbacks{})

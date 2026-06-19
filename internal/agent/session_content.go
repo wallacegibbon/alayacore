@@ -55,7 +55,7 @@ func contentsToMessages(content []llm.ContentPart) []llm.Message {
 		if len(msgs) == 0 || msgs[len(msgs)-1].Role != role {
 			msgs = append(msgs, llm.Message{Role: role})
 		}
-		msgs[len(msgs)-1].Content = append(msgs[len(msgs)-1].Content, part)
+		msgs[len(msgs)-1].Contents = append(msgs[len(msgs)-1].Contents, part)
 	}
 	return msgs
 }

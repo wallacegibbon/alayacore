@@ -9,7 +9,7 @@ import (
 func NewUserMessage(text string) Message {
 	return Message{
 		Role: RoleUser,
-		Content: []ContentPart{
+		Contents: []ContentPart{
 			&TextPart{Text: text},
 		},
 	}

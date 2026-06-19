@@ -18,27 +18,27 @@ type ImagePart      struct { DataURI string }
 type AudioPart      struct { DataURI string }
 type VideoPart      struct { DataURI string }
 type DocumentPart   struct { DataURI string }
-type ToolUsePart    struct { ID, ToolName string; Input json.RawMessage }
-type ToolResultPart struct { ID string; Content []ContentPart; IsError bool }
+type ToolInputPart  struct { ID, ToolName string; Input json.RawMessage }
+type ToolOutputPart struct { ID string; Output []ContentPart; IsError bool }
 
 type Message struct {
-    Role    MessageRole   // "system" | "user" | "assistant" | "tool"
-    Content []ContentPart
+    Role     MessageRole   // "system" | "user" | "assistant" | "tool"
+    Contents []ContentPart
 }
 
 type StreamEvent interface { isStreamEvent() }
 
 // Implementations:
-type TextDeltaEvent      struct { Delta string }
-type ReasoningDeltaEvent struct { Delta string }
-type ToolUseStartEvent   struct { ID, ToolName string }
-type ToolUsePart         struct { ID, ToolName string; Input json.RawMessage } // also a StreamEvent
-type StepCompleteEvent   struct { Message; Usage; StopReason string }
+type TextDeltaEvent         struct { Delta string; Index int }
+type ReasoningDeltaEvent    struct { Delta string; Index int }
+type ToolInputStartEvent    struct { ID, ToolName string; Index int }
+type ToolInputCompleteEvent struct { ID, ToolName string; Input json.RawMessage; Index int }
+type StepCompleteEvent      struct { Message; Usage; StopReason string }
 ```
 
 ## Design: Domain Layer Models Anthropic, Not OpenAI
 
-The domain layer `Message.Content []ContentPart` is practically a **generic version** of Anthropic's `[]anthropicContentBlock` array, **not** OpenAI's flat-field model.
+The domain layer `Message.Contents []ContentPart` is practically a **generic version** of Anthropic's `[]anthropicContentBlock` array, **not** OpenAI's flat-field model.
 
 Compare the three representations for the same assistant message:
 
@@ -46,10 +46,10 @@ Compare the three representations for the same assistant message:
 // Domain (llm/types.go) — array of ContentPart interfaces
 Message{
     Role: "assistant",
-    Content: []ContentPart{
+    Contents: []ContentPart{
         ReasoningPart{Type:"reasoning", Text:"Let me think..."},
         TextPart{Type:"text", Text:"The answer is 42"},
-        ToolUsePart{ID:"call_abc", ToolName:"read_file",
+        ToolInputPart{ID:"call_abc", ToolName:"read_file",
                      Input: json.RawMessage(`{"path":"/tmp/foo"}`)},
     },
 }
@@ -85,17 +85,17 @@ The Anthropic adapter is a **direct 1:1 mapping** — each `ContentPart` becomes
 
 ```go
 // Anthropic — simple type switch, one block per ContentPart
-for _, part := range msg.Content {
+for _, part := range msg.Contents {
     switch v := part.(type) {
     case llm.TextPart:
         → {Type:"text", Text: v.Text}
     case llm.ReasoningPart:
         → {Type:"thinking", Thinking: &v.Text}
-    case llm.ToolUsePart:
+    case llm.ToolInputPart:
         → {Type:"tool_use", ID: v.ID, Name: v.ToolName, Input: v.Input}
-    case llm.ToolResultPart:
-        → {Type:"tool_result", ToolUseID: v.ID, Content: [...], IsError: v.IsError}
-        // Content is an array of content blocks (text, image, etc.)
+    case llm.ToolOutputPart:
+        → {Type:"tool_result", ToolUseID: v.ID, Output: [...], IsError: v.IsError}
+        // Output is an array of content blocks (text, image, etc.)
         // Single text block uses string shorthand for backward compat
     }
 }
@@ -107,8 +107,8 @@ The OpenAI adapter must **split** a single `[]ContentPart` across three independ
 // OpenAI — must distribute ContentParts into separate wire fields
 apiMsg.Content = ...          // only TextParts go here
 apiMsg.ReasoningContent = ... // only ReasoningParts go here
-apiMsg.ToolCalls = ...        // only ToolUseParts go here
-// ToolResultParts become entirely separate messages with role="tool"
+apiMsg.ToolCalls = ...        // only ToolInputParts go here
+// ToolOutputParts become entirely separate messages with role="tool"
 ```
 
 And on receive, both providers use the same pattern: accumulate content by `index` across streaming chunks, then assemble into a single `[]ContentPart` at step completion. OpenAI accumulates three parallel fields (reasoning, text, tool arguments) by index; Anthropic accumulates content blocks by index — structurally the same approach.
@@ -125,8 +125,8 @@ And on receive, both providers use the same pattern: accumulate content by `inde
 | `AudioPart` | `content[]` array: `{type:"input_audio", input_audio:{data:"data:audio/...;base64,..."}}` | `content[]` array: `{type:"audio", source:{type:"base64", media_type:"audio/mpeg", data:"..."}}` |
 | `VideoPart` | `content[]` array: `{type:"video_url", video_url:{url:"data:video/...;base64,..."}, fps:2, media_resolution:"default"}` | `content[]` array: `{type:"video", source:{type:"base64", media_type:"video/mp4", data:"..."}}` |
 | `DocumentPart` | ❌ Not supported | `content[]` array: `{type:"document", source:{type:"base64", media_type:"application/pdf", data:"..."}}` |
-| `ToolUsePart` | `tool_calls[]` (top-level array) | `content[]` array: `{type:"tool_use", id, name, input}` |
-| `ToolResultPart` | Separate message: `{role:"tool", tool_call_id, content}` (content is JSON-wrapped with `"status"` field — see note below) | `content[]` array: `{type:"tool_result", tool_use_id, content, is_error}`, **role remapped to "user"**. `content` can be a string or an array of content blocks (text, image, etc.) |
+| `ToolInputPart` | `tool_calls[]` (top-level array) | `content[]` array: `{type:"tool_use", id, name, input}` |
+| `ToolOutputPart` | Separate message: `{role:"tool", tool_call_id, content}` (content is JSON-wrapped with `"status"` field — see note below) | `content[]` array: `{type:"tool_result", tool_use_id, content, is_error}`, **role remapped to "user"**. `content` can be a string or an array of content blocks (text, image, etc.) |
 
 > **Note on OpenAI tool result content format:** OpenAI's API has no native `is_error` field for tool results (unlike Anthropic). To prevent ambiguity — e.g., a tool returning `"no such file"` as an error vs. a file containing the literal text `"no such file"` — the OpenAI provider wraps tool results as JSON:
 >
@@ -204,10 +204,10 @@ event: content_block_stop
 **Domain output (same for both):**
 ```go
 // Stream event at name arrival:
-ToolUseStartEvent{ID: "call_abc", ToolName: "read_file"}
+ToolInputStartEvent{ID: "call_abc", ToolName: "read_file"}
 
 // Stream event at completion (after all args received):
-ToolUsePart{
+ToolInputPart{
     ID: "call_abc",
     ToolName:   "read_file",
     Input:      json.RawMessage(`{"path":"/tmp/foo"}`),
@@ -217,7 +217,7 @@ ToolUsePart{
 Message{
     Role: "assistant",
     Content: []ContentPart{
-        ToolUsePart{
+        ToolInputPart{
             Type:       "tool_use",
             ID: "call_abc",
             ToolName:   "read_file",
@@ -251,22 +251,22 @@ Chunk 6: {"choices":[{"delta":{"tool_calls":[
 ```go
 // Interleaved stream events:
 ReasoningDeltaEvent{Delta: "Read file"}
-ToolUseStartEvent{ID: "call_abc", ToolName: "read_file"}
+ToolInputStartEvent{ID: "call_abc", ToolName: "read_file"}
 ReasoningDeltaEvent{Delta: " to check"}
 // (no more ReasoningDelta or ToolUseStart — just args accumulating)
 
-ToolUsePart{
+ToolInputPart{
     ID: "call_abc",
     ToolName:   "read_file",
     Input:      json.RawMessage(`{"path":"/tmp/foo"}`),
 }
 
-// Final message — both in one Message.Content:
+// Final message — both in one Message.Contents:
 Message{
     Role: "assistant",
     Content: []ContentPart{
         ReasoningPart{Type: "reasoning", Text: "Read file to check"},
-        ToolUsePart{
+        ToolInputPart{
             Type: "tool_use", ID: "call_abc",
             ToolName: "read_file",
             Input:    json.RawMessage(`{"path":"/tmp/foo"}`),
@@ -287,7 +287,7 @@ Message{
     Role: "assistant",
     Content: []ContentPart{
         ReasoningPart{Type: "reasoning", Text: "Let me read the file"},
-        ToolUsePart{
+        ToolInputPart{
             ID: "call_abc",
             ToolName:   "read_file",
             Input:      json.RawMessage(`{"path":"/tmp/foo"}`),
@@ -400,7 +400,7 @@ openAIToolAccumulator {
 }
 ```
 
-All three accumulate simultaneously during streaming. At `StepCompleteEvent`, they merge into a single `Message.Content` slice.
+All three accumulate simultaneously during streaming. At `StepCompleteEvent`, they merge into a single `Message.Contents` slice.
 
 ### Anthropic: Indexed block accumulator (like OpenAI)
 

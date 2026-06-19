@@ -174,8 +174,8 @@ Rules:
 	}
 	// Strip reasoning/thinking content from the summary message — it's
 	// internal model deliberation, not summary content.
-	filtered := make([]llm.ContentPart, 0, len(lastAssistantMsg.Content))
-	for _, part := range lastAssistantMsg.Content {
+	filtered := make([]llm.ContentPart, 0, len(lastAssistantMsg.Contents))
+	for _, part := range lastAssistantMsg.Contents {
 		switch part.(type) {
 		case *llm.ReasoningPart:
 			continue
@@ -183,7 +183,7 @@ Rules:
 			filtered = append(filtered, part)
 		}
 	}
-	lastAssistantMsg.Content = filtered
+	lastAssistantMsg.Contents = filtered
 	// Prepend a "Continue" user message before the summary assistant message.
 	result = []llm.Message{
 		llm.NewUserMessage("Continue"),
@@ -202,11 +202,11 @@ Rules:
 		},
 	})
 	summaryID := s.histIncAndGet()
-	firstPart := lastAssistantMsg.Content[0]
+	firstPart := lastAssistantMsg.Contents[0]
 	firstPart.UpdateContentPartMeta(summaryID, llm.RoleAssistant)
 	tc.Entries = append(tc.Entries, firstPart)
-	for i := 1; i < len(lastAssistantMsg.Content); i++ {
-		part := lastAssistantMsg.Content[i]
+	for i := 1; i < len(lastAssistantMsg.Contents); i++ {
+		part := lastAssistantMsg.Contents[i]
 		part.UpdateContentPartMeta(s.histIncAndGet(), llm.RoleAssistant)
 		tc.Entries = append(tc.Entries, part)
 	}

@@ -414,7 +414,7 @@ func (s *anthropicStreamState) finishBlock(index int) {
 			Text: block.buffer.String(),
 		}
 	case anthropicBlockTypeToolUse:
-		s.contentParts[index] = &llm.ToolUsePart{
+		s.contentParts[index] = &llm.ToolInputPart{
 			ID:       block.id,
 			ToolName: block.name,
 			Input:    json.RawMessage(block.buffer.String()),
@@ -447,18 +447,18 @@ func (s *anthropicStreamState) getMessage() llm.Message {
 		content[pos] = s.contentParts[i]
 	}
 	return llm.Message{
-		Role:    llm.RoleAssistant,
-		Content: content,
+		Role:     llm.RoleAssistant,
+		Contents: content,
 	}
 }
 
-// toolUsePart returns a complete ToolUsePart if the block at the given index is a tool_use.
-func (s *anthropicStreamState) toolUsePart(index int) *llm.ToolUsePart {
+// toolUsePart returns a complete ToolInputPart if the block at the given index is a tool_use.
+func (s *anthropicStreamState) toolUsePart(index int) *llm.ToolInputPart {
 	block, ok := s.blocks[index]
 	if !ok || block.blockType != anthropicBlockTypeToolUse {
 		return nil
 	}
-	return &llm.ToolUsePart{
+	return &llm.ToolInputPart{
 		ID:       block.id,
 		ToolName: block.name,
 		Input:    json.RawMessage(block.buffer.String()),
@@ -529,7 +529,7 @@ func (p *AnthropicProvider) handleContentBlockStart(data string, yield func(llm.
 	}
 	state.createBlock(event.Index, event.ContentBlock.Type, event.ContentBlock.ID, event.ContentBlock.Name)
 	if event.ContentBlock.Type == anthropicBlockTypeToolUse {
-		if !yield(llm.ToolUseStartEvent{
+		if !yield(llm.ToolInputStartEvent{
 			ID:       event.ContentBlock.ID,
 			ToolName: event.ContentBlock.Name,
 			Index:    event.Index,
@@ -573,7 +573,7 @@ func (p *AnthropicProvider) handleContentBlockStop(index int, yield func(llm.Str
 	tc := state.toolUsePart(index)
 	state.finishBlock(index)
 	if tc != nil {
-		if !yield(llm.ToolUseCompleteEvent{
+		if !yield(llm.ToolInputCompleteEvent{
 			ID:       tc.ID,
 			ToolName: tc.ToolName,
 			Input:    tc.Input,
@@ -674,14 +674,14 @@ func unmarshalSSE[T any](data string, yield func(llm.StreamEvent, error) bool) (
 // Wire-format mappings:
 //   - llm.TextPart       → anthropicContentBlock{Type: "text"}
 //   - llm.ReasoningPart  → anthropicContentBlock{Type: "thinking"}  (domain "reasoning" → wire "thinking")
-//   - llm.ToolUsePart   → anthropicContentBlock{Type: "tool_use"}
-//   - llm.ToolResultPart → anthropicContentBlock{Type: "tool_result"} (role remapped to "user")
+//   - llm.ToolInputPart   → anthropicContentBlock{Type: "tool_use"}
+//   - llm.ToolOutputPart → anthropicContentBlock{Type: "tool_result"} (role remapped to "user")
 func anthropicConvertMessages(messages []llm.Message, reasoningLevel int) []anthropicMessage {
 	apiMessages := make([]anthropicMessage, 0, len(messages))
 	for _, msg := range messages {
 		apiMsg := anthropicMessage{
 			Role:    string(msg.Role),
-			Content: make([]anthropicContentBlock, 0, len(msg.Content)),
+			Content: make([]anthropicContentBlock, 0, len(msg.Contents)),
 		}
 
 		// In Anthropic API, tool results must be in a "user" role message
@@ -689,7 +689,7 @@ func anthropicConvertMessages(messages []llm.Message, reasoningLevel int) []anth
 			apiMsg.Role = "user"
 		}
 
-		for _, part := range msg.Content {
+		for _, part := range msg.Contents {
 			if block := anthropicPartToBlock(part); block != nil {
 				apiMsg.Content = append(apiMsg.Content, *block)
 			}
@@ -721,7 +721,7 @@ func anthropicConvertMessages(messages []llm.Message, reasoningLevel int) []anth
 // anthropicPartToBlock converts a domain ContentPart to an Anthropic content block.
 // Returns nil for unsupported parts.
 //
-// Recursion: When handling ToolResultPart, the function calls itself for each
+// Recursion: When handling ToolOutputPart, the function calls itself for each
 // sub-part in the result's Content slice. This allows tool results containing
 // ImagePart, TextPart, etc. to be serialized as nested content blocks inside
 // the tool_result block — matching Anthropic's wire format where
@@ -747,14 +747,14 @@ func anthropicPartToBlock(part llm.ContentPart) *anthropicContentBlock {
 			Type:     anthropicBlockTypeThinking,
 			Thinking: &text,
 		}
-	case *llm.ToolUsePart:
+	case *llm.ToolInputPart:
 		return &anthropicContentBlock{
 			Type:  anthropicBlockTypeToolUse,
 			ID:    v.ID,
 			Name:  v.ToolName,
 			Input: v.Input,
 		}
-	case *llm.ToolResultPart:
+	case *llm.ToolOutputPart:
 		block := &anthropicContentBlock{
 			Type:      anthropicBlockTypeToolResult,
 			ToolUseID: v.ID,
@@ -764,8 +764,8 @@ func anthropicPartToBlock(part llm.ContentPart) *anthropicContentBlock {
 		// This handles TextPart → text block, ImagePart → image block, etc.
 		// via the same anthropicPartToBlock function, enabling nested content
 		// inside tool_result (e.g. text + image in a single tool result).
-		blocks := make([]anthropicContentBlock, 0, len(v.Content))
-		for _, part := range v.Content {
+		blocks := make([]anthropicContentBlock, 0, len(v.Output))
+		for _, part := range v.Output {
 			if b := anthropicPartToBlock(part); b != nil {
 				blocks = append(blocks, *b)
 			}

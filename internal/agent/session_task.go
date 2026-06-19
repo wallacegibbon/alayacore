@@ -61,9 +61,9 @@ func (s *Session) handleUserPrompt(ctx context.Context, tc *taskCtx, prompt stri
 	// Append to messages for the LLM request.  If the preceding message
 	// is also from the user, merge to avoid duplicate user messages.
 	if len(tc.Messages) > 0 && tc.Messages[len(tc.Messages)-1].Role == llm.RoleUser {
-		tc.Messages[len(tc.Messages)-1].Content = append(tc.Messages[len(tc.Messages)-1].Content, content...)
+		tc.Messages[len(tc.Messages)-1].Contents = append(tc.Messages[len(tc.Messages)-1].Contents, content...)
 	} else {
-		tc.Messages = append(tc.Messages, llm.Message{Role: llm.RoleUser, Content: content})
+		tc.Messages = append(tc.Messages, llm.Message{Role: llm.RoleUser, Contents: content})
 	}
 
 	updatedMessages, newEntries, _, err := s.processPrompt(ctx, tc.Messages)
@@ -196,7 +196,7 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 			newMsgs := messages[lastProcessed:]
 			lastProcessed = len(messages)
 			for _, msg := range newMsgs {
-				newEntries = append(newEntries, msg.Content...)
+				newEntries = append(newEntries, msg.Contents...)
 			}
 
 			s.sendEvent(usageToStepFinishEvent(usage))
@@ -245,15 +245,15 @@ func cleanIncompleteToolUses(messages []llm.Message) []llm.Message {
 	// All tool uses in the last assistant message are orphaned — the agent
 	// only completes a step after executing all tools. If the last message
 	// has tool uses, the step was interrupted (cancel/error).
-	filtered := make([]llm.ContentPart, 0, len(last.Content))
-	for _, part := range last.Content {
-		if _, ok := part.(*llm.ToolUsePart); ok {
+	filtered := make([]llm.ContentPart, 0, len(last.Contents))
+	for _, part := range last.Contents {
+		if _, ok := part.(*llm.ToolInputPart); ok {
 			continue
 		}
 		filtered = append(filtered, part)
 	}
 	if len(filtered) > 0 {
-		messages[len(messages)-1].Content = filtered
+		messages[len(messages)-1].Contents = filtered
 		return messages
 	}
 	// The last message had nothing but orphaned tool calls — drop it.

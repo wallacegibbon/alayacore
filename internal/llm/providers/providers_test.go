@@ -59,7 +59,7 @@ func TestAnthropicProvider(t *testing.T) {
 
 	// Stream messages
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
+		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
 	}
 
 	events, err := provider.StreamMessages(context.Background(), messages, nil, "You are helpful", "")
@@ -129,7 +129,7 @@ func TestOpenAIProvider(t *testing.T) {
 
 	// Stream messages
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
+		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
 	}
 
 	events, err := provider.StreamMessages(context.Background(), messages, nil, "You are helpful", "")
@@ -200,7 +200,7 @@ func TestToolCallStreaming(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "test"}}},
+		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "test"}}},
 	}
 
 	events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
@@ -208,10 +208,10 @@ func TestToolCallStreaming(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var toolCalls []llm.ToolUsePart
+	var toolCalls []llm.ToolInputPart
 	for event := range events {
-		if tc, ok := event.(llm.ToolUseCompleteEvent); ok {
-			toolCalls = append(toolCalls, llm.ToolUsePart{ID: tc.ID, ToolName: tc.ToolName, Input: tc.Input})
+		if tc, ok := event.(llm.ToolInputCompleteEvent); ok {
+			toolCalls = append(toolCalls, llm.ToolInputPart{ID: tc.ID, ToolName: tc.ToolName, Input: tc.Input})
 		}
 	}
 
@@ -269,7 +269,7 @@ func TestToolCallStreamingChunked(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Run uname -a"}}},
+		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "Run uname -a"}}},
 	}
 
 	events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
@@ -277,10 +277,10 @@ func TestToolCallStreamingChunked(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var toolCalls []llm.ToolUsePart
+	var toolCalls []llm.ToolInputPart
 	for event := range events {
-		if tc, ok := event.(llm.ToolUseCompleteEvent); ok {
-			toolCalls = append(toolCalls, llm.ToolUsePart{ID: tc.ID, ToolName: tc.ToolName, Input: tc.Input})
+		if tc, ok := event.(llm.ToolInputCompleteEvent); ok {
+			toolCalls = append(toolCalls, llm.ToolInputPart{ID: tc.ID, ToolName: tc.ToolName, Input: tc.Input})
 		}
 	}
 
@@ -334,7 +334,7 @@ func TestToolCallStreamingWithNullArguments(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Read README"}}},
+		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "Read README"}}},
 	}
 
 	events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
@@ -342,10 +342,10 @@ func TestToolCallStreamingWithNullArguments(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var toolCalls []llm.ToolUsePart
+	var toolCalls []llm.ToolInputPart
 	for event := range events {
-		if tc, ok := event.(llm.ToolUseCompleteEvent); ok {
-			toolCalls = append(toolCalls, llm.ToolUsePart{ID: tc.ID, ToolName: tc.ToolName, Input: tc.Input})
+		if tc, ok := event.(llm.ToolInputCompleteEvent); ok {
+			toolCalls = append(toolCalls, llm.ToolInputPart{ID: tc.ID, ToolName: tc.ToolName, Input: tc.Input})
 		}
 	}
 
@@ -397,7 +397,7 @@ func TestAnthropicToolCallStreaming(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "What's the weather?"}}},
+		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "What's the weather?"}}},
 	}
 
 	events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
@@ -405,11 +405,11 @@ func TestAnthropicToolCallStreaming(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var toolCalls []llm.ToolUsePart
+	var toolCalls []llm.ToolInputPart
 	var stepComplete *llm.StepCompleteEvent
 	for event := range events {
-		if e, ok := event.(llm.ToolUseCompleteEvent); ok {
-			toolCalls = append(toolCalls, llm.ToolUsePart{ID: e.ID, ToolName: e.ToolName, Input: e.Input})
+		if e, ok := event.(llm.ToolInputCompleteEvent); ok {
+			toolCalls = append(toolCalls, llm.ToolInputPart{ID: e.ID, ToolName: e.ToolName, Input: e.Input})
 		} else if e, ok := event.(llm.StepCompleteEvent); ok {
 			stepComplete = &e
 		}
@@ -445,8 +445,8 @@ func TestAnthropicToolCallStreaming(t *testing.T) {
 	}
 }
 
-func TestToolUseStartEventOpenAI(t *testing.T) {
-	// Verify ToolUseStartEvent is emitted before ToolUsePart for OpenAI.
+func TestToolInputStartEventOpenAI(t *testing.T) {
+	// Verify ToolInputStartEvent is emitted before ToolInputPart for OpenAI.
 	// This allows the UI to show a tool window immediately when the tool name
 	// is known, before the potentially large arguments finish streaming.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -477,7 +477,7 @@ func TestToolUseStartEventOpenAI(t *testing.T) {
 	}
 
 	events, err := provider.StreamMessages(context.Background(), []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "test"}}},
+		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "test"}}},
 	}, nil, "", "")
 	if err != nil {
 		t.Fatal(err)
@@ -486,9 +486,9 @@ func TestToolUseStartEventOpenAI(t *testing.T) {
 	var order []string
 	for event := range events {
 		switch e := event.(type) {
-		case llm.ToolUseStartEvent:
+		case llm.ToolInputStartEvent:
 			order = append(order, fmt.Sprintf("start(%s)", e.ToolName))
-		case llm.ToolUseCompleteEvent:
+		case llm.ToolInputCompleteEvent:
 			order = append(order, fmt.Sprintf("complete(%s)", e.ToolName))
 		}
 	}
@@ -504,8 +504,8 @@ func TestToolUseStartEventOpenAI(t *testing.T) {
 	}
 }
 
-func TestToolUseStartEventAnthropic(t *testing.T) {
-	// Verify ToolUseStartEvent is emitted before ToolUsePart for Anthropic.
+func TestToolInputStartEventAnthropic(t *testing.T) {
+	// Verify ToolInputStartEvent is emitted before ToolInputPart for Anthropic.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
@@ -534,7 +534,7 @@ func TestToolUseStartEventAnthropic(t *testing.T) {
 	}
 
 	events, err := provider.StreamMessages(context.Background(), []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "test"}}},
+		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "test"}}},
 	}, nil, "", "")
 	if err != nil {
 		t.Fatal(err)
@@ -543,9 +543,9 @@ func TestToolUseStartEventAnthropic(t *testing.T) {
 	var order []string
 	for event := range events {
 		switch e := event.(type) {
-		case llm.ToolUseStartEvent:
+		case llm.ToolInputStartEvent:
 			order = append(order, fmt.Sprintf("start(%s)", e.ToolName))
-		case llm.ToolUseCompleteEvent:
+		case llm.ToolInputCompleteEvent:
 			order = append(order, fmt.Sprintf("complete(%s)", e.ToolName))
 		}
 	}
@@ -593,7 +593,7 @@ func TestAnthropicReasoningStreaming(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "What is the answer?"}}},
+		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "What is the answer?"}}},
 	}
 
 	events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
@@ -629,19 +629,19 @@ func TestAnthropicReasoningStreaming(t *testing.T) {
 
 	// Check message content includes both reasoning and text
 	msg := stepComplete.Message
-	if len(msg.Content) != 2 {
-		t.Fatalf("Expected 2 content parts, got %d", len(msg.Content))
+	if len(msg.Contents) != 2 {
+		t.Fatalf("Expected 2 content parts, got %d", len(msg.Contents))
 	}
 
 	// First should be reasoning
-	if reasonPart, ok := msg.Content[0].(*llm.ReasoningPart); !ok {
+	if reasonPart, ok := msg.Contents[0].(*llm.ReasoningPart); !ok {
 		t.Error("First content part should be ReasoningPart")
 	} else if reasonPart.Text != "Let me think..." {
 		t.Errorf("Reasoning text mismatch: %s", reasonPart.Text)
 	}
 
 	// Second should be text
-	if textPart, ok := msg.Content[1].(*llm.TextPart); !ok {
+	if textPart, ok := msg.Contents[1].(*llm.TextPart); !ok {
 		t.Error("Second content part should be TextPart")
 	} else if textPart.Text != "The answer is 42." {
 		t.Errorf("Text mismatch: %s", textPart.Text)
@@ -683,7 +683,7 @@ func TestAnthropicThinkingOmittedMode(t *testing.T) {
 	}
 
 	events, err := provider.StreamMessages(context.Background(), []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "GCD of 1071 and 462?"}}},
+		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "GCD of 1071 and 462?"}}},
 	}, nil, "", "")
 	if err != nil {
 		t.Fatal(err)
@@ -695,7 +695,7 @@ func TestAnthropicThinkingOmittedMode(t *testing.T) {
 	)
 	for event := range events {
 		if e, ok := event.(llm.StepCompleteEvent); ok {
-			for _, part := range e.Message.Content {
+			for _, part := range e.Message.Contents {
 				switch p := part.(type) {
 				case *llm.ReasoningPart:
 					reasoningParts++
@@ -732,7 +732,7 @@ func TestAnthropicAPIError(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
+		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
 	}
 
 	_, err = provider.StreamMessages(context.Background(), messages, nil, "", "")
@@ -768,7 +768,7 @@ func TestAnthropicRefusalStopReason(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
+		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
 	}
 
 	events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
@@ -816,7 +816,7 @@ func TestAnthropicUnknownStopReason(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
+		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
 	}
 
 	events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
@@ -870,7 +870,7 @@ func TestAnthropicValidStopReasons(t *testing.T) {
 			}
 
 			messages := []llm.Message{
-				{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
+				{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
 			}
 
 			events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
@@ -929,7 +929,7 @@ func TestOpenAIContentFilter(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
+		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
 	}
 
 	events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
@@ -972,7 +972,7 @@ func TestOpenAILengthFinishReason(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
+		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
 	}
 
 	events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
@@ -1022,7 +1022,7 @@ func TestOpenAIAPIError(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
+		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
 	}
 
 	_, err = provider.StreamMessages(context.Background(), messages, nil, "", "")
@@ -1055,7 +1055,7 @@ func TestOpenAINetworkError(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
+		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
 	}
 
 	events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
@@ -1119,7 +1119,7 @@ func TestOpenAIWithSystemPrompt(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
+		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "Hi"}}},
 	}
 
 	events, err := provider.StreamMessages(context.Background(), messages, nil, "You are helpful", "")
@@ -1174,7 +1174,7 @@ func TestAnthropicWithTools(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Use the tool"}}},
+		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "Use the tool"}}},
 	}
 
 	tools := []llm.ToolDefinition{
@@ -1223,7 +1223,7 @@ func TestOpenAIWithReasoning(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Calculate"}}},
+		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "Calculate"}}},
 	}
 
 	events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
@@ -1259,19 +1259,19 @@ func TestOpenAIWithReasoning(t *testing.T) {
 	}
 
 	msg := stepComplete.Message
-	if len(msg.Content) < 2 {
-		t.Fatalf("Expected at least 2 content parts (reasoning + text), got %d", len(msg.Content))
+	if len(msg.Contents) < 2 {
+		t.Fatalf("Expected at least 2 content parts (reasoning + text), got %d", len(msg.Contents))
 	}
 
 	// First should be reasoning
-	if rp, ok := msg.Content[0].(*llm.ReasoningPart); !ok {
+	if rp, ok := msg.Contents[0].(*llm.ReasoningPart); !ok {
 		t.Error("First content part should be ReasoningPart")
 	} else if rp.Text != "Analyzing... computing..." {
 		t.Errorf("Reasoning text mismatch: %s", rp.Text)
 	}
 
 	// Second should be text
-	if tp, ok := msg.Content[1].(*llm.TextPart); !ok {
+	if tp, ok := msg.Contents[1].(*llm.TextPart); !ok {
 		t.Error("Second content part should be TextPart")
 	} else if tp.Text != "Result: 123." {
 		t.Errorf("Text mismatch: %s", tp.Text)
@@ -1344,13 +1344,13 @@ func TestOpenAITextWithToolCallsConversion(t *testing.T) {
 
 	// Simulate a multi-turn conversation where assistant returned text + tool call
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Check the weather"}}},
-		{Role: llm.RoleAssistant, Content: []llm.ContentPart{
+		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "Check the weather"}}},
+		{Role: llm.RoleAssistant, Contents: []llm.ContentPart{
 			&llm.TextPart{Text: "Let me check that."},
-			&llm.ToolUsePart{ID: "call_123", ToolName: "get_weather", Input: json.RawMessage(`{"location":"SF"}`)},
+			&llm.ToolInputPart{ID: "call_123", ToolName: "get_weather", Input: json.RawMessage(`{"location":"SF"}`)},
 		}},
-		{Role: llm.RoleTool, Content: []llm.ContentPart{
-			&llm.ToolResultPart{ID: "call_123", Content: []llm.ContentPart{&llm.TextPart{Text: "Sunny, 72°F"}}},
+		{Role: llm.RoleTool, Contents: []llm.ContentPart{
+			&llm.ToolOutputPart{ID: "call_123", Output: []llm.ContentPart{&llm.TextPart{Text: "Sunny, 72°F"}}},
 		}},
 	}
 
@@ -1433,15 +1433,15 @@ func TestAnthropicToolResultMessageFormat(t *testing.T) {
 
 	// Simulate a conversation with tool call and result
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Use the tool"}}},
-		{Role: llm.RoleAssistant, Content: []llm.ContentPart{&llm.ToolUsePart{
+		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "Use the tool"}}},
+		{Role: llm.RoleAssistant, Contents: []llm.ContentPart{&llm.ToolInputPart{
 			ID:       "tool-123",
 			ToolName: "test_tool",
 			Input:    json.RawMessage(`{"input": "value"}`),
 		}}},
-		{Role: llm.RoleTool, Content: []llm.ContentPart{&llm.ToolResultPart{
-			ID:      "tool-123",
-			Content: []llm.ContentPart{&llm.TextPart{Text: "Tool executed successfully"}},
+		{Role: llm.RoleTool, Contents: []llm.ContentPart{&llm.ToolOutputPart{
+			ID:     "tool-123",
+			Output: []llm.ContentPart{&llm.TextPart{Text: "Tool executed successfully"}},
 		}}},
 	}
 
@@ -1491,7 +1491,7 @@ func TestAnthropicMultiToolCall(t *testing.T) {
 	}
 
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Get weather for NYC and LA"}}},
+		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "Get weather for NYC and LA"}}},
 	}
 
 	events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
@@ -1499,10 +1499,10 @@ func TestAnthropicMultiToolCall(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var toolCalls []llm.ToolUsePart
+	var toolCalls []llm.ToolInputPart
 	for event := range events {
-		if e, ok := event.(llm.ToolUseCompleteEvent); ok {
-			toolCalls = append(toolCalls, llm.ToolUsePart{ID: e.ID, ToolName: e.ToolName, Input: e.Input})
+		if e, ok := event.(llm.ToolInputCompleteEvent); ok {
+			toolCalls = append(toolCalls, llm.ToolInputPart{ID: e.ID, ToolName: e.ToolName, Input: e.Input})
 		}
 	}
 
@@ -1586,15 +1586,15 @@ func TestOpenAIToolResultMessageFormat(t *testing.T) {
 
 	// Simulate a conversation with tool call and result
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Use the tool"}}},
-		{Role: llm.RoleAssistant, Content: []llm.ContentPart{&llm.ToolUsePart{
+		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "Use the tool"}}},
+		{Role: llm.RoleAssistant, Contents: []llm.ContentPart{&llm.ToolInputPart{
 			ID:       "call-123",
 			ToolName: "test_tool",
 			Input:    json.RawMessage(`{"input": "value"}`),
 		}}},
-		{Role: llm.RoleTool, Content: []llm.ContentPart{&llm.ToolResultPart{
-			ID:      "call-123",
-			Content: []llm.ContentPart{&llm.TextPart{Text: "Tool executed successfully"}},
+		{Role: llm.RoleTool, Contents: []llm.ContentPart{&llm.ToolOutputPart{
+			ID:     "call-123",
+			Output: []llm.ContentPart{&llm.TextPart{Text: "Tool executed successfully"}},
 		}}},
 	}
 
@@ -1695,27 +1695,27 @@ func TestOpenAIMultiToolResultMessageFormat(t *testing.T) {
 
 	// Simulate a conversation with 2 tool calls and 2 results in a single tool message
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Run two tools"}}},
-		{Role: llm.RoleAssistant, Content: []llm.ContentPart{
-			&llm.ToolUsePart{
+		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "Run two tools"}}},
+		{Role: llm.RoleAssistant, Contents: []llm.ContentPart{
+			&llm.ToolInputPart{
 				ID:       "call-1",
 				ToolName: "tool_a",
 				Input:    json.RawMessage(`{}`),
 			},
-			&llm.ToolUsePart{
+			&llm.ToolInputPart{
 				ID:       "call-2",
 				ToolName: "tool_b",
 				Input:    json.RawMessage(`{}`),
 			},
 		}},
-		{Role: llm.RoleTool, Content: []llm.ContentPart{
-			&llm.ToolResultPart{
-				ID:      "call-1",
-				Content: []llm.ContentPart{&llm.TextPart{Text: "Result A"}},
+		{Role: llm.RoleTool, Contents: []llm.ContentPart{
+			&llm.ToolOutputPart{
+				ID:     "call-1",
+				Output: []llm.ContentPart{&llm.TextPart{Text: "Result A"}},
 			},
-			&llm.ToolResultPart{
-				ID:      "call-2",
-				Content: []llm.ContentPart{&llm.TextPart{Text: "Result B"}},
+			&llm.ToolOutputPart{
+				ID:     "call-2",
+				Output: []llm.ContentPart{&llm.TextPart{Text: "Result B"}},
 			},
 		}},
 	}
@@ -1791,15 +1791,15 @@ func TestAnthropicToolResultError(t *testing.T) {
 
 	// Conversation with error tool result
 	messages := []llm.Message{
-		{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Use the tool"}}},
-		{Role: llm.RoleAssistant, Content: []llm.ContentPart{&llm.ToolUsePart{
+		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "Use the tool"}}},
+		{Role: llm.RoleAssistant, Contents: []llm.ContentPart{&llm.ToolInputPart{
 			ID:       "tool-123",
 			ToolName: "test_tool",
 			Input:    json.RawMessage(`{}`),
 		}}},
-		{Role: llm.RoleTool, Content: []llm.ContentPart{&llm.ToolResultPart{
+		{Role: llm.RoleTool, Contents: []llm.ContentPart{&llm.ToolOutputPart{
 			ID:      "tool-123",
-			Content: []llm.ContentPart{&llm.TextPart{Text: "Something went wrong"}},
+			Output:  []llm.ContentPart{&llm.TextPart{Text: "Something went wrong"}},
 			IsError: true,
 		}}},
 	}

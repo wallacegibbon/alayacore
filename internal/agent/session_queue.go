@@ -127,8 +127,8 @@ const cancelMessage = "Canceled"
 
 func (s *Session) appendCancelMessage(tc *taskCtx) {
 	tc.Messages = append(tc.Messages, llm.Message{
-		Role:    llm.RoleAssistant,
-		Content: []llm.ContentPart{&llm.TextPart{Text: cancelMessage}},
+		Role:     llm.RoleAssistant,
+		Contents: []llm.ContentPart{&llm.TextPart{Text: cancelMessage}},
 	})
 	id := s.histIncAndGet()
 	tc.Entries = append(tc.Entries, &llm.TextPart{

@@ -18,14 +18,14 @@ func TestMultiPartUserMessageRoundtrip(t *testing.T) {
 	msgs := []llm.Message{
 		{
 			Role: llm.RoleUser,
-			Content: []llm.ContentPart{
+			Contents: []llm.ContentPart{
 				&llm.TextPart{Text: "First part"},
 				&llm.TextPart{Text: "Second part"},
 			},
 		},
 		{
-			Role:    llm.RoleAssistant,
-			Content: []llm.ContentPart{&llm.TextPart{Text: "Got it."}},
+			Role:     llm.RoleAssistant,
+			Contents: []llm.ContentPart{&llm.TextPart{Text: "Got it."}},
 		},
 	}
 	session := &Session{
@@ -62,14 +62,14 @@ func TestMultiPartUserMessageRoundtrip(t *testing.T) {
 	if loadedMsgs[0].Role != llm.RoleUser {
 		t.Errorf("First message should be user, got %s", loadedMsgs[0].Role)
 	}
-	if len(loadedMsgs[0].Content) != 2 {
-		t.Fatalf("User message should have 2 content parts, got %d", len(loadedMsgs[0].Content))
+	if len(loadedMsgs[0].Contents) != 2 {
+		t.Fatalf("User message should have 2 content parts, got %d", len(loadedMsgs[0].Contents))
 	}
-	if tp, ok := loadedMsgs[0].Content[0].(*llm.TextPart); !ok || tp.Text != "First part" {
-		t.Errorf("First part mismatch: %v", loadedMsgs[0].Content[0])
+	if tp, ok := loadedMsgs[0].Contents[0].(*llm.TextPart); !ok || tp.Text != "First part" {
+		t.Errorf("First part mismatch: %v", loadedMsgs[0].Contents[0])
 	}
-	if tp, ok := loadedMsgs[0].Content[1].(*llm.TextPart); !ok || tp.Text != "Second part" {
-		t.Errorf("Second part mismatch: %v", loadedMsgs[0].Content[1])
+	if tp, ok := loadedMsgs[0].Contents[1].(*llm.TextPart); !ok || tp.Text != "Second part" {
+		t.Errorf("Second part mismatch: %v", loadedMsgs[0].Contents[1])
 	}
 
 	// Assistant message should be intact
@@ -108,16 +108,16 @@ func TestConsecutiveUserChunksGrouped(t *testing.T) {
 	if msgs[0].Role != llm.RoleUser {
 		t.Errorf("First message should be user, got %s", msgs[0].Role)
 	}
-	if len(msgs[0].Content) != 2 {
-		t.Fatalf("User message should have 2 content parts, got %d", len(msgs[0].Content))
+	if len(msgs[0].Contents) != 2 {
+		t.Fatalf("User message should have 2 content parts, got %d", len(msgs[0].Contents))
 	}
-	tp0, ok := msgs[0].Content[0].(*llm.TextPart)
+	tp0, ok := msgs[0].Contents[0].(*llm.TextPart)
 	if !ok || tp0.Text != "Hello" {
-		t.Errorf("First part mismatch: %v", msgs[0].Content[0])
+		t.Errorf("First part mismatch: %v", msgs[0].Contents[0])
 	}
-	tp1, ok := msgs[0].Content[1].(*llm.TextPart)
+	tp1, ok := msgs[0].Contents[1].(*llm.TextPart)
 	if !ok || tp1.Text != " world" {
-		t.Errorf("Second part mismatch: %v", msgs[0].Content[1])
+		t.Errorf("Second part mismatch: %v", msgs[0].Contents[1])
 	}
 
 	// Assistant message
@@ -154,8 +154,8 @@ func TestHandleUserPromptAppendsToExistingUserMessage(t *testing.T) {
 	if session.Messages[0].Role != llm.RoleUser {
 		t.Fatalf("Expected user message, got %s", session.Messages[0].Role)
 	}
-	if len(session.Messages[0].Content) != 1 {
-		t.Fatalf("Expected 1 content part, got %d", len(session.Messages[0].Content))
+	if len(session.Messages[0].Contents) != 1 {
+		t.Fatalf("Expected 1 content part, got %d", len(session.Messages[0].Contents))
 	}
 
 	// Now simulate submitting a new prompt — handleUserPrompt would check if
@@ -163,8 +163,8 @@ func TestHandleUserPromptAppendsToExistingUserMessage(t *testing.T) {
 	// replicating what handleUserPrompt does:
 	prompt := "Second attempt"
 	if len(session.Messages) > 0 && session.Messages[len(session.Messages)-1].Role == llm.RoleUser {
-		session.Messages[len(session.Messages)-1].Content = append(
-			session.Messages[len(session.Messages)-1].Content,
+		session.Messages[len(session.Messages)-1].Contents = append(
+			session.Messages[len(session.Messages)-1].Contents,
 			&llm.TextPart{Text: prompt},
 		)
 	} else {
@@ -175,17 +175,17 @@ func TestHandleUserPromptAppendsToExistingUserMessage(t *testing.T) {
 	if len(session.Messages) != 1 {
 		t.Fatalf("Expected 1 message, got %d", len(session.Messages))
 	}
-	if len(session.Messages[0].Content) != 2 {
-		t.Fatalf("Expected 2 content parts, got %d", len(session.Messages[0].Content))
+	if len(session.Messages[0].Contents) != 2 {
+		t.Fatalf("Expected 2 content parts, got %d", len(session.Messages[0].Contents))
 	}
 
-	tp0, ok := session.Messages[0].Content[0].(*llm.TextPart)
+	tp0, ok := session.Messages[0].Contents[0].(*llm.TextPart)
 	if !ok || tp0.Text != "First attempt" {
-		t.Errorf("First part mismatch: %v", session.Messages[0].Content[0])
+		t.Errorf("First part mismatch: %v", session.Messages[0].Contents[0])
 	}
-	tp1, ok := session.Messages[0].Content[1].(*llm.TextPart)
+	tp1, ok := session.Messages[0].Contents[1].(*llm.TextPart)
 	if !ok || tp1.Text != "Second attempt" {
-		t.Errorf("Second part mismatch: %v", session.Messages[0].Content[1])
+		t.Errorf("Second part mismatch: %v", session.Messages[0].Contents[1])
 	}
 }
 
@@ -195,8 +195,8 @@ func TestHandleUserPromptCreatesNewMessageWhenPreviousIsAssistant(t *testing.T) 
 	session := &Session{
 		runState: runState{
 			Messages: []llm.Message{
-				{Role: llm.RoleUser, Content: []llm.ContentPart{&llm.TextPart{Text: "Hello"}}},
-				{Role: llm.RoleAssistant, Content: []llm.ContentPart{&llm.TextPart{Text: "Hi!"}}},
+				{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "Hello"}}},
+				{Role: llm.RoleAssistant, Contents: []llm.ContentPart{&llm.TextPart{Text: "Hi!"}}},
 			},
 			taskQueue: make([]QueueItem, 0),
 		},
@@ -205,8 +205,8 @@ func TestHandleUserPromptCreatesNewMessageWhenPreviousIsAssistant(t *testing.T) 
 	// Simulate new prompt submission
 	prompt := "How are you?"
 	if len(session.Messages) > 0 && session.Messages[len(session.Messages)-1].Role == llm.RoleUser {
-		session.Messages[len(session.Messages)-1].Content = append(
-			session.Messages[len(session.Messages)-1].Content,
+		session.Messages[len(session.Messages)-1].Contents = append(
+			session.Messages[len(session.Messages)-1].Contents,
 			&llm.TextPart{Text: prompt},
 		)
 	} else {
@@ -222,11 +222,11 @@ func TestHandleUserPromptCreatesNewMessageWhenPreviousIsAssistant(t *testing.T) 
 	if session.Messages[2].Role != llm.RoleUser {
 		t.Errorf("Third message should be user, got %s", session.Messages[2].Role)
 	}
-	if len(session.Messages[2].Content) != 1 {
-		t.Fatalf("Third message should have 1 content part, got %d", len(session.Messages[2].Content))
+	if len(session.Messages[2].Contents) != 1 {
+		t.Fatalf("Third message should have 1 content part, got %d", len(session.Messages[2].Contents))
 	}
-	tp, ok := session.Messages[2].Content[0].(*llm.TextPart)
+	tp, ok := session.Messages[2].Contents[0].(*llm.TextPart)
 	if !ok || tp.Text != "How are you?" {
-		t.Errorf("Third message text mismatch: %v", session.Messages[2].Content[0])
+		t.Errorf("Third message text mismatch: %v", session.Messages[2].Contents[0])
 	}
 }

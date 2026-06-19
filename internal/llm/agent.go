@@ -86,8 +86,8 @@ type ToolConfirmRequest struct {
 	Input    json.RawMessage
 }
 
-// ToConfirmRequest builds a ToolConfirmRequest from a ToolUsePart.
-func (tc *ToolUsePart) ToConfirmRequest() ToolConfirmRequest {
+// ToConfirmRequest builds a ToolConfirmRequest from a ToolInputPart.
+func (tc *ToolInputPart) ToConfirmRequest() ToolConfirmRequest {
 	return ToolConfirmRequest{
 		ID:       tc.ID,
 		ToolName: tc.ToolName,
@@ -118,7 +118,7 @@ type StreamResult struct {
 
 // Stream executes the agent with streaming callbacks.
 // Tools are confirmed and executed as soon as their arguments finish streaming
-// (on ToolUseCompleteEvent), overlapping with other tools still being streamed.
+// (on ToolInputCompleteEvent), overlapping with other tools still being streamed.
 func (a *Agent) Stream(ctx context.Context, messages []Message, callbacks StreamCallbacks) (*StreamResult, error) {
 	allMessages := make([]Message, len(messages))
 	copy(allMessages, messages)
@@ -184,7 +184,7 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 		stepMessage Message
 		stepUsage   Usage
 		truncated   bool
-		deferred    []*ToolUsePart
+		deferred    []*ToolInputPart
 		results     []ContentPart
 	)
 
@@ -220,14 +220,14 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 				}
 			}
 
-		case ToolUseStartEvent:
+		case ToolInputStartEvent:
 			if callbacks.OnToolUseStart != nil {
 				if err := callbacks.OnToolUseStart(e.ID, e.ToolName, getOrAssignID(callbacks, idByIndex, e.Index)); err != nil {
 					return nil, Usage{}, false, err
 				}
 			}
 
-		case ToolUseCompleteEvent:
+		case ToolInputCompleteEvent:
 			id := getOrAssignID(callbacks, idByIndex, e.Index)
 			if callbacks.OnToolUseInput != nil {
 				if err := callbacks.OnToolUseInput(e.ID, e.Input, id); err != nil {
@@ -242,14 +242,14 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 			stepMessage = e.Message
 			stepUsage = e.Usage
 			// Set IDs on final content parts from tracked values.
-			for i := range stepMessage.Content {
+			for i := range stepMessage.Contents {
 				if id, ok := idByIndex[i]; ok {
-					stepMessage.Content[i].UpdateContentPartMeta(id, RoleAssistant)
+					stepMessage.Contents[i].UpdateContentPartMeta(id, RoleAssistant)
 				}
 			}
 			// Strip empty placeholders that providers may have inserted
 			// to keep delta indices aligned with content positions.
-			stepMessage.Content = stripEmptyPlaceholders(stepMessage.Content)
+			stepMessage.Contents = stripEmptyPlaceholders(stepMessage.Contents)
 			if e.StopReason == "max_tokens" || e.StopReason == "length" {
 				truncated = true
 			}
@@ -263,18 +263,18 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 	}
 
 	// Re-order results by tool call ID to match the LLM's intended order.
-	// toolUses are extracted from stepMessage.Content, which preserves the
+	// toolUses are extracted from stepMessage.Contents, which preserves the
 	// SSE index order (0, 1, 2...) from the streaming response. Each result
 	// carries its tool call ID, so we place them at the correct position
 	// regardless of execution or collection order.
-	toolUses := extractToolUses(stepMessage.Content)
+	toolUses := extractToolUses(stepMessage.Contents)
 	finalResults := make([]ContentPart, len(toolUses))
 	idToTool := make(map[string]int, len(toolUses))
 	for i, tc := range toolUses {
 		idToTool[tc.ID] = i
 	}
 	for _, r := range results {
-		if tr, ok := r.(*ToolResultPart); ok {
+		if tr, ok := r.(*ToolOutputPart); ok {
 			if idx, ok := idToTool[tr.ID]; ok {
 				finalResults[idx] = r
 			}
@@ -283,7 +283,7 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 
 	stepMessages := []Message{stepMessage}
 	if len(finalResults) > 0 && !truncated {
-		stepMessages = append(stepMessages, Message{Role: RoleTool, Content: finalResults})
+		stepMessages = append(stepMessages, Message{Role: RoleTool, Contents: finalResults})
 	}
 
 	return stepMessages, stepUsage, truncated, nil
@@ -292,14 +292,14 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 // handleStreamedToolUse processes a completed tool use during streaming.
 // If the tool requires confirmation (per ToolNeedsConfirm), it is deferred.
 // Otherwise it executes immediately in a goroutine.
-func (a *Agent) handleStreamedToolUse(ctx context.Context, tc *ToolUsePart, callbacks StreamCallbacks, deferred []*ToolUsePart, resultCh chan<- ContentPart) []*ToolUsePart {
+func (a *Agent) handleStreamedToolUse(ctx context.Context, tc *ToolInputPart, callbacks StreamCallbacks, deferred []*ToolInputPart, resultCh chan<- ContentPart) []*ToolInputPart {
 	if callbacks.ToolNeedsConfirm != nil && callbacks.ToolNeedsConfirm(tc.ToolName) {
 		deferred = append(deferred, tc)
 		return deferred
 	}
 
 	historyID := getHistoryID(callbacks)
-	go func(tc *ToolUsePart, historyID uint64) {
+	go func(tc *ToolInputPart, historyID uint64) {
 		resultCh <- a.executeTool(ctx, tc, callbacks, historyID)
 	}(tc, historyID)
 	return deferred
@@ -309,7 +309,7 @@ func (a *Agent) handleStreamedToolUse(ctx context.Context, tc *ToolUsePart, call
 // confirmed tools concurrently as confirm responses arrive.
 // Results (errors, denials, and successful executions) are all sent through resultCh.
 // Exactly len(deferred) items are sent to the channel.
-func (a *Agent) executeDeferredTools(ctx context.Context, deferred []*ToolUsePart, callbacks StreamCallbacks, resultCh chan<- ContentPart) {
+func (a *Agent) executeDeferredTools(ctx context.Context, deferred []*ToolInputPart, callbacks StreamCallbacks, resultCh chan<- ContentPart) {
 	if len(deferred) == 0 {
 		return
 	}
@@ -343,7 +343,7 @@ func (a *Agent) executeDeferredTools(ctx context.Context, deferred []*ToolUsePar
 		// Confirmed — execute concurrently.
 		tc := deferred[idToIdx[resp.ID]]
 		historyID := getHistoryID(callbacks)
-		go func(tc *ToolUsePart, historyID uint64) {
+		go func(tc *ToolInputPart, historyID uint64) {
 			resultCh <- a.executeTool(ctx, tc, callbacks, historyID)
 		}(tc, historyID)
 	}
@@ -401,10 +401,10 @@ func stripEmptyPlaceholders(content []ContentPart) []ContentPart {
 	return filtered
 }
 
-// ToPart converts a ToolUseCompleteEvent to a ToolUsePart,
+// ToPart converts a ToolInputCompleteEvent to a ToolInputPart,
 // carrying over the history ID assigned during streaming.
-func (e ToolUseCompleteEvent) ToPart(historyID uint64) *ToolUsePart {
-	return &ToolUsePart{
+func (e ToolInputCompleteEvent) ToPart(historyID uint64) *ToolInputPart {
+	return &ToolInputPart{
 		ID:       e.ID,
 		ToolName: e.ToolName,
 		Input:    e.Input,
@@ -415,7 +415,7 @@ func (e ToolUseCompleteEvent) ToPart(historyID uint64) *ToolUsePart {
 }
 
 // executeTool executes a single tool call and returns the result.
-func (a *Agent) executeTool(ctx context.Context, tc *ToolUsePart, callbacks StreamCallbacks, historyID uint64) ContentPart {
+func (a *Agent) executeTool(ctx context.Context, tc *ToolInputPart, callbacks StreamCallbacks, historyID uint64) ContentPart {
 	var tool *Tool
 	for _, t := range a.config.Tools {
 		if t.Definition.Name == tc.ToolName {
@@ -432,12 +432,12 @@ func (a *Agent) executeTool(ctx context.Context, tc *ToolUsePart, callbacks Stre
 	return newToolResult(callbacks, tc.ID, content, err, historyID)
 }
 
-// newToolResult creates a ToolResultPart and fires the OnToolUseOutput callback
+// newToolResult creates a ToolOutputPart and fires the OnToolUseOutput callback
 // so the UI is notified immediately as each tool finishes.
 //
 // Note: content is processed (nil → empty, error → TextPart) BEFORE the
 // callback fires, so the callback always receives meaningful display text.
-func newToolResult(callbacks StreamCallbacks, id string, content []ContentPart, err error, historyID uint64) *ToolResultPart {
+func newToolResult(callbacks StreamCallbacks, id string, content []ContentPart, err error, historyID uint64) *ToolOutputPart {
 	if content == nil {
 		content = []ContentPart{}
 	}
@@ -448,14 +448,14 @@ func newToolResult(callbacks StreamCallbacks, id string, content []ContentPart, 
 	if callbacks.OnToolUseOutput != nil {
 		callbacks.OnToolUseOutput(id, content, err, historyID) //nolint:errcheck
 	}
-	return &ToolResultPart{ID: id, Content: content, IsError: isError, ContentMeta: ContentMeta{HistoryID: historyID, Role: RoleTool}}
+	return &ToolOutputPart{ID: id, Output: content, IsError: isError, ContentMeta: ContentMeta{HistoryID: historyID, Role: RoleTool}}
 }
 
-// extractToolUses extracts ToolUseParts from message content.
-func extractToolUses(content []ContentPart) []ToolUsePart {
-	var uses []ToolUsePart
+// extractToolUses extracts ToolInputParts from message content.
+func extractToolUses(content []ContentPart) []ToolInputPart {
+	var uses []ToolInputPart
 	for _, part := range content {
-		if tc, ok := part.(*ToolUsePart); ok {
+		if tc, ok := part.(*ToolInputPart); ok {
 			uses = append(uses, *tc)
 		}
 	}

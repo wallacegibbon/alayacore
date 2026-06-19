@@ -380,16 +380,16 @@ func (s *openAIStreamState) setToolCallName(index int, id, name string) {
 	acc.name = name
 }
 
-func (s *openAIStreamState) getToolCalls() []llm.ToolUseCompleteEvent {
+func (s *openAIStreamState) getToolCalls() []llm.ToolInputCompleteEvent {
 	indices := make([]int, 0, len(s.toolAccumulators))
 	for i := range s.toolAccumulators {
 		indices = append(indices, i)
 	}
 	sort.Ints(indices)
-	result := make([]llm.ToolUseCompleteEvent, len(indices))
+	result := make([]llm.ToolInputCompleteEvent, len(indices))
 	for pos, i := range indices {
 		acc := s.toolAccumulators[i]
-		result[pos] = llm.ToolUseCompleteEvent{
+		result[pos] = llm.ToolInputCompleteEvent{
 			ID:       acc.id,
 			ToolName: acc.name,
 			Input:    json.RawMessage(acc.args.String()),
@@ -419,15 +419,15 @@ func (s *openAIStreamState) getMessage() llm.Message {
 		Text: s.textBuilder.String(),
 	})
 	for _, tc := range tcs {
-		content = append(content, &llm.ToolUsePart{
+		content = append(content, &llm.ToolInputPart{
 			ID:       tc.ID,
 			ToolName: tc.ToolName,
 			Input:    tc.Input,
 		})
 	}
 	return llm.Message{
-		Role:    llm.RoleAssistant,
-		Content: content,
+		Role:     llm.RoleAssistant,
+		Contents: content,
 	}
 }
 
@@ -509,7 +509,7 @@ func (p *OpenAIProvider) handleDelta(delta openAIDelta, yield func(llm.StreamEve
 		}
 		if tc.Function.Name != "" {
 			state.setToolCallName(tc.Index, tc.ID, tc.Function.Name)
-			if !yield(llm.ToolUseStartEvent{
+			if !yield(llm.ToolInputStartEvent{
 				ID:       tc.ID,
 				ToolName: tc.Function.Name,
 				Index:    2 + tc.Index, // content block: 0=reasoning, 1=text, 2+=tools
@@ -531,20 +531,20 @@ func openaiConvertMessages(messages []llm.Message, reasoningLevel int) []openAIM
 	apiMessages := make([]openAIMessage, 0, len(messages))
 	for _, msg := range messages {
 		if msg.Role == llm.RoleTool {
-			apiMessages = append(apiMessages, openaiConvertToolResults(msg.Content)...)
+			apiMessages = append(apiMessages, openaiConvertToolResults(msg.Contents)...)
 			continue
 		}
 
 		apiMsg := openAIMessage{Role: string(msg.Role)}
 
-		if msg.Role == llm.RoleAssistant && openaiHasToolCalls(msg.Content) {
-			openaiConvertToolCalls(&apiMsg, msg.Content)
+		if msg.Role == llm.RoleAssistant && openaiHasToolCalls(msg.Contents) {
+			openaiConvertToolCalls(&apiMsg, msg.Contents)
 		} else {
-			openaiConvertRegularContent(&apiMsg, msg.Content)
+			openaiConvertRegularContent(&apiMsg, msg.Contents)
 		}
 
 		if msg.Role == llm.RoleAssistant {
-			reasoningText := openaiExtractReasoning(msg.Content)
+			reasoningText := openaiExtractReasoning(msg.Contents)
 			if reasoningText != "" || reasoningLevel > config.ReasoningLevelOff {
 				apiMsg.ReasoningContent = &reasoningText
 			}
@@ -566,7 +566,7 @@ func openaiConvertMessages(messages []llm.Message, reasoningLevel int) []openAIM
 func openaiConvertToolResults(content []llm.ContentPart) []openAIMessage {
 	results := make([]openAIMessage, 0, len(content))
 	for _, part := range content {
-		tr, ok := part.(*llm.ToolResultPart)
+		tr, ok := part.(*llm.ToolOutputPart)
 		if !ok {
 			continue
 		}
@@ -578,7 +578,7 @@ func openaiConvertToolResults(content []llm.ContentPart) []openAIMessage {
 		// TextParts contribute their text directly; ImageParts contribute
 		// their data URI so the model can still access the image data.
 		var textParts []string
-		for _, cp := range tr.Content {
+		for _, cp := range tr.Output {
 			switch v := cp.(type) {
 			case *llm.TextPart:
 				textParts = append(textParts, v.Text)
@@ -601,7 +601,7 @@ func openaiConvertToolResults(content []llm.ContentPart) []openAIMessage {
 // openaiHasToolCalls checks if content contains tool calls
 func openaiHasToolCalls(content []llm.ContentPart) bool {
 	for _, part := range content {
-		if _, ok := part.(*llm.ToolUsePart); ok {
+		if _, ok := part.(*llm.ToolInputPart); ok {
 			return true
 		}
 	}
@@ -625,7 +625,7 @@ func openaiConvertToolCalls(apiMsg *openAIMessage, content []llm.ContentPart) {
 	var textParts []string
 	for _, part := range content {
 		switch v := part.(type) {
-		case *llm.ToolUsePart:
+		case *llm.ToolInputPart:
 			argsStr, err := json.Marshal(string(v.Input))
 			if err != nil {
 				argsStr = []byte("{}")

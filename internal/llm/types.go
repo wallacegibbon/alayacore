@@ -95,26 +95,26 @@ type ReasoningPart struct {
 	Text string
 }
 
-// ToolUsePart represents a tool call stored in conversation history.
-type ToolUsePart struct {
+// ToolInputPart represents a tool call stored in conversation history.
+type ToolInputPart struct {
 	ContentMeta
 	ID       string
-	ToolName string
 	Input    json.RawMessage
+	ToolName string
 }
 
-// ToolResultPart represents a tool execution result.
-type ToolResultPart struct {
+// ToolOutputPart represents a tool execution result.
+type ToolOutputPart struct {
 	ContentMeta
 	ID      string
-	Content []ContentPart
+	Output  []ContentPart
 	IsError bool
 }
 
 // Message represents a single message in the conversation
 type Message struct {
-	Role    MessageRole
-	Content []ContentPart
+	Role     MessageRole
+	Contents []ContentPart
 }
 
 // ToolDefinition defines a tool that can be called
@@ -153,24 +153,24 @@ type ReasoningDeltaEvent struct {
 
 func (ReasoningDeltaEvent) isStreamEvent() {}
 
-// ToolUseStartEvent signals that a tool use has started
-type ToolUseStartEvent struct {
+// ToolInputStartEvent signals that a tool use has started
+type ToolInputStartEvent struct {
 	ID       string
 	ToolName string
 	Index    int
 }
 
-func (ToolUseStartEvent) isStreamEvent() {}
+func (ToolInputStartEvent) isStreamEvent() {}
 
-// ToolUseCompleteEvent signals that a tool use's arguments have finished streaming
-type ToolUseCompleteEvent struct {
+// ToolInputCompleteEvent signals that a tool use's arguments have finished streaming
+type ToolInputCompleteEvent struct {
 	ID       string
 	ToolName string
 	Input    json.RawMessage
 	Index    int
 }
 
-func (ToolUseCompleteEvent) isStreamEvent() {}
+func (ToolInputCompleteEvent) isStreamEvent() {}
 
 // StepCompleteEvent represents completion of an agentic step.
 type StepCompleteEvent struct {

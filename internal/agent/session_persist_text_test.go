@@ -12,15 +12,15 @@ func TestSessionSavePreservesTextWithToolCalls(t *testing.T) {
 	msgs := []llm.Message{
 		{
 			Role: llm.RoleUser,
-			Content: []llm.ContentPart{
+			Contents: []llm.ContentPart{
 				&llm.TextPart{Text: "What's the weather?"},
 			},
 		},
 		{
 			Role: llm.RoleAssistant,
-			Content: []llm.ContentPart{
+			Contents: []llm.ContentPart{
 				&llm.TextPart{Text: "Let me check that for you."},
-				&llm.ToolUsePart{
+				&llm.ToolInputPart{
 					ID:       "call_123",
 					ToolName: "get_weather",
 					Input:    []byte(`{"location":"SF"}`),
@@ -29,16 +29,16 @@ func TestSessionSavePreservesTextWithToolCalls(t *testing.T) {
 		},
 		{
 			Role: llm.RoleTool,
-			Content: []llm.ContentPart{
-				&llm.ToolResultPart{
-					ID:      "call_123",
-					Content: []llm.ContentPart{&llm.TextPart{Text: "Sunny, 72F"}},
+			Contents: []llm.ContentPart{
+				&llm.ToolOutputPart{
+					ID:     "call_123",
+					Output: []llm.ContentPart{&llm.TextPart{Text: "Sunny, 72F"}},
 				},
 			},
 		},
 		{
 			Role: llm.RoleAssistant,
-			Content: []llm.ContentPart{
+			Contents: []llm.ContentPart{
 				&llm.TextPart{Text: "The weather in SF is sunny and 72F."},
 			},
 		},
@@ -81,14 +81,14 @@ func TestSessionSavePreservesTextWithToolCalls(t *testing.T) {
 
 	hasText := false
 	hasToolCall := false
-	for _, part := range assistantMsg.Content {
+	for _, part := range assistantMsg.Contents {
 		switch p := part.(type) {
 		case *llm.TextPart:
 			hasText = true
 			if p.Text != "Let me check that for you." {
 				t.Errorf("Assistant text mismatch: %q", p.Text)
 			}
-		case *llm.ToolUsePart:
+		case *llm.ToolInputPart:
 			hasToolCall = true
 			if p.ToolName != "get_weather" {
 				t.Errorf("Tool name mismatch: %s", p.ToolName)
@@ -110,11 +110,11 @@ func TestSessionSavePreservesTextWithToolCalls(t *testing.T) {
 		t.Fatalf("Expected assistant message at index 3, got %s", finalAssistantMsg.Role)
 	}
 
-	if len(finalAssistantMsg.Content) != 1 {
-		t.Errorf("Expected 1 content part in final assistant message, got %d", len(finalAssistantMsg.Content))
+	if len(finalAssistantMsg.Contents) != 1 {
+		t.Errorf("Expected 1 content part in final assistant message, got %d", len(finalAssistantMsg.Contents))
 	}
 
-	if textPart, ok := finalAssistantMsg.Content[0].(*llm.TextPart); ok {
+	if textPart, ok := finalAssistantMsg.Contents[0].(*llm.TextPart); ok {
 		if textPart.Text != "The weather in SF is sunny and 72F." {
 			t.Errorf("Final assistant text mismatch: %q", textPart.Text)
 		}
@@ -132,7 +132,7 @@ func contentsFromMessagesForTest(msgs []llm.Message) []llm.ContentPart {
 	var items []llm.ContentPart
 	var id uint64
 	for _, msg := range msgs {
-		for _, part := range msg.Content {
+		for _, part := range msg.Contents {
 			id++
 			part.UpdateContentPartMeta(id, msg.Role)
 			items = append(items, part)

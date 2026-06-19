@@ -221,15 +221,15 @@ func contentPartToTLV(part llm.ContentPart) (tag string, content string, err err
 		return stream.TagUserD, p.DataURI, nil
 	case *llm.ReasoningPart:
 		return stream.TagAssistantR, p.Text, nil
-	case *llm.ToolUsePart:
+	case *llm.ToolInputPart:
 		fd := stream.ToolUseData{ID: p.ID, Name: p.ToolName, Input: p.Input}
 		jsonData, err := json.Marshal(fd)
 		if err != nil {
 			return "", "", err
 		}
 		return stream.TagAssistantF, string(jsonData), nil
-	case *llm.ToolResultPart:
-		contentJSON, err := serializeContentParts(p.Content)
+	case *llm.ToolOutputPart:
+		contentJSON, err := serializeContentParts(p.Output)
 		if err != nil {
 			return "", "", fmt.Errorf("failed to serialize tool result content: %w", err)
 		}
@@ -276,7 +276,7 @@ func contentPartFromTLV(tag string, content []byte) (llm.ContentPart, error) {
 		if fd.Name == "" {
 			return nil, nil
 		}
-		return &llm.ToolUsePart{
+		return &llm.ToolInputPart{
 			ID: fd.ID, ToolName: fd.Name, Input: fd.Input, ContentMeta: llm.ContentMeta{Role: llm.RoleAssistant},
 		}, nil
 	case stream.TagUserF:
@@ -288,7 +288,7 @@ func contentPartFromTLV(tag string, content []byte) (llm.ContentPart, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse tool result content: %w", err)
 		}
-		return &llm.ToolResultPart{ID: tr.ID, Content: contentParts, IsError: tr.IsError, ContentMeta: llm.ContentMeta{Role: llm.RoleTool}}, nil
+		return &llm.ToolOutputPart{ID: tr.ID, Output: contentParts, IsError: tr.IsError, ContentMeta: llm.ContentMeta{Role: llm.RoleTool}}, nil
 	default:
 		return nil, fmt.Errorf("unknown tag: %s", tag)
 	}

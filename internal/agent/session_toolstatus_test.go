@@ -67,9 +67,9 @@ func TestOnToolUseOutputCallback(t *testing.T) {
 	callback := func(id string, content []llm.ContentPart, err error) {
 		session.Messages = append(session.Messages, llm.Message{
 			Role: llm.RoleTool,
-			Content: []llm.ContentPart{&llm.ToolResultPart{
+			Contents: []llm.ContentPart{&llm.ToolOutputPart{
 				ID:      id,
-				Content: content,
+				Output:  content,
 				IsError: err != nil,
 			}},
 		})
