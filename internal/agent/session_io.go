@@ -266,7 +266,9 @@ func (s *Session) handleModelSet(args []string) {
 	if s.SessionFile != "" {
 		s.sessionMetaModel = model.Name
 	} else if s.RuntimeManager != nil {
-		_ = s.RuntimeManager.SetActiveModel(model.Name) //nolint:errcheck // best-effort save, errors ignored
+		if err := s.RuntimeManager.SetActiveModel(model.Name); err != nil {
+			s.writeNotifyf("Failed to persist model switch: %v", err)
+		}
 	}
 
 	if err := s.SwitchModel(model); err != nil {
@@ -385,7 +387,9 @@ func (s *Session) handleThemeSet(args []string) {
 	}
 
 	if s.RuntimeManager != nil {
-		_ = s.RuntimeManager.SetActiveTheme(name) //nolint:errcheck // best-effort save, errors ignored
+		if err := s.RuntimeManager.SetActiveTheme(name); err != nil {
+			s.writeNotifyf("Failed to persist theme switch: %v", err)
+		}
 	}
 	s.writeNotifyf("Theme set to: %s", name)
 	s.sendSystemInfo("theme")

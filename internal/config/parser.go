@@ -91,6 +91,7 @@ func parseConfig(content string, target any) []ParseWarning {
 		// Look up field by tag
 		fieldIdx, ok := tagToField[key]
 		if !ok {
+			warnings = append(warnings, ParseWarning{Key: key, Value: value, Err: "unknown config key"})
 			continue
 		}
 

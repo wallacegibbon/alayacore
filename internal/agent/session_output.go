@@ -87,12 +87,14 @@ func (s *Session) writeTLVStr(tag string, msg string) {
 }
 
 // writeTLVJSON marshals a value to JSON and writes it as a TLV frame.
+// On marshal failure, marks output as broken (same as writeTLV on write failure).
 func (s *Session) writeTLVJSON(tag string, v any) {
 	if s.outputBroken.Load() || s.Output == nil {
 		return
 	}
 	data, err := json.Marshal(v)
 	if err != nil {
+		s.markOutputBroken()
 		return
 	}
 	s.writeTLV(tag, string(data))

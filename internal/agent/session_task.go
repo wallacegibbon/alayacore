@@ -9,6 +9,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strconv"
 
 	domainerrors "github.com/alayacore/alayacore/internal/errors"
@@ -106,25 +107,34 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.ContentPart) 
 			return nil
 		},
 		OnToolInputStart: func(toolCallID, name string, historyID uint64) error {
-			data, _ := json.Marshal(stream.ToolInputData{ID: toolCallID, Name: name}) //nolint:errcheck
+			data, err := json.Marshal(stream.ToolInputData{ID: toolCallID, Name: name})
+			if err != nil {
+				return fmt.Errorf("failed to marshal tool input start: %w", err)
+			}
 			s.writeTLVWithID(stream.TagAssistantF, historyID, string(data))
 			return nil
 		},
 		OnToolInputComplete: func(toolCallID string, input json.RawMessage, historyID uint64) error {
-			data, _ := json.Marshal(stream.ToolInputData{ID: toolCallID, Input: input}) //nolint:errcheck
+			data, err := json.Marshal(stream.ToolInputData{ID: toolCallID, Input: input})
+			if err != nil {
+				return fmt.Errorf("failed to marshal tool input complete: %w", err)
+			}
 			s.writeTLVWithID(stream.TagAssistantF, historyID, string(data))
 			return nil
 		},
 		OnToolOutput: func(toolCallID string, contents []llm.ContentPart, err error, historyID uint64) error {
-			contentJSON, err2 := serializeContentParts(contents)
-			if err2 != nil {
+			contentJSON, serErr := serializeContentParts(contents)
+			if serErr != nil {
 				contentJSON = []byte(`[{"type":"text","text":"(serialization error)"}]`)
 			}
-			data, _ := json.Marshal(stream.ToolOutputData{ //nolint:errcheck
+			data, marshalErr := json.Marshal(stream.ToolOutputData{
 				ID:      toolCallID,
 				Output:  contentJSON,
 				IsError: err != nil,
 			})
+			if marshalErr != nil {
+				return fmt.Errorf("failed to marshal tool output: %w", marshalErr)
+			}
 			s.writeTLVWithID(stream.TagUserF, historyID, string(data))
 			return nil
 		},

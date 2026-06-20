@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
@@ -66,7 +67,7 @@ func TestEditFileStreamingMemory(t *testing.T) {
 	runtime.GC()
 	runtime.ReadMemStats(&m1)
 
-	_, err = executeEditFile(context.TODO(), EditFileInput{
+	_, err = executeEditFile(context.Background(), EditFileInput{
 		Path:      testFile,
 		OldString: string(pattern),
 		NewString: "REPLACED_SUCCESSFULLY",
@@ -84,11 +85,11 @@ func TestEditFileStreamingMemory(t *testing.T) {
 		t.Fatalf("Failed to read edited file: %v", err)
 	}
 
-	if !contains(content, []byte("REPLACED_SUCCESSFULLY")) {
+	if !bytes.Contains(content, []byte("REPLACED_SUCCESSFULLY")) {
 		t.Error("Replacement text not found in file")
 	}
 
-	if contains(content, pattern) {
+	if bytes.Contains(content, pattern) {
 		t.Error("Original pattern still exists in file")
 	}
 
@@ -105,30 +106,6 @@ func TestEditFileStreamingMemory(t *testing.T) {
 	} else {
 		t.Logf("Memory decreased (GC ran): %.2f MB", float64(-memIncrease)/1024/1024)
 	}
-}
-
-func contains(data []byte, substr []byte) bool {
-	return len(data) >= len(substr) &&
-		(len(data) == 0 && len(substr) == 0) ||
-		(len(data) > 0 && findBytes(data, substr))
-}
-
-func findBytes(data, substr []byte) bool {
-	for i := 0; i <= len(data)-len(substr); i++ {
-		if matchBytes(data[i:], substr) {
-			return true
-		}
-	}
-	return false
-}
-
-func matchBytes(data, substr []byte) bool {
-	for i, b := range substr {
-		if data[i] != b {
-			return false
-		}
-	}
-	return true
 }
 
 func TestEditFileStreamingEdgeCases(t *testing.T) {
@@ -180,7 +157,7 @@ func TestEditFileStreamingEdgeCases(t *testing.T) {
 				t.Fatalf("Failed to create test file: %v", err)
 			}
 
-			_, err := executeEditFile(context.TODO(), EditFileInput{
+			_, err := executeEditFile(context.Background(), EditFileInput{
 				Path:      testFile,
 				OldString: tt.oldString,
 				NewString: tt.newString,
