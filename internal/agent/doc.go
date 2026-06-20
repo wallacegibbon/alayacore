@@ -100,7 +100,7 @@
 //   - session_io.go: TLV input/output, summarize, continue commands
 //   - session_content.go: ContentPart helpers, tag mapping, ID lookup
 //   - session_persist.go: Session save/load functionality
-//   - session_types.go: Type definitions (taskCtx, QueueItem, etc.)
+//   - session_types.go: Type definitions (QueueItem, etc.)
 //   - command_registry.go: Declarative command registration
 //   - model_manager.go: Model configuration management
 //   - runtime_manager.go: Runtime persistence

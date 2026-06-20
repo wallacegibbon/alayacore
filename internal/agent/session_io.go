@@ -95,33 +95,33 @@ func (s *Session) clearQueue() {
 	s.requestSystemInfo()
 }
 
-func (s *Session) handleContinue(ctx context.Context, tc *taskCtx, args []string) {
+func (s *Session) handleContinue(ctx context.Context, contents []llm.ContentPart, args []string) []llm.ContentPart {
 	// Validate arguments before doing anything.
 	if len(args) > 0 && args[0] != "skip" {
 		s.writeError("usage: :continue [skip]")
-		return
+		return contents
 	}
 
 	s.pausedOnError.Store(false)
 
 	// With no arguments, resend the last prompt.
 	if len(args) == 0 {
-		s.resendPrompt(ctx, tc)
-		return
+		return s.resendPrompt(ctx, contents)
 	}
 
 	// "skip" — skip the failed prompt and resume the remaining queue.
 	qLen := len(s.taskQueue)
 	if qLen == 0 {
 		s.writeNotify("Queue is empty")
-		return
+		return contents
 	}
 
 	s.writeNotify("Resuming queue...")
 	s.requestSystemInfo()
+	return contents
 }
 
-func (s *Session) summarize(ctx context.Context, tc *taskCtx) {
+func (s *Session) summarize(ctx context.Context, contents []llm.ContentPart) []llm.ContentPart {
 	// Save a timestamped backup before the destructive summarization
 	// replaces the conversation history.  This preserves the full context
 	// for recovery if the summary omits important details.
@@ -151,7 +151,7 @@ Rules:
 - Skip completed exploration; only preserve findings that affect next steps`
 
 	id := s.histIncAndGet()
-	tc.Contents = append(tc.Contents, &llm.TextPart{
+	contents = append(contents, &llm.TextPart{
 		Text: prompt,
 		ContentPartMeta: llm.ContentPartMeta{
 			HistoryID: id,
@@ -161,13 +161,13 @@ Rules:
 
 	s.writeNotify("Summarizing conversation...")
 
-	beforeLen := len(tc.Contents)
-	fullContents, outputTokens, err := s.processPrompt(ctx, tc.Contents)
+	beforeLen := len(contents)
+	fullContents, outputTokens, err := s.processPrompt(ctx, contents)
 	if err != nil {
 		s.writeError(err.Error())
 		s.pausedOnError.Store(true)
 		s.requestSystemInfo()
-		return
+		return fullContents
 	}
 
 	// Find assistant content parts in the newly added content (response to summary).
@@ -186,9 +186,9 @@ Rules:
 	}
 
 	// Rebuild contents: "Continue" user message + filtered summary.
-	tc.Contents = tc.Contents[:0]
+	contents = contents[:0]
 	continueID := s.histIncAndGet()
-	tc.Contents = append(tc.Contents, &llm.TextPart{
+	contents = append(contents, &llm.TextPart{
 		Text: "Continue",
 		ContentPartMeta: llm.ContentPartMeta{
 			HistoryID: continueID,
@@ -197,7 +197,7 @@ Rules:
 	})
 	for _, part := range summaryParts {
 		part.UpdateContentPartMeta(s.histIncAndGet(), llm.RoleAssistant)
-		tc.Contents = append(tc.Contents, part)
+		contents = append(contents, part)
 	}
 
 	if outputTokens > 0 {
@@ -206,6 +206,7 @@ Rules:
 
 	s.writeNotify("Summarized conversation")
 	s.requestSystemInfo()
+	return contents
 }
 
 func (s *Session) saveSession(args []string) {
@@ -399,16 +400,16 @@ func (s *Session) handleThemeSet(args []string) {
 //     equivalent to a user turn, so the LLM can respond directly.
 //  3. Assistant message → the API partially succeeded or was canceled.
 //     A "Continue" user message is appended so the model picks up where it left off.
-func (s *Session) resendPrompt(ctx context.Context, tc *taskCtx) {
-	if len(tc.Contents) == 0 {
+func (s *Session) resendPrompt(ctx context.Context, contents []llm.ContentPart) []llm.ContentPart {
+	if len(contents) == 0 {
 		s.writeError("No messages to resend")
-		return
+		return contents
 	}
 
-	lastPart := tc.Contents[len(tc.Contents)-1]
+	lastPart := contents[len(contents)-1]
 	if lastPart.GetRole() == llm.RoleAssistant {
 		id := s.histIncAndGet()
-		tc.Contents = append(tc.Contents, &llm.TextPart{
+		contents = append(contents, &llm.TextPart{
 			Text: "Continue",
 			ContentPartMeta: llm.ContentPartMeta{
 				HistoryID: id,
@@ -420,17 +421,16 @@ func (s *Session) resendPrompt(ctx context.Context, tc *taskCtx) {
 		s.writeNotify("Resending...")
 	}
 
-	fullContents, _, err := s.processPrompt(ctx, tc.Contents)
-	tc.Contents = fullContents
-
+	fullContents, _, err := s.processPrompt(ctx, contents)
 	if err != nil {
 		s.writeError(err.Error())
 		s.pausedOnError.Store(true)
 		s.requestSystemInfo()
-		return
+		return fullContents
 	}
 
 	s.requestSystemInfo()
+	return fullContents
 }
 
 // ============================================================================

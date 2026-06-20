@@ -12,12 +12,6 @@ import (
 	"github.com/alayacore/alayacore/internal/theme"
 )
 
-// taskCtx holds the working copy of Contents that the
-// task goroutine passes through its processing pipeline.
-type taskCtx struct {
-	Contents []llm.ContentPart
-}
-
 // QueueItem represents a queued task with metadata.
 type QueueItem struct {
 	QueueID     string            `json:"queue_id"`

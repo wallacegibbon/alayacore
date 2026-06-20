@@ -74,49 +74,43 @@ func (s *Session) enqueueTask(item QueueItem, front bool) {
 // runTask executes a single task in its own goroutine. It is called from
 // run() via "go s.runTask(ctx, item, taskContent)". On completion it sends
 // the result on taskResultCh so the main loop can update s.Contents.
-//
-// The task goroutine wraps the content snapshot in a taskCtx and passes it
-// through the processing pipeline. All state mutations during execution
-// (step progress, new content, token counts) are sent to run() via taskEventCh.
-// The task goroutine never writes to s.Contents directly.
 func (s *Session) runTask(ctx context.Context, item QueueItem, taskContent []llm.ContentPart) {
-	tc := &taskCtx{
-		Contents: taskContent,
-	}
+	contents := taskContent
 
 	defer func() {
-		s.taskResultCh <- tc.Contents
+		s.taskResultCh <- contents
 	}()
 
 	s.requestSystemInfo()
 
 	switch item.Type {
 	case TaskTypePrompt:
-		s.handleUserPrompt(ctx, tc, item.Content, item.Attachments)
+		contents = s.handleUserPrompt(ctx, contents, item.Content, item.Attachments)
 	case TaskTypeCommand:
-		s.runTaskCommand(ctx, tc, item.Content)
+		contents = s.runTaskCommand(ctx, contents, item.Content)
 	}
 
 	if ctx.Err() == context.Canceled {
-		s.appendCancelMessage(tc)
+		contents = s.appendCancelMessage(contents)
 	}
 }
 
 // runTaskCommand handles a task command in the task goroutine.
 // Unlike commands dispatched directly by handleInputMsg in run(),
-// task commands operate on the task's local message copy.
-func (s *Session) runTaskCommand(ctx context.Context, tc *taskCtx, cmd string) {
+// task commands operate on the task's local content copy.
+func (s *Session) runTaskCommand(ctx context.Context, contents []llm.ContentPart, cmd string) []llm.ContentPart {
 	parts := strings.Fields(cmd)
 	if len(parts) == 0 {
-		return
+		return contents
 	}
 	switch parts[0] {
 	case CommandNameSummarize:
-		s.summarize(ctx, tc)
+		return s.summarize(ctx, contents)
 	case CommandNameContinue:
-		s.handleContinue(ctx, tc, parts[1:])
+		return s.handleContinue(ctx, contents, parts[1:])
 	default:
 		s.writeError(domainerrors.NewSessionErrorf("command", "unknown cmd <%s>", parts[0]).Error())
+		return contents
 	}
 }
 
@@ -124,9 +118,9 @@ func (s *Session) runTaskCommand(ctx context.Context, tc *taskCtx, cmd string) {
 // message window when a task is canceled by the user.
 const cancelMessage = "Canceled"
 
-func (s *Session) appendCancelMessage(tc *taskCtx) {
+func (s *Session) appendCancelMessage(contents []llm.ContentPart) []llm.ContentPart {
 	id := s.histIncAndGet()
-	tc.Contents = append(tc.Contents, &llm.TextPart{
+	contents = append(contents, &llm.TextPart{
 		Text: cancelMessage,
 		ContentPartMeta: llm.ContentPartMeta{
 			HistoryID: id,
@@ -134,6 +128,7 @@ func (s *Session) appendCancelMessage(tc *taskCtx) {
 		},
 	})
 	s.writeTLVStr(stream.TagAssistantT, stream.WrapDelta(strconv.FormatUint(id, 10), cancelMessage))
+	return contents
 }
 
 // ============================================================================

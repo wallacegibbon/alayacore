@@ -31,36 +31,36 @@ const (
 // ============================================================================
 
 // handleUserPrompt echoes the user prompt to output, appends it to
-// tc.Contents, then runs the agent loop.
-func (s *Session) handleUserPrompt(ctx context.Context, tc *taskCtx, prompt string, attachments []llm.ContentPart) {
+// contents, then runs the agent loop.
+func (s *Session) handleUserPrompt(ctx context.Context, contents []llm.ContentPart, prompt string, attachments []llm.ContentPart) []llm.ContentPart {
 	if s.shouldAutoSummarize() {
-		s.doAutoSummarize(ctx, tc)
+		s.doAutoSummarize(ctx, contents)
 	}
 
-	// Assign history IDs, append to tc.Contents, and echo to output.
+	// Assign history IDs, append to contents, and echo to output.
 	for _, att := range attachments {
 		id := s.histIncAndGet()
 		att.SetHistoryID(id)
 		att.SetRole(llm.RoleUser)
-		tc.Contents = append(tc.Contents, att)
+		contents = append(contents, att)
 		if tag, val, err := contentPartToTLV(att); err == nil && tag != "" {
 			s.writeTLVStr(tag, stream.WrapDelta(strconv.FormatUint(id, 10), val))
 		}
 	}
 	id := s.histIncAndGet()
 	part := &llm.TextPart{Text: prompt, ContentPartMeta: llm.ContentPartMeta{HistoryID: id, Role: llm.RoleUser}}
-	tc.Contents = append(tc.Contents, part)
+	contents = append(contents, part)
 	s.writeTLVStr(stream.TagUserT, stream.WrapDelta(strconv.FormatUint(id, 10), prompt))
 
-	fullContents, _, err := s.processPrompt(ctx, tc.Contents)
-	tc.Contents = fullContents
-
+	fullContents, _, err := s.processPrompt(ctx, contents)
 	if err != nil {
 		s.writeError(err.Error())
 		s.pausedOnError.Store(true)
 		s.requestSystemInfo()
-		return
+		return contents
 	}
+
+	return fullContents
 }
 
 // shouldAutoSummarize returns true when auto-summarization is enabled and
@@ -72,12 +72,12 @@ func (s *Session) shouldAutoSummarize() bool {
 }
 
 // doAutoSummarize logs a notification and triggers summarization.
-func (s *Session) doAutoSummarize(ctx context.Context, tc *taskCtx) {
+func (s *Session) doAutoSummarize(ctx context.Context, contents []llm.ContentPart) []llm.ContentPart {
 	limit := s.ContextLimit
 	usage := float64(s.ContextTokens) * AutoSummarizePctBase / float64(limit)
 	s.writeNotifyf("Context usage at %d/%d tokens (%.0f%%). Auto-summarizing...",
 		s.ContextTokens, limit, usage)
-	s.summarize(ctx, tc)
+	return s.summarize(ctx, contents)
 }
 
 // ============================================================================
@@ -157,13 +157,8 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.ContentPart) 
 			return nil
 		},
 		OnStepFinish: func(contents []llm.ContentPart, usage llm.Usage) error {
-			// Remove orphaned tool uses from the end before capturing
-			// new content. This keeps Contents free of tool
-			// calls that were emitted but never executed (cancel/error).
 			fullContents = cleanIncompleteToolInputs(contents)
-
 			s.sendEvent(usageToStepFinishEvent(usage))
-
 			outputTokens += usage.OutputTokens
 			s.requestSystemInfo()
 			return nil
