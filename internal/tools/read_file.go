@@ -58,35 +58,59 @@ var documentMimePrefixes = []string{
 }
 
 // isMediaFile checks whether the file at path is a supported media type
-// (image, video, audio, document) by examining the extension and content.
+// (image, video, audio, document) by examining both the extension and content.
+// Content sniffing is used to catch false positives where the extension-based
+// MIME type is misleading (e.g., .mod → audio/x-mod for a go.mod text file).
+// Only overrides extension-based detection when content explicitly says text.
 // Returns the MIME type and a constructor for the appropriate ContentPart.
 func isMediaFile(path string) (mimeType string, newPart func(dataURI string) llm.ContentPart, ok bool) {
 	ext := strings.ToLower(filepath.Ext(path))
+
+	// Get extension-based MIME
+	var extMime string
 	if ext != "" {
-		mimeType = mime.TypeByExtension(ext)
-		if mimeType != "" {
-			if part, ok := matchMediaType(mimeType); ok {
-				return mimeType, part, true
-			}
-		}
+		extMime = mime.TypeByExtension(ext)
 	}
 
-	// Extension didn't match — sniff content (first 512 bytes)
+	// Open and sniff content (first 512 bytes) for verification
 	f, err := os.Open(path)
 	if err != nil {
+		// Can't sniff — trust extension if it says media
+		if extMime != "" {
+			if part, ok := matchMediaType(extMime); ok {
+				return extMime, part, true
+			}
+		}
 		return "", nil, false
 	}
 	defer f.Close()
 
 	buf := make([]byte, 512)
 	n, _ := f.Read(buf) //nolint:errcheck // partial read is fine for sniffing
-	if n == 0 {
-		return "", nil, false
+
+	var contentMime string
+	if n > 0 {
+		contentMime = http.DetectContentType(buf[:n])
 	}
 
-	mimeType = http.DetectContentType(buf[:n])
-	if part, ok := matchMediaType(mimeType); ok {
-		return mimeType, part, true
+	// If extension says media, verify with content sniffing
+	if extMime != "" {
+		if extPart, ok := matchMediaType(extMime); ok {
+			// Content explicitly says text — extension was misleading
+			// (e.g., .mod → audio/x-mod but go.mod is text)
+			if contentMime != "" && strings.HasPrefix(contentMime, "text/") {
+				return "", nil, false
+			}
+			// Content isn't text — trust extension
+			return extMime, extPart, true
+		}
+	}
+
+	// Extension didn't match or was overridden — use content sniffing
+	if contentMime != "" {
+		if part, ok := matchMediaType(contentMime); ok {
+			return contentMime, part, true
+		}
 	}
 	return "", nil, false
 }
