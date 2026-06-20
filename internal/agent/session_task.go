@@ -45,13 +45,13 @@ func (s *Session) handleUserPrompt(ctx context.Context, contents []llm.ContentPa
 		att.SetRole(llm.RoleUser)
 		contents = append(contents, att)
 		if tag, val, err := contentPartToTLV(att); err == nil && tag != "" {
-			s.writeTLV(tag, stream.WrapDelta(strconv.FormatUint(id, 10), val))
+			s.writeTLVStr(tag, stream.WrapDelta(strconv.FormatUint(id, 10), val))
 		}
 	}
 	id := s.histIncAndGet()
 	part := &llm.TextPart{Text: prompt, ContentPartMeta: llm.ContentPartMeta{HistoryID: id, Role: llm.RoleUser}}
 	contents = append(contents, part)
-	s.writeTLV(stream.TagUserT, stream.WrapDelta(strconv.FormatUint(id, 10), prompt))
+	s.writeTLVStr(stream.TagUserT, stream.WrapDelta(strconv.FormatUint(id, 10), prompt))
 
 	fullContents, _, err := s.processPrompt(ctx, contents)
 	if err != nil {

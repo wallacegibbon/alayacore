@@ -117,7 +117,7 @@ func TestOutputWriterToolCallStartThenFull(t *testing.T) {
 			ID:   id,
 			Name: name,
 		})
-		return stream.EncodeTLV(stream.TagAssistantF, fd)
+		return stream.EncodeTLV(stream.TagAssistantF, string(fd))
 	}
 
 	makeInputFD := func(id, input string) []byte {
@@ -125,7 +125,7 @@ func TestOutputWriterToolCallStartThenFull(t *testing.T) {
 			ID:    id,
 			Input: json.RawMessage(input),
 		})
-		return stream.EncodeTLV(stream.TagAssistantF, fd)
+		return stream.EncodeTLV(stream.TagAssistantF, string(fd))
 	}
 
 	// 1. Simulate ToolCallStart: Name set, no input yet

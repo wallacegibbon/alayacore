@@ -50,7 +50,7 @@ func (s *Session) markOutputBroken() {
 }
 
 // writeTLV writes a TLV frame. On error, marks output as broken.
-func (s *Session) writeTLV(tag string, value []byte) {
+func (s *Session) writeTLV(tag string, value string) {
 	if s.outputBroken.Load() || s.Output == nil {
 		return
 	}
@@ -81,6 +81,11 @@ func (s *Session) writeNotifyf(format string, args ...any) {
 	s.writeNotify(fmt.Sprintf(format, args...))
 }
 
+// writeTLVStr writes a string TLV frame.
+func (s *Session) writeTLVStr(tag string, msg string) {
+	s.writeTLV(tag, msg)
+}
+
 // writeTLVJSON marshals a value to JSON and writes it as a TLV frame.
 // On marshal failure, marks output as broken (same as writeTLV on write failure).
 func (s *Session) writeTLVJSON(tag string, v any) {
@@ -92,7 +97,7 @@ func (s *Session) writeTLVJSON(tag string, v any) {
 		s.markOutputBroken()
 		return
 	}
-	s.writeTLV(tag, data)
+	s.writeTLV(tag, string(data))
 }
 
 func (s *Session) writeToolInput(input json.RawMessage, id string) {

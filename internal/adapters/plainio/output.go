@@ -65,17 +65,17 @@ func (o *stdoutOutput) processBuffer() {
 		if len(o.buf) < 6+length {
 			break
 		}
-		value := o.buf[6 : 6+length]
+		value := string(o.buf[6 : 6+length])
 		o.buf = o.buf[6+length:]
 		o.printMessage(tag, value)
 	}
 }
 
-func (o *stdoutOutput) printMessage(tag string, value []byte) {
+func (o *stdoutOutput) printMessage(tag string, value string) {
 	o.handleTag(tag, value)
 }
 
-func (o *stdoutOutput) handleTag(tag string, value []byte) {
+func (o *stdoutOutput) handleTag(tag, value string) {
 	switch tag {
 	case stream.TagAssistantT, stream.TagAssistantR:
 		o.handleTextDelta(tag, value)
@@ -86,7 +86,7 @@ func (o *stdoutOutput) handleTag(tag string, value []byte) {
 			content = value
 		}
 		o.emitSeparator(tag)
-		fmt.Fprintf(o.writer, "> %s\n", string(content))
+		fmt.Fprintf(o.writer, "> %s\n", content)
 
 	case stream.TagSystemMsg:
 		o.handleSystemMsg(value)
@@ -102,7 +102,7 @@ func (o *stdoutOutput) handleTag(tag string, value []byte) {
 		o.lastTag = tag
 		o.lastHistoryID = ""
 		// Show complete tool call JSON.
-		fmt.Fprintf(o.writer, "%s\n", string(payload))
+		fmt.Fprintf(o.writer, "%s\n", payload)
 
 	case stream.TagUserF:
 		_, payload, ok := stream.UnwrapDelta(value)
@@ -115,21 +115,21 @@ func (o *stdoutOutput) handleTag(tag string, value []byte) {
 		}
 		o.lastTag = tag
 		o.lastHistoryID = ""
-		fmt.Fprintf(o.writer, "%s\n", string(payload))
+		fmt.Fprintf(o.writer, "%s\n", payload)
 
 	case stream.TagUserI, stream.TagUserV, stream.TagUserA, stream.TagUserD:
 		o.handleMediaTag(tag, value)
 
 	default:
 		o.emitSeparator(tag)
-		fmt.Fprintf(o.writer, "[unknown-tag:%s %s]", tag, string(value))
+		fmt.Fprintf(o.writer, "[unknown-tag:%s %s]", tag, value)
 	}
 }
 
 // handleTextDelta handles AT (assistant text) and AR (reasoning text) tags.
 // It prints a separator when transitioning between different tags or
 // stream IDs, then prints the content delta.
-func (o *stdoutOutput) handleTextDelta(tag string, value []byte) {
+func (o *stdoutOutput) handleTextDelta(tag, value string) {
 	id, content, _ := stream.UnwrapDelta(value)
 	// When id is "" (replayed from session file, no NUL prefix),
 	// we just track it as-is — no stream transition to detect.
@@ -142,7 +142,7 @@ func (o *stdoutOutput) handleTextDelta(tag string, value []byte) {
 	}
 	o.lastTag = tag
 	o.lastHistoryID = id
-	fmt.Fprint(o.writer, string(content))
+	fmt.Fprint(o.writer, content)
 	if id == "" {
 		fmt.Fprintln(o.writer)
 	}
@@ -152,7 +152,7 @@ func (o *stdoutOutput) handleTextDelta(tag string, value []byte) {
 // new tag and the previous frame was streamed (had a non-empty stream ID).
 // It updates lastTag to the new tag.
 // handleMediaTag prints a media attachment label (image/video/audio/document).
-func (o *stdoutOutput) handleMediaTag(tag string, value []byte) {
+func (o *stdoutOutput) handleMediaTag(tag, value string) {
 	stream.UnwrapDelta(value)
 	o.emitSeparator(tag)
 	label := map[string]string{
@@ -175,7 +175,7 @@ func (o *stdoutOutput) emitSeparator(tag string) {
 // handleSystemMsg processes a TagSystemMsg frame.
 // Handles error, notify, task, and tool_confirm system messages.
 // Task completion transitions print a trailing blank line between tasks.
-func (o *stdoutOutput) handleSystemMsg(value []byte) {
+func (o *stdoutOutput) handleSystemMsg(value string) {
 	env, err := stream.ParseSystemMsg(value)
 	if err != nil {
 		return

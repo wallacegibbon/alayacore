@@ -25,7 +25,7 @@ import (
 // emitCommand sends a user-level command to the session via TLV.
 // Errors are ignored — commands are best-effort.
 func (m *Terminal) emitCommand(cmd string) {
-	_ = stream.WriteTLVStr(m.streamInput, stream.TagUserT, cmd) //nolint:errcheck
+	_ = stream.WriteTLV(m.streamInput, stream.TagUserT, cmd) //nolint:errcheck
 }
 
 // ============================================================================

@@ -420,7 +420,7 @@ func (s *Session) resendPrompt(ctx context.Context, contents []llm.ContentPart) 
 				Role:      llm.RoleUser,
 			},
 		})
-		s.writeTLV(stream.TagUserT, stream.WrapDelta(strconv.FormatUint(id, 10), "Continue"))
+		s.writeTLVStr(stream.TagUserT, stream.WrapDelta(strconv.FormatUint(id, 10), "Continue"))
 	} else {
 		s.writeNotify("Resending...")
 	}
@@ -465,15 +465,15 @@ func (s *Session) inputPump() {
 
 		switch tag {
 		case stream.TagUserI:
-			pendingAttachments = append(pendingAttachments, &llm.ImagePart{DataURI: string(value)})
+			pendingAttachments = append(pendingAttachments, &llm.ImagePart{DataURI: value})
 		case stream.TagUserV:
-			pendingAttachments = append(pendingAttachments, &llm.VideoPart{DataURI: string(value)})
+			pendingAttachments = append(pendingAttachments, &llm.VideoPart{DataURI: value})
 		case stream.TagUserA:
-			pendingAttachments = append(pendingAttachments, &llm.AudioPart{DataURI: string(value)})
+			pendingAttachments = append(pendingAttachments, &llm.AudioPart{DataURI: value})
 		case stream.TagUserD:
-			pendingAttachments = append(pendingAttachments, &llm.DocumentPart{DataURI: string(value)})
+			pendingAttachments = append(pendingAttachments, &llm.DocumentPart{DataURI: value})
 		case stream.TagUserT:
-			s.handleInputUserText(string(value), &pendingAttachments)
+			s.handleInputUserText(value, &pendingAttachments)
 
 		default:
 			if len(pendingAttachments) > 0 {

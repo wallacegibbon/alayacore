@@ -26,8 +26,8 @@ func TestReadPrompts_SingleLine(t *testing.T) {
 	if tag != stream.TagUserT {
 		t.Errorf("expected tag UT, got %s", tag)
 	}
-	if string(value) != "hello" {
-		t.Errorf("expected value 'hello', got %q", string(value))
+	if value != "hello" {
+		t.Errorf("expected value 'hello', got %q", value)
 	}
 }
 
@@ -49,8 +49,8 @@ func TestReadPrompts_MultiLineBackslash(t *testing.T) {
 	}
 
 	expected := "first line\nsecond line\nthird line"
-	if string(value) != expected {
-		t.Errorf("expected %q, got %q", expected, string(value))
+	if value != expected {
+		t.Errorf("expected %q, got %q", expected, value)
 	}
 }
 
@@ -71,8 +71,8 @@ func TestReadPrompts_MultiplePrompts(t *testing.T) {
 		if tag != stream.TagUserT {
 			t.Errorf("prompt %d: expected tag UT, got %s", i, tag)
 		}
-		if string(value) != expected {
-			t.Errorf("prompt %d: expected %q, got %q", i, expected, string(value))
+		if value != expected {
+			t.Errorf("prompt %d: expected %q, got %q", i, expected, value)
 		}
 	}
 }
@@ -95,8 +95,8 @@ func TestReadPrompts_EmptyLines(t *testing.T) {
 		if tag != stream.TagUserT {
 			t.Errorf("prompt %d: expected tag UT, got %s", i, tag)
 		}
-		if string(value) != expected {
-			t.Errorf("prompt %d: expected %q, got %q", i, expected, string(value))
+		if value != expected {
+			t.Errorf("prompt %d: expected %q, got %q", i, expected, value)
 		}
 	}
 
@@ -154,8 +154,8 @@ func TestReadPrompts_EOFWithPartialPrompt(t *testing.T) {
 	if tag != stream.TagUserT {
 		t.Errorf("expected tag UT, got %s", tag)
 	}
-	if string(value) != "partial prompt without newline" {
-		t.Errorf("expected partial prompt text, got %q", string(value))
+	if value != "partial prompt without newline" {
+		t.Errorf("expected partial prompt text, got %q", value)
 	}
 }
 
@@ -188,8 +188,8 @@ func TestReadPrompts_MixedBackslashAndNormal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first prompt: failed to read TLV: %v", err)
 	}
-	if string(value) != "normal" {
-		t.Errorf("expected 'normal', got %q", string(value))
+	if value != "normal" {
+		t.Errorf("expected 'normal', got %q", value)
 	}
 	_ = tag
 
@@ -198,8 +198,8 @@ func TestReadPrompts_MixedBackslashAndNormal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("second prompt: failed to read TLV: %v", err)
 	}
-	if string(value) != "backslash\ncontinuation" {
-		t.Errorf("expected 'backslash\\ncontinuation', got %q", string(value))
+	if value != "backslash\ncontinuation" {
+		t.Errorf("expected 'backslash\\ncontinuation', got %q", value)
 	}
 }
 

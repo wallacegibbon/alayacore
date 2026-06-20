@@ -635,7 +635,7 @@ func TestWindowBufferNonDeltaMessages(t *testing.T) {
 func TestWindowBufferEdgeCases(t *testing.T) {
 	out := NewTerminalOutput(DefaultStyles())
 	// Delta message without valid NUL-delimited stream ID (plain text)
-	err := stream.WriteTLVStr(out, stream.TagAssistantT, "plain text without stream ID")
+	err := stream.WriteTLV(out, stream.TagAssistantT, "plain text without stream ID")
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}

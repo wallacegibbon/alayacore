@@ -32,13 +32,13 @@ func main() {
 		dataURI := fmt.Sprintf("data:%s;base64,%s", mime, b64)
 		tag := tagForMIME(mime)
 
-		if _, err := os.Stdout.Write(stream.EncodeTLVStr(tag, dataURI)); err != nil {
+		if _, err := os.Stdout.Write(stream.EncodeTLV(tag, dataURI)); err != nil {
 			fmt.Fprintf(os.Stderr, "write: %v\n", err)
 			os.Exit(1)
 		}
 	}
 
-	if _, err := os.Stdout.Write(stream.EncodeTLVStr(stream.TagUserT, prompt)); err != nil {
+	if _, err := os.Stdout.Write(stream.EncodeTLV(stream.TagUserT, prompt)); err != nil {
 		fmt.Fprintf(os.Stderr, "write: %v\n", err)
 		os.Exit(1)
 	}

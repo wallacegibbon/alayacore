@@ -2,10 +2,22 @@ package plainio
 
 import (
 	"bytes"
+	"encoding/binary"
 	"testing"
 
 	"github.com/alayacore/alayacore/internal/stream"
 )
+
+// encodeTLV is a test helper that builds a TLV frame.
+func encodeTLV(tag, value string) []byte {
+	data := []byte(value)
+	msg := make([]byte, 6+len(data))
+	msg[0] = tag[0]
+	msg[1] = tag[1]
+	binary.BigEndian.PutUint32(msg[2:], uint32(len(data)))
+	copy(msg[6:], data)
+	return msg
+}
 
 func TestNewlineBetweenDifferentStreamGroups(t *testing.T) {
 	var buf bytes.Buffer
@@ -14,10 +26,10 @@ func TestNewlineBetweenDifferentStreamGroups(t *testing.T) {
 	}
 
 	// Simulate: assistant text delta with NUL-delimited stream IDs
-	msg1 := stream.EncodeTLV(stream.TagAssistantT, stream.WrapDelta("0-1-t", "hello "))
-	msg2 := stream.EncodeTLV(stream.TagAssistantT, stream.WrapDelta("0-1-t", "world"))
+	msg1 := encodeTLV(stream.TagAssistantT, stream.WrapDelta("0-1-t", "hello "))
+	msg2 := encodeTLV(stream.TagAssistantT, stream.WrapDelta("0-1-t", "world"))
 	// New step: different stream ID
-	msg3 := stream.EncodeTLV(stream.TagAssistantT, stream.WrapDelta("0-2-t", "new step"))
+	msg3 := encodeTLV(stream.TagAssistantT, stream.WrapDelta("0-2-t", "new step"))
 
 	o.Write(msg1)
 	o.Write(msg2)
@@ -36,8 +48,8 @@ func TestNoNewlineWithinSameStreamGroup(t *testing.T) {
 		writer: &buf,
 	}
 
-	msg1 := stream.EncodeTLV(stream.TagAssistantT, stream.WrapDelta("0-1-t", "hello "))
-	msg2 := stream.EncodeTLV(stream.TagAssistantT, stream.WrapDelta("0-1-t", "world"))
+	msg1 := encodeTLV(stream.TagAssistantT, stream.WrapDelta("0-1-t", "hello "))
+	msg2 := encodeTLV(stream.TagAssistantT, stream.WrapDelta("0-1-t", "world"))
 
 	o.Write(msg1)
 	o.Write(msg2)
@@ -55,8 +67,8 @@ func TestNewlineBetweenTextAndReasoning(t *testing.T) {
 		writer: &buf,
 	}
 
-	msg1 := stream.EncodeTLV(stream.TagAssistantT, stream.WrapDelta("0-1-t", "some text"))
-	msg2 := stream.EncodeTLV(stream.TagAssistantR, stream.WrapDelta("0-1-r", "some reasoning"))
+	msg1 := encodeTLV(stream.TagAssistantT, stream.WrapDelta("0-1-t", "some text"))
+	msg2 := encodeTLV(stream.TagAssistantR, stream.WrapDelta("0-1-r", "some reasoning"))
 
 	o.Write(msg1)
 	o.Write(msg2)
@@ -74,8 +86,8 @@ func TestNewlineBetweenReasoningAndText(t *testing.T) {
 		writer: &buf,
 	}
 
-	msg1 := stream.EncodeTLV(stream.TagAssistantR, stream.WrapDelta("0-1-r", "thinking..."))
-	msg2 := stream.EncodeTLV(stream.TagAssistantT, stream.WrapDelta("0-2-t", "answer"))
+	msg1 := encodeTLV(stream.TagAssistantR, stream.WrapDelta("0-1-r", "thinking..."))
+	msg2 := encodeTLV(stream.TagAssistantT, stream.WrapDelta("0-2-t", "answer"))
 
 	o.Write(msg1)
 	o.Write(msg2)
@@ -95,8 +107,8 @@ func TestNoPrefixNoNewline(t *testing.T) {
 
 	// Messages without stream prefixes are treated as complete text parts
 	// (session load style) and each ends with a newline.
-	msg1 := stream.EncodeTLVStr(stream.TagAssistantT, "hello ")
-	msg2 := stream.EncodeTLVStr(stream.TagAssistantT, "world")
+	msg1 := encodeTLV(stream.TagAssistantT, "hello ")
+	msg2 := encodeTLV(stream.TagAssistantT, "world")
 
 	o.Write(msg1)
 	o.Write(msg2)
@@ -115,11 +127,11 @@ func TestToolCallResetsStreamPrefix(t *testing.T) {
 	}
 
 	// Stream some text
-	msg1 := stream.EncodeTLV(stream.TagAssistantT, stream.WrapDelta("0-1-t", "hello"))
+	msg1 := encodeTLV(stream.TagAssistantT, stream.WrapDelta("0-1-t", "hello"))
 	// Then a tool call (resets prefix)
-	msg2 := stream.EncodeTLVStr(stream.TagAssistantF, `{"id":"1","type":"call","name":"read_file","input":"{}"}`)
+	msg2 := encodeTLV(stream.TagAssistantF, `{"id":"1","type":"call","name":"read_file","input":"{}"}`)
 	// Then more text with different prefix — should NOT get extra newline since tool call reset it
-	msg3 := stream.EncodeTLV(stream.TagAssistantT, stream.WrapDelta("0-3-t", "result"))
+	msg3 := encodeTLV(stream.TagAssistantT, stream.WrapDelta("0-3-t", "result"))
 
 	o.Write(msg1)
 	o.Write(msg2)
@@ -138,9 +150,9 @@ func TestUserPromptResetsStreamPrefix(t *testing.T) {
 		writer: &buf,
 	}
 
-	msg1 := stream.EncodeTLV(stream.TagAssistantT, stream.WrapDelta("0-1-t", "response"))
-	msg2 := stream.EncodeTLVStr(stream.TagUserT, "next prompt")
-	msg3 := stream.EncodeTLV(stream.TagAssistantT, stream.WrapDelta("1-1-t", "new response"))
+	msg1 := encodeTLV(stream.TagAssistantT, stream.WrapDelta("0-1-t", "response"))
+	msg2 := encodeTLV(stream.TagUserT, "next prompt")
+	msg3 := encodeTLV(stream.TagAssistantT, stream.WrapDelta("1-1-t", "new response"))
 
 	o.Write(msg1)
 	o.Write(msg2)

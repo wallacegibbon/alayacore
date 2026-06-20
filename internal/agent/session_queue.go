@@ -127,7 +127,7 @@ func (s *Session) appendCancelMessage(contents []llm.ContentPart) []llm.ContentP
 			Role:      llm.RoleAssistant,
 		},
 	})
-	s.writeTLV(stream.TagAssistantT, stream.WrapDelta(strconv.FormatUint(id, 10), cancelMessage))
+	s.writeTLVStr(stream.TagAssistantT, stream.WrapDelta(strconv.FormatUint(id, 10), cancelMessage))
 	return contents
 }
 
