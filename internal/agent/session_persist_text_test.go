@@ -6,50 +6,44 @@ import (
 	"github.com/alayacore/alayacore/internal/llm"
 )
 
-// TestSessionSavePreservesTextWithToolCalls verifies that text messages
-// are preserved when saving/loading sessions with tool calls
+// TestSessionSavePreservesTextWithToolCalls verifies that text content parts
+// are preserved when saving/loading sessions with tool calls.
 func TestSessionSavePreservesTextWithToolCalls(t *testing.T) {
-	msgs := []llm.Message{
-		{
-			Role: llm.RoleUser,
-			Contents: []llm.ContentPart{
-				&llm.TextPart{Text: "What's the weather?"},
-			},
+	// Build flat ContentParts with roles
+	var id uint64
+	nextID := func() uint64 { id++; return id }
+
+	contents := []llm.ContentPart{
+		&llm.TextPart{
+			Text:            "What's the weather?",
+			ContentPartMeta: llm.ContentPartMeta{HistoryID: nextID(), Role: llm.RoleUser},
 		},
-		{
-			Role: llm.RoleAssistant,
-			Contents: []llm.ContentPart{
-				&llm.TextPart{Text: "Let me check that for you."},
-				&llm.ToolInputPart{
-					ID:       "call_123",
-					ToolName: "get_weather",
-					Input:    []byte(`{"location":"SF"}`),
-				},
-			},
+		&llm.TextPart{
+			Text:            "Let me check that for you.",
+			ContentPartMeta: llm.ContentPartMeta{HistoryID: nextID(), Role: llm.RoleAssistant},
 		},
-		{
-			Role: llm.RoleTool,
-			Contents: []llm.ContentPart{
-				&llm.ToolOutputPart{
-					ID:     "call_123",
-					Output: []llm.ContentPart{&llm.TextPart{Text: "Sunny, 72F"}},
-				},
-			},
+		&llm.ToolInputPart{
+			ID:              "call_123",
+			ToolName:        "get_weather",
+			Input:           []byte(`{"location":"SF"}`),
+			ContentPartMeta: llm.ContentPartMeta{HistoryID: nextID(), Role: llm.RoleAssistant},
 		},
-		{
-			Role: llm.RoleAssistant,
-			Contents: []llm.ContentPart{
-				&llm.TextPart{Text: "The weather in SF is sunny and 72F."},
-			},
+		&llm.ToolOutputPart{
+			ID:              "call_123",
+			Output:          []llm.ContentPart{&llm.TextPart{Text: "Sunny, 72F"}},
+			ContentPartMeta: llm.ContentPartMeta{HistoryID: nextID(), Role: llm.RoleTool},
+		},
+		&llm.TextPart{
+			Text:            "The weather in SF is sunny and 72F.",
+			ContentPartMeta: llm.ContentPartMeta{HistoryID: nextID(), Role: llm.RoleAssistant},
 		},
 	}
 
-	// Create session data with Content (source of truth) derived from Messages.
 	data := &SessionData{
 		SessionMeta: SessionMeta{
 			MessageVersion: MessageVersion,
 		},
-		Contents: contentsFromMessagesForTest(msgs),
+		Contents: contents,
 	}
 
 	// Format to markdown (TLV format)
@@ -66,77 +60,46 @@ func TestSessionSavePreservesTextWithToolCalls(t *testing.T) {
 		t.Fatalf("Failed to parse session: %v", err)
 	}
 
-	loadedMsgs := contentsToMessages(loaded.Contents)
-
-	// Verify all messages are preserved
-	if len(loadedMsgs) != len(msgs) {
-		t.Fatalf("Message count mismatch: got %d, want %d", len(loadedMsgs), len(msgs))
+	// Verify content parts are preserved
+	if len(loaded.Contents) != len(contents) {
+		t.Fatalf("Content part count mismatch: got %d, want %d", len(loaded.Contents), len(contents))
 	}
 
-	// Check first assistant message (index 1) - should have BOTH text and tool call
-	assistantMsg := loadedMsgs[1]
-	if assistantMsg.Role != llm.RoleAssistant {
-		t.Fatalf("Expected assistant message at index 1, got %s", assistantMsg.Role)
-	}
-
-	hasText := false
-	hasToolCall := false
-	for _, part := range assistantMsg.Contents {
-		switch p := part.(type) {
-		case *llm.TextPart:
-			hasText = true
-			if p.Text != "Let me check that for you." {
-				t.Errorf("Assistant text mismatch: %q", p.Text)
-			}
-		case *llm.ToolInputPart:
-			hasToolCall = true
-			if p.ToolName != "get_weather" {
-				t.Errorf("Tool name mismatch: %s", p.ToolName)
-			}
-		}
-	}
-
-	if !hasText {
-		t.Error("CRITICAL: Assistant message lost text content during save/load!")
-	}
-
-	if !hasToolCall {
-		t.Error("Assistant message lost tool call during save/load!")
-	}
-
-	// Check second assistant message (index 3) - should have only text
-	finalAssistantMsg := loadedMsgs[3]
-	if finalAssistantMsg.Role != llm.RoleAssistant {
-		t.Fatalf("Expected assistant message at index 3, got %s", finalAssistantMsg.Role)
-	}
-
-	if len(finalAssistantMsg.Contents) != 1 {
-		t.Errorf("Expected 1 content part in final assistant message, got %d", len(finalAssistantMsg.Contents))
-	}
-
-	if textPart, ok := finalAssistantMsg.Contents[0].(*llm.TextPart); ok {
-		if textPart.Text != "The weather in SF is sunny and 72F." {
-			t.Errorf("Final assistant text mismatch: %q", textPart.Text)
+	// Check first assistant part (index 1) - text
+	if tp, ok := loaded.Contents[1].(*llm.TextPart); ok {
+		if tp.Text != "Let me check that for you." {
+			t.Errorf("Assistant text mismatch: %q", tp.Text)
 		}
 	} else {
-		t.Error("Final assistant message content is not a TextPart")
+		t.Error("Content[1] is not a TextPart")
 	}
 
-	if hasText && hasToolCall {
-		t.Log("PASS: Text messages preserved during save/load with tool calls")
-	}
-}
-
-// contentsFromMessagesForTest builds Content from Messages for test setup.
-func contentsFromMessagesForTest(msgs []llm.Message) []llm.ContentPart {
-	var items []llm.ContentPart
-	var id uint64
-	for _, msg := range msgs {
-		for _, part := range msg.Contents {
-			id++
-			part.UpdateContentPartMeta(id, msg.Role)
-			items = append(items, part)
+	// Check assistant tool call (index 2)
+	if tc, ok := loaded.Contents[2].(*llm.ToolInputPart); ok {
+		if tc.ToolName != "get_weather" {
+			t.Errorf("Tool name mismatch: %s", tc.ToolName)
 		}
+	} else {
+		t.Error("Content[2] is not a ToolInputPart")
 	}
-	return items
+
+	// Check tool result (index 3)
+	if tr, ok := loaded.Contents[3].(*llm.ToolOutputPart); ok {
+		if tr.ID != "call_123" {
+			t.Errorf("Tool result ID mismatch: %s", tr.ID)
+		}
+	} else {
+		t.Error("Content[3] is not a ToolOutputPart")
+	}
+
+	// Check final assistant text (index 4)
+	if tp, ok := loaded.Contents[4].(*llm.TextPart); ok {
+		if tp.Text != "The weather in SF is sunny and 72F." {
+			t.Errorf("Final assistant text mismatch: %q", tp.Text)
+		}
+	} else {
+		t.Error("Content[4] is not a TextPart")
+	}
+
+	t.Log("PASS: Content parts preserved during save/load with tool calls")
 }

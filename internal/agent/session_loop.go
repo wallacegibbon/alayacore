@@ -58,8 +58,8 @@ func (s *Session) run() {
 		case ev := <-s.taskEventCh:
 			s.handleTaskEvent(ev)
 
-		case result := <-s.taskResultCh:
-			s.handleTaskDone(result)
+		case contents := <-s.taskResultCh:
+			s.handleTaskDone(contents)
 
 		case <-s.taskRefreshCh:
 			s.sendSystemInfo("task")
@@ -97,17 +97,9 @@ func (s *Session) tryStartNextTask() bool {
 	s.taskQueue = s.taskQueue[1:]
 	s.inProgress = true
 
-	// Create a snapshot of Messages for the task goroutine.
-	// Messages and Contents are both copied from their authoritative
-	// sources; they stay in sync because both are set from the same
-	// task result in handleTaskDone.
-	taskMessages := make([]llm.Message, len(s.Messages))
-	copy(taskMessages, s.Messages)
-
-	// Create a snapshot of Content for the task goroutine, seeded as
-	// the starting Entries. Task processing appends new entries as they're
-	// produced. handleTaskDone replaces s.Contents with result.Entries,
-	// keeping both in sync.
+	// Create a snapshot of Contents for the task goroutine, seeded as
+	// the starting Contents. Task processing appends new contents as they're
+	// produced. handleTaskDone replaces s.Contents with the final contents.
 	taskContent := make([]llm.ContentPart, len(s.Contents))
 	copy(taskContent, s.Contents)
 
@@ -120,13 +112,13 @@ func (s *Session) tryStartNextTask() bool {
 	// Reset step counter before starting the task.
 	s.currentStep = 0
 
-	go s.runTask(taskCtx, item, taskMessages, taskContent)
+	go s.runTask(taskCtx, item, taskContent)
 	return true
 }
 
 // handleTaskDone processes a task completion signal from the task goroutine.
-// result carries the final message state and the full ContentParts list.
-func (s *Session) handleTaskDone(result TaskResult) {
+// contents is the full ContentParts list from the completed task.
+func (s *Session) handleTaskDone(contents []llm.ContentPart) {
 	// Commit remaining state events before the next task starts.
 	s.flushPendingEvents()
 
@@ -134,12 +126,11 @@ func (s *Session) handleTaskDone(result TaskResult) {
 	s.inProgress = false
 	s.taskCancel = nil
 
-	// Replace both s.Contents and s.Messages with the final task state.
-	// Entries is seeded from s.Contents at task start and accumulated
+	// Replace s.Contents with the final task state.
+	// contents is seeded from s.Contents at task start and accumulated
 	// during processing, so it always represents the full content.
-	if len(result.Entries) > 0 {
-		s.Contents = result.Entries
-		s.Messages = result.Messages
+	if len(contents) > 0 {
+		s.Contents = contents
 	}
 
 	// Auto-save if configured
@@ -174,8 +165,8 @@ func (s *Session) drainUntilTaskDone() {
 		select {
 		case ev := <-s.taskEventCh:
 			s.handleTaskEvent(ev)
-		case result := <-s.taskResultCh:
-			s.handleTaskDone(result)
+		case contents := <-s.taskResultCh:
+			s.handleTaskDone(contents)
 			return
 		case <-s.taskRefreshCh:
 			s.sendSystemInfo("task")

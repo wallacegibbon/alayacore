@@ -43,11 +43,9 @@ func Example_usage() {
 	})
 
 	// Stream with callbacks
-	messages := []llm.Message{
-		llm.NewUserMessage("Hello!"),
-	}
+	contents := llm.NewUserContent("Hello!")
 
-	result, err := agent.Stream(context.Background(), messages, llm.StreamCallbacks{
+	result, err := agent.Stream(context.Background(), contents, llm.StreamCallbacks{
 		OnTextDelta: func(delta string, _ uint64) error {
 			fmt.Print(delta)
 			return nil

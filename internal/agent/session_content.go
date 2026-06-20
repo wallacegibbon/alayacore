@@ -42,24 +42,6 @@ func serializeContentParts(parts []llm.ContentPart) (json.RawMessage, error) {
 	return data, nil
 }
 
-// contentsToMessages groups consecutive ContentParts with the same role into
-// []llm.Message for API calls. Used on session load — during runtime both
-// s.Contents and s.Messages are set together from the task result.
-func contentsToMessages(contents []llm.ContentPart) []llm.Message {
-	if len(contents) == 0 {
-		return nil
-	}
-	msgs := make([]llm.Message, 0)
-	for _, part := range contents {
-		role := part.GetRole()
-		if len(msgs) == 0 || msgs[len(msgs)-1].Role != role {
-			msgs = append(msgs, llm.Message{Role: role})
-		}
-		msgs[len(msgs)-1].Contents = append(msgs[len(msgs)-1].Contents, part)
-	}
-	return msgs
-}
-
 // deserializeContentParts deserializes []ContentPart from JSON produced by serializeContentParts.
 func deserializeContentParts(data json.RawMessage) ([]llm.ContentPart, error) {
 	if len(data) == 0 {

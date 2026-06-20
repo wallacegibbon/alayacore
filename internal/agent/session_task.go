@@ -31,59 +31,36 @@ const (
 // ============================================================================
 
 // handleUserPrompt echoes the user prompt to output, appends it to
-// both tc.Messages and tc.Entries, then runs the agent loop.
+// tc.Contents, then runs the agent loop.
 func (s *Session) handleUserPrompt(ctx context.Context, tc *taskCtx, prompt string, attachments []llm.ContentPart) {
 	if s.shouldAutoSummarize() {
 		s.doAutoSummarize(ctx, tc)
 	}
 
-	// Build content parts with history IDs and echo to output.
-	// ContentParts are shared between messages and entries so both
-	// representations refer to the same objects.
-	contents := make([]llm.ContentPart, 0, 1+len(attachments))
+	// Assign history IDs, append to tc.Contents, and echo to output.
 	for _, att := range attachments {
 		id := s.histIncAndGet()
 		att.SetHistoryID(id)
 		att.SetRole(llm.RoleUser)
-		contents = append(contents, att)
-		tc.Entries = append(tc.Entries, att)
-		// Echo back using the correct TLV tag for the attachment type
+		tc.Contents = append(tc.Contents, att)
 		if tag, val, err := contentPartToTLV(att); err == nil && tag != "" {
 			s.writeTLVStr(tag, stream.WrapDelta(strconv.FormatUint(id, 10), val))
 		}
 	}
 	id := s.histIncAndGet()
-	part := &llm.TextPart{Text: prompt, ContentMeta: llm.ContentMeta{HistoryID: id, Role: llm.RoleUser}}
-	contents = append(contents, part)
-	tc.Entries = append(tc.Entries, part)
+	part := &llm.TextPart{Text: prompt, ContentPartMeta: llm.ContentPartMeta{HistoryID: id, Role: llm.RoleUser}}
+	tc.Contents = append(tc.Contents, part)
 	s.writeTLVStr(stream.TagUserT, stream.WrapDelta(strconv.FormatUint(id, 10), prompt))
 
-	// Append to messages for the LLM request.  If the preceding message
-	// is also from the user, merge to avoid duplicate user messages.
-	if len(tc.Messages) > 0 && tc.Messages[len(tc.Messages)-1].Role == llm.RoleUser {
-		tc.Messages[len(tc.Messages)-1].Contents = append(tc.Messages[len(tc.Messages)-1].Contents, contents...)
-	} else {
-		tc.Messages = append(tc.Messages, llm.Message{Role: llm.RoleUser, Contents: contents})
-	}
-
-	updatedMessages, newEntries, _, err := s.processPrompt(ctx, tc.Messages)
-	tc.Entries = append(tc.Entries, newEntries...)
+	newContents, _, err := s.processPrompt(ctx, tc.Contents)
+	tc.Contents = append(tc.Contents, newContents...)
 
 	if err != nil {
 		s.writeError(err.Error())
 		s.pausedOnError.Store(true)
 		s.requestSystemInfo()
-		// When cancel or error occurs before OnStepFinish sets updatedMessages,
-		// updatedMessages is nil/empty and the user prompt would be lost on save.
-		// Fall back to tc.Messages (which has the user prompt appended above)
-		// so the UT is preserved in the session file alongside the cancel AT.
-		if len(updatedMessages) > 0 {
-			tc.Messages = updatedMessages
-		}
 		return
 	}
-
-	tc.Messages = updatedMessages
 }
 
 // shouldAutoSummarize returns true when auto-summarization is enabled and
@@ -114,11 +91,10 @@ func (s *Session) writeTLVWithID(tag string, historyID uint64, data string) {
 }
 
 //nolint:gocyclo // callback-heavy; extracting harms readability.
-func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]llm.Message, []llm.ContentPart, int64, error) {
+func (s *Session) processPrompt(ctx context.Context, history []llm.ContentPart) ([]llm.ContentPart, int64, error) {
 	var outputTokens int64
 
-	var updatedMessages []llm.Message
-	var newEntries []llm.ContentPart
+	var newContents []llm.ContentPart
 
 	lastProcessed := len(history) // track where the last step ended
 
@@ -182,22 +158,17 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 			s.requestSystemInfo()
 			return nil
 		},
-		OnStepFinish: func(messages []llm.Message, usage llm.Usage) error {
-			// Remove orphaned tool uses from the last message before capturing
-			// new entries. This keeps both Messages and Contents free of tool
+		OnStepFinish: func(contents []llm.ContentPart, usage llm.Usage) error {
+			// Remove orphaned tool uses from the end before capturing
+			// new content. This keeps Contents free of tool
 			// calls that were emitted but never executed (cancel/error).
-			messages = cleanIncompleteToolInputs(messages)
-			if len(messages) > 0 {
-				updatedMessages = messages
-			}
+			contents = cleanIncompleteToolInputs(contents)
 
-			// Only capture messages added since the last step to avoid
+			// Only capture content parts added since the last step to avoid
 			// duplicating content across multi-step conversations.
-			newMsgs := messages[lastProcessed:]
-			lastProcessed = len(messages)
-			for _, msg := range newMsgs {
-				newEntries = append(newEntries, msg.Contents...)
-			}
+			newParts := contents[lastProcessed:]
+			lastProcessed = len(contents)
+			newContents = append(newContents, newParts...)
 
 			s.sendEvent(usageToStepFinishEvent(usage))
 
@@ -209,10 +180,10 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.Message) ([]l
 	})
 
 	if err != nil {
-		return updatedMessages, newEntries, 0, err
+		return newContents, 0, err
 	}
 
-	return updatedMessages, newEntries, outputTokens, nil
+	return newContents, outputTokens, nil
 }
 
 // usageToStepFinishEvent converts an llm.Usage to a StepFinishEvent.
@@ -225,37 +196,61 @@ func usageToStepFinishEvent(usage llm.Usage) StepFinishEvent {
 	}
 }
 
-// cleanIncompleteToolInputs removes orphaned tool uses from the last
-// message. This happens when the user cancels mid-cycle: the model
-// emitted tool uses but the agent never executed them. Only the last
-// message can have orphaned uses — earlier steps are already complete.
-// If the last message becomes empty after stripping, it is removed.
-func cleanIncompleteToolInputs(messages []llm.Message) []llm.Message {
-	if len(messages) == 0 {
-		return messages
+// cleanIncompleteToolInputs removes orphaned tool uses from the end of
+// the content slice. This happens when the user cancels mid-cycle: the model
+// emitted tool uses but the agent never executed them. Only the most recent
+// assistant content parts can have orphaned uses — earlier steps are already
+// complete.
+func cleanIncompleteToolInputs(contents []llm.ContentPart) []llm.ContentPart {
+	if len(contents) == 0 {
+		return contents
 	}
 
-	last := messages[len(messages)-1]
-
-	// Only assistant messages carry tool calls.
-	if last.Role != llm.RoleAssistant {
-		return messages
+	// Find the last assistant segment and remove ToolInputParts from it.
+	// Work backwards: find where the last batch of assistant parts starts.
+	lastIdx := len(contents) - 1
+	for lastIdx >= 0 && contents[lastIdx].GetRole() != llm.RoleAssistant {
+		lastIdx--
+	}
+	if lastIdx < 0 {
+		return contents
 	}
 
-	// All tool uses in the last assistant message are orphaned — the agent
-	// only completes a step after executing all tools. If the last message
-	// has tool uses, the step was interrupted (cancel/error).
-	filtered := make([]llm.ContentPart, 0, len(last.Contents))
-	for _, part := range last.Contents {
-		if _, ok := part.(*llm.ToolInputPart); ok {
-			continue
+	// If there are ToolOutputParts after the last assistant segment,
+	// the tools were actually executed — keep everything.
+	for _, part := range contents[lastIdx+1:] {
+		if _, ok := part.(*llm.ToolOutputPart); ok {
+			return contents
 		}
-		filtered = append(filtered, part)
 	}
-	if len(filtered) > 0 {
-		messages[len(messages)-1].Contents = filtered
-		return messages
+
+	// Find the start of this assistant segment
+	startIdx := lastIdx
+	for startIdx > 0 && contents[startIdx-1].GetRole() == llm.RoleAssistant {
+		startIdx--
 	}
-	// The last message had nothing but orphaned tool calls — drop it.
-	return messages[:len(messages)-1]
+
+	// Check if any tool calls in this segment
+	hasToolCalls := false
+	for _, part := range contents[startIdx : lastIdx+1] {
+		if _, ok := part.(*llm.ToolInputPart); ok {
+			hasToolCalls = true
+			break
+		}
+	}
+	if !hasToolCalls {
+		return contents
+	}
+
+	// Filter out ToolInputParts from the last assistant segment
+	filtered := make([]llm.ContentPart, 0, len(contents))
+	filtered = append(filtered, contents[:startIdx]...)
+	for _, part := range contents[startIdx : lastIdx+1] {
+		if _, ok := part.(*llm.ToolInputPart); !ok {
+			filtered = append(filtered, part)
+		}
+	}
+	filtered = append(filtered, contents[lastIdx+1:]...)
+
+	return filtered
 }

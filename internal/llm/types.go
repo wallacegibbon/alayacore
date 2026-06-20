@@ -22,32 +22,7 @@ const (
 	RoleTool      MessageRole = "tool"
 )
 
-// ContentMeta holds the metadata common to all ContentPart types.
-// Embedded in each concrete ContentPart to avoid duplicating
-// the HistoryID/Role fields and their accessor methods.
-type ContentMeta struct {
-	HistoryID uint64      `json:"-"`
-	Role      MessageRole `json:"-"`
-}
-
-func (m *ContentMeta) GetHistoryID() uint64   { return m.HistoryID }
-func (m *ContentMeta) SetHistoryID(id uint64) { m.HistoryID = id }
-func (m *ContentMeta) GetRole() MessageRole   { return m.Role }
-func (m *ContentMeta) SetRole(r MessageRole)  { m.Role = r }
-func (m *ContentMeta) UpdateContentPartMeta(id uint64, r MessageRole) {
-	m.HistoryID = id
-	m.Role = r
-}
-
-// ContentPart represents a part of message content
-type ContentPart interface {
-	GetHistoryID() uint64
-	SetHistoryID(uint64)
-	GetRole() MessageRole
-	SetRole(MessageRole)
-	UpdateContentPartMeta(historyID uint64, role MessageRole)
-}
-
+// ContentPart type discriminator strings for TLV serialization.
 const (
 	ContentPartText       = "text"
 	ContentPartImage      = "image"
@@ -59,45 +34,71 @@ const (
 	ContentPartToolResult = "tool_result"
 )
 
+// ContentPart represents a part of message content
+type ContentPart interface {
+	GetHistoryID() uint64
+	SetHistoryID(uint64)
+	GetRole() MessageRole
+	SetRole(MessageRole)
+	UpdateContentPartMeta(historyID uint64, role MessageRole)
+}
+
+// ContentPartMeta holds the metadata common to all ContentPart types.
+// Embedded in each concrete ContentPart to avoid duplicating
+// the HistoryID/Role fields and their accessor methods.
+type ContentPartMeta struct {
+	HistoryID uint64      `json:"-"`
+	Role      MessageRole `json:"-"`
+}
+
+func (m *ContentPartMeta) GetHistoryID() uint64   { return m.HistoryID }
+func (m *ContentPartMeta) SetHistoryID(id uint64) { m.HistoryID = id }
+func (m *ContentPartMeta) GetRole() MessageRole   { return m.Role }
+func (m *ContentPartMeta) SetRole(r MessageRole)  { m.Role = r }
+func (m *ContentPartMeta) UpdateContentPartMeta(id uint64, r MessageRole) {
+	m.HistoryID = id
+	m.Role = r
+}
+
 // TextPart represents text content
 type TextPart struct {
-	ContentMeta
+	ContentPartMeta
 	Text string
 }
 
 // ImagePart represents an image content (DataURI: data:image/...;base64,...)
 type ImagePart struct {
-	ContentMeta
+	ContentPartMeta
 	DataURI string
 }
 
 // VideoPart represents a video content (DataURI: data:video/...;base64,...)
 type VideoPart struct {
-	ContentMeta
+	ContentPartMeta
 	DataURI string
 }
 
 // AudioPart represents an audio content (DataURI: data:audio/...;base64,...)
 type AudioPart struct {
-	ContentMeta
+	ContentPartMeta
 	DataURI string
 }
 
 // DocumentPart represents a document content (DataURI: data:application/...;base64,...)
 type DocumentPart struct {
-	ContentMeta
+	ContentPartMeta
 	DataURI string
 }
 
 // ReasoningPart represents reasoning/thinking content.
 type ReasoningPart struct {
-	ContentMeta
+	ContentPartMeta
 	Text string
 }
 
 // ToolInputPart represents a tool call stored in conversation history.
 type ToolInputPart struct {
-	ContentMeta
+	ContentPartMeta
 	ID       string
 	Input    json.RawMessage
 	ToolName string
@@ -105,16 +106,10 @@ type ToolInputPart struct {
 
 // ToolOutputPart represents a tool execution result.
 type ToolOutputPart struct {
-	ContentMeta
+	ContentPartMeta
 	ID      string
 	Output  []ContentPart
 	IsError bool
-}
-
-// Message represents a single message in the conversation
-type Message struct {
-	Role     MessageRole
-	Contents []ContentPart
 }
 
 // ToolDefinition defines a tool that can be called
@@ -173,7 +168,7 @@ func (ToolInputCompleteEvent) isStreamEvent() {}
 
 // StepCompleteEvent represents completion of an agentic step.
 type StepCompleteEvent struct {
-	Message    Message
+	Contents   []ContentPart
 	Usage      Usage
 	StopReason string
 }
@@ -182,6 +177,6 @@ func (StepCompleteEvent) isStreamEvent() {}
 
 // Provider defines the interface for LLM providers
 type Provider interface {
-	StreamMessages(ctx context.Context, messages []Message, tools []ToolDefinition, systemPrompt string, extraSystemPrompt string) (iter.Seq2[StreamEvent, error], error)
+	StreamMessages(ctx context.Context, contents []ContentPart, tools []ToolDefinition, systemPrompt string, extraSystemPrompt string) (iter.Seq2[StreamEvent, error], error)
 	SetReasoningLevel(level int)
 }

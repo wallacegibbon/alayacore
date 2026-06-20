@@ -12,6 +12,16 @@ import (
 	"github.com/alayacore/alayacore/internal/llm/factory"
 )
 
+// testMsg is a test helper that builds flat ContentParts from a role and content.
+//
+//nolint:unparam // role is always llm.RoleUser in this file; kept for signature compatibility
+func testMsg(role llm.MessageRole, parts ...llm.ContentPart) []llm.ContentPart {
+	for _, p := range parts {
+		p.SetRole(role)
+	}
+	return parts
+}
+
 // TestFullIntegration shows complete end-to-end usage
 func TestFullIntegration(t *testing.T) {
 	// Mock server simulating Anthropic API
@@ -64,12 +74,10 @@ func TestFullIntegration(t *testing.T) {
 	})
 
 	// 4. Create conversation
-	messages := []llm.Message{
-		llm.NewUserMessage("Hello!"),
-	}
+	contents := llm.NewUserContent("Hello!")
 
 	// 5. Stream with callbacks
-	result, err := agent.Stream(context.Background(), messages, llm.StreamCallbacks{
+	result, err := agent.Stream(context.Background(), contents, llm.StreamCallbacks{
 		OnTextDelta: func(delta string, _ uint64) error {
 			fmt.Print(delta)
 			return nil
@@ -86,7 +94,7 @@ func TestFullIntegration(t *testing.T) {
 			fmt.Printf("\n=== Step %d ===\n", step)
 			return nil
 		},
-		OnStepFinish: func(_ []llm.Message, usage llm.Usage) error {
+		OnStepFinish: func(_ []llm.ContentPart, usage llm.Usage) error {
 			fmt.Printf("\n[Step complete: %d in, %d out tokens]\n",
 				usage.InputTokens, usage.OutputTokens)
 			return nil
@@ -101,7 +109,7 @@ func TestFullIntegration(t *testing.T) {
 		t.Errorf("Expected 5 input tokens, got %d", result.Usage.InputTokens)
 	}
 
-	if len(result.Messages) == 0 {
+	if len(result.Contents) == 0 {
 		t.Error("Expected at least one message")
 	}
 }
@@ -199,18 +207,16 @@ func TestAgentMultiTurnWithTools(t *testing.T) {
 	})
 
 	// First query - will trigger tool call
-	allMessages := []llm.Message{
-		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "Use echo"}}},
-	}
+	allContents := testMsg(llm.RoleUser, &llm.TextPart{Text: "Use echo"})
 
-	result, err := agent.Stream(context.Background(), allMessages, llm.StreamCallbacks{})
+	result, err := agent.Stream(context.Background(), allContents, llm.StreamCallbacks{})
 	if err != nil {
 		t.Fatalf("First query failed: %v", err)
 	}
 
 	// Verify result has correct message structure
-	if len(result.Messages) != 4 {
-		t.Errorf("Expected 4 messages (user, assistant with tool, tool result, assistant response), got %d", len(result.Messages))
+	if len(result.Contents) != 4 {
+		t.Errorf("Expected 4 messages (user, assistant with tool, tool result, assistant response), got %d", len(result.Contents))
 	}
 
 	// Check message structure
@@ -218,28 +224,25 @@ func TestAgentMultiTurnWithTools(t *testing.T) {
 	// [1] = assistant with tool_use
 	// [2] = tool result (role: tool)
 	// [3] = assistant text response
-	if result.Messages[0].Role != llm.RoleUser {
+	if result.Contents[0].GetRole() != llm.RoleUser {
 		t.Error("First message should be user")
 	}
-	if result.Messages[1].Role != llm.RoleAssistant {
+	if result.Contents[1].GetRole() != llm.RoleAssistant {
 		t.Error("Second message should be assistant")
 	}
-	if result.Messages[2].Role != llm.RoleTool {
+	if result.Contents[2].GetRole() != llm.RoleTool {
 		t.Error("Third message should be tool result")
 	}
-	if result.Messages[3].Role != llm.RoleAssistant {
+	if result.Contents[3].GetRole() != llm.RoleAssistant {
 		t.Error("Fourth message should be assistant")
 	}
 
-	// Now use result.Messages for a second query (simulating session behavior)
-	allMessages = result.Messages
-	allMessages = append(allMessages, llm.Message{
-		Role:     llm.RoleUser,
-		Contents: []llm.ContentPart{&llm.TextPart{Text: "Thanks!"}},
-	})
+	// Now use result.Contents for a second query (simulating session behavior)
+	allContents = result.Contents
+	allContents = append(allContents, testMsg(llm.RoleUser, &llm.TextPart{Text: "Thanks!"})...)
 
 	// Second query - should NOT fail with "tool call result does not follow tool call"
-	_, err = agent.Stream(context.Background(), allMessages, llm.StreamCallbacks{})
+	_, err = agent.Stream(context.Background(), allContents, llm.StreamCallbacks{})
 	if err != nil {
 		t.Fatalf("Second query failed (this is the bug we're testing): %v", err)
 	}
@@ -305,35 +308,27 @@ func TestAgentMultiTurnSequentialTools(t *testing.T) {
 	})
 
 	// First query
-	allMessages := []llm.Message{
-		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "Query 1"}}},
-	}
+	allContents := testMsg(llm.RoleUser, &llm.TextPart{Text: "Query 1"})
 
-	result, err := agent.Stream(context.Background(), allMessages, llm.StreamCallbacks{})
+	result, err := agent.Stream(context.Background(), allContents, llm.StreamCallbacks{})
 	if err != nil {
 		t.Fatalf("Query 1 failed: %v", err)
 	}
 
 	// Second query using accumulated messages
-	allMessages = result.Messages
-	allMessages = append(allMessages, llm.Message{
-		Role:     llm.RoleUser,
-		Contents: []llm.ContentPart{&llm.TextPart{Text: "Query 2"}}},
-	)
+	allContents = result.Contents
+	allContents = append(allContents, testMsg(llm.RoleUser, &llm.TextPart{Text: "Query 2"})...)
 
-	result, err = agent.Stream(context.Background(), allMessages, llm.StreamCallbacks{})
+	_, err = agent.Stream(context.Background(), allContents, llm.StreamCallbacks{})
 	if err != nil {
 		t.Fatalf("Query 2 failed: %v", err)
 	}
 
 	// Third query
-	allMessages = result.Messages
-	allMessages = append(allMessages, llm.Message{
-		Role:     llm.RoleUser,
-		Contents: []llm.ContentPart{&llm.TextPart{Text: "Query 3"}}},
-	)
+	allContents = result.Contents
+	allContents = append(allContents, testMsg(llm.RoleUser, &llm.TextPart{Text: "Query 3"})...)
 
-	_, err = agent.Stream(context.Background(), allMessages, llm.StreamCallbacks{})
+	_, err = agent.Stream(context.Background(), allContents, llm.StreamCallbacks{})
 	if err != nil {
 		t.Fatalf("Query 3 failed: %v", err)
 	}
@@ -426,18 +421,16 @@ func TestOpenAIMultiTurnWithTools(t *testing.T) {
 	})
 
 	// First query - will trigger tool call
-	allMessages := []llm.Message{
-		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "Use echo"}}},
-	}
+	allContents := testMsg(llm.RoleUser, &llm.TextPart{Text: "Use echo"})
 
-	result, err := agent.Stream(context.Background(), allMessages, llm.StreamCallbacks{})
+	result, err := agent.Stream(context.Background(), allContents, llm.StreamCallbacks{})
 	if err != nil {
 		t.Fatalf("First query failed: %v", err)
 	}
 
 	// Verify result has correct message structure
-	if len(result.Messages) != 4 {
-		t.Errorf("Expected 4 messages (user, assistant with tool, tool result, assistant response), got %d", len(result.Messages))
+	if len(result.Contents) != 4 {
+		t.Errorf("Expected 4 messages (user, assistant with tool, tool result, assistant response), got %d", len(result.Contents))
 	}
 
 	// Check message structure
@@ -445,28 +438,25 @@ func TestOpenAIMultiTurnWithTools(t *testing.T) {
 	// [1] = assistant with tool_use
 	// [2] = tool result (role: tool)
 	// [3] = assistant text response
-	if result.Messages[0].Role != llm.RoleUser {
+	if result.Contents[0].GetRole() != llm.RoleUser {
 		t.Error("First message should be user")
 	}
-	if result.Messages[1].Role != llm.RoleAssistant {
+	if result.Contents[1].GetRole() != llm.RoleAssistant {
 		t.Error("Second message should be assistant")
 	}
-	if result.Messages[2].Role != llm.RoleTool {
+	if result.Contents[2].GetRole() != llm.RoleTool {
 		t.Error("Third message should be tool result")
 	}
-	if result.Messages[3].Role != llm.RoleAssistant {
+	if result.Contents[3].GetRole() != llm.RoleAssistant {
 		t.Error("Fourth message should be assistant")
 	}
 
-	// Now use result.Messages for a second query (simulating session behavior)
-	allMessages = result.Messages
-	allMessages = append(allMessages, llm.Message{
-		Role:     llm.RoleUser,
-		Contents: []llm.ContentPart{&llm.TextPart{Text: "Thanks!"}},
-	})
+	// Now use result.Contents for a second query (simulating session behavior)
+	allContents = result.Contents
+	allContents = append(allContents, testMsg(llm.RoleUser, &llm.TextPart{Text: "Thanks!"})...)
 
 	// Second query - should NOT fail with message order errors
-	_, err = agent.Stream(context.Background(), allMessages, llm.StreamCallbacks{})
+	_, err = agent.Stream(context.Background(), allContents, llm.StreamCallbacks{})
 	if err != nil {
 		t.Fatalf("Second query failed (this is the bug we're testing): %v", err)
 	}
@@ -525,35 +515,27 @@ func TestOpenAISequentialQueriesWithTools(t *testing.T) {
 	})
 
 	// First query
-	allMessages := []llm.Message{
-		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "Query 1"}}},
-	}
+	allContents := testMsg(llm.RoleUser, &llm.TextPart{Text: "Query 1"})
 
-	result, err := agent.Stream(context.Background(), allMessages, llm.StreamCallbacks{})
+	result, err := agent.Stream(context.Background(), allContents, llm.StreamCallbacks{})
 	if err != nil {
 		t.Fatalf("Query 1 failed: %v", err)
 	}
 
 	// Second query using accumulated messages
-	allMessages = result.Messages
-	allMessages = append(allMessages, llm.Message{
-		Role:     llm.RoleUser,
-		Contents: []llm.ContentPart{&llm.TextPart{Text: "Query 2"}},
-	})
+	allContents = result.Contents
+	allContents = append(allContents, testMsg(llm.RoleUser, &llm.TextPart{Text: "Query 2"})...)
 
-	result, err = agent.Stream(context.Background(), allMessages, llm.StreamCallbacks{})
+	result, err = agent.Stream(context.Background(), allContents, llm.StreamCallbacks{})
 	if err != nil {
 		t.Fatalf("Query 2 failed: %v", err)
 	}
 
 	// Third query
-	allMessages = result.Messages
-	allMessages = append(allMessages, llm.Message{
-		Role:     llm.RoleUser,
-		Contents: []llm.ContentPart{&llm.TextPart{Text: "Query 3"}},
-	})
+	allContents = result.Contents
+	allContents = append(allContents, testMsg(llm.RoleUser, &llm.TextPart{Text: "Query 3"})...)
 
-	_, err = agent.Stream(context.Background(), allMessages, llm.StreamCallbacks{})
+	_, err = agent.Stream(context.Background(), allContents, llm.StreamCallbacks{})
 	if err != nil {
 		t.Fatalf("Query 3 failed: %v", err)
 	}

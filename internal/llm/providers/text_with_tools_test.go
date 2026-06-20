@@ -42,9 +42,7 @@ func TestTextWithToolCalls(t *testing.T) {
 	}
 
 	// Stream messages
-	messages := []llm.Message{
-		{Role: llm.RoleUser, Contents: []llm.ContentPart{&llm.TextPart{Text: "What's the weather?"}}},
-	}
+	messages := testMsg(llm.RoleUser, &llm.TextPart{Text: "What's the weather?"})
 
 	events, err := provider.StreamMessages(context.Background(), messages, nil, "You are helpful", "")
 	if err != nil {
@@ -73,14 +71,14 @@ func TestTextWithToolCalls(t *testing.T) {
 		t.Fatal("No StepCompleteEvent received")
 	}
 
-	msg := stepComplete.Message
-	t.Logf("Message role: %s", msg.Role)
-	t.Logf("Message content parts: %d", len(msg.Contents))
+	msg := stepComplete.Contents
+	t.Logf("Message role: %s", "(assistant)")
+	t.Logf("Message content parts: %d", len(msg))
 
 	// Check for text part
 	hasText := false
 	hasToolCall := false
-	for _, part := range msg.Contents {
+	for _, part := range msg {
 		switch p := part.(type) {
 		case *llm.TextPart:
 			hasText = true

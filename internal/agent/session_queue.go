@@ -72,21 +72,20 @@ func (s *Session) enqueueTask(item QueueItem, front bool) {
 // ============================================================================
 
 // runTask executes a single task in its own goroutine. It is called from
-// run() via "go s.runTask(ctx, item, taskMessages)". On completion it sends
-// the result on taskResultCh so the main loop can update s.Contents and s.Messages.
+// run() via "go s.runTask(ctx, item, taskContent)". On completion it sends
+// the result on taskResultCh so the main loop can update s.Contents.
 //
-// The task goroutine wraps the message snapshot in a taskCtx and passes it
+// The task goroutine wraps the content snapshot in a taskCtx and passes it
 // through the processing pipeline. All state mutations during execution
-// (step progress, new messages, token counts) are sent to run() via taskEventCh.
-// The task goroutine never writes to s.Contents or s.Messages directly.
-func (s *Session) runTask(ctx context.Context, item QueueItem, taskMessages []llm.Message, taskContent []llm.ContentPart) {
+// (step progress, new content, token counts) are sent to run() via taskEventCh.
+// The task goroutine never writes to s.Contents directly.
+func (s *Session) runTask(ctx context.Context, item QueueItem, taskContent []llm.ContentPart) {
 	tc := &taskCtx{
-		Messages: taskMessages,
-		Entries:  taskContent,
+		Contents: taskContent,
 	}
 
 	defer func() {
-		s.taskResultCh <- TaskResult{Messages: tc.Messages, Entries: tc.Entries}
+		s.taskResultCh <- tc.Contents
 	}()
 
 	s.requestSystemInfo()
@@ -126,14 +125,10 @@ func (s *Session) runTaskCommand(ctx context.Context, tc *taskCtx, cmd string) {
 const cancelMessage = "Canceled"
 
 func (s *Session) appendCancelMessage(tc *taskCtx) {
-	tc.Messages = append(tc.Messages, llm.Message{
-		Role:     llm.RoleAssistant,
-		Contents: []llm.ContentPart{&llm.TextPart{Text: cancelMessage}},
-	})
 	id := s.histIncAndGet()
-	tc.Entries = append(tc.Entries, &llm.TextPart{
+	tc.Contents = append(tc.Contents, &llm.TextPart{
 		Text: cancelMessage,
-		ContentMeta: llm.ContentMeta{
+		ContentPartMeta: llm.ContentPartMeta{
 			HistoryID: id,
 			Role:      llm.RoleAssistant,
 		},

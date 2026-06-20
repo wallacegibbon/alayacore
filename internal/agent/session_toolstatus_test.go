@@ -55,9 +55,6 @@ func TestWriteToolOutput(t *testing.T) {
 func TestOnToolOutputCallback(t *testing.T) {
 	output := &mockOutput{}
 	session := &Session{
-		runState: runState{
-			Messages: []llm.Message{},
-		},
 		sessionConfig: sessionConfig{
 			SessionConfig: SessionConfig{Output: output},
 		},
@@ -65,13 +62,10 @@ func TestOnToolOutputCallback(t *testing.T) {
 
 	// Simulate the OnToolOutput callback from processPrompt
 	callback := func(id string, content []llm.ContentPart, err error) {
-		session.Messages = append(session.Messages, llm.Message{
-			Role: llm.RoleTool,
-			Contents: []llm.ContentPart{&llm.ToolOutputPart{
-				ID:      id,
-				Output:  content,
-				IsError: err != nil,
-			}},
+		session.Contents = append(session.Contents, &llm.ToolOutputPart{
+			ID:      id,
+			Output:  content,
+			IsError: err != nil,
 		})
 
 		if err != nil {
@@ -83,8 +77,8 @@ func TestOnToolOutputCallback(t *testing.T) {
 
 	callback("call1", []llm.ContentPart{&llm.TextPart{Text: "success output"}}, nil)
 
-	if len(session.Messages) != 1 {
-		t.Fatalf("Expected 1 message, got %d", len(session.Messages))
+	if len(session.Contents) != 1 {
+		t.Fatalf("Expected 1 content part, got %d", len(session.Contents))
 	}
 
 	tag, value := parseTLVFromBytes(output.data)

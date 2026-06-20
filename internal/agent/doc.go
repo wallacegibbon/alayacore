@@ -15,8 +15,8 @@
 //	ContentPart, where each item has a stable ID matching the TLV stream ID
 //	sent to the adapter. This enables the adapter to reference individual
 //	content blocks by ID (e.g. ":save 5") without any secondary index.
-//	For LLM API calls, ContentParts are grouped by role into []llm.Message
-//	on the fly at the task boundary.
+//	Each ContentPart carries its own Role, so provider conversion functions
+//	group consecutive same-role parts into API messages on the fly.
 //
 // Concurrency Model:
 //
@@ -28,8 +28,7 @@
 //	     exiting (see drainUntilTaskDone).
 //	  2. task goroutine — spawned per task, runs in background, sends
 //	     state mutations via typed channel events (taskEventCh) to run().
-//	     On completion it sends a TaskResult with the final messages
-//	     and full ContentParts list back via taskResultCh.
+//	     On completion it sends the full ContentParts list back via taskResultCh.
 //	  3. inputPump — reads TLV frames from input, forwards to run()
 //	     via a message channel.
 //
@@ -101,7 +100,7 @@
 //   - session_io.go: TLV input/output, summarize, continue commands
 //   - session_content.go: ContentPart helpers, tag mapping, ID lookup
 //   - session_persist.go: Session save/load functionality
-//   - session_types.go: Type definitions (ContentPart, TaskResult, etc.)
+//   - session_types.go: Type definitions (taskCtx, QueueItem, etc.)
 //   - command_registry.go: Declarative command registration
 //   - model_manager.go: Model configuration management
 //   - runtime_manager.go: Runtime persistence

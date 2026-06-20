@@ -150,72 +150,59 @@ Rules:
 - Include error messages verbatim
 - Skip completed exploration; only preserve findings that affect next steps`
 
-	tc.Messages = append(tc.Messages, llm.NewUserMessage(prompt))
-	beforeCount := len(tc.Messages)
+	id := s.histIncAndGet()
+	tc.Contents = append(tc.Contents, &llm.TextPart{
+		Text: prompt,
+		ContentPartMeta: llm.ContentPartMeta{
+			HistoryID: id,
+			Role:      llm.RoleUser,
+		},
+	})
 
 	s.writeNotify("Summarizing conversation...")
 
-	result, newEntries, outputTokens, err := s.processPrompt(ctx, tc.Messages)
-	tc.Entries = append(tc.Entries, newEntries...)
-
+	newContents, outputTokens, err := s.processPrompt(ctx, tc.Contents)
 	if err != nil {
 		s.writeError(err.Error())
 		s.pausedOnError.Store(true)
 		s.requestSystemInfo()
-		tc.Messages = result
 		return
 	}
 
-	var lastAssistantMsg llm.Message
-	for i := beforeCount; i < len(result); i++ {
-		if result[i].Role == llm.RoleAssistant {
-			lastAssistantMsg = result[i]
+	// Find assistant content parts in newContents (the response to the summary prompt).
+	// Strip reasoning/thinking content — it's internal model deliberation, not summary.
+	var summaryParts []llm.ContentPart
+	for _, part := range newContents {
+		if part.GetRole() != llm.RoleAssistant {
+			continue
 		}
-	}
-	// Strip reasoning/thinking content from the summary message — it's
-	// internal model deliberation, not summary content.
-	filtered := make([]llm.ContentPart, 0, len(lastAssistantMsg.Contents))
-	for _, part := range lastAssistantMsg.Contents {
 		switch part.(type) {
 		case *llm.ReasoningPart:
 			continue
 		default:
-			filtered = append(filtered, part)
+			summaryParts = append(summaryParts, part)
 		}
 	}
-	lastAssistantMsg.Contents = filtered
-	// Prepend a "Continue" user message before the summary assistant message.
-	result = []llm.Message{
-		llm.NewUserMessage("Continue"),
-		lastAssistantMsg,
-	}
-	// Rebuild entries to match the new message structure:
-	// [UserMessage("Continue"), filteredAssistantMsg]
-	// Assign new IDs since the old entries are being replaced.
-	tc.Entries = tc.Entries[:0]
+
+	// Rebuild contents: "Continue" user message + filtered summary.
+	tc.Contents = tc.Contents[:0]
 	continueID := s.histIncAndGet()
-	tc.Entries = append(tc.Entries, &llm.TextPart{
+	tc.Contents = append(tc.Contents, &llm.TextPart{
 		Text: "Continue",
-		ContentMeta: llm.ContentMeta{
+		ContentPartMeta: llm.ContentPartMeta{
 			HistoryID: continueID,
 			Role:      llm.RoleUser,
 		},
 	})
-	summaryID := s.histIncAndGet()
-	firstPart := lastAssistantMsg.Contents[0]
-	firstPart.UpdateContentPartMeta(summaryID, llm.RoleAssistant)
-	tc.Entries = append(tc.Entries, firstPart)
-	for i := 1; i < len(lastAssistantMsg.Contents); i++ {
-		part := lastAssistantMsg.Contents[i]
+	for _, part := range summaryParts {
 		part.UpdateContentPartMeta(s.histIncAndGet(), llm.RoleAssistant)
-		tc.Entries = append(tc.Entries, part)
+		tc.Contents = append(tc.Contents, part)
 	}
 
 	if outputTokens > 0 {
 		s.sendEvent(SetContextTokensEvent{Tokens: outputTokens})
 	}
 
-	tc.Messages = result
 	s.writeNotify("Summarized conversation")
 	s.requestSystemInfo()
 }
@@ -405,29 +392,24 @@ func (s *Session) handleThemeSet(args []string) {
 // resendPrompt resends the conversation history to the LLM.
 // This is called by handleContinue (no args) to resend the failed prompt.
 //
-// Three cases:
-//  1. Latest message is a user prompt → re-send history as-is (the previous
-//     API call never produced a response).
-//  2. Latest message is a tool result → re-send history as-is. Tool results
-//     are functionally equivalent to a user turn, so the LLM can respond
-//     directly without an additional user message.
-//  3. Latest message is an assistant message → the API partially succeeded
-//     or was canceled. A "Continue" user message is appended so the
-//     model picks up where it left off.
+// Three cases based on the role of the last content part:
+//  1. User prompt → re-send history as-is (the previous API call never produced a response).
+//  2. Tool result → re-send history as-is. Tool results are functionally
+//     equivalent to a user turn, so the LLM can respond directly.
+//  3. Assistant message → the API partially succeeded or was canceled.
+//     A "Continue" user message is appended so the model picks up where it left off.
 func (s *Session) resendPrompt(ctx context.Context, tc *taskCtx) {
-	if len(tc.Messages) == 0 {
+	if len(tc.Contents) == 0 {
 		s.writeError("No messages to resend")
 		return
 	}
 
-	msgCount := len(tc.Messages)
-	lastMsg := tc.Messages[msgCount-1]
-	if lastMsg.Role == llm.RoleAssistant {
-		tc.Messages = append(tc.Messages, llm.NewUserMessage("Continue"))
+	lastPart := tc.Contents[len(tc.Contents)-1]
+	if lastPart.GetRole() == llm.RoleAssistant {
 		id := s.histIncAndGet()
-		tc.Entries = append(tc.Entries, &llm.TextPart{
+		tc.Contents = append(tc.Contents, &llm.TextPart{
 			Text: "Continue",
-			ContentMeta: llm.ContentMeta{
+			ContentPartMeta: llm.ContentPartMeta{
 				HistoryID: id,
 				Role:      llm.RoleUser,
 			},
@@ -437,19 +419,16 @@ func (s *Session) resendPrompt(ctx context.Context, tc *taskCtx) {
 		s.writeNotify("Resending...")
 	}
 
-	result, newEntries, _, err := s.processPrompt(ctx, tc.Messages)
-	tc.Entries = append(tc.Entries, newEntries...)
+	newContents, _, err := s.processPrompt(ctx, tc.Contents)
+	tc.Contents = append(tc.Contents, newContents...)
 
-	result = cleanIncompleteToolInputs(result)
 	if err != nil {
 		s.writeError(err.Error())
 		s.pausedOnError.Store(true)
 		s.requestSystemInfo()
-		tc.Messages = result
 		return
 	}
 
-	tc.Messages = result
 	s.requestSystemInfo()
 }
 

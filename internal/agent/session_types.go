@@ -12,13 +12,10 @@ import (
 	"github.com/alayacore/alayacore/internal/theme"
 )
 
-// taskCtx holds the working copies of Messages and Entries that the
-// task goroutine passes through its processing pipeline. Using a
-// pointer avoids threading ([]llm.Message, []llm.ContentPart) pairs
-// through every function signature.
+// taskCtx holds the working copy of Contents that the
+// task goroutine passes through its processing pipeline.
 type taskCtx struct {
-	Messages []llm.Message
-	Entries  []llm.ContentPart
+	Contents []llm.ContentPart
 }
 
 // QueueItem represents a queued task with metadata.
@@ -125,14 +122,7 @@ type SessionMeta struct {
 	MessageVersion int       `config:"message_version,omitempty"`
 }
 
-// TaskResult carries the final state from the task goroutine back to run().
-// Messages is the grouped API format (for provider compatibility).
-// Entries is the flattened ContentParts list representing the full content
-// (seeded from s.Contents at task start, accumulated during processing).
-type TaskResult struct {
-	Messages []llm.Message
-	Entries  []llm.ContentPart
-}
+// taskResultCh carries the final content list from the task goroutine to run().
 
 // SessionData is the persisted form of a Session.
 type SessionData struct {

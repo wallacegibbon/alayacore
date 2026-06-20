@@ -14,7 +14,7 @@ type mockProviderAlwaysToolCalls struct {
 	callCount int
 }
 
-func (m *mockProviderAlwaysToolCalls) StreamMessages(_ context.Context, _ []Message, _ []ToolDefinition, _, _ string) (iter.Seq2[StreamEvent, error], error) {
+func (m *mockProviderAlwaysToolCalls) StreamMessages(_ context.Context, _ []ContentPart, _ []ToolDefinition, _, _ string) (iter.Seq2[StreamEvent, error], error) {
 	m.callCount++
 	return func(yield func(StreamEvent, error) bool) {
 		// Always emit a tool call, never a text-only response.
@@ -26,14 +26,12 @@ func (m *mockProviderAlwaysToolCalls) StreamMessages(_ context.Context, _ []Mess
 			Index: 0,
 		}, nil)
 		yield(StepCompleteEvent{
-			Message: Message{
-				Role: RoleAssistant,
-				Contents: []ContentPart{
-					&ToolInputPart{
-						ID:       "call_1",
-						ToolName: "repeat",
-						Input:    []byte(`{}`),
-					},
+			Contents: []ContentPart{
+				&ToolInputPart{
+					ID:              "call_1",
+					ToolName:        "repeat",
+					Input:           []byte(`{}`),
+					ContentPartMeta: ContentPartMeta{Role: RoleAssistant},
 				},
 			},
 			Usage: Usage{InputTokens: 10, OutputTokens: 5},
@@ -59,8 +57,8 @@ func TestAgentMaxStepsExceeded(t *testing.T) {
 		MaxSteps: 3,
 	})
 
-	result, err := agent.Stream(context.Background(), []Message{
-		{Role: RoleUser, Contents: []ContentPart{&TextPart{Text: "go"}}},
+	result, err := agent.Stream(context.Background(), []ContentPart{
+		&TextPart{Text: "go", ContentPartMeta: ContentPartMeta{Role: RoleUser}},
 	}, StreamCallbacks{})
 
 	if !errors.Is(err, ErrMaxStepsExceeded) {
@@ -104,8 +102,8 @@ func TestAgentCompletesWithinMaxSteps(t *testing.T) {
 		MaxSteps: 3,
 	})
 
-	result, err := agent.Stream(context.Background(), []Message{
-		{Role: RoleUser, Contents: []ContentPart{&TextPart{Text: "go"}}},
+	result, err := agent.Stream(context.Background(), []ContentPart{
+		&TextPart{Text: "go", ContentPartMeta: ContentPartMeta{Role: RoleUser}},
 	}, StreamCallbacks{})
 
 	if err != nil {
@@ -124,14 +122,11 @@ type mockProviderTruncated struct {
 	stopReason string
 }
 
-func (m *mockProviderTruncated) StreamMessages(_ context.Context, _ []Message, _ []ToolDefinition, _, _ string) (iter.Seq2[StreamEvent, error], error) {
+func (m *mockProviderTruncated) StreamMessages(_ context.Context, _ []ContentPart, _ []ToolDefinition, _, _ string) (iter.Seq2[StreamEvent, error], error) {
 	return func(yield func(StreamEvent, error) bool) {
 		yield(TextDeltaEvent{Delta: "Partial response...", Index: 0}, nil)
 		yield(StepCompleteEvent{
-			Message: Message{
-				Role:     RoleAssistant,
-				Contents: []ContentPart{&TextPart{Text: "Partial response..."}},
-			},
+			Contents:   []ContentPart{&TextPart{Text: "Partial response...", ContentPartMeta: ContentPartMeta{Role: RoleAssistant}}},
 			Usage:      Usage{InputTokens: 10, OutputTokens: 5},
 			StopReason: m.stopReason,
 		}, nil)
@@ -148,16 +143,16 @@ func TestAgentTruncatedMaxTokens(t *testing.T) {
 		MaxSteps: 5,
 	})
 
-	result, err := agent.Stream(context.Background(), []Message{
-		{Role: RoleUser, Contents: []ContentPart{&TextPart{Text: "Write a novel"}}},
+	result, err := agent.Stream(context.Background(), []ContentPart{
+		&TextPart{Text: "Write a novel", ContentPartMeta: ContentPartMeta{Role: RoleUser}},
 	}, StreamCallbacks{})
 
 	if !errors.Is(err, ErrResponseTruncated) {
 		t.Fatalf("expected ErrResponseTruncated, got: %v", err)
 	}
 
-	if result == nil || len(result.Messages) == 0 {
-		t.Fatalf("expected non-nil StreamResult with partial messages, got: %+v", result)
+	if result == nil || len(result.Contents) == 0 {
+		t.Fatalf("expected non-nil StreamResult with partial content, got: %+v", result)
 	}
 
 	t.Log("PASS: Agent returns ErrResponseTruncated for max_tokens with partial messages")
@@ -171,8 +166,8 @@ func TestAgentTruncatedLength(t *testing.T) {
 		MaxSteps: 5,
 	})
 
-	result, err := agent.Stream(context.Background(), []Message{
-		{Role: RoleUser, Contents: []ContentPart{&TextPart{Text: "Write a novel"}}},
+	result, err := agent.Stream(context.Background(), []ContentPart{
+		&TextPart{Text: "Write a novel", ContentPartMeta: ContentPartMeta{Role: RoleUser}},
 	}, StreamCallbacks{})
 
 	if !errors.Is(err, ErrResponseTruncated) {
@@ -194,8 +189,8 @@ func TestAgentNoTruncationOnEndTurn(t *testing.T) {
 		MaxSteps: 5,
 	})
 
-	result, err := agent.Stream(context.Background(), []Message{
-		{Role: RoleUser, Contents: []ContentPart{&TextPart{Text: "Hello"}}},
+	result, err := agent.Stream(context.Background(), []ContentPart{
+		&TextPart{Text: "Hello", ContentPartMeta: ContentPartMeta{Role: RoleUser}},
 	}, StreamCallbacks{})
 
 	if err != nil {

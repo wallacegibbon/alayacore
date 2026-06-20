@@ -21,7 +21,7 @@ package providers
 //    is always set (even as empty string) on assistant messages so that
 //    messages containing only tool calls still satisfy this requirement.
 //    Conditional on reasoning mode to avoid wasting tokens. The logic lives
-//    in openaiConvertMessages, not in the sub-converters.
+//    in openaiConvertContents, not in the sub-converters.
 //
 // 5. NULL ARGUMENTS IN TOOL CALL CHUNKS: Some providers emit no-op deltas
 //    with "arguments": null. Must be skipped to avoid corrupting the
@@ -204,20 +204,20 @@ func (p *OpenAIProvider) SetReasoningLevel(level int) {
 // StreamMessages streams messages from OpenAI
 func (p *OpenAIProvider) StreamMessages(
 	ctx context.Context,
-	messages []llm.Message,
+	contents []llm.ContentPart,
 	tools []llm.ToolDefinition,
 	systemPrompt string,
 	extraSystemPrompt string,
 ) (iter.Seq2[llm.StreamEvent, error], error) {
 	// Convert messages to OpenAI format
-	apiMessages := make([]openAIMessage, 0, len(messages)+2)
+	apiMessages := make([]openAIMessage, 0, len(contents)+2)
 	if systemPrompt != "" {
 		apiMessages = append(apiMessages, openAIMessage{Role: "system", Content: systemPrompt})
 	}
 	if extraSystemPrompt != "" {
 		apiMessages = append(apiMessages, openAIMessage{Role: "system", Content: extraSystemPrompt})
 	}
-	apiMessages = append(apiMessages, openaiConvertMessages(messages, p.reasoningLevel)...)
+	apiMessages = append(apiMessages, openaiConvertContents(contents, p.reasoningLevel)...)
 
 	// Convert tools to OpenAI format
 	apiTools := make([]openAITool, 0, len(tools))
@@ -315,7 +315,7 @@ func (p *OpenAIProvider) parseStream(reader io.Reader) iter.Seq2[llm.StreamEvent
 		}
 
 		yield(llm.StepCompleteEvent{
-			Message:    state.getMessage(),
+			Contents:   state.getContents(),
 			Usage:      state.getUsage(),
 			StopReason: state.getStopReason(),
 		}, nil)
@@ -404,37 +404,37 @@ func (s *openAIStreamState) getToolCompleteEvents() []llm.ToolInputCompleteEvent
 	return result
 }
 
-// getMessage assembles a domain Message from the three parallel OpenAI stream accumulators.
+// getContents assembles a []ContentPart from the three parallel OpenAI stream accumulators.
 // OpenAI delivers reasoning, text, and tool calls as separate flat delta fields.
-// This function merges them into a single domain Message with a unified ContentPart array,
+// This function merges them into a flat ContentPart array,
 // matching the Anthropic-inspired content block model used by the rest of the codebase.
 //
 // Reasoning and text are always included as content blocks (even when empty) so that
 // their fixed indices (0 and 1) match the delta event indices used during streaming.
 // The agent strips empty placeholders after assigning history IDs via StepCompleteEvent.
-func (s *openAIStreamState) getMessage() llm.Message {
+func (s *openAIStreamState) getContents() []llm.ContentPart {
 	indices := s.toolIndices()
 	contents := make([]llm.ContentPart, 0, 2+len(indices))
 	// Always add reasoning slot (index 0), may be empty placeholder.
 	contents = append(contents, &llm.ReasoningPart{
-		Text: s.reasoningBuilder.String(),
+		Text:            s.reasoningBuilder.String(),
+		ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant},
 	})
 	// Always add text slot (index 1), may be empty placeholder.
 	contents = append(contents, &llm.TextPart{
-		Text: s.textBuilder.String(),
+		Text:            s.textBuilder.String(),
+		ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant},
 	})
 	for _, i := range indices {
 		acc := s.toolAccumulators[i]
 		contents = append(contents, &llm.ToolInputPart{
-			ID:       acc.id,
-			ToolName: acc.name,
-			Input:    json.RawMessage(acc.args.String()),
+			ID:              acc.id,
+			ToolName:        acc.name,
+			Input:           json.RawMessage(acc.args.String()),
+			ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant},
 		})
 	}
-	return llm.Message{
-		Role:     llm.RoleAssistant,
-		Contents: contents,
-	}
+	return contents
 }
 
 // ============================================================================
@@ -532,25 +532,40 @@ func (p *OpenAIProvider) handleDelta(delta openAIDelta, yield func(llm.StreamEve
 // Message Conversion (OpenAI wire format)
 // ============================================================================
 
-// openaiConvertMessages converts domain messages to OpenAI wire format.
-func openaiConvertMessages(messages []llm.Message, reasoningLevel int) []openAIMessage {
-	apiMessages := make([]openAIMessage, 0, len(messages))
-	for _, msg := range messages {
-		if msg.Role == llm.RoleTool {
-			apiMessages = append(apiMessages, openaiConvertToolOutputs(msg.Contents)...)
+// openaiConvertContents converts domain ContentParts to OpenAI wire format.
+// It groups consecutive same-role ContentParts into API messages.
+func openaiConvertContents(contents []llm.ContentPart, reasoningLevel int) []openAIMessage {
+	apiMessages := make([]openAIMessage, 0, len(contents))
+	if len(contents) == 0 {
+		return apiMessages
+	}
+
+	// Group consecutive same-role parts into API messages
+	i := 0
+	for i < len(contents) {
+		role := contents[i].GetRole()
+		j := i
+		for j < len(contents) && contents[j].GetRole() == role {
+			j++
+		}
+		chunk := contents[i:j]
+		i = j
+
+		if role == llm.RoleTool {
+			apiMessages = append(apiMessages, openaiConvertToolOutputs(chunk)...)
 			continue
 		}
 
-		apiMsg := openAIMessage{Role: string(msg.Role)}
+		apiMsg := openAIMessage{Role: string(role)}
 
-		if msg.Role == llm.RoleAssistant && openaiHasToolInputs(msg.Contents) {
-			openaiConvertToolInputs(&apiMsg, msg.Contents)
+		if role == llm.RoleAssistant && openaiHasToolInputs(chunk) {
+			openaiConvertToolInputs(&apiMsg, chunk)
 		} else {
-			openaiConvertRegularContent(&apiMsg, msg.Contents)
+			openaiConvertRegularContent(&apiMsg, chunk)
 		}
 
-		if msg.Role == llm.RoleAssistant {
-			reasoningText := openaiExtractReasoning(msg.Contents)
+		if role == llm.RoleAssistant {
+			reasoningText := openaiExtractReasoning(chunk)
 			if reasoningText != "" || reasoningLevel > config.ReasoningLevelOff {
 				apiMsg.ReasoningContent = &reasoningText
 			}
@@ -561,6 +576,7 @@ func openaiConvertMessages(messages []llm.Message, reasoningLevel int) []openAIM
 
 		apiMessages = append(apiMessages, apiMsg)
 	}
+
 	return apiMessages
 }
 

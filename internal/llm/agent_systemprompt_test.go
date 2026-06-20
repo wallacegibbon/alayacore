@@ -14,7 +14,7 @@ type mockProvider struct {
 
 func (m *mockProvider) StreamMessages(
 	_ context.Context,
-	_ []Message,
+	_ []ContentPart,
 	_ []ToolDefinition,
 	systemPrompt string,
 	extraSystemPrompt string,
@@ -71,8 +71,8 @@ func TestAgentSystemPromptSeparation(t *testing.T) {
 				MaxSteps:          1,
 			})
 
-			// Stream with empty messages to trigger provider call
-			_, err := agent.Stream(context.Background(), []Message{}, StreamCallbacks{})
+			// Stream with empty contents to trigger provider call
+			_, err := agent.Stream(context.Background(), []ContentPart{}, StreamCallbacks{})
 			if err != nil {
 				t.Fatalf("Stream() error = %v", err)
 			}

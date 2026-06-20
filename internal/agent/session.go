@@ -15,15 +15,15 @@ package agent
 //        info. Processes input messages, dispatches commands, manages
 //        cancellation.
 //     3. task goroutine — spawned by run() to execute each task. It
-//        receives a taskCtx with a snapshot of Messages at task start,
-//        accumulates new Entries, and sends the final state back to
-//        run() via taskResultCh on completion.
+//        receives a taskCtx seeded from s.Contents, accumulates new
+//        content parts, and sends the final state back to run() via
+//        taskResultCh on completion.
 //
 //   Cross-goroutine communication:
 //     inputMsgCh (inputMsg channel)  — inputPump → run()
 //     taskEventCh (taskEvent)        — task → run()
 //     taskCancel (func call)     — run() → task (cancellation via cancelRunningTask)
-//     taskResultCh                 — task → run (TaskResult with messages + entries)
+//     taskResultCh                 — task → run (full ContentParts list)
 //     taskRefreshCh               — task → run() (best-effort system-info refresh; see session_output.go)
 //
 // Related files:
@@ -66,8 +66,7 @@ type sessionConfig struct {
 // runState groups fields owned exclusively by the run() goroutine.
 // All reads and writes happen in the run() event loop.
 type runState struct {
-	Contents []llm.ContentPart // flat, ordered, 1:1 with TLV — set from task result Entries
-	Messages []llm.Message     // grouped by role for API calls — set from task result Messages
+	Contents []llm.ContentPart // flat, ordered, 1:1 with TLV — set from task result
 
 	taskQueue []QueueItem
 
@@ -79,7 +78,7 @@ type runState struct {
 
 	inputMsgCh    chan inputMsg // inputPump → run: parsed TLV messages
 	taskEventCh   chan TaskEvent
-	taskResultCh  chan TaskResult
+	taskResultCh  chan []llm.ContentPart
 	taskRefreshCh chan struct{}
 }
 
@@ -183,10 +182,9 @@ func NewSession(cfg SessionConfig) *Session {
 		},
 		runState: runState{
 			Contents:      make([]llm.ContentPart, 0),
-			Messages:      make([]llm.Message, 0),
 			taskQueue:     make([]QueueItem, 0),
 			taskEventCh:   make(chan TaskEvent, 64),
-			taskResultCh:  make(chan TaskResult, 1),
+			taskResultCh:  make(chan []llm.ContentPart, 1),
 			taskRefreshCh: make(chan struct{}, 1),
 		},
 		sharedState: sharedState{
@@ -223,10 +221,9 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 		},
 		runState: runState{
 			Contents:      data.Contents,
-			Messages:      contentsToMessages(data.Contents),
 			taskQueue:     make([]QueueItem, 0),
 			taskEventCh:   make(chan TaskEvent, 64),
-			taskResultCh:  make(chan TaskResult, 1),
+			taskResultCh:  make(chan []llm.ContentPart, 1),
 			taskRefreshCh: make(chan struct{}, 1),
 		},
 		sharedState: sharedState{

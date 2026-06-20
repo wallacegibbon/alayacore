@@ -274,13 +274,13 @@ func (p *AnthropicProvider) SetReasoningLevel(level int) {
 // StreamMessages streams messages from Anthropic
 func (p *AnthropicProvider) StreamMessages(
 	ctx context.Context,
-	messages []llm.Message,
+	contents []llm.ContentPart,
 	tools []llm.ToolDefinition,
 	systemPrompt string,
 	extraSystemPrompt string,
 ) (iter.Seq2[llm.StreamEvent, error], error) {
 	// Convert messages to Anthropic format
-	apiMessages := anthropicConvertMessages(messages, p.reasoningLevel)
+	apiMessages := anthropicConvertContents(contents, p.reasoningLevel)
 
 	// Convert tools to Anthropic format
 	apiTools := make([]anthropicTool, 0, len(tools))
@@ -407,17 +407,20 @@ func (s *anthropicStreamState) finishBlock(index int) {
 	switch block.blockType {
 	case anthropicBlockTypeText:
 		s.contentParts[index] = &llm.TextPart{
-			Text: block.buffer.String(),
+			Text:            block.buffer.String(),
+			ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant},
 		}
 	case anthropicBlockTypeThinking:
 		s.contentParts[index] = &llm.ReasoningPart{
-			Text: block.buffer.String(),
+			Text:            block.buffer.String(),
+			ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant},
 		}
 	case anthropicBlockTypeToolUse:
 		s.contentParts[index] = &llm.ToolInputPart{
-			ID:       block.id,
-			ToolName: block.name,
-			Input:    json.RawMessage(block.buffer.String()),
+			ID:              block.id,
+			ToolName:        block.name,
+			Input:           json.RawMessage(block.buffer.String()),
+			ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant},
 		}
 	}
 	delete(s.blocks, index)
@@ -432,11 +435,11 @@ func (s *anthropicStreamState) setUsage(inputTokens, outputTokens, cacheReadToke
 	})
 }
 
-// getMessage wraps the accumulated contentParts into a domain Message.
+// getContents returns the accumulated ContentParts sorted by index.
 // finishBlock() already converted each block to the correct ContentPart type
 // and stored it by index in the map. This function sorts by index to ensure
 // correct ordering regardless of the order blocks finished.
-func (s *anthropicStreamState) getMessage() llm.Message {
+func (s *anthropicStreamState) getContents() []llm.ContentPart {
 	indices := make([]int, 0, len(s.contentParts))
 	for i := range s.contentParts {
 		indices = append(indices, i)
@@ -446,10 +449,7 @@ func (s *anthropicStreamState) getMessage() llm.Message {
 	for pos, i := range indices {
 		contents[pos] = s.contentParts[i]
 	}
-	return llm.Message{
-		Role:     llm.RoleAssistant,
-		Contents: contents,
-	}
+	return contents
 }
 
 // toolInputPart returns a complete ToolInputPart if the block at the given index is a tool_use.
@@ -506,7 +506,7 @@ func (p *AnthropicProvider) handleEvent(eventType, data string, yield func(llm.S
 		}
 		p.mergeUsage(event.Usage, state)
 		yield(llm.StepCompleteEvent{
-			Message:    state.getMessage(),
+			Contents:   state.getContents(),
 			Usage:      state.getUsage(),
 			StopReason: state.stopReason,
 		}, nil)
@@ -668,34 +668,50 @@ func unmarshalSSE[T any](data string, yield func(llm.StreamEvent, error) bool) (
 // Message Conversion (Anthropic wire format)
 // ============================================================================
 
-// anthropicConvertMessages converts domain messages to Anthropic wire format.
+// anthropicConvertContents converts domain ContentParts to Anthropic wire format.
+// Groups consecutive same-role parts into API messages.
 //
 // Wire-format mappings:
 //   - llm.TextPart       → anthropicContentBlock{Type: "text"}
 //   - llm.ReasoningPart  → anthropicContentBlock{Type: "thinking"}  (domain "reasoning" → wire "thinking")
 //   - llm.ToolInputPart   → anthropicContentBlock{Type: "tool_use"}
 //   - llm.ToolOutputPart → anthropicContentBlock{Type: "tool_result"} (role remapped to "user")
-func anthropicConvertMessages(messages []llm.Message, reasoningLevel int) []anthropicMessage {
-	apiMessages := make([]anthropicMessage, 0, len(messages))
-	for _, msg := range messages {
+func anthropicConvertContents(contents []llm.ContentPart, reasoningLevel int) []anthropicMessage {
+	if len(contents) == 0 {
+		return nil
+	}
+
+	apiMessages := make([]anthropicMessage, 0)
+
+	// Group consecutive same-role parts into API messages
+	i := 0
+	for i < len(contents) {
+		role := contents[i].GetRole()
+		j := i
+		for j < len(contents) && contents[j].GetRole() == role {
+			j++
+		}
+		chunk := contents[i:j]
+		i = j
+
 		apiMsg := anthropicMessage{
-			Role:    string(msg.Role),
-			Content: make([]anthropicContentBlock, 0, len(msg.Contents)),
+			Role:    string(role),
+			Content: make([]anthropicContentBlock, 0, len(chunk)),
 		}
 
 		// In Anthropic API, tool results must be in a "user" role message
-		if msg.Role == llm.RoleTool {
+		if role == llm.RoleTool {
 			apiMsg.Role = "user"
 		}
 
-		for _, part := range msg.Contents {
+		for _, part := range chunk {
 			if block := anthropicPartToBlock(part); block != nil {
 				apiMsg.Content = append(apiMsg.Content, *block)
 			}
 		}
 
 		// Empty thinking block padding when reasoning is enabled
-		if reasoningLevel > config.ReasoningLevelOff && msg.Role == llm.RoleAssistant {
+		if reasoningLevel > config.ReasoningLevelOff && role == llm.RoleAssistant {
 			hasThinking := false
 			for _, block := range apiMsg.Content {
 				if block.Type == anthropicBlockTypeThinking {
@@ -714,6 +730,7 @@ func anthropicConvertMessages(messages []llm.Message, reasoningLevel int) []anth
 
 		apiMessages = append(apiMessages, apiMsg)
 	}
+
 	return apiMessages
 }
 

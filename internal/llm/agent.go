@@ -3,12 +3,12 @@ package llm
 // Agent Tool-Calling Gotchas:
 //
 // 1. ONSTEPFINISH RECEIVES FULL HISTORY: OnStepFinish callback receives
-//    the complete allMessages slice (full conversation history), not just
-//    the current step's messages. The session layer replaces its state
+//    the complete allContents slice (full conversation history), not just
+//    the current step's content parts. The session layer replaces its state
 //    from this rather than appending increments. OnToolOutput should only
-//    send UI notifications, not append to session messages.
+//    send UI notifications, not append to session contents.
 //
-// 2. INCOMPLETE TOOL CALLS ON CANCEL: When user cancels mid-tool-call, messages may have
+// 2. INCOMPLETE TOOL CALLS ON CANCEL: When user cancels mid-tool-call, content may have
 //    tool_use without matching tool_result. Clean up these orphaned tool uses before the
 //    next API request to prevent errors.
 
@@ -71,7 +71,7 @@ type StreamCallbacks struct {
 	ToolNeedsConfirm func(toolName string) bool
 
 	OnStepStart  func(step int) error
-	OnStepFinish func(messages []Message, usage Usage) error
+	OnStepFinish func(contents []ContentPart, usage Usage) error
 
 	// IDGen provides unique history IDs. Called once per content block
 	// (first delta for AT/AR, once for each AF/UF). The returned ID is
@@ -105,23 +105,23 @@ type ToolConfirmResponse struct {
 }
 
 // StreamResult is the final result of streaming.
-// Messages is the full conversation history (allMessages).
+// Contents is the full conversation history (allContents).
 // Usage is the total token usage summed across all steps.
 //
 // Note: Both fields are also available per-step via OnStepFinish callback.
 // StreamResult serves as a convenience return for callers that don't use
 // the callback or want a final summary after Stream() returns.
 type StreamResult struct {
-	Messages []Message
+	Contents []ContentPart
 	Usage    Usage
 }
 
 // Stream executes the agent with streaming callbacks.
 // Tools are confirmed and executed as soon as their arguments finish streaming
 // (on ToolInputCompleteEvent), overlapping with other tools still being streamed.
-func (a *Agent) Stream(ctx context.Context, messages []Message, callbacks StreamCallbacks) (*StreamResult, error) {
-	allMessages := make([]Message, len(messages))
-	copy(allMessages, messages)
+func (a *Agent) Stream(ctx context.Context, contents []ContentPart, callbacks StreamCallbacks) (*StreamResult, error) {
+	allContents := make([]ContentPart, len(contents))
+	copy(allContents, contents)
 
 	var totalUsage Usage
 
@@ -138,20 +138,20 @@ func (a *Agent) Stream(ctx context.Context, messages []Message, callbacks Stream
 			}
 		}
 
-		events, err := a.config.Provider.StreamMessages(ctx, allMessages, a.toolDefinitions(), a.config.SystemPrompt, a.config.ExtraSystemPrompt)
+		events, err := a.config.Provider.StreamMessages(ctx, allContents, a.toolDefinitions(), a.config.SystemPrompt, a.config.ExtraSystemPrompt)
 		if err != nil {
 			return nil, fmt.Errorf("provider stream failed: %w", err)
 		}
 
-		stepMessages, stepUsage, truncated, err := a.streamEvents(ctx, events, callbacks)
+		stepContents, stepUsage, truncated, err := a.streamEvents(ctx, events, callbacks)
 		if err != nil {
 			return nil, err
 		}
 
-		allMessages = append(allMessages, stepMessages...)
+		allContents = append(allContents, stepContents...)
 
 		if callbacks.OnStepFinish != nil {
-			if err := callbacks.OnStepFinish(allMessages, stepUsage); err != nil {
+			if err := callbacks.OnStepFinish(allContents, stepUsage); err != nil {
 				return nil, err
 			}
 		}
@@ -159,9 +159,12 @@ func (a *Agent) Stream(ctx context.Context, messages []Message, callbacks Stream
 		totalUsage.InputTokens += stepUsage.InputTokens
 		totalUsage.OutputTokens += stepUsage.OutputTokens
 
-		// len(stepMessages) == 1 means no more tooluse.
-		if truncated || len(stepMessages) == 1 {
-			result := &StreamResult{Messages: allMessages, Usage: totalUsage}
+		// stepContents has no tool calls → no more tooluse.
+		// Check: if stepContents has no ToolInputParts and has ToolOutputParts,
+		// that's the final step with results. If no tool-related parts at all,
+		// it's a text-only response.
+		if truncated || !hasToolInputs(stepContents) {
+			result := &StreamResult{Contents: allContents, Usage: totalUsage}
 			if truncated {
 				return result, ErrResponseTruncated
 			}
@@ -169,23 +172,23 @@ func (a *Agent) Stream(ctx context.Context, messages []Message, callbacks Stream
 		}
 	}
 
-	return &StreamResult{Messages: allMessages, Usage: totalUsage}, ErrMaxStepsExceeded
+	return &StreamResult{Contents: allContents, Usage: totalUsage}, ErrMaxStepsExceeded
 }
 
 // streamEvents iterates streaming events, firing callbacks and collecting
-// tool calls. Returns the assembled messages (assistant response + optional
+// tool calls. Returns the assembled content parts (assistant response +
 // tool results), usage, and whether the response was truncated.
 // Assigns unique history IDs via IDGen on first touch of each content block,
 // passes them to callbacks, and stores them on ContentParts.
 //
 //nolint:gocyclo // extracting further would harm readability
-func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, error], callbacks StreamCallbacks) ([]Message, Usage, bool, error) {
+func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, error], callbacks StreamCallbacks) ([]ContentPart, Usage, bool, error) {
 	var (
-		stepMessage Message
-		stepUsage   Usage
-		truncated   bool
-		deferred    []*ToolInputPart
-		results     []ContentPart
+		stepContents []ContentPart
+		stepUsage    Usage
+		truncated    bool
+		deferred     []*ToolInputPart
+		results      []ContentPart
 	)
 
 	// Channel for collecting all tool execution results.
@@ -243,17 +246,17 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 			deferred = a.handleStreamedToolInput(ctx, tc, callbacks, deferred, resultCh)
 
 		case StepCompleteEvent:
-			stepMessage = e.Message
+			stepContents = e.Contents
 			stepUsage = e.Usage
 			// Set IDs on final content parts from tracked values.
-			for i := range stepMessage.Contents {
+			for i := range stepContents {
 				if id, ok := idByIndex[i]; ok {
-					stepMessage.Contents[i].UpdateContentPartMeta(id, RoleAssistant)
+					stepContents[i].UpdateContentPartMeta(id, RoleAssistant)
 				}
 			}
 			// Strip empty placeholders that providers may have inserted
 			// to keep delta indices aligned with content positions.
-			stepMessage.Contents = stripEmptyPlaceholders(stepMessage.Contents)
+			stepContents = stripEmptyPlaceholders(stepContents)
 			if e.StopReason == "max_tokens" || e.StopReason == "length" {
 				truncated = true
 			}
@@ -267,11 +270,11 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 	}
 
 	// Re-order results by tool call ID to match the LLM's intended order.
-	// toolInputs are extracted from stepMessage.Contents, which preserves the
+	// toolInputs are extracted from stepContents, which preserves the
 	// SSE index order (0, 1, 2...) from the streaming response. Each result
 	// carries its tool call ID, so we place them at the correct position
 	// regardless of execution or collection order.
-	toolInputs := extractToolInputs(stepMessage.Contents)
+	toolInputs := extractToolInputs(stepContents)
 	finalResults := make([]ContentPart, len(toolInputs))
 	idToTool := make(map[string]int, len(toolInputs))
 	for i, tc := range toolInputs {
@@ -285,12 +288,10 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 		}
 	}
 
-	stepMessages := []Message{stepMessage}
-	if len(finalResults) > 0 && !truncated {
-		stepMessages = append(stepMessages, Message{Role: RoleTool, Contents: finalResults})
-	}
+	// Append assistant contents + tool results as flat list
+	stepContents = append(stepContents, finalResults...)
 
-	return stepMessages, stepUsage, truncated, nil
+	return stepContents, stepUsage, truncated, nil
 }
 
 // handleStreamedToolInput processes a completed tool use during streaming.
@@ -412,7 +413,7 @@ func (e ToolInputCompleteEvent) ToPart(historyID uint64, toolName string) *ToolI
 		ID:       e.ID,
 		ToolName: toolName,
 		Input:    e.Input,
-		ContentMeta: ContentMeta{
+		ContentPartMeta: ContentPartMeta{
 			HistoryID: historyID,
 		},
 	}
@@ -452,7 +453,7 @@ func newToolOutput(callbacks StreamCallbacks, id string, contents []ContentPart,
 	if callbacks.OnToolOutput != nil {
 		callbacks.OnToolOutput(id, contents, err, historyID) //nolint:errcheck
 	}
-	return &ToolOutputPart{ID: id, Output: contents, IsError: isError, ContentMeta: ContentMeta{HistoryID: historyID, Role: RoleTool}}
+	return &ToolOutputPart{ID: id, Output: contents, IsError: isError, ContentPartMeta: ContentPartMeta{HistoryID: historyID, Role: RoleTool}}
 }
 
 // extractToolInputs extracts ToolInputParts from message content.
@@ -464,4 +465,14 @@ func extractToolInputs(contents []ContentPart) []ToolInputPart {
 		}
 	}
 	return uses
+}
+
+// hasToolInputs checks if content contains tool calls.
+func hasToolInputs(contents []ContentPart) bool {
+	for _, part := range contents {
+		if _, ok := part.(*ToolInputPart); ok {
+			return true
+		}
+	}
+	return false
 }

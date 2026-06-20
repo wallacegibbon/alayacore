@@ -5,13 +5,10 @@ import (
 	"encoding/json"
 )
 
-// NewUserMessage creates a user message
-func NewUserMessage(text string) Message {
-	return Message{
-		Role: RoleUser,
-		Contents: []ContentPart{
-			&TextPart{Text: text},
-		},
+// NewUserContent creates user content parts
+func NewUserContent(text string) []ContentPart {
+	return []ContentPart{
+		&TextPart{Text: text},
 	}
 }
 
