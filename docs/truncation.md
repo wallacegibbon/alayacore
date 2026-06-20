@@ -20,7 +20,7 @@ Files larger than 64KB are truncated at a line boundary with metadata:
 [file content...]
 ```
 
-- Agent can use `start_line`/`end_line` to read specific ranges
+- Agent can use `start_line`/`num_lines` to read specific ranges
 - No file is created; truncation happens in-memory
 
 ## execute_command

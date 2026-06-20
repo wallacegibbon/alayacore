@@ -57,10 +57,10 @@ func (h *ReadFileHandler) FormatCall(input json.RawMessage) string {
 
 	parts := []string{args.Path}
 	if args.StartLine > 0 {
-		parts = append(parts, fmt.Sprintf("%d", args.StartLine))
+		parts = append(parts, fmt.Sprintf("start=%d", args.StartLine))
 	}
-	if args.EndLine > 0 {
-		parts = append(parts, fmt.Sprintf("%d", args.EndLine))
+	if args.NumLines > 0 {
+		parts = append(parts, fmt.Sprintf("count=%d", args.NumLines))
 	}
 	// Add newline at end so output starts on new line
 	return fmt.Sprintf("read_file: %s\n", strings.Join(parts, ", "))

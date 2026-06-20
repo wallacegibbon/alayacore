@@ -102,6 +102,7 @@ Multiple media frames of different types can be combined in any order.
 ut-read-file.bin               UT "Read the file main.go"
 af-read-file-start.bin         AF {"id":"t1","name":"read_file"}
 af-read-file-input.bin         AF {"id":"t1","input":{"path":"main.go"}}
+af-read-file-input-range.bin   AF {"id":"t1","input":{"path":"main.go","start_line":10,"num_lines":20}}
 uf-read-file-success.bin       UF {"id":"t1","output":[{"text":"package main...","type":"text"}]}
 uf-read-file-failed.bin        UF {"id":"t1","output":[{"text":"file not found","type":"text"}],"is_error":true}
 ```
@@ -157,7 +158,7 @@ at-delta-new-step.bin          AT \x00 6 \x00 Next step (new stream)
 at-plain.bin                   AT "plain text without stream id"
 ar-delta.bin                   AR \x00 5 \x00 thinking...
 ui-image.bin                   UI data:image/jpeg;base64,...
-sm-message-version.bin         SM {"type":"version","data":{"message_version":6}}
+sm-message-version.bin         SM {"type":"version","data":{"message_version":7}}
 sm-model-list.bin              SM {"type":"model_list","data":{"models":[{"id":0,"name":"Anthropic / Claude Haiku 4",...},{"id":4,"name":"DeepSeek / DeepSeek-V4 Flash",...}],"model_config_path":"..."}}
 sm-model.bin                   SM {"type":"model","data":{"active_id":4,"active_name":"DeepSeek / DeepSeek-V4 Flash","context_limit":1000000}}
 sm-theme-list.bin              SM {"type":"theme_list","data":{"themes":[{"name":"theme-dark",...},{"name":"theme-light",...}]}}

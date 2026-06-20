@@ -83,7 +83,7 @@ When reasoning mode is **disabled**, assistant messages contain only the tool ca
 			"role": "assistant",
 			"tool_calls": [{
 				"function": {
-					"arguments": "{\"path\":\"/home/wallace/playground/alayacore/go.mod\",\"end_line\":5}",
+					"arguments": "{\"path\":\"/home/wallace/playground/alayacore/go.mod\",\"num_lines\":5}",
 					"name": "read_file"
 				},
 				"id": "call_ca6eef24512147a6a9dae7bd",
@@ -117,7 +117,7 @@ When reasoning mode is **enabled**, every assistant message is padded with `"rea
 			"reasoning_content": "",
 			"tool_calls": [{
 				"function": {
-					"arguments": "{\"path\":\"/home/wallace/playground/alayacore/go.mod\",\"end_line\":5}",
+					"arguments": "{\"path\":\"/home/wallace/playground/alayacore/go.mod\",\"num_lines\":5}",
 					"name": "read_file"
 				},
 				"id": "call_ca6eef24512147a6a9dae7bd",
@@ -155,7 +155,7 @@ When reasoning mode is **disabled**, assistant messages contain only the tool-us
 				{
 					"id": "call_ca6eef24512147a6a9dae7bd",
 					"input": {
-						"end_line": 5,
+						"num_lines": 5,
 						"path": "/home/wallace/playground/alayacore/go.mod"
 					},
 					"name": "read_file",
@@ -194,7 +194,7 @@ When reasoning mode is **enabled**, every assistant message is prepended with an
 				{
 					"id": "call_ca6eef24512147a6a9dae7bd",
 					"input": {
-						"end_line": 5,
+						"num_lines": 5,
 						"path": "/home/wallace/playground/alayacore/go.mod"
 					},
 					"name": "read_file",

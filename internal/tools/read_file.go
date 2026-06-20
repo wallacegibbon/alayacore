@@ -20,14 +20,14 @@ const maxTextReadSize = 64 * 1024 // 64KB limit for text files (~16K tokens)
 type ReadFileInput struct {
 	Path      string `json:"path" jsonschema:"required,description=File path to read"`
 	StartLine int    `json:"start_line" jsonschema:"description=Starting line number (1-indexed)"`
-	EndLine   int    `json:"end_line" jsonschema:"description=Ending line number (1-indexed)"`
+	NumLines  int    `json:"num_lines" jsonschema:"description=Number of lines to read from start_line"`
 }
 
 // NewReadFileTool creates a tool for reading files
 func NewReadFileTool() llm.Tool {
 	return llm.NewTool(
 		"read_file",
-		`Read file contents. For media files (image, video, audio, document/PDF), returns the content directly for you to see. For text files, supports optional line range using start_line and end_line parameters (1-indexed).`,
+		`Read file contents. For media files (image, video, audio, document/PDF), returns the content directly for you to see. For text files, supports optional line range using start_line and num_lines parameters (1-indexed).`,
 	).
 		WithSchema(llm.MustGenerateSchema(ReadFileInput{})).
 		WithExecute(llm.TypedExecute(executeReadFile)).
@@ -137,20 +137,20 @@ func executeReadFile(ctx context.Context, args ReadFileInput) ([]llm.ContentPart
 		return nil, err
 	}
 
-	// Validate line range parameters
-	if valErr := validateLineRange(args.StartLine, args.EndLine); valErr != nil {
+	// Validate line parameters
+	if valErr := validateLineParams(args.StartLine, args.NumLines); valErr != nil {
 		return nil, valErr
 	}
 
-	// Detect media files — return content directly
-	if args.StartLine == 0 && args.EndLine == 0 {
+	// Detect media files — return content directly (only when reading full file)
+	if args.StartLine == 0 && args.NumLines == 0 {
 		if mimeType, newPart, ok := isMediaFile(args.Path); ok {
 			return readMediaFile(args.Path, mimeType, newPart)
 		}
 	}
 
 	// Full file read case
-	if args.StartLine == 0 && args.EndLine == 0 {
+	if args.StartLine == 0 && args.NumLines == 0 {
 		if info.Size() > maxTextReadSize {
 			return readLargeFileTruncated(args.Path, info.Size())
 		}
@@ -169,7 +169,13 @@ func executeReadFile(ctx context.Context, args ReadFileInput) ([]llm.ContentPart
 	}
 	defer file.Close()
 
-	lines, err := readLinesRange(ctx, file, args.StartLine, args.EndLine)
+	// Normalize: start_line=0 means start at line 1
+	startLine := args.StartLine
+	if startLine == 0 {
+		startLine = 1
+	}
+
+	lines, err := readLinesRange(ctx, file, startLine, args.NumLines)
 	if err != nil {
 		return nil, err
 	}
@@ -242,22 +248,19 @@ func readLargeFileTruncated(path string, totalSize int64) ([]llm.ContentPart, er
 	return []llm.ContentPart{&llm.TextPart{Text: header + "\n" + content}}, nil
 }
 
-func validateLineRange(startLine, endLine int) error {
+func validateLineParams(startLine, numLines int) error {
 	if startLine < 0 {
 		return fmt.Errorf("start_line must be >= 0")
 	}
-	if endLine < 0 {
-		return fmt.Errorf("end_line must be >= 0")
-	}
-	if startLine > 0 && endLine > 0 && startLine > endLine {
-		return fmt.Errorf("start_line must be <= end_line")
+	if numLines < 0 {
+		return fmt.Errorf("num_lines must be >= 0")
 	}
 	// 0 means "not specified" (default int value)
-	// Positive values are 1-indexed line numbers
+	// Positive startLine values are 1-indexed line numbers
 	return nil
 }
 
-func readLinesRange(ctx context.Context, file *os.File, startLine, endLine int) ([]string, error) {
+func readLinesRange(ctx context.Context, file *os.File, startLine, numLines int) ([]string, error) {
 	scanner := bufio.NewScanner(file)
 	// Increase buffer size to handle long lines (default is 64KB)
 	// We use 1MB which should be reasonable for most cases while still
@@ -274,12 +277,12 @@ func readLinesRange(ctx context.Context, file *os.File, startLine, endLine int) 
 		default:
 		}
 
-		if startLine > 0 && currentLine < startLine {
+		if currentLine < startLine {
 			currentLine++
 			continue
 		}
 
-		if endLine > 0 && currentLine > endLine {
+		if numLines > 0 && len(lines) >= numLines {
 			break
 		}
 
