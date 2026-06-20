@@ -90,7 +90,7 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 			return nil, domainerrors.Wrap(CommandNameSave, err)
 		}
 		tlvBuf.WriteString("\n\n")
-		tlvBuf.Write(stream.EncodeTLV(tag, content))
+		tlvBuf.Write(stream.EncodeTLVStr(tag, content))
 	}
 
 	buf.WriteString(tlvBuf.String())
@@ -249,8 +249,8 @@ func contentPartToTLV(part llm.ContentPart) (tag string, content string, err err
 // rebuilt when the session is loaded.
 func contentPartFromTLV(tag string, content []byte) (llm.ContentPart, error) {
 	cleanContent := string(content)
-	if _, stripped, ok := stream.UnwrapDelta(cleanContent); ok {
-		cleanContent = stripped
+	if _, stripped, ok := stream.UnwrapDelta(content); ok {
+		cleanContent = string(stripped)
 	}
 
 	switch tag {

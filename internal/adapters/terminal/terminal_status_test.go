@@ -10,10 +10,10 @@ func TestStatusBarShowsLastMaxStepsOnError(t *testing.T) {
 	out := NewTerminalOutput(DefaultStyles())
 
 	// Simulate task in progress with max steps = 50, current step = 2
-	out.handleSystemMsg(`{"type":"task","data":{"in_progress":true,"current_step":2,"max_steps":50,"context":0,"context_limit":0,"task_error":false}}`)
+	out.handleSystemMsg([]byte(`{"type":"task","data":{"in_progress":true,"current_step":2,"max_steps":50,"context":0,"context_limit":0,"task_error":false}}`))
 
 	// Simulate task ending with error
-	out.handleSystemMsg(`{"type":"task","data":{"in_progress":false,"current_step":50,"max_steps":50,"context":0,"context_limit":0,"task_error":true}}`)
+	out.handleSystemMsg([]byte(`{"type":"task","data":{"in_progress":false,"current_step":50,"max_steps":50,"context":0,"context_limit":0,"task_error":true}}`))
 
 	// Create terminal with the output writer
 	styles := DefaultStyles()
@@ -45,7 +45,7 @@ func TestStatusBarShowsCurrentStepsDuringProgress(t *testing.T) {
 	out := NewTerminalOutput(DefaultStyles())
 
 	// Simulate task in progress
-	out.handleSystemMsg(`{"type":"task","data":{"in_progress":true,"current_step":7,"max_steps":20,"context":0,"context_limit":0,"task_error":false}}`)
+	out.handleSystemMsg([]byte(`{"type":"task","data":{"in_progress":true,"current_step":7,"max_steps":20,"context":0,"context_limit":0,"task_error":false}}`))
 
 	// Create terminal with the output writer
 	styles := DefaultStyles()

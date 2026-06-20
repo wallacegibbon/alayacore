@@ -105,7 +105,7 @@ func (to *outputWriter) processBuffer() {
 			break
 		}
 
-		value := string(to.buffer[6 : 6+length])
+		value := to.buffer[6 : 6+length]
 		to.writeColored(tag, value)
 		to.buffer = to.buffer[6+length:]
 	}
@@ -114,7 +114,7 @@ func (to *outputWriter) processBuffer() {
 // writeColored writes styled content based on the TLV tag
 //
 //nolint:gocyclo // dispatch over many tag types; each case is simple
-func (to *outputWriter) writeColored(tag string, value string) {
+func (to *outputWriter) writeColored(tag string, value []byte) {
 	to.triggerUpdateForTag(tag)
 
 	switch tag {
@@ -129,7 +129,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 			content = value
 		}
 		// Pass raw content - styling is applied during render
-		to.windowBuffer.AppendOrUpdate(tag, id, content)
+		to.windowBuffer.AppendOrUpdate(tag, id, string(content))
 
 	// User text tag — may carry NUL-delimited historyID
 	case stream.TagUserT:
@@ -139,7 +139,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 			content = value
 		}
 		// Pass raw value - styling is applied during render
-		to.windowBuffer.AppendOrUpdate(tag, id, content)
+		to.windowBuffer.AppendOrUpdate(tag, id, string(content))
 
 	// User image tag — may carry NUL-delimited historyID
 	case stream.TagUserI:
@@ -181,7 +181,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 			payload = value
 		}
 		var fd stream.ToolInputData
-		if err := json.Unmarshal([]byte(payload), &fd); err != nil {
+		if err := json.Unmarshal(payload, &fd); err != nil {
 			return
 		}
 
@@ -210,7 +210,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 			payload = value
 		}
 		var tr stream.ToolOutputData
-		if err := json.Unmarshal([]byte(payload), &tr); err != nil {
+		if err := json.Unmarshal(payload, &tr); err != nil {
 			return
 		}
 		// Extract display text from the content JSON array
@@ -224,7 +224,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 
 	default:
 		id := to.generateWindowID()
-		to.windowBuffer.AppendOrUpdate(tag, id, value)
+		to.windowBuffer.AppendOrUpdate(tag, id, string(value))
 	}
 }
 
@@ -243,7 +243,7 @@ func (to *outputWriter) triggerUpdateForTag(tag string) {
 
 // handleSystemMsg processes a TagSystemMsg frame.
 // Called from processBuffer which holds outputWriter.mu.
-func (to *outputWriter) handleSystemMsg(value string) {
+func (to *outputWriter) handleSystemMsg(value []byte) {
 	env, err := stream.ParseSystemMsg(value)
 	if err != nil {
 		return

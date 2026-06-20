@@ -20,7 +20,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
-		if _, err := fmt.Printf("%s\t%s\n", tag, value); err != nil {
+		if _, err := fmt.Printf("%s\t%s\n", tag, string(value)); err != nil {
 			fmt.Fprintf(os.Stderr, "write error: %v\n", err)
 			os.Exit(1)
 		}

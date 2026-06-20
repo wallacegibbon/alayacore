@@ -87,51 +87,60 @@ func (b *SliceBuffer) Write(p []byte) (int, error) {
 
 // EncodeTLV creates a TLV-encoded byte slice.
 // Format: [2-byte tag][4-byte length][value]
-func EncodeTLV(tag string, value string) []byte {
-	data := []byte(value)
-	length := len(data)
+func EncodeTLV(tag string, value []byte) []byte {
+	length := len(value)
 	if length > maxMessageSize {
 		length = maxMessageSize
-		data = data[:maxMessageSize]
+		value = value[:maxMessageSize]
 	}
 
 	msg := make([]byte, 6+length)
 	msg[0] = tag[0]
 	msg[1] = tag[1]
 	binary.BigEndian.PutUint32(msg[2:], uint32(length)) //nolint:gosec // G115: length is bounded by maxMessageSize
-	copy(msg[6:], data)
+	copy(msg[6:], value)
 
 	return msg
+}
+
+// EncodeTLVStr is a convenience wrapper around EncodeTLV that takes a string value.
+func EncodeTLVStr(tag string, value string) []byte {
+	return EncodeTLV(tag, []byte(value))
 }
 
 const maxMessageSize = 1<<31 - 1 // Max int32 to fit in uint32
 
 // WriteTLV writes a TLV-encoded message to the writer.
-func WriteTLV(output io.Writer, tag string, value string) error {
+func WriteTLV(output io.Writer, tag string, value []byte) error {
 	_, err := output.Write(EncodeTLV(tag, value))
 	return err
 }
 
+// WriteTLVStr is a convenience wrapper around WriteTLV that takes a string value.
+func WriteTLVStr(output io.Writer, tag string, value string) error {
+	return WriteTLV(output, tag, []byte(value))
+}
+
 // ReadTLV reads a single TLV-framed message from input.
 // It blocks until a full frame has been read or an error occurs.
-func ReadTLV(input io.Reader) (string, string, error) {
+func ReadTLV(input io.Reader) (string, []byte, error) {
 	header := make([]byte, 6)
 	if _, err := io.ReadFull(input, header); err != nil {
-		return "", "", err
+		return "", nil, err
 	}
 	tag := string(header[0:2])
 	length := binary.BigEndian.Uint32(header[2:])
 
 	if length == 0 {
-		return tag, "", nil
+		return tag, nil, nil
 	}
 
-	valueBuf := make([]byte, length)
-	if _, err := io.ReadFull(input, valueBuf); err != nil {
-		return "", "", err
+	value := make([]byte, length)
+	if _, err := io.ReadFull(input, value); err != nil {
+		return "", nil, err
 	}
 
-	return tag, string(valueBuf), nil
+	return tag, value, nil
 }
 
 // NopInput is a Reader that always returns EOF.
@@ -185,9 +194,9 @@ type SystemMsgEnvelope struct {
 
 // ParseSystemMsg parses a TagSystemMsg value into its type and payload.
 // Returns the envelope on success, or an error if the JSON is malformed.
-func ParseSystemMsg(value string) (SystemMsgEnvelope, error) {
+func ParseSystemMsg(value []byte) (SystemMsgEnvelope, error) {
 	var env SystemMsgEnvelope
-	if err := json.Unmarshal([]byte(value), &env); err != nil {
+	if err := json.Unmarshal(value, &env); err != nil {
 		return SystemMsgEnvelope{}, err
 	}
 	return env, nil
@@ -195,7 +204,7 @@ func ParseSystemMsg(value string) (SystemMsgEnvelope, error) {
 
 // ParseSystemMsgType extracts just the type from a TagSystemMsg value.
 // Returns the type string and whether parsing succeeded.
-func ParseSystemMsgType(value string) (string, bool) {
+func ParseSystemMsgType(value []byte) (string, bool) {
 	env, err := ParseSystemMsg(value)
 	return env.Type, err == nil
 }
@@ -210,7 +219,7 @@ func WriteSystemMsg(w io.Writer, msg SystemMsg) error {
 	if err != nil {
 		return err
 	}
-	return WriteTLV(w, TagSystemMsg, string(env))
+	return WriteTLV(w, TagSystemMsg, env)
 }
 
 // ErrorMsg is a system error message (type "error").

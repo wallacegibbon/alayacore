@@ -37,8 +37,8 @@ func TestWrapUnwrapDelta(t *testing.T) {
 			if gotID != tt.id {
 				t.Errorf("id = %q, want %q", gotID, tt.id)
 			}
-			if gotContent != tt.content {
-				t.Errorf("content = %q, want %q", gotContent, tt.content)
+			if string(gotContent) != tt.content {
+				t.Errorf("content = %q, want %q", string(gotContent), tt.content)
 			}
 		})
 	}
@@ -58,7 +58,7 @@ func TestUnwrapDelta_InvalidInput(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, ok := UnwrapDelta(tt.value)
+			_, _, ok := UnwrapDelta([]byte(tt.value))
 			if ok {
 				t.Errorf("expected ok=false for %q", tt.value)
 			}
@@ -79,7 +79,7 @@ func TestRoundTrip(t *testing.T) {
 	if gotID != id {
 		t.Errorf("id = %q, want %q", gotID, id)
 	}
-	if gotContent != delta {
-		t.Errorf("content = %q, want %q", gotContent, delta)
+	if string(gotContent) != delta {
+		t.Errorf("content = %q, want %q", string(gotContent), delta)
 	}
 }
