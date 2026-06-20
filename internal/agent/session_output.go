@@ -81,11 +81,6 @@ func (s *Session) writeNotifyf(format string, args ...any) {
 	s.writeNotify(fmt.Sprintf(format, args...))
 }
 
-// writeTLVStr writes a string TLV frame.
-func (s *Session) writeTLVStr(tag string, msg string) {
-	s.writeTLV(tag, msg)
-}
-
 // writeTLVJSON marshals a value to JSON and writes it as a TLV frame.
 // On marshal failure, marks output as broken (same as writeTLV on write failure).
 func (s *Session) writeTLVJSON(tag string, v any) {

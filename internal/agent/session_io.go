@@ -420,7 +420,7 @@ func (s *Session) resendPrompt(ctx context.Context, contents []llm.ContentPart) 
 				Role:      llm.RoleUser,
 			},
 		})
-		s.writeTLVStr(stream.TagUserT, stream.WrapDelta(strconv.FormatUint(id, 10), "Continue"))
+		s.writeTLV(stream.TagUserT, stream.WrapDelta(strconv.FormatUint(id, 10), "Continue"))
 	} else {
 		s.writeNotify("Resending...")
 	}
