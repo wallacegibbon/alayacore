@@ -206,10 +206,10 @@ func TestToolCallStreaming(t *testing.T) {
 	toolNames := make(map[string]string)
 	for event := range events {
 		if e, ok := event.(llm.ToolInputStartEvent); ok {
-			toolNames[e.ID] = e.ToolName
+			toolNames[e.ID] = e.Name
 		}
 		if tc, ok := event.(llm.ToolInputCompleteEvent); ok {
-			toolCalls = append(toolCalls, llm.ToolInputPart{ID: tc.ID, ToolName: toolNames[tc.ID], Input: tc.Input})
+			toolCalls = append(toolCalls, llm.ToolInputPart{ID: tc.ID, Name: toolNames[tc.ID], Input: tc.Input})
 		}
 	}
 
@@ -217,8 +217,8 @@ func TestToolCallStreaming(t *testing.T) {
 		t.Fatalf("Expected 1 tool call, got %d", len(toolCalls))
 	}
 
-	if toolCalls[0].ToolName != "test_tool" {
-		t.Errorf("Expected tool name 'test_tool', got '%s'", toolCalls[0].ToolName)
+	if toolCalls[0].Name != "test_tool" {
+		t.Errorf("Expected tool name 'test_tool', got '%s'", toolCalls[0].Name)
 	}
 
 	if toolCalls[0].ID != "call-123" {
@@ -277,10 +277,10 @@ func TestToolCallStreamingChunked(t *testing.T) {
 	toolNames := make(map[string]string)
 	for event := range events {
 		if e, ok := event.(llm.ToolInputStartEvent); ok {
-			toolNames[e.ID] = e.ToolName
+			toolNames[e.ID] = e.Name
 		}
 		if tc, ok := event.(llm.ToolInputCompleteEvent); ok {
-			toolCalls = append(toolCalls, llm.ToolInputPart{ID: tc.ID, ToolName: toolNames[tc.ID], Input: tc.Input})
+			toolCalls = append(toolCalls, llm.ToolInputPart{ID: tc.ID, Name: toolNames[tc.ID], Input: tc.Input})
 		}
 	}
 
@@ -288,8 +288,8 @@ func TestToolCallStreamingChunked(t *testing.T) {
 		t.Fatalf("Expected 1 tool call, got %d", len(toolCalls))
 	}
 
-	if toolCalls[0].ToolName != "execute_command" {
-		t.Errorf("Expected tool name 'execute_command', got '%s'", toolCalls[0].ToolName)
+	if toolCalls[0].Name != "execute_command" {
+		t.Errorf("Expected tool name 'execute_command', got '%s'", toolCalls[0].Name)
 	}
 
 	// Verify arguments were accumulated and can be unmarshaled
@@ -344,10 +344,10 @@ func TestToolCallStreamingWithNullArguments(t *testing.T) {
 	toolNames := make(map[string]string)
 	for event := range events {
 		if e, ok := event.(llm.ToolInputStartEvent); ok {
-			toolNames[e.ID] = e.ToolName
+			toolNames[e.ID] = e.Name
 		}
 		if tc, ok := event.(llm.ToolInputCompleteEvent); ok {
-			toolCalls = append(toolCalls, llm.ToolInputPart{ID: tc.ID, ToolName: toolNames[tc.ID], Input: tc.Input})
+			toolCalls = append(toolCalls, llm.ToolInputPart{ID: tc.ID, Name: toolNames[tc.ID], Input: tc.Input})
 		}
 	}
 
@@ -410,10 +410,10 @@ func TestAnthropicToolCallStreaming(t *testing.T) {
 	toolNames := make(map[string]string)
 	for event := range events {
 		if e, ok := event.(llm.ToolInputStartEvent); ok {
-			toolNames[e.ID] = e.ToolName
+			toolNames[e.ID] = e.Name
 		}
 		if e, ok := event.(llm.ToolInputCompleteEvent); ok {
-			toolCalls = append(toolCalls, llm.ToolInputPart{ID: e.ID, ToolName: toolNames[e.ID], Input: e.Input})
+			toolCalls = append(toolCalls, llm.ToolInputPart{ID: e.ID, Name: toolNames[e.ID], Input: e.Input})
 		} else if e, ok := event.(llm.StepCompleteEvent); ok {
 			stepComplete = &e
 		}
@@ -423,8 +423,8 @@ func TestAnthropicToolCallStreaming(t *testing.T) {
 		t.Fatalf("Expected 1 tool call, got %d", len(toolCalls))
 	}
 
-	if toolCalls[0].ToolName != "get_weather" {
-		t.Errorf("Expected tool name 'get_weather', got '%s'", toolCalls[0].ToolName)
+	if toolCalls[0].Name != "get_weather" {
+		t.Errorf("Expected tool name 'get_weather', got '%s'", toolCalls[0].Name)
 	}
 
 	if toolCalls[0].ID != "toolu_123" {
@@ -490,8 +490,8 @@ func TestToolInputStartEventOpenAI(t *testing.T) {
 	for event := range events {
 		switch e := event.(type) {
 		case llm.ToolInputStartEvent:
-			toolNames[e.ID] = e.ToolName
-			order = append(order, fmt.Sprintf("start(%s)", e.ToolName))
+			toolNames[e.ID] = e.Name
+			order = append(order, fmt.Sprintf("start(%s)", e.Name))
 		case llm.ToolInputCompleteEvent:
 			order = append(order, fmt.Sprintf("complete(%s)", toolNames[e.ID]))
 		}
@@ -547,8 +547,8 @@ func TestToolInputStartEventAnthropic(t *testing.T) {
 	for event := range events {
 		switch e := event.(type) {
 		case llm.ToolInputStartEvent:
-			toolNames[e.ID] = e.ToolName
-			order = append(order, fmt.Sprintf("start(%s)", e.ToolName))
+			toolNames[e.ID] = e.Name
+			order = append(order, fmt.Sprintf("start(%s)", e.Name))
 		case llm.ToolInputCompleteEvent:
 			order = append(order, fmt.Sprintf("complete(%s)", toolNames[e.ID]))
 		}
@@ -1324,7 +1324,7 @@ func TestOpenAITextWithToolCallsConversion(t *testing.T) {
 	messages := testMsg(llm.RoleUser, &llm.TextPart{Text: "Check the weather"})
 	messages = append(messages, testMsg(llm.RoleAssistant,
 		&llm.TextPart{Text: "Let me check that."},
-		&llm.ToolInputPart{ID: "call_123", ToolName: "get_weather", Input: json.RawMessage(`{"location":"SF"}`)},
+		&llm.ToolInputPart{ID: "call_123", Name: "get_weather", Input: json.RawMessage(`{"location":"SF"}`)},
 	)...)
 	messages = append(messages, testMsg(llm.RoleTool,
 		&llm.ToolOutputPart{ID: "call_123", Output: []llm.ContentPart{&llm.TextPart{Text: "Sunny, 72°F"}}},
@@ -1410,7 +1410,7 @@ func TestAnthropicToolResultMessageFormat(t *testing.T) {
 	// Simulate a conversation with tool call and result
 	messages := testMsg(llm.RoleUser, &llm.TextPart{Text: "Use the tool"})
 	messages = append(messages, testMsg(llm.RoleAssistant,
-		&llm.ToolInputPart{ID: "tool-123", ToolName: "test_tool", Input: json.RawMessage(`{"input": "value"}`)},
+		&llm.ToolInputPart{ID: "tool-123", Name: "test_tool", Input: json.RawMessage(`{"input": "value"}`)},
 	)...)
 	messages = append(messages, testMsg(llm.RoleTool,
 		&llm.ToolOutputPart{ID: "tool-123", Output: []llm.ContentPart{&llm.TextPart{Text: "Tool executed successfully"}}},
@@ -1472,10 +1472,10 @@ func TestAnthropicMultiToolCall(t *testing.T) {
 	toolNames := make(map[string]string)
 	for event := range events {
 		if e, ok := event.(llm.ToolInputStartEvent); ok {
-			toolNames[e.ID] = e.ToolName
+			toolNames[e.ID] = e.Name
 		}
 		if e, ok := event.(llm.ToolInputCompleteEvent); ok {
-			toolCalls = append(toolCalls, llm.ToolInputPart{ID: e.ID, ToolName: toolNames[e.ID], Input: e.Input})
+			toolCalls = append(toolCalls, llm.ToolInputPart{ID: e.ID, Name: toolNames[e.ID], Input: e.Input})
 		}
 	}
 
@@ -1487,8 +1487,8 @@ func TestAnthropicMultiToolCall(t *testing.T) {
 	if toolCalls[0].ID != "tool-1" {
 		t.Errorf("Expected tool call ID 'tool-1', got '%s'", toolCalls[0].ID)
 	}
-	if toolCalls[0].ToolName != "get_weather" {
-		t.Errorf("Expected tool name 'get_weather', got '%s'", toolCalls[0].ToolName)
+	if toolCalls[0].Name != "get_weather" {
+		t.Errorf("Expected tool name 'get_weather', got '%s'", toolCalls[0].Name)
 	}
 
 	// Check second tool call
@@ -1560,7 +1560,7 @@ func TestOpenAIToolResultMessageFormat(t *testing.T) {
 	// Simulate a conversation with tool call and result
 	messages := testMsg(llm.RoleUser, &llm.TextPart{Text: "Use the tool"})
 	messages = append(messages, testMsg(llm.RoleAssistant,
-		&llm.ToolInputPart{ID: "call-123", ToolName: "test_tool", Input: json.RawMessage(`{"input": "value"}`)},
+		&llm.ToolInputPart{ID: "call-123", Name: "test_tool", Input: json.RawMessage(`{"input": "value"}`)},
 	)...)
 	messages = append(messages, testMsg(llm.RoleTool,
 		&llm.ToolOutputPart{ID: "call-123", Output: []llm.ContentPart{&llm.TextPart{Text: "Tool executed successfully"}}},
@@ -1664,8 +1664,8 @@ func TestOpenAIMultiToolResultMessageFormat(t *testing.T) {
 	// Simulate a conversation with 2 tool calls and 2 results in a single tool message
 	messages := testMsg(llm.RoleUser, &llm.TextPart{Text: "Run two tools"})
 	messages = append(messages, testMsg(llm.RoleAssistant,
-		&llm.ToolInputPart{ID: "call-1", ToolName: "tool_a", Input: json.RawMessage(`{}`)},
-		&llm.ToolInputPart{ID: "call-2", ToolName: "tool_b", Input: json.RawMessage(`{}`)},
+		&llm.ToolInputPart{ID: "call-1", Name: "tool_a", Input: json.RawMessage(`{}`)},
+		&llm.ToolInputPart{ID: "call-2", Name: "tool_b", Input: json.RawMessage(`{}`)},
 	)...)
 	messages = append(messages, testMsg(llm.RoleTool,
 		&llm.ToolOutputPart{ID: "call-1", Output: []llm.ContentPart{&llm.TextPart{Text: "Result A"}}},
@@ -1744,7 +1744,7 @@ func TestAnthropicToolResultError(t *testing.T) {
 	// Conversation with error tool result
 	messages := testMsg(llm.RoleUser, &llm.TextPart{Text: "Use the tool"})
 	messages = append(messages, testMsg(llm.RoleAssistant,
-		&llm.ToolInputPart{ID: "tool-123", ToolName: "test_tool", Input: json.RawMessage(`{}`)},
+		&llm.ToolInputPart{ID: "tool-123", Name: "test_tool", Input: json.RawMessage(`{}`)},
 	)...)
 	messages = append(messages, testMsg(llm.RoleTool,
 		&llm.ToolOutputPart{ID: "tool-123", Output: []llm.ContentPart{&llm.TextPart{Text: "Something went wrong"}}, IsError: true},

@@ -24,7 +24,7 @@ func TestSessionSavePreservesTextWithToolCalls(t *testing.T) {
 		},
 		&llm.ToolInputPart{
 			ID:              "call_123",
-			ToolName:        "get_weather",
+			Name:            "get_weather",
 			Input:           []byte(`{"location":"SF"}`),
 			ContentPartMeta: llm.ContentPartMeta{HistoryID: nextID(), Role: llm.RoleAssistant},
 		},
@@ -76,8 +76,8 @@ func TestSessionSavePreservesTextWithToolCalls(t *testing.T) {
 
 	// Check assistant tool call (index 2)
 	if tc, ok := loaded.Contents[2].(*llm.ToolInputPart); ok {
-		if tc.ToolName != "get_weather" {
-			t.Errorf("Tool name mismatch: %s", tc.ToolName)
+		if tc.Name != "get_weather" {
+			t.Errorf("Tool name mismatch: %s", tc.Name)
 		}
 	} else {
 		t.Error("Content[2] is not a ToolInputPart")

@@ -201,9 +201,9 @@ func TestAnthropicRealToolCall(t *testing.T) {
 		if e, ok := event.(llm.TextDeltaEvent); ok {
 			textReceived += e.Delta
 		} else if e, ok := event.(llm.ToolInputStartEvent); ok {
-			toolNames[e.ID] = e.ToolName
+			toolNames[e.ID] = e.Name
 		} else if e, ok := event.(llm.ToolInputCompleteEvent); ok {
-			toolCalls = append(toolCalls, llm.ToolInputPart{ID: e.ID, ToolName: toolNames[e.ID], Input: e.Input})
+			toolCalls = append(toolCalls, llm.ToolInputPart{ID: e.ID, Name: toolNames[e.ID], Input: e.Input})
 		}
 	}
 
@@ -213,9 +213,9 @@ func TestAnthropicRealToolCall(t *testing.T) {
 		t.Error("Expected at least one tool call")
 	} else {
 		for _, tc := range toolCalls {
-			t.Logf("Tool call: %s(%s)", tc.ToolName, string(tc.Input))
-			if tc.ToolName != "echo" {
-				t.Errorf("Expected tool name 'echo', got '%s'", tc.ToolName)
+			t.Logf("Tool call: %s(%s)", tc.Name, string(tc.Input))
+			if tc.Name != "echo" {
+				t.Errorf("Expected tool name 'echo', got '%s'", tc.Name)
 			}
 		}
 	}

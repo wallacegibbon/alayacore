@@ -418,8 +418,8 @@ func (s *anthropicStreamState) finishBlock(index int) {
 	case anthropicBlockTypeToolUse:
 		s.contentParts[index] = &llm.ToolInputPart{
 			ID:              block.id,
-			ToolName:        block.name,
 			Input:           json.RawMessage(block.buffer.String()),
+			Name:            block.name,
 			ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant},
 		}
 	}
@@ -459,9 +459,9 @@ func (s *anthropicStreamState) toolInputPart(index int) *llm.ToolInputPart {
 		return nil
 	}
 	return &llm.ToolInputPart{
-		ID:       block.id,
-		ToolName: block.name,
-		Input:    json.RawMessage(block.buffer.String()),
+		ID:    block.id,
+		Name:  block.name,
+		Input: json.RawMessage(block.buffer.String()),
 	}
 }
 
@@ -530,9 +530,9 @@ func (p *AnthropicProvider) handleContentBlockStart(data string, yield func(llm.
 	state.createBlock(event.Index, event.ContentBlock.Type, event.ContentBlock.ID, event.ContentBlock.Name)
 	if event.ContentBlock.Type == anthropicBlockTypeToolUse {
 		if !yield(llm.ToolInputStartEvent{
-			ID:       event.ContentBlock.ID,
-			ToolName: event.ContentBlock.Name,
-			Index:    event.Index,
+			ID:    event.ContentBlock.ID,
+			Name:  event.ContentBlock.Name,
+			Index: event.Index,
 		}, nil) {
 			return false
 		}
@@ -767,7 +767,7 @@ func anthropicPartToBlock(part llm.ContentPart) *anthropicContentBlock {
 		return &anthropicContentBlock{
 			Type:  anthropicBlockTypeToolUse,
 			ID:    v.ID,
-			Name:  v.ToolName,
+			Name:  v.Name,
 			Input: v.Input,
 		}
 	case *llm.ToolOutputPart:

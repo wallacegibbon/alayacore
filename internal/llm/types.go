@@ -99,9 +99,9 @@ type ReasoningPart struct {
 // ToolInputPart represents a tool call stored in conversation history.
 type ToolInputPart struct {
 	ContentPartMeta
-	ID       string
-	Input    json.RawMessage
-	ToolName string
+	ID    string
+	Input json.RawMessage
+	Name  string
 }
 
 // ToolOutputPart represents a tool execution result.
@@ -150,9 +150,9 @@ func (ReasoningDeltaEvent) isStreamEvent() {}
 
 // ToolInputStartEvent signals that a tool use has started
 type ToolInputStartEvent struct {
-	ID       string
-	ToolName string
-	Index    int
+	ID    string
+	Name  string
+	Index int
 }
 
 func (ToolInputStartEvent) isStreamEvent() {}

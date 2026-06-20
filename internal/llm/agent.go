@@ -58,7 +58,7 @@ func NewAgent(config AgentConfig) *Agent {
 type StreamCallbacks struct {
 	OnTextDelta         func(delta string, historyID uint64) error
 	OnReasoningDelta    func(delta string, historyID uint64) error
-	OnToolInputStart    func(toolCallID, toolName string, historyID uint64) error
+	OnToolInputStart    func(toolCallID, name string, historyID uint64) error
 	OnToolInputComplete func(toolCallID string, input json.RawMessage, historyID uint64) error
 	OnToolOutput        func(toolCallID string, contents []ContentPart, err error, historyID uint64) error
 
@@ -68,7 +68,7 @@ type StreamCallbacks struct {
 
 	// ToolNeedsConfirm reports whether a tool requires user confirmation.
 	// If nil, no tools are deferred — they all execute immediately.
-	ToolNeedsConfirm func(toolName string) bool
+	ToolNeedsConfirm func(name string) bool
 
 	OnStepStart  func(step int) error
 	OnStepFinish func(contents []ContentPart, usage Usage) error
@@ -81,17 +81,17 @@ type StreamCallbacks struct {
 
 // ToolConfirmRequest represents a single tool call awaiting user confirmation.
 type ToolConfirmRequest struct {
-	ID       string
-	ToolName string
-	Input    json.RawMessage
+	ID    string
+	Name  string
+	Input json.RawMessage
 }
 
 // ToConfirmRequest builds a ToolConfirmRequest from a ToolInputPart.
 func (tc *ToolInputPart) ToConfirmRequest() ToolConfirmRequest {
 	return ToolConfirmRequest{
-		ID:       tc.ID,
-		ToolName: tc.ToolName,
-		Input:    tc.Input,
+		ID:    tc.ID,
+		Name:  tc.Name,
+		Input: tc.Input,
 	}
 }
 
@@ -204,7 +204,7 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 	idByIndex := make(map[int]uint64)
 	// Track tool names by index so ToolInputCompleteEvent can look up the name
 	// it received earlier from ToolInputStartEvent.
-	toolNameByIndex := make(map[int]string)
+	nameByIndex := make(map[int]string)
 
 	for event, err := range events {
 		if err != nil {
@@ -228,11 +228,11 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 
 		case ToolInputStartEvent:
 			if callbacks.OnToolInputStart != nil {
-				if err := callbacks.OnToolInputStart(e.ID, e.ToolName, getOrAssignID(callbacks, idByIndex, e.Index)); err != nil {
+				if err := callbacks.OnToolInputStart(e.ID, e.Name, getOrAssignID(callbacks, idByIndex, e.Index)); err != nil {
 					return nil, Usage{}, false, err
 				}
 			}
-			toolNameByIndex[e.Index] = e.ToolName
+			nameByIndex[e.Index] = e.Name
 
 		case ToolInputCompleteEvent:
 			id := getOrAssignID(callbacks, idByIndex, e.Index)
@@ -242,7 +242,7 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 				}
 			}
 			execCount++
-			tc := e.ToPart(id, toolNameByIndex[e.Index])
+			tc := e.ToPart(id, nameByIndex[e.Index])
 			deferred = a.handleStreamedToolInput(ctx, tc, callbacks, deferred, resultCh)
 
 		case StepCompleteEvent:
@@ -298,7 +298,7 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 // If the tool requires confirmation (per ToolNeedsConfirm), it is deferred.
 // Otherwise it executes immediately in a goroutine.
 func (a *Agent) handleStreamedToolInput(ctx context.Context, tc *ToolInputPart, callbacks StreamCallbacks, deferred []*ToolInputPart, resultCh chan<- ContentPart) []*ToolInputPart {
-	if callbacks.ToolNeedsConfirm != nil && callbacks.ToolNeedsConfirm(tc.ToolName) {
+	if callbacks.ToolNeedsConfirm != nil && callbacks.ToolNeedsConfirm(tc.Name) {
 		deferred = append(deferred, tc)
 		return deferred
 	}
@@ -408,11 +408,11 @@ func stripEmptyPlaceholders(contents []ContentPart) []ContentPart {
 
 // ToPart converts a ToolInputCompleteEvent to a ToolInputPart,
 // carrying over the history ID assigned during streaming.
-func (e ToolInputCompleteEvent) ToPart(historyID uint64, toolName string) *ToolInputPart {
+func (e ToolInputCompleteEvent) ToPart(historyID uint64, name string) *ToolInputPart {
 	return &ToolInputPart{
-		ID:       e.ID,
-		ToolName: toolName,
-		Input:    e.Input,
+		ID:    e.ID,
+		Name:  name,
+		Input: e.Input,
 		ContentPartMeta: ContentPartMeta{
 			HistoryID: historyID,
 		},
@@ -423,14 +423,14 @@ func (e ToolInputCompleteEvent) ToPart(historyID uint64, toolName string) *ToolI
 func (a *Agent) executeTool(ctx context.Context, tc *ToolInputPart, callbacks StreamCallbacks, historyID uint64) ContentPart {
 	var tool *Tool
 	for _, t := range a.config.Tools {
-		if t.Definition.Name == tc.ToolName {
+		if t.Definition.Name == tc.Name {
 			tool = &t
 			break
 		}
 	}
 
 	if tool == nil {
-		return newToolOutput(callbacks, tc.ID, nil, fmt.Errorf("unknown tool: %s", tc.ToolName), historyID)
+		return newToolOutput(callbacks, tc.ID, nil, fmt.Errorf("unknown tool: %s", tc.Name), historyID)
 	}
 
 	content, err := tool.Execute(ctx, tc.Input)

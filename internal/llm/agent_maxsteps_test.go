@@ -19,7 +19,7 @@ func (m *mockProviderAlwaysToolCalls) StreamMessages(_ context.Context, _ []Cont
 	return func(yield func(StreamEvent, error) bool) {
 		// Always emit a tool call, never a text-only response.
 		// Must emit ToolInputStartEvent first so the agent can track the name by index.
-		yield(ToolInputStartEvent{ID: "call_1", ToolName: "repeat", Index: 0}, nil)
+		yield(ToolInputStartEvent{ID: "call_1", Name: "repeat", Index: 0}, nil)
 		yield(ToolInputCompleteEvent{
 			ID:    "call_1",
 			Input: []byte(`{}`),
@@ -29,7 +29,7 @@ func (m *mockProviderAlwaysToolCalls) StreamMessages(_ context.Context, _ []Cont
 			Contents: []ContentPart{
 				&ToolInputPart{
 					ID:              "call_1",
-					ToolName:        "repeat",
+					Name:            "repeat",
 					Input:           []byte(`{}`),
 					ContentPartMeta: ContentPartMeta{Role: RoleAssistant},
 				},
@@ -81,7 +81,7 @@ func TestAgentCompletesWithinMaxSteps(t *testing.T) {
 	provider := &mockProviderWithTextAndTools{
 		responses: []mockResponse{
 			{
-				toolCalls: []ToolInputPart{{ID: "call_1", ToolName: "ping", Input: []byte(`{}`)}},
+				toolCalls: []ToolInputPart{{ID: "call_1", Name: "ping", Input: []byte(`{}`)}},
 			},
 			{
 				text: "Done!",

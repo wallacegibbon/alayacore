@@ -222,7 +222,7 @@ func contentPartToTLV(part llm.ContentPart) (tag string, content string, err err
 	case *llm.ReasoningPart:
 		return stream.TagAssistantR, p.Text, nil
 	case *llm.ToolInputPart:
-		fd := stream.ToolInputData{ID: p.ID, Name: p.ToolName, Input: p.Input}
+		fd := stream.ToolInputData{ID: p.ID, Name: p.Name, Input: p.Input}
 		jsonData, err := json.Marshal(fd)
 		if err != nil {
 			return "", "", err
@@ -277,7 +277,7 @@ func contentPartFromTLV(tag string, content []byte) (llm.ContentPart, error) {
 			return nil, nil
 		}
 		return &llm.ToolInputPart{
-			ID: fd.ID, ToolName: fd.Name, Input: fd.Input, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant},
+			ID: fd.ID, Name: fd.Name, Input: fd.Input, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant},
 		}, nil
 	case stream.TagUserF:
 		var tr stream.ToolOutputData

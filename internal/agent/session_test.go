@@ -132,7 +132,7 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 		&llm.ReasoningPart{Text: "User needs help...", ContentPartMeta: llm.ContentPartMeta{HistoryID: nextID(), Role: llm.RoleAssistant}},
 		&llm.TextPart{Text: "Let me help you.", ContentPartMeta: llm.ContentPartMeta{HistoryID: nextID(), Role: llm.RoleAssistant}},
 		&llm.ToolInputPart{
-			ID: "call_1", ToolName: "read_file", Input: json.RawMessage(`{"path":"/tmp/test.txt"}`),
+			ID: "call_1", Name: "read_file", Input: json.RawMessage(`{"path":"/tmp/test.txt"}`),
 			ContentPartMeta: llm.ContentPartMeta{HistoryID: nextID(), Role: llm.RoleAssistant},
 		},
 		&llm.ToolOutputPart{
@@ -190,7 +190,7 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 	if tp, ok := loaded.Contents[2].(*llm.TextPart); !ok || tp.Text != "Let me help you." {
 		t.Errorf("Content[2] text mismatch: got %v", loaded.Contents[2])
 	}
-	if tc, ok := loaded.Contents[3].(*llm.ToolInputPart); !ok || tc.ToolName != "read_file" {
+	if tc, ok := loaded.Contents[3].(*llm.ToolInputPart); !ok || tc.Name != "read_file" {
 		t.Errorf("Content[3] should be ToolInputPart, got %T", loaded.Contents[3])
 	}
 
@@ -474,7 +474,7 @@ func TestDisplayMessagesWithToolCalls(t *testing.T) {
 		&llm.TextPart{Text: "List files", ContentPartMeta: llm.ContentPartMeta{HistoryID: nextID(), Role: llm.RoleUser}},
 		&llm.TextPart{Text: "I'll list files for you.", ContentPartMeta: llm.ContentPartMeta{HistoryID: nextID(), Role: llm.RoleAssistant}},
 		&llm.ToolInputPart{
-			ID: "call_123", ToolName: "execute_command", Input: json.RawMessage(`{"command": "ls -la"}`),
+			ID: "call_123", Name: "execute_command", Input: json.RawMessage(`{"command": "ls -la"}`),
 			ContentPartMeta: llm.ContentPartMeta{HistoryID: nextID(), Role: llm.RoleAssistant},
 		},
 		&llm.ToolOutputPart{
@@ -566,7 +566,7 @@ func TestCleanIncompleteToolCalls(t *testing.T) {
 			name: "complete tool call cycle",
 			contents: []llm.ContentPart{
 				&llm.TextPart{Text: "Hello", ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}},
-				&llm.ToolInputPart{ID: "call-1", ToolName: "test_tool", Input: json.RawMessage("{}"), ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant}},
+				&llm.ToolInputPart{ID: "call-1", Name: "test_tool", Input: json.RawMessage("{}"), ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant}},
 				&llm.ToolOutputPart{ID: "call-1", Output: []llm.ContentPart{&llm.TextPart{Text: "result"}}, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleTool}},
 				&llm.TextPart{Text: "Done", ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant}},
 			},
@@ -576,7 +576,7 @@ func TestCleanIncompleteToolCalls(t *testing.T) {
 			name: "incomplete tool call - no result",
 			contents: []llm.ContentPart{
 				&llm.TextPart{Text: "Hello", ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}},
-				&llm.ToolInputPart{ID: "call-1", ToolName: "test_tool", Input: json.RawMessage("{}"), ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant}},
+				&llm.ToolInputPart{ID: "call-1", Name: "test_tool", Input: json.RawMessage("{}"), ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant}},
 				// No tool result
 			},
 			wantLen: 1, // user kept, tool call removed
@@ -586,7 +586,7 @@ func TestCleanIncompleteToolCalls(t *testing.T) {
 			contents: []llm.ContentPart{
 				&llm.TextPart{Text: "Hello", ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}},
 				&llm.TextPart{Text: "Let me help", ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant}},
-				&llm.ToolInputPart{ID: "call-1", ToolName: "test_tool", Input: json.RawMessage("{}"), ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant}},
+				&llm.ToolInputPart{ID: "call-1", Name: "test_tool", Input: json.RawMessage("{}"), ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant}},
 				// Tool call has no result
 			},
 			wantLen: 2, // user kept, text part kept, tool call removed
@@ -604,8 +604,8 @@ func TestCleanIncompleteToolCalls(t *testing.T) {
 			name: "complete tool call - multiple tools",
 			contents: []llm.ContentPart{
 				&llm.TextPart{Text: "Hello", ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}},
-				&llm.ToolInputPart{ID: "call-1", ToolName: "tool_a", Input: json.RawMessage("{}"), ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant}},
-				&llm.ToolInputPart{ID: "call-2", ToolName: "tool_b", Input: json.RawMessage("{}"), ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant}},
+				&llm.ToolInputPart{ID: "call-1", Name: "tool_a", Input: json.RawMessage("{}"), ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant}},
+				&llm.ToolInputPart{ID: "call-2", Name: "tool_b", Input: json.RawMessage("{}"), ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant}},
 				&llm.ToolOutputPart{ID: "call-1", Output: []llm.ContentPart{&llm.TextPart{Text: "result_a"}}, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleTool}},
 				&llm.ToolOutputPart{ID: "call-2", Output: []llm.ContentPart{&llm.TextPart{Text: "result_b"}}, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleTool}},
 				&llm.TextPart{Text: "Done", ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant}},
@@ -616,7 +616,7 @@ func TestCleanIncompleteToolCalls(t *testing.T) {
 			name: "complete tool call - no trailing text",
 			contents: []llm.ContentPart{
 				&llm.TextPart{Text: "Hello", ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}},
-				&llm.ToolInputPart{ID: "call-1", ToolName: "test_tool", Input: json.RawMessage("{}"), ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant}},
+				&llm.ToolInputPart{ID: "call-1", Name: "test_tool", Input: json.RawMessage("{}"), ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant}},
 				&llm.ToolOutputPart{ID: "call-1", Output: []llm.ContentPart{&llm.TextPart{Text: "result"}}, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleTool}},
 				// No trailing assistant text
 			},
@@ -650,7 +650,7 @@ func TestTLVFormatRecursionProtection(t *testing.T) {
 	contents := []llm.ContentPart{
 		&llm.TextPart{Text: "Read the session file", ContentPartMeta: llm.ContentPartMeta{HistoryID: nextID(), Role: llm.RoleUser}},
 		&llm.ToolInputPart{
-			ID: "call1", ToolName: "read_file", Input: json.RawMessage(`{"path": "old-session.md"}`),
+			ID: "call1", Name: "read_file", Input: json.RawMessage(`{"path": "old-session.md"}`),
 			ContentPartMeta: llm.ContentPartMeta{HistoryID: nextID(), Role: llm.RoleAssistant},
 		},
 		&llm.ToolOutputPart{

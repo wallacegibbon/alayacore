@@ -16,7 +16,7 @@ func TestAgentPreservesTextWithToolCalls(t *testing.T) {
 			{
 				text: "Let me check that for you.",
 				toolCalls: []ToolInputPart{
-					{ID: "call_123", ToolName: "get_weather", Input: []byte(`{"location":"SF"}`)},
+					{ID: "call_123", Name: "get_weather", Input: []byte(`{"location":"SF"}`)},
 				},
 			},
 			{
@@ -74,8 +74,8 @@ func TestAgentPreservesTextWithToolCalls(t *testing.T) {
 				}
 			case *ToolInputPart:
 				hasToolCall = true
-				if p.ToolName != "get_weather" {
-					t.Errorf("Tool name mismatch: %s", p.ToolName)
+				if p.Name != "get_weather" {
+					t.Errorf("Tool name mismatch: %s", p.Name)
 				}
 			}
 		}
@@ -121,7 +121,7 @@ func (m *mockProviderWithTextAndTools) StreamMessages(_ context.Context, _ []Con
 		// Real providers send ToolInputStartEvent with the name, then
 		// ToolInputCompleteEvent without the name (looked up by index).
 		for _, tc := range resp.toolCalls {
-			if !yield(ToolInputStartEvent{ID: tc.ID, ToolName: tc.ToolName, Index: 0}, nil) {
+			if !yield(ToolInputStartEvent{ID: tc.ID, Name: tc.Name, Index: 0}, nil) {
 				return
 			}
 			if !yield(ToolInputCompleteEvent{ID: tc.ID, Input: tc.Input, Index: 0}, nil) {
@@ -137,7 +137,7 @@ func (m *mockProviderWithTextAndTools) StreamMessages(_ context.Context, _ []Con
 		for _, tc := range resp.toolCalls {
 			content = append(content, &ToolInputPart{
 				ID:              tc.ID,
-				ToolName:        tc.ToolName,
+				Name:            tc.Name,
 				Input:           tc.Input,
 				ContentPartMeta: ContentPartMeta{Role: RoleAssistant},
 			})

@@ -88,7 +88,7 @@ func TestTextWithToolCalls(t *testing.T) {
 			}
 		case *llm.ToolInputPart:
 			hasToolCall = true
-			t.Logf("  ToolInputPart: %s(%s)", p.ToolName, string(p.Input))
+			t.Logf("  ToolInputPart: %s(%s)", p.Name, string(p.Input))
 		}
 	}
 

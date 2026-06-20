@@ -429,8 +429,8 @@ func (s *openAIStreamState) getContents() []llm.ContentPart {
 		acc := s.toolAccumulators[i]
 		contents = append(contents, &llm.ToolInputPart{
 			ID:              acc.id,
-			ToolName:        acc.name,
 			Input:           json.RawMessage(acc.args.String()),
+			Name:            acc.name,
 			ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant},
 		})
 	}
@@ -516,9 +516,9 @@ func (p *OpenAIProvider) handleDelta(delta openAIDelta, yield func(llm.StreamEve
 		if tc.Function.Name != "" {
 			state.setToolCallName(tc.Index, tc.ID, tc.Function.Name)
 			if !yield(llm.ToolInputStartEvent{
-				ID:       tc.ID,
-				ToolName: tc.Function.Name,
-				Index:    2 + tc.Index, // content block: 0=reasoning, 1=text, 2+=tools
+				ID:    tc.ID,
+				Name:  tc.Function.Name,
+				Index: 2 + tc.Index, // content block: 0=reasoning, 1=text, 2+=tools
 			}, nil) {
 				return false
 			}
@@ -656,7 +656,7 @@ func openaiConvertToolInputs(apiMsg *openAIMessage, contents []llm.ContentPart) 
 				ID:   v.ID,
 				Type: "function",
 				Function: openAIFunction{
-					Name:      v.ToolName,
+					Name:      v.Name,
 					Arguments: argsStr,
 				},
 			})

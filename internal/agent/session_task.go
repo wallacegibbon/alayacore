@@ -105,8 +105,8 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.ContentPart) 
 			s.writeTLVWithID(stream.TagAssistantR, historyID, delta)
 			return nil
 		},
-		OnToolInputStart: func(toolCallID, toolName string, historyID uint64) error {
-			data, _ := json.Marshal(stream.ToolInputData{ID: toolCallID, Name: toolName}) //nolint:errcheck
+		OnToolInputStart: func(toolCallID, name string, historyID uint64) error {
+			data, _ := json.Marshal(stream.ToolInputData{ID: toolCallID, Name: name}) //nolint:errcheck
 			s.writeTLVWithID(stream.TagAssistantF, historyID, string(data))
 			return nil
 		},
@@ -144,11 +144,11 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.ContentPart) 
 
 			return ch
 		},
-		ToolNeedsConfirm: func(toolName string) bool {
+		ToolNeedsConfirm: func(name string) bool {
 			if s.toolConfirmSet == nil {
 				return false
 			}
-			_, ok := s.toolConfirmSet[toolName]
+			_, ok := s.toolConfirmSet[name]
 			return ok
 		},
 		OnStepStart: func(step int) error {
