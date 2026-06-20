@@ -52,8 +52,8 @@ func (s *Session) handleUserPrompt(ctx context.Context, tc *taskCtx, prompt stri
 	tc.Contents = append(tc.Contents, part)
 	s.writeTLVStr(stream.TagUserT, stream.WrapDelta(strconv.FormatUint(id, 10), prompt))
 
-	newContents, _, err := s.processPrompt(ctx, tc.Contents)
-	tc.Contents = append(tc.Contents, newContents...)
+	fullContents, _, err := s.processPrompt(ctx, tc.Contents)
+	tc.Contents = fullContents
 
 	if err != nil {
 		s.writeError(err.Error())
@@ -94,9 +94,7 @@ func (s *Session) writeTLVWithID(tag string, historyID uint64, data string) {
 func (s *Session) processPrompt(ctx context.Context, history []llm.ContentPart) ([]llm.ContentPart, int64, error) {
 	var outputTokens int64
 
-	var newContents []llm.ContentPart
-
-	lastProcessed := len(history) // track where the last step ended
+	var fullContents []llm.ContentPart
 
 	_, err := s.agent.Stream(ctx, history, llm.StreamCallbacks{
 		OnTextDelta: func(delta string, historyID uint64) error {
@@ -162,13 +160,7 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.ContentPart) 
 			// Remove orphaned tool uses from the end before capturing
 			// new content. This keeps Contents free of tool
 			// calls that were emitted but never executed (cancel/error).
-			contents = cleanIncompleteToolInputs(contents)
-
-			// Only capture content parts added since the last step to avoid
-			// duplicating content across multi-step conversations.
-			newParts := contents[lastProcessed:]
-			lastProcessed = len(contents)
-			newContents = append(newContents, newParts...)
+			fullContents = cleanIncompleteToolInputs(contents)
 
 			s.sendEvent(usageToStepFinishEvent(usage))
 
@@ -180,10 +172,10 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.ContentPart) 
 	})
 
 	if err != nil {
-		return newContents, 0, err
+		return fullContents, 0, err
 	}
 
-	return newContents, outputTokens, nil
+	return fullContents, outputTokens, nil
 }
 
 // usageToStepFinishEvent converts an llm.Usage to a StepFinishEvent.

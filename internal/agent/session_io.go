@@ -161,7 +161,8 @@ Rules:
 
 	s.writeNotify("Summarizing conversation...")
 
-	newContents, outputTokens, err := s.processPrompt(ctx, tc.Contents)
+	beforeLen := len(tc.Contents)
+	fullContents, outputTokens, err := s.processPrompt(ctx, tc.Contents)
 	if err != nil {
 		s.writeError(err.Error())
 		s.pausedOnError.Store(true)
@@ -169,10 +170,10 @@ Rules:
 		return
 	}
 
-	// Find assistant content parts in newContents (the response to the summary prompt).
+	// Find assistant content parts in the newly added content (response to summary).
 	// Strip reasoning/thinking content — it's internal model deliberation, not summary.
 	var summaryParts []llm.ContentPart
-	for _, part := range newContents {
+	for _, part := range fullContents[beforeLen:] {
 		if part.GetRole() != llm.RoleAssistant {
 			continue
 		}
@@ -419,8 +420,8 @@ func (s *Session) resendPrompt(ctx context.Context, tc *taskCtx) {
 		s.writeNotify("Resending...")
 	}
 
-	newContents, _, err := s.processPrompt(ctx, tc.Contents)
-	tc.Contents = append(tc.Contents, newContents...)
+	fullContents, _, err := s.processPrompt(ctx, tc.Contents)
+	tc.Contents = fullContents
 
 	if err != nil {
 		s.writeError(err.Error())
