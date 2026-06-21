@@ -39,20 +39,10 @@ func Setup(cfg *config.Settings) (*Config, error) {
 		return nil, fmt.Errorf("failed to initialize skills: %w", err)
 	}
 
-	readFileTool := tools.NewReadFileTool()
-	writeFileTool := tools.NewWriteFileTool()
-	executeCommandTool := tools.NewExecuteCommandTool()
-	editFileTool := tools.NewEditFileTool()
-
-	agentTools := []llm.Tool{readFileTool, editFileTool, writeFileTool, executeCommandTool}
-
-	// Conditionally register search_content tool if rg binary is available
-	rgAvailable := tools.RGAvailable()
-	if rgAvailable {
-		agentTools = append(agentTools, tools.NewSearchContentTool())
-	}
+	agentTools := tools.DefaultTools()
 
 	// Build the default system prompt
+	rgAvailable := tools.RGAvailable()
 	var systemPrompt string
 	if rgAvailable {
 		systemPrompt = systemPromptIdentity + "\n\n" + systemPromptRules + "\n\n" + systemPromptSearch
