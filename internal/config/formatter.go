@@ -62,9 +62,12 @@ func FormatKeyValue(v any) string {
 
 // formatFieldValue formats a single reflected value for key-value output.
 func formatFieldValue(v reflect.Value) string {
-	// time.Time
+	// time.Time — use safe comma-ok assertion to handle aliased types.
 	if v.Type() == reflect.TypeOf(time.Time{}) {
-		t := v.Interface().(time.Time) //nolint:errcheck // guarded by type check above
+		t, ok := v.Interface().(time.Time)
+		if !ok {
+			return fmt.Sprintf("%v", v.Interface())
+		}
 		return t.Format(time.RFC3339)
 	}
 

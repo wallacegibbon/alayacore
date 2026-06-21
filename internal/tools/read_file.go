@@ -212,6 +212,13 @@ func readLargeFileTruncated(path string, totalSize int64) ([]llm.ContentPart, er
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
+	// Scanner buffer (1MB) is much larger than the truncation limit
+	// (maxTextReadSize, 64KB) because the scanner needs to hold individual
+	// lines that may exceed 64KB. The truncation limit applies to total
+	// output, not individual lines — a single line can be arbitrarily long
+	// (e.g. minified JS, base64-encoded data). The 1MB buffer covers the
+	// vast majority of real-world cases while preventing memory exhaustion
+	// from pathological input.
 	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
 
 	var lines []string
@@ -262,9 +269,13 @@ func validateLineParams(startLine, numLines int) error {
 
 func readLinesRange(ctx context.Context, file *os.File, startLine, numLines int) ([]string, error) {
 	scanner := bufio.NewScanner(file)
-	// Increase buffer size to handle long lines (default is 64KB)
-	// We use 1MB which should be reasonable for most cases while still
-	// preventing memory exhaustion from extremely long lines
+	// Scanner buffer (1MB) is much larger than the truncation limit
+	// (maxTextReadSize, 64KB) because the scanner needs to hold individual
+	// lines that may exceed 64KB. The truncation limit applies to total
+	// output, not individual lines — a single line can be arbitrarily long
+	// (e.g. minified JS, base64-encoded data). The 1MB buffer covers the
+	// vast majority of real-world cases while preventing memory exhaustion
+	// from pathological input.
 	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
 
 	var lines []string

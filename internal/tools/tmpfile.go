@@ -7,8 +7,9 @@ import (
 )
 
 var (
-	procTmpDir     string
-	procTmpDirOnce sync.Once
+	procTmpDir          string
+	procTmpDirOnce      sync.Once
+	procTmpDirCreated   bool // true when MkdirTemp succeeded; prevents Cleanup from removing the system temp root
 )
 
 // procTmpDirInit creates a per-process temporary directory under the
@@ -21,7 +22,9 @@ func procTmpDirInit() {
 	if err != nil {
 		// Fall back to the system temp root if we can't create the scoped dir.
 		procTmpDir = os.TempDir()
+		return
 	}
+	procTmpDirCreated = true
 }
 
 // saveToTmpFile saves output to a temporary file in this process's
@@ -49,9 +52,11 @@ func saveToTmpFile(output, prefix string) (string, error) {
 }
 
 // Cleanup removes this process's temporary directory.
+// Safe to call even when the scoped directory could not be created
+// (only the scoped dir created by MkdirTemp is removed, never the
+// system temp root).
 func Cleanup() {
-	d := procTmpDir
-	if d != "" {
-		os.RemoveAll(d)
+	if procTmpDirCreated && procTmpDir != "" {
+		os.RemoveAll(procTmpDir)
 	}
 }

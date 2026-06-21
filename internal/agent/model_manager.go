@@ -260,7 +260,9 @@ func (mm *ModelManager) AddModel(m ModelConfig) int {
 	return m.ID
 }
 
-// GetModels returns all models (without API keys)
+// GetModels returns all models (without API keys).
+// BaseURL is sanitized to strip any embedded credentials
+// (e.g. https://key@api.example.com → https://api.example.com).
 func (mm *ModelManager) GetModels() []ModelInfo {
 	result := make([]ModelInfo, len(mm.models))
 	for i, m := range mm.models {
@@ -268,7 +270,7 @@ func (mm *ModelManager) GetModels() []ModelInfo {
 			ID:           m.ID,
 			Name:         m.Name,
 			ProtocolType: m.ProtocolType,
-			BaseURL:      m.BaseURL,
+			BaseURL:      sanitizeBaseURL(m.BaseURL),
 			ModelName:    m.ModelName,
 			ContextLimit: m.ContextLimit,
 			MaxTokens:    m.MaxTokens,
@@ -351,4 +353,16 @@ func (mm *ModelManager) SetActiveByName(name string) error {
 		return domainerrors.Wrapf(CommandNameModelSet, domainerrors.ErrModelNotFound, "model not found: %q", name)
 	}
 	return mm.SetActive(id)
+}
+
+// sanitizeBaseURL strips userinfo (credentials) from a URL string.
+// This prevents API keys embedded in the base_url from leaking through
+// GetModels() to adapters and log output.
+func sanitizeBaseURL(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil || u.User == nil {
+		return rawURL
+	}
+	u.User = nil
+	return u.String()
 }
