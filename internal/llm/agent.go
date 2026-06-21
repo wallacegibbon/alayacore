@@ -303,7 +303,7 @@ func (a *Agent) handleStreamedToolInput(ctx context.Context, tc *ToolInputPart, 
 		return deferred
 	}
 
-	historyID := getHistoryID(callbacks)
+	historyID := genHistoryID(callbacks)
 	go func(tc *ToolInputPart, historyID uint64) {
 		resultCh <- a.executeTool(ctx, tc, callbacks, historyID)
 	}(tc, historyID)
@@ -337,17 +337,17 @@ func (a *Agent) executeDeferredTools(ctx context.Context, deferred []*ToolInputP
 		pendingConfirm--
 
 		if resp.Error != "" {
-			resultCh <- newToolOutput(callbacks, resp.ID, nil, fmt.Errorf("denied: %s", resp.Error), getHistoryID(callbacks))
+			resultCh <- newToolOutput(callbacks, resp.ID, nil, fmt.Errorf("denied: %s", resp.Error), genHistoryID(callbacks))
 			continue
 		}
 		if !resp.Allowed {
-			resultCh <- newToolOutput(callbacks, resp.ID, nil, fmt.Errorf("Tool execution denied by user"), getHistoryID(callbacks))
+			resultCh <- newToolOutput(callbacks, resp.ID, nil, fmt.Errorf("Tool execution denied by user"), genHistoryID(callbacks))
 			continue
 		}
 
 		// Confirmed — execute concurrently.
 		tc := deferred[idToIdx[resp.ID]]
-		historyID := getHistoryID(callbacks)
+		historyID := genHistoryID(callbacks)
 		go func(tc *ToolInputPart, historyID uint64) {
 			resultCh <- a.executeTool(ctx, tc, callbacks, historyID)
 		}(tc, historyID)
@@ -369,15 +369,15 @@ func getOrAssignID(callbacks StreamCallbacks, idByIndex map[int]uint64, index in
 	if id, ok := idByIndex[index]; ok && id != 0 {
 		return id
 	}
-	id := getHistoryID(callbacks)
+	id := genHistoryID(callbacks)
 	if id != 0 {
 		idByIndex[index] = id
 	}
 	return id
 }
 
-// getHistoryID generates a new history ID using the callback's IDGen if available.
-func getHistoryID(callbacks StreamCallbacks) uint64 {
+// genHistoryID generates a new history ID using the callback's IDGen if available.
+func genHistoryID(callbacks StreamCallbacks) uint64 {
 	if callbacks.IDGen != nil {
 		return callbacks.IDGen()
 	}
