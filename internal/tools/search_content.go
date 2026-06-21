@@ -11,6 +11,7 @@ import (
 	"github.com/alayacore/alayacore/internal/llm"
 )
 
+// SearchContentInput represents the input for the search_content tool.
 type SearchContentInput struct {
 	Pattern    string `json:"pattern" jsonschema:"required,description=Regex pattern to search for"`
 	Path       string `json:"path" jsonschema:"description=File or directory to search (default: cwd)"`
@@ -22,11 +23,16 @@ type SearchContentInput struct {
 
 const defaultSearchContentMaxLines = 100
 
+// RGAvailable checks whether ripgrep (rg) is available on this system.
+// Used at startup to conditionally register the search_content tool.
+// If rg is not found, the tool is omitted entirely, so executeSearchContent
+// can rely on rg being present without a redundant LookPath check.
 func RGAvailable() bool {
 	_, err := exec.LookPath("rg")
 	return err == nil
 }
 
+// NewSearchContentTool creates the search_content tool for use by the agent.
 func NewSearchContentTool() llm.Tool {
 	return llm.NewTool(
 		"search_content",
@@ -35,6 +41,15 @@ func NewSearchContentTool() llm.Tool {
 		WithSchema(llm.MustGenerateSchema(SearchContentInput{})).
 		WithExecute(llm.TypedExecute(executeSearchContent)).
 		Build()
+}
+
+// searchResult captures the exit status and output streams of a ripgrep search.
+// Using a structured result instead of nullable error + buffer parameters
+// makes the execution/formatting separation explicit and testable.
+type searchResult struct {
+	stdout   string
+	stderr   string
+	exitCode int
 }
 
 func buildSearchContentArgs(args SearchContentInput) []string {
@@ -64,30 +79,84 @@ func buildSearchContentArgs(args SearchContentInput) []string {
 	return rgArgs
 }
 
-func handleSearchContentResult(execErr error, stdout, stderr *bytes.Buffer, maxLines int) ([]llm.ContentPart, error) {
+// runSearch executes ripgrep and returns a structured result.
+// rg availability is guaranteed by RGAvailable() at tool registration time,
+// so no exec.LookPath check is needed here.
+func runSearch(ctx context.Context, args SearchContentInput) (searchResult, error) {
+	if args.Pattern == "" {
+		return searchResult{}, fmt.Errorf("pattern is required")
+	}
+
+	rgArgs := buildSearchContentArgs(args)
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		cwd = "."
+	}
+
+	//nolint:gosec // G204: args are from user input, rg is a trusted binary
+	cmd := exec.CommandContext(ctx, "rg", rgArgs...)
+	cmd.Dir = cwd
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	execErr := cmd.Run()
+
+	result := searchResult{
+		stdout: stdout.String(),
+		stderr: stderr.String(),
+	}
+
 	if execErr != nil {
-		// rg exits with code 1 when no matches found — that's not an error for us
-		if exitErr, ok := execErr.(*exec.ExitError); ok {
-			if exitErr.ExitCode() == 1 && stderr.Len() == 0 {
-				return []llm.ContentPart{&llm.TextPart{Text: "No matches found"}}, nil
-			}
+		if ctx.Err() != nil {
+			return searchResult{}, fmt.Errorf("canceled")
 		}
-		// Real error (bad regex, permission denied, etc.)
-		errMsg := execErr.Error()
-		if stderr.Len() > 0 {
-			errMsg = stderr.String()
+
+		// rg uses exit codes to signal status: 0 = matches found,
+		// 1 = no matches, 2+ = error (bad regex, permission denied, etc.).
+		var exitErr *exec.ExitError
+		if errors.As(execErr, &exitErr) {
+			result.exitCode = exitErr.ExitCode()
+			return result, nil
+		}
+
+		// Non-exit error (e.g. binary doesn't exist) — shouldn't happen
+		// since RGAvailable() verified rg at startup, but handle gracefully.
+		return searchResult{}, execErr
+	}
+
+	return result, nil
+}
+
+// formatSearchResult converts a structured search result into ContentParts.
+// It is separated from runSearch so that each concern (execution vs. formatting)
+// can be tested and reasoned about independently.
+func formatSearchResult(result searchResult, maxLines int) ([]llm.ContentPart, error) {
+	// rg exits with code 1 when no matches found — that's not an error for us.
+	if result.exitCode == 1 && result.stderr == "" {
+		return []llm.ContentPart{&llm.TextPart{Text: "No matches found"}}, nil
+	}
+
+	// Real error (bad regex, permission denied, etc.)
+	if result.exitCode != 0 {
+		errMsg := result.stderr
+		if errMsg == "" {
+			errMsg = fmt.Sprintf("ripgrep exited with code %d", result.exitCode)
 		}
 		return nil, errors.New(errMsg)
+	}
+
+	// Success path
+	output := result.stdout
+	if output == "" {
+		return []llm.ContentPart{&llm.TextPart{Text: "No matches found"}}, nil
 	}
 
 	// Use default if maxLines not specified
 	if maxLines <= 0 {
 		maxLines = defaultSearchContentMaxLines
-	}
-
-	output := stdout.String()
-	if output == "" {
-		return []llm.ContentPart{&llm.TextPart{Text: "No matches found"}}, nil
 	}
 
 	// Count total lines in output
@@ -101,6 +170,8 @@ func handleSearchContentResult(execErr error, stdout, stderr *bytes.Buffer, maxL
 	return []llm.ContentPart{&llm.TextPart{Text: output}}, nil
 }
 
+// handleLargeSearchResult saves large search output to a temp file and
+// returns a summary message with the file path.
 func handleLargeSearchResult(output string, totalLines int) ([]llm.ContentPart, error) {
 	filePath, err := saveToTmpFile(output, "search-*.txt")
 	if err != nil {
@@ -113,36 +184,12 @@ func handleLargeSearchResult(output string, totalLines int) ([]llm.ContentPart, 
 	)}}, nil
 }
 
+// executeSearchContent is the typed entry point for the search_content tool.
+// It runs ripgrep and formats the results.
 func executeSearchContent(ctx context.Context, args SearchContentInput) ([]llm.ContentPart, error) {
-	if args.Pattern == "" {
-		return nil, fmt.Errorf("pattern is required")
-	}
-
-	rgPath, err := exec.LookPath("rg")
+	result, err := runSearch(ctx, args)
 	if err != nil {
-		return nil, fmt.Errorf("ripgrep (rg) is not available on this system")
+		return nil, err
 	}
-
-	rgArgs := buildSearchContentArgs(args)
-
-	cwd, err := os.Getwd()
-	if err != nil {
-		cwd = "."
-	}
-
-	//nolint:gosec // G204: rg path is validated, args are from user input
-	cmd := exec.CommandContext(ctx, rgPath, rgArgs...)
-	cmd.Dir = cwd
-
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		if ctx.Err() != nil {
-			return nil, fmt.Errorf("canceled")
-		}
-		return handleSearchContentResult(err, &stdout, &stderr, args.MaxLines)
-	}
-	return handleSearchContentResult(nil, &stdout, &stderr, args.MaxLines)
+	return formatSearchResult(result, args.MaxLines)
 }
