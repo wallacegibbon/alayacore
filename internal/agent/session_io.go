@@ -579,39 +579,40 @@ func (s *Session) handleInputMsg(msg inputMsg) {
 		s.writeError(msg.errText)
 		return
 	}
-	if msg.isCmd {
-		cmd := msg.text
-		parts := strings.Fields(cmd)
-		if len(parts) == 0 {
-			s.writeError(domainerrors.ErrEmptyCommand.Error())
-			return
-		}
-
-		commandName := parts[0]
-		args := parts[1:]
-
-		c, ok := LookupCommand(commandName)
-		if !ok {
-			// Unknown commands are submitted as tasks so they fall
-			// through to the task-command path (handles :summarize,
-			// :continue, and reports unknown cmd errors).
-			s.submitTaskCommand(cmd)
-			return
-		}
-
-		switch c.Schedule {
-		case ScheduleImmediate:
-			c.Handler(s, s.sessionCtx, args)
-		case ScheduleIdle:
-			if s.activeTask != nil {
-				s.writeError("Cannot run this command while a task is in progress. Please wait or cancel the current task.")
-				return
-			}
-			c.Handler(s, s.sessionCtx, args)
-		default: // ScheduleTask
-			s.submitTaskCommand(cmd)
-		}
-	} else {
+	if !msg.isCmd {
 		s.submitTask(QueueItem{Type: TaskTypePrompt, Content: msg.text, Attachments: msg.attachments})
+		return
+	}
+
+	cmd := msg.text
+	parts := strings.Fields(cmd)
+	if len(parts) == 0 {
+		s.writeError(domainerrors.ErrEmptyCommand.Error())
+		return
+	}
+
+	commandName := parts[0]
+	args := parts[1:]
+
+	c, ok := LookupCommand(commandName)
+	if !ok {
+		// Unknown commands are submitted as tasks so they fall
+		// through to the task-command path (handles :summarize,
+		// :continue, and reports unknown cmd errors).
+		s.submitTaskCommand(cmd)
+		return
+	}
+
+	switch c.Schedule {
+	case ScheduleImmediate:
+		c.Handler(s, s.sessionCtx, args)
+	case ScheduleIdle:
+		if s.activeTask != nil {
+			s.writeError("Cannot run this command while a task is in progress. Please wait or cancel the current task.")
+			return
+		}
+		c.Handler(s, s.sessionCtx, args)
+	default: // ScheduleTask
+		s.submitTaskCommand(cmd)
 	}
 }
