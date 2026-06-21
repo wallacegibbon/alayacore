@@ -2,9 +2,6 @@ package agent
 
 import (
 	"context"
-	"strings"
-
-	domainerrors "github.com/alayacore/alayacore/internal/errors"
 )
 
 // Command name constants
@@ -101,39 +98,4 @@ func LookupCommand(name string) (*Command, bool) {
 		}
 	}
 	return nil, false
-}
-
-// LookupSchedule returns the SchedulePolicy for the given command string.
-// Returns ScheduleTask for unknown commands so they fall through to
-// the task-command path (handles :summarize and :continue).
-func LookupSchedule(cmd string) SchedulePolicy {
-	name := cmd
-	if idx := strings.IndexByte(cmd, ' '); idx >= 0 {
-		name = cmd[:idx]
-	}
-	if c, ok := LookupCommand(name); ok {
-		return c.Schedule
-	}
-	return ScheduleTask
-}
-
-// DispatchCommand dispatches a colon-command to its registered handler.
-// Returns true if the command was recognized (even if execution failed).
-func (s *Session) dispatchCommand(ctx context.Context, cmd string) bool {
-	parts := strings.Fields(cmd)
-	if len(parts) == 0 {
-		s.writeError(domainerrors.ErrEmptyCommand.Error())
-		return false
-	}
-
-	commandName := parts[0]
-	args := parts[1:]
-
-	c, ok := LookupCommand(commandName)
-	if !ok || c.Handler == nil {
-		return false
-	}
-
-	c.Handler(s, ctx, args)
-	return true
 }

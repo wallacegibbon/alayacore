@@ -27,20 +27,6 @@ import (
 // Command Handling
 // ============================================================================
 
-func (s *Session) handleCommand(ctx context.Context, cmd string) {
-	parts := strings.Fields(cmd)
-	if len(parts) == 0 {
-		s.writeError(domainerrors.ErrEmptyCommand.Error())
-		return
-	}
-
-	if s.dispatchCommand(ctx, cmd) {
-		return
-	}
-
-	s.writeError(domainerrors.NewSessionErrorf("command", "unknown cmd <%s>", parts[0]).Error())
-}
-
 func (s *Session) cancelTask() {
 	if s.activeTask != nil {
 		if s.cancelRunningTask() {
@@ -508,7 +494,7 @@ func (s *Session) handleInputUserText(value string, pendingAttachments *[]llm.Co
 	}
 	*pendingAttachments = nil
 
-	// Strip the colon prefix; run() uses isCmd to route to dispatchCommand.
+	// Strip the colon prefix; run() uses isCmd to route to handleInputMsg.
 	if len(value) > 0 && value[0] == ':' {
 		msg.text = value[1:]
 		msg.isCmd = true
@@ -555,7 +541,7 @@ func (s *Session) handleFork(args []string) {
 
 // handleConfirmCommand processes a `:confirm <id> yes|no` command.
 // It writes the response to the task goroutine's pending confirmation
-// channel.  Called from the run() goroutine via dispatchCommand.
+// channel.  Called from the run() goroutine via the command registry.
 func (s *Session) handleConfirmCommand(args []string) {
 	if len(args) != 2 {
 		s.writeError("usage: :confirm <id> yes|no")
@@ -584,6 +570,9 @@ func (s *Session) handleConfirmCommand(args []string) {
 }
 
 // handleInputMsg processes a parsed input message. Called from run() goroutine.
+// Command dispatch uses a single lookup in the command registry to determine
+// both the schedule policy and the handler, avoiding the redundant parsing
+// and double-lookup of the previous handleCommand → dispatchCommand chain.
 func (s *Session) handleInputMsg(msg inputMsg) {
 	// Deliver any validation error from the input pump first.
 	if msg.errText != "" {
@@ -592,16 +581,34 @@ func (s *Session) handleInputMsg(msg inputMsg) {
 	}
 	if msg.isCmd {
 		cmd := msg.text
-		switch LookupSchedule(cmd) {
+		parts := strings.Fields(cmd)
+		if len(parts) == 0 {
+			s.writeError(domainerrors.ErrEmptyCommand.Error())
+			return
+		}
+
+		commandName := parts[0]
+		args := parts[1:]
+
+		c, ok := LookupCommand(commandName)
+		if !ok {
+			// Unknown commands are submitted as tasks so they fall
+			// through to the task-command path (handles :summarize,
+			// :continue, and reports unknown cmd errors).
+			s.submitTaskCommand(cmd)
+			return
+		}
+
+		switch c.Schedule {
 		case ScheduleImmediate:
-			s.handleCommand(s.sessionCtx, cmd)
+			c.Handler(s, s.sessionCtx, args)
 		case ScheduleIdle:
 			if s.activeTask != nil {
 				s.writeError("Cannot run this command while a task is in progress. Please wait or cancel the current task.")
 				return
 			}
-			s.handleCommand(s.sessionCtx, cmd)
-		default:
+			c.Handler(s, s.sessionCtx, args)
+		default: // ScheduleTask
 			s.submitTaskCommand(cmd)
 		}
 	} else {
