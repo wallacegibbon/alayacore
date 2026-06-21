@@ -435,7 +435,7 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 
 	// Test 2: model_set should fail when task is running.
 	output.Messages = nil
-	session.inProgress = true
+	session.activeTask = &taskHandle{}
 	session.handleInputMsg(inputMsg{text: "model_set 1", isCmd: true})
 
 	foundError = false
@@ -451,7 +451,7 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 
 	// Test 3: model_set should work again after task completes.
 	output.Messages = nil
-	session.inProgress = false
+	session.activeTask = nil
 	session.handleInputMsg(inputMsg{text: "model_set 1", isCmd: true})
 
 	foundError = false

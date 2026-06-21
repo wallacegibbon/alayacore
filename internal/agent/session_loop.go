@@ -48,7 +48,7 @@ func (s *Session) run() {
 			if !ok {
 				// Input is closed (EOF on stdin). Drain the currently
 				// running task, then process any remaining queued tasks.
-				for s.inProgress || s.tryStartNextTask() {
+				for s.activeTask != nil || s.tryStartNextTask() {
 					s.drainUntilTaskDone()
 				}
 				return
@@ -75,7 +75,7 @@ func (s *Session) run() {
 // allowed to run — user prompts must wait for explicit recovery via :continue.
 // Returns true if a task was started.
 func (s *Session) tryStartNextTask() bool {
-	if len(s.taskQueue) == 0 || s.inProgress || s.sessionCtx.Err() != nil {
+	if len(s.taskQueue) == 0 || s.activeTask != nil || s.sessionCtx.Err() != nil {
 		return false
 	}
 
@@ -95,7 +95,6 @@ func (s *Session) tryStartNextTask() bool {
 	}
 
 	s.taskQueue = s.taskQueue[1:]
-	s.inProgress = true
 
 	// Create a snapshot of Contents for the task goroutine, seeded as
 	// the starting Contents. Task processing appends new contents as they're
@@ -104,13 +103,10 @@ func (s *Session) tryStartNextTask() bool {
 	copy(taskContent, s.Contents)
 
 	// Create a per-task context derived from sessionCtx. The cancel
-	// function is stored in s.taskCancel so cancelRunningTask() can
-	// cancel the task. Cleared in handleTaskDone().
+	// function is stored on s.activeTask so cancelRunningTask() can
+	// cancel the task. Consumed (set to nil) in handleTaskDone().
 	taskCtx, taskCancel := context.WithCancel(s.sessionCtx)
-	s.taskCancel = taskCancel
-
-	// Reset step counter before starting the task.
-	s.currentStep = 0
+	s.activeTask = &taskHandle{cancel: taskCancel, step: 0}
 
 	go s.runTask(taskCtx, item, taskContent)
 	return true
@@ -123,8 +119,7 @@ func (s *Session) handleTaskDone(contents []llm.ContentPart) {
 	s.flushPendingEvents()
 
 	// Mark the task as finished so the next queue item can start.
-	s.inProgress = false
-	s.taskCancel = nil
+	s.activeTask = nil
 
 	// Replace s.Contents with the final task state.
 	// contents is seeded from s.Contents at task start and accumulated
@@ -181,7 +176,9 @@ func (s *Session) drainUntilTaskDone() {
 func (s *Session) handleTaskEvent(ev TaskEvent) {
 	switch e := ev.(type) {
 	case StepStartEvent:
-		s.currentStep = e.Step
+		if s.activeTask != nil {
+			s.activeTask.step = e.Step
+		}
 		s.sendSystemInfo("task")
 
 	case StepFinishEvent:

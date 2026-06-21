@@ -63,23 +63,38 @@ type sessionConfig struct {
 	toolConfirmSet   map[string]struct{}
 }
 
+// taskHandle encapsulates the mutable state of a currently running task.
+// It is created by tryStartNextTask and consumed by handleTaskDone.
+// Grouping these fields prevents inconsistent state that could arise from
+// out-of-order method calls on individual fields (e.g. setting inProgress
+// without a cancel func, or clearing them separately).
+type taskHandle struct {
+	cancel context.CancelFunc // cancels the task's per-task context
+	step   int                // current agent step (set via StepStartEvent)
+}
+
 // runState groups fields owned exclusively by the run() goroutine.
 // All reads and writes happen in the run() event loop.
 type runState struct {
 	Contents []llm.ContentPart // flat, ordered, 1:1 with TLV — set from task result
 
-	taskQueue []QueueItem
-
-	currentStep int // set by handleTaskEvent (StepStartEvent); read by sendTaskMsg
-	inProgress  bool
+	taskQueue   []QueueItem
 	nextQueueID uint64
 
-	taskCancel context.CancelFunc
+	activeTask *taskHandle // non-nil when a task is running; nil when idle
 
 	inputMsgCh    chan inputMsg // inputPump → run: parsed TLV messages
 	taskEventCh   chan TaskEvent
 	taskResultCh  chan []llm.ContentPart
 	taskRefreshCh chan struct{}
+}
+
+// activeTaskStep returns the current step of the active task, or 0 if idle.
+func (s *Session) activeTaskStep() int {
+	if s.activeTask != nil {
+		return s.activeTask.step
+	}
+	return 0
 }
 
 // sharedState groups fields that are either genuinely cross-goroutine
@@ -282,11 +297,11 @@ func (s *Session) Start() {
 // cancelRunningTask cancels the currently running task via its per-task
 // context. Returns true if a task was actually running and was canceled.
 func (s *Session) cancelRunningTask() bool {
-	if !s.inProgress {
+	if s.activeTask == nil {
 		return false
 	}
-	if s.taskCancel != nil {
-		s.taskCancel()
+	if s.activeTask.cancel != nil {
+		s.activeTask.cancel()
 		return true
 	}
 	return false

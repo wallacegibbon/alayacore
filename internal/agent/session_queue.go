@@ -38,10 +38,10 @@ func (s *Session) submitTask(item QueueItem) {
 // submitTaskCommand enqueues a task command at the front of the task queue.
 // Task commands (e.g. :continue, :summarize) can only run when no task is
 // currently in progress, or when the current task is paused on error (which also
-// means inProgress is false — the task goroutine has returned).
+// means activeTask is nil — the task goroutine has returned).
 // They are placed at the front so they run ahead of any accumulated user prompts.
 func (s *Session) submitTaskCommand(cmd string) {
-	if s.inProgress {
+	if s.activeTask != nil {
 		s.writeError("Cannot run command while a task is running. Please wait or cancel first.")
 		return
 	}

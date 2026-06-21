@@ -163,8 +163,8 @@ func (s *Session) sendMessageVersionMsg() {
 
 func (s *Session) sendTaskMsg() {
 	s.writeSystemMsg(TaskMsg{
-		InProgress:  s.inProgress,
-		CurrentStep: s.currentStep,
+		InProgress:  s.activeTask != nil,
+		CurrentStep: s.activeTaskStep(),
 		MaxSteps:    s.MaxSteps,
 		Context:     s.ContextTokens,
 		TaskError:   s.pausedOnError.Load(),
