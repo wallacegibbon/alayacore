@@ -251,8 +251,8 @@ func (s *Session) inputPump() {
 
 // handleInputFrame processes a single TLV frame from the input stream.
 // Returns the updated staged content (nil when staged content has been
-// consumed by MB or discarded by an error). Media tags (UI/UV/UA/UD)
-// and regular text (UT without ':') are staged until MB or EOF.
+// consumed by UE or discarded by an error). Media tags (UI/UV/UA/UD)
+// and regular text (UT without ':') are staged until UE or EOF.
 // Command text (UT starting with ':') is sent immediately without staging.
 func (s *Session) handleInputFrame(tag, value string, staged []llm.ContentPart) []llm.ContentPart {
 	switch tag {

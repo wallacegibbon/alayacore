@@ -91,8 +91,8 @@ main.go → config.Parse() → Settings
 ```
 User types prompt
   → InputModel captures input
-    → Emit TLV(UT, prompt), TLV(MB)
-      → inputPump reads TLV, stages content, flushes on MB
+    → Emit TLV(UT, prompt), TLV(UE)
+      → inputPump reads TLV, stages content, flushes on UE
         → runTask() (task goroutine)
           → handleUserPrompt()
             → processPrompt()

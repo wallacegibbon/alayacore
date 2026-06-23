@@ -263,7 +263,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 
 // replayContentsToAdapter sends all content parts to the adapter with history IDs,
 // so the adapter can reference them by ID even after session reload.
-// No MB markers are needed — writeColored's non-user-tag flush and the
+// No UE markers are needed — writeColored's non-user-tag flush and the
 // bufferUserContent / AppendFromTLV incremental path handle grouping.
 func (s *Session) replayContentsToAdapter() error {
 	for _, part := range s.Contents {

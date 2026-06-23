@@ -525,7 +525,7 @@ func (m *Terminal) handleSubmit() tea.Cmd {
 		return nil
 	}
 
-	// Regular prompt — stage the text, then flush with MB.
+	// Regular prompt — stage the text, then flush with UE.
 	m.emitCommand(prompt)
 	m.emitMB()
 	m.input.SetValue("")

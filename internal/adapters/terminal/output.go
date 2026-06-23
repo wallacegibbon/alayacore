@@ -53,7 +53,7 @@ type outputWriter struct {
 	status       sessionState // cached session state (status, models, queue)
 
 	// Active user window — set on first user frame (UT/UI/UV/UA/UD),
-	// cleared on MB or next non-user tag. Each new frame updates the
+	// cleared on UE or next non-user tag. Each new frame updates the
 	// window incrementally and marks dirty for immediate render.
 	activeUserWindowIdx int    // index into windowBuffer.windows, -1 = none
 	activeUserWindowID  string // window ID (for LookupID fallback)
@@ -148,7 +148,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 		to.windowBuffer.AppendOrUpdate(tag, id, content)
 
 	// User text tag — may carry NUL-delimited historyID
-	// User content tags — buffer until MB or next non-user tag.
+	// User content tags — buffer until UE or next non-user tag.
 	case stream.TagUserT:
 		id, content, ok := stream.UnwrapDelta(value)
 		if !ok {

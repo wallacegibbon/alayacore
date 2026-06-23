@@ -101,7 +101,7 @@ func (s *Session) doAutoSummarize(ctx context.Context, contents []llm.ContentPar
 	s.summarizeBackup(contents)
 	s.writeNotify("Summarizing conversation...")
 
-	// Echo the summarization prompt to output and emit MB, same as
+	// Echo the summarization prompt to output and emit UE, same as
 	// handleUserPrompt does for a normal prompt, but call processPrompt
 	// directly to avoid mutual recursion.
 	promptPart := &llm.TextPart{Text: summarizePrompt}

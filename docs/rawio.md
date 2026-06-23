@@ -52,15 +52,15 @@ controlling process detects and handles it.
 ## Example
 
 ```sh
-# Send a UT (user text) frame followed by MB (message boundary) to AlayaCore
-printf 'UT\x00\x00\x00\x05helloMB\x00\x00\x00\x00' | alayacore --rawio
+# Send a UT (user text) frame followed by UE (user message end) to AlayaCore
+printf 'UT\x00\x00\x00\x05helloUE\x00\x00\x00\x00' | alayacore --rawio
 ```
 
 Inspect the raw TLV output with `tlvcat`:
 
 ```sh
 # Pipe the output through tlvcat to see tags and values
-printf 'UT\x00\x00\x00\x05helloMB\x00\x00\x00\x00' | alayacore --rawio | go run ./misc/tlvcat.go
+printf 'UT\x00\x00\x00\x05helloUE\x00\x00\x00\x00' | alayacore --rawio | go run ./misc/tlvcat.go
 ```
 
 Or generate a TLV request with images and inspect the result:

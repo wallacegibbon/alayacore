@@ -122,7 +122,7 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 
 	case stream.TagUserEnd:
 		// Message boundary — plainio doesn't group user content into
-		// windows like the TUI does, so MB is a no-op.
+		// windows like the TUI does, so UE is a no-op.
 
 	default:
 		o.emitSeparator(tag)

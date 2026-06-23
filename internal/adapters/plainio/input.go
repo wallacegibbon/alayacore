@@ -61,8 +61,8 @@ func readPrompts(input io.Writer, reader io.Reader) error {
 	}
 }
 
-// sendPrompt writes a prompt to the TLV stream, followed by MB to flush.
-// Commands (starting with ':') are sent without MB. Returns the first
+// sendPrompt writes a prompt to the TLV stream, followed by UE to flush.
+// Commands (starting with ':') are sent without UE. Returns the first
 // write error, if any.
 func sendPrompt(input io.Writer, text string) error {
 	if err := stream.WriteTLV(input, stream.TagUserT, text); err != nil {
