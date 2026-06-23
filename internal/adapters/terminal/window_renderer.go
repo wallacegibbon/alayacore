@@ -176,7 +176,7 @@ func (r *userRenderer) BuildInner(width int, folded bool, styles *Styles) (strin
 	// Media portion
 	if media != "" {
 		var mediaBlock strings.Builder
-		mediaBlock.WriteString(styles.System.Render("MEDIA:"))
+		mediaBlock.WriteString(styles.System.Render("---"))
 		mediaBlock.WriteString("\n")
 		mediaBlock.WriteString(styles.Attachment.Render(media))
 		if innerWidth > 0 {
@@ -271,7 +271,7 @@ func (r *toolRenderer) BuildInner(width int, folded bool, styles *Styles) (strin
 		var result strings.Builder
 		result.WriteString(call)
 
-		sep := styles.System.Render("OUTPUT:")
+		sep := styles.System.Render("---")
 		styled := styleMultiline(prepareContent(r.output), styles.Text)
 		if innerWidth > 0 {
 			styled = wrapContent(styled, innerWidth)
