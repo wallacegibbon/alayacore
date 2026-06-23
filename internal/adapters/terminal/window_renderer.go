@@ -193,6 +193,13 @@ type toolRenderer struct {
 
 func (r *toolRenderer) Tag() string { return stream.TagAssistantF }
 
+// showSeparator returns true if the tool should display an OUTPUT: separator
+// between the call input and its result. Only diff-style tools (edit_file,
+// write_file) show a separator — other tools append output directly.
+func (r *toolRenderer) showSeparator() bool {
+	return r.name == "edit_file" || r.name == "write_file"
+}
+
 func (r *toolRenderer) ToolInfo() *ToolInfo {
 	return &ToolInfo{
 		Name:  r.name,
@@ -243,8 +250,8 @@ func (r *toolRenderer) BuildInner(width int, folded bool, styles *Styles) (strin
 	// Render input
 	call := renderFn(r.input, r.status, styles, innerWidth)
 
-	// Append output if present
-	if r.output != "" {
+	// Append output if present, with separator only for diff-style tools
+	if r.output != "" && r.showSeparator() {
 		var result strings.Builder
 		result.WriteString(call)
 
@@ -260,6 +267,16 @@ func (r *toolRenderer) BuildInner(width int, folded bool, styles *Styles) (strin
 
 		content := result.String()
 		return content, strings.Count(content, "\n") + 1 + 2
+	}
+
+	// No separator — append output directly after input
+	if r.output != "" {
+		styled := styleMultiline(prepareContent(r.output), styles.Text)
+		if innerWidth > 0 {
+			styled = wrapContent(styled, innerWidth)
+		}
+		call += styled
+		return call, strings.Count(call, "\n") + 1 + 2
 	}
 
 	return call, strings.Count(call, "\n") + 1 + 2
