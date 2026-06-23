@@ -24,24 +24,24 @@ func TestHandleToolInputEvent(t *testing.T) {
 	}
 
 	// Status defaults to pending (inferred from window creation)
-	if wb.WindowAt(0).Status != ToolStatusPending {
-		t.Errorf("Expected ToolStatusPending, got %v", wb.WindowAt(0).Status)
+	if wb.WindowAt(0).RawStatus() != ToolStatusPending {
+		t.Errorf("Expected ToolStatusPending, got %v", wb.WindowAt(0).RawStatus())
 	}
 
 	// Send a result
 	wb.HandleToolOutput("tool123", "output text", false, 0)
 
 	// Check status was updated
-	if wb.WindowAt(0).Status != ToolStatusSuccess {
-		t.Errorf("Expected ToolStatusSuccess, got %v", wb.WindowAt(0).Status)
+	if wb.WindowAt(0).RawStatus() != ToolStatusSuccess {
+		t.Errorf("Expected ToolStatusSuccess, got %v", wb.WindowAt(0).RawStatus())
 	}
 
 	// Send a result with error
 	wb.HandleToolOutput("tool123", "error output", true, 0)
 
 	// Check status was updated
-	if wb.WindowAt(0).Status != ToolStatusError {
-		t.Errorf("Expected ToolStatusError, got %v", wb.WindowAt(0).Status)
+	if wb.WindowAt(0).RawStatus() != ToolStatusError {
+		t.Errorf("Expected ToolStatusError, got %v", wb.WindowAt(0).RawStatus())
 	}
 
 	// Try to update non-existent window (should not crash)
@@ -139,8 +139,8 @@ func TestOutputWriterToolCallStartThenFull(t *testing.T) {
 		t.Fatalf("Expected 1 window after start event, got %d", wb.WindowCount())
 	}
 	w := wb.WindowAt(0)
-	if w.ToolName != "write_file" {
-		t.Errorf("Expected tool name 'write_file', got %q", w.ToolName)
+	if w.RawToolName() != "write_file" {
+		t.Errorf("Expected tool name 'write_file', got %q", w.RawToolName())
 	}
 
 	// 2. Simulate ToolCallComplete: Name nil with full JSON input
@@ -153,7 +153,7 @@ func TestOutputWriterToolCallStartThenFull(t *testing.T) {
 		t.Fatalf("Expected still 1 window, got %d", wb.WindowCount())
 	}
 	w = wb.WindowAt(0)
-	if w.ToolInput != "write_file: /tmp/f.txt\nhello world" {
-		t.Errorf("Expected full input, got %q", w.ToolInput)
+	if ti := w.ToolInfo(); ti == nil || ti.Input != "write_file: /tmp/f.txt\nhello world" {
+		t.Errorf("Expected full input, got %v", w.ToolInfo())
 	}
 }

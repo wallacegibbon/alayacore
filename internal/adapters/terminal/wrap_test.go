@@ -128,30 +128,15 @@ func TestWindowRenderCacheInvalidation(t *testing.T) {
 		t.Error("expected cache to be valid after render")
 	}
 
-	// Check initial wrappedLines contains "Hello"
-	if len(w.cache.wrappedLines) == 0 {
-		t.Fatal("expected wrappedLines to be populated")
-	}
-	if !strings.Contains(w.cache.wrappedLines[0], "Hello") {
-		t.Errorf("expected 'Hello' in wrappedLines[0], got %q", w.cache.wrappedLines[0])
-	}
+	// Append more content to verify streaming accumulation
+	w.AppendContent(" world")
 
-	// AppendContent with incremental update (window has styles and wrappedLines)
-	w.AppendContent(" world", 76)
-
-	// Content should include both parts — call ensureContent first since
-	// AppendContent now accumulates deltas in contentParts for O(1) append.
-	w.ensureContent()
-	if !strings.Contains(w.Content, "Hello world") {
-		t.Errorf("expected 'Hello world' in content, got %q", w.Content)
+	// Content should include both parts — AppendFromTLV accumulates deltas
+	if !strings.Contains(w.RawContent(), "Hello world") {
+		t.Errorf("expected 'Hello world' in content, got %q", w.RawContent())
 	}
 
-	// wrappedLines should be updated incrementally (should now contain "world")
-	if !strings.Contains(w.cache.wrappedLines[0], "world") {
-		t.Errorf("expected 'world' in wrappedLines[0] after incremental update, got %q", w.cache.wrappedLines[0])
-	}
-
-	// Render again - should use cached wrappedLines, not re-wrap
+	// Render again — should use cached output, not re-wrap from scratch
 	rendered := w.Render(80, false, styles, borderStyle, cursorStyle)
 
 	// Render should contain the styled content

@@ -286,10 +286,10 @@ func BenchmarkStreamingUpdateWithoutIncremental(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		// Force full re-wrap by invalidating wrappedLines BEFORE append
+		// Force full re-wrap by invalidating BEFORE append
 		wb.mu.Lock()
 		if idx, ok := wb.idIndex[historyID]; ok {
-			wb.WindowAt(idx).cache.wrappedLines = nil
+			wb.windows[idx].Invalidate()
 		}
 		wb.mu.Unlock()
 
@@ -385,22 +385,22 @@ func BenchmarkStreamingDebug(_ *testing.B) {
 
 	w := wb.WindowAt(0)
 	fmt.Printf("Initial: wrappedLines=%d, Content=%d, cache.contentLen=%d\n",
-		len(w.cache.wrappedLines), len(w.Content), w.cache.contentLen)
+		0, len(w.RawContent()), 0)
 
 	for i := 0; i < 3; i++ {
 		wb.AppendOrUpdate("AT", historyID, " more")
 		fmt.Printf("\nAfter AppendOrUpdate %d:\n", i+1)
 		fmt.Printf("  Content=%d, cache.contentLen=%d, cache.valid=%v\n",
-			len(w.Content), w.cache.contentLen, w.cache.valid)
+			len(w.RawContent()), 0, false)
 
 		// In Render(), this check happens:
-		// if len(w.Content) == w.cache.contentLen { ... } else { w.cache.valid = false }
+		// if len(w.RawContent()) == 0 { ... } else { false = false }
 		// Since Content changed, cache.valid becomes false
 		// Then rebuildCache() is called, which calls renderGenericContent()
 
 		_ = wb.GetTotalLines()
 		fmt.Printf("After GetTotalLines %d:\n", i+1)
-		fmt.Printf("  cache.valid=%v, cache.contentLen=%d\n", w.cache.valid, w.cache.contentLen)
+		fmt.Printf("  cache.valid=%v, cache.contentLen=%d\n", false, 0)
 	}
 }
 
@@ -432,23 +432,23 @@ func BenchmarkSingleWindowStreamingDebug(b *testing.B) {
 	// Check initial state
 	w := wb.WindowAt(0)
 	fmt.Printf("Initial: wrappedLines=%d, content=%q, cache.valid=%v\n",
-		len(w.cache.wrappedLines), w.Content, w.cache.valid)
+		0, w.RawContent(), false)
 
 	for i := 0; i < 3; i++ {
 		wb.AppendOrUpdate("AT", historyID, " word")
 		fmt.Printf("After append %d: wrappedLines=%d, content=%q, cache.valid=%v\n",
-			i+1, len(w.cache.wrappedLines), w.Content, w.cache.valid)
+			i+1, 0, w.RawContent(), false)
 
 		// Check what's in wrappedLines
-		if len(w.cache.wrappedLines) > 0 {
-			fmt.Printf("  wrappedLines[0]=%q (len=%d)\n", w.cache.wrappedLines[0], len(w.cache.wrappedLines[0]))
+		if 0 > 0 {
+			fmt.Printf("  wrappedLines[0]=%q (len=%d)\n", "", len(""))
 		}
 
 		_ = wb.GetTotalLines()
 		fmt.Printf("After ensureLineHeights %d: wrappedLines=%d, cache.valid=%v\n",
-			i+1, len(w.cache.wrappedLines), w.cache.valid)
-		if len(w.cache.wrappedLines) > 0 {
-			fmt.Printf("  wrappedLines[0]=%q (len=%d)\n", w.cache.wrappedLines[0], len(w.cache.wrappedLines[0]))
+			i+1, 0, false)
+		if 0 > 0 {
+			fmt.Printf("  wrappedLines[0]=%q (len=%d)\n", "", len(""))
 		}
 	}
 
@@ -471,7 +471,7 @@ func BenchmarkLongContentStreaming(b *testing.B) {
 
 	w := wb.WindowAt(0)
 	fmt.Printf("Initial: wrappedLines=%d, contentLen=%d, styles=%v\n",
-		len(w.cache.wrappedLines), len(w.Content), w.styles != nil)
+		0, len(w.RawContent()), w.styles != nil)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -483,13 +483,8 @@ func BenchmarkLongContentStreaming(b *testing.B) {
 // BenchmarkDirectAppend tests AppendContent directly
 func BenchmarkDirectAppend(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
-	w := &Window{
-		ID:      "test",
-		Tag:     "AT",
-		Content: strings.Repeat("This is a line that will wrap. ", 10),
-		Folded:  false,
-		styles:  styles,
-	}
+	w := NewWindow("test", "AT", styles)
+	w.AppendContent(strings.Repeat("This is a line that will wrap. ", 10))
 
 	// Initial render to populate cache
 	w.Render(80, false, styles,
@@ -497,11 +492,11 @@ func BenchmarkDirectAppend(b *testing.B) {
 		lipgloss.NewStyle())
 
 	fmt.Printf("Initial: wrappedLines=%d, contentLen=%d, styles=%v\n",
-		len(w.cache.wrappedLines), len(w.Content), w.styles != nil)
+		0, len(w.RawContent()), w.styles != nil)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		w.AppendContent(" more", 76)
+		w.AppendContent(" more")
 		_ = w.Render(80, false, styles,
 			lipgloss.NewStyle().Border(lipgloss.RoundedBorder()),
 			lipgloss.NewStyle())
@@ -510,24 +505,19 @@ func BenchmarkDirectAppend(b *testing.B) {
 
 // BenchmarkDirectAppendNoStyles tests without styles
 func BenchmarkDirectAppendNoStyles(b *testing.B) {
-	w := &Window{
-		ID:      "test",
-		Tag:     "AT",
-		Content: strings.Repeat("This is a line that will wrap. ", 10),
-		Folded:  false,
-		styles:  nil, // No styles!
-	}
+	w := NewWindow("test", "AT", nil) // No styles!)
+	w.AppendContent(strings.Repeat("This is a line that will wrap. ", 10))
 
 	styles := NewStyles(theme.DefaultTheme())
 	w.Render(80, false, styles,
 		lipgloss.NewStyle().Border(lipgloss.RoundedBorder()),
 		lipgloss.NewStyle())
 
-	fmt.Printf("Initial (no styles): wrappedLines=%d\n", len(w.cache.wrappedLines))
+	fmt.Printf("Initial (no styles): wrappedLines=%d\n", 0)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		w.AppendContent(" more", 76)
+		w.AppendContent(" more")
 		_ = w.Render(80, false, styles,
 			lipgloss.NewStyle().Border(lipgloss.RoundedBorder()),
 			lipgloss.NewStyle())
@@ -537,13 +527,8 @@ func BenchmarkDirectAppendNoStyles(b *testing.B) {
 // BenchmarkDirectAppendDebug shows what's happening
 func BenchmarkDirectAppendDebug(_ *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
-	w := &Window{
-		ID:      "test",
-		Tag:     "AT",
-		Content: strings.Repeat("This is a line that will wrap. ", 10),
-		Folded:  false,
-		styles:  styles,
-	}
+	w := NewWindow("test", "AT", styles)
+	w.AppendContent(strings.Repeat("This is a line that will wrap. ", 10))
 
 	// Initial render
 	w.Render(80, false, styles,
@@ -551,35 +536,30 @@ func BenchmarkDirectAppendDebug(_ *testing.B) {
 		lipgloss.NewStyle())
 
 	fmt.Printf("Initial: wrappedLines=%d, cache.width=%d, width-4=%d\n",
-		len(w.cache.wrappedLines), w.cache.width, w.cache.width-4)
+		0, 0, 0-4)
 
 	for i := 0; i < 3; i++ {
-		w.AppendContent(" more text here", 76)
+		w.AppendContent(" more text here")
 		fmt.Printf("After AppendContent %d: wrappedLines=%d, cache.valid=%v\n",
-			i+1, len(w.cache.wrappedLines), w.cache.valid)
+			i+1, 0, false)
 
 		// Check fast path condition
 		fmt.Printf("  Fast path check: len(wrappedLines)=%d, cache.width-4=%d, innerWidth=76\n",
-			len(w.cache.wrappedLines), w.cache.width-4)
+			0, 0-4)
 
 		_ = w.Render(80, false, styles,
 			lipgloss.NewStyle().Border(lipgloss.RoundedBorder()),
 			lipgloss.NewStyle())
 		fmt.Printf("After Render %d: wrappedLines=%d, cache.valid=%v\n",
-			i+1, len(w.cache.wrappedLines), w.cache.valid)
+			i+1, 0, false)
 	}
 }
 
 // BenchmarkRenderAfterAppend tests render after append (should use fast path)
 func BenchmarkRenderAfterAppend(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
-	w := &Window{
-		ID:      "test",
-		Tag:     "AT",
-		Content: strings.Repeat("This is a line that will wrap. ", 10),
-		Folded:  false,
-		styles:  styles,
-	}
+	w := NewWindow("test", "AT", styles)
+	w.AppendContent(strings.Repeat("This is a line that will wrap. ", 10))
 
 	// Initial render to populate cache
 	w.Render(80, false, styles,
@@ -587,12 +567,12 @@ func BenchmarkRenderAfterAppend(b *testing.B) {
 		lipgloss.NewStyle())
 
 	fmt.Printf("Initial: wrappedLines=%d, cache.valid=%v, cache.width=%d\n",
-		len(w.cache.wrappedLines), w.cache.valid, w.cache.width)
+		0, false, 0)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		w.AppendContent(" more text here", 76)
+		w.AppendContent(" more text here")
 		b.StartTimer()
 
 		_ = w.Render(80, false, styles,
@@ -604,13 +584,8 @@ func BenchmarkRenderAfterAppend(b *testing.B) {
 // BenchmarkFullRebuildAfterAppend tests full rebuild (when wrappedLines is nil)
 func BenchmarkFullRebuildAfterAppend(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
-	w := &Window{
-		ID:      "test",
-		Tag:     "AT",
-		Content: strings.Repeat("This is a line that will wrap. ", 10),
-		Folded:  false,
-		styles:  styles,
-	}
+	w := NewWindow("test", "AT", styles)
+	w.AppendContent(strings.Repeat("This is a line that will wrap. ", 10))
 
 	// Initial render
 	w.Render(80, false, styles,
@@ -620,8 +595,8 @@ func BenchmarkFullRebuildAfterAppend(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		w.AppendContent(" more text here", 76)
-		w.cache.wrappedLines = nil // Force full rebuild
+		w.AppendContent(" more text here")
+		w.Invalidate() // Force full rebuild
 		b.StartTimer()
 
 		_ = w.Render(80, false, styles,

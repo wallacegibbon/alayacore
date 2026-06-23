@@ -512,8 +512,8 @@ func TestWindowBufferDeltaRouting(t *testing.T) {
 	}
 	// Content should have both deltas concatenated
 	// Note: content is styled with color codes; we just check containment
-	if !strings.Contains(win1.Content, "Hello") || !strings.Contains(win1.Content, "world") {
-		t.Errorf("Window content missing expected parts, got: %q", win1.Content)
+	if !strings.Contains(win1.RawContent(), "Hello") || !strings.Contains(win1.RawContent(), "world") {
+		t.Errorf("Window content missing expected parts, got: %q", win1.RawContent())
 	}
 	// Check stream2 window exists
 	var win2 *Window
@@ -582,11 +582,11 @@ func TestWindowBufferNonDeltaMessages(t *testing.T) {
 		t.Errorf("Non-delta windows should have different IDs: %s", windows[0].ID)
 	}
 	// Ensure tags are correct (error → TagWindowSE, notify → TagWindowSN)
-	if windows[0].Tag != TagWindowSE {
-		t.Errorf("Expected SE tag, got %s", windows[0].Tag)
+	if windows[0].RawTag() != TagWindowSE {
+		t.Errorf("Expected SE tag, got %s", windows[0].RawTag())
 	}
-	if windows[1].Tag != TagWindowSN {
-		t.Errorf("Expected SN tag, got %s", windows[1].Tag)
+	if windows[1].RawTag() != TagWindowSN {
+		t.Errorf("Expected SN tag, got %s", windows[1].RawTag())
 	}
 }
 
@@ -621,14 +621,14 @@ func TestWindowBufferEdgeCases(t *testing.T) {
 		t.Errorf("Expected 3 windows, got %d", len(windows))
 	}
 	// Check ordering: first malformed, second delta, third error
-	if windows[0].Tag != stream.TagAssistantT {
+	if windows[0].RawTag() != stream.TagAssistantT {
 		t.Errorf("First window tag mismatch")
 	}
-	if windows[1].Tag != stream.TagAssistantT {
+	if windows[1].RawTag() != stream.TagAssistantT {
 		t.Errorf("Second window tag mismatch")
 	}
-	if windows[2].Tag != TagWindowSE {
-		t.Errorf("Third window tag mismatch, got %s", windows[2].Tag)
+	if windows[2].RawTag() != TagWindowSE {
+		t.Errorf("Third window tag mismatch, got %s", windows[2].RawTag())
 	}
 }
 

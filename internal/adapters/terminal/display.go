@@ -511,7 +511,7 @@ func (m *DisplayModel) MoveWindowCursorToNextUserPrompt() bool {
 
 	found := false
 	m.windowBuffer.ForEachVisible(m.windowCursor+1, func(i int, w *Window) bool {
-		if w.Tag == stream.TagUserT {
+		if w.Tag() == stream.TagUserT {
 			m.setCursor(i)
 			found = true
 			return false
@@ -532,7 +532,7 @@ func (m *DisplayModel) MoveWindowCursorToPrevUserPrompt() bool {
 
 	found := false
 	m.windowBuffer.ForEachVisibleBackward(m.windowCursor-1, func(i int, w *Window) bool {
-		if w.Tag == stream.TagUserT {
+		if w.Tag() == stream.TagUserT {
 			m.setCursor(i)
 			found = true
 			return false

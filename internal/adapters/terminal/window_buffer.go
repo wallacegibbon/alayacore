@@ -107,15 +107,10 @@ func (wb *WindowBuffer) AppendOrUpdate(tag string, id string, content string) in
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 
-	innerWidth := max(0, wb.width-BorderInnerPadding)
-
 	if idx, ok := wb.idIndex[id]; ok {
 		w := wb.windows[idx]
-		w.AppendContent(content, innerWidth)
-		// Update visibility for delta windows when new content arrives
-		if !w.Visible && hasVisibleContent(content) {
-			w.Visible = true
-		}
+		w.AppendContent(content)
+		w.EnsureVisibleContent(content)
 		wb.markDirty(idx)
 		return idx
 	}
@@ -123,15 +118,12 @@ func (wb *WindowBuffer) AppendOrUpdate(tag string, id string, content string) in
 	// Create new window
 	folded := tag != stream.TagUserT && tag != stream.TagAssistantT
 	historyID := parseHistoryID(id)
-	w := &Window{
-		ID:        id,
-		HistoryID: historyID,
-		Tag:       tag,
-		Content:   content,
-		Folded:    folded,
-		Visible:   hasVisibleContent(content),
-		styles:    wb.styles,
-	}
+	w := NewWindow(id, tag, wb.styles)
+	w.HistoryID = historyID
+	w.Folded = folded
+	w.Visible = hasVisibleContent(content)
+	w.AppendContent(content) // set initial content via renderer
+
 	wb.windows = append(wb.windows, w)
 	idx := len(wb.windows) - 1
 	wb.idIndex[id] = idx
@@ -150,41 +142,23 @@ func (wb *WindowBuffer) HandleToolInputEvent(data stream.ToolInputData, historyI
 
 	if idx, ok := wb.idIndex[data.ID]; ok {
 		w := wb.windows[idx]
-		if data.Name != "" && len(data.Input) == 0 {
-			w.ToolName = data.Name
-			if w.ToolInput == "" {
-				w.ToolInput = string(data.Input)
-			}
-		} else {
-			if data.Name != "" {
-				w.ToolName = data.Name
-			}
-			w.ToolInput = string(data.Input)
-		}
-		if historyID > w.HistoryID {
-			w.HistoryID = historyID
-		}
-		if w.Status == ToolStatusNone {
-			w.Status = ToolStatusPending
-		}
-		w.Invalidate()
+		w.HandleToolInput(data, historyID)
 		wb.markDirty(idx)
 		return
 	}
 
-	// Create new window. Status defaults to pending — the result will
-	// update it to success/error when it arrives.
-	w := &Window{
-		ID:        data.ID,
-		HistoryID: historyID,
-		Tag:       stream.TagAssistantF,
-		ToolName:  data.Name,
-		ToolInput: string(data.Input),
-		Folded:    true,
-		Visible:   true,
-		Status:    ToolStatusPending,
-		styles:    wb.styles,
+	// Create new window with tool renderer
+	w := NewWindow(data.ID, stream.TagAssistantF, wb.styles)
+	w.HistoryID = historyID
+	w.Folded = true
+	w.Visible = true
+	w.SetRendererForTool(data.Name, string(data.Input))
+	if w.renderer != nil {
+		if tr, ok := w.renderer.(*toolRenderer); ok && tr.status == ToolStatusNone {
+			tr.status = ToolStatusPending
+		}
 	}
+
 	wb.windows = append(wb.windows, w)
 	wb.idIndex[data.ID] = len(wb.windows) - 1
 	wb.markDirty(len(wb.windows) - 1)
@@ -198,16 +172,7 @@ func (wb *WindowBuffer) HandleToolOutput(id, output string, isError bool, histor
 
 	if idx, ok := wb.idIndex[id]; ok {
 		w := wb.windows[idx]
-		w.ToolOutput = output
-		if historyID > w.HistoryID {
-			w.HistoryID = historyID
-		}
-		if isError {
-			w.Status = ToolStatusError
-		} else {
-			w.Status = ToolStatusSuccess
-		}
-		w.Invalidate()
+		w.HandleToolOutput(output, isError, historyID)
 		wb.markDirty(idx)
 		return
 	}
@@ -217,16 +182,16 @@ func (wb *WindowBuffer) HandleToolOutput(id, output string, isError bool, histor
 	if isError {
 		status = ToolStatusError
 	}
-	w := &Window{
-		ID:         id,
-		HistoryID:  historyID,
-		Tag:        stream.TagUserF,
-		ToolOutput: output,
-		Status:     status,
-		Folded:     true,
-		Visible:    true,
-		styles:     wb.styles,
+	w := NewWindow(id, stream.TagUserF, wb.styles)
+	w.HistoryID = historyID
+	w.Folded = true
+	w.Visible = true
+	w.SetRendererForTool("", "")
+	if tr, ok := w.renderer.(*toolRenderer); ok {
+		tr.output = output
+		tr.status = status
 	}
+
 	wb.windows = append(wb.windows, w)
 	wb.idIndex[id] = len(wb.windows) - 1
 	wb.markDirty(len(wb.windows) - 1)
@@ -280,7 +245,6 @@ func (wb *WindowBuffer) WindowAt(index int) *Window {
 	if index < 0 || index >= len(wb.windows) {
 		return nil
 	}
-	wb.windows[index].ensureContent()
 	return wb.windows[index]
 }
 
@@ -301,15 +265,6 @@ func (wb *WindowBuffer) SetHistoryID(index int, historyID uint64) {
 	}
 }
 
-// SetMediaContent sets the media content for the window at the given index.
-func (wb *WindowBuffer) SetMediaContent(index int, media string) {
-	wb.mu.Lock()
-	defer wb.mu.Unlock()
-	if index >= 0 && index < len(wb.windows) {
-		wb.windows[index].MediaContent = media
-	}
-}
-
 // AllWindows returns a copy of the windows slice for snapshotting.
 // The returned slice contains the same *Window pointers (no deep copy).
 // Each window's Content is built from parts before returning.
@@ -318,7 +273,6 @@ func (wb *WindowBuffer) AllWindows() []*Window {
 	defer wb.mu.Unlock()
 	result := make([]*Window, len(wb.windows))
 	for i, w := range wb.windows {
-		w.ensureContent()
 		result[i] = w
 	}
 	return result
@@ -361,11 +315,11 @@ func (wb *WindowBuffer) GetFunctionInfo(id string) *FunctionInfo {
 	defer wb.mu.Unlock()
 	if idx, ok := wb.idIndex[id]; ok {
 		w := wb.windows[idx]
-		if w.ToolName != "" {
+		if ti := w.ToolInfo(); ti != nil {
 			return &FunctionInfo{
 				ID:    w.ID,
-				Name:  w.ToolName,
-				Input: w.ToolInput,
+				Name:  ti.Name,
+				Input: ti.Input,
 			}
 		}
 	}
@@ -383,14 +337,14 @@ func (wb *WindowBuffer) GetWindowContent(windowIndex int) string {
 	}
 
 	w := wb.windows[windowIndex]
-	if w.IsToolWindow() {
-		if w.ToolOutput != "" {
-			return w.ToolInput + "\n" + w.ToolOutput
+	if ti := w.ToolInfo(); ti != nil {
+		if tr, ok := w.renderer.(*toolRenderer); ok && tr.output != "" {
+			return ti.Input + "\n" + tr.output
 		}
-		return w.ToolInput
+		return ti.Input
 	}
-	w.ensureContent()
-	return w.Content
+	// For non-tool windows, return raw accumulated text
+	return w.RawContent()
 }
 
 // ============================================================================
@@ -420,17 +374,18 @@ func (wb *WindowBuffer) ensureLineHeights() {
 		w := wb.windows[wb.dirtyIndex]
 		// Only render and count lines for visible windows
 		if w.Visible {
-			// Fast path: UpdateLineCount uses len(wrappedLines) to avoid
-			// an O(n) join. If wrappedLines is nil (first render or after
-			// invalidation), UpdateLineCount returns false and we fall back
-			// to the full Render which populates wrappedLines.
-			if !w.UpdateLineCount(wb.width) {
+			// Fast path: try UpdateLineCountFast first (~58μs vs full Render).
+			if lc, ok := w.UpdateLineCountFast(wb.width); ok {
+				oldHeight := wb.lineHeights[wb.dirtyIndex]
+				wb.lineHeights[wb.dirtyIndex] = lc
+				wb.totalLines += lc - oldHeight
+			} else {
 				w.Render(wb.width, false, wb.styles, wb.borderStyle, wb.cursorStyle)
+				oldHeight := wb.lineHeights[wb.dirtyIndex]
+				newHeight := w.LineCount()
+				wb.lineHeights[wb.dirtyIndex] = newHeight
+				wb.totalLines += newHeight - oldHeight
 			}
-			oldHeight := wb.lineHeights[wb.dirtyIndex]
-			newHeight := w.LineCount()
-			wb.lineHeights[wb.dirtyIndex] = newHeight
-			wb.totalLines += newHeight - oldHeight
 		} else {
 			// Non-visible windows contribute 0 lines
 			oldHeight := wb.lineHeights[wb.dirtyIndex]
@@ -748,10 +703,12 @@ func (wb *WindowBuffer) findWindowAtLine(line int) int {
 
 // RenderWindowContent renders the content of a window (for testing).
 func (wb *WindowBuffer) RenderWindowContent(w *Window, innerWidth int) string {
-	if w.IsToolWindow() {
-		return w.renderGenericContent(innerWidth, wb.styles, w.ToolInput)
+	if w.renderer == nil {
+		return ""
 	}
-	return w.renderGenericContent(innerWidth, wb.styles, w.Content)
+	// Use BuildInner to get the rendered content (without border)
+	inner, _ := w.renderer.BuildInner(innerWidth+BorderInnerPadding, false, wb.styles)
+	return inner
 }
 
 // parseHistoryID parses a history ID string (from the wire format) to uint64.

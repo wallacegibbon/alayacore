@@ -44,10 +44,10 @@ func TestWindowBuffer(t *testing.T) {
 		if wb.WindowCount() != 1 {
 			t.Fatalf("len(Windows) = %d, want 1", wb.WindowCount())
 		}
-		if !strings.Contains(wb.WindowAt(0).Content, "Hello") {
+		if !strings.Contains(wb.WindowAt(0).RawContent(), "Hello") {
 			t.Error("Content should contain 'Hello'")
 		}
-		if !strings.Contains(wb.WindowAt(0).Content, "World") {
+		if !strings.Contains(wb.WindowAt(0).RawContent(), "World") {
 			t.Error("Content should contain 'World'")
 		}
 	})
@@ -137,8 +137,8 @@ func TestWindowBufferDiff(t *testing.T) {
 		if wb.WindowCount() != 1 {
 			t.Fatalf("len(Windows) = %d, want 1", wb.WindowCount())
 		}
-		if wb.WindowAt(0).ToolName != "edit_file" {
-			t.Errorf("ToolName = %s, want edit_file", wb.WindowAt(0).ToolName)
+		if wb.WindowAt(0).RawToolName() != "edit_file" {
+			t.Errorf("ToolName = %s, want edit_file", wb.WindowAt(0).RawToolName())
 		}
 	})
 
@@ -415,8 +415,8 @@ func TestWindowBufferVisibility(t *testing.T) {
 
 		// Content should include all the whitespace
 		expected := "  \n  \tWorld"
-		if wb.WindowAt(0).Content != expected {
-			t.Errorf("Content = %q, want %q", wb.WindowAt(0).Content, expected)
+		if wb.WindowAt(0).RawContent() != expected {
+			t.Errorf("Content = %q, want %q", wb.WindowAt(0).RawContent(), expected)
 		}
 	})
 

@@ -46,8 +46,8 @@ import (
 // frames (UT, UI/UV/UA/UD) and are flushed into one window on MB or
 // before the next non-user tag.
 type userContentPart struct {
-	content string
-	isMedia bool
+	tag     string // original TLV tag (UT, UI, UV, UA, UD)
+	content string // text content or media URI
 }
 
 // outputWriter parses TLV from the session and writes styled content to the WindowBuffer.
@@ -161,14 +161,14 @@ func (to *outputWriter) writeColored(tag string, value string) {
 			id = to.generateWindowID()
 			content = value
 		}
-		to.bufferUserContent(id, content, false) // text, not media
+		to.bufferUserContent(id, content, stream.TagUserT)
 
 	case stream.TagUserI, stream.TagUserV, stream.TagUserA, stream.TagUserD:
 		id, _, ok := stream.UnwrapDelta(value)
 		if !ok {
 			id = to.generateWindowID()
 		}
-		to.bufferUserContent(id, mediaLabel(tag), true) // media, not text
+		to.bufferUserContent(id, mediaLabel(tag), tag)
 
 	// Message boundary — flush pending user content as one window.
 	case stream.TagMessageBoundary:
@@ -446,11 +446,12 @@ func mediaLabel(tag string) string {
 
 // bufferUserContent accumulates a user content part. When flushed,
 // all accumulated parts appear as a single window with text first.
-// isMedia distinguishes media labels from text content.
-func (to *outputWriter) bufferUserContent(id, content string, isMedia bool) {
+// tag is the original TLV tag (UT, UI, UV, UA, UD) so the renderer
+// can distinguish text from different media types.
+func (to *outputWriter) bufferUserContent(id, content string, tag string) {
 	to.pendingUserParts = append(to.pendingUserParts, userContentPart{
+		tag:     tag,
 		content: content,
-		isMedia: isMedia,
 	})
 
 	// Track the max history ID from the TLV delta.
@@ -469,30 +470,14 @@ func (to *outputWriter) flushUserContent() {
 		return
 	}
 
-	// Separate text and media parts in insertion order.
-	var textParts, mediaParts []string
+	// Create the window and feed all parts in order.
+	// The userRenderer accumulates text and media separately and
+	// renders them correctly at display time.
+	idx := to.windowBuffer.AppendOrUpdate(stream.TagUserT, to.pendingUserID, "")
 	for _, p := range to.pendingUserParts {
-		if p.isMedia {
-			mediaParts = append(mediaParts, p.content)
-		} else {
-			textParts = append(textParts, p.content)
-		}
+		to.windowBuffer.windows[idx].AppendFromTLV(p.tag, p.content)
 	}
-
-	text := joinLines(textParts)
-	media := joinLines(mediaParts)
-
-	// For media-only messages, use a space as content so the window is
-	// visible — applyTagStyle skips the "> " prefix for whitespace-only
-	// content and renders only the MEDIA section.
-	displayText := text
-	if displayText == "" {
-		displayText = " "
-	}
-	idx := to.windowBuffer.AppendOrUpdate(stream.TagUserT, to.pendingUserID, displayText)
-	if media != "" {
-		to.windowBuffer.SetMediaContent(idx, media)
-	}
+	to.windowBuffer.windows[idx].Visible = true
 	to.windowBuffer.SetHistoryID(idx, to.pendingUserMaxID)
 
 	to.pendingUserParts = nil

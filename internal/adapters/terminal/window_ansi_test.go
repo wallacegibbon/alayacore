@@ -58,14 +58,12 @@ func TestWindow_WithANSIContent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			w := &Window{
-				ID:      "test-window",
-				Tag:     tt.tag,
-				Content: tt.content,
-			}
+			w := NewWindow("test-window", tt.tag, styles)
+			w.AppendContent(tt.content)
 
-			// Render the window content
-			result := w.renderGenericContent(80, styles, w.Content)
+			// Render the window inner content (without border)
+			inner, _ := w.renderer.BuildInner(80, false, styles)
+			result := inner
 
 			// Strip lipgloss ANSI to check the actual text content
 			resultStripped := stripANSI(result)
@@ -122,14 +120,12 @@ func TestWindow_PreservesLipglossColors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			w := &Window{
-				ID:      "test-window",
-				Tag:     tt.tag,
-				Content: tt.content,
-			}
+			w := NewWindow("test-window", tt.tag, styles)
+			w.AppendContent(tt.content)
 
-			// Render the window content
-			result := w.renderGenericContent(80, styles, w.Content)
+			// Render the window inner content (without border)
+			inner, _ := w.renderer.BuildInner(80, false, styles)
+			result := inner
 
 			// Check if result contains ANSI codes
 			hasColor := containsANSI(result)
