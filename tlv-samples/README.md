@@ -167,6 +167,7 @@ sm-model.bin                   SM {"type":"model","data":{"active_id":4,"active_
 sm-theme-list.bin              SM {"type":"theme_list","data":{"themes":[{"name":"theme-dark",...},{"name":"theme-light",...}]}}
 sm-theme.bin                   SM {"type":"theme","data":{"name":"theme-dark"}}
 sm-reasoning.bin               SM {"type":"reasoning","data":{"level":2}}
+sm-video-config.bin            SM {"type":"video_config","data":{"fps":5,"res":1}}
 sm-task-start.bin              SM {"type":"task","data":{"in_progress":true,"context":0,"queue_items":[]}}
 sm-task-queued.bin             SM {"type":"task","data":{"in_progress":true,"context":0,"queue_items":[{"queue_id":"Q1","type":"prompt","content":"Read the file main.go","created_at":"..."},{"queue_id":"Q2","type":"command","content":":continue","created_at":"..."}]}}
 sm-task-end.bin                SM {"type":"task","data":{"in_progress":false,"context":0,"queue_items":[]}}
