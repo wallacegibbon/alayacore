@@ -277,7 +277,7 @@ func (s *Session) handleInputFrame(tag, value string, staged []llm.ContentPart) 
 			return append(staged, &llm.TextPart{Text: value})
 		}
 		return staged
-	case stream.TagMessageBoundary:
+	case stream.TagUserEnd:
 		if len(staged) > 0 {
 			s.inputMsgCh <- inputMsg{contentParts: staged}
 		}

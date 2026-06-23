@@ -43,8 +43,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Flush with message boundary.
-	if _, err := os.Stdout.Write(stream.EncodeTLV(stream.TagMessageBoundary, "")); err != nil {
+	// Flush with TagUserEnd to commit the user message.
+	if _, err := os.Stdout.Write(stream.EncodeTLV(stream.TagUserEnd, "")); err != nil {
 		fmt.Fprintf(os.Stderr, "write: %v\n", err)
 		os.Exit(1)
 	}

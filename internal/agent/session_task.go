@@ -55,7 +55,7 @@ func (s *Session) handleUserPrompt(ctx context.Context, contents []llm.ContentPa
 	}
 
 	// Signal end of user message so the adapter can group parts into one window.
-	s.writeTLV(stream.TagMessageBoundary, "")
+	s.writeTLV(stream.TagUserEnd, "")
 
 	fullContents, outputTokens, err := s.processPrompt(ctx, contents)
 	if err != nil {
@@ -112,7 +112,7 @@ func (s *Session) doAutoSummarize(ctx context.Context, contents []llm.ContentPar
 	if tag, val, err := contentPartToTLV(promptPart); err == nil && tag != "" {
 		s.writeTLV(tag, stream.WrapDelta(strconv.FormatUint(id, 10), val))
 	}
-	s.writeTLV(stream.TagMessageBoundary, "")
+	s.writeTLV(stream.TagUserEnd, "")
 
 	beforeLen := len(contents)
 	fullContents, outputTokens, err := s.processPrompt(ctx, contents)

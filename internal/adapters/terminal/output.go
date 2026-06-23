@@ -165,7 +165,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 		to.bufferUserContent(id, mediaLabel(tag), tag)
 
 	// Message boundary — flush pending user content as one window.
-	case stream.TagMessageBoundary:
+	case stream.TagUserEnd:
 		if to.activeUserWindowIdx >= 0 {
 			to.flushUserContent()
 		}
@@ -231,7 +231,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 // after processing, so it doesn't need the early dirty flag from this function.
 func (to *outputWriter) triggerUpdateForTag(tag string) {
 	switch tag {
-	case stream.TagAssistantT, stream.TagAssistantR, stream.TagAssistantF, stream.TagUserT, stream.TagUserF, stream.TagUserI, stream.TagUserV, stream.TagUserA, stream.TagUserD, stream.TagMessageBoundary:
+	case stream.TagAssistantT, stream.TagAssistantR, stream.TagAssistantF, stream.TagUserT, stream.TagUserF, stream.TagUserI, stream.TagUserV, stream.TagUserA, stream.TagUserD, stream.TagUserEnd:
 		to.dirty.Store(true)
 	}
 }

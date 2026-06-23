@@ -28,10 +28,10 @@ func (m *Terminal) emitCommand(cmd string) {
 	_ = stream.WriteTLV(m.streamInput, stream.TagUserT, cmd) //nolint:errcheck
 }
 
-// emitMB sends a message boundary tag, flushing any staged content
+// emitMB sends a TagUserEnd frame, flushing any staged content
 // as a complete user message.
 func (m *Terminal) emitMB() {
-	_ = stream.WriteTLV(m.streamInput, stream.TagMessageBoundary, "") //nolint:errcheck
+	_ = stream.WriteTLV(m.streamInput, stream.TagUserEnd, "") //nolint:errcheck
 }
 
 // ============================================================================

@@ -120,7 +120,7 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 	case stream.TagUserI, stream.TagUserV, stream.TagUserA, stream.TagUserD:
 		o.handleMediaTag(tag, value)
 
-	case stream.TagMessageBoundary:
+	case stream.TagUserEnd:
 		// Message boundary — plainio doesn't group user content into
 		// windows like the TUI does, so MB is a no-op.
 

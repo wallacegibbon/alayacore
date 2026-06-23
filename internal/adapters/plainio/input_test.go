@@ -34,7 +34,7 @@ func TestReadPrompts_SingleLine(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read MB TLV: %v", err)
 	}
-	if tag != stream.TagMessageBoundary {
+	if tag != stream.TagUserEnd {
 		t.Errorf("expected MB tag, got %s", tag)
 	}
 }
@@ -64,7 +64,7 @@ func TestReadPrompts_MultiLineBackslash(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read MB TLV: %v", err)
 	}
-	if tag != stream.TagMessageBoundary {
+	if tag != stream.TagUserEnd {
 		t.Errorf("expected MB tag, got %s", tag)
 	}
 }
@@ -96,7 +96,7 @@ func TestReadPrompts_TrailingBackslash(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read MB TLV: %v", err)
 	}
-	if tag != stream.TagMessageBoundary {
+	if tag != stream.TagUserEnd {
 		t.Errorf("expected MB tag, got %s", tag)
 	}
 }
@@ -127,7 +127,7 @@ func TestReadPrompts_MultipleLines(t *testing.T) {
 		if err != nil {
 			t.Fatalf("prompt %d: failed to read MB TLV: %v", i, err)
 		}
-		if tag != stream.TagMessageBoundary {
+		if tag != stream.TagUserEnd {
 			t.Errorf("prompt %d: expected MB tag, got %s", i, tag)
 		}
 	}
@@ -159,7 +159,7 @@ func TestReadPrompts_EmptyLines(t *testing.T) {
 		if err != nil {
 			t.Fatalf("prompt %d: failed to read MB TLV: %v", i, err)
 		}
-		if tag != stream.TagMessageBoundary {
+		if tag != stream.TagUserEnd {
 			t.Errorf("prompt %d: expected MB tag, got %s", i, tag)
 		}
 	}
@@ -195,7 +195,7 @@ func TestReadPrompts_EOFPartialLine(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read MB TLV: %v", err)
 	}
-	if tag != stream.TagMessageBoundary {
+	if tag != stream.TagUserEnd {
 		t.Errorf("expected MB tag, got %s", tag)
 	}
 }
@@ -255,7 +255,7 @@ func TestReadPrompts_QuitCommand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read MB TLV: %v", err)
 	}
-	if tag != stream.TagMessageBoundary {
+	if tag != stream.TagUserEnd {
 		t.Errorf("expected MB tag, got %s", tag)
 	}
 
@@ -290,7 +290,7 @@ func TestReadPrompts_BackslashThenEOF(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read MB TLV: %v", err)
 	}
-	if tag != stream.TagMessageBoundary {
+	if tag != stream.TagUserEnd {
 		t.Errorf("expected MB tag, got %s", tag)
 	}
 }

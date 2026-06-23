@@ -23,7 +23,7 @@ const (
 	TagUserA      = "UA" // User audio — data:audio/...;base64,... or URL
 	TagUserD      = "UD" // User document — data:application/...;base64,... or URL
 
-	TagMessageBoundary = "MB" // Message boundary — marks end of a user message
+	TagUserEnd = "MB" // User message end — flushes staged content as one window
 
 	TagSystemMsg = "SM" // System message JSON: {"type":"...","data":{...}}
 )

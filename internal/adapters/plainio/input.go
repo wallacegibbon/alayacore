@@ -69,7 +69,7 @@ func sendPrompt(input io.Writer, text string) error {
 		return err
 	}
 	if !strings.HasPrefix(text, ":") {
-		if err := stream.WriteTLV(input, stream.TagMessageBoundary, ""); err != nil {
+		if err := stream.WriteTLV(input, stream.TagUserEnd, ""); err != nil {
 			return err
 		}
 	}
