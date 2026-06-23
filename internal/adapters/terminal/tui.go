@@ -23,15 +23,18 @@ import (
 )
 
 // emitCommand sends a user-level command to the session via TLV.
-// Errors are ignored — commands are best-effort.
+// Errors are silently ignored — commands are best-effort and the
+// session may close the input stream at any time.
 func (m *Terminal) emitCommand(cmd string) {
-	_ = stream.WriteTLV(m.streamInput, stream.TagUserT, cmd) //nolint:errcheck
+	//nolint:errcheck
+	_ = stream.WriteTLV(m.streamInput, stream.TagUserT, cmd)
 }
 
 // emitUE sends a TagUserEnd frame, flushing any staged content
 // as a complete user message.
 func (m *Terminal) emitUE() {
-	_ = stream.WriteTLV(m.streamInput, stream.TagUserEnd, "") //nolint:errcheck
+	//nolint:errcheck
+	_ = stream.WriteTLV(m.streamInput, stream.TagUserEnd, "")
 }
 
 // ============================================================================
