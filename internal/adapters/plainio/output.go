@@ -120,6 +120,10 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 	case stream.TagUserI, stream.TagUserV, stream.TagUserA, stream.TagUserD:
 		o.handleMediaTag(tag, value)
 
+	case stream.TagMessageBoundary:
+		// Message boundary — plainio doesn't group user content into
+		// windows like the TUI does, so MB is a no-op.
+
 	default:
 		o.emitSeparator(tag)
 		fmt.Fprintf(o.writer, "[unknown-tag:%s %s]", tag, value)
