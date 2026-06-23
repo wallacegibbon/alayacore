@@ -28,6 +28,23 @@ const (
 
 	// AutoSummarizePctBase is the base for percentage calculations (100%).
 	AutoSummarizePctBase = 100
+
+	// SummarizePrompt is the prompt sent to the LLM to summarize the
+	// conversation for continuation. Shared between auto-summarize and
+	// the :summarize command so behavior stays consistent.
+	SummarizePrompt = `Summarize the conversation for continuation. The resuming instance has no prior context.
+
+Provide:
+1. **Task** — Original request and success criteria
+2. **Done** — Completed items with specifics (file paths, function names, values)
+3. **State** — Files created/modified/deleted, key decisions and rationale
+4. **Blocked** — Unresolved errors, failing tests, open questions
+5. **Next** — Ordered actions to resume
+
+Rules:
+- Prefer exact identifiers, file paths, and code snippets over prose descriptions
+- Include error messages verbatim
+- Skip completed exploration; only preserve findings that affect next steps`
 )
 
 // ============================================================================
@@ -41,7 +58,7 @@ const (
 // For media-only messages, there is no text part — only media parts.
 func (s *Session) handleUserPrompt(ctx context.Context, contents []llm.ContentPart, parts []llm.ContentPart) ([]llm.ContentPart, int64) {
 	if s.shouldAutoSummarize() {
-		s.doAutoSummarize(ctx, contents)
+		contents = s.doAutoSummarize(ctx, contents)
 	}
 
 	// Assign history IDs, append to contents, and echo to output.
@@ -76,6 +93,22 @@ func (s *Session) shouldAutoSummarize() bool {
 		s.ContextTokens >= limit*AutoSummarizeThreshold/AutoSummarizePctBase
 }
 
+// summarizeBackup saves a timestamped backup of the current session contents
+// before summarization. Silently skips if no session file is configured.
+func (s *Session) summarizeBackup(contents []llm.ContentPart) {
+	if s.SessionFile == "" {
+		return
+	}
+	ext := filepath.Ext(s.SessionFile)
+	base := strings.TrimSuffix(s.SessionFile, ext)
+	backupPath := fmt.Sprintf("%s-%s%s", base, time.Now().Format("20060102150405"), ext)
+	if err := s.saveContentToFile(backupPath, contents); err != nil {
+		s.writeNotifyf("Failed to create pre-summarize backup: %v", err)
+	} else {
+		s.writeNotifyf("Pre-summarize backup saved to %s", backupPath)
+	}
+}
+
 // doAutoSummarize logs a notification and triggers summarization.
 func (s *Session) doAutoSummarize(ctx context.Context, contents []llm.ContentPart) []llm.ContentPart {
 	limit := s.ContextLimit
@@ -83,31 +116,9 @@ func (s *Session) doAutoSummarize(ctx context.Context, contents []llm.ContentPar
 	s.writeNotifyf("Context usage at %d/%d tokens (%.0f%%). Auto-summarizing...",
 		s.ContextTokens, limit, usage)
 
-	// Save a backup before summarization.
-	if s.SessionFile != "" {
-		ext := filepath.Ext(s.SessionFile)
-		base := strings.TrimSuffix(s.SessionFile, ext)
-		backupPath := fmt.Sprintf("%s-%s%s", base, time.Now().Format("20060102150405"), ext)
-		if err := s.saveContentToFile(backupPath, contents); err != nil {
-			s.writeNotifyf("Failed to create pre-summarize backup: %v", err)
-		} else {
-			s.writeNotifyf("Pre-summarize backup saved to %s", backupPath)
-		}
-	}
+	s.summarizeBackup(contents)
 
-	prompt := `Summarize the conversation for continuation. The resuming instance has no prior context.
-
-Provide:
-1. **Task** — Original request and success criteria
-2. **Done** — Completed items with specifics (file paths, function names, values)
-3. **State** — Files created/modified/deleted, key decisions and rationale
-4. **Blocked** — Unresolved errors, failing tests, open questions
-5. **Next** — Ordered actions to resume
-
-Rules:
-- Prefer exact identifiers, file paths, and code snippets over prose descriptions
-- Include error messages verbatim
-- Skip completed exploration; only preserve findings that affect next steps`
+	prompt := SummarizePrompt
 
 	s.writeNotify("Summarizing conversation...")
 

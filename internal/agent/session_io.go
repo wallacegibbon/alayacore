@@ -227,7 +227,7 @@ type inputMsg struct {
 	contentParts []llm.ContentPart // combined user content (media + text)
 	cmd          string            // command text for commands, empty for prompts
 	isCmd        bool              // true when cmd is set
-	errText      string            // non-empty when the input pump hit a validation error
+	err          error             // non-nil when the input pump hit a validation error
 }
 
 // inputPump runs in its own goroutine.  It reads TLV frames from the
@@ -273,11 +273,11 @@ func (s *Session) inputPump() {
 		default:
 			if len(staged) > 0 {
 				staged = nil
-				s.inputMsgCh <- inputMsg{errText: domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
-					"unexpected tag while content is staged: %s", tag).Error()}
+				s.inputMsgCh <- inputMsg{err: domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
+					"unexpected tag while content is staged: %s", tag)}
 			} else {
-				s.inputMsgCh <- inputMsg{errText: domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
-					"invalid input tag: %s", tag).Error()}
+				s.inputMsgCh <- inputMsg{err: domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
+					"invalid input tag: %s", tag)}
 			}
 		}
 	}
@@ -294,8 +294,8 @@ func (s *Session) handleInputUserText(value string, staged *[]llm.ContentPart) {
 		// Command with staged content is rejected.
 		if len(*staged) > 0 {
 			*staged = nil
-			s.inputMsgCh <- inputMsg{errText: domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
-				"command can not be sent with staged content").Error()}
+			s.inputMsgCh <- inputMsg{err: domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
+				"command can not be sent with staged content")}
 			return
 		}
 		// Command without staged content — send as-is.
@@ -410,8 +410,8 @@ func (s *Session) startTaskOrCmd(text, name string) {
 
 // handleInputMsg processes a parsed input message. Called from run() goroutine.
 func (s *Session) handleInputMsg(msg inputMsg) {
-	if msg.errText != "" {
-		s.writeError(msg.errText)
+	if msg.err != nil {
+		s.writeError(msg.err.Error())
 		return
 	}
 

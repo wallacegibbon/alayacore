@@ -5,23 +5,24 @@ package agent
 
 import (
 	"context"
-	"fmt"
-	"path/filepath"
 	"strconv"
-	"strings"
-	"time"
 
 	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/stream"
 )
 
+// sendTaskResult sends the final contents back to the run() goroutine
+// via taskResultCh when the task goroutine exits. Must be deferred at
+// the start of each task runner (runTask, runContinue, runSummarize).
+func (s *Session) sendTaskResult(contents *[]llm.ContentPart) {
+	s.taskResultCh <- *contents
+}
+
 // runTask executes a prompt in its own goroutine.
 func (s *Session) runTask(ctx context.Context, taskContent []llm.ContentPart, parts []llm.ContentPart) {
 	contents := taskContent
 
-	defer func() {
-		s.taskResultCh <- contents
-	}()
+	defer s.sendTaskResult(&contents)
 
 	s.requestSystemInfo()
 
@@ -38,9 +39,7 @@ func (s *Session) runTask(ctx context.Context, taskContent []llm.ContentPart, pa
 func (s *Session) runContinue(ctx context.Context, taskContent []llm.ContentPart) {
 	contents := taskContent
 
-	defer func() {
-		s.taskResultCh <- contents
-	}()
+	defer s.sendTaskResult(&contents)
 
 	if len(contents) == 0 {
 		s.writeError("No messages to resend")
@@ -75,35 +74,11 @@ func (s *Session) runContinue(ctx context.Context, taskContent []llm.ContentPart
 func (s *Session) runSummarize(ctx context.Context, taskContent []llm.ContentPart) {
 	contents := taskContent
 
-	defer func() {
-		s.taskResultCh <- contents
-	}()
+	defer s.sendTaskResult(&contents)
 
-	// Save a backup before summarization.
-	if s.SessionFile != "" {
-		ext := filepath.Ext(s.SessionFile)
-		base := strings.TrimSuffix(s.SessionFile, ext)
-		backupPath := fmt.Sprintf("%s-%s%s", base, time.Now().Format("20060102150405"), ext)
-		if err := s.saveContentToFile(backupPath, contents); err != nil {
-			s.writeNotifyf("Failed to create pre-summarize backup: %v", err)
-		} else {
-			s.writeNotifyf("Pre-summarize backup saved to %s", backupPath)
-		}
-	}
+	s.summarizeBackup(contents)
 
-	prompt := `Summarize the conversation for continuation. The resuming instance has no prior context.
-
-Provide:
-1. **Task** — Original request and success criteria
-2. **Done** — Completed items with specifics (file paths, function names, values)
-3. **State** — Files created/modified/deleted, key decisions and rationale
-4. **Blocked** — Unresolved errors, failing tests, open questions
-5. **Next** — Ordered actions to resume
-
-Rules:
-- Prefer exact identifiers, file paths, and code snippets over prose descriptions
-- Include error messages verbatim
-- Skip completed exploration; only preserve findings that affect next steps`
+	prompt := SummarizePrompt
 
 	s.writeNotify("Summarizing conversation...")
 

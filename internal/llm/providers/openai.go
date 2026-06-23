@@ -684,9 +684,12 @@ func openaiConvertRegularContent(apiMsg *openAIMessage, contents []llm.ContentPa
 		case *llm.VideoPart:
 			contentParts = append(contentParts, openAIVideoPart(v.URI, videoFPS, videoRes))
 		case *llm.DocumentPart:
-			// Document (PDF) is not supported by OpenAI Chat Completions API.
-			// The protocol supports DocumentPart, but this provider cannot handle it.
-			continue
+			// Document (PDF) is not natively supported by OpenAI Chat Completions API.
+			// Include a text placeholder so the model knows a document was attached.
+			contentParts = append(contentParts, map[string]any{
+				"type": "text",
+				"text": fmt.Sprintf("[Document attached: %s (PDF not supported by this API, only filename available)]", v.URI),
+			})
 		}
 	}
 	if len(contentParts) == 0 {

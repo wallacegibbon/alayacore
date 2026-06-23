@@ -17,8 +17,11 @@ import (
 
 // sessionState caches the session's status, model, and queue item state
 // for race-free access between the session and Bubble Tea goroutines.
+//
+// mu is a pointer to prevent copying when sessionState is embedded in
+// outputWriter by value.
 type sessionState struct {
-	mu sync.Mutex
+	mu *sync.Mutex
 
 	// Status fields
 	contextTokens   int64

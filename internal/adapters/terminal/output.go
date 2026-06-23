@@ -63,6 +63,7 @@ type outputWriter struct {
 func NewTerminalOutput(styles *Styles) *outputWriter { //nolint:revive // tests need access to internal methods
 	to := &outputWriter{
 		windowBuffer: NewWindowBuffer(DefaultWidth, styles),
+		status:       sessionState{mu: &sync.Mutex{}},
 	}
 	to.styles.Store(styles)
 	return to
@@ -152,14 +153,14 @@ func (to *outputWriter) writeColored(tag string, value string) {
 			id = to.generateWindowID()
 			content = value
 		}
-		to.bufferUserContent(id, content)
+		to.bufferUserContent(id, content, false) // text, not media
 
 	case stream.TagUserI, stream.TagUserV, stream.TagUserA, stream.TagUserD:
 		id, _, ok := stream.UnwrapDelta(value)
 		if !ok {
 			id = to.generateWindowID()
 		}
-		to.bufferUserContent(id, mediaLabel(tag))
+		to.bufferUserContent(id, mediaLabel(tag), true) // media, not text
 
 	// Message boundary — flush pending user content as one window.
 	case stream.TagMessageBoundary:
@@ -437,21 +438,18 @@ func mediaLabel(tag string) string {
 
 // bufferUserContent accumulates a user content part. When flushed,
 // all accumulated parts appear as a single window with text first.
-func (to *outputWriter) bufferUserContent(id, content string) {
-	// Detect text vs media by content prefix.
-	isText := !strings.HasPrefix(content, "📎") && !strings.HasPrefix(content, "🎬") &&
-		!strings.HasPrefix(content, "🎵") && !strings.HasPrefix(content, "📄")
-
-	if isText {
-		if to.pendingUserText.Len() > 0 {
-			to.pendingUserText.WriteString("\n")
-		}
-		to.pendingUserText.WriteString(content)
-	} else {
+// isMedia distinguishes media labels from text content.
+func (to *outputWriter) bufferUserContent(id, content string, isMedia bool) {
+	if isMedia {
 		if to.pendingUserMedia.Len() > 0 {
 			to.pendingUserMedia.WriteString("\n")
 		}
 		to.pendingUserMedia.WriteString(content)
+	} else {
+		if to.pendingUserText.Len() > 0 {
+			to.pendingUserText.WriteString("\n")
+		}
+		to.pendingUserText.WriteString(content)
 	}
 
 	// Track the max history ID from the TLV delta.
