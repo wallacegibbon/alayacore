@@ -32,6 +32,8 @@ type StatusSnapshot struct {
 	ReasoningLevel  int
 	ActiveTheme     string
 	ActiveThemeData *theme.Theme
+	VideoFPS        int
+	VideoRes        int
 }
 
 // ModelSnapshot holds a consistent point-in-time view of model state.

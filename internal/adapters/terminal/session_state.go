@@ -31,6 +31,10 @@ type sessionState struct {
 	lastTaskError   bool
 	reasoningLevel  int
 
+	// Video config
+	videoFPS int
+	videoRes int
+
 	// Model fields
 	models          []agentpkg.ModelInfo
 	activeModelID   int
@@ -142,6 +146,14 @@ func (s *sessionState) updateReasoning(level int) {
 	s.mu.Unlock()
 }
 
+// updateVideoConfig atomically updates the video FPS and resolution.
+func (s *sessionState) updateVideoConfig(fps, res int) {
+	s.mu.Lock()
+	s.videoFPS = fps
+	s.videoRes = res
+	s.mu.Unlock()
+}
+
 // setToolConfirmPending appends a pending tool confirmation request.
 func (s *sessionState) setToolConfirmPending(id, toolName, toolInput string) {
 	s.mu.Lock()
@@ -181,6 +193,8 @@ func (s *sessionState) snapshotStatus() StatusSnapshot {
 		ReasoningLevel:  s.reasoningLevel,
 		ActiveTheme:     s.activeTheme,
 		ActiveThemeData: s.activeThemeData,
+		VideoFPS:        s.videoFPS,
+		VideoRes:        s.videoRes,
 	}
 }
 

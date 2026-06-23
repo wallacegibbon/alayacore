@@ -367,9 +367,7 @@ func (m *Terminal) updateStatus() {
 
 	// Queue segment
 	if snap.QueueCount > 0 {
-		segments = append(segments,
-			keyStyle.Render("Q:")+valStyle.Render(fmt.Sprintf("%d", snap.QueueCount)),
-		)
+		segments = append(segments, keyStyle.Render("Q:")+valStyle.Render(fmt.Sprintf("%d", snap.QueueCount)))
 	}
 
 	// Context segment
@@ -381,29 +379,18 @@ func (m *Terminal) updateStatus() {
 		} else {
 			ctxVal = formatTokenCount(snap.ContextTokens)
 		}
-		segments = append(segments,
-			valStyle.Render(ctxVal),
-		)
+		segments = append(segments, valStyle.Render(ctxVal))
 	}
 
 	// Steps segment (rightmost — show only when there's step activity)
-	var showSteps bool
-	var stepsVal string
-	if snap.LastMaxSteps > 0 && snap.TaskError {
-		showSteps = true
-		stepsVal = fmt.Sprintf("%d/%d", snap.LastCurrentStep, snap.LastMaxSteps)
-	} else if snap.InProgress && snap.CurrentStep > 0 {
-		showSteps = true
-		if snap.MaxSteps > 0 {
-			stepsVal = fmt.Sprintf("%d/%d", snap.CurrentStep, snap.MaxSteps)
-		} else {
-			stepsVal = fmt.Sprintf("%d/INF", snap.CurrentStep)
-		}
+	if stepVal := statusStepsSegment(snap.LastMaxSteps, snap.TaskError, snap.LastCurrentStep,
+		snap.InProgress, snap.CurrentStep, snap.MaxSteps); stepVal != "" {
+		segments = append(segments, valStyle.Render(stepVal))
 	}
-	if showSteps {
-		segments = append(segments,
-			valStyle.Render(stepsVal),
-		)
+
+	// Video config segment (last)
+	if fps := snap.VideoFPS; fps > 0 {
+		segments = append(segments, valStyle.Render(fmt.Sprintf("V:%d,%d", fps, snap.VideoRes)))
 	}
 
 	// Join segments with dimmed separator
@@ -421,6 +408,20 @@ func (m *Terminal) updateStatus() {
 
 	m.syncThemeFromSession(snap.ActiveTheme, snap.ActiveThemeData)
 	m.activeTheme = snap.ActiveTheme
+}
+
+// statusStepsSegment returns the steps status string, or "" if no activity.
+func statusStepsSegment(lastMaxSteps int, taskError bool, lastCurrentStep int, inProgress bool, currentStep int, maxSteps int) string {
+	if lastMaxSteps > 0 && taskError {
+		return fmt.Sprintf("%d/%d", lastCurrentStep, lastMaxSteps)
+	}
+	if inProgress && currentStep > 0 {
+		if maxSteps > 0 {
+			return fmt.Sprintf("%d/%d", currentStep, maxSteps)
+		}
+		return fmt.Sprintf("%d/INF", currentStep)
+	}
+	return ""
 }
 
 // syncThemeFromSession checks if the session has reported a different active

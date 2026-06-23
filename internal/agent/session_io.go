@@ -261,8 +261,6 @@ func (s *Session) handleModelSet(args []string) {
 		s.writeError("Failed to switch model: " + err.Error())
 		return
 	}
-
-	s.writeNotifyf("Switched to model: %s (%s)", model.Name, model.ModelName)
 }
 
 func (s *Session) handleModelLoad() {
@@ -305,7 +303,6 @@ func (s *Session) handleModelLoad() {
 	}
 
 	s.sendModelListMsg()
-	s.writeNotify("Models reloaded from configuration file")
 }
 
 func (s *Session) handleTaskQueueGetAll() {
@@ -375,7 +372,6 @@ func (s *Session) handleVideoConfig(args []string) {
 		return
 	}
 	s.SetVideoConfig(fps, res)
-	s.writeNotifyf("Video config set: fps=%d, resolution=%d", fps, res)
 }
 
 // handleThemeSet sets the active theme, persists it to runtime config,
@@ -401,7 +397,6 @@ func (s *Session) handleThemeSet(args []string) {
 			s.writeNotifyf("Failed to persist theme switch: %v", err)
 		}
 	}
-	s.writeNotifyf("Theme set to: %s", name)
 	s.sendSystemInfo("theme")
 }
 

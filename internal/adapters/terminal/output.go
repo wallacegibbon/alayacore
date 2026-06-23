@@ -265,6 +265,8 @@ func (to *outputWriter) handleSystemMsg(value string) {
 		to.handleSystemThemeList(env.Data)
 	case "reasoning":
 		to.handleSystemReasoning(env.Data)
+	case "video_config":
+		to.handleSystemVideoConfig(env.Data)
 	case "tool_confirm":
 		to.handleSystemToolConfirm(env.Data)
 	}
@@ -367,6 +369,17 @@ func (to *outputWriter) handleSystemReasoning(data json.RawMessage) {
 		return
 	}
 	to.status.updateReasoning(m.Level)
+}
+
+func (to *outputWriter) handleSystemVideoConfig(data json.RawMessage) {
+	var m struct {
+		FPS int `json:"fps"`
+		Res int `json:"res"`
+	}
+	if json.Unmarshal(data, &m) != nil {
+		return
+	}
+	to.status.updateVideoConfig(m.FPS, m.Res)
 }
 
 // handleSystemToolConfirm processes a tool_confirm system message.
