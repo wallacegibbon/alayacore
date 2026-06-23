@@ -70,8 +70,10 @@ type Window struct {
 
 	renderer WindowRendering
 
-	// Render cache
-	cache struct {
+	// border caches the border-wrapped render output.
+	// This is separate from any internal cache inside the renderer
+	// (e.g. textRenderer.wrappedLines for streaming optimization).
+	border struct {
 		valid     bool
 		width     int
 		folded    bool
@@ -125,7 +127,7 @@ func (w *Window) AppendFromTLV(tag string, value string) {
 		return
 	}
 	w.renderer.AppendFromTLV(tag, value)
-	w.cache.valid = false
+	w.border.valid = false
 }
 
 // AppendContent adds content from a non-TLV source (e.g. directly from output.go).
@@ -135,7 +137,7 @@ func (w *Window) AppendContent(content string) {
 		return
 	}
 	w.renderer.AppendFromTLV(w.renderer.Tag(), content)
-	w.cache.valid = false
+	w.border.valid = false
 }
 
 // EnsureVisibleContent marks the window visible if it has non-whitespace content.
@@ -147,7 +149,7 @@ func (w *Window) EnsureVisibleContent(content string) {
 
 // Invalidate marks the cache as stale.
 func (w *Window) Invalidate() {
-	w.cache.valid = false
+	w.border.valid = false
 	if w.renderer != nil {
 		w.renderer.Invalidate()
 	}
@@ -160,7 +162,7 @@ func (w *Window) SetRendererForTool(name, input string) {
 		input: input,
 		status: ToolStatusPending,
 	}
-	w.cache.valid = false
+	w.border.valid = false
 }
 
 // HandleToolInput updates the tool call data on an existing tool window
@@ -189,7 +191,7 @@ func (w *Window) HandleToolInput(data stream.ToolInputData, historyID uint64) {
 	if historyID > w.HistoryID {
 		w.HistoryID = historyID
 	}
-	w.cache.valid = false
+	w.border.valid = false
 }
 
 // HandleToolOutput sets the output and status on a tool window.
@@ -205,7 +207,7 @@ func (w *Window) HandleToolOutput(output string, isError bool, historyID uint64)
 	if historyID > w.HistoryID {
 		w.HistoryID = historyID
 	}
-	w.cache.valid = false
+	w.border.valid = false
 }
 
 // SetHistoryID sets the history ID if the given value is larger.
@@ -255,11 +257,11 @@ func (w *Window) RawTag() string {
 // Render returns the window with border, using cache if valid.
 func (w *Window) Render(width int, isCursor bool, styles *Styles, borderStyle, cursorStyle lipgloss.Style) string {
 	// Validate cache
-	if w.cache.valid && w.cache.width == width && w.cache.folded == w.Folded {
+	if w.border.valid && w.border.width == width && w.border.folded == w.Folded {
 		if isCursor {
-			return cursorStyle.Width(width).Render(w.cache.inner)
+			return cursorStyle.Width(width).Render(w.border.inner)
 		}
-		return w.cache.rendered
+		return w.border.rendered
 	}
 
 	// Cache miss — rebuild from renderer
@@ -270,22 +272,22 @@ func (w *Window) Render(width int, isCursor bool, styles *Styles, borderStyle, c
 		inner = w.applyFolding(inner, width, styles)
 	}
 
-	w.cache.inner = inner
-	w.cache.rendered = borderStyle.Width(width).Render(inner)
-	w.cache.lineCount = lineCount
-	w.cache.width = width
-	w.cache.folded = w.Folded
-	w.cache.valid = true
+	w.border.inner = inner
+	w.border.rendered = borderStyle.Width(width).Render(inner)
+	w.border.lineCount = lineCount
+	w.border.width = width
+	w.border.folded = w.Folded
+	w.border.valid = true
 
 	if isCursor {
 		return cursorStyle.Width(width).Render(inner)
 	}
-	return w.cache.rendered
+	return w.border.rendered
 }
 
 // LineCount returns the cached line count (valid after Render).
 func (w *Window) LineCount() int {
-	return w.cache.lineCount
+	return w.border.lineCount
 }
 
 // UpdateLineCountFast attempts to compute the line count without a full render.
