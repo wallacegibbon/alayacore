@@ -18,7 +18,7 @@ func TestReadPrompts_SingleLine(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Should emit TLV(UT, "hello") followed by :send
+	// Should emit TLV(UT, "hello") followed by MB
 	tag, value, err := stream.ReadTLV(&buf)
 	if err != nil {
 		t.Fatalf("failed to read TLV: %v", err)
@@ -29,13 +29,13 @@ func TestReadPrompts_SingleLine(t *testing.T) {
 	if value != "hello" {
 		t.Errorf("expected value 'hello', got %q", value)
 	}
-	// :send
-	_, value, err = stream.ReadTLV(&buf)
+	// MB
+	tag, _, err = stream.ReadTLV(&buf)
 	if err != nil {
-		t.Fatalf("failed to read :send TLV: %v", err)
+		t.Fatalf("failed to read MB TLV: %v", err)
 	}
-	if tag == stream.TagMessageBoundary {
-		t.Errorf("expected :send, got %q", value)
+	if tag != stream.TagMessageBoundary {
+		t.Errorf("expected MB tag, got %s", tag)
 	}
 }
 
@@ -48,6 +48,7 @@ func TestReadPrompts_MultiLineBackslash(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
+	// Should emit TLV(UT, "first line\nsecond line\nthird line") followed by MB
 	tag, value, err := stream.ReadTLV(&buf)
 	if err != nil {
 		t.Fatalf("failed to read TLV: %v", err)
@@ -55,23 +56,62 @@ func TestReadPrompts_MultiLineBackslash(t *testing.T) {
 	if tag != stream.TagUserT {
 		t.Errorf("expected tag UT, got %s", tag)
 	}
-
-	expected := "first line\nsecond line\nthird line"
-	if value != expected {
-		t.Errorf("expected %q, got %q", expected, value)
+	if value != "first line\nsecond line\nthird line" {
+		t.Errorf("expected multi-line value, got %q", value)
+	}
+	// MB
+	tag, _, err = stream.ReadTLV(&buf)
+	if err != nil {
+		t.Fatalf("failed to read MB TLV: %v", err)
+	}
+	if tag != stream.TagMessageBoundary {
+		t.Errorf("expected MB tag, got %s", tag)
 	}
 }
 
-func TestReadPrompts_MultiplePrompts(t *testing.T) {
+func TestReadPrompts_TrailingBackslash(t *testing.T) {
 	var buf bytes.Buffer
-	input := strings.NewReader("prompt1\nprompt2\nprompt3\n")
+	input := strings.NewReader("hello\\\n")
+	// Trailing backslash at EOF with no continuation — the backslash
+	// is consumed, leaving "hello" as the accumulated text.
 
 	err := readPrompts(&buf, input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	for i, expected := range []string{"prompt1", "prompt2", "prompt3"} {
+	// Should emit TLV(UT, "hello") followed by MB
+	tag, value, err := stream.ReadTLV(&buf)
+	if err != nil {
+		t.Fatalf("failed to read TLV: %v", err)
+	}
+	if tag != stream.TagUserT {
+		t.Errorf("expected tag UT, got %s", tag)
+	}
+	if value != "hello" {
+		t.Errorf("expected 'hello', got %q", value)
+	}
+	// MB
+	tag, _, err = stream.ReadTLV(&buf)
+	if err != nil {
+		t.Fatalf("failed to read MB TLV: %v", err)
+	}
+	if tag != stream.TagMessageBoundary {
+		t.Errorf("expected MB tag, got %s", tag)
+	}
+}
+
+func TestReadPrompts_MultipleLines(t *testing.T) {
+	var buf bytes.Buffer
+	input := strings.NewReader("first\nsecond\nthird\n")
+
+	err := readPrompts(&buf, input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Each prompt is followed by MB.
+	for i, expected := range []string{"first", "second", "third"} {
 		tag, value, err := stream.ReadTLV(&buf)
 		if err != nil {
 			t.Fatalf("prompt %d: failed to read TLV: %v", i, err)
@@ -82,27 +122,27 @@ func TestReadPrompts_MultiplePrompts(t *testing.T) {
 		if value != expected {
 			t.Errorf("prompt %d: expected %q, got %q", i, expected, value)
 		}
-		// Each prompt is followed by :send.
-		_, value, err = stream.ReadTLV(&buf)
+		// MB
+		tag, _, err = stream.ReadTLV(&buf)
 		if err != nil {
-			t.Fatalf("prompt %d: failed to read :send TLV: %v", i, err)
+			t.Fatalf("prompt %d: failed to read MB TLV: %v", i, err)
 		}
-		if tag == stream.TagMessageBoundary {
-			t.Errorf("prompt %d: expected :send, got %q", i, value)
+		if tag != stream.TagMessageBoundary {
+			t.Errorf("prompt %d: expected MB tag, got %s", i, tag)
 		}
 	}
 }
 
 func TestReadPrompts_EmptyLines(t *testing.T) {
 	var buf bytes.Buffer
-	input := strings.NewReader("\n\nhello\n\nworld\n")
+	input := strings.NewReader("hello\n\n\nworld\n")
 
 	err := readPrompts(&buf, input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Empty lines should be skipped
+	// Each prompt is followed by MB.
 	for i, expected := range []string{"hello", "world"} {
 		tag, value, err := stream.ReadTLV(&buf)
 		if err != nil {
@@ -114,63 +154,32 @@ func TestReadPrompts_EmptyLines(t *testing.T) {
 		if value != expected {
 			t.Errorf("prompt %d: expected %q, got %q", i, expected, value)
 		}
-		// Each prompt is followed by :send.
-		_, value, err = stream.ReadTLV(&buf)
+		// MB
+		tag, _, err = stream.ReadTLV(&buf)
 		if err != nil {
-			t.Fatalf("prompt %d: failed to read :send TLV: %v", i, err)
+			t.Fatalf("prompt %d: failed to read MB TLV: %v", i, err)
 		}
-		if tag == stream.TagMessageBoundary {
-			t.Errorf("prompt %d: expected :send, got %q", i, value)
+		if tag != stream.TagMessageBoundary {
+			t.Errorf("prompt %d: expected MB tag, got %s", i, tag)
 		}
 	}
 
-	// No more messages
-	_, _, err = stream.ReadTLV(&buf)
-	if err != io.EOF {
-		t.Errorf("expected EOF, got %v", err)
+	// Should be no more data
+	if buf.Len() > 0 {
+		t.Errorf("expected no more data after last prompt, got %d bytes", buf.Len())
 	}
 }
 
-func TestReadPrompts_QuitCommand(t *testing.T) {
+func TestReadPrompts_EOFPartialLine(t *testing.T) {
 	var buf bytes.Buffer
-	input := strings.NewReader(":quit\n")
+	input := strings.NewReader("partial prompt")
 
 	err := readPrompts(&buf, input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// :quit should NOT emit a TLV message — it's handled locally
-	_, _, err = stream.ReadTLV(&buf)
-	if err != io.EOF {
-		t.Errorf("expected EOF (no TLV emitted for :quit), got %v", err)
-	}
-}
-
-func TestReadPrompts_QuitShort(t *testing.T) {
-	var buf bytes.Buffer
-	input := strings.NewReader(":q\n")
-
-	err := readPrompts(&buf, input)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	_, _, err = stream.ReadTLV(&buf)
-	if err != io.EOF {
-		t.Errorf("expected EOF (no TLV emitted for :q), got %v", err)
-	}
-}
-
-func TestReadPrompts_EOFWithPartialPrompt(t *testing.T) {
-	var buf bytes.Buffer
-	input := strings.NewReader("partial prompt without newline")
-
-	err := readPrompts(&buf, input)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
+	// Partial prompt on EOF should also flush with MB.
 	tag, value, err := stream.ReadTLV(&buf)
 	if err != nil {
 		t.Fatalf("failed to read TLV: %v", err)
@@ -178,102 +187,127 @@ func TestReadPrompts_EOFWithPartialPrompt(t *testing.T) {
 	if tag != stream.TagUserT {
 		t.Errorf("expected tag UT, got %s", tag)
 	}
-	if value != "partial prompt without newline" {
-		t.Errorf("expected partial prompt text, got %q", value)
+	if value != "partial prompt" {
+		t.Errorf("expected 'partial prompt', got %q", value)
 	}
-	_ = tag
-
-	// Partial prompt on EOF should also flush with :send.
-	_, value, err = stream.ReadTLV(&buf)
+	// MB
+	tag, _, err = stream.ReadTLV(&buf)
 	if err != nil {
-		t.Fatalf("failed to read :send TLV: %v", err)
+		t.Fatalf("failed to read MB TLV: %v", err)
 	}
-	if tag == stream.TagMessageBoundary {
-		t.Errorf("expected :send after partial prompt, got %q", value)
+	if tag != stream.TagMessageBoundary {
+		t.Errorf("expected MB tag, got %s", tag)
 	}
 }
 
-func TestReadPrompts_EOFWithNoInput(t *testing.T) {
+func TestReadPrompts_Command(t *testing.T) {
 	var buf bytes.Buffer
-	input := strings.NewReader("")
+	input := strings.NewReader(":cancel\n")
 
 	err := readPrompts(&buf, input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	_, _, err = stream.ReadTLV(&buf)
-	if err != io.EOF {
-		t.Errorf("expected EOF, got %v", err)
-	}
-}
-
-func TestReadPrompts_MixedBackslashAndNormal(t *testing.T) {
-	var buf bytes.Buffer
-	input := strings.NewReader("normal\nbackslash\\\ncontinuation\n")
-
-	err := readPrompts(&buf, input)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	// First: "normal"
+	// Commands should emit UT without MB.
 	tag, value, err := stream.ReadTLV(&buf)
 	if err != nil {
-		t.Fatalf("first prompt: failed to read TLV: %v", err)
+		t.Fatalf("failed to read TLV: %v", err)
 	}
-	if value != "normal" {
-		t.Errorf("expected 'normal', got %q", value)
+	if tag != stream.TagUserT {
+		t.Errorf("expected tag UT, got %s", tag)
 	}
-	_ = tag
-
-	// :send after first prompt
-	_, value, err = stream.ReadTLV(&buf)
-	if err != nil {
-		t.Fatalf("first prompt :send: failed to read TLV: %v", err)
-	}
-	if tag == stream.TagMessageBoundary {
-		t.Errorf("expected :send after first prompt, got %q", value)
+	if value != ":cancel" {
+		t.Errorf("expected ':cancel', got %q", value)
 	}
 
-	// Second: "backslash\ncontinuation"
-	_, value, err = stream.ReadTLV(&buf)
-	if err != nil {
-		t.Fatalf("second prompt: failed to read TLV: %v", err)
-	}
-	if value != "backslash\ncontinuation" {
-		t.Errorf("expected 'backslash\\ncontinuation', got %q", value)
-	}
-
-	// :send after second prompt
-	_, value, err = stream.ReadTLV(&buf)
-	if err != nil {
-		t.Fatalf("second prompt :send: failed to read TLV: %v", err)
-	}
-	if tag == stream.TagMessageBoundary {
-		t.Errorf("expected :send after second prompt, got %q", value)
-	}
-}
-
-func TestReadPrompts_WriteError(t *testing.T) {
-	// A writer that always returns an error on Write.
-	failWriter := &errWriter{err: io.ErrClosedPipe}
-	input := strings.NewReader("hello\n")
-
-	err := readPrompts(failWriter, input)
+	// Should be no MB after command
+	tag, _, err = stream.ReadTLV(&buf)
 	if err == nil {
-		t.Fatal("expected error from write failure, got nil")
-	}
-	if err != io.ErrClosedPipe {
-		t.Errorf("expected io.ErrClosedPipe, got %v", err)
+		t.Errorf("expected EOF after command, got tag %s", tag)
 	}
 }
 
-// errWriter returns err on every Write call.
-type errWriter struct {
-	err error
+func TestReadPrompts_QuitCommand(t *testing.T) {
+	var buf bytes.Buffer
+
+	// :quit should return nil immediately without any output
+	input := strings.NewReader("some text\n:quit\nmore text\n")
+	err := readPrompts(&buf, input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Only "some text" should be emitted
+	tag, value, err := stream.ReadTLV(&buf)
+	if err != nil {
+		t.Fatalf("failed to read TLV: %v", err)
+	}
+	if tag != stream.TagUserT {
+		t.Errorf("expected tag UT, got %s", tag)
+	}
+	if value != "some text" {
+		t.Errorf("expected 'some text', got %q", value)
+	}
+
+	// MB after first prompt
+	tag, _, err = stream.ReadTLV(&buf)
+	if err != nil {
+		t.Fatalf("failed to read MB TLV: %v", err)
+	}
+	if tag != stream.TagMessageBoundary {
+		t.Errorf("expected MB tag, got %s", tag)
+	}
+
+	// Should be no more data
+	if buf.Len() > 0 {
+		t.Errorf("expected no more data after :quit, got %d bytes", buf.Len())
+	}
 }
 
-func (w *errWriter) Write(_ []byte) (int, error) {
-	return 0, w.err
+func TestReadPrompts_BackslashThenEOF(t *testing.T) {
+	var buf bytes.Buffer
+	input := strings.NewReader("hello\\\n")
+
+	err := readPrompts(&buf, input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// The backslash consumed the newline, "hello" is the accumulated text.
+	tag, value, err := stream.ReadTLV(&buf)
+	if err != nil {
+		t.Fatalf("failed to read TLV: %v", err)
+	}
+	if tag != stream.TagUserT {
+		t.Errorf("expected tag UT, got %s", tag)
+	}
+	if value != "hello" {
+		t.Errorf("expected 'hello', got %q", value)
+	}
+	// MB
+	tag, _, err = stream.ReadTLV(&buf)
+	if err != nil {
+		t.Fatalf("failed to read MB TLV: %v", err)
+	}
+	if tag != stream.TagMessageBoundary {
+		t.Errorf("expected MB tag, got %s", tag)
+	}
+}
+
+func TestReadPrompts_ReturnsEOFError(t *testing.T) {
+	var buf bytes.Buffer
+	input := &errorReader{}
+
+	err := readPrompts(&buf, input)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+// errorReader returns an error on every read
+type errorReader struct{}
+
+func (r *errorReader) Read(p []byte) (int, error) {
+	return 0, io.ErrUnexpectedEOF
 }

@@ -4,7 +4,7 @@ package terminal
 // It uses Bubble Tea for the TUI framework and handles:
 //   - Display of assistant output with virtual scrolling
 //   - User input with external editor support
-//   - Model selection and task queue management
+//   - Model selection and theme switching
 //   - TLV protocol communication with the session
 
 import (

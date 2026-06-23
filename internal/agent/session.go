@@ -11,7 +11,7 @@ package agent
 //     1. inputPump — reads TLV frames from input, sends parsed messages
 //        to the main loop via s.inputMsgCh.  It has no knowledge of commands
 //        and never touches session state.
-//     2. run() — main loop that owns Contents, task queue, and system
+//     2. run() — main loop that owns Contents, active task, and system
 //        info. Processes input messages, dispatches commands, manages
 //        cancellation.
 //     3. task goroutine — spawned by run() to execute each task. It

@@ -342,9 +342,9 @@ func (s *Session) handleConfirmCommand(args []string) {
 
 	var allowed bool
 	switch args[1] {
-	case "yes", "y":
+	case "yes":
 		allowed = true
-	case "no", "n":
+	case "no":
 		allowed = false
 	default:
 		s.writeError("usage: :confirm <id> yes|no")
