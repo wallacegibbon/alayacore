@@ -40,17 +40,10 @@ func (m InputModel) Init() tea.Cmd {
 func (m InputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if msg, ok := msg.(tea.WindowSizeMsg); ok {
 		m.width = msg.Width
-		m.input.SetWidth(max(0, msg.Width-8))
+		m.input.SetWidth(max(0, msg.Width-InputPaddingH))
 	}
 
-	oldValue := m.input.Value()
-	m.input, _ = m.input.Update(msg)
-	newValue := m.input.Value()
-
-	// Clear editor content if user manually edits the input field
-	if m.editorContent != "" && oldValue != newValue {
-		m.editorContent = ""
-	}
+	m.updateFromMsg(msg)
 
 	return m, nil
 }
