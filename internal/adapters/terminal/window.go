@@ -270,9 +270,10 @@ func (w *Window) Render(width int, isCursor bool, styles *Styles, borderStyle, c
 	// Cache miss — rebuild from renderer
 	inner, lineCount := w.renderer.BuildInner(width, w.Folded, styles)
 
-	// Apply folding if needed
+	// Apply folding if needed, then recalculate line count from folded output.
 	if w.Folded {
 		inner = w.applyFolding(inner, width, styles)
+		lineCount = strings.Count(inner, "\n") + 1 + 2 // add 2 for border
 	}
 
 	w.border.inner = inner
@@ -300,8 +301,14 @@ func (w *Window) UpdateLineCountFast(width int) (int, bool) {
 	if w.renderer == nil {
 		return 0, false
 	}
-	// Delegate to renderer's fast path if supported
-	return w.renderLineCountFromCache(width)
+	lc, ok := w.renderLineCountFromCache(width)
+	if ok && w.Folded && lc > 5+2 {
+		// Folded windows show at most 5 content lines + 2 border lines.
+		// The +2 accounts for the top and bottom border lines added by
+		// borderStyle.Width(width).Render(inner). See ensureLineHeights.
+		return 7, true
+	}
+	return lc, ok
 }
 
 // renderLineCountFromCache tries to get line count from the renderer's cache.
