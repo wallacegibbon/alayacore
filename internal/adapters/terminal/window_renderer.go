@@ -139,22 +139,43 @@ func (r *userRenderer) AppendFromTLV(tag string, value string) {
 func (r *userRenderer) Invalidate() {}
 
 // BuildInner renders the user message: optional "> " prefix + text + media section.
+// Multiple text parts are separated with "---" in System color.
 func (r *userRenderer) BuildInner(width int, folded bool, styles *Styles) (string, int) {
 	innerWidth := max(0, width-BorderInnerPadding)
-
-	text := strings.Join(r.textParts, "\n")
 	media := strings.Join(r.mediaParts, "\n")
 
 	var parts []string
 
-	// Text portion with "> " prompt prefix
-	trimmed := strings.TrimSpace(text)
-	if trimmed != "" {
-		styledText := styles.Prompt.Render("> ") + styles.UserInput.Render(trimmed)
-		if innerWidth > 0 {
-			styledText = wrapContent(styledText, innerWidth)
+	// Text portion: first part gets "> " prefix, subsequent parts separated by "---"
+	if len(r.textParts) > 0 {
+		var textBlock strings.Builder
+
+		first := strings.TrimSpace(r.textParts[0])
+		if first != "" {
+			textBlock.WriteString(styles.Prompt.Render("> "))
+			textBlock.WriteString(styles.UserInput.Render(first))
 		}
-		parts = append(parts, styledText)
+
+		for i := 1; i < len(r.textParts); i++ {
+			part := strings.TrimSpace(r.textParts[i])
+			if part == "" {
+				continue
+			}
+			if textBlock.Len() > 0 {
+				textBlock.WriteString("\n")
+			}
+			textBlock.WriteString(styles.System.Render("---"))
+			textBlock.WriteString("\n")
+			textBlock.WriteString(styles.UserInput.Render(part))
+		}
+
+		if textBlock.Len() > 0 {
+			styledText := textBlock.String()
+			if innerWidth > 0 {
+				styledText = wrapContent(styledText, innerWidth)
+			}
+			parts = append(parts, styledText)
+		}
 	}
 
 	// Media portion
