@@ -16,7 +16,7 @@ UI  → stdin   User image (data:image/...;base64,... or URL)
 UV  → stdin   User video (data:video/...;base64,... or URL)
 UA  → stdin   User audio (data:audio/...;base64,... or URL)
 UD  → stdin   User document (data:application/...;base64,... or URL)
-MB  → stdin   Message boundary — flushes staged content as a single message
+UE  → stdin   User message end — flushes staged content as a single message
 AT  ← stdout  Assistant text (delta: \x00<id>\x00<content>)
 AR  ← stdout  Assistant reasoning (delta: \x00<id>\x00<content>)
 AF  ← stdout  Function/tool lifecycle (JSON)
@@ -65,7 +65,7 @@ A tool call (AF) without a matching UF is still in progress. Each `.bin` sample 
 
 ```
 Adapter writes → stdin:        UT "Read the file main.go"
-                               MB
+                               UE
 Session writes → stdout:       AF {"id":"t1","name":"read_file"}
                                AF {"id":"t1","input":{"path":"main.go"}}
                                UF {"id":"t1","output":[{"text":"package main...","type":"text"}]}
@@ -79,10 +79,10 @@ Session writes → stdout:       AF {"id":"t1","name":"read_file"}
 Adapter writes → stdin:        UI data:image/jpeg;base64,...
                                UI data:image/png;base64,...
                                UT "What's in these images?"
-                               MB
+                               UE
 ```
 
-All content (UI, UT, etc.) is staged until MB flushes it as a single message.
+All content (UI, UT, etc.) is staged until UE flushes it as a single message.
 
 ## Example: Media Prompt Flow
 
@@ -92,11 +92,11 @@ Adapter writes → stdin:        UI data:image/jpeg;base64,...
                                UV data:video/mp4;base64,...
                                UD data:application/pdf;base64,...
                                UT "Analyze these files"
-                               MB
+                               UE
 ```
 
 Media frames (UI, UA, UV, UD) and text (UT) are combined in any order.
-MB flushes them all as one user message.
+UE flushes them all as one user message.
 
 ## Example: Media URL Prompt Flow
 
@@ -104,7 +104,7 @@ MB flushes them all as one user message.
 Adapter writes → stdin:        UI https://example.com/image.jpg
                                UA https://example.com/audio.wav
                                UT "Analyze these files from URLs"
-                               MB
+                               UE
 ```
 
 Plain URLs are accepted alongside data URIs for all media types.
@@ -113,10 +113,10 @@ Plain URLs are accepted alongside data URIs for all media types.
 
 ```
 Adapter writes → stdin:        UA https://example.com/audio.wav
-                               MB
+                               UE
 ```
 
-Media without text is valid. MB flushes the staged audio as a complete message.
+Media without text is valid. UE flushes the staged audio as a complete message.
 
 ## Samples by Tool
 
