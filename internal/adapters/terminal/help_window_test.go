@@ -174,8 +174,8 @@ func TestHelpWindowViewWhenOpen(t *testing.T) {
 	}
 
 	// Should contain command entries
-	if !containsStr(view.Content, ":continue [skip]") {
-		t.Error("View should contain ':continue [skip]' command")
+	if !containsStr(view.Content, ":continue") {
+		t.Error("View should contain ':continue' command")
 	}
 
 	// RenderOverlay should contain navigation help text
@@ -286,13 +286,13 @@ func TestHelpWindowEnterOnCommandStripsArgs(t *testing.T) {
 	// Set up items with argument syntax in the key
 	hw.items = []HelpItem{
 		{ID: 1, IsSection: true, Description: "Commands"},
-		{ID: 2, Key: ":continue [skip]", Description: "Resume after error", Type: HelpItemCommand},
+		{ID: 2, Key: ":continue", Description: "Retry last prompt", Type: HelpItemCommand},
 		{ID: 3, Key: ":theme_set <name>", Description: "Switch theme by name", Type: HelpItemCommand},
 		{ID: 4, Key: ":confirm <id> <yes|no>", Description: "Confirm or deny pending tool", Type: HelpItemCommand},
 	}
 	hw.Open()
 
-	// Press Enter on :continue [skip] — should produce ":continue"
+	// Press Enter on :continue — should produce ":continue"
 	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	pending := hw.ConsumePendingCommand()
 	if pending != ":continue" {

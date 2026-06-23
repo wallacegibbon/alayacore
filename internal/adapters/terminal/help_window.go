@@ -75,7 +75,7 @@ func buildHelpItems() []HelpItem {
 		// Commands
 		{ID: nextID(), IsSection: true, Description: "Commands"},
 		{ID: nextID(), Key: ":confirm <id> <yes|no>", Description: "Confirm or deny pending tool", Type: HelpItemCommand},
-		{ID: nextID(), Key: ":continue [skip]", Description: "Retry / skip failed prompt", Type: HelpItemCommand},
+		{ID: nextID(), Key: ":continue", Description: "Retry last prompt", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":reason <0|1|2>", Description: "Set reasoning level", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":cancel", Description: "Cancel current task", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":summarize", Description: "Summarize & compress history", Type: HelpItemCommand},
