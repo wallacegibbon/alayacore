@@ -3,7 +3,31 @@ package llm
 import (
 	"context"
 	"encoding/json"
+	"strings"
 )
+
+// ParseDataURI parses a data URI into media type and base64 data.
+// Input: "data:image/jpeg;base64,/9j/4AAQ..."
+// Output: "image/jpeg", "/9j/4AAQ...", true
+// Returns ok=false for non-data URIs (e.g. plain URLs).
+func ParseDataURI(uri string) (mediaType, data string, ok bool) {
+	const prefix = "data:"
+	if !strings.HasPrefix(uri, prefix) {
+		return "", "", false
+	}
+	rest := uri[len(prefix):]
+	semi := strings.IndexByte(rest, ';')
+	if semi == -1 {
+		return "", "", false
+	}
+	mediaType = rest[:semi]
+	rest = rest[semi+1:]
+	const b64Prefix = "base64,"
+	if !strings.HasPrefix(rest, b64Prefix) {
+		return "", "", false
+	}
+	return mediaType, rest[len(b64Prefix):], true
+}
 
 // NewUserContent creates user content parts
 func NewUserContent(text string) []ContentPart {
