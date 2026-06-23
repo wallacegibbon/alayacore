@@ -107,7 +107,7 @@ func (to *outputWriter) WriteError(format string, args ...any) {
 func (to *outputWriter) WriteNotify(msg string) {
 	id := to.generateWindowID()
 	to.windowBuffer.AppendOrUpdate(TagWindowSN, id, msg)
-	to.triggerUpdateForTag(TagWindowSN)
+	to.dirty.Store(true)
 }
 
 // processBuffer parses TLV-encoded data from the buffer
