@@ -2,7 +2,11 @@ package plainio
 
 // Package plainio provides a plain stdin/stdout adapter for AlayaCore.
 // It reads prompts from stdin (one per line) and prints messages to stdout.
-// No terminal features are used - just plain IO.
+// No terminal features are used — just plain IO.
+//
+// There is no task queue: only one prompt is processed per invocation.
+// If stdin contains multiple prompts, only the first is executed;
+// subsequent prompts are rejected while a task is running.
 
 import (
 	"fmt"

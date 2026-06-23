@@ -7,8 +7,11 @@
 // Activate with the --plainio flag.
 //
 // Input rules:
-//   - Each line is treated as a separate prompt.
+//   - Each line is read as a prompt.
 //   - A trailing backslash (\) before newline continues the prompt on the next line.
+//   - There is no task queue — only one prompt is processed per invocation.
+//     If stdin contains multiple prompts, only the first is executed; the
+//     rest are rejected while the first is running.
 //   - Ctrl-D (EOF) closes input; the program exits after the current task finishes (code 0).
 //   - Ctrl-C (SIGINT): terminates immediately with default signal handling
 //     (exit code 130).
