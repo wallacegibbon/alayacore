@@ -33,7 +33,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -41,6 +40,15 @@ import (
 	"github.com/alayacore/alayacore/internal/stream"
 	"github.com/alayacore/alayacore/internal/theme"
 )
+
+// userContentPart is a single piece of user content (text or media label)
+// awaiting assembly into a display window. Parts arrive in order via TLV
+// frames (UT, UI/UV/UA/UD) and are flushed into one window on MB or
+// before the next non-user tag.
+type userContentPart struct {
+	content string
+	isMedia bool
+}
 
 // outputWriter parses TLV from the session and writes styled content to the WindowBuffer.
 // It implements io.Writer for the agent/session output stream.
@@ -53,11 +61,11 @@ type outputWriter struct {
 	nextWindowID atomic.Int64
 	status       sessionState // cached session state (status, models, queue)
 
-	// Pending user content — accumulated until MB or next non-user tag.
-	pendingUserText  strings.Builder // text parts
-	pendingUserMedia strings.Builder // media labels
-	pendingUserID    string          // window ID for the pending user message
-	pendingUserMaxID uint64          // max HistoryID among accumulated parts
+	// Pending user content — ordered list of parts accumulated until MB
+	// or next non-user tag triggers flushUserContent.
+	pendingUserParts []userContentPart
+	pendingUserID    string // history ID of the first part (used as window ID)
+	pendingUserMaxID uint64 // max history ID across all parts (used for history ordering)
 }
 
 func NewTerminalOutput(styles *Styles) *outputWriter { //nolint:revive // tests need access to internal methods
@@ -127,7 +135,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 	to.triggerUpdateForTag(tag)
 
 	// Flush pending user content before any non-user tag.
-	if to.pendingUserText.Len()+to.pendingUserMedia.Len() > 0 && !userTag(tag) {
+	if len(to.pendingUserParts) > 0 && !userTag(tag) {
 		to.flushUserContent()
 	}
 
@@ -164,7 +172,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 
 	// Message boundary — flush pending user content as one window.
 	case stream.TagMessageBoundary:
-		if to.pendingUserText.Len()+to.pendingUserMedia.Len() > 0 {
+		if len(to.pendingUserParts) > 0 {
 			to.flushUserContent()
 		}
 
@@ -440,22 +448,16 @@ func mediaLabel(tag string) string {
 // all accumulated parts appear as a single window with text first.
 // isMedia distinguishes media labels from text content.
 func (to *outputWriter) bufferUserContent(id, content string, isMedia bool) {
-	if isMedia {
-		if to.pendingUserMedia.Len() > 0 {
-			to.pendingUserMedia.WriteString("\n")
-		}
-		to.pendingUserMedia.WriteString(content)
-	} else {
-		if to.pendingUserText.Len() > 0 {
-			to.pendingUserText.WriteString("\n")
-		}
-		to.pendingUserText.WriteString(content)
-	}
+	to.pendingUserParts = append(to.pendingUserParts, userContentPart{
+		content: content,
+		isMedia: isMedia,
+	})
 
 	// Track the max history ID from the TLV delta.
 	if hid, err := strconv.ParseUint(id, 10, 64); err == nil && hid > to.pendingUserMaxID {
 		to.pendingUserMaxID = hid
 	}
+	// First part's history ID becomes the window ID.
 	if to.pendingUserID == "" {
 		to.pendingUserID = id
 	}
@@ -463,33 +465,37 @@ func (to *outputWriter) bufferUserContent(id, content string, isMedia bool) {
 
 // flushUserContent creates a single window from all accumulated user content.
 func (to *outputWriter) flushUserContent() {
-	if to.pendingUserText.Len() == 0 && to.pendingUserMedia.Len() == 0 {
+	if len(to.pendingUserParts) == 0 {
 		return
 	}
 
-	text := to.pendingUserText.String()
-	media := to.pendingUserMedia.String()
-
-	id := to.pendingUserID
-	if text == "" && media != "" {
-		// Media-only — store a visible placeholder in content and
-		// put the media labels in MediaContent so applyTagStyle
-		// does not render a spurious "> " prompt prefix.
-		idx := to.windowBuffer.AppendOrUpdate(stream.TagUserT, id, " ")
-		to.windowBuffer.SetMediaContent(idx, media)
-	} else {
-		idx := to.windowBuffer.AppendOrUpdate(stream.TagUserT, id, text)
-		if media != "" {
-			to.windowBuffer.SetMediaContent(idx, media)
+	// Separate text and media parts in insertion order.
+	var textParts, mediaParts []string
+	for _, p := range to.pendingUserParts {
+		if p.isMedia {
+			mediaParts = append(mediaParts, p.content)
+		} else {
+			textParts = append(textParts, p.content)
 		}
 	}
 
-	if idx, ok := to.windowBuffer.LookupID(id); ok {
-		to.windowBuffer.SetHistoryID(idx, to.pendingUserMaxID)
-	}
+	text := joinLines(textParts)
+	media := joinLines(mediaParts)
 
-	to.pendingUserText.Reset()
-	to.pendingUserMedia.Reset()
+	// For media-only messages, use a space as content so the window is
+	// visible — applyTagStyle skips the "> " prefix for whitespace-only
+	// content and renders only the MEDIA section.
+	displayText := text
+	if displayText == "" {
+		displayText = " "
+	}
+	idx := to.windowBuffer.AppendOrUpdate(stream.TagUserT, to.pendingUserID, displayText)
+	if media != "" {
+		to.windowBuffer.SetMediaContent(idx, media)
+	}
+	to.windowBuffer.SetHistoryID(idx, to.pendingUserMaxID)
+
+	to.pendingUserParts = nil
 	to.pendingUserID = ""
 	to.pendingUserMaxID = 0
 }
@@ -497,6 +503,25 @@ func (to *outputWriter) flushUserContent() {
 // SetWindowWidth updates the window buffer width.
 func (to *outputWriter) SetWindowWidth(width int) {
 	to.windowBuffer.SetWidth(width)
+}
+
+// joinLines joins non-empty strings with newlines, skipping empty entries.
+func joinLines(parts []string) string {
+	if len(parts) == 0 {
+		return ""
+	}
+	n := 0
+	for _, p := range parts {
+		n += len(p) + 1 // content + possible newline
+	}
+	buf := make([]byte, 0, n)
+	for i, p := range parts {
+		if i > 0 {
+			buf = append(buf, '\n')
+		}
+		buf = append(buf, p...)
+	}
+	return string(buf)
 }
 
 // extractToolOutputDisplayText extracts display text from a tool result content JSON array.
