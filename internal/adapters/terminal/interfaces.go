@@ -69,7 +69,8 @@ type OutputWriter interface {
 	GetPendingToolConfirm() (id, toolName, toolInput string, ok bool)
 
 	// Update signaling
-	DrainDirty() bool // returns true if display was dirty, clears the flag
+	DrainDirty() bool         // returns true if display was dirty, clears the flag
+	DirtyCh() <-chan struct{} // channel-based notification for immediate refresh
 	WindowBuffer() *WindowBuffer
 }
 
@@ -77,9 +78,16 @@ type OutputWriter interface {
 var _ OutputWriter = (*outputWriter)(nil)
 
 // DrainDirty returns true if the display was dirty and clears the flag.
-// This replaces the channel-based update signaling with a simple atomic bool.
+// Used by the tick handler for periodic polling.
 func (w *outputWriter) DrainDirty() bool {
 	return w.dirty.CompareAndSwap(true, false)
+}
+
+// DirtyCh returns a channel that fires when the display needs an
+// immediate refresh. The Bubble Tea goroutine listens on this channel
+// for push-based notifications (faster than waiting for the next tick).
+func (w *outputWriter) DirtyCh() <-chan struct{} {
+	return w.dirtyCh
 }
 
 // WindowBuffer returns the window buffer for direct access

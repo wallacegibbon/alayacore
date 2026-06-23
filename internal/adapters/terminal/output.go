@@ -56,6 +56,11 @@ type outputWriter struct {
 	nextWindowID atomic.Int64
 	status       sessionState // cached session state (status, models, queue)
 
+	// dirtyCh notifies the Bubble Tea goroutine when dirty is set,
+	// so it can render immediately instead of waiting for the next
+	// 250ms tick. Buffer 1 ensures non-blocking sends.
+	dirtyCh chan struct{}
+
 	// Active user window — set on first user frame (UT/UI/UV/UA/UD),
 	// cleared on MB or next non-user tag. Each new frame updates the
 	// window incrementally and marks dirty for immediate render.
@@ -69,6 +74,7 @@ func NewTerminalOutput(styles *Styles) *outputWriter { //nolint:revive // tests 
 		windowBuffer:        NewWindowBuffer(DefaultWidth, styles),
 		status:              sessionState{mu: &sync.Mutex{}},
 		activeUserWindowIdx: -1,
+		dirtyCh:             make(chan struct{}, 1),
 	}
 	to.styles.Store(styles)
 	return to
@@ -228,14 +234,25 @@ func (to *outputWriter) writeColored(tag string, value string) {
 	}
 }
 
+// setDirty marks the display as dirty and notifies the Bubble Tea
+// goroutine immediately via the dirty channel, instead of waiting
+// for the next 250ms tick.
+func (to *outputWriter) setDirty() {
+	to.dirty.Store(true)
+	select {
+	case to.dirtyCh <- struct{}{}:
+	default:
+	}
+}
+
 // triggerUpdateForTag marks the display as dirty for tags that modify the display.
 //
-// TagSystemMsg is NOT listed here because handleSystemMsg() calls dirty.Store(true)
+// TagSystemMsg is NOT listed here because handleSystemMsg() calls setDirty()
 // after processing, so it doesn't need the early dirty flag from this function.
 func (to *outputWriter) triggerUpdateForTag(tag string) {
 	switch tag {
 	case stream.TagAssistantT, stream.TagAssistantR, stream.TagAssistantF, stream.TagUserT, stream.TagUserF, stream.TagUserI, stream.TagUserV, stream.TagUserA, stream.TagUserD, stream.TagMessageBoundary:
-		to.dirty.Store(true)
+		to.setDirty()
 	}
 }
 
@@ -268,7 +285,7 @@ func (to *outputWriter) handleSystemMsg(value string) {
 	case "tool_confirm":
 		to.handleSystemToolConfirm(env.Data)
 	}
-	to.dirty.Store(true)
+	to.setDirty()
 }
 
 func (to *outputWriter) handleSystemError(data json.RawMessage) {
@@ -460,7 +477,7 @@ func (to *outputWriter) bufferUserContent(id, content string, tag string) {
 
 	// Feed the frame to the window's userRenderer via safe method
 	to.windowBuffer.AppendUserContent(to.activeUserWindowID, tag, content)
-	to.dirty.Store(true)
+	to.setDirty()
 }
 
 // flushUserContent finalizes the active user window (sets HistoryID)
