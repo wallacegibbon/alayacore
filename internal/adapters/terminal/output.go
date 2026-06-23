@@ -472,14 +472,15 @@ func (to *outputWriter) flushUserContent() {
 
 	id := to.pendingUserID
 	if text == "" && media != "" {
-		// Media-only — use media labels as window content.
-		to.windowBuffer.AppendOrUpdate(stream.TagUserT, id, media)
+		// Media-only — store a visible placeholder in content and
+		// put the media labels in MediaContent so applyTagStyle
+		// does not render a spurious "> " prompt prefix.
+		idx := to.windowBuffer.AppendOrUpdate(stream.TagUserT, id, " ")
+		to.windowBuffer.SetMediaContent(idx, media)
 	} else {
-		to.windowBuffer.AppendOrUpdate(stream.TagUserT, id, text)
+		idx := to.windowBuffer.AppendOrUpdate(stream.TagUserT, id, text)
 		if media != "" {
-			if idx, ok := to.windowBuffer.LookupID(id); ok {
-				to.windowBuffer.SetMediaContent(idx, media)
-			}
+			to.windowBuffer.SetMediaContent(idx, media)
 		}
 	}
 

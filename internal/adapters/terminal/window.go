@@ -390,12 +390,16 @@ func (w *Window) applyTagStyle(content string, styles *Styles) string {
 	case stream.TagUserD:
 		return styleMultiline(content, styles.Attachment)
 	case stream.TagUserT:
-		result := styles.Prompt.Render("> ")
-		if content != "" {
-			result += styles.UserInput.Render(content)
+		trimmed := strings.TrimSpace(content)
+		var result string
+		if trimmed != "" {
+			result = styles.Prompt.Render("> ") + styles.UserInput.Render(trimmed)
 		}
 		if w.MediaContent != "" {
-			result += "\n" + styles.System.Render("MEDIA:") + "\n" +
+			if result != "" {
+				result += "\n"
+			}
+			result += styles.System.Render("MEDIA:") + "\n" +
 				styleMultiline(w.MediaContent, styles.Attachment)
 		}
 		return result

@@ -102,7 +102,8 @@ func (wb *WindowBuffer) SetStyles(styles *Styles) {
 // AppendOrUpdate adds content to an existing window or creates a new one.
 // Used for text content (UT, AT, AR, SE, SN) and replayed UF sessions.
 // Tool windows use HandleToolInputEvent and HandleToolOutput instead.
-func (wb *WindowBuffer) AppendOrUpdate(tag string, id string, content string) {
+// Returns the index of the window in the buffer.
+func (wb *WindowBuffer) AppendOrUpdate(tag string, id string, content string) int {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 
@@ -116,7 +117,7 @@ func (wb *WindowBuffer) AppendOrUpdate(tag string, id string, content string) {
 			w.Visible = true
 		}
 		wb.markDirty(idx)
-		return
+		return idx
 	}
 
 	// Create new window
@@ -132,8 +133,10 @@ func (wb *WindowBuffer) AppendOrUpdate(tag string, id string, content string) {
 		styles:    wb.styles,
 	}
 	wb.windows = append(wb.windows, w)
-	wb.idIndex[id] = len(wb.windows) - 1
-	wb.markDirty(len(wb.windows) - 1)
+	idx := len(wb.windows) - 1
+	wb.idIndex[id] = idx
+	wb.markDirty(idx)
+	return idx
 }
 
 // HandleToolInputEvent processes a TagAssistantF (AF) frame.
