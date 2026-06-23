@@ -99,6 +99,7 @@ func (to *outputWriter) WriteError(format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	id := to.generateWindowID()
 	to.windowBuffer.AppendOrUpdate(TagWindowSE, id, msg)
+	to.dirty.Store(true)
 }
 
 // WriteNotify writes a notification message to the display.
