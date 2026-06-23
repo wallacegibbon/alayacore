@@ -101,7 +101,7 @@ See [providers.md](docs/providers.md) for provider-specific details.
 | [Getting Started](docs/getting-started.md) | Installation, CLI flags, and usage examples |
 | [Commands](docs/commands.md) | All session commands (`:save`, `:cancel`, `:fork`, etc.) |
 | [Configuration](docs/configuration.md) | Model config, runtime config, and themes |
-| [Terminal UI](docs/tui.md) | Keybindings, commands, windows, task queue |
+| [Terminal UI](docs/tui.md) | Keybindings, commands, windows, and navigation |
 | [Plain IO Mode](docs/plainio.md) | stdin/stdout for scripts and pipes |
 | [Raw IO Mode](docs/rawio.md) | Raw TLV frames on stdin/stdout for programmatic control |
 | [TLV Samples](tlv-samples/README.md) | Sample TLV messages for Raw IO protocol reference |

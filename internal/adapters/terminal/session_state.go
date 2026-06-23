@@ -1,6 +1,6 @@
 package terminal
 
-// Session state cache: status, models, and queue items written by the session
+// Session state cache: status and models written by the session
 // goroutine and read by the Bubble Tea goroutine for display updates.
 //
 // All access is protected by the embedded sync.Mutex. The two goroutines

@@ -3,7 +3,7 @@
 // The agent package implements the session layer that sits between the
 // adapters (terminal/plainio) and the AI model provider. It handles:
 //
-//   - Task queue management (prompts and commands)
+//   - Prompt execution and task management
 //   - Model interaction and streaming
 //   - Context management and auto-summarization (opt-in via --auto-summarize flag)
 //   - Command processing (:save, :model_set, :model_load, etc.)
@@ -21,7 +21,7 @@
 // Concurrency Model:
 //
 //	The session uses an actor model with three goroutines:
-//	  1. run() — owns all mutable session state (Contents, task queue,
+//	  1. run() — owns all mutable session state (Contents, active task,
 //	     token counts). Processes input messages and task events.
 //	     When the input stream reaches EOF while a task is in progress,
 //	     it drains remaining events until the task completes before
@@ -88,14 +88,13 @@
 //     Rejects models with invalid protocol_type, base_url, or model_name.
 //     Use GetLoadErrors() to retrieve validation messages.
 //   - RuntimeManager: Persists runtime settings (active model)
-//   - Task Queue: FIFO queue for pending prompts/commands
 //   - Command Registry: Declarative command registration
 //
 // Key Files:
 //
 //   - session.go: Session struct, lifecycle, and cross-goroutine channels
 //   - session_task.go: Prompt processing, agent loop, OnStepFinish ContentPart building
-//   - session_queue.go: Task queue, task runner, task commands
+//   - session_queue.go: Task runner (runTask, runContinue, runSummarize)
 //   - session_loop.go: Main event loop, task start/done
 //   - session_io.go: TLV input/output, summarize, continue commands
 //   - session_content.go: ContentPart helpers, tag mapping, ID lookup

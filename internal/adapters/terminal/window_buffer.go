@@ -307,15 +307,6 @@ func (wb *WindowBuffer) SetMediaContent(index int, media string) {
 	}
 }
 
-// SetContent replaces the content of the window at the given index.
-func (wb *WindowBuffer) SetContent(index int, content string) {
-	wb.mu.Lock()
-	defer wb.mu.Unlock()
-	if index >= 0 && index < len(wb.windows) {
-		wb.windows[index].Content = content
-	}
-}
-
 // AllWindows returns a copy of the windows slice for snapshotting.
 // The returned slice contains the same *Window pointers (no deep copy).
 // Each window's Content is built from parts before returning.

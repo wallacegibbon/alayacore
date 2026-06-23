@@ -21,7 +21,7 @@ func NewInputModel(styles *Styles) InputModel {
 	input.Placeholder = "Enter your prompt..."
 	input.Focus()
 	input.Prompt = "> "
-	input.SetWidth(76)
+	input.SetWidth(max(0, DefaultWidth-InputPaddingH))
 
 	return InputModel{
 		input:   input,

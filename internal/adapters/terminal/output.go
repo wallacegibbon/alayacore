@@ -224,8 +224,8 @@ func (to *outputWriter) writeColored(tag string, value string) {
 
 // triggerUpdateForTag marks the display as dirty for tags that modify the display.
 //
-// TagSystemMsg is NOT listed here because handleSystemMsg() calls
-// has been fully updated. Setting dirty early would create a race where the
+// TagSystemMsg is NOT listed here because handleSystemMsg() calls dirty.Store(true)
+// after processing, so it doesn't need the early dirty flag from this function.
 func (to *outputWriter) triggerUpdateForTag(tag string) {
 	switch tag {
 	case stream.TagAssistantT, stream.TagAssistantR, stream.TagAssistantF, stream.TagUserT, stream.TagUserF, stream.TagUserI, stream.TagUserV, stream.TagUserA, stream.TagUserD, stream.TagMessageBoundary:
