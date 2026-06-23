@@ -146,27 +146,22 @@ func (r *userRenderer) BuildInner(width int, folded bool, styles *Styles) (strin
 
 	var parts []string
 
-	// Text portion: first part gets "> " prefix, subsequent parts separated by "---"
+	// Text portion: each text part gets "> " prefix, separated by "---"
 	if len(r.textParts) > 0 {
 		var textBlock strings.Builder
 
-		first := strings.TrimSpace(r.textParts[0])
-		if first != "" {
-			textBlock.WriteString(styles.Prompt.Render("> "))
-			textBlock.WriteString(styles.UserInput.Render(first))
-		}
-
-		for i := 1; i < len(r.textParts); i++ {
-			part := strings.TrimSpace(r.textParts[i])
-			if part == "" {
+		for _, part := range r.textParts {
+			trimmed := strings.TrimSpace(part)
+			if trimmed == "" {
 				continue
 			}
 			if textBlock.Len() > 0 {
 				textBlock.WriteString("\n")
+				textBlock.WriteString(styles.System.Render("---"))
+				textBlock.WriteString("\n")
 			}
-			textBlock.WriteString(styles.System.Render("---"))
-			textBlock.WriteString("\n")
-			textBlock.WriteString(styles.UserInput.Render(part))
+			textBlock.WriteString(styles.Prompt.Render("> "))
+			textBlock.WriteString(styles.UserInput.Render(trimmed))
 		}
 
 		if textBlock.Len() > 0 {
