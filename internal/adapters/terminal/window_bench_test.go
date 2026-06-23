@@ -439,17 +439,11 @@ func BenchmarkSingleWindowStreamingDebug(b *testing.B) {
 		fmt.Printf("After append %d: wrappedLines=%d, content=%q, cache.valid=%v\n",
 			i+1, 0, w.RawContent(), false)
 
-		// Check what's in wrappedLines
-		if 0 > 0 {
-			fmt.Printf("  wrappedLines[0]=%q (len=%d)\n", "", len(""))
-		}
-
+		// wrappedLines debug removed during refactoring
 		_ = wb.GetTotalLines()
 		fmt.Printf("After ensureLineHeights %d: wrappedLines=%d, cache.valid=%v\n",
 			i+1, 0, false)
-		if 0 > 0 {
-			fmt.Printf("  wrappedLines[0]=%q (len=%d)\n", "", len(""))
-		}
+		// wrappedLines debug removed during refactoring
 	}
 
 	b.ResetTimer()

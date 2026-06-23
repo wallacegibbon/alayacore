@@ -19,24 +19,24 @@ import (
 // textRenderer handles simple text content with optional streaming deltas.
 // Used for AT, AR, SN, and SE tags.
 type textRenderer struct {
-	tag         string      // TLV tag that created this window
-	content     string      // full content (built from parts on demand)
-	contentLen  int         // cumulative length of all deltas
-	contentParts []string   // streaming deltas (avoids O(n²) string concat)
+	tag          string   // TLV tag that created this window
+	content      string   // full content (built from parts on demand)
+	contentLen   int      // cumulative length of all deltas
+	contentParts []string // streaming deltas (avoids O(n²) string concat)
 
 	// Cached wrapped lines for fast incremental update via appendDeltaToLines.
 	// Populated by BuildInner, updated incrementally by AppendFromTLV.
 	wrappedLines []string
-	cacheWidth   int       // inner width used for wrapping (0 = unknown)
-	cacheValid   bool      // true = BuildInner can skip full re-wrap
-	lastStyles   *Styles   // cached styles reference for incremental append
+	cacheWidth   int     // inner width used for wrapping (0 = unknown)
+	cacheValid   bool    // true = BuildInner can skip full re-wrap
+	lastStyles   *Styles // cached styles reference for incremental append
 }
 
 func (r *textRenderer) Tag() string { return r.tag }
 
 func (r *textRenderer) ToolInfo() *ToolInfo { return nil }
 
-func (r *textRenderer) AppendFromTLV(tag string, value string) {
+func (r *textRenderer) AppendFromTLV(_ string, value string) {
 	r.contentParts = append(r.contentParts, value)
 	r.contentLen += len(value)
 
@@ -73,7 +73,7 @@ func (r *textRenderer) rawContent() string {
 
 // BuildInner returns the styled inner content.
 // For textRenderer, this applies tag-based styling and wraps to width.
-func (r *textRenderer) BuildInner(width int, folded bool, styles *Styles) (string, int) {
+func (r *textRenderer) BuildInner(width int, _ bool, styles *Styles) (string, int) {
 	innerWidth := max(0, width-BorderInnerPadding)
 
 	// Fast path: use cached wrapped lines if width matches.
@@ -170,7 +170,7 @@ func (r *userRenderer) Invalidate() {}
 
 // BuildInner renders the user message: optional "> " prefix + text + media section.
 // Multiple text parts are separated with "---" in System color.
-func (r *userRenderer) BuildInner(width int, folded bool, styles *Styles) (string, int) {
+func (r *userRenderer) BuildInner(width int, _ bool, styles *Styles) (string, int) {
 	innerWidth := max(0, width-BorderInnerPadding)
 	media := strings.Join(r.mediaParts, "  ")
 
@@ -232,10 +232,10 @@ func (r *userRenderer) BuildInner(width int, folded bool, styles *Styles) (strin
 
 // toolRenderer handles tool call windows that show input and optional output.
 type toolRenderer struct {
-	isUF   bool       // true for UF-only windows (no prior AF frame)
-	name   string     // tool name (e.g. "read_file")
-	input  string     // formatted tool call input
-	output string     // tool execution output
+	isUF   bool   // true for UF-only windows (no prior AF frame)
+	name   string // tool name (e.g. "read_file")
+	input  string // formatted tool call input
+	output string // tool execution output
 	status ToolStatus
 }
 
@@ -255,7 +255,7 @@ func (r *toolRenderer) ToolInfo() *ToolInfo {
 	}
 }
 
-func (r *toolRenderer) AppendFromTLV(tag string, value string) {
+func (r *toolRenderer) AppendFromTLV(_ string, value string) {
 	// Tool data normally arrives via structured setters (HandleToolInput/HandleToolOutput).
 	// For replayed content or direct testing, dispatch by window type.
 	if r.isUF {
@@ -267,7 +267,7 @@ func (r *toolRenderer) AppendFromTLV(tag string, value string) {
 
 func (r *toolRenderer) Invalidate() {}
 
-func (r *toolRenderer) BuildInner(width int, folded bool, styles *Styles) (string, int) {
+func (r *toolRenderer) BuildInner(width int, _ bool, styles *Styles) (string, int) {
 	innerWidth := max(0, width-BorderInnerPadding)
 
 	// UF-only windows (no tool name, created from UF tag) render as plain text.
@@ -285,14 +285,8 @@ func (r *toolRenderer) BuildInner(width int, folded bool, styles *Styles) (strin
 	switch r.name {
 	case "edit_file":
 		renderFn = RenderDiffContent
-	case "write_file":
-		renderFn = func(input string, status ToolStatus, styles *Styles, w int) string {
-			return defaultToolRender(input, status, styles, w)
-		}
 	default:
-		renderFn = func(input string, status ToolStatus, styles *Styles, w int) string {
-			return defaultToolRender(input, status, styles, w)
-		}
+		renderFn = defaultToolRender
 	}
 
 	// Render input
@@ -346,7 +340,7 @@ func defaultToolRender(input string, status ToolStatus, styles *Styles, innerWid
 
 // styleByTag applies styling based on the window's TLV tag.
 // mediaContent is only relevant for TagUserT windows.
-func styleByTag(tag, content string, styles *Styles, mediaContent string) string {
+func styleByTag(tag, content string, styles *Styles, _ string) string {
 	if styles == nil {
 		return content
 	}

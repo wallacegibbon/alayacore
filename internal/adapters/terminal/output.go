@@ -450,7 +450,7 @@ func (to *outputWriter) bufferUserContent(id, content string, tag string) {
 		// First frame — create the window
 		to.activeUserWindowID = id
 		to.activeUserWindowIdx = to.windowBuffer.AppendOrUpdate(stream.TagUserT, id, "")
-		to.windowBuffer.windows[to.activeUserWindowIdx].Visible = true
+		to.windowBuffer.SetWindowVisible(id)
 	}
 
 	// Track max history ID
@@ -458,8 +458,8 @@ func (to *outputWriter) bufferUserContent(id, content string, tag string) {
 		to.pendingUserMaxID = hid
 	}
 
-	// Feed the frame to the window's userRenderer
-	to.windowBuffer.windows[to.activeUserWindowIdx].AppendFromTLV(tag, content)
+	// Feed the frame to the window's userRenderer via safe method
+	to.windowBuffer.AppendUserContent(to.activeUserWindowID, tag, content)
 	to.dirty.Store(true)
 }
 

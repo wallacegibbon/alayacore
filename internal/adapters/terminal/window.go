@@ -161,8 +161,8 @@ func (w *Window) Invalidate() {
 // SetRendererForTool switches the renderer to toolRenderer (for AF/UF frames).
 func (w *Window) SetRendererForTool(name, input string) {
 	w.renderer = &toolRenderer{
-		name:  name,
-		input: input,
+		name:   name,
+		input:  input,
 		status: ToolStatusPending,
 	}
 	w.border.valid = false

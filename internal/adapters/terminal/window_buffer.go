@@ -232,6 +232,28 @@ func (wb *WindowBuffer) Clear() {
 	wb.dirtyIndex = dirtyClean
 }
 
+// AppendUserContent appends a user content frame to the window identified by id.
+// The window must already exist (created by a prior AppendOrUpdate call).
+// This is safe for concurrent access (holds WindowBuffer.mu).
+func (wb *WindowBuffer) AppendUserContent(id, tag, value string) {
+	wb.mu.Lock()
+	defer wb.mu.Unlock()
+	if idx, ok := wb.idIndex[id]; ok {
+		wb.windows[idx].AppendFromTLV(tag, value)
+		wb.markDirty(idx)
+	}
+}
+
+// SetWindowVisible marks the window with the given ID as visible.
+// No-op if the window doesn't exist.
+func (wb *WindowBuffer) SetWindowVisible(id string) {
+	wb.mu.Lock()
+	defer wb.mu.Unlock()
+	if idx, ok := wb.idIndex[id]; ok {
+		wb.windows[idx].Visible = true
+	}
+}
+
 func (wb *WindowBuffer) WindowCount() int {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
@@ -272,9 +294,7 @@ func (wb *WindowBuffer) AllWindows() []*Window {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 	result := make([]*Window, len(wb.windows))
-	for i, w := range wb.windows {
-		result[i] = w
-	}
+	copy(result, wb.windows)
 	return result
 }
 
