@@ -53,7 +53,7 @@ type outputWriter struct {
 	status       sessionState // cached session state (status, models, queue)
 
 	// Active user window — set on first user frame (UT/UI/UV/UA/UD),
-	// cleared on UE or next non-user tag. Each new frame updates the
+	// cleared on next non-user tag. Each new frame updates the
 	// window incrementally and marks dirty for immediate render.
 	activeUserWindowIdx int    // index into windowBuffer.windows, -1 = none
 	activeUserWindowID  string // window ID (for LookupID fallback)
@@ -148,7 +148,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 		to.windowBuffer.AppendOrUpdate(tag, id, content)
 
 	// User text tag — may carry NUL-delimited historyID
-	// User content tags — buffer until UE or next non-user tag.
+	// User content tags — accumulated until next non-user tag triggers flush.
 	case stream.TagUserT:
 		id, content, ok := stream.UnwrapDelta(value)
 		if !ok {
@@ -163,12 +163,6 @@ func (to *outputWriter) writeColored(tag string, value string) {
 			id = to.generateWindowID()
 		}
 		to.bufferUserContent(id, mediaLabel(tag), tag)
-
-	// Message boundary — flush pending user content as one window.
-	case stream.TagUserEnd:
-		if to.activeUserWindowIdx >= 0 {
-			to.flushUserContent()
-		}
 
 	// Function lifecycle (JSON: id, type, name, input, status)
 	// May carry NUL-delimited historyID prefix
@@ -231,7 +225,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 // after processing, so it doesn't need the early dirty flag from this function.
 func (to *outputWriter) triggerUpdateForTag(tag string) {
 	switch tag {
-	case stream.TagAssistantT, stream.TagAssistantR, stream.TagAssistantF, stream.TagUserT, stream.TagUserF, stream.TagUserI, stream.TagUserV, stream.TagUserA, stream.TagUserD, stream.TagUserEnd:
+	case stream.TagAssistantT, stream.TagAssistantR, stream.TagAssistantF, stream.TagUserT, stream.TagUserF, stream.TagUserI, stream.TagUserV, stream.TagUserA, stream.TagUserD:
 		to.dirty.Store(true)
 	}
 }

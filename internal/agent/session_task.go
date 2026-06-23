@@ -54,9 +54,6 @@ func (s *Session) handleUserPrompt(ctx context.Context, contents []llm.ContentPa
 		}
 	}
 
-	// Signal end of user message so the adapter can group parts into one window.
-	s.writeTLV(stream.TagUserEnd, "")
-
 	fullContents, outputTokens, err := s.processPrompt(ctx, contents)
 	if err != nil {
 		s.writeError(err.Error())
@@ -101,7 +98,7 @@ func (s *Session) doAutoSummarize(ctx context.Context, contents []llm.ContentPar
 	s.summarizeBackup(contents)
 	s.writeNotify("Summarizing conversation...")
 
-	// Echo the summarization prompt to output and emit UE, same as
+	// Echo the summarization prompt to output, same as
 	// handleUserPrompt does for a normal prompt, but call processPrompt
 	// directly to avoid mutual recursion.
 	promptPart := &llm.TextPart{Text: summarizePrompt}
@@ -112,7 +109,6 @@ func (s *Session) doAutoSummarize(ctx context.Context, contents []llm.ContentPar
 	if tag, val, err := contentPartToTLV(promptPart); err == nil && tag != "" {
 		s.writeTLV(tag, stream.WrapDelta(strconv.FormatUint(id, 10), val))
 	}
-	s.writeTLV(stream.TagUserEnd, "")
 
 	beforeLen := len(contents)
 	fullContents, outputTokens, err := s.processPrompt(ctx, contents)
