@@ -24,10 +24,12 @@ type textRenderer struct {
 	contentLen  int         // cumulative length of all deltas
 	contentParts []string   // streaming deltas (avoids O(n²) string concat)
 
-	// Cached wrapped lines for fast incremental update
+	// Cached wrapped lines for fast incremental update via appendDeltaToLines.
+	// Populated by BuildInner, updated incrementally by AppendFromTLV.
 	wrappedLines []string
-	cacheWidth   int
-	cacheValid   bool
+	cacheWidth   int       // inner width used for wrapping (0 = unknown)
+	cacheValid   bool      // true = BuildInner can skip full re-wrap
+	lastStyles   *Styles   // cached styles reference for incremental append
 }
 
 func (r *textRenderer) Tag() string { return r.tag }
@@ -37,7 +39,18 @@ func (r *textRenderer) ToolInfo() *ToolInfo { return nil }
 func (r *textRenderer) AppendFromTLV(tag string, value string) {
 	r.contentParts = append(r.contentParts, value)
 	r.contentLen += len(value)
-	r.cacheValid = false
+
+	// Incremental update: style and wrap the delta, append to wrappedLines.
+	// This avoids O(n) full re-wrap on every streaming frame.
+	if len(r.wrappedLines) > 0 && r.cacheWidth > 0 && r.lastStyles != nil {
+		prepared := prepareContent(value)
+		styled := styleByTag(r.tag, prepared, r.lastStyles, "")
+		r.wrappedLines = appendDeltaToLines(r.wrappedLines, styled, r.cacheWidth)
+		// cacheValid stays false — border cache needs rebuild,
+		// but wrappedLines is current for TryLineCount.
+	} else {
+		r.cacheValid = false
+	}
 }
 
 func (r *textRenderer) Invalidate() {
@@ -62,6 +75,25 @@ func (r *textRenderer) rawContent() string {
 func (r *textRenderer) BuildInner(width int, folded bool, styles *Styles) (string, int) {
 	innerWidth := max(0, width-BorderInnerPadding)
 
+	// Fast path: use cached wrapped lines if width matches.
+	// wrappedLines is kept current by AppendFromTLV's incremental path.
+	if r.cacheWidth == innerWidth && len(r.wrappedLines) > 0 {
+		// Still merge contentParts for eventual consistency (resize, slow path).
+		// This prevents unbounded growth during long streaming sessions.
+		if len(r.contentParts) > 0 {
+			var buf strings.Builder
+			buf.WriteString(r.content)
+			for _, part := range r.contentParts {
+				buf.WriteString(part)
+			}
+			r.content = buf.String()
+			r.contentParts = nil
+		}
+		r.lastStyles = styles
+		return strings.Join(r.wrappedLines, "\n"), len(r.wrappedLines) + 2
+	}
+
+	// Full render: prepare, style, and wrap
 	// Ensure full content from parts
 	if len(r.contentParts) > 0 {
 		var buf strings.Builder
@@ -73,12 +105,6 @@ func (r *textRenderer) BuildInner(width int, folded bool, styles *Styles) (strin
 		r.contentParts = nil
 	}
 
-	// Fast path: use cached wrapped lines if width matches
-	if r.cacheValid && r.cacheWidth == innerWidth && len(r.wrappedLines) > 0 {
-		return strings.Join(r.wrappedLines, "\n"), len(r.wrappedLines) + 2
-	}
-
-	// Full render: prepare, style, and wrap
 	content := prepareContent(r.content)
 	content = styleByTag(r.tag, content, styles, "")
 
@@ -90,15 +116,18 @@ func (r *textRenderer) BuildInner(width int, folded bool, styles *Styles) (strin
 	wrapped := wrapContent(content, innerWidth)
 	r.wrappedLines = strings.Split(wrapped, "\n")
 	r.cacheWidth = innerWidth
+	r.lastStyles = styles
 	r.cacheValid = true
 
 	return wrapped, len(r.wrappedLines) + 2
 }
 
 // TryLineCount returns the line count from cached wrapped lines (fast path).
+// With incremental append, wrappedLines is kept current during streaming,
+// so this succeeds even after content changes (no cacheValid check).
 func (r *textRenderer) TryLineCount(width int) (int, bool) {
 	innerWidth := max(0, width-BorderInnerPadding)
-	if r.cacheValid && r.cacheWidth == innerWidth && len(r.wrappedLines) > 0 {
+	if len(r.wrappedLines) > 0 && r.cacheWidth == innerWidth {
 		return len(r.wrappedLines) + 2, true
 	}
 	return 0, false
