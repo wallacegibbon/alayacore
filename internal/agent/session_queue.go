@@ -77,50 +77,13 @@ func (s *Session) runSummarize(ctx context.Context, taskContent []llm.ContentPar
 	defer s.sendTaskResult(&contents)
 
 	s.summarizeBackup(contents)
-
-	prompt := summarizePrompt
-
 	s.writeNotify("Summarizing conversation...")
 
 	beforeLen := len(contents)
-	promptParts := []llm.ContentPart{&llm.TextPart{Text: prompt}}
+	promptParts := []llm.ContentPart{&llm.TextPart{Text: summarizePrompt}}
 	fullContents, outputTokens := s.handleUserPrompt(ctx, contents, promptParts)
 
-	// Find assistant content parts in the newly added content.
-	var summaryParts []llm.ContentPart
-	for _, part := range fullContents[beforeLen:] {
-		if part.GetRole() != llm.RoleAssistant {
-			continue
-		}
-		switch part.(type) {
-		case *llm.ReasoningPart:
-			continue
-		default:
-			summaryParts = append(summaryParts, part)
-		}
-	}
-
-	// Rebuild contents: "Continue" user message + filtered summary.
-	contents = contents[:0]
-	continueID := s.histIncAndGet()
-	contents = append(contents, &llm.TextPart{
-		Text: "Continue",
-		ContentPartMeta: llm.ContentPartMeta{
-			HistoryID: continueID,
-			Role:      llm.RoleUser,
-		},
-	})
-	for _, part := range summaryParts {
-		part.UpdateContentPartMeta(s.histIncAndGet(), llm.RoleAssistant)
-		contents = append(contents, part)
-	}
-
-	if outputTokens > 0 {
-		s.sendEvent(SetContextTokensEvent{Tokens: outputTokens})
-	}
-
-	s.writeNotify("Summarized conversation")
-	s.requestSystemInfo()
+	contents = s.buildSummary(fullContents, beforeLen, outputTokens)
 
 	if ctx.Err() == context.Canceled {
 		contents = s.appendCancelMessage(contents)

@@ -99,19 +99,39 @@ func (s *Session) doAutoSummarize(ctx context.Context, contents []llm.ContentPar
 		s.ContextTokens, limit, usage)
 
 	s.summarizeBackup(contents)
-
-	prompt := summarizePrompt
-
 	s.writeNotify("Summarizing conversation...")
 
-	// Append the summarization prompt and process.
-	beforeLen := len(contents)
-	contents, outputTokens := s.handleUserPrompt(ctx, contents,
-		[]llm.ContentPart{&llm.TextPart{Text: prompt}})
+	// Echo the summarization prompt to output and emit MB, same as
+	// handleUserPrompt does for a normal prompt, but call processPrompt
+	// directly to avoid mutual recursion.
+	promptPart := &llm.TextPart{Text: summarizePrompt}
+	id := s.histIncAndGet()
+	promptPart.SetHistoryID(id)
+	promptPart.SetRole(llm.RoleUser)
+	contents = append(contents, promptPart)
+	if tag, val, err := contentPartToTLV(promptPart); err == nil && tag != "" {
+		s.writeTLV(tag, stream.WrapDelta(strconv.FormatUint(id, 10), val))
+	}
+	s.writeTLV(stream.TagMessageBoundary, "")
 
-	// Find assistant content parts in the newly added content.
+	beforeLen := len(contents)
+	fullContents, outputTokens, err := s.processPrompt(ctx, contents)
+	if err != nil {
+		s.writeError(err.Error())
+		s.requestSystemInfo()
+		return contents
+	}
+
+	return s.buildSummary(fullContents, beforeLen, outputTokens)
+}
+
+// buildSummary extracts assistant response parts from the LLM output,
+// rebuilds contents as a "Continue" user message + filtered summary,
+// and updates context tokens. Shared between doAutoSummarize and
+// runSummarize.
+func (s *Session) buildSummary(fullContents []llm.ContentPart, beforeLen int, outputTokens int64) []llm.ContentPart {
 	var summaryParts []llm.ContentPart
-	for _, part := range contents[beforeLen:] {
+	for _, part := range fullContents[beforeLen:] {
 		if part.GetRole() != llm.RoleAssistant {
 			continue
 		}
@@ -123,8 +143,7 @@ func (s *Session) doAutoSummarize(ctx context.Context, contents []llm.ContentPar
 		}
 	}
 
-	// Rebuild contents: "Continue" user message + filtered summary.
-	contents = contents[:0]
+	contents := make([]llm.ContentPart, 0, 1+len(summaryParts))
 	continueID := s.histIncAndGet()
 	contents = append(contents, &llm.TextPart{
 		Text: "Continue",

@@ -388,20 +388,29 @@ func (s *Session) startTaskSummarize() {
 	go s.runSummarize(taskCtx, taskContent)
 }
 
-// handleCommand dispatches a colon-command string (without the ':' prefix).
-// Returns true if the command was recognized and handled, false if the text
-// is not a known command and should be treated as a regular prompt.
-func (s *Session) handleCommand(cmd string) bool {
-	fields := strings.Fields(cmd)
+// handleInputMsg processes a parsed input message. Called from run() goroutine.
+func (s *Session) handleInputMsg(msg inputMsg) {
+	if msg.err != nil {
+		s.writeError(msg.err.Error())
+		return
+	}
+
+	if !msg.isCmd {
+		s.handlePrompt(msg.contentParts)
+		return
+	}
+
+	// Command dispatch.
+	fields := strings.Fields(msg.cmd)
 	if len(fields) == 0 {
 		s.writeError("empty command")
-		return true // consumed, even though it's an error
+		return
 	}
 
 	name := fields[0]
 	args := fields[1:]
 
-	// Known registry commands.
+	// Registry commands.
 	if cmdDef, ok := LookupCommand(name); ok {
 		switch cmdDef.Policy {
 		case CmdImmediate:
@@ -409,44 +418,27 @@ func (s *Session) handleCommand(cmd string) bool {
 		case CmdIdle:
 			if s.activeTask != nil {
 				s.writeError("Cannot run this command while a task is in progress. Please wait or cancel the current task.")
-				return true
+				return
 			}
 			cmdDef.Handler(s, s.sessionCtx, args)
 		}
-		return true
+		return
 	}
 
 	// Task commands — :continue and :summarize run in their own goroutine.
 	switch name {
 	case CommandNameContinue:
 		s.startTaskContinue()
-		return true
 	case CommandNameSummarize:
 		s.startTaskSummarize()
-		return true
+	default:
+		s.writeError(fmt.Sprintf("unknown command: %s", name))
 	}
-
-	// Not a known command — caller should treat as a prompt.
-	return false
 }
 
-// handleInputMsg processes a parsed input message. Called from run() goroutine.
-//
-// For colon-prefixed text (msg.isCmd), handleCommand is tried first. If it
-// returns false the text is not a known command and is treated as a prompt.
-// For regular prompts (non-command), the text is sent to the LLM directly.
-func (s *Session) handleInputMsg(msg inputMsg) {
-	if msg.err != nil {
-		s.writeError(msg.err.Error())
-		return
-	}
-
-	// Colon-prefixed text — try command dispatch first.
-	if msg.isCmd && s.handleCommand(msg.cmd) {
-		return // handled as a command
-	}
-
-	// Regular prompt — reject if a task is already running.
+// handlePrompt starts a task goroutine for a user prompt.
+// Called from handleInputMsg when the input is not a command.
+func (s *Session) handlePrompt(contentParts []llm.ContentPart) {
 	if s.activeTask != nil {
 		s.writeError("A task is already running. Wait for it to complete or cancel it.")
 		return
@@ -459,5 +451,5 @@ func (s *Session) handleInputMsg(msg inputMsg) {
 	copy(taskContent, s.Contents)
 	taskCtx, taskCancel := context.WithCancel(s.sessionCtx)
 	s.activeTask = &taskHandle{cancel: taskCancel, step: 0}
-	go s.runTask(taskCtx, taskContent, msg.contentParts)
+	go s.runTask(taskCtx, taskContent, contentParts)
 }
