@@ -94,6 +94,17 @@ Adapter writes → stdin:        UI data:image/jpeg;base64,...
 Media frames (UI, UA, UV, UD) must precede the UT frame they belong to.
 Multiple media frames of different types can be combined in any order.
 
+## Example: Media URL Prompt Flow
+
+```
+Adapter writes → stdin:        UI https://example.com/image.jpg
+                               UA https://example.com/audio.wav
+                               UV https://example.com/video.mp4
+                               UT "Analyze these files from URLs"
+```
+
+Plain URLs are accepted alongside data URIs for all media types.
+
 ## Samples by Tool
 
 ### read_file
@@ -184,8 +195,8 @@ cat tlv-samples/ut-read-file.bin | alayacore --rawio | go run ./misc/tlvcat.go
 cat tlv-samples/af-read-file-start.bin | go run ./misc/tlvcat.go
 ```
 
-## Generate Image Requests (Go)
+## Generate Media Requests (Go)
 
 ```sh
-go run misc/gen_tlv_request.go "question" image1.jpg [image2.jpg ...]
+go run misc/gen_tlv_request.go "question" image.jpg audio.wav video.mp4
 ```

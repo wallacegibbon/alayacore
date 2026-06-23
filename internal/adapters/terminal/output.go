@@ -371,6 +371,7 @@ func (to *outputWriter) handleSystemReasoning(data json.RawMessage) {
 	to.status.updateReasoning(m.Level)
 }
 
+// handleSystemVideoConfig updates the video FPS and resolution in session status.
 func (to *outputWriter) handleSystemVideoConfig(data json.RawMessage) {
 	var m struct {
 		FPS int `json:"fps"`
