@@ -146,7 +146,6 @@ func (s *Session) TaskError() bool {
 	return s.pausedOnError.Load()
 }
 
-// HasModels returns true if any models are configured.
 func (s *Session) HasModels() bool {
 	if s.ModelManager == nil {
 		return false
@@ -154,7 +153,6 @@ func (s *Session) HasModels() bool {
 	return s.ModelManager.HasModels()
 }
 
-// ModelConfigPath returns the path to the model config file.
 func (s *Session) ModelConfigPath() string {
 	if s.ModelManager == nil {
 		return ""
@@ -287,7 +285,6 @@ func (s *Session) replayContentsToAdapter() error {
 	return nil
 }
 
-// histIncAndGet increments the history counter by 1 and returns the new value.
 func (s *Session) histIncAndGet() uint64 {
 	s.histCounter++
 	return s.histCounter

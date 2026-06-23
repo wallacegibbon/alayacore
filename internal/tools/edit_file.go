@@ -109,12 +109,10 @@ func (s *editSession) Close() {
 	}
 }
 
-// Read implements io.Reader by reading from the source file.
 func (s *editSession) Read(p []byte) (int, error) {
 	return s.srcFile.Read(p)
 }
 
-// Write implements io.Writer by writing to the temp file.
 func (s *editSession) Write(p []byte) (int, error) {
 	if s.tempFile == nil {
 		return 0, fmt.Errorf("temp file already closed")

@@ -53,19 +53,16 @@ func NewTool(name, description string) *ToolBuilder {
 	}
 }
 
-// WithSchema sets the tool schema
 func (b *ToolBuilder) WithSchema(schema json.RawMessage) *ToolBuilder {
 	b.tool.Definition.Schema = schema
 	return b
 }
 
-// WithExecute sets the execute function
 func (b *ToolBuilder) WithExecute(fn func(ctx context.Context, input json.RawMessage) ([]ContentPart, error)) *ToolBuilder {
 	b.tool.Execute = fn
 	return b
 }
 
-// Build returns the tool
 func (b *ToolBuilder) Build() Tool {
 	return b.tool
 }

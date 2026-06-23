@@ -42,7 +42,6 @@ type ScrollableListCore struct {
 	HasFocus    bool
 }
 
-// IsOpen returns true if the list is open.
 func (sl *ScrollableListCore) IsOpen() bool { return sl.State != ScrollableListClosed }
 
 // Close closes the list.
@@ -53,7 +52,6 @@ func (sl *ScrollableListCore) SetStyles(styles *Styles) {
 	sl.Styles = styles
 }
 
-// SetHasFocus sets the application focus state.
 // When the app loses focus, all UI elements should be dimmed.
 func (sl *ScrollableListCore) SetHasFocus(hasFocus bool) {
 	sl.HasFocus = hasFocus

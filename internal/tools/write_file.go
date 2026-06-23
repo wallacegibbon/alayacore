@@ -14,7 +14,6 @@ type WriteFileInput struct {
 	Content string `json:"content" jsonschema:"required,description=Content to write to the file"`
 }
 
-// NewWriteFileTool creates a tool for writing files
 func NewWriteFileTool() llm.Tool {
 	return llm.NewTool(
 		"write_file",

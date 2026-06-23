@@ -210,7 +210,6 @@ func (tm *Manager) ReloadThemes() {
 	})
 }
 
-// GetThemes returns the list of available themes.
 func (tm *Manager) GetThemes() []Info {
 	if tm.themes == nil {
 		return nil
@@ -220,7 +219,6 @@ func (tm *Manager) GetThemes() []Info {
 	return result
 }
 
-// GetThemesFolder returns the themes folder path.
 func (tm *Manager) GetThemesFolder() string {
 	return tm.themesFolder
 }

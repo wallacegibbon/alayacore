@@ -88,7 +88,6 @@ func NoModelsErrorMessage(configPath string, hasRejected bool) string {
 	return b.String()
 }
 
-// NewModelManager creates a new model manager
 func NewModelManager(configPath string) *ModelManager {
 	mm := &ModelManager{
 		filePath: configPath,
@@ -242,7 +241,6 @@ func (mm *ModelManager) Reload() error {
 	return mm.LoadFromFile(mm.filePath)
 }
 
-// HasModels returns true if there are any models available
 func (mm *ModelManager) HasModels() bool {
 	return len(mm.models) > 0
 }
@@ -301,7 +299,6 @@ func (mm *ModelManager) SetActive(id int) error {
 	return domainerrors.Wrapf(CommandNameModelSet, domainerrors.ErrModelNotFound, "model not found: %d", id)
 }
 
-// SetActiveToFirst sets the active model to the first one in the list.
 // Returns false if there are no models.
 func (mm *ModelManager) SetActiveToFirst() bool {
 	if len(mm.models) == 0 {
@@ -321,22 +318,18 @@ func (mm *ModelManager) GetActive() *ModelConfig {
 	return nil
 }
 
-// GetActiveID returns the active model ID
 func (mm *ModelManager) GetActiveID() int {
 	return mm.activeID
 }
 
-// GetFilePath returns the current file path
 func (mm *ModelManager) GetFilePath() string {
 	return mm.filePath
 }
 
-// ModelCount returns the number of models in the runtime list
 func (mm *ModelManager) ModelCount() int {
 	return len(mm.models)
 }
 
-// FindModelByName finds a model by its name and returns its ID
 func (mm *ModelManager) FindModelByName(name string) int {
 	for _, m := range mm.models {
 		if m.Name == name {

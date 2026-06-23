@@ -76,7 +76,6 @@ func (s *Session) InitError() error {
 	return s.initError
 }
 
-// activeModelName returns the display name of the currently active model.
 func (s *Session) activeModelName() string {
 	if s.ModelManager == nil {
 		return ""
@@ -87,8 +86,6 @@ func (s *Session) activeModelName() string {
 	return ""
 }
 
-// createProviderAndAgent creates a new provider and agent for the given model config.
-// This is the single source of truth for provider/agent construction.
 func (s *Session) createProviderAndAgent(modelConfig *ModelConfig) (llm.Provider, *llm.Agent, error) {
 	provider, err := createProviderFromConfig(modelConfig, s.DebugAPI, s.ProxyURL)
 	if err != nil {

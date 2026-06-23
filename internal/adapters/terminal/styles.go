@@ -119,7 +119,6 @@ func NewStyles(t *theme.Theme) *Styles {
 	}
 }
 
-// DefaultStyles returns the default styling configuration.
 func DefaultStyles() *Styles {
 	return NewStyles(theme.DefaultTheme())
 }

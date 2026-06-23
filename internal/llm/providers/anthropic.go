@@ -195,7 +195,6 @@ type anthropicSSEError struct {
 // Anthropic Provider
 // ============================================================================
 
-// AnthropicProvider implements the Anthropic API
 type AnthropicProvider struct {
 	baseProvider
 }
@@ -217,7 +216,6 @@ func NewAnthropicWithConfig(cfg BaseConfig) (*AnthropicProvider, error) {
 	return p, nil
 }
 
-// NewAnthropic creates a new Anthropic provider via functional options.
 func NewAnthropic(opts ...AnthropicOption) (*AnthropicProvider, error) {
 	p := &AnthropicProvider{}
 	p.setBaseConfig(BaseConfig{}, "claude-3-5-sonnet-20241022")
@@ -231,35 +229,30 @@ func NewAnthropic(opts ...AnthropicOption) (*AnthropicProvider, error) {
 	return p, nil
 }
 
-// WithAPIKey sets the API key
 func WithAPIKey(key string) AnthropicOption {
 	return func(p *AnthropicProvider) {
 		p.apiKey = key
 	}
 }
 
-// WithBaseURL sets the base URL
 func WithBaseURL(url string) AnthropicOption {
 	return func(p *AnthropicProvider) {
 		p.baseURL = strings.TrimSuffix(url, "/")
 	}
 }
 
-// WithHTTPClient sets the HTTP client
 func WithHTTPClient(client *http.Client) AnthropicOption {
 	return func(p *AnthropicProvider) {
 		p.client = client
 	}
 }
 
-// WithAnthropicModel sets the model name
 func WithAnthropicModel(model string) AnthropicOption {
 	return func(p *AnthropicProvider) {
 		p.model = model
 	}
 }
 
-// WithMaxTokens sets the maximum output tokens
 func WithMaxTokens(tokens int) AnthropicOption {
 	return func(p *AnthropicProvider) {
 		p.maxTokens = tokens
@@ -332,7 +325,6 @@ func (p *AnthropicProvider) StreamMessages(
 	return p.parseStream(body), nil
 }
 
-// computeAnthropicReasoning returns the thinking field for an Anthropic request.
 func computeAnthropicReasoning(level int) *anthropicThinkingField {
 	if level > config.ReasoningLevelOff {
 		return &anthropicThinkingField{Type: "enabled"}

@@ -277,7 +277,6 @@ func (hw *HelpWindow) updateFilteredItems() {
 	}
 }
 
-// filteredLen returns the length of filteredItems.
 func (hw *HelpWindow) filteredLen() int {
 	return len(hw.filteredItems)
 }
@@ -429,7 +428,6 @@ func (hw *HelpWindow) ensureVisible() {
 
 // --- Rendering ---
 
-// View returns the rendered help window content as a string.
 func (hw *HelpWindow) View() tea.View {
 	if hw.State == FilteredListClosed {
 		return tea.NewView("")

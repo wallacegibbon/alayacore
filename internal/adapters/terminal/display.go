@@ -55,34 +55,28 @@ func (m *DisplayModel) View() tea.View {
 	return tea.NewView(m.viewport.View())
 }
 
-// SetHeight sets the viewport height
 func (m *DisplayModel) SetHeight(height int) {
 	m.height = height
 	m.viewport.SetHeight(max(0, height))
 }
 
-// GetHeight returns the current viewport height
 func (m *DisplayModel) GetHeight() int {
 	return m.viewport.Height()
 }
 
-// SetWidth sets the viewport width
 func (m *DisplayModel) SetWidth(width int) {
 	m.width = width
 	m.viewport.SetWidth(max(0, width))
 }
 
-// SetDisplayFocused sets whether the display is focused
 func (m *DisplayModel) SetDisplayFocused(focused bool) {
 	m.displayFocused = focused
 }
 
-// SetStyles updates the styles for the display
 func (m *DisplayModel) SetStyles(styles *Styles) {
 	m.styles = styles
 }
 
-// YOffset returns the current scroll position
 func (m *DisplayModel) YOffset() int {
 	return m.viewport.YOffset()
 }
@@ -142,23 +136,19 @@ func (m *DisplayModel) GotoTop() {
 	m.viewport.GotoTop()
 }
 
-// UpdateHeight sets the viewport height based on total window height
 func (m *DisplayModel) UpdateHeight(totalHeight int) {
 	m.viewport.SetHeight(max(0, totalHeight-LayoutGap))
 	m.updateContent()
 }
 
-// shouldFollow returns true when viewport should auto-follow new content
 func (m *DisplayModel) shouldFollow() bool {
 	return m.autoFollow
 }
 
-// GetWindowCursor returns the current window cursor index
 func (m *DisplayModel) GetWindowCursor() int {
 	return m.windowCursor
 }
 
-// GetCursorWindowContent returns the content of the currently selected window.
 // Returns empty string if no window is selected.
 func (m *DisplayModel) GetCursorWindowContent() string {
 	if m.windowCursor < 0 {
@@ -167,7 +157,6 @@ func (m *DisplayModel) GetCursorWindowContent() string {
 	return m.windowBuffer.GetWindowContent(m.windowCursor)
 }
 
-// GetCursorWindowHistoryID returns the history ID of the currently selected window.
 // Returns 0 if no window is selected.
 func (m *DisplayModel) GetCursorWindowHistoryID() uint64 {
 	if m.windowCursor < 0 {
@@ -193,7 +182,6 @@ func (m *DisplayModel) clearCursor() {
 	m.autoFollow = false
 }
 
-// SetWindowCursor sets the window cursor to a specific visible window near the given index.
 // If the index points to an invisible window, the nearest visible window is chosen instead.
 // Disables auto-follow only if the cursor actually moves; only G re-enables it.
 func (m *DisplayModel) SetWindowCursor(index int) {
@@ -355,7 +343,6 @@ func (m *DisplayModel) ClampCursor() {
 	m.windowCursor = m.windowBuffer.NearestVisibleIndex(m.windowCursor)
 }
 
-// SetCursorToLastWindow sets the cursor to the last visible window
 func (m *DisplayModel) SetCursorToLastWindow() {
 	i := m.windowBuffer.LastVisibleIndex()
 	if i >= 0 {
@@ -366,7 +353,6 @@ func (m *DisplayModel) SetCursorToLastWindow() {
 	m.autoFollow = true
 }
 
-// ToggleWindowFold toggles the fold state of the selected window
 func (m *DisplayModel) ToggleWindowFold() bool {
 	if m.windowCursor < 0 {
 		return false
@@ -374,7 +360,6 @@ func (m *DisplayModel) ToggleWindowFold() bool {
 	return m.windowBuffer.ToggleFold(m.windowCursor)
 }
 
-// MoveWindowCursorToTop moves cursor to top visible window.
 func (m *DisplayModel) MoveWindowCursorToTop() bool {
 	if m.windowBuffer.WindowCount() == 0 {
 		return false

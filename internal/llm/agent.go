@@ -354,7 +354,6 @@ func (a *Agent) executeDeferredTools(ctx context.Context, deferred []*ToolInputP
 	}
 }
 
-// toolDefinitions returns the tool definitions from the agent config.
 func (a *Agent) toolDefinitions() []ToolDefinition {
 	defs := make([]ToolDefinition, len(a.config.Tools))
 	for i, tool := range a.config.Tools {

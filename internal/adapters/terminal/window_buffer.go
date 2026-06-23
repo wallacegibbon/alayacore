@@ -77,7 +77,6 @@ func (wb *WindowBuffer) SetWidth(width int) {
 	}
 }
 
-// Width returns the current window width.
 func (wb *WindowBuffer) Width() int {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
@@ -265,14 +264,13 @@ func (wb *WindowBuffer) Clear() {
 	wb.dirtyIndex = dirtyClean
 }
 
-// WindowCount returns the number of windows.
 func (wb *WindowBuffer) WindowCount() int {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 	return len(wb.windows)
 }
 
-// WindowAt returns the window at the given index, or nil if out of bounds.
+// Returns nil if out of bounds.
 func (wb *WindowBuffer) WindowAt(index int) *Window {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
@@ -297,7 +295,6 @@ func (wb *WindowBuffer) AllWindows() []*Window {
 	return result
 }
 
-// GetVisibleWindowCount returns the number of visible windows.
 func (wb *WindowBuffer) GetVisibleWindowCount() int {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
@@ -310,7 +307,6 @@ func (wb *WindowBuffer) GetVisibleWindowCount() int {
 	return count
 }
 
-// ToggleFold toggles the fold state of a window.
 func (wb *WindowBuffer) ToggleFold(windowIndex int) bool {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
@@ -330,7 +326,6 @@ type FunctionInfo struct {
 	Input string // tool call input/arguments (formatted for display)
 }
 
-// GetFunctionInfo returns tool call information for a given tool call ID.
 // Returns nil if no window with that ID exists or if it's not a tool window.
 func (wb *WindowBuffer) GetFunctionInfo(id string) *FunctionInfo {
 	wb.mu.Lock()
@@ -348,7 +343,6 @@ func (wb *WindowBuffer) GetFunctionInfo(id string) *FunctionInfo {
 	return nil
 }
 
-// GetWindowContent returns the raw content of a window by index.
 // For tool windows, returns tool input + tool output combined.
 // Returns empty string if index is out of bounds.
 func (wb *WindowBuffer) GetWindowContent(windowIndex int) string {
@@ -433,7 +427,6 @@ func (wb *WindowBuffer) ensureLineHeights() {
 	wb.dirtyIndex = dirtyClean
 }
 
-// GetWindowLineRange returns the start and end line numbers for a window.
 // Returns (0, 0) if windowIndex is out of bounds.
 // IMPORTANT: This calls ensureLineHeights() to guarantee accurate positions,
 // since line heights may be stale after content updates.
@@ -454,7 +447,6 @@ func (wb *WindowBuffer) GetWindowLineRange(windowIndex int) (start, end int) {
 	return start, start + wb.lineHeights[windowIndex]
 }
 
-// GetTotalLines returns total lines across all windows.
 func (wb *WindowBuffer) GetTotalLines() int {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
@@ -558,7 +550,7 @@ func (wb *WindowBuffer) ForEachVisibleBackwardRanged(fn func(i int, startLine, e
 	return true
 }
 
-// FirstVisibleIndex returns the index of the first visible window, or -1.
+// Returns -1 if none are visible.
 func (wb *WindowBuffer) FirstVisibleIndex() int {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
@@ -570,7 +562,7 @@ func (wb *WindowBuffer) FirstVisibleIndex() int {
 	return -1
 }
 
-// LastVisibleIndex returns the index of the last visible window, or -1.
+// Returns -1 if none are visible.
 func (wb *WindowBuffer) LastVisibleIndex() int {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()

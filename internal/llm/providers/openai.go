@@ -12,10 +12,7 @@ package providers
 //    history, arguments must be marshaled to a JSON string (not raw JSON).
 //    See `openaiConvertToolInputs()`.
 //
-// 3. REASONING SUPPORT: OpenAI-compatible APIs (DeepSeek, Qwen, etc.) use
-//    `reasoning_content` field for thinking tokens. Handled in `handleEvent()`.
-//
-// 4. REASONING_CONTENT IN TOOL CALL CHAINS: Per DeepSeek's documentation,
+// 3. REASONING_CONTENT IN TOOL CALL CHAINS: Per DeepSeek's documentation,
 //    between two user messages all intermediate assistant reasoning_content
 //    must be passed back. When reasoning mode is enabled, reasoning_content
 //    is always set (even as empty string) on assistant messages so that
@@ -23,18 +20,13 @@ package providers
 //    Conditional on reasoning mode to avoid wasting tokens. The logic lives
 //    in openaiConvertContents, not in the sub-converters.
 //
-// 5. NULL ARGUMENTS IN TOOL CALL CHUNKS: Some providers emit no-op deltas
+// 4. NULL ARGUMENTS IN TOOL CALL CHUNKS: Some providers emit no-op deltas
 //    with "arguments": null. Must be skipped to avoid corrupting the
 //    accumulated arguments string. See docs/providers.md →
 //    "Null arguments in tool call chunks".
 //    See `appendToolCallArgs()`.
 //
-// 6. TEXT CONTENT WITH TOOL CALLS: Some providers (DeepSeek, Qwen) return
-//    text content alongside tool calls in the same assistant message.
-//    openaiConvertToolInputs preserves text content when present, so
-//    multi-turn tool call chains don't lose the assistant's commentary.
-//
-// 7. CONTENT BLOCK INDEXING: Delta event indices always use fixed positions:
+// 5. CONTENT BLOCK INDEXING: Delta event indices always use fixed positions:
 //    reasoning=0, text=1, tools=2+wire_index. The final message always includes
 //    reasoning and text content blocks (even if empty) so that indices match
 //    content array positions. The agent strips empty placeholders in
@@ -124,7 +116,6 @@ type openAIDelta struct {
 // OpenAI Provider
 // ============================================================================
 
-// OpenAIProvider implements the OpenAI API
 type OpenAIProvider struct {
 	baseProvider
 }
@@ -146,7 +137,6 @@ func NewOpenAIWithConfig(cfg BaseConfig) (*OpenAIProvider, error) {
 	return p, nil
 }
 
-// NewOpenAI creates a new OpenAI provider via functional options.
 func NewOpenAI(opts ...OpenAIOption) (*OpenAIProvider, error) {
 	p := &OpenAIProvider{}
 	p.setBaseConfig(BaseConfig{}, "gpt-4o")
@@ -160,35 +150,30 @@ func NewOpenAI(opts ...OpenAIOption) (*OpenAIProvider, error) {
 	return p, nil
 }
 
-// WithOpenAIAPIKey sets the API key
 func WithOpenAIAPIKey(key string) OpenAIOption {
 	return func(p *OpenAIProvider) {
 		p.apiKey = key
 	}
 }
 
-// WithOpenAIBaseURL sets the base URL
 func WithOpenAIBaseURL(url string) OpenAIOption {
 	return func(p *OpenAIProvider) {
 		p.baseURL = strings.TrimSuffix(url, "/")
 	}
 }
 
-// WithOpenAIHTTPClient sets the HTTP client
 func WithOpenAIHTTPClient(client *http.Client) OpenAIOption {
 	return func(p *OpenAIProvider) {
 		p.client = client
 	}
 }
 
-// WithOpenAIModel sets the model
 func WithOpenAIModel(model string) OpenAIOption {
 	return func(p *OpenAIProvider) {
 		p.model = model
 	}
 }
 
-// WithOpenAIMaxTokens sets the maximum output tokens
 func WithOpenAIMaxTokens(tokens int) OpenAIOption {
 	return func(p *OpenAIProvider) {
 		p.maxTokens = tokens
@@ -628,7 +613,6 @@ func openaiConvertToolOutputs(contents []llm.ContentPart) []openAIMessage {
 	return results
 }
 
-// openaiHasToolInputs checks if content contains tool calls
 func openaiHasToolInputs(contents []llm.ContentPart) bool {
 	for _, part := range contents {
 		if _, ok := part.(*llm.ToolInputPart); ok {
@@ -689,17 +673,13 @@ func openaiConvertRegularContent(apiMsg *openAIMessage, contents []llm.ContentPa
 			})
 		case *llm.ImagePart:
 			contentParts = append(contentParts, map[string]any{
-				"type": "image_url",
-				"image_url": map[string]string{
-					"url": v.URI,
-				},
+				"type":      "image_url",
+				"image_url": map[string]string{"url": v.URI},
 			})
 		case *llm.AudioPart:
 			contentParts = append(contentParts, map[string]any{
-				"type": "input_audio",
-				"input_audio": map[string]string{
-					"data": v.URI,
-				},
+				"type":        "input_audio",
+				"input_audio": map[string]string{"data": v.URI},
 			})
 		case *llm.VideoPart:
 			contentParts = append(contentParts, openAIVideoPart(v.URI, videoFPS, videoRes))
@@ -719,8 +699,7 @@ func openaiConvertRegularContent(apiMsg *openAIMessage, contents []llm.ContentPa
 	}
 }
 
-// openAIVideoPart builds a video_url content block with the given FPS and resolution.
-func openAIVideoPart(dataURI string, fps int, resolution int) map[string]any {
+func openAIVideoPart(uri string, fps int, resolution int) map[string]any {
 	if fps == 0 {
 		fps = 2
 	}
@@ -729,10 +708,8 @@ func openAIVideoPart(dataURI string, fps int, resolution int) map[string]any {
 		res = "max"
 	}
 	return map[string]any{
-		"type": "video_url",
-		"video_url": map[string]string{
-			"url": dataURI,
-		},
+		"type":             "video_url",
+		"video_url":        map[string]string{"url": uri},
 		"fps":              fps,
 		"media_resolution": res,
 	}

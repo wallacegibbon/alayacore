@@ -212,8 +212,6 @@ func (s *Session) sendThemeMsg() {
 	s.writeSystemMsg(ThemeMsg{Name: name})
 }
 
-// sendThemeListMsg sends the full list of available themes with content.
-// loadThemeFromFile loads a theme file and returns a ThemeInfo.
 // Returns zero ThemeInfo and false if the file cannot be loaded.
 func loadThemeFromFile(path string) (ThemeInfo, bool) {
 	name := strings.TrimSuffix(filepath.Base(path), ".conf")

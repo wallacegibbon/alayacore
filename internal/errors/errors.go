@@ -75,7 +75,6 @@ func (e *SessionError) Unwrap() error {
 	return e.Err
 }
 
-// Operation returns the operation that failed.
 func (e *SessionError) Operation() string {
 	return e.Op
 }

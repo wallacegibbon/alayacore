@@ -206,10 +206,8 @@ func (cd *ConfirmDialog) ConsumeResult() (bool, bool) {
 
 // ---- Rendering ----
 
-// View returns the rendered dialog content as a tea.View.
 // Uses RenderBorderedBox for consistent styling with other overlays.
 // The dialog has a fixed content height (ConfirmContentRows) matching
-// the pattern used by QueueManager, ModelSelector, and other overlays.
 func (cd *ConfirmDialog) View() tea.View {
 	if !cd.IsOpen() {
 		return tea.NewView("")

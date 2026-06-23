@@ -29,7 +29,6 @@ type RuntimeManager struct {
 	path   string
 }
 
-// NewRuntimeManager creates a new runtime manager
 func NewRuntimeManager(runtimePath string) *RuntimeManager {
 	rm := &RuntimeManager{}
 	rm.path = runtimePath
@@ -94,7 +93,6 @@ func formatRuntimeConfig(cfg RuntimeConfig) string {
 	return sb.String()
 }
 
-// GetActiveModel returns the active model name
 func (rm *RuntimeManager) GetActiveModel() string {
 	return rm.config.ActiveModel
 }
@@ -105,7 +103,6 @@ func (rm *RuntimeManager) SetActiveModel(name string) error {
 	return rm.save()
 }
 
-// GetActiveTheme returns the active theme name
 func (rm *RuntimeManager) GetActiveTheme() string {
 	return rm.config.ActiveTheme
 }

@@ -47,7 +47,6 @@ type FilteredListCore struct {
 	lastFilterValue    string
 }
 
-// IsOpen returns true if the filtered list is open.
 func (fl *FilteredListCore) IsOpen() bool { return fl.State != FilteredListClosed }
 
 // Close closes the filtered list.
@@ -68,7 +67,6 @@ func (fl *FilteredListCore) SetStyles(styles *Styles) {
 	fl.updateFilterInputStyles()
 }
 
-// SetHasFocus sets the application focus state.
 // When the app loses focus, all UI elements should be dimmed.
 func (fl *FilteredListCore) SetHasFocus(hasFocus bool) {
 	fl.HasFocus = hasFocus

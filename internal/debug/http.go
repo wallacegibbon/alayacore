@@ -180,7 +180,6 @@ func (dr *debugReader) Read(p []byte) (n int, err error) {
 	return n, err
 }
 
-// RoundTrip implements the http.RoundTripper interface
 func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	w := t.Writer
 	var requestBody []byte

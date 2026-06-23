@@ -258,7 +258,6 @@ func FormatEditorContent(content string) string {
 	return fmt.Sprintf("[%d lines] %s (press Enter to send)", lineCount, previewText)
 }
 
-// getEditorCommand returns the editor command to use
 func getEditorCommand(editorCmd string) string {
 	if editorCmd != "" {
 		return editorCmd

@@ -31,12 +31,10 @@ func (tm *ThemeManager) ReloadThemes() {
 	tm.inner.ReloadThemes()
 }
 
-// GetThemes returns the list of available themes.
 func (tm *ThemeManager) GetThemes() []ThemeInfo {
 	return tm.inner.GetThemes()
 }
 
-// GetThemesFolder returns the themes folder path.
 func (tm *ThemeManager) GetThemesFolder() string {
 	return tm.inner.GetThemesFolder()
 }

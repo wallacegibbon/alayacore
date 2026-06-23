@@ -84,17 +84,14 @@ func (m *InputModel) Blur() {
 	m.input.Blur()
 }
 
-// IsFocused returns whether the input is focused
 func (m InputModel) IsFocused() bool {
 	return m.focused
 }
 
-// Value returns the current input value
 func (m InputModel) Value() string {
 	return m.input.Value()
 }
 
-// SetValue sets the input value
 func (m *InputModel) SetValue(value string) {
 	m.input.SetValue(value)
 }
@@ -113,12 +110,10 @@ func (m InputModel) GetPrompt() string {
 	return m.input.Value()
 }
 
-// GetEditorContent returns the editor content
 func (m InputModel) GetEditorContent() string {
 	return m.editorContent
 }
 
-// ClearEditorContent clears the editor content
 func (m *InputModel) ClearEditorContent() {
 	m.editorContent = ""
 }
@@ -157,13 +152,11 @@ func (m InputModel) RenderWithBorder(blockInput bool) string {
 	return m.styles.RenderBorderedBox(m.input.View(), m.width, borderColor)
 }
 
-// SetWidth sets the input width
 func (m *InputModel) SetWidth(width int) {
 	m.width = width
 	m.input.SetWidth(max(0, width-InputPaddingH))
 }
 
-// SetStyles updates the styles for the input
 func (m *InputModel) SetStyles(styles *Styles) {
 	m.styles = styles
 	m.updateInputStyles()
