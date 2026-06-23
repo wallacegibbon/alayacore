@@ -527,7 +527,7 @@ func (m *Terminal) handleSubmit() tea.Cmd {
 
 	// Regular prompt — stage the text, then flush with UE.
 	m.emitCommand(prompt)
-	m.emitMB()
+	m.emitUE()
 	m.input.SetValue("")
 
 	return scheduleTick()
