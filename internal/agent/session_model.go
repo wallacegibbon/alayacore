@@ -171,7 +171,7 @@ func (s *Session) SetReasoningLevel(level int) {
 // SetVideoConfig sets the default video FPS and resolution.
 // :video_config is ScheduleIdle so this is only called when no task is running.
 // The provider is synced immediately.
-func (s *Session) SetVideoConfig(fps int, resolution string) {
+func (s *Session) SetVideoConfig(fps int, resolution int) {
 	s.videoFPS = fps
 	s.videoRes = resolution
 	if s.provider != nil {

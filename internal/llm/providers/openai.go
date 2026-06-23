@@ -203,8 +203,8 @@ func (p *OpenAIProvider) SetReasoningLevel(level int) {
 
 // SetVideoConfig sets the default FPS and resolution for video attachments.
 // fps: frames per second (0 means default 2)
-// resolution: "default" or "max" (empty means "default")
-func (p *OpenAIProvider) SetVideoConfig(fps int, resolution string) {
+// resolution: 0=default, 1=max
+func (p *OpenAIProvider) SetVideoConfig(fps int, resolution int) {
 	p.videoFPS = fps
 	p.videoRes = resolution
 }
@@ -542,7 +542,7 @@ func (p *OpenAIProvider) handleDelta(delta openAIDelta, yield func(llm.StreamEve
 
 // openaiConvertContents converts domain ContentParts to OpenAI wire format.
 // It groups consecutive same-role ContentParts into API messages.
-func openaiConvertContents(contents []llm.ContentPart, reasoningLevel int, videoFPS int, videoRes string) []openAIMessage {
+func openaiConvertContents(contents []llm.ContentPart, reasoningLevel int, videoFPS int, videoRes int) []openAIMessage {
 	apiMessages := make([]openAIMessage, 0, len(contents))
 	if len(contents) == 0 {
 		return apiMessages
@@ -678,7 +678,7 @@ func openaiConvertToolInputs(apiMsg *openAIMessage, contents []llm.ContentPart) 
 }
 
 // openaiConvertRegularContent handles conversion of regular text content.
-func openaiConvertRegularContent(apiMsg *openAIMessage, contents []llm.ContentPart, videoFPS int, videoRes string) {
+func openaiConvertRegularContent(apiMsg *openAIMessage, contents []llm.ContentPart, videoFPS int, videoRes int) {
 	var contentParts []map[string]any
 	for _, part := range contents {
 		switch v := part.(type) {
@@ -720,12 +720,13 @@ func openaiConvertRegularContent(apiMsg *openAIMessage, contents []llm.ContentPa
 }
 
 // openAIVideoPart builds a video_url content block with the given FPS and resolution.
-func openAIVideoPart(dataURI string, fps int, resolution string) map[string]any {
+func openAIVideoPart(dataURI string, fps int, resolution int) map[string]any {
 	if fps == 0 {
 		fps = 2
 	}
-	if resolution == "" {
-		resolution = "default"
+	res := "default"
+	if resolution == 1 {
+		res = "max"
 	}
 	return map[string]any{
 		"type": "video_url",
@@ -733,6 +734,6 @@ func openAIVideoPart(dataURI string, fps int, resolution string) map[string]any 
 			"url": dataURI,
 		},
 		"fps":              fps,
-		"media_resolution": resolution,
+		"media_resolution": res,
 	}
 }

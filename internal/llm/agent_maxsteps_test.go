@@ -39,8 +39,8 @@ func (m *mockProviderAlwaysToolCalls) StreamMessages(_ context.Context, _ []Cont
 	}, nil
 }
 
-func (m *mockProviderAlwaysToolCalls) SetReasoningLevel(_ int)        {}
-func (m *mockProviderAlwaysToolCalls) SetVideoConfig(_ int, _ string) {}
+func (m *mockProviderAlwaysToolCalls) SetReasoningLevel(_ int)     {}
+func (m *mockProviderAlwaysToolCalls) SetVideoConfig(_ int, _ int) {}
 
 func TestAgentMaxStepsExceeded(t *testing.T) {
 	provider := &mockProviderAlwaysToolCalls{}
@@ -134,8 +134,8 @@ func (m *mockProviderTruncated) StreamMessages(_ context.Context, _ []ContentPar
 	}, nil
 }
 
-func (m *mockProviderTruncated) SetReasoningLevel(_ int)        {}
-func (m *mockProviderTruncated) SetVideoConfig(_ int, _ string) {}
+func (m *mockProviderTruncated) SetReasoningLevel(_ int)     {}
+func (m *mockProviderTruncated) SetVideoConfig(_ int, _ int) {}
 
 func TestAgentTruncatedMaxTokens(t *testing.T) {
 	provider := &mockProviderTruncated{stopReason: "max_tokens"}

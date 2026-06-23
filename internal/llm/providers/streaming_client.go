@@ -45,9 +45,9 @@ type baseProvider struct {
 	client         *http.Client
 	model          string
 	maxTokens      int
-	reasoningLevel int    // 0=off, 1=normal, 2=max
-	videoFPS       int    // frames per second for video attachments; 0 means default (2)
-	videoRes       string // "default" or "max"; empty means "default"
+	reasoningLevel int // 0=off, 1=normal, 2=max
+	videoFPS       int // frames per second for video attachments; 0 means default (2)
+	videoRes       int // video resolution mode: 0 or 1
 }
 
 // setBaseConfig applies the common config to a baseProvider.

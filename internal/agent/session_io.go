@@ -361,7 +361,7 @@ func (s *Session) handleReason(args []string) {
 //	resolution: 1=default, 2=max
 func (s *Session) handleVideoConfig(args []string) {
 	if len(args) < 2 {
-		s.writeError("usage: :video_config <fps> <resolution>  (resolution: 1=default, 2=max)")
+		s.writeError("usage: :video_config <fps> <resolution>  (resolution: 0=default, 1=max)")
 		return
 	}
 	fps, err := strconv.Atoi(args[0])
@@ -370,16 +370,12 @@ func (s *Session) handleVideoConfig(args []string) {
 		return
 	}
 	res, err := strconv.Atoi(args[1])
-	if err != nil || res < 1 || res > 2 {
-		s.writeError("usage: :video_config <fps> <resolution>  (resolution: 1=default, 2=max)")
+	if err != nil || res < 0 || res > 1 {
+		s.writeError("usage: :video_config <fps> <resolution>  (resolution: 0=default, 1=max)")
 		return
 	}
-	resolution := "default"
-	if res == 2 {
-		resolution = "max"
-	}
-	s.SetVideoConfig(fps, resolution)
-	s.writeNotifyf("Video config set: fps=%d, resolution=%s", fps, resolution)
+	s.SetVideoConfig(fps, res)
+	s.writeNotifyf("Video config set: fps=%d, resolution=%d", fps, res)
 }
 
 // handleThemeSet sets the active theme, persists it to runtime config,

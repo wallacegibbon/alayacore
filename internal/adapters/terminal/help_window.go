@@ -89,7 +89,7 @@ func buildHelpItems() []HelpItem {
 		{ID: nextID(), Key: ":taskqueue_del <id>", Description: "Delete queued task", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":taskqueue_edit <id>", Description: "Edit queued task", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":clear_queue", Description: "Clear queued tasks", Type: HelpItemCommand},
-		{ID: nextID(), Key: ":video_config <fps> <1|2>", Description: "Set video FPS and resolution", Type: HelpItemCommand},
+		{ID: nextID(), Key: ":video_config <fps> <0|1>", Description: "Set video FPS and resolution", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":suspend", Description: "Suspend process", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":quit", Description: "Exit application", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":help", Description: "Open help window", Type: HelpItemCommand},
