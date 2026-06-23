@@ -542,5 +542,3 @@ func (m *DisplayModel) MoveWindowCursorToPrevUserPrompt() bool {
 
 	return found
 }
-
-var _ tea.Model = (*DisplayModel)(nil)
