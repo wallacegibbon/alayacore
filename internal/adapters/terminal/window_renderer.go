@@ -55,6 +55,7 @@ func (r *textRenderer) AppendFromTLV(tag string, value string) {
 
 func (r *textRenderer) Invalidate() {
 	r.cacheValid = false
+	r.wrappedLines = nil
 }
 
 // rawContent returns the full accumulated content for testing.
