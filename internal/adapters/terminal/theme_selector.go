@@ -7,7 +7,6 @@ package terminal
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -22,7 +21,6 @@ type ThemeSelector struct {
 
 	// Preview state
 	previewTheme     *theme.Theme
-	previewTimer     *time.Timer
 	previewThemeName string
 
 	// Selection state
@@ -67,10 +65,6 @@ func (ts *ThemeSelector) Close() {
 	ts.State = ScrollableListClosed
 	ts.previewTheme = nil
 	ts.previewThemeName = ""
-	if ts.previewTimer != nil {
-		ts.previewTimer.Stop()
-		ts.previewTimer = nil
-	}
 }
 
 // --- Theme Management ---
