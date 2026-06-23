@@ -6,7 +6,7 @@
 //   - Task queue management (prompts and commands)
 //   - Model interaction and streaming
 //   - Context management and auto-summarization (opt-in via --auto-summarize flag)
-//   - Command processing (:save, :model_set, :taskqueue_*, etc.)
+//   - Command processing (:save, :model_set, :model_load, etc.)
 //   - Session persistence (save/load conversations)
 //
 // Data Model:
@@ -33,7 +33,7 @@
 //	     via a message channel.
 //
 //	The only mutable state accessed from more than one goroutine are:
-//	  - atomic fields for pausedOnError, outputBroken, and confirmCh
+//	  - atomic fields for outputBroken, outputBroken, and confirmCh
 //	  - A few buffered channels for cancellation, completion signaling,
 //	    and system-info refresh requests.
 //
@@ -100,7 +100,7 @@
 //   - session_io.go: TLV input/output, summarize, continue commands
 //   - session_content.go: ContentPart helpers, tag mapping, ID lookup
 //   - session_persist.go: Session save/load functionality
-//   - session_types.go: Type definitions (QueueItem, etc.)
+//   - session_types.go: Type definitions (SessionConfig, etc.)
 //   - command_registry.go: Declarative command registration
 //   - model_manager.go: Model configuration management
 //   - runtime_manager.go: Runtime persistence

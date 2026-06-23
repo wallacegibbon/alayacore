@@ -78,9 +78,6 @@ type taskHandle struct {
 type runState struct {
 	Contents []llm.ContentPart // flat, ordered, 1:1 with TLV — set from task result
 
-	taskQueue   []QueueItem
-	nextQueueID uint64
-
 	activeTask *taskHandle // non-nil when a task is running; nil when idle
 
 	inputMsgCh    chan inputMsg // inputPump → run: parsed TLV messages
@@ -118,8 +115,7 @@ type sharedState struct {
 
 	confirmCh atomic.Pointer[chan<- llm.ToolConfirmResponse]
 
-	pausedOnError atomic.Bool
-	outputBroken  atomic.Bool
+	outputBroken atomic.Bool
 }
 
 // Session manages conversation state and task execution.
@@ -139,11 +135,6 @@ type Session struct {
 // Done returns a channel that is closed when run() has exited.
 func (s *Session) Done() <-chan struct{} {
 	return s.runDoneCh
-}
-
-// TaskError reports whether the last task ended with an error.
-func (s *Session) TaskError() bool {
-	return s.pausedOnError.Load()
 }
 
 func (s *Session) HasModels() bool {
@@ -198,7 +189,6 @@ func NewSession(cfg SessionConfig) *Session {
 		},
 		runState: runState{
 			Contents:      make([]llm.ContentPart, 0),
-			taskQueue:     make([]QueueItem, 0),
 			taskEventCh:   make(chan TaskEvent, 64),
 			taskResultCh:  make(chan []llm.ContentPart, 1),
 			taskRefreshCh: make(chan struct{}, 1),
@@ -237,7 +227,6 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 		},
 		runState: runState{
 			Contents:      data.Contents,
-			taskQueue:     make([]QueueItem, 0),
 			taskEventCh:   make(chan TaskEvent, 64),
 			taskResultCh:  make(chan []llm.ContentPart, 1),
 			taskRefreshCh: make(chan struct{}, 1),
@@ -275,12 +264,24 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 // replayContentsToAdapter sends all content parts to the adapter with history IDs,
 // so the adapter can reference them by ID even after session reload.
 func (s *Session) replayContentsToAdapter() error {
+	var lastRole llm.MessageRole
 	for _, part := range s.Contents {
 		tag, content, err := contentPartToTLV(part)
 		if err != nil {
 			return fmt.Errorf("corrupt session file: failed to serialize content part (HistoryID=%d): %w", part.GetHistoryID(), err)
 		}
+		// Emit MB between messages (role transitions) so the adapter
+		// can group parts into windows. User → Assistant or Assistant → User.
+		if lastRole != "" && part.GetRole() != lastRole {
+			s.writeTLV(stream.TagMessageBoundary, "")
+		}
+		lastRole = part.GetRole()
 		s.writeTLV(tag, stream.WrapDelta(strconv.FormatUint(part.GetHistoryID(), 10), content))
+	}
+
+	// Final MB to flush the last message.
+	if len(s.Contents) > 0 {
+		s.writeTLV(stream.TagMessageBoundary, "")
 	}
 	return nil
 }

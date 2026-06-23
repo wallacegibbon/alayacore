@@ -6,7 +6,6 @@
 //   - User input (text prompts and commands)
 //   - Display of assistant responses with styling
 //   - Model selection and switching
-//   - Task queue management
 //   - Focus management between input and display windows
 //
 // Architecture Overview:
@@ -15,9 +14,8 @@
 //	  - Terminal: The main model that composes all components
 //	  - DisplayModel: Renders assistant output with virtual scrolling
 //	  - InputModel: Handles user text input with external editor support
-//	  - Status bar: Shows session status (tokens, queue, model info)
+//	  - Status bar: Shows session status (tokens, model info)
 //	  - ModelSelector: Modal for switching between AI models
-//	  - QueueManager: Modal for managing the task queue
 //
 // Communication with the session layer uses TLV (Tag-Length-Value) protocol:
 //   - Input: io.WriteCloser sends TLV messages to the session
@@ -32,11 +30,10 @@
 //   - styles.go: Lipgloss style derivation from theme.Theme
 //   - input_component.go: Input handling and external editor support
 //   - model_selector.go: Model switching UI with fuzzy search
-//   - queue_manager.go: Task queue UI
 //   - theme_manager.go: Wrapper around theme.Manager with startup warnings
 //   - theme_selector.go: Theme selection UI with live preview
 //   - warnings.go: Warning collection for non-fatal initialization errors
-//   - overlay.go: Overlay rendering for selectors and queue manager
+//   - overlay.go: Overlay rendering for selectors
 //   - help_window.go: Keybinding and command help overlay
 //   - confirm_dialog.go: Confirmation dialogs for quit/cancel/tool
 //   - tool.go, tool_handler.go: Tool execution display

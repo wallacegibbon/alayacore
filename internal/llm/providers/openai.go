@@ -689,12 +689,9 @@ func openaiConvertRegularContent(apiMsg *openAIMessage, contents []llm.ContentPa
 			continue
 		}
 	}
-	switch len(contentParts) {
-	case 1:
-		apiMsg.Content = contentParts[0]["text"]
-	case 0:
-		// No content parts
-	default:
+	if len(contentParts) == 0 {
+		apiMsg.Content = ""
+	} else {
 		apiMsg.Content = contentParts
 	}
 }

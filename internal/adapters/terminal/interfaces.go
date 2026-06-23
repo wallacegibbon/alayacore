@@ -22,7 +22,6 @@ type ThemeEntry struct {
 type StatusSnapshot struct {
 	ContextTokens   int64
 	ContextLimit    int64
-	QueueCount      int
 	InProgress      bool
 	CurrentStep     int
 	MaxSteps        int
@@ -61,9 +60,6 @@ type OutputWriter interface {
 	// Snapshots (replaces many individual getters)
 	SnapshotStatus() StatusSnapshot
 	SnapshotModels() ModelSnapshot
-
-	// Queue management
-	GetQueueItems() []QueueItem
 
 	// Output methods
 	WriteError(format string, args ...any)

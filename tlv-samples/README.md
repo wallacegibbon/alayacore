@@ -16,6 +16,7 @@ UI  → stdin   User image (data:image/...;base64,... or URL)
 UV  → stdin   User video (data:video/...;base64,... or URL)
 UA  → stdin   User audio (data:audio/...;base64,... or URL)
 UD  → stdin   User document (data:application/...;base64,... or URL)
+MB  → stdin   Message boundary — flushes staged content as a single message
 AT  ← stdout  Assistant text (delta: \x00<id>\x00<content>)
 AR  ← stdout  Assistant reasoning (delta: \x00<id>\x00<content>)
 AF  ← stdout  Function/tool lifecycle (JSON)
@@ -64,11 +65,12 @@ A tool call (AF) without a matching UF is still in progress. Each `.bin` sample 
 
 ```
 Adapter writes → stdin:        UT "Read the file main.go"
+                               MB
 Session writes → stdout:       AF {"id":"t1","name":"read_file"}
                                AF {"id":"t1","input":{"path":"main.go"}}
                                UF {"id":"t1","output":[{"text":"package main...","type":"text"}]}
                                AT \x00 5 \x00 Here's what main.go does...
-                               SM {"type":"task","data":{"in_progress":false,"context":0,"queue_items":[]}}
+                               SM {"type":"task","data":{"in_progress":false,"context":0}}
 ```
 
 ## Example: Image Prompt Flow
@@ -77,9 +79,10 @@ Session writes → stdout:       AF {"id":"t1","name":"read_file"}
 Adapter writes → stdin:        UI data:image/jpeg;base64,...
                                UI data:image/png;base64,...
                                UT "What's in these images?"
+                               MB
 ```
 
-UI frames must precede the UT frame they belong to.
+All content (UI, UT, etc.) is staged until MB flushes it as a single message.
 
 ## Example: Media Prompt Flow
 
@@ -89,21 +92,31 @@ Adapter writes → stdin:        UI data:image/jpeg;base64,...
                                UV data:video/mp4;base64,...
                                UD data:application/pdf;base64,...
                                UT "Analyze these files"
+                               MB
 ```
 
-Media frames (UI, UA, UV, UD) must precede the UT frame they belong to.
-Multiple media frames of different types can be combined in any order.
+Media frames (UI, UA, UV, UD) and text (UT) are combined in any order.
+MB flushes them all as one user message.
 
 ## Example: Media URL Prompt Flow
 
 ```
 Adapter writes → stdin:        UI https://example.com/image.jpg
                                UA https://example.com/audio.wav
-                               UV https://example.com/video.mp4
                                UT "Analyze these files from URLs"
+                               MB
 ```
 
 Plain URLs are accepted alongside data URIs for all media types.
+
+## Example: Media-Only Prompt (no text)
+
+```
+Adapter writes → stdin:        UA https://example.com/audio.wav
+                               MB
+```
+
+Media without text is valid. MB flushes the staged audio as a complete message.
 
 ## Samples by Tool
 
@@ -179,9 +192,8 @@ sm-theme-list.bin              SM {"type":"theme_list","data":{"themes":[{"name"
 sm-theme.bin                   SM {"type":"theme","data":{"name":"theme-dark"}}
 sm-reasoning.bin               SM {"type":"reasoning","data":{"level":2}}
 sm-video-config.bin            SM {"type":"video_config","data":{"fps":5,"res":1}}
-sm-task-start.bin              SM {"type":"task","data":{"in_progress":true,"context":0,"queue_items":[]}}
-sm-task-queued.bin             SM {"type":"task","data":{"in_progress":true,"context":0,"queue_items":[{"queue_id":"Q1","type":"prompt","content":"Read the file main.go","created_at":"..."},{"queue_id":"Q2","type":"command","content":":continue","created_at":"..."}]}}
-sm-task-end.bin                SM {"type":"task","data":{"in_progress":false,"context":0,"queue_items":[]}}
+sm-task-start.bin              SM {"type":"task","data":{"in_progress":true,"context":0}}
+sm-task-end.bin                SM {"type":"task","data":{"in_progress":false,"context":0}}
 sm-error.bin                   SM {"type":"error","data":{"text":"something broke"}}
 sm-notify.bin                  SM {"type":"notify","data":{"text":"all good"}}
 sm-tool-confirm.bin            SM {"type":"tool_confirm","data":{"id":"t1"}}

@@ -47,11 +47,6 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleOverlayModelSelector(msg)
 	}
 
-	// 4. Queue manager takes precedence when open
-	if m.queueManager.IsOpen() {
-		return m.handleOverlayQueueManager(msg)
-	}
-
 	// 5. Help window takes precedence when open
 	if m.helpWindow.IsOpen() {
 		t := trackOverlay(m.helpWindow)
@@ -196,7 +191,7 @@ func (m *Terminal) handleConfirmResult() (tea.Model, tea.Cmd) {
 // keys in handleKeyMsg.
 func (m *Terminal) restoreFocusAfterConfirm() {
 	if m.modelSelector.IsOpen() || m.themeSelector.IsOpen() ||
-		m.queueManager.IsOpen() || m.helpWindow.IsOpen() {
+		m.helpWindow.IsOpen() {
 		m.display.updateContent()
 		return
 	}
@@ -238,13 +233,6 @@ func (m *Terminal) handleConfirmConfirmed(kind ConfirmKind, toolID string, fromC
 		m.restoreFocusAfterConfirm()
 		return m, m.submitCommand(agentpkg.CommandNameCancel, fromCmd)
 
-	case ConfirmCancelAll:
-		if fromCmd {
-			m.input.SetValue("")
-		}
-		m.restoreFocusAfterConfirm()
-		return m, m.submitCommand(agentpkg.CommandNameCancelAll, fromCmd)
-
 	case ConfirmTool:
 		m.emitCommand(":confirm " + toolID + " yes")
 		m.restoreFocusAfterConfirm()
@@ -253,8 +241,6 @@ func (m *Terminal) handleConfirmConfirmed(kind ConfirmKind, toolID string, fromC
 		}
 		return m, scheduleTick()
 	}
-
-	m.restoreFocusAfterConfirm()
 	return m, nil
 }
 
@@ -273,33 +259,6 @@ func (m *Terminal) handleOverlayModelSelector(msg tea.KeyMsg) (tea.Model, tea.Cm
 		m.emitCommand(":model_load")
 	}
 	if wasOpen && !m.modelSelector.IsOpen() {
-		m.restoreFocus()
-	}
-	return m, cmd
-}
-
-// handleOverlayQueueManager handles keyboard input when the queue manager is open.
-func (m *Terminal) handleOverlayQueueManager(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if msg.String() == keyD {
-		selectedItem := m.queueManager.GetSelectedItem()
-		if selectedItem != nil {
-			m.emitCommand(":taskqueue_del " + selectedItem.QueueID)
-			m.emitCommand(":taskqueue_get_all")
-		}
-		return m, nil
-	}
-
-	if msg.String() == keyE {
-		selectedItem := m.queueManager.GetSelectedItem()
-		if selectedItem != nil {
-			return m, m.editor.OpenForQueue(selectedItem.Content, selectedItem.QueueID)
-		}
-		return m, nil
-	}
-
-	wasOpen := m.queueManager.IsOpen()
-	cmd := m.queueManager.HandleKeyMsg(msg)
-	if wasOpen && !m.queueManager.IsOpen() {
 		m.restoreFocus()
 	}
 	return m, cmd
@@ -503,7 +462,6 @@ func (m *Terminal) handleGlobalKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 		return nil, true
 
 	case keyCtrlQ:
-		m.openQueueManager()
 		return nil, true
 
 	case keyCtrlH, keyF1:
@@ -561,8 +519,15 @@ func (m *Terminal) handleSubmit() tea.Cmd {
 		return m.handleCommand(strings.TrimSpace(command))
 	}
 
-	// Regular prompt - send to agent
+	// If a task is running, reject without clearing input.
+	if m.inProgress {
+		m.out.WriteError("A task is already running. Wait for it to complete or cancel it.")
+		return nil
+	}
+
+	// Regular prompt — stage the text, then flush with MB.
 	m.emitCommand(prompt)
+	m.emitMB()
 	m.input.SetValue("")
 
 	return scheduleTick()
@@ -580,13 +545,6 @@ func (m *Terminal) handleCommand(command string) tea.Cmd {
 	// Cancel command
 	if command == cmdCancel {
 		m.openConfirmCancel()
-		m.confirmFromCommand = true
-		return nil
-	}
-
-	// Cancel all command
-	if command == cmdCancelAll {
-		m.openConfirmCancelAll()
 		m.confirmFromCommand = true
 		return nil
 	}

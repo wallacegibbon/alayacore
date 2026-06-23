@@ -31,9 +31,7 @@ func TestSaveAndLoadSession(t *testing.T) {
 
 	// Create a minimal session for testing
 	session := &Session{
-		runState: runState{
-			taskQueue: make([]QueueItem, 0),
-		},
+		runState: runState{},
 		sessionConfig: sessionConfig{
 			SessionConfig: SessionConfig{
 				Input:  &stream.NopInput{},
@@ -145,8 +143,7 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 
 	session := &Session{
 		runState: runState{
-			Contents:  contents,
-			taskQueue: make([]QueueItem, 0),
+			Contents: contents,
 		},
 		sessionConfig: sessionConfig{
 			SessionConfig: SessionConfig{
@@ -226,8 +223,7 @@ func TestMarkdownFormat_HumanReadable(t *testing.T) {
 	}
 	session := &Session{
 		runState: runState{
-			Contents:  contents,
-			taskQueue: make([]QueueItem, 0),
+			Contents: contents,
 		},
 		sessionConfig: sessionConfig{
 			SessionConfig: SessionConfig{
@@ -275,8 +271,7 @@ func TestReasoningOnlyMessage(t *testing.T) {
 	}
 	session := &Session{
 		runState: runState{
-			Contents:  contents,
-			taskQueue: make([]QueueItem, 0),
+			Contents: contents,
 		},
 		sessionConfig: sessionConfig{
 			SessionConfig: SessionConfig{
@@ -330,8 +325,7 @@ func TestTextAndReasoningInSameMessage(t *testing.T) {
 	}
 	session := &Session{
 		runState: runState{
-			Contents:  contents,
-			taskQueue: make([]QueueItem, 0),
+			Contents: contents,
 		},
 		sessionConfig: sessionConfig{
 			SessionConfig: SessionConfig{
@@ -390,9 +384,7 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 	sessionCtx, sessionCancel := context.WithCancel(context.Background())
 	defer sessionCancel()
 	session := &Session{
-		runState: runState{
-			taskQueue: make([]QueueItem, 0),
-		},
+		runState: runState{},
 		sessionConfig: sessionConfig{
 			ModelManager: NewModelManager(""),
 			SessionConfig: SessionConfig{
@@ -418,9 +410,9 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 
 	// Test 1: model_set should work when no task is running.
 	// Dispatch through handleInputMsg (the real entry point) so the
-	// ScheduleIdle policy is enforced.
+	// CmdIdle policy is enforced.
 	output.Messages = nil
-	session.handleInputMsg(inputMsg{text: "model_set 1", isCmd: true})
+	session.handleInputMsg(inputMsg{cmd: "model_set 1", isCmd: true})
 
 	foundError := false
 	for _, msg := range output.Messages {
@@ -436,7 +428,7 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 	// Test 2: model_set should fail when task is running.
 	output.Messages = nil
 	session.activeTask = &taskHandle{}
-	session.handleInputMsg(inputMsg{text: "model_set 1", isCmd: true})
+	session.handleInputMsg(inputMsg{cmd: "model_set 1", isCmd: true})
 
 	foundError = false
 	for _, msg := range output.Messages {
@@ -452,7 +444,7 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 	// Test 3: model_set should work again after task completes.
 	output.Messages = nil
 	session.activeTask = nil
-	session.handleInputMsg(inputMsg{text: "model_set 1", isCmd: true})
+	session.handleInputMsg(inputMsg{cmd: "model_set 1", isCmd: true})
 
 	foundError = false
 	for _, msg := range output.Messages {
@@ -662,8 +654,7 @@ func TestTLVFormatRecursionProtection(t *testing.T) {
 	}
 	session := &Session{
 		runState: runState{
-			Contents:  contents,
-			taskQueue: make([]QueueItem, 0),
+			Contents: contents,
 		},
 		sessionConfig: sessionConfig{
 			SessionConfig: SessionConfig{

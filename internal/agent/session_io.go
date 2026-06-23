@@ -15,7 +15,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/alayacore/alayacore/internal/config"
 	domainerrors "github.com/alayacore/alayacore/internal/errors"
@@ -34,165 +33,6 @@ func (s *Session) cancelTask() {
 		}
 	}
 	s.writeError(domainerrors.ErrNothingToCancel.Error())
-}
-
-func (s *Session) cancelAllTasks() {
-	queueLen := len(s.taskQueue)
-	s.taskQueue = make([]QueueItem, 0)
-
-	// Cancel the running task (if any) and clear the queue in one
-	// place.  Everything runs in the run() goroutine — no split.
-	currentCanceled := false
-	if s.activeTask != nil {
-		if s.cancelRunningTask() {
-			currentCanceled = true
-		}
-	}
-
-	// Send notification
-	switch {
-	case currentCanceled && queueLen > 0:
-		s.writeNotifyf("Canceled current task and cleared %d queued tasks", queueLen)
-	case currentCanceled:
-		s.writeNotify("Canceled current task")
-	case queueLen > 0:
-		s.writeNotifyf("Cleared %d queued tasks", queueLen)
-	default:
-		s.writeError(domainerrors.ErrNothingToCancel.Error())
-		return
-	}
-
-	// Clear paused-on-error state so the queue can resume if needed
-	s.pausedOnError.Store(false)
-
-	s.requestSystemInfo()
-}
-
-// clearQueue removes all queued tasks without affecting the currently
-// running task.  If the queue is already empty it reports an error.
-func (s *Session) clearQueue() {
-	if len(s.taskQueue) == 0 {
-		s.writeError("Task queue is already empty")
-		return
-	}
-	count := len(s.taskQueue)
-	s.taskQueue = make([]QueueItem, 0)
-	s.writeNotifyf("Cleared %d queued tasks", count)
-	s.requestSystemInfo()
-}
-
-func (s *Session) handleContinue(ctx context.Context, contents []llm.ContentPart, args []string) []llm.ContentPart {
-	// Validate arguments before doing anything.
-	if len(args) > 0 && args[0] != "skip" {
-		s.writeError("usage: :continue [skip]")
-		return contents
-	}
-
-	s.pausedOnError.Store(false)
-
-	// With no arguments, resend the last prompt.
-	if len(args) == 0 {
-		return s.resendPrompt(ctx, contents)
-	}
-
-	// "skip" — skip the failed prompt and resume the remaining queue.
-	qLen := len(s.taskQueue)
-	if qLen == 0 {
-		s.writeNotify("Queue is empty")
-		return contents
-	}
-
-	s.writeNotify("Resuming queue...")
-	s.requestSystemInfo()
-	return contents
-}
-
-func (s *Session) summarize(ctx context.Context, contents []llm.ContentPart) []llm.ContentPart {
-	// Save a timestamped backup before the destructive summarization
-	// replaces the conversation history.  This preserves the full context
-	// for recovery if the summary omits important details.
-	if s.SessionFile != "" {
-		ext := filepath.Ext(s.SessionFile)
-		base := strings.TrimSuffix(s.SessionFile, ext)
-		backupPath := fmt.Sprintf("%s-%s%s", base, time.Now().Format("20060102150405"), ext)
-		if err := s.saveContentToFile(backupPath, s.Contents); err != nil {
-			s.writeNotifyf("Failed to create pre-summarize backup: %v", err)
-		} else {
-			s.writeNotifyf("Pre-summarize backup saved to %s", backupPath)
-		}
-	}
-
-	prompt := `Summarize the conversation for continuation. The resuming instance has no prior context.
-
-Provide:
-1. **Task** — Original request and success criteria
-2. **Done** — Completed items with specifics (file paths, function names, values)
-3. **State** — Files created/modified/deleted, key decisions and rationale
-4. **Blocked** — Unresolved errors, failing tests, open questions
-5. **Next** — Ordered actions to resume
-
-Rules:
-- Prefer exact identifiers, file paths, and code snippets over prose descriptions
-- Include error messages verbatim
-- Skip completed exploration; only preserve findings that affect next steps`
-
-	id := s.histIncAndGet()
-	contents = append(contents, &llm.TextPart{
-		Text: prompt,
-		ContentPartMeta: llm.ContentPartMeta{
-			HistoryID: id,
-			Role:      llm.RoleUser,
-		},
-	})
-
-	s.writeNotify("Summarizing conversation...")
-
-	beforeLen := len(contents)
-	fullContents, outputTokens, err := s.processPrompt(ctx, contents)
-	if err != nil {
-		s.writeError(err.Error())
-		s.pausedOnError.Store(true)
-		s.requestSystemInfo()
-		return fullContents
-	}
-
-	// Find assistant content parts in the newly added content (response to summary).
-	// Strip reasoning/thinking content — it's internal model deliberation, not summary.
-	var summaryParts []llm.ContentPart
-	for _, part := range fullContents[beforeLen:] {
-		if part.GetRole() != llm.RoleAssistant {
-			continue
-		}
-		switch part.(type) {
-		case *llm.ReasoningPart:
-			continue
-		default:
-			summaryParts = append(summaryParts, part)
-		}
-	}
-
-	// Rebuild contents: "Continue" user message + filtered summary.
-	contents = contents[:0]
-	continueID := s.histIncAndGet()
-	contents = append(contents, &llm.TextPart{
-		Text: "Continue",
-		ContentPartMeta: llm.ContentPartMeta{
-			HistoryID: continueID,
-			Role:      llm.RoleUser,
-		},
-	})
-	for _, part := range summaryParts {
-		part.UpdateContentPartMeta(s.histIncAndGet(), llm.RoleAssistant)
-		contents = append(contents, part)
-	}
-
-	if outputTokens > 0 {
-		s.sendEvent(SetContextTokensEvent{Tokens: outputTokens})
-	}
-
-	s.writeNotify("Summarized conversation")
-	s.requestSystemInfo()
-	return contents
 }
 
 func (s *Session) saveSession(args []string) {
@@ -305,44 +145,7 @@ func (s *Session) handleModelLoad() {
 	s.sendModelListMsg()
 }
 
-func (s *Session) handleTaskQueueGetAll() {
-	s.sendSystemInfo("task")
-}
-
-func (s *Session) handleTaskQueueDel(args []string) {
-	if len(args) == 0 {
-		s.writeError("usage: :taskqueue_del <queue_id>")
-		return
-	}
-
-	queueID := args[0]
-	if s.DeleteQueueItem(queueID) {
-		s.sendSystemInfo("task")
-	} else {
-		s.writeError(domainerrors.Wrapf("taskqueue_del", domainerrors.ErrQueueItemNotFound, "queue item %s not found", queueID).Error())
-	}
-}
-
-func (s *Session) handleTaskQueueEdit(args []string) {
-	if len(args) < 2 {
-		s.writeError("usage: :taskqueue_edit <queue_id> <new_content>")
-		return
-	}
-
-	queueID := args[0]
-	newContent := strings.Join(args[1:], " ")
-	if s.UpdateQueueItem(queueID, newContent) {
-		s.sendSystemInfo("task")
-	} else {
-		s.writeError(domainerrors.Wrapf("taskqueue_edit", domainerrors.ErrQueueItemNotFound, "queue item %s not found", queueID).Error())
-	}
-}
-
 func (s *Session) handleReason(args []string) {
-	if len(args) == 0 {
-		s.writeError("usage: :reason [0|1|2]  (0=off, 1=normal, 2=max)")
-		return
-	}
 	level, err := strconv.Atoi(args[0])
 	if err != nil || level < config.ReasoningLevelOff || level > config.ReasoningLevelMax {
 		s.writeError("usage: :reason [0|1|2]  (0=off, 1=normal, 2=max)")
@@ -409,49 +212,22 @@ func (s *Session) handleThemeSet(args []string) {
 //     equivalent to a user turn, so the LLM can respond directly.
 //  3. Assistant message → the API partially succeeded or was canceled.
 //     A "Continue" user message is appended so the model picks up where it left off.
-func (s *Session) resendPrompt(ctx context.Context, contents []llm.ContentPart) []llm.ContentPart {
-	if len(contents) == 0 {
-		s.writeError("No messages to resend")
-		return contents
-	}
-
-	lastPart := contents[len(contents)-1]
-	if lastPart.GetRole() == llm.RoleAssistant {
-		id := s.histIncAndGet()
-		contents = append(contents, &llm.TextPart{
-			Text: "Continue",
-			ContentPartMeta: llm.ContentPartMeta{
-				HistoryID: id,
-				Role:      llm.RoleUser,
-			},
-		})
-		s.writeTLV(stream.TagUserT, stream.WrapDelta(strconv.FormatUint(id, 10), "Continue"))
-	} else {
-		s.writeNotify("Resending...")
-	}
-
-	fullContents, _, err := s.processPrompt(ctx, contents)
-	if err != nil {
-		s.writeError(err.Error())
-		s.pausedOnError.Store(true)
-		s.requestSystemInfo()
-		return fullContents
-	}
-
-	s.requestSystemInfo()
-	return fullContents
-}
-
-// ============================================================================
-// Input Pump (reads TLV frames from input stream)
 // ============================================================================
 
 // inputMsg carries a parsed input message from the I/O pump to run().
+//
+// For prompt messages:
+//   - contentParts holds the combined message (media parts + optional text part)
+//   - isCmd is false, cmd is empty
+//
+// For command messages:
+//   - cmd holds the command text (without ':' prefix)
+//   - contentParts is nil, isCmd is true
 type inputMsg struct {
-	text        string            // the raw user text or command text (without ':')
-	attachments []llm.ContentPart // media attachments from preceding UI/UV/UA/UD tags
-	isCmd       bool              // true if text starts with ':'
-	errText     string            // non-empty when the input pump hit a validation error
+	contentParts []llm.ContentPart // combined user content (media + text)
+	cmd          string            // command text for commands, empty for prompts
+	isCmd        bool              // true when cmd is set
+	errText      string            // non-empty when the input pump hit a validation error
 }
 
 // inputPump runs in its own goroutine.  It reads TLV frames from the
@@ -459,32 +235,46 @@ type inputMsg struct {
 // It does NOT interpret commands or access session state — all of
 // that lives in the run() goroutine.
 func (s *Session) inputPump() {
-	var pendingAttachments []llm.ContentPart
+	var staged []llm.ContentPart
+
+	// flushStaged sends all staged content as a prompt.
+	// Called on MB tag or EOF.
+	flushStaged := func() {
+		if len(staged) > 0 {
+			msg := inputMsg{contentParts: staged}
+			staged = nil
+			s.inputMsgCh <- msg
+		}
+	}
 
 	for {
 		tag, value, err := stream.ReadTLV(s.Input)
 		if err != nil {
+			// Flush any staged content before closing on EOF.
+			flushStaged()
 			close(s.inputMsgCh)
 			return
 		}
 
 		switch tag {
 		case stream.TagUserI:
-			pendingAttachments = append(pendingAttachments, &llm.ImagePart{URI: value})
+			staged = append(staged, &llm.ImagePart{URI: value})
 		case stream.TagUserV:
-			pendingAttachments = append(pendingAttachments, &llm.VideoPart{URI: value})
+			staged = append(staged, &llm.VideoPart{URI: value})
 		case stream.TagUserA:
-			pendingAttachments = append(pendingAttachments, &llm.AudioPart{URI: value})
+			staged = append(staged, &llm.AudioPart{URI: value})
 		case stream.TagUserD:
-			pendingAttachments = append(pendingAttachments, &llm.DocumentPart{URI: value})
+			staged = append(staged, &llm.DocumentPart{URI: value})
 		case stream.TagUserT:
-			s.handleInputUserText(value, &pendingAttachments)
+			s.handleInputUserText(value, &staged)
+		case stream.TagMessageBoundary:
+			flushStaged()
 
 		default:
-			if len(pendingAttachments) > 0 {
-				pendingAttachments = nil
+			if len(staged) > 0 {
+				staged = nil
 				s.inputMsgCh <- inputMsg{errText: domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
-					"media tag must be followed by another media or text, got: %s", tag).Error()}
+					"unexpected tag while content is staged: %s", tag).Error()}
 			} else {
 				s.inputMsgCh <- inputMsg{errText: domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
 					"invalid input tag: %s", tag).Error()}
@@ -493,33 +283,33 @@ func (s *Session) inputPump() {
 	}
 }
 
-// handleInputUserText builds an inputMsg from the text value and any
-// preceding attachments.  It strips the ':' prefix for commands and sets
-// isCmd so run() can dispatch them.  The only validation is rejecting
-// attachments followed by a command (attaching media to a command makes
-// no sense).
-func (s *Session) handleInputUserText(value string, pendingAttachments *[]llm.ContentPart) {
-	if len(*pendingAttachments) > 0 && len(value) > 0 && value[0] == ':' {
-		// Attachments followed by a command is not allowed.
-		*pendingAttachments = nil
-		s.inputMsgCh <- inputMsg{errText: domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
-			"command can not attach media").Error()}
+// handleInputUserText handles a UT (user text) tag from the input pump.
+//
+// All content — both media (UI/UV/UA/UD) and text — is staged until
+// an MB (message boundary) tag or EOF flushes it.  Commands (starting
+// with ':') are sent immediately when there is no staged content; a
+// command with staged content is rejected.
+func (s *Session) handleInputUserText(value string, staged *[]llm.ContentPart) {
+	if len(value) > 0 && value[0] == ':' {
+		// Command with staged content is rejected.
+		if len(*staged) > 0 {
+			*staged = nil
+			s.inputMsgCh <- inputMsg{errText: domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
+				"command can not be sent with staged content").Error()}
+			return
+		}
+		// Command without staged content — send as-is.
+		s.inputMsgCh <- inputMsg{
+			isCmd: true,
+			cmd:   value[1:],
+		}
 		return
 	}
 
-	msg := inputMsg{
-		text:        value,
-		attachments: *pendingAttachments,
+	// Regular text — stage it.  Content stays staged until MB or EOF.
+	if value != "" {
+		*staged = append(*staged, &llm.TextPart{Text: value})
 	}
-	*pendingAttachments = nil
-
-	// Strip the colon prefix; run() uses isCmd to route to handleInputMsg.
-	if len(value) > 0 && value[0] == ':' {
-		msg.text = value[1:]
-		msg.isCmd = true
-	}
-
-	s.inputMsgCh <- msg
 }
 
 // handleFork saves all content from the start of the session up to (and
@@ -588,50 +378,86 @@ func (s *Session) handleConfirmCommand(args []string) {
 	*p <- llm.ToolConfirmResponse{ID: id, Allowed: allowed}
 }
 
+// startTaskOrCmd starts a task goroutine for an unrecognized command.
+// text is the full raw input; name is the first word for routing.
+// :continue and :summarize run their own handlers; everything else is
+// treated as a normal prompt with the raw text as content.
+// Known commands like :continue and :summarize are routed to specific
+// handlers; all others are treated as a normal prompt with the command
+// text as content.
+func (s *Session) startTaskOrCmd(text, name string) {
+	if s.activeTask != nil {
+		s.writeError("Cannot run command while a task is running. Please wait or cancel first.")
+		return
+	}
+	if err := s.ensureAgentInitialized(); err != nil {
+		s.writeError(err.Error())
+		return
+	}
+	taskContent := make([]llm.ContentPart, len(s.Contents))
+	copy(taskContent, s.Contents)
+	taskCtx, taskCancel := context.WithCancel(s.sessionCtx)
+	s.activeTask = &taskHandle{cancel: taskCancel, step: 0}
+	switch name {
+	case CommandNameContinue:
+		go s.runContinue(taskCtx, taskContent)
+	case CommandNameSummarize:
+		go s.runSummarize(taskCtx, taskContent)
+	default:
+		go s.runTask(taskCtx, taskContent, []llm.ContentPart{&llm.TextPart{Text: text}})
+	}
+}
+
 // handleInputMsg processes a parsed input message. Called from run() goroutine.
-// Command dispatch uses a single lookup in the command registry to determine
-// both the schedule policy and the handler, avoiding the redundant parsing
-// and double-lookup of the previous handleCommand → dispatchCommand chain.
 func (s *Session) handleInputMsg(msg inputMsg) {
-	// Deliver any validation error from the input pump first.
 	if msg.errText != "" {
 		s.writeError(msg.errText)
 		return
 	}
+
 	if !msg.isCmd {
-		s.submitTask(QueueItem{Type: TaskTypePrompt, Content: msg.text, Attachments: msg.attachments})
+		// Prompt — reject if a task is already running.
+		if s.activeTask != nil {
+			s.writeError("A task is already running. Wait for it to complete or cancel it.")
+			return
+		}
+		if err := s.ensureAgentInitialized(); err != nil {
+			s.writeError(err.Error())
+			return
+		}
+		taskContent := make([]llm.ContentPart, len(s.Contents))
+		copy(taskContent, s.Contents)
+		taskCtx, taskCancel := context.WithCancel(s.sessionCtx)
+		s.activeTask = &taskHandle{cancel: taskCancel, step: 0}
+		go s.runTask(taskCtx, taskContent, msg.contentParts)
 		return
 	}
 
-	cmd := msg.text
-	parts := strings.Fields(cmd)
-	if len(parts) == 0 {
+	// Command dispatch.
+	raw := msg.cmd
+	fields := strings.Fields(raw)
+	if len(fields) == 0 {
 		s.writeError(domainerrors.ErrEmptyCommand.Error())
 		return
 	}
 
-	commandName := parts[0]
-	args := parts[1:]
+	name := fields[0]
+	args := fields[1:]
 
-	c, ok := LookupCommand(commandName)
+	cmdDef, ok := LookupCommand(name)
 	if !ok {
-		// Unknown commands are submitted as tasks so they fall
-		// through to the task-command path (handles :summarize,
-		// :continue, and reports unknown cmd errors).
-		s.submitTaskCommand(cmd)
+		s.startTaskOrCmd(raw, name)
 		return
 	}
 
-	switch c.Schedule {
-	case ScheduleImmediate:
-		c.Handler(s, s.sessionCtx, args)
-	case ScheduleIdle:
+	switch cmdDef.Policy {
+	case CmdImmediate:
+		cmdDef.Handler(s, s.sessionCtx, args)
+	case CmdIdle:
 		if s.activeTask != nil {
 			s.writeError("Cannot run this command while a task is in progress. Please wait or cancel the current task.")
 			return
 		}
-		c.Handler(s, s.sessionCtx, args)
-	default: // ScheduleTask
-		s.submitTaskCommand(cmd)
+		cmdDef.Handler(s, s.sessionCtx, args)
 	}
 }

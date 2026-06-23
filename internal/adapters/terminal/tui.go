@@ -28,6 +28,12 @@ func (m *Terminal) emitCommand(cmd string) {
 	_ = stream.WriteTLV(m.streamInput, stream.TagUserT, cmd) //nolint:errcheck
 }
 
+// emitMB sends a message boundary tag, flushing any staged content
+// as a complete user message.
+func (m *Terminal) emitMB() {
+	_ = stream.WriteTLV(m.streamInput, stream.TagMessageBoundary, "") //nolint:errcheck
+}
+
 // ============================================================================
 // Constants
 // ============================================================================
@@ -81,7 +87,6 @@ type Terminal struct {
 	display        DisplayModel
 	input          InputModel
 	modelSelector  *ModelSelector
-	queueManager   *QueueManager
 	themeSelector  *ThemeSelector
 	themeManager   *ThemeManager
 	helpWindow     *HelpWindow
@@ -129,7 +134,6 @@ func NewTerminalWithTheme(
 		display:        NewDisplayModel(out.WindowBuffer(), styles),
 		input:          NewInputModel(styles),
 		modelSelector:  NewModelSelector(styles),
-		queueManager:   NewQueueManager(styles),
 		themeSelector:  NewThemeSelector(styles),
 		themeManager:   themeManager,
 		helpWindow:     NewHelpWindow(styles),
@@ -147,7 +151,6 @@ func NewTerminalWithTheme(
 	m.display.SetWidth(initialWidth)
 	m.input.SetWidth(initialWidth)
 	m.modelSelector.SetSize(initialWidth, initialHeight)
-	m.queueManager.SetSize(initialWidth, initialHeight)
 	m.themeSelector.SetSize(initialWidth, initialHeight)
 	m.helpWindow.SetSize(initialWidth, initialHeight)
 	m.confirmOverlay.SetSize(initialWidth, initialHeight)
@@ -229,7 +232,6 @@ func (m *Terminal) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 	m.display.SetWidth(max(0, msg.Width))
 	m.input.SetWidth(max(0, msg.Width))
 	m.modelSelector.SetSize(msg.Width, msg.Height)
-	m.queueManager.SetSize(msg.Width, msg.Height)
 	m.themeSelector.SetSize(msg.Width, msg.Height)
 	m.helpWindow.SetSize(msg.Width, msg.Height)
 	m.confirmOverlay.SetSize(msg.Width, msg.Height)
@@ -271,17 +273,9 @@ func (m *Terminal) handleTick() (tea.Model, tea.Cmd) {
 		// Update model selector if models changed
 		modelSnap := m.out.SnapshotModels()
 		cmd = m.modelSelector.LoadModels(modelSnap.Models, modelSnap.ActiveID)
-
-		// Check for queue items update
-		if queueItems := m.out.GetQueueItems(); queueItems != nil {
-			m.queueManager.SetItems(queueItems)
-			m.display.updateContent()
-		}
 	} else {
 		m.updateStatus()
 	}
-
-	// Continue ticking
 	return m, tea.Batch(
 		tea.Tick(TickInterval, func(_ time.Time) tea.Msg {
 			return tickMsg{}
@@ -295,7 +289,6 @@ func (m *Terminal) handleTick() (tea.Model, tea.Cmd) {
 //
 //   - EditorActionNone:          view-only (display), no side effects
 //   - EditorActionSubmit:        submit content as user input
-//   - EditorActionQueueEdit:     update a queued task's content
 //   - EditorActionReloadConfig:  reload configuration after file edit
 func (m *Terminal) handleEditorFinished(msg EditorFinishedMsg) (tea.Model, tea.Cmd) {
 	if msg.Err != nil {
@@ -319,13 +312,6 @@ func (m *Terminal) handleEditorFinished(msg EditorFinishedMsg) (tea.Model, tea.C
 		}
 		return m, nil
 
-	case EditorActionQueueEdit:
-		if msg.Content != "" && msg.QueueID != "" {
-			m.emitCommand(":taskqueue_edit " + msg.QueueID + " " + msg.Content)
-			m.emitCommand(":taskqueue_get_all")
-		}
-		return m, nil
-
 	case EditorActionReloadConfig:
 		if msg.FileType == "model_config" {
 			m.emitCommand(":model_load")
@@ -346,7 +332,6 @@ func (m *Terminal) updateDisplayHeight() {
 func (m *Terminal) updateStatus() {
 	snap := m.out.SnapshotStatus()
 
-	keyStyle := m.styles.Status
 	valStyle := m.styles.Status.Foreground(m.styles.ColorMuted)
 
 	// Build status segments - each rendered separately with appropriate colors
@@ -363,11 +348,6 @@ func (m *Terminal) updateStatus() {
 	}
 	if len(switches) > 0 {
 		segments = append(segments, strings.Join(switches, " "))
-	}
-
-	// Queue segment
-	if snap.QueueCount > 0 {
-		segments = append(segments, keyStyle.Render("Q:")+valStyle.Render(fmt.Sprintf("%d", snap.QueueCount)))
 	}
 
 	// Context segment
@@ -459,7 +439,7 @@ func (m *Terminal) View() tea.View {
 
 	baseContent := sb.String()
 
-	// Layer 1: Regular overlay windows (model selector, theme selector, queue manager, help).
+	// Layer 1: Regular overlay windows (model selector, theme selector, help).
 	// These are mutually exclusive — only one can be open at a time.
 	overlayContent := baseContent
 
@@ -468,8 +448,6 @@ func (m *Terminal) View() tea.View {
 		overlayContent = m.modelSelector.RenderOverlay(baseContent, m.windowWidth, m.windowHeight)
 	case m.themeSelector.IsOpen():
 		overlayContent = m.themeSelector.RenderOverlay(baseContent, m.windowWidth, m.windowHeight)
-	case m.queueManager.IsOpen():
-		overlayContent = m.queueManager.RenderOverlay(baseContent, m.windowWidth, m.windowHeight)
 	case m.helpWindow.IsOpen():
 		overlayContent = m.helpWindow.RenderOverlay(baseContent, m.windowWidth, m.windowHeight)
 	}
@@ -580,15 +558,6 @@ func (m *Terminal) restoreFocus() {
 	m.display.updateContent()
 }
 
-// openQueueManager opens the queue manager UI.
-func (m *Terminal) openQueueManager() {
-	m.emitCommand(":taskqueue_get_all")
-	m.queueManager.Open()
-	m.input.Blur()
-	m.display.SetDisplayFocused(false)
-	m.display.updateContent()
-}
-
 // openThemeSelector opens the theme selector UI.
 func (m *Terminal) openThemeSelector() {
 	if m.themeManager == nil {
@@ -625,14 +594,6 @@ func (m *Terminal) openConfirmCancel() {
 	m.display.updateContent()
 }
 
-// openConfirmCancelAll opens the cancel-all-tasks confirmation dialog.
-func (m *Terminal) openConfirmCancelAll() {
-	m.confirmOverlay.OpenCancelAll()
-	m.input.Blur()
-	m.display.SetDisplayFocused(false)
-	m.display.updateContent()
-}
-
 // openConfirmTool opens the tool-execution confirmation dialog.
 func (m *Terminal) openConfirmTool(id, toolName, toolInput string) {
 	m.confirmOverlay.OpenTool(id, toolName, toolInput)
@@ -648,7 +609,6 @@ func (m *Terminal) applyTheme(theme *theme.Theme) {
 	m.display.SetStyles(m.styles)
 	m.input.SetStyles(m.styles)
 	m.modelSelector.SetStyles(m.styles)
-	m.queueManager.SetStyles(m.styles)
 	m.themeSelector.SetStyles(m.styles)
 	m.helpWindow.SetStyles(m.styles)
 	m.confirmOverlay.Styles = m.styles
@@ -661,7 +621,6 @@ func (m *Terminal) handleBlur() (tea.Model, tea.Cmd) {
 	m.display.SetDisplayFocused(false)
 	m.input.Blur()
 	m.modelSelector.SetHasFocus(false)
-	m.queueManager.SetHasFocus(false)
 	m.themeSelector.SetHasFocus(false)
 	m.helpWindow.SetHasFocus(false)
 	m.confirmOverlay.HasFocus = false
@@ -674,17 +633,11 @@ func (m *Terminal) handleFocus() (tea.Model, tea.Cmd) {
 	m.hasFocus = true
 
 	m.modelSelector.SetHasFocus(true)
-	m.queueManager.SetHasFocus(true)
 	m.themeSelector.SetHasFocus(true)
 	m.helpWindow.SetHasFocus(true)
 	m.confirmOverlay.HasFocus = true
 
 	if m.modelSelector.IsOpen() {
-		m.display.updateContent()
-		return m, nil
-	}
-
-	if m.queueManager.IsOpen() {
 		m.display.updateContent()
 		return m, nil
 	}

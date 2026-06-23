@@ -42,6 +42,12 @@ func main() {
 		fmt.Fprintf(os.Stderr, "write: %v\n", err)
 		os.Exit(1)
 	}
+
+	// Flush with message boundary.
+	if _, err := os.Stdout.Write(stream.EncodeTLV(stream.TagMessageBoundary, "")); err != nil {
+		fmt.Fprintf(os.Stderr, "write: %v\n", err)
+		os.Exit(1)
+	}
 }
 
 // tagForMIME returns the TLV tag for the given MIME type.

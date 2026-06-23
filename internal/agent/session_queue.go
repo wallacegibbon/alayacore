@@ -1,80 +1,22 @@
 package agent
 
-// Session task queue: submit, enqueue, run, and manage queued tasks.
-//
-// The main loop (run()) manages the queue. Tasks are executed in their
-// own goroutine via runTask(). The task queue is owned exclusively by
-// the run() goroutine — no mutex needed.
-//
-// The task goroutine communicates state changes (step progress, new
-// ContentParts, token counts) back to run() via taskEventCh.
+// Session task execution: runs prompts and LLM-requiring commands
+// in their own goroutine, communicating results back via taskResultCh.
 
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/stream"
-
-	domainerrors "github.com/alayacore/alayacore/internal/errors"
 )
 
-// ============================================================================
-// Task Submission (called from run() goroutine only)
-// ============================================================================
-
-func (s *Session) submitTask(item QueueItem) {
-	queueEmpty := len(s.taskQueue) == 0
-	// Clear paused-on-error only if queue was empty (new task will run immediately).
-	if queueEmpty {
-		s.pausedOnError.Store(false)
-	}
-	s.enqueueTask(item, false)
-}
-
-// submitTaskCommand enqueues a task command at the front of the task queue.
-// Task commands (e.g. :continue, :summarize) can only run when no task is
-// currently in progress, or when the current task is paused on error (which also
-// means activeTask is nil — the task goroutine has returned).
-// They are placed at the front so they run ahead of any accumulated user prompts.
-func (s *Session) submitTaskCommand(cmd string) {
-	if s.activeTask != nil {
-		s.writeError("Cannot run command while a task is running. Please wait or cancel first.")
-		return
-	}
-	s.enqueueTask(QueueItem{Type: TaskTypeCommand, Content: cmd}, true)
-}
-
-// enqueueTask adds a task to the queue. When front is true, the task is
-// placed at the front so it runs before previously queued items.
-//
-// nextQueueID is goroutine-local (only accessed from the run() goroutine),
-// so it's updated without synchronization.
-func (s *Session) enqueueTask(item QueueItem, front bool) {
-	s.nextQueueID++
-	item.QueueID = fmt.Sprintf("Q%d", s.nextQueueID)
-	item.CreatedAt = time.Now()
-
-	if front {
-		s.taskQueue = append([]QueueItem{item}, s.taskQueue...)
-	} else {
-		s.taskQueue = append(s.taskQueue, item)
-	}
-
-	s.sendSystemInfo("task")
-}
-
-// ============================================================================
-// Task Runner (runs in its own goroutine)
-// ============================================================================
-
-// runTask executes a single task in its own goroutine. It is called from
-// run() via "go s.runTask(ctx, item, taskContent)". On completion it sends
-// the result on taskResultCh so the main loop can update s.Contents.
-func (s *Session) runTask(ctx context.Context, item QueueItem, taskContent []llm.ContentPart) {
+// runTask executes a prompt in its own goroutine.
+func (s *Session) runTask(ctx context.Context, taskContent []llm.ContentPart, parts []llm.ContentPart) {
 	contents := taskContent
 
 	defer func() {
@@ -83,11 +25,44 @@ func (s *Session) runTask(ctx context.Context, item QueueItem, taskContent []llm
 
 	s.requestSystemInfo()
 
-	switch item.Type {
-	case TaskTypePrompt:
-		contents = s.handleUserPrompt(ctx, contents, item.Content, item.Attachments)
-	case TaskTypeCommand:
-		contents = s.runTaskCommand(ctx, contents, item.Content)
+	contents, _ = s.handleUserPrompt(ctx, contents, parts)
+
+	if ctx.Err() == context.Canceled {
+		contents = s.appendCancelMessage(contents)
+	}
+}
+
+// runContinue constructs a "Continue" user prompt and processes it as
+// a normal user message.  If the last message was from the assistant,
+// a "Continue" text is appended; otherwise the last prompt is resent.
+func (s *Session) runContinue(ctx context.Context, taskContent []llm.ContentPart) {
+	contents := taskContent
+
+	defer func() {
+		s.taskResultCh <- contents
+	}()
+
+	if len(contents) == 0 {
+		s.writeError("No messages to resend")
+		return
+	}
+
+	lastPart := contents[len(contents)-1]
+	if lastPart.GetRole() == llm.RoleAssistant {
+		// Assistant message — LLM was interrupted mid-response.
+		// Append "Continue" as a user message to tell it to pick up where it left off.
+		contents, _ = s.handleUserPrompt(ctx, contents, []llm.ContentPart{
+			&llm.TextPart{Text: "Continue"},
+		})
+	} else {
+		// User or tool message — resend the conversation as-is.
+		s.writeNotify("Resending...")
+		fullContents, _, err := s.processPrompt(ctx, contents)
+		if err != nil {
+			s.writeError(err.Error())
+			s.requestSystemInfo()
+		}
+		contents = fullContents
 	}
 
 	if ctx.Err() == context.Canceled {
@@ -95,27 +70,90 @@ func (s *Session) runTask(ctx context.Context, item QueueItem, taskContent []llm
 	}
 }
 
-// runTaskCommand handles a task command in the task goroutine.
-// Unlike commands dispatched directly by handleInputMsg in run(),
-// task commands operate on the task's local content copy.
-func (s *Session) runTaskCommand(ctx context.Context, contents []llm.ContentPart, cmd string) []llm.ContentPart {
-	parts := strings.Fields(cmd)
-	if len(parts) == 0 {
-		return contents
+// runSummarize constructs a summarization prompt and processes it.
+// After the LLM responds, the conversation is replaced with a summary.
+func (s *Session) runSummarize(ctx context.Context, taskContent []llm.ContentPart) {
+	contents := taskContent
+
+	defer func() {
+		s.taskResultCh <- contents
+	}()
+
+	// Save a backup before summarization.
+	if s.SessionFile != "" {
+		ext := filepath.Ext(s.SessionFile)
+		base := strings.TrimSuffix(s.SessionFile, ext)
+		backupPath := fmt.Sprintf("%s-%s%s", base, time.Now().Format("20060102150405"), ext)
+		if err := s.saveContentToFile(backupPath, contents); err != nil {
+			s.writeNotifyf("Failed to create pre-summarize backup: %v", err)
+		} else {
+			s.writeNotifyf("Pre-summarize backup saved to %s", backupPath)
+		}
 	}
-	switch parts[0] {
-	case CommandNameSummarize:
-		return s.summarize(ctx, contents)
-	case CommandNameContinue:
-		return s.handleContinue(ctx, contents, parts[1:])
-	default:
-		s.writeError(domainerrors.NewSessionErrorf("command", "unknown cmd <%s>", parts[0]).Error())
-		return contents
+
+	prompt := `Summarize the conversation for continuation. The resuming instance has no prior context.
+
+Provide:
+1. **Task** — Original request and success criteria
+2. **Done** — Completed items with specifics (file paths, function names, values)
+3. **State** — Files created/modified/deleted, key decisions and rationale
+4. **Blocked** — Unresolved errors, failing tests, open questions
+5. **Next** — Ordered actions to resume
+
+Rules:
+- Prefer exact identifiers, file paths, and code snippets over prose descriptions
+- Include error messages verbatim
+- Skip completed exploration; only preserve findings that affect next steps`
+
+	s.writeNotify("Summarizing conversation...")
+
+	beforeLen := len(contents)
+	promptParts := []llm.ContentPart{&llm.TextPart{Text: prompt}}
+	fullContents, outputTokens := s.handleUserPrompt(ctx, contents, promptParts)
+
+	// Find assistant content parts in the newly added content.
+	var summaryParts []llm.ContentPart
+	for _, part := range fullContents[beforeLen:] {
+		if part.GetRole() != llm.RoleAssistant {
+			continue
+		}
+		switch part.(type) {
+		case *llm.ReasoningPart:
+			continue
+		default:
+			summaryParts = append(summaryParts, part)
+		}
+	}
+
+	// Rebuild contents: "Continue" user message + filtered summary.
+	contents = contents[:0]
+	continueID := s.histIncAndGet()
+	contents = append(contents, &llm.TextPart{
+		Text: "Continue",
+		ContentPartMeta: llm.ContentPartMeta{
+			HistoryID: continueID,
+			Role:      llm.RoleUser,
+		},
+	})
+	for _, part := range summaryParts {
+		part.UpdateContentPartMeta(s.histIncAndGet(), llm.RoleAssistant)
+		contents = append(contents, part)
+	}
+
+	if outputTokens > 0 {
+		s.sendEvent(SetContextTokensEvent{Tokens: outputTokens})
+	}
+
+	s.writeNotify("Summarized conversation")
+	s.requestSystemInfo()
+
+	if ctx.Err() == context.Canceled {
+		contents = s.appendCancelMessage(contents)
 	}
 }
 
-// cancelMessage is inserted into the conversation history and displayed in the
-// message window when a task is canceled by the user.
+// cancelMessage is inserted into the conversation history when a task
+// is canceled by the user.
 const cancelMessage = "Canceled"
 
 func (s *Session) appendCancelMessage(contents []llm.ContentPart) []llm.ContentPart {
@@ -129,30 +167,4 @@ func (s *Session) appendCancelMessage(contents []llm.ContentPart) []llm.ContentP
 	})
 	s.writeTLV(stream.TagAssistantT, stream.WrapDelta(strconv.FormatUint(id, 10), cancelMessage))
 	return contents
-}
-
-// ============================================================================
-// Queue Accessors (called from run() goroutine only)
-// ============================================================================
-
-// DeleteQueueItem removes a queue item by ID
-func (s *Session) DeleteQueueItem(queueID string) bool {
-	for i, item := range s.taskQueue {
-		if item.QueueID == queueID {
-			s.taskQueue = append(s.taskQueue[:i], s.taskQueue[i+1:]...)
-			return true
-		}
-	}
-	return false
-}
-
-// UpdateQueueItem updates the content of a queue item by ID.
-func (s *Session) UpdateQueueItem(queueID, newContent string) bool {
-	for i, item := range s.taskQueue {
-		if item.QueueID == queueID {
-			s.taskQueue[i].Content = newContent
-			return true
-		}
-	}
-	return false
 }

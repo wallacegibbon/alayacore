@@ -171,8 +171,7 @@ func (s *Session) sendTaskMsg() {
 		CurrentStep: s.activeTaskStep(),
 		MaxSteps:    s.MaxSteps,
 		Context:     s.ContextTokens,
-		TaskError:   s.pausedOnError.Load(),
-		QueueItems:  s.taskQueue,
+		TaskError:   false,
 	})
 }
 

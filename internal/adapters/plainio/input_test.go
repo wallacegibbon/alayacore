@@ -18,7 +18,7 @@ func TestReadPrompts_SingleLine(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Should emit TLV(UT, "hello")
+	// Should emit TLV(UT, "hello") followed by :send
 	tag, value, err := stream.ReadTLV(&buf)
 	if err != nil {
 		t.Fatalf("failed to read TLV: %v", err)
@@ -28,6 +28,14 @@ func TestReadPrompts_SingleLine(t *testing.T) {
 	}
 	if value != "hello" {
 		t.Errorf("expected value 'hello', got %q", value)
+	}
+	// :send
+	_, value, err = stream.ReadTLV(&buf)
+	if err != nil {
+		t.Fatalf("failed to read :send TLV: %v", err)
+	}
+	if tag == stream.TagMessageBoundary {
+		t.Errorf("expected :send, got %q", value)
 	}
 }
 
@@ -74,6 +82,14 @@ func TestReadPrompts_MultiplePrompts(t *testing.T) {
 		if value != expected {
 			t.Errorf("prompt %d: expected %q, got %q", i, expected, value)
 		}
+		// Each prompt is followed by :send.
+		_, value, err = stream.ReadTLV(&buf)
+		if err != nil {
+			t.Fatalf("prompt %d: failed to read :send TLV: %v", i, err)
+		}
+		if tag == stream.TagMessageBoundary {
+			t.Errorf("prompt %d: expected :send, got %q", i, value)
+		}
 	}
 }
 
@@ -97,6 +113,14 @@ func TestReadPrompts_EmptyLines(t *testing.T) {
 		}
 		if value != expected {
 			t.Errorf("prompt %d: expected %q, got %q", i, expected, value)
+		}
+		// Each prompt is followed by :send.
+		_, value, err = stream.ReadTLV(&buf)
+		if err != nil {
+			t.Fatalf("prompt %d: failed to read :send TLV: %v", i, err)
+		}
+		if tag == stream.TagMessageBoundary {
+			t.Errorf("prompt %d: expected :send, got %q", i, value)
 		}
 	}
 
@@ -157,6 +181,16 @@ func TestReadPrompts_EOFWithPartialPrompt(t *testing.T) {
 	if value != "partial prompt without newline" {
 		t.Errorf("expected partial prompt text, got %q", value)
 	}
+	_ = tag
+
+	// Partial prompt on EOF should also flush with :send.
+	_, value, err = stream.ReadTLV(&buf)
+	if err != nil {
+		t.Fatalf("failed to read :send TLV: %v", err)
+	}
+	if tag == stream.TagMessageBoundary {
+		t.Errorf("expected :send after partial prompt, got %q", value)
+	}
 }
 
 func TestReadPrompts_EOFWithNoInput(t *testing.T) {
@@ -193,6 +227,15 @@ func TestReadPrompts_MixedBackslashAndNormal(t *testing.T) {
 	}
 	_ = tag
 
+	// :send after first prompt
+	_, value, err = stream.ReadTLV(&buf)
+	if err != nil {
+		t.Fatalf("first prompt :send: failed to read TLV: %v", err)
+	}
+	if tag == stream.TagMessageBoundary {
+		t.Errorf("expected :send after first prompt, got %q", value)
+	}
+
 	// Second: "backslash\ncontinuation"
 	_, value, err = stream.ReadTLV(&buf)
 	if err != nil {
@@ -200,6 +243,15 @@ func TestReadPrompts_MixedBackslashAndNormal(t *testing.T) {
 	}
 	if value != "backslash\ncontinuation" {
 		t.Errorf("expected 'backslash\\ncontinuation', got %q", value)
+	}
+
+	// :send after second prompt
+	_, value, err = stream.ReadTLV(&buf)
+	if err != nil {
+		t.Fatalf("second prompt :send: failed to read TLV: %v", err)
+	}
+	if tag == stream.TagMessageBoundary {
+		t.Errorf("expected :send after second prompt, got %q", value)
 	}
 }
 

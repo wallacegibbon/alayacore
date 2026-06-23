@@ -23,23 +23,18 @@ type EditorAction int
 const (
 	EditorActionNone         EditorAction = iota // e.g. display viewing — no side effects
 	EditorActionSubmit                           // submit content as user input
-	EditorActionQueueEdit                        // update a queued task's content
 	EditorActionReloadConfig                     // reload model/runtime config after edit
 )
 
 // EditorFinishedMsg is sent when an external editor closes.
-// It replaces four separate message types (editorFinishedMsg,
-// displayEditorFinishedMsg, queueEditorFinishedMsg, FileEditorFinishedMsg).
 //
 // - For EditorActionNone: content is empty, no side effects.
 // - For EditorActionSubmit: content contains the editor's text.
-// - For EditorActionQueueEdit: content + QueueID identify the queue item to update.
 // - For EditorActionReloadConfig: Path + FileType identify the edited file.
 type EditorFinishedMsg struct {
 	Content  string
 	Err      error
 	Action   EditorAction
-	QueueID  string // for EditorActionQueueEdit
 	Path     string // for EditorActionReloadConfig
 	FileType string // for EditorActionReloadConfig ("model_config", etc.)
 }
@@ -49,7 +44,6 @@ type editorStartMsg struct {
 	editorCmd  string
 	editorArgs []string
 	action     EditorAction
-	queueID    string
 	path       string
 	fileType   string
 }
@@ -94,18 +88,13 @@ func NewEditor() *Editor {
 
 // Open opens an external editor for multi-line input.
 func (e *Editor) Open(currentContent string) tea.Cmd {
-	return e.openWithAction(currentContent, EditorActionSubmit, "", "", "")
+	return e.openWithAction(currentContent, EditorActionSubmit, "", "")
 }
 
 // OpenForDisplay opens an external editor to view display window content.
 // Content is NOT read back — this is a view-only operation.
 func (e *Editor) OpenForDisplay(content string) tea.Cmd {
-	return e.openWithAction(content, EditorActionNone, "", "", "")
-}
-
-// OpenForQueue opens an external editor to edit a queue item's content.
-func (e *Editor) OpenForQueue(content string, queueID string) tea.Cmd {
-	return e.openWithAction(content, EditorActionQueueEdit, queueID, "", "")
+	return e.openWithAction(content, EditorActionNone, "", "")
 }
 
 // OpenFile opens an external editor for a specific file path.
@@ -138,13 +127,13 @@ func (e *Editor) OpenFile(path, fileType string) tea.Cmd {
 }
 
 // openWithAction is the shared implementation for all editor operations
-// that require temp file creation (input, display viewing, queue editing).
-func (e *Editor) openWithAction(content string, action EditorAction, queueID, path, fileType string) tea.Cmd {
+// that require temp file creation (input, display viewing).
+func (e *Editor) openWithAction(content string, action EditorAction, path, fileType string) tea.Cmd {
 	editorCmd := getEditorCommand(os.Getenv("EDITOR"))
 
 	if editorCmd == "" {
 		return func() tea.Msg {
-			return EditorFinishedMsg{Err: errEditorNotFound(), Action: action, QueueID: queueID, Path: path, FileType: fileType}
+			return EditorFinishedMsg{Err: errEditorNotFound(), Action: action, Path: path, FileType: fileType}
 		}
 	}
 
@@ -158,7 +147,6 @@ func (e *Editor) openWithAction(content string, action EditorAction, queueID, pa
 			editorCmd:  cmd,
 			editorArgs: args,
 			action:     action,
-			queueID:    queueID,
 			path:       path,
 			fileType:   fileType,
 		}
@@ -210,7 +198,6 @@ func (m *Terminal) handleEditorStart(msg editorStartMsg) (tea.Model, tea.Cmd) {
 		result := EditorFinishedMsg{
 			Err:      err,
 			Action:   msg.action,
-			QueueID:  msg.queueID,
 			Path:     msg.path,
 			FileType: msg.fileType,
 		}

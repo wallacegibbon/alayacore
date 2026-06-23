@@ -78,7 +78,6 @@ if stopReason != "" && stopReason != "end_turn" && stopReason != "max_tokens" &&
 1. The provider returns an error from the event handler via the streaming iterator's error parameter (`yield(nil, err)`)
 2. The agent's event loop in `streamEvents` receives the error from the `iter.Seq2[StreamEvent, error]` iterator (`for event, err := range events`)
 3. The agent loop terminates and returns the error to the caller
-4. The session sets `pausedOnError = true` and notifies the user via a system error message
 5. The UI displays the error message to the user
 
 ### Agent-level errors (truncation, max steps)
@@ -97,54 +96,27 @@ case StepCompleteEvent:
     }
 ```
 
-## Queue Pause on Error
+## Error Recovery
 
-When an error occurs during prompt processing, the task queue **pauses** instead of moving on to the next queued task. This prevents cascading failures and gives the user control over recovery.
+When an error occurs during prompt processing, the prompt **fails** instead of continuing.
 
-Errors that trigger pause include:
+Errors include:
 - **Provider errors** — network failure, API error, content filter, refusal
 - **Max steps exceeded** — agent loop hit `--max-steps` limit without final response (error: `"agent loop exceeded maximum steps"`)
 - **Response truncated** — model hit output token limit (error: `"response truncated: hit output token limit"`)
 
-### Why pause instead of continue
+### Recovery
 
-Without pausing, a network outage would cause every queued prompt to fail in sequence, each adding an orphaned user message (with no assistant reply) to the conversation history. This corrupts context for subsequent API calls.
+The user can:
+- `:continue` — retry the last prompt
+- `:model_set` — switch to a different model, then `:continue`
+- Type a new prompt — the next prompt is sent as a new user message
 
-### How it works
+### `:continue`
 
-1. `handleUserPrompt` (or `resendPrompt` / `summarize`) detects the error from `processPrompt`
-2. Sets `pausedOnError = true` on the session via `atomic.Bool.Store()`
-3. `tryStartNextTask` in the main loop checks `s.pausedOnError.Load()` — when true, it skips dequeuing non-command tasks, effectively blocking the queue
-4. Remaining queued tasks stay in the queue (visible via Ctrl+Q)
-5. The user can now:
-   - `:continue` — resend the failed prompt (or `:continue skip` to skip it and resume the queue)
-   - `:model_set` — switch to a different model, then `:continue`
-   - Type a new prompt — appends to the existing user message (if the last message is user) or creates a new one. Clears the pause if the queue was empty.
-   - `:cancel_all` — clear the queue and the pause
-   - Inspect the queue with Ctrl+Q
+`:continue` runs in a separate goroutine — it can be canceled with `:cancel` while the LLM call is in progress. It resends the last prompt to the LLM. See [commands.md](commands.md) for details.
 
-### Implementation
-
-`internal/agent/session.go`:
-- `pausedOnError` field on `Session` (atomic.Bool)
-
-`internal/agent/session_loop.go`:
-- `tryStartNextTask()` checks `s.pausedOnError.Load()` — when true and the front task is a user prompt (not a command), returns false without dequeuing
-- `submitTaskCommand` guards: rejects if `inProgress && !pausedOnError`, then calls `enqueueTask`
-- `submitTask` clears `pausedOnError` when the queue was empty (before `enqueueTask` signals, so task runner sees consistent state)
-
-`internal/agent/session_io.go`:
-- `handleUserPrompt`, `resendPrompt`, and `summarize` set `pausedOnError = true` on error
-- `cancelAllTasks` clears `pausedOnError` and signals the condition variable
-- `handleContinue` clears `pausedOnError`, then either calls `resendPrompt` (no args) or skips and resumes the queue (`skip`)
-- `resendPrompt` re-sets `pausedOnError` on failure
-
-**User message merging:** When a user submits a new prompt after a failed one (instead of using `:continue`), the new text is appended as an additional `TextPart` to the existing user message rather than creating a separate message. This keeps the conversation valid (APIs require user/assistant alternation) and allows the user to add context or clarification to their original prompt.
-
-`internal/agent/command_registry.go`:
-- `:continue` is dispatched via `dispatchCommand` → `handleContinue`
-
-**Task execution:** `:continue` is a task command — it is enqueued at the front of the task queue and runs in a task goroutine. This means it can be canceled with `:cancel` while the LLM call is in progress. See [architecture.md](architecture.md) for details on the task goroutine model.
+No queue management needed.
 
 ## Testing
 

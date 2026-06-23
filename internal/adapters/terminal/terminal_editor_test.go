@@ -450,49 +450,7 @@ func TestCtrlGTriggersCancel(t *testing.T) {
 	}
 }
 
-func TestCancelAllCommandRequiresConfirm(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
-	terminal.input.SetValue(":cancel_all")
-
-	// Press Enter to submit the command
-	terminal.focusInput()
-	msg := tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter})
-
-	model, cmd := terminal.Update(msg)
-
-	// Should return a model and no command (just shows dialog)
-	if model == nil {
-		t.Fatal("Update returned nil model")
-	}
-
-	if cmd != nil {
-		t.Fatal(":cancel_all should not emit command immediately, should show confirm dialog")
-	}
-
-	// Cancel all confirmation dialog should be shown
-	if !terminal.confirmOverlay.IsOpen() {
-		t.Fatal(":cancel_all should open confirm overlay")
-	}
-	if terminal.confirmOverlay.Kind != ConfirmCancelAll {
-		t.Errorf(":cancel_all should set confirm overlay kind to ConfirmCancelAll, got %v", terminal.confirmOverlay.Kind)
-	}
-
-	// Test confirming the dialog by pressing 'y'
-	msg = tea.KeyPressMsg(tea.Key{Code: 'y'})
-	_, cmd = terminal.Update(msg)
-
-	// Now should emit cancel_all command
-	if cmd == nil {
-		t.Fatal("Pressing 'y' should emit cancel_all command")
-	}
-
-	// Cancel dialog should be closed
-	if terminal.confirmOverlay.IsOpen() {
-		t.Errorf("Cancel dialog should be closed after confirming")
-	}
-}
-
-func TestCtrlUDoesNothingInInput(t *testing.T) {
+func TestCtrlUClearsInput(t *testing.T) {
 	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
 	terminal.input.SetValue("test input text")
 
@@ -895,83 +853,5 @@ func TestGetWindowContentRegular(t *testing.T) {
 	content := wb.GetWindowContent(0)
 	if content != "Hello world" {
 		t.Errorf("Expected regular content, got: %q", content)
-	}
-}
-
-func TestEKeyInQueueManagerOpensEditor(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
-
-	// Open queue manager with items
-	items := []QueueItem{
-		{QueueID: "Q1", Type: "prompt", Content: "test content to edit"},
-	}
-	terminal.queueManager.Open()
-	terminal.queueManager.SetItems(items)
-
-	// Press 'e' key while queue manager is open
-	msg := tea.KeyPressMsg(tea.Key{Code: 'e'})
-
-	model, cmd := terminal.Update(msg)
-
-	if model == nil {
-		t.Fatal("Update returned nil model")
-	}
-
-	// Should return a command (editor open)
-	if cmd == nil {
-		t.Fatal("Update returned nil command - should return editor command when 'e' pressed in queue manager with selected item")
-	}
-}
-
-func TestEKeyInQueueManagerNoItems(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
-
-	// Open queue manager with no items
-	terminal.queueManager.Open()
-	terminal.queueManager.SetItems(nil)
-
-	// Press 'e' key while queue manager is open
-	msg := tea.KeyPressMsg(tea.Key{Code: 'e'})
-
-	model, cmd := terminal.Update(msg)
-
-	if model == nil {
-		t.Fatal("Update returned nil model")
-	}
-
-	// Should NOT return a command (no item to edit)
-	if cmd != nil {
-		t.Fatal("Update should return nil command when no queue item is selected")
-	}
-}
-
-func TestQueueEditorFinishedUpdatesContent(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
-
-	// Simulate queue editor finishing with updated content
-	msg := EditorFinishedMsg{Action: EditorActionQueueEdit, QueueID: "Q1", Content: "updated content", Err: nil}
-
-	model, _ := terminal.Update(msg)
-	if model == nil {
-		t.Fatal("Update returned nil model")
-	}
-}
-
-func TestQueueEditorFinishedWithError(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
-	terminal.input.SetValue("original input")
-
-	// Simulate queue editor finishing with error
-	msg := EditorFinishedMsg{Action: EditorActionQueueEdit, QueueID: "Q1", Content: "", Err: fmt.Errorf("editor failed")}
-
-	model, _ := terminal.Update(msg)
-
-	if model == nil {
-		t.Fatal("Update returned nil model")
-	}
-
-	// Input should remain unchanged
-	if terminal.input.Value() != "original input" {
-		t.Errorf("Input should not be modified after queue editor error, got '%s'", terminal.input.Value())
 	}
 }

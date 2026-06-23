@@ -20,11 +20,6 @@ var (
 	ErrFailedToLoadModels         = fmt.Errorf("failed to load models")
 )
 
-// Queue errors
-var (
-	ErrQueueItemNotFound = fmt.Errorf("queue item not found")
-)
-
 // Session errors
 var (
 	ErrNoSessionFile       = fmt.Errorf("no session file set")

@@ -1,9 +1,9 @@
 package terminal
 
 // ConfirmDialog renders a centered floating overlay for confirmation dialogs.
-// Used for quit, cancel, cancel_all, and tool_confirm prompts.
+// Used for quit, cancel, and tool_confirm prompts.
 //
-// The dialog uses the same rendering pattern as ModelSelector and QueueManager:
+// The dialog uses the same rendering pattern as ModelSelector and ModelSelector:
 //   - SetSize stores the terminal dimensions
 //   - View renders with RenderBorderedBox
 //   - RenderOverlay delegates to the shared overlay renderer
@@ -21,20 +21,19 @@ import (
 
 // ConfirmContentRows defines the fixed number of content lines inside
 // the confirm dialog border. Matches SelectorListRows (8) used by
-// QueueManager, ModelSelector, ThemeSelector, and HelpWindow.
+// ModelSelector, ModelSelector, ThemeSelector, and HelpWindow.
 // If content exceeds this, it gets truncated with a "..." indicator —
-// same pattern used by QueueManager for items.
+// same pattern used by ModelSelector for items.
 const ConfirmContentRows = 8
 
 // ConfirmKind represents the type of active confirmation dialog.
 type ConfirmKind int
 
 const (
-	ConfirmNone      ConfirmKind = iota // No dialog active
-	ConfirmQuit                         // Confirm exit
-	ConfirmCancel                       // Confirm cancel current request
-	ConfirmCancelAll                    // Confirm cancel all queued requests
-	ConfirmTool                         // Confirm tool execution
+	ConfirmNone   ConfirmKind = iota // No dialog active
+	ConfirmQuit                      // Confirm exit
+	ConfirmCancel                    // Confirm cancel current request
+	ConfirmTool                      // Confirm tool execution
 )
 
 // ConfirmDialog manages a floating confirmation overlay.
@@ -51,7 +50,7 @@ type ConfirmDialog struct {
 	Styles   *Styles
 
 	// Width is set by SetSize with the full terminal width, matching
-	// the overlay pattern used by ModelSelector, QueueManager, etc.
+	// the overlay pattern used by ModelSelector, ModelSelector, etc.
 	Width  int
 	Height int
 
@@ -110,18 +109,6 @@ func (cd *ConfirmDialog) OpenCancel() {
 	cd.State = FilteredListOpen
 	cd.Kind = ConfirmCancel
 	cd.Description = "The current request will be stopped."
-	cd.ToolID = ""
-	cd.ToolName = ""
-	cd.ToolInput = ""
-	cd.Confirmed = false
-	cd.Canceled = false
-}
-
-// OpenCancelAll opens the dialog for confirming cancellation of all tasks.
-func (cd *ConfirmDialog) OpenCancelAll() {
-	cd.State = FilteredListOpen
-	cd.Kind = ConfirmCancelAll
-	cd.Description = "Current task and all pending requests will be canceled."
 	cd.ToolID = ""
 	cd.ToolName = ""
 	cd.ToolInput = ""
@@ -216,7 +203,7 @@ func (cd *ConfirmDialog) View() tea.View {
 	// Build the message lines (pre-styled with Confirm/System styles)
 	msgLines := cd.buildContentLines()
 
-	// Pad to the fixed content height, same as QueueManager
+	// Pad to the fixed content height, same as ModelSelector
 	for len(msgLines) < ConfirmContentRows {
 		msgLines = append(msgLines, "")
 	}
@@ -226,7 +213,7 @@ func (cd *ConfirmDialog) View() tea.View {
 
 	// Render with bordered box — border uses error color for visual warning.
 	// Pass fixed height so the window is always the same size, same as
-	// QueueManager and ModelSelector overlays.
+	// ModelSelector and ModelSelector overlays.
 	box := cd.Styles.RenderBorderedBox(content, cd.Width, cd.Styles.ColorError, ConfirmContentRows)
 
 	return tea.NewView("\n" + box + "\n")
@@ -285,8 +272,6 @@ func (cd *ConfirmDialog) buildTitleText() string {
 		return "Exit AlayaCore?"
 	case ConfirmCancel:
 		return "Cancel current task?"
-	case ConfirmCancelAll:
-		return "Cancel all queued tasks?"
 	case ConfirmTool:
 		msg := "Allow "
 		if cd.ToolName != "" {

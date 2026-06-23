@@ -281,6 +281,41 @@ func (wb *WindowBuffer) WindowAt(index int) *Window {
 	return wb.windows[index]
 }
 
+// LookupID returns the window index by ID, or false if not found.
+func (wb *WindowBuffer) LookupID(id string) (int, bool) {
+	wb.mu.Lock()
+	defer wb.mu.Unlock()
+	idx, ok := wb.idIndex[id]
+	return idx, ok
+}
+
+// SetHistoryID sets the HistoryID of the window at the given index.
+func (wb *WindowBuffer) SetHistoryID(index int, historyID uint64) {
+	wb.mu.Lock()
+	defer wb.mu.Unlock()
+	if index >= 0 && index < len(wb.windows) {
+		wb.windows[index].HistoryID = historyID
+	}
+}
+
+// SetMediaContent sets the media content for the window at the given index.
+func (wb *WindowBuffer) SetMediaContent(index int, media string) {
+	wb.mu.Lock()
+	defer wb.mu.Unlock()
+	if index >= 0 && index < len(wb.windows) {
+		wb.windows[index].MediaContent = media
+	}
+}
+
+// SetContent replaces the content of the window at the given index.
+func (wb *WindowBuffer) SetContent(index int, content string) {
+	wb.mu.Lock()
+	defer wb.mu.Unlock()
+	if index >= 0 && index < len(wb.windows) {
+		wb.windows[index].Content = content
+	}
+}
+
 // AllWindows returns a copy of the windows slice for snapshotting.
 // The returned slice contains the same *Window pointers (no deep copy).
 // Each window's Content is built from parts before returning.

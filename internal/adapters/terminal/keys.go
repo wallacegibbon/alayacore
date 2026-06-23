@@ -65,10 +65,9 @@ const (
 	keyCtrlZ = "ctrl+z"
 
 	// Command names (used with ":" prefix in input)
-	cmdQuit      = "quit"
-	cmdQShort    = "q"
-	cmdCancel    = "cancel"
-	cmdCancelAll = "cancel_all"
-	cmdSuspend   = "suspend"
-	cmdHelp      = "help"
+	cmdQuit    = "quit"
+	cmdQShort  = "q"
+	cmdCancel  = "cancel"
+	cmdSuspend = "suspend"
+	cmdHelp    = "help"
 )

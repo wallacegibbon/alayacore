@@ -77,7 +77,6 @@ func buildHelpItems() []HelpItem {
 		{ID: nextID(), Key: ":confirm <id> <yes|no>", Description: "Confirm or deny pending tool", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":continue [skip]", Description: "Retry / skip failed prompt", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":reason <0|1|2>", Description: "Set reasoning level", Type: HelpItemCommand},
-		{ID: nextID(), Key: ":cancel_all", Description: "Cancel all & clear queue", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":cancel", Description: "Cancel current task", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":summarize", Description: "Summarize & compress history", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":theme_set <name>", Description: "Switch theme by name", Type: HelpItemCommand},
@@ -85,10 +84,6 @@ func buildHelpItems() []HelpItem {
 		{ID: nextID(), Key: ":model_load", Description: "Reload model config", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":save [filename]", Description: "Save session", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":fork <id> <filename>", Description: "Fork session up to content", Type: HelpItemCommand},
-		{ID: nextID(), Key: ":taskqueue_get_all", Description: "List queued tasks", Type: HelpItemCommand},
-		{ID: nextID(), Key: ":taskqueue_del <id>", Description: "Delete queued task", Type: HelpItemCommand},
-		{ID: nextID(), Key: ":taskqueue_edit <id>", Description: "Edit queued task", Type: HelpItemCommand},
-		{ID: nextID(), Key: ":clear_queue", Description: "Clear queued tasks", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":video_config <fps> <0|1>", Description: "Set video FPS and resolution", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":suspend", Description: "Suspend process", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":quit", Description: "Exit application", Type: HelpItemCommand},
@@ -105,16 +100,7 @@ func buildHelpItems() []HelpItem {
 		{ID: nextID(), Key: "Ctrl+O", Description: "Open in editor (main input)", Type: HelpItemKey},
 		{ID: nextID(), Key: "Ctrl+L", Description: "Open model selector", Type: HelpItemKey},
 		{ID: nextID(), Key: "Ctrl+P", Description: "Open theme selector", Type: HelpItemKey},
-		{ID: nextID(), Key: "Ctrl+Q", Description: "Open queue manager", Type: HelpItemKey},
 		{ID: nextID(), Key: "Ctrl+Z", Description: "Suspend process", Type: HelpItemKey},
-
-		// Queue Manager
-		{ID: nextID(), IsSection: true, Description: "Queue Manager"},
-		{ID: nextID(), Key: "j/k", Description: "Navigate queue items", Type: HelpItemKey},
-		{ID: nextID(), Key: "d", Description: "Delete selected queue item", Type: HelpItemKey},
-		{ID: nextID(), Key: "e", Description: "Edit selected item in editor", Type: HelpItemKey},
-		{ID: nextID(), Key: "q/esc", Description: "Close queue manager", Type: HelpItemKey},
-
 		// Display Mode
 		{ID: nextID(), IsSection: true, Description: "Display Mode"},
 		{ID: nextID(), Key: "j/k", Description: "Move window cursor", Type: HelpItemKey},

@@ -31,7 +31,6 @@ AlayaCore's terminal UI is built with [Bubble Tea](https://github.com/charmbrace
 | `Ctrl+O` | Open in editor (`$EDITOR`) for multi-line input |
 | `Ctrl+L` | Open model selector |
 | `Ctrl+P` | Open theme selector |
-| `Ctrl+Q` | Open task queue manager |
 | `Ctrl+H` | Open help window |
 | `Ctrl+G` | Cancel current task (with confirmation) |
 | `Ctrl+Z` | Suspend process |
@@ -39,8 +38,6 @@ AlayaCore's terminal UI is built with [Bubble Tea](https://github.com/charmbrace
 | `Ctrl+F` | Fork session from cursor position |
 | `:` | Switch to input with `:` prefix (command mode) |
 | `Space` | Toggle window fold (expand/collapse) |
-
-## Session Commands
 
 ## Session Commands
 
@@ -99,19 +96,6 @@ The display uses virtual scrolling to handle large outputs efficiently. Only vis
 
 When styling text with lipgloss, each segment must be rendered individually before concatenation. You cannot render a string that already contains ANSI codes with a new style and expect it to work.
 
-## Task Queue Manager
-
-When you submit prompts or commands while a previous task is running, they are queued. Press `Ctrl+Q` to manage the queue:
-
-| Key | Action |
-|-----|--------|
-| `q`, `Esc` | Close queue manager |
-| `j`, `↓` | Move selection down |
-| `k`, `↑` | Move selection up |
-| `d` | Delete selected task |
-| `e` | Edit selected task in external editor |
-
-Each queued task shows its queue ID (Q1, Q2, …), type (`P` for prompt, `C` for command), and a truncated content preview.
 
 ## Tool Confirm Dialog
 
@@ -142,7 +126,7 @@ Incremental updates avoid re-wrapping the entire content on every token. Only th
 
 ## Help Window
 
-Press `Ctrl+H` or type `:help` to open a help window listing all keybindings and commands. The filter input at the top lets you fuzzy-search for specific keys or commands (e.g. typing `gt` matches `:taskqueue_get_all`):
+Press `Ctrl+H` or type `:help` to open a help window listing all keybindings and commands. The filter input at the top lets you fuzzy-search for specific keys or commands (e.g. typing `gt` matches `:theme_set`):
 
 | Key | Action |
 |-----|--------|
@@ -154,8 +138,8 @@ Press `Ctrl+H` or type `:help` to open a help window listing all keybindings and
 
 The help window is organized into three sections:
 
-- **Commands** — colon commands available in the input field (queue manager internals like `:taskqueue_get_all` and `:taskqueue_del` are omitted)
+- **Commands** — colon commands available in the input field (commands available in the input field)
 - **Global Shortcuts** — keybindings that work from any context
 - **Display Mode** — navigation and editing keys for the display area
 
-The help window uses the same size, position, and overlay pattern as the task queue manager and theme selector.
+The help window uses the same size, position, and overlay pattern as the model selector and theme selector.

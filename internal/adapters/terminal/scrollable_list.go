@@ -1,7 +1,7 @@
 package terminal
 
 // ScrollableListCore provides shared state, methods, and key handling
-// for simple scrollable list components (QueueManager, ThemeSelector).
+// for simple scrollable list components (ModelSelector, ThemeSelector).
 //
 // Both components follow the same pattern:
 //   - A list of items with keyboard navigation (j/k, up/down)

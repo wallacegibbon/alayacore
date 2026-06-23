@@ -13,7 +13,7 @@
 //   - Ctrl-C (SIGINT): terminates immediately with default signal handling
 //     (exit code 130).
 //   - Errors during the session cause input to close. The program waits for the
-//     current task to finish, then exits with code 1. Remaining queued tasks
+//     current task to finish, then exits with code 1. Subsequent prompts
 //     are NOT executed.
 //   - A clean exit (EOF with no errors) returns code 0.
 //

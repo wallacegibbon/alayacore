@@ -32,6 +32,8 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -50,6 +52,12 @@ type outputWriter struct {
 	styles       atomic.Pointer[Styles]
 	nextWindowID atomic.Int64
 	status       sessionState // cached session state (status, models, queue)
+
+	// Pending user content — accumulated until MB or next non-user tag.
+	pendingUserText  strings.Builder // text parts
+	pendingUserMedia strings.Builder // media labels
+	pendingUserID    string          // window ID for the pending user message
+	pendingUserMaxID uint64          // max HistoryID among accumulated parts
 }
 
 func NewTerminalOutput(styles *Styles) *outputWriter { //nolint:revive // tests need access to internal methods
@@ -117,6 +125,11 @@ func (to *outputWriter) processBuffer() {
 func (to *outputWriter) writeColored(tag string, value string) {
 	to.triggerUpdateForTag(tag)
 
+	// Flush pending user content before any non-user tag.
+	if to.pendingUserText.Len()+to.pendingUserMedia.Len() > 0 && !userTag(tag) {
+		to.flushUserContent()
+	}
+
 	switch tag {
 	// Text content tags — may carry NUL-delimited stream ID for live deltas,
 	// or plain text when replayed from a saved session file.
@@ -132,46 +145,27 @@ func (to *outputWriter) writeColored(tag string, value string) {
 		to.windowBuffer.AppendOrUpdate(tag, id, content)
 
 	// User text tag — may carry NUL-delimited historyID
+	// User content tags — buffer until MB or next non-user tag.
 	case stream.TagUserT:
 		id, content, ok := stream.UnwrapDelta(value)
 		if !ok {
 			id = to.generateWindowID()
 			content = value
 		}
-		// Pass raw value - styling is applied during render
-		to.windowBuffer.AppendOrUpdate(tag, id, content)
+		to.bufferUserContent(id, content)
 
-	// User image tag — may carry NUL-delimited historyID
-	case stream.TagUserI:
+	case stream.TagUserI, stream.TagUserV, stream.TagUserA, stream.TagUserD:
 		id, _, ok := stream.UnwrapDelta(value)
 		if !ok {
 			id = to.generateWindowID()
 		}
-		to.windowBuffer.AppendOrUpdate(stream.TagUserI, id, "📎 Image")
+		to.bufferUserContent(id, mediaLabel(tag))
 
-	// User video tag
-	case stream.TagUserV:
-		id, _, ok := stream.UnwrapDelta(value)
-		if !ok {
-			id = to.generateWindowID()
+	// Message boundary — flush pending user content as one window.
+	case stream.TagMessageBoundary:
+		if to.pendingUserText.Len()+to.pendingUserMedia.Len() > 0 {
+			to.flushUserContent()
 		}
-		to.windowBuffer.AppendOrUpdate(stream.TagUserV, id, "📎 Video")
-
-	// User audio tag
-	case stream.TagUserA:
-		id, _, ok := stream.UnwrapDelta(value)
-		if !ok {
-			id = to.generateWindowID()
-		}
-		to.windowBuffer.AppendOrUpdate(stream.TagUserA, id, "📎 Audio")
-
-	// User document tag
-	case stream.TagUserD:
-		id, _, ok := stream.UnwrapDelta(value)
-		if !ok {
-			id = to.generateWindowID()
-		}
-		to.windowBuffer.AppendOrUpdate(stream.TagUserD, id, "📎 Document")
 
 	// Function lifecycle (JSON: id, type, name, input, status)
 	// May carry NUL-delimited historyID prefix
@@ -231,12 +225,10 @@ func (to *outputWriter) writeColored(tag string, value string) {
 // triggerUpdateForTag marks the display as dirty for tags that modify the display.
 //
 // TagSystemMsg is NOT listed here because handleSystemMsg() calls
-// to.dirty.Store(true) itself after all state (including pendingQueueItems)
 // has been fully updated. Setting dirty early would create a race where the
-// Bubble Tea goroutine sees dirty=true but pendingQueueItems has not been set yet.
 func (to *outputWriter) triggerUpdateForTag(tag string) {
 	switch tag {
-	case stream.TagAssistantT, stream.TagAssistantR, stream.TagAssistantF, stream.TagUserT, stream.TagUserF, stream.TagUserI, stream.TagUserV, stream.TagUserA, stream.TagUserD:
+	case stream.TagAssistantT, stream.TagAssistantR, stream.TagAssistantF, stream.TagUserT, stream.TagUserF, stream.TagUserI, stream.TagUserV, stream.TagUserA, stream.TagUserD, stream.TagMessageBoundary:
 		to.dirty.Store(true)
 	}
 }
@@ -297,17 +289,16 @@ func (to *outputWriter) handleSystemNotify(data json.RawMessage) {
 
 func (to *outputWriter) handleSystemTask(data json.RawMessage) {
 	var m struct {
-		InProgress  bool        `json:"in_progress"`
-		CurrentStep int         `json:"current_step"`
-		MaxSteps    int         `json:"max_steps"`
-		Context     int64       `json:"context"`
-		TaskError   bool        `json:"task_error"`
-		QueueItems  []QueueItem `json:"queue_items"`
+		InProgress  bool  `json:"in_progress"`
+		CurrentStep int   `json:"current_step"`
+		MaxSteps    int   `json:"max_steps"`
+		Context     int64 `json:"context"`
+		TaskError   bool  `json:"task_error"`
 	}
 	if json.Unmarshal(data, &m) != nil {
 		return
 	}
-	to.status.updateTask(m.InProgress, m.CurrentStep, m.MaxSteps, m.Context, m.TaskError, m.QueueItems)
+	to.status.updateTask(m.InProgress, m.CurrentStep, m.MaxSteps, m.Context, m.TaskError)
 }
 
 func (to *outputWriter) handleSystemModel(data json.RawMessage) {
@@ -418,14 +409,90 @@ func (to *outputWriter) SnapshotModels() ModelSnapshot {
 	return to.status.snapshotModels()
 }
 
-// GetQueueItems returns the pending queue items (a copy, not cleared).
-func (to *outputWriter) GetQueueItems() []QueueItem {
-	return to.status.takeQueueItems()
-}
-
 // generateWindowID returns a unique window ID for non-delta messages.
 func (to *outputWriter) generateWindowID() string {
 	return fmt.Sprintf("win%d", to.nextWindowID.Add(1))
+}
+
+// userTag returns true if tag is a user content tag.
+func userTag(tag string) bool {
+	return tag == stream.TagUserT || tag == stream.TagUserI ||
+		tag == stream.TagUserV || tag == stream.TagUserA || tag == stream.TagUserD
+}
+
+// mediaLabel returns a display label for media tags.
+func mediaLabel(tag string) string {
+	switch tag {
+	case stream.TagUserI:
+		return "📎 Image"
+	case stream.TagUserV:
+		return "🎬 Video"
+	case stream.TagUserA:
+		return "🎵 Audio"
+	case stream.TagUserD:
+		return "📄 Document"
+	}
+	return ""
+}
+
+// bufferUserContent accumulates a user content part. When flushed,
+// all accumulated parts appear as a single window with text first.
+func (to *outputWriter) bufferUserContent(id, content string) {
+	// Detect text vs media by content prefix.
+	isText := !strings.HasPrefix(content, "📎") && !strings.HasPrefix(content, "🎬") &&
+		!strings.HasPrefix(content, "🎵") && !strings.HasPrefix(content, "📄")
+
+	if isText {
+		if to.pendingUserText.Len() > 0 {
+			to.pendingUserText.WriteString("\n")
+		}
+		to.pendingUserText.WriteString(content)
+	} else {
+		if to.pendingUserMedia.Len() > 0 {
+			to.pendingUserMedia.WriteString("\n")
+		}
+		to.pendingUserMedia.WriteString(content)
+	}
+
+	// Track the max history ID from the TLV delta.
+	if hid, err := strconv.ParseUint(id, 10, 64); err == nil && hid > to.pendingUserMaxID {
+		to.pendingUserMaxID = hid
+	}
+	if to.pendingUserID == "" {
+		to.pendingUserID = id
+	}
+}
+
+// flushUserContent creates a single window from all accumulated user content.
+func (to *outputWriter) flushUserContent() {
+	if to.pendingUserText.Len() == 0 && to.pendingUserMedia.Len() == 0 {
+		return
+	}
+
+	text := to.pendingUserText.String()
+	media := to.pendingUserMedia.String()
+
+	id := to.pendingUserID
+	if text == "" && media != "" {
+		// Media-only — use media labels as window content.
+		to.windowBuffer.AppendOrUpdate(stream.TagUserT, id, media)
+	} else {
+		to.windowBuffer.AppendOrUpdate(stream.TagUserT, id, text)
+		if media != "" {
+			if idx, ok := to.windowBuffer.LookupID(id); ok {
+				to.windowBuffer.SetMediaContent(idx, media)
+			}
+		}
+	}
+
+	if idx, ok := to.windowBuffer.LookupID(id); ok {
+		to.windowBuffer.SetHistoryID(idx, to.pendingUserMaxID)
+	}
+
+	to.pendingUserText.Reset()
+	to.pendingUserMedia.Reset()
+	to.pendingUserID = ""
+	to.pendingUserMaxID = 0
 }
 
 // SetWindowWidth updates the window buffer width.

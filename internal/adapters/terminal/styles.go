@@ -64,7 +64,7 @@ type Styles struct {
 }
 
 // RenderBorderedBox renders content with consistent border, padding, and width.
-// This ensures all bordered boxes (input, model selector, queue manager) have the same width.
+// This ensures all bordered boxes (input, model selector, input field) have the same width.
 // The width calculation is: borderStyle.Padding(0, 1).Render(innerStyle.Width(width-4).Render(content))
 func (s *Styles) RenderBorderedBox(content string, width int, borderColor color.Color, height ...int) string {
 	borderStyle := s.InputBorder.

@@ -42,12 +42,8 @@ func (a *Adapter) Start() int {
 		inputWriter.Close()
 	}()
 
-	// Wait for the session to finish (EOF from stdin or task completion).
+	// Wait for the session to finish.
 	<-session.Done()
-
-	if session.TaskError() {
-		return 1
-	}
 
 	return 0
 }

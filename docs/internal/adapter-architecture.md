@@ -11,9 +11,7 @@ The adapter layer handles user interaction and translates between user actions a
 | `Terminal` | Main Bubble Tea model composing all UI components |
 | `DisplayModel` | Renders assistant output with virtual scrolling |
 | `InputModel` | Handles user text input |
-| `Editor` | External editor operations (`$EDITOR`) for multi-line input, display viewing, and queue editing |
 | `ModelSelector` | Modal for switching between AI models |
-| `QueueManager` | Modal for managing the task queue |
 | `ThemeSelector` | Modal for switching between color themes |
 | `OutputWriter` | Parses TLV from session and renders styled content |
 | `WindowBuffer` | Virtual scrolling buffer for display windows |
@@ -93,19 +91,17 @@ main.go → config.Parse() → Settings
 ```
 User types prompt
   → InputModel captures input
-    → Emit TLV(UT, prompt)
-      → inputPump reads TLV
-        → submitTask(QueueItem{Type: "prompt", Content: text, Images: images})
-          → Task Queue
-            → runTask() (task goroutine)
-              → handleUserPrompt()
-                → processPrompt()
-                  → Agent.Stream()
-                    → Callbacks emit TLV(AT), TLV(AR), TLV(AF), TLV(UF), etc.
-                      → OutputWriter parses TLV
-                        → WindowBuffer.AppendOrUpdate()
-                          → DisplayModel.View()
-                            → Terminal renders output
+    → Emit TLV(UT, prompt), TLV(MB)
+      → inputPump reads TLV, stages content, flushes on MB
+        → runTask() (task goroutine)
+          → handleUserPrompt()
+            → processPrompt()
+              → Agent.Stream()
+                → Callbacks emit TLV(AT), TLV(AR), TLV(AF), TLV(UF), etc.
+                  → OutputWriter parses TLV
+                    → WindowBuffer.AppendOrUpdate()
+                      → DisplayModel.View()
+                        → Terminal renders output
 ```
 
 ### Tool Execution Flow

@@ -12,33 +12,17 @@ import (
 	"github.com/alayacore/alayacore/internal/theme"
 )
 
-// QueueItem represents a queued task with metadata.
-type QueueItem struct {
-	QueueID     string            `json:"queue_id"`
-	Type        string            `json:"type"` // "prompt" or "command"
-	Content     string            `json:"content"`
-	Attachments []llm.ContentPart `json:"-"` // carried to handleUserPrompt; not serialized to adapter
-	CreatedAt   time.Time         `json:"created_at"`
-}
-
-// Task type constants for QueueItem.Type.
-const (
-	TaskTypePrompt  = "prompt"
-	TaskTypeCommand = "command"
-)
-
 // ============================================================================
 // TagSystemMsg (SM) payload types
 // ============================================================================
 
 // TaskMsg carries task progress info (type "task").
 type TaskMsg struct {
-	InProgress  bool        `json:"in_progress"`
-	CurrentStep int         `json:"current_step,omitempty"`
-	MaxSteps    int         `json:"max_steps,omitempty"`
-	Context     int64       `json:"context"`
-	TaskError   bool        `json:"task_error,omitempty"`
-	QueueItems  []QueueItem `json:"queue_items"`
+	InProgress  bool  `json:"in_progress"`
+	CurrentStep int   `json:"current_step,omitempty"`
+	MaxSteps    int   `json:"max_steps,omitempty"`
+	Context     int64 `json:"context"`
+	TaskError   bool  `json:"task_error,omitempty"`
 }
 
 func (TaskMsg) SystemMsgType() string { return "task" }

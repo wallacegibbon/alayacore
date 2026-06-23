@@ -41,10 +41,6 @@ type sessionState struct {
 	activeModelName string
 	modelConfigPath string
 
-	// Queue items — set by handleSystemTask, read by GetQueueItems
-	// (set again on each task update, so no accumulation).
-	pendingQueueItems []QueueItem
-
 	// Theme — active theme broadcast by the session via TagSystemMsg.
 	// The terminal reads this in updateStatus() and applies the theme visually
 	// when it detects a change from the previously applied theme.
@@ -65,8 +61,8 @@ type toolConfirmPending struct {
 	Input string
 }
 
-// updateTask atomically updates task progress fields and queue items.
-func (s *sessionState) updateTask(inProgress bool, currentStep, maxSteps int, context int64, taskError bool, queueItems []QueueItem) {
+// updateTask atomically updates task progress fields.
+func (s *sessionState) updateTask(inProgress bool, currentStep, maxSteps int, context int64, taskError bool) {
 	s.mu.Lock()
 	// Save step info when task completes (transition from in-progress to done)
 	if s.inProgress && !inProgress && s.maxSteps > 0 {
@@ -84,7 +80,6 @@ func (s *sessionState) updateTask(inProgress bool, currentStep, maxSteps int, co
 	s.currentStep = currentStep
 	s.maxSteps = maxSteps
 	s.contextTokens = context
-	s.pendingQueueItems = queueItems
 	s.mu.Unlock()
 }
 
@@ -183,7 +178,6 @@ func (s *sessionState) snapshotStatus() StatusSnapshot {
 	return StatusSnapshot{
 		ContextTokens:   s.contextTokens,
 		ContextLimit:    s.contextLimit,
-		QueueCount:      len(s.pendingQueueItems),
 		InProgress:      s.inProgress,
 		CurrentStep:     s.currentStep,
 		MaxSteps:        s.maxSteps,
@@ -211,15 +205,4 @@ func (s *sessionState) snapshotModels() ModelSnapshot {
 		snap.Models = s.models
 	}
 	return snap
-}
-
-// takeQueueItems returns the pending queue items without clearing them.
-// The status bar reads QueueCount from SnapshotStatus, so clearing would
-// lose the count after the first tick that consumes them.
-func (s *sessionState) takeQueueItems() []QueueItem {
-	s.mu.Lock()
-	items := make([]QueueItem, len(s.pendingQueueItems))
-	copy(items, s.pendingQueueItems)
-	s.mu.Unlock()
-	return items
 }

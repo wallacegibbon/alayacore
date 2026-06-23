@@ -12,7 +12,7 @@ This is a single \
 prompt that spans two lines.
 ```
 
-- **Ctrl-D** (EOF): closes stdin, waits for queued tasks to finish, exits with code `0`
+- **Ctrl-D** (EOF): closes stdin, waits for remaining tasks to finish, exits with code `0`
 - **Ctrl-C** (SIGINT): terminates immediately with default signal handling
   (exit code 130).
 

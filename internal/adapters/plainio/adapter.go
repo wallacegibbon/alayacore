@@ -9,7 +9,6 @@ import (
 	"os"
 
 	"github.com/alayacore/alayacore/internal/app"
-	"github.com/alayacore/alayacore/internal/stream"
 )
 
 // Compile-time check: Adapter satisfies app.Adapter.
@@ -31,7 +30,7 @@ func NewAdapter(cfg *app.Config) *Adapter {
 //
 // plainio processes prompts one at a time. If a task produces an error
 // (TagSystemMsg with type "error"), the remaining input is discarded and the process exits
-// with code 1 - queued tasks are NOT executed.
+// with code 1 - errors are reported immediately.
 func (a *Adapter) Start() int {
 	output := newStdoutOutput()
 
@@ -44,15 +43,11 @@ func (a *Adapter) Start() int {
 
 	exitCh := make(chan int, 1)
 
-	// Read stdin and emit TLV messages. On read error, write :cancel_all to
-	// unblock any stuck task, then close inputWriter.
-	// Only the stdin goroutine touches inputWriter.
+	// Read stdin and emit TLV messages. On read error, close inputWriter
+	// to signal EOF. Only the stdin goroutine touches inputWriter.
 	go func() {
 		err := readPrompts(inputWriter, os.Stdin)
-		if err != nil {
-			// Best-effort cancellation; Close() below signals EOF regardless.
-			_ = stream.WriteTLV(inputWriter, stream.TagUserT, ":cancel_all") //nolint:errcheck
-		}
+		// Close signals EOF regardless, unblocking the session.
 		inputWriter.Close()
 		if err != nil {
 			select {

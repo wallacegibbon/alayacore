@@ -23,7 +23,7 @@ See [TLV Protocol](adapter-architecture.md#tlv-protocol) for full details.
 
 - Raw bytes from stdin are piped directly to the session. The session's
   `io.ReadFull` handles TLV frame boundary detection internally.
-- **Ctrl-D** (EOF): closes stdin, the session finishes queued tasks, and
+- **Ctrl-D** (EOF): closes stdin, the session finishes pending tasks, and
   the process exits with code `0`.
 - **Ctrl-C** (SIGINT): terminates immediately with the default OS signal
   handling (exit code 130).
@@ -52,15 +52,15 @@ controlling process detects and handles it.
 ## Example
 
 ```sh
-# Send 2 UT (TagUserT) frames to AlayaCore
-printf 'UT\x00\x00\x00\x05helloUT\x00\x00\x00\x06my os?' | alayacore --rawio
+# Send a UT (user text) frame followed by MB (message boundary) to AlayaCore
+printf 'UT\x00\x00\x00\x05helloMB\x00\x00\x00\x00' | alayacore --rawio
 ```
 
 Inspect the raw TLV output with `tlvcat`:
 
 ```sh
 # Pipe the output through tlvcat to see tags and values
-printf 'UT\x00\x00\x00\x05helloUT\x00\x00\x00\x06my os?' | alayacore --rawio | go run ./misc/tlvcat.go
+printf 'UT\x00\x00\x00\x05helloMB\x00\x00\x00\x00' | alayacore --rawio | go run ./misc/tlvcat.go
 ```
 
 Or generate a TLV request with images and inspect the result:

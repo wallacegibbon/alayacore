@@ -18,7 +18,6 @@
 //	  - ErrNoModelFilePath: No model config file path
 //
 //	Queue errors:
-//	  - ErrQueueItemNotFound: Queue item not found
 //
 //	Session errors:
 //	  - ErrNoSessionFile: No session file set

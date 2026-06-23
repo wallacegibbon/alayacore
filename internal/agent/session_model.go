@@ -6,7 +6,7 @@ package agent
 //
 // The run() goroutine owns provider/agent creation (via SwitchModel,
 // model_set command) and all ModelManager/RuntimeManager access. Model
-// switching is ScheduleIdle, so agent/provider are stable during a task;
+// switching is CmdIdle, so agent/provider are stable during a task;
 // the task goroutine reads them as plain fields. Cross-goroutine
 // communication is channel-based (see session_event.go).
 
@@ -155,7 +155,7 @@ func (s *Session) applyModelContextLimit(model *ModelConfig) {
 }
 
 // SetReasoningLevel sets the reasoning level.
-// :reason is ScheduleIdle so this is only called when no task is running.
+// :reason is CmdIdle so this is only called when no task is running.
 // The provider is synced immediately.
 func (s *Session) SetReasoningLevel(level int) {
 	s.reasoningLevel = level
@@ -166,7 +166,7 @@ func (s *Session) SetReasoningLevel(level int) {
 }
 
 // SetVideoConfig sets the default video FPS and resolution.
-// :video_config is ScheduleIdle so this is only called when no task is running.
+// :video_config is CmdIdle so this is only called when no task is running.
 // The provider is synced immediately.
 func (s *Session) SetVideoConfig(fps int, resolution int) {
 	s.videoFPS = fps

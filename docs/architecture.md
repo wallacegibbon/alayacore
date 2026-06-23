@@ -22,7 +22,7 @@ The session layer manages conversation state, task execution, and model interact
 | Component | Description |
 |-----------|-------------|
 | `Session` | Main struct managing conversation state and message history |
-| `Task Queue` | FIFO queue for pending prompts and commands |
+| `Session` | Manages conversation state, executes prompts |
 | `ModelManager` | Loads and manages AI model configurations from `model.conf`. Never writes to the file. |
 | `RuntimeManager` | Persists runtime settings (active model, active theme) to `runtime.conf` |
 | `CommandDefinitions` | Static metadata for session commands (`:save`, `:cancel`, etc.) |
@@ -34,7 +34,7 @@ The session uses three goroutines for concurrent operation:
 
 | Goroutine | Source | Role |
 |-----------|--------|------|
-| **Main loop** (`run()`) | `Session.Start()` | Owns all mutable state, manages the task queue, processes commands |
+| **Main loop** (`run()`) | `Session.Start()` | Owns all mutable state, processes commands |
 | **Input pump** (`inputPump()`) | launched by `run()` | Reads TLV frames from the input stream, sends parsed messages to the main loop |
 | **Task worker** (`runTask()`) | spawned by `run()` per task | Executes a single task (LLM streaming + tool calls), returns final messages via `taskResultCh` |
 
@@ -45,9 +45,8 @@ The session uses three goroutines for concurrent operation:
 | `inputMsgCh` (buffered, cap 100) | inputPump | run() | Parsed user input messages |
 | `taskCancel` (atomic.Value) | run() | task worker | Cancel the running task |
 | `taskResultCh` (buffered, cap 1) | task worker | run() | Return final messages and signal task completion |
-| `taskEventCh` (buffered, cap 64) | task worker | run() | Step progress, token counts, paused state |
-| `infoUpdateCh` (buffered, cap 1) | task worker | run() | Request system-info broadcast |
-| `pausedOnError` (atomic.Bool) | both | — | Paused state (written by task goroutine, read by run()) |
+| `taskEventCh` (buffered, cap 64) | task worker | run() | Step progress, token counts |
+| `taskRefreshCh` (buffered, cap 1) | task worker | run() | Request system-info broadcast |
 | `outputBroken` (atomic.Bool) | both | — | Output stream failure flag (any goroutine can set) |
 | `confirmCh` (atomic.Pointer) | both | — | Tool-confirmation channel handoff |
 
@@ -56,9 +55,8 @@ The session uses three goroutines for concurrent operation:
 When the input stream reaches EOF (e.g. a piped `echo` command closes stdin),
 the inputPump closes `inputMsgCh` and exits. If a task is still running, `run()`
 enters `drainUntilTaskDone()` to process state events and the task completion
-signal. After the current task finishes, any remaining queued tasks are
 processed one by one before the session exits. This ensures that all output
-(prompt echo, assistant response, tool results) is flushed and no queued
+(prompt echo, assistant response, tool results) is flushed and no pending
 prompts are abandoned.
 
 ```
@@ -66,7 +64,6 @@ stdin EOF ──▶ inputPump closes inputMsgCh ──▶ run() detects closed c
                                                 │
                                     ┌───────────┴───────────┐
                                     │  drain running task   │
-                                    │  + queued tasks       │
                                     │  (loop until empty)   │
                                     └───────────┬───────────┘
                                                 │
@@ -74,16 +71,13 @@ stdin EOF ──▶ inputPump closes inputMsgCh ──▶ run() detects closed c
 ```
 
 **State ownership:**
-- The `run()` goroutine is the sole owner of session state. It reads/writes `taskQueue`, `inProgress`, `pausedOnError`, and all command-handling logic. ModelManager and RuntimeManager are also accessed only from `run()`.
-- The task goroutine communicates state changes via typed events on `taskEventCh` (step progress, token counts) and reads three atomic fields (`pausedOnError`, `outputBroken`, `confirmCh`) for lock-free access. All other state (agent, provider, ContextTokens, reasoningLevel, histCounter) is either passed as snapshots at task start or read from plain fields that are stable during task execution. The final message state is returned via `taskResultCh` on completion.
 - The input pump goroutine is a pure TLV parser. It reads frames from the input stream, builds inputMsg values, and sends them to `run()` via `inputMsgCh`. It has zero knowledge of commands and never touches session state — not even for `:cancel` or `:confirm`. All command dispatch, cancellation, and output writing happens in `run()`.
 - `sendSystemInfo` runs only in the `run()` goroutine; the task goroutine requests updates via `infoUpdateCh`.
 
-**Gotcha — everything is in run():** There is no "fast path" in the input pump for latency-critical commands. The `inputMsgCh` buffer is cap 100 but each message is processed in microseconds — the queue drains orders of magnitude faster than a human can type or an LLM can stream. If you're tempted to add a special case to the input pump, ask: is the latency measurable? If not, keep it in `run()` where it belongs.
+**Gotcha — everything is in run():** There is no "fast path" in the input pump for latency-critical commands. The `inputMsgCh` buffer is cap 100 but each message is processed in microseconds — the input channel drains orders of magnitude faster than a human can type or an LLM can stream. If you're tempted to add a special case to the input pump, ask: is the latency measurable? If not, keep it in `run()` where it belongs.
 
-**Design rationale:** Tasks must run in a separate goroutine because LLM streaming is blocking (3-10s per step). If tasks ran synchronously in `run()`, the main loop could not process user input (`:cancel`, new prompts, immediate commands) during task execution. The per-task goroutine pattern keeps the main loop responsive while avoiding a persistent worker goroutine that would sit idle between tasks.
+**Design rationale:** Tasks must run in a separate goroutine because LLM streaming is blocking (3-10s per step). If tasks ran synchronously in `run()`, the main loop could not process user input (`:cancel`, new prompts, immediate commands) during task execution. The per-task goroutine keeps the main loop responsive.
 
-**Gotcha — atomic fields use Load/Store:** `pausedOnError`, `outputBroken`, and `confirmCh` are atomic. Always use `.Load()` to read and `.Store()` to write. Direct assignment will not compile.
 
 ### Session Persistence
 
@@ -226,13 +220,12 @@ correct base directory for the current session.
 ## Design Decisions
 
 1. **TLV Protocol** — Simple binary protocol for clean separation between adapters and session. The TUI, plain-IO, and raw-IO modes all share the same session/agent logic.
-2. **Task Queue** — Deferred task processing with cancellation support. Queued tasks execute sequentially.
-3. **Virtual Scrolling** — Only visible windows are rendered. See [virtual-rendering-performance.md](virtual-rendering-performance.md).
-4. **Typed Tools** — `TypedExecute[T]` wrapper for type-safe tool implementations with auto-generated schemas. See [schema-improvements.md](schema-improvements.md).
-5. **Lazy Agent Init** — Agent and provider are created on first use, not at startup.
-6. **Tool Execution** — Tools execute concurrently during streaming (no-confirm) or as confirmations arrive (deferred). See [tool-execution.md](tool-execution.md).
-7. **Context Efficiency** — Large outputs (>64KB) saved to `os.TempDir()/alayacore-<suffix>/` instead of inline. See [truncation.md](truncation.md).
-8. **Reasoning Mode** — Provider-specific thinking fields added to API requests. Three levels: 0=off, 1=normal, 2=max. Toggled via `:reason [0|1|2]`.
-9. **Concurrent Task Execution** — Each task runs in its own goroutine so the main loop stays responsive during LLM streaming. Communication via typed channels and atomic fields.
-10. **Filter-What-You-See** — Searchable list components (ModelSelector, HelpWindow) build a pre-computed, lowercased `searchStr` that concatenates all visible fields of each item. Filtering is a single `FuzzyMatch(term, searchStr)` against this string, ensuring the search always matches exactly what the user can see, including cross-field queries (e.g. typing "quitexit" matches `:quit` + `Exit application`).
+2. **Virtual Scrolling** — Only visible windows are rendered. See [virtual-rendering-performance.md](virtual-rendering-performance.md).
+3. **Typed Tools** — `TypedExecute[T]` wrapper for type-safe tool implementations with auto-generated schemas. See [schema-improvements.md](schema-improvements.md).
+4. **Lazy Agent Init** — Agent and provider are created on first use, not at startup.
+5. **Tool Execution** — Tools execute concurrently during streaming (no-confirm) or as confirmations arrive (deferred). See [tool-execution.md](tool-execution.md).
+6. **Context Efficiency** — Large outputs (>64KB) saved to `os.TempDir()/alayacore-<suffix>/` instead of inline. See [truncation.md](truncation.md).
+7. **Reasoning Mode** — Provider-specific thinking fields added to API requests. Three levels: 0=off, 1=normal, 2=max. Toggled via `:reason [0|1|2]`.
+8. **Concurrent Task Execution** — Each task runs in its own goroutine so the main loop stays responsive during LLM streaming. Communication via typed channels and atomic fields.
+9. **Filter-What-You-See** — Searchable list components (ModelSelector, HelpWindow) build a pre-computed, lowercased `searchStr` that concatenates all visible fields of each item. Filtering is a single `FuzzyMatch(term, searchStr)` against this string, ensuring the search always matches exactly what the user can see, including cross-field queries (e.g. typing "quitexit" matches `:quit` + `Exit application`).
 

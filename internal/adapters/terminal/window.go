@@ -61,17 +61,18 @@ import (
 // The full Content string is only built when a full cache rebuild
 // is needed (resize, style change, etc.).
 type Window struct {
-	ID         string     // stream ID or generated unique ID
-	HistoryID  uint64     // numeric history ID from the stream
-	Tag        string     // TLV tag that created this window
-	ToolName   string     // tool name (for AF/UF tags)
-	ToolInput  string     // tool call input (formatted, for AF windows)
-	ToolOutput string     // tool execution output (for UF windows)
-	Content    string     // accumulated content — built from contentParts on demand
-	Folded     bool       // true if window is in folded (collapsed) mode
-	Status     ToolStatus // status indicator for tool windows
-	Visible    bool       // true if window should be rendered (delta windows only when has non-whitespace content)
-	styles     *Styles    // reference to styles for incremental updates
+	ID           string     // stream ID or generated unique ID
+	HistoryID    uint64     // numeric history ID from the stream
+	Tag          string     // TLV tag that created this window
+	ToolName     string     // tool name (for AF/UF tags)
+	ToolInput    string     // tool call input (formatted, for AF windows)
+	ToolOutput   string     // tool execution output (for UF windows)
+	Content      string     // accumulated content — built from contentParts on demand
+	MediaContent string     // media labels (for user windows with attachments)
+	Folded       bool       // true if window is in folded (collapsed) mode
+	Status       ToolStatus // status indicator for tool windows
+	Visible      bool       // true if window should be rendered (delta windows only when has non-whitespace content)
+	styles       *Styles    // reference to styles for incremental updates
 
 	// contentParts accumulates streaming deltas to avoid O(n²)
 	// from repeated Content += delta. Joined into Content on full rebuild.
@@ -389,7 +390,15 @@ func (w *Window) applyTagStyle(content string, styles *Styles) string {
 	case stream.TagUserD:
 		return styleMultiline(content, styles.Attachment)
 	case stream.TagUserT:
-		return styles.Prompt.Render("> ") + styles.UserInput.Render(content)
+		result := styles.Prompt.Render("> ")
+		if content != "" {
+			result += styles.UserInput.Render(content)
+		}
+		if w.MediaContent != "" {
+			result += "\n" + styles.System.Render("MEDIA:") + "\n" +
+				styleMultiline(w.MediaContent, styles.Attachment)
+		}
+		return result
 	case TagWindowSE:
 		return styleMultiline(content, styles.Error)
 	case TagWindowSN:

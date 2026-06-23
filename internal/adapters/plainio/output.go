@@ -151,7 +151,7 @@ func (o *stdoutOutput) handleTextDelta(tag, value string) {
 // emitSeparator prints a newline if the previous visible tag differs from the
 // new tag and the previous frame was streamed (had a non-empty stream ID).
 // It updates lastTag to the new tag.
-// handleMediaTag prints a media attachment label (image/video/audio/document).
+// handleMediaTag prints a media label (image/video/audio/document).
 func (o *stdoutOutput) handleMediaTag(tag, value string) {
 	stream.UnwrapDelta(value)
 	o.emitSeparator(tag)

@@ -101,7 +101,6 @@ func TestDomainErrors(t *testing.T) {
 		{"ErrModelNotFound", ErrModelNotFound},
 		{"ErrModelManagerNotInitialized", ErrModelManagerNotInitialized},
 		{"ErrNoModelFilePath", ErrNoModelFilePath},
-		{"ErrQueueItemNotFound", ErrQueueItemNotFound},
 		{"ErrNoSessionFile", ErrNoSessionFile},
 		{"ErrEmptyCommand", ErrEmptyCommand},
 		{"ErrNothingToCancel", ErrNothingToCancel},

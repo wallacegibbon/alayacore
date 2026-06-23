@@ -2,27 +2,22 @@
 
 AlayaCore provides colon-prefixed commands (`:command`) that work across all adapters — TUI, Plain IO, and Raw IO.
 
-Commands fall into three scheduling categories:
+Commands fall into three categories:
 
-- **Immediate commands** — run synchronously in the main loop, always allowed
-- **Idle commands** — run synchronously, but rejected while a task is in progress
-- **Task commands** — enqueued at the front of the task queue; run when no task is active and can be canceled with `:cancel`
+- **Immediate commands** (`CmdImmediate`) — run synchronously in the main loop, always allowed
+- **Idle commands** (`CmdIdle`) — run synchronously, but rejected while a task is in progress
+- **Task commands** — require LLM calls, run in a separate goroutine
 
 ## Immediate Commands
 
 | Command | Action |
 |---------|--------|
 | `:cancel` | Cancel current task |
-| `:cancel_all` | Cancel current task and clear the task queue |
 | `:save [filename]` | Save session. Uses `--session` path if no filename given. |
 | `:reason [0\|1\|2]` | Set reasoning level (0=off, 1=normal, 2=max). Default: 1 |
 | `:theme_set <name>` | Switch to a different theme |
 | `:confirm <id> yes\|no` | Confirm or deny a pending tool execution |
 | `:fork <id> <filename>` | Fork session — save all content up to a history ID to a file |
-| `:taskqueue_get_all` | List all queued tasks |
-| `:taskqueue_del <queue_id>` | Delete a queued task by ID |
-| `:taskqueue_edit <queue_id> <content>` | Edit a queued task's content by ID |
-| `:clear_queue` | Clear all queued tasks without canceling the current task |
 
 ## Idle Commands
 
@@ -36,11 +31,11 @@ These commands are rejected with an error if a task is currently running:
 
 ## Task Commands
 
-Task commands run in a task goroutine and can be canceled with `:cancel` while executing:
+These commands require LLM calls and run in a separate goroutine:
 
 | Command | Action |
 |---------|--------|
-| `:continue [skip]` | Retry last prompt, or skip it with `skip` and resume the queue |
+| `:continue` | Retry the last prompt |
 | `:summarize` | Summarize conversation to reduce token usage ⚠️ **Replaces entire conversation history with a summary** — see [context-tracking.md](context-tracking.md) |
 
 ## Adapter-Specific Commands
@@ -65,7 +60,6 @@ In the TUI, you can also press `Ctrl+F` at a window to pre-fill the `:fork` comm
 
 ## :continue
 
-When a task fails or is canceled, `:continue` retries the last prompt. If the task queue has pending items, `:continue skip` discards the failed prompt and advances to the next queued task.
 
 See [error-handling.md](error-handling.md) for details on error recovery with `:continue`.
 

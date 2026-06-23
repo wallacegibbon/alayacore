@@ -112,7 +112,6 @@ Both are sent by the same goroutine sequentially, and the FIFO channel guarantee
 
 - **Destructive** — The conversation history is replaced by the summary. Previous turns are lost. Only run `:summarize` when you're confident the summary captures everything needed.
 - **One-shot** — There is no undo. Consider saving the session first (`:save`) if you might need the full history later.
-- **Error risk** — If the LLM fails during summarization (network error, rate limit, etc.), the session enters the paused-on-error state. Use `:continue` to retry or `:continue skip` to resume queued tasks.
 
 ### When to use
 
@@ -123,7 +122,7 @@ Both are sent by the same goroutine sequentially, and the FIFO channel guarantee
 ## Related
 
 - `shouldAutoSummarize()` — triggers when `ContextTokens >= ContextLimit * 65%` (only when `--auto-summarize` is enabled)
-- `summarize()` — appends the summary prompt to Messages, calls `processPrompt`, then replaces conversation history with the summary and resets `ContextTokens` to the summary's output token count via `SetContextTokensEvent`
+- `runSummarize()` (in `session_queue.go`) — appends the summary prompt to Messages, calls `handleUserPrompt`, then replaces conversation history with the summary and resets `ContextTokens` to the summary's output token count via `SetContextTokensEvent`
 - `SetContextTokensEvent` — a dedicated task event that sets `ContextTokens` to the correct value after summarization, overriding the stale value from the preceding `StepFinishEvent`
 - `applyModelContextLimit()` — sets `ContextLimit` from the active model's config
 - `SessionMeta.ContextTokens` — persisted to session file frontmatter so the status bar shows the correct context usage immediately after loading a session

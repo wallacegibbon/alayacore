@@ -6,90 +6,63 @@ import (
 
 // Command name constants
 const (
-	CommandNameSummarize       = "summarize"
-	CommandNameCancel          = "cancel"
-	CommandNameCancelAll       = "cancel_all"
-	CommandNameContinue        = "continue"
-	CommandNameSave            = "save"
-	CommandNameModelSet        = "model_set"
-	CommandNameModelLoad       = "model_load"
-	CommandNameTaskQueueGetAll = "taskqueue_get_all"
-	CommandNameTaskQueueDel    = "taskqueue_del"
-	CommandNameTaskQueueEdit   = "taskqueue_edit"
-	CommandNameReason          = "reason"
-	CommandNameThemeSet        = "theme_set"
-	CommandNameConfirm         = "confirm"
-	CommandNameFork            = "fork"
-	CommandNameClearQueue      = "clear_queue"
-	CommandNameVideoConfig     = "video_config"
+	CommandNameSummarize   = "summarize"
+	CommandNameCancel      = "cancel"
+	CommandNameContinue    = "continue"
+	CommandNameSave        = "save"
+	CommandNameModelSet    = "model_set"
+	CommandNameModelLoad   = "model_load"
+	CommandNameReason      = "reason"
+	CommandNameThemeSet    = "theme_set"
+	CommandNameConfirm     = "confirm"
+	CommandNameFork        = "fork"
+	CommandNameVideoConfig = "video_config"
 )
 
-// SchedulePolicy specifies how and when a command is dispatched.
-type SchedulePolicy int
+// CmdPolicy specifies how and when a command is dispatched.
+type CmdPolicy int
 
 const (
-	// ScheduleTask commands are enqueued as tasks and executed
-	// in the task goroutine.  Unknown commands also receive this
-	// policy so they fall through to the task path where
-	// runTaskCommand handles summarize and continue.
-	ScheduleTask SchedulePolicy = iota
+	// CmdImmediate runs synchronously in the run() goroutine.
+	// Safe to execute even while a task is streaming (e.g. :cancel, :save).
+	CmdImmediate CmdPolicy = iota
 
-	// ScheduleImmediate commands run synchronously in the run()
-	// goroutine.  They are safe to execute even while a task is
-	// streaming (e.g. :cancel, :save, :reason).
-	ScheduleImmediate
-
-	// ScheduleIdle commands run synchronously in the run()
-	// goroutine but are rejected when a task is in progress
-	// because they mutate state that the task goroutine reads
-	// (model configuration, agent/provider pointers).
-	ScheduleIdle
+	// CmdIdle runs synchronously but is rejected when a task is
+	// in progress (e.g. :model_set changes state the task reads).
+	CmdIdle
 )
 
 // CommandHandler is a function that handles a colon-command.
-// The session, context, and parsed arguments are passed in.
-// Unused parameters can be ignored by the handler.
 type CommandHandler func(s *Session, ctx context.Context, args []string)
 
 // Command describes a user-facing colon-command with its handler and metadata.
 type Command struct {
-	Name        string         // Command name (without colon)
-	Description string         // Short description for help
-	Usage       string         // Usage example (e.g. "<id>")
-	Schedule    SchedulePolicy // When the command can be dispatched
-	Handler     CommandHandler // The handler function
+	Name        string
+	Description string
+	Usage       string
+	Policy      CmdPolicy
+	Handler     CommandHandler
 }
 
 // commandDefs is the single source of truth for all colon-commands.
-// Order here determines the order used by LookupCommand iteration.
 var commandDefs = []Command{
-	{CommandNameCancel, "Cancel the current task", "", ScheduleImmediate,
+	{CommandNameCancel, "Cancel the current task", "", CmdImmediate,
 		func(s *Session, _ context.Context, _ []string) { s.cancelTask() }},
-	{CommandNameCancelAll, "Cancel current task and clear the task queue", "", ScheduleImmediate,
-		func(s *Session, _ context.Context, _ []string) { s.cancelAllTasks() }},
-	{CommandNameSave, "Save the current session", "[filename]", ScheduleImmediate,
+	{CommandNameSave, "Save the current session", "[filename]", CmdImmediate,
 		func(s *Session, _ context.Context, args []string) { s.saveSession(args) }},
-	{CommandNameModelSet, "Switch to a different model", "<id>", ScheduleIdle,
+	{CommandNameModelSet, "Switch to a different model", "<id>", CmdIdle,
 		func(s *Session, _ context.Context, args []string) { s.handleModelSet(args) }},
-	{CommandNameModelLoad, "Reload models from configuration file", "", ScheduleIdle,
+	{CommandNameModelLoad, "Reload models from configuration file", "", CmdIdle,
 		func(s *Session, _ context.Context, _ []string) { s.handleModelLoad() }},
-	{CommandNameTaskQueueGetAll, "List all queued tasks", "", ScheduleImmediate,
-		func(s *Session, _ context.Context, _ []string) { s.handleTaskQueueGetAll() }},
-	{CommandNameTaskQueueDel, "Delete a queued task", "<queue_id>", ScheduleImmediate,
-		func(s *Session, _ context.Context, args []string) { s.handleTaskQueueDel(args) }},
-	{CommandNameTaskQueueEdit, "Edit a queued task's content", "<queue_id> <new_content>", ScheduleImmediate,
-		func(s *Session, _ context.Context, args []string) { s.handleTaskQueueEdit(args) }},
-	{CommandNameReason, "Set reasoning level (0=off, 1=normal, 2=max)", "[0|1|2]", ScheduleIdle,
+	{CommandNameReason, "Set reasoning level (0=off, 1=normal, 2=max)", "[0|1|2]", CmdIdle,
 		func(s *Session, _ context.Context, args []string) { s.handleReason(args) }},
-	{CommandNameThemeSet, "Set the active theme", "<name>", ScheduleImmediate,
+	{CommandNameThemeSet, "Set the active theme", "<name>", CmdImmediate,
 		func(s *Session, _ context.Context, args []string) { s.handleThemeSet(args) }},
-	{CommandNameConfirm, "Confirm or deny a pending tool execution", "yes|no", ScheduleImmediate,
+	{CommandNameConfirm, "Confirm or deny a pending tool execution", "yes|no", CmdImmediate,
 		func(s *Session, _ context.Context, args []string) { s.handleConfirmCommand(args) }},
-	{CommandNameFork, "Fork session up to content ID and save to file", "<id> <filename>", ScheduleImmediate,
+	{CommandNameFork, "Fork session up to content ID and save to file", "<id> <filename>", CmdImmediate,
 		func(s *Session, _ context.Context, args []string) { s.handleFork(args) }},
-	{CommandNameClearQueue, "Clear all queued tasks without canceling the current task", "", ScheduleImmediate,
-		func(s *Session, _ context.Context, _ []string) { s.clearQueue() }},
-	{CommandNameVideoConfig, "Set video FPS and resolution", "<fps> <0|1>", ScheduleIdle,
+	{CommandNameVideoConfig, "Set video FPS and resolution", "<fps> <0|1>", CmdIdle,
 		func(s *Session, _ context.Context, args []string) { s.handleVideoConfig(args) }},
 }
 
