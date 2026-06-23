@@ -173,11 +173,13 @@ func (r *userRenderer) BuildInner(width int, folded bool, styles *Styles) (strin
 		}
 	}
 
-	// Media portion
+	// Media portion — separated from text by "---" only when text exists
 	if media != "" {
 		var mediaBlock strings.Builder
-		mediaBlock.WriteString(styles.System.Render(Separator))
-		mediaBlock.WriteString("\n")
+		if len(parts) > 0 {
+			mediaBlock.WriteString(styles.System.Render(Separator))
+			mediaBlock.WriteString("\n")
+		}
 		mediaBlock.WriteString(styles.Attachment.Render(media))
 		if innerWidth > 0 {
 			mediaBlockStr := wrapContent(mediaBlock.String(), innerWidth)
