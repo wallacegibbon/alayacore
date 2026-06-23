@@ -15,7 +15,6 @@ import (
 	"strings"
 	"time"
 
-	domainerrors "github.com/alayacore/alayacore/internal/errors"
 	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/stream"
 )
@@ -215,7 +214,7 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.ContentPart) 
 					ch <- llm.ToolConfirmResponse{ID: req.ID, Error: "output broken"}
 				} else if err := stream.WriteSystemMsg(s.Output, stream.ToolConfirmMsg{ID: req.ID}); err != nil {
 					s.markOutputBroken()
-					ch <- llm.ToolConfirmResponse{ID: req.ID, Error: domainerrors.Wrap("tool", err).Error()}
+					ch <- llm.ToolConfirmResponse{ID: req.ID, Error: fmt.Errorf("tool: %w", err).Error()}
 				}
 			}
 

@@ -17,7 +17,6 @@ import (
 	"strings"
 
 	"github.com/alayacore/alayacore/internal/config"
-	domainerrors "github.com/alayacore/alayacore/internal/errors"
 	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/stream"
 )
@@ -32,7 +31,7 @@ func (s *Session) cancelTask() {
 			return
 		}
 	}
-	s.writeError(domainerrors.ErrNothingToCancel.Error())
+	s.writeError("nothing to cancel")
 }
 
 func (s *Session) saveSession(args []string) {
@@ -40,7 +39,7 @@ func (s *Session) saveSession(args []string) {
 	switch len(args) {
 	case 0:
 		if s.SessionFile == "" {
-			s.writeError(domainerrors.ErrNoSessionFile.Error())
+			s.writeError("no session file set")
 			return
 		}
 		path = s.SessionFile
@@ -52,7 +51,7 @@ func (s *Session) saveSession(args []string) {
 	}
 
 	if err := s.saveContentToFile(path, s.Contents); err != nil {
-		s.writeError(domainerrors.Wrapf(CommandNameSave, domainerrors.ErrFailedToSaveSession, "%v", err).Error())
+		s.writeError(fmt.Sprintf("save: failed to save session: %v", err))
 	} else {
 		s.writeNotifyf("Session saved to %s", path)
 	}
@@ -60,7 +59,7 @@ func (s *Session) saveSession(args []string) {
 
 func (s *Session) handleModelSet(args []string) {
 	if s.ModelManager == nil {
-		s.writeError(domainerrors.ErrModelManagerNotInitialized.Error())
+		s.writeError("model manager not initialized")
 		return
 	}
 
@@ -72,12 +71,12 @@ func (s *Session) handleModelSet(args []string) {
 	modelIDStr := args[0]
 	modelID, err := strconv.Atoi(modelIDStr)
 	if err != nil {
-		s.writeError(domainerrors.NewSessionErrorf(CommandNameModelSet, "invalid model ID: %s", modelIDStr).Error())
+		s.writeError(fmt.Sprintf("model_set: invalid model ID: %s", modelIDStr))
 		return
 	}
 	model := s.ModelManager.GetModel(modelID)
 	if model == nil {
-		s.writeError(domainerrors.Wrapf(CommandNameModelSet, domainerrors.ErrModelNotFound, "model not found: %d", modelID).Error())
+		s.writeError(fmt.Sprintf("model_set: model not found: %d", modelID))
 		return
 	}
 
@@ -105,18 +104,18 @@ func (s *Session) handleModelSet(args []string) {
 
 func (s *Session) handleModelLoad() {
 	if s.ModelManager == nil {
-		s.writeError(domainerrors.ErrModelManagerNotInitialized.Error())
+		s.writeError("model manager not initialized")
 		return
 	}
 
 	path := s.ModelManager.GetFilePath()
 	if path == "" {
-		s.writeError(domainerrors.ErrNoModelFilePath.Error())
+		s.writeError("no model file path configured")
 		return
 	}
 
 	if err := s.ModelManager.LoadFromFile(path); err != nil {
-		s.writeError(domainerrors.Wrapf(CommandNameModelLoad, domainerrors.ErrFailedToLoadModels, "%v", err).Error())
+		s.writeError(fmt.Sprintf("model_load: failed to load models: %v", err))
 		return
 	}
 
@@ -237,78 +236,55 @@ type inputMsg struct {
 func (s *Session) inputPump() {
 	var staged []llm.ContentPart
 
-	// flushStaged sends all staged content as a prompt.
-	// Called on MB tag or EOF.
-	flushStaged := func() {
-		if len(staged) > 0 {
-			msg := inputMsg{contentParts: staged}
-			staged = nil
-			s.inputMsgCh <- msg
-		}
-	}
-
 	for {
 		tag, value, err := stream.ReadTLV(s.Input)
 		if err != nil {
-			// Flush any staged content before closing on EOF.
-			flushStaged()
+			if len(staged) > 0 {
+				s.inputMsgCh <- inputMsg{contentParts: staged}
+			}
 			close(s.inputMsgCh)
 			return
 		}
-
-		switch tag {
-		case stream.TagUserI:
-			staged = append(staged, &llm.ImagePart{URI: value})
-		case stream.TagUserV:
-			staged = append(staged, &llm.VideoPart{URI: value})
-		case stream.TagUserA:
-			staged = append(staged, &llm.AudioPart{URI: value})
-		case stream.TagUserD:
-			staged = append(staged, &llm.DocumentPart{URI: value})
-		case stream.TagUserT:
-			s.handleInputUserText(value, &staged)
-		case stream.TagMessageBoundary:
-			flushStaged()
-
-		default:
-			if len(staged) > 0 {
-				staged = nil
-				s.inputMsgCh <- inputMsg{err: domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
-					"unexpected tag while content is staged: %s", tag)}
-			} else {
-				s.inputMsgCh <- inputMsg{err: domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
-					"invalid input tag: %s", tag)}
-			}
-		}
+		staged = s.handleInputFrame(tag, value, staged)
 	}
 }
 
-// handleInputUserText handles a UT (user text) tag from the input pump.
-//
-// All content — both media (UI/UV/UA/UD) and text — is staged until
-// an MB (message boundary) tag or EOF flushes it.  Commands (starting
-// with ':') are sent immediately when there is no staged content; a
-// command with staged content is rejected.
-func (s *Session) handleInputUserText(value string, staged *[]llm.ContentPart) {
-	if len(value) > 0 && value[0] == ':' {
-		// Command with staged content is rejected.
-		if len(*staged) > 0 {
-			*staged = nil
-			s.inputMsgCh <- inputMsg{err: domainerrors.Wrapf("input", domainerrors.ErrInvalidInputTag,
-				"command can not be sent with staged content")}
-			return
+// handleInputFrame processes a single TLV frame from the input stream.
+// Returns the updated staged content (nil when staged content has been
+// consumed by MB or discarded by an error). Media tags (UI/UV/UA/UD)
+// and regular text (UT without ':') are staged until MB or EOF.
+// Command text (UT starting with ':') is sent immediately without staging.
+func (s *Session) handleInputFrame(tag, value string, staged []llm.ContentPart) []llm.ContentPart {
+	switch tag {
+	case stream.TagUserI:
+		return append(staged, &llm.ImagePart{URI: value})
+	case stream.TagUserV:
+		return append(staged, &llm.VideoPart{URI: value})
+	case stream.TagUserA:
+		return append(staged, &llm.AudioPart{URI: value})
+	case stream.TagUserD:
+		return append(staged, &llm.DocumentPart{URI: value})
+	case stream.TagUserT:
+		if len(value) > 0 && value[0] == ':' {
+			if len(staged) > 0 {
+				s.inputMsgCh <- inputMsg{err: fmt.Errorf("command can not be sent with staged content")}
+				return nil
+			}
+			s.inputMsgCh <- inputMsg{isCmd: true, cmd: value[1:]}
+			return staged
 		}
-		// Command without staged content — send as-is.
-		s.inputMsgCh <- inputMsg{
-			isCmd: true,
-			cmd:   value[1:],
+		if value != "" {
+			return append(staged, &llm.TextPart{Text: value})
 		}
-		return
-	}
-
-	// Regular text — stage it.  Content stays staged until MB or EOF.
-	if value != "" {
-		*staged = append(*staged, &llm.TextPart{Text: value})
+		return staged
+	case stream.TagMessageBoundary:
+		if len(staged) > 0 {
+			s.inputMsgCh <- inputMsg{contentParts: staged}
+		}
+		return nil
+	default:
+		s.inputMsgCh <- inputMsg{err: fmt.Errorf("invalid input tag: %s", tag)}
+		return nil
 	}
 }
 
@@ -412,64 +388,76 @@ func (s *Session) startTaskSummarize() {
 	go s.runSummarize(taskCtx, taskContent)
 }
 
-// handleInputMsg processes a parsed input message. Called from run() goroutine.
-func (s *Session) handleInputMsg(msg inputMsg) {
-	if msg.err != nil {
-		s.writeError(msg.err.Error())
-		return
-	}
-
-	if !msg.isCmd {
-		// Prompt — reject if a task is already running.
-		if s.activeTask != nil {
-			s.writeError("A task is already running. Wait for it to complete or cancel it.")
-			return
-		}
-		if err := s.ensureAgentInitialized(); err != nil {
-			s.writeError(err.Error())
-			return
-		}
-		taskContent := make([]llm.ContentPart, len(s.Contents))
-		copy(taskContent, s.Contents)
-		taskCtx, taskCancel := context.WithCancel(s.sessionCtx)
-		s.activeTask = &taskHandle{cancel: taskCancel, step: 0}
-		go s.runTask(taskCtx, taskContent, msg.contentParts)
-		return
-	}
-
-	// Command dispatch.
-	raw := msg.cmd
-	fields := strings.Fields(raw)
+// handleCommand dispatches a colon-command string (without the ':' prefix).
+// Returns true if the command was recognized and handled, false if the text
+// is not a known command and should be treated as a regular prompt.
+func (s *Session) handleCommand(cmd string) bool {
+	fields := strings.Fields(cmd)
 	if len(fields) == 0 {
-		s.writeError(domainerrors.ErrEmptyCommand.Error())
-		return
+		s.writeError("empty command")
+		return true // consumed, even though it's an error
 	}
 
 	name := fields[0]
 	args := fields[1:]
 
-	cmdDef, ok := LookupCommand(name)
-	if ok {
+	// Known registry commands.
+	if cmdDef, ok := LookupCommand(name); ok {
 		switch cmdDef.Policy {
 		case CmdImmediate:
 			cmdDef.Handler(s, s.sessionCtx, args)
 		case CmdIdle:
 			if s.activeTask != nil {
 				s.writeError("Cannot run this command while a task is in progress. Please wait or cancel the current task.")
-				return
+				return true
 			}
 			cmdDef.Handler(s, s.sessionCtx, args)
 		}
-		return
+		return true
 	}
 
 	// Task commands — :continue and :summarize run in their own goroutine.
 	switch name {
 	case CommandNameContinue:
 		s.startTaskContinue()
+		return true
 	case CommandNameSummarize:
 		s.startTaskSummarize()
-	default:
-		s.writeError(fmt.Sprintf("unknown command: %s", name))
+		return true
 	}
+
+	// Not a known command — caller should treat as a prompt.
+	return false
+}
+
+// handleInputMsg processes a parsed input message. Called from run() goroutine.
+//
+// For colon-prefixed text (msg.isCmd), handleCommand is tried first. If it
+// returns false the text is not a known command and is treated as a prompt.
+// For regular prompts (non-command), the text is sent to the LLM directly.
+func (s *Session) handleInputMsg(msg inputMsg) {
+	if msg.err != nil {
+		s.writeError(msg.err.Error())
+		return
+	}
+
+	// Colon-prefixed text — try command dispatch first.
+	if msg.isCmd && s.handleCommand(msg.cmd) {
+		return // handled as a command
+	}
+
+	// Regular prompt — reject if a task is already running.
+	if s.activeTask != nil {
+		s.writeError("A task is already running. Wait for it to complete or cancel it.")
+		return
+	}
+	if err := s.ensureAgentInitialized(); err != nil {
+		s.writeError(err.Error())
+		return
+	}
+	taskContent := make([]llm.ContentPart, len(s.Contents))
+	copy(taskContent, s.Contents)
+	taskCtx, taskCancel := context.WithCancel(s.sessionCtx)
+	s.activeTask = &taskHandle{cancel: taskCancel, step: 0}
+	go s.runTask(taskCtx, taskContent, msg.contentParts)
 }

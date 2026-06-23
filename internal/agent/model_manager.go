@@ -17,7 +17,6 @@ import (
 	"strings"
 
 	"github.com/alayacore/alayacore/internal/config"
-	domainerrors "github.com/alayacore/alayacore/internal/errors"
 )
 
 // ModelConfig represents a model configuration
@@ -236,7 +235,7 @@ func validateModel(m ModelConfig) []string {
 // Reload reloads models from the config file
 func (mm *ModelManager) Reload() error {
 	if mm.filePath == "" {
-		return domainerrors.Wrap("model", fmt.Errorf("no config file path set"))
+		return fmt.Errorf("model: no config file path set")
 	}
 	return mm.LoadFromFile(mm.filePath)
 }
@@ -296,7 +295,7 @@ func (mm *ModelManager) SetActive(id int) error {
 			return nil
 		}
 	}
-	return domainerrors.Wrapf(CommandNameModelSet, domainerrors.ErrModelNotFound, "model not found: %d", id)
+	return fmt.Errorf("model_set: model not found: %d", id)
 }
 
 // Returns false if there are no models.
@@ -343,7 +342,7 @@ func (mm *ModelManager) FindModelByName(name string) int {
 func (mm *ModelManager) SetActiveByName(name string) error {
 	id := mm.FindModelByName(name)
 	if id == 0 {
-		return domainerrors.Wrapf(CommandNameModelSet, domainerrors.ErrModelNotFound, "model not found: %q", name)
+		return fmt.Errorf("model_set: model not found: %q", name)
 	}
 	return mm.SetActive(id)
 }

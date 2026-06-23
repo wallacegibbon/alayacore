@@ -2,10 +2,10 @@
 package factory
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
-	"github.com/alayacore/alayacore/internal/errors"
 	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/llm/providers"
 )
@@ -36,6 +36,6 @@ func NewProvider(config ProviderConfig) (llm.Provider, error) {
 	case "openai":
 		return providers.NewOpenAIWithConfig(cfg)
 	default:
-		return nil, errors.Wrapf("provider", errors.ErrProviderCreationFailed, "unknown provider type: %s", config.Type)
+		return nil, fmt.Errorf("provider: unknown provider type: %s", config.Type)
 	}
 }

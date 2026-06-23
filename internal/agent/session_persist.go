@@ -15,8 +15,6 @@ import (
 	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/stream"
-
-	domainerrors "github.com/alayacore/alayacore/internal/errors"
 )
 
 // maxTLVContentSize is the safety limit for a single TLV record's content.
@@ -36,7 +34,7 @@ var ErrSessionVersionMismatch = errors.New("session file version mismatch")
 func LoadSession(path string) (*SessionData, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, domainerrors.Wrap("load", err)
+		return nil, fmt.Errorf("load: %w", err)
 	}
 	sd, err := parseSessionData(data)
 	if err != nil {
@@ -62,10 +60,10 @@ func (s *Session) saveContentToFile(path string, contents []llm.ContentPart) err
 
 	raw, err := formatSessionMarkdown(&data)
 	if err != nil {
-		return domainerrors.Wrap(CommandNameSave, err)
+		return fmt.Errorf("save: %w", err)
 	}
 	if err := os.WriteFile(path, raw, 0600); err != nil {
-		return domainerrors.Wrap(CommandNameSave, err)
+		return fmt.Errorf("save: %w", err)
 	}
 	return nil
 }
@@ -89,7 +87,7 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 	for _, part := range data.Contents {
 		tag, content, err := contentPartToTLV(part)
 		if err != nil {
-			return nil, domainerrors.Wrap(CommandNameSave, err)
+			return nil, fmt.Errorf("save: %w", err)
 		}
 		tlvBuf.WriteString("\n\n")
 		tlvBuf.Write(stream.EncodeTLV(tag, content))
@@ -103,12 +101,12 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 // Returns the frontmatter content (between the delimiters) and the body (after the closing delimiter).
 func parseFrontmatter(content string) (frontmatter, body string, err error) {
 	if !strings.HasPrefix(content, "---\n") {
-		return "", "", domainerrors.NewSessionErrorf("load", "session file missing frontmatter")
+		return "", "", fmt.Errorf("load: session file missing frontmatter")
 	}
 
 	endIdx := strings.Index(content[4:], "\n---\n")
 	if endIdx == -1 {
-		return "", "", domainerrors.NewSessionErrorf("load", "session file missing frontmatter end marker")
+		return "", "", fmt.Errorf("load: session file missing frontmatter end marker")
 	}
 
 	frontmatter = content[4 : endIdx+4]
