@@ -611,7 +611,7 @@ func (m *Terminal) applyTheme(theme *theme.Theme) {
 	m.modelSelector.SetStyles(m.styles)
 	m.themeSelector.SetStyles(m.styles)
 	m.helpWindow.SetStyles(m.styles)
-	m.confirmOverlay.Styles = m.styles
+	m.confirmOverlay.SetStyles(m.styles)
 	m.display.updateContent()
 }
 
@@ -623,7 +623,7 @@ func (m *Terminal) handleBlur() (tea.Model, tea.Cmd) {
 	m.modelSelector.SetHasFocus(false)
 	m.themeSelector.SetHasFocus(false)
 	m.helpWindow.SetHasFocus(false)
-	m.confirmOverlay.HasFocus = false
+	m.confirmOverlay.SetHasFocus(false)
 	m.display.updateContent()
 	return m, nil
 }
@@ -635,7 +635,7 @@ func (m *Terminal) handleFocus() (tea.Model, tea.Cmd) {
 	m.modelSelector.SetHasFocus(true)
 	m.themeSelector.SetHasFocus(true)
 	m.helpWindow.SetHasFocus(true)
-	m.confirmOverlay.HasFocus = true
+	m.confirmOverlay.SetHasFocus(true)
 
 	if m.modelSelector.IsOpen() {
 		m.display.updateContent()

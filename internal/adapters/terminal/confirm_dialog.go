@@ -43,14 +43,14 @@ const (
 //
 // Key handling: y/Y = confirm, n/N/esc = cancel.
 type ConfirmDialog struct {
-	// Core state — follows the FilteredListCore/ScrollableListCore pattern.
-	State    FilteredListState
-	Kind     ConfirmKind
-	HasFocus bool
-	Styles   *Styles
+	// Core state — follows the ScrollableListCore pattern.
+	state    FilteredListState
+	kind     ConfirmKind
+	hasFocus bool
+	styles   *Styles
 
 	// Width is set by SetSize with the full terminal width, matching
-	// the overlay pattern used by ModelSelector, ModelSelector, etc.
+	// the overlay pattern used by ModelSelector, ThemeSelector, etc.
 	Width  int
 	Height int
 
@@ -59,22 +59,46 @@ type ConfirmDialog struct {
 	Description string
 
 	// Tool confirm fields (only used for ConfirmTool kind)
-	ToolID    string
-	ToolName  string
-	ToolInput string
+	toolID    string
+	toolName  string
+	toolInput string
 
 	// Result flags — consumed by the Terminal after key handling.
 	// Only one of these is set per interaction.
-	Confirmed bool
-	Canceled  bool
+	confirmed bool
+	canceled  bool
 }
 
 // NewConfirmDialog creates a new confirm dialog.
 func NewConfirmDialog(styles *Styles) *ConfirmDialog {
 	return &ConfirmDialog{
-		Styles: styles,
+		styles: styles,
 	}
 }
+
+// SetStyles updates the styles used for rendering.
+func (cd *ConfirmDialog) SetStyles(styles *Styles) {
+	cd.styles = styles
+}
+
+// SetHasFocus sets the focus state for styling.
+func (cd *ConfirmDialog) SetHasFocus(focused bool) {
+	cd.hasFocus = focused
+}
+
+// Kind returns the type of confirmation dialog currently active.
+func (cd *ConfirmDialog) Kind() ConfirmKind {
+	return cd.kind
+}
+
+// ToolName returns the tool name for tool confirmations.
+func (cd *ConfirmDialog) ToolName() string { return cd.toolName }
+
+// ToolInput returns the tool input for tool confirmations.
+func (cd *ConfirmDialog) ToolInput() string { return cd.toolInput }
+
+// ToolID returns the tool call ID for tool confirmations.
+func (cd *ConfirmDialog) ToolID() string { return cd.toolID }
 
 // SetSize updates the terminal dimensions for responsive sizing.
 // Called on initialization and terminal resize.
@@ -87,42 +111,42 @@ func (cd *ConfirmDialog) SetSize(width, height int) {
 
 // IsOpen returns true if the dialog is currently shown.
 func (cd *ConfirmDialog) IsOpen() bool {
-	return cd.State != FilteredListClosed
+	return cd.state != FilteredListClosed
 }
 
 // ---- Open / Close ----
 
 // OpenQuit opens the dialog for confirming application exit.
 func (cd *ConfirmDialog) OpenQuit() {
-	cd.State = FilteredListOpen
-	cd.Kind = ConfirmQuit
+	cd.state = FilteredListOpen
+	cd.kind = ConfirmQuit
 	cd.Description = "All unsaved progress will be lost."
-	cd.ToolID = ""
-	cd.ToolName = ""
-	cd.ToolInput = ""
-	cd.Confirmed = false
-	cd.Canceled = false
+	cd.toolID = ""
+	cd.toolName = ""
+	cd.toolInput = ""
+	cd.confirmed = false
+	cd.canceled = false
 }
 
 // OpenCancel opens the dialog for confirming task cancellation.
 func (cd *ConfirmDialog) OpenCancel() {
-	cd.State = FilteredListOpen
-	cd.Kind = ConfirmCancel
+	cd.state = FilteredListOpen
+	cd.kind = ConfirmCancel
 	cd.Description = "The current request will be stopped."
-	cd.ToolID = ""
-	cd.ToolName = ""
-	cd.ToolInput = ""
-	cd.Confirmed = false
-	cd.Canceled = false
+	cd.toolID = ""
+	cd.toolName = ""
+	cd.toolInput = ""
+	cd.confirmed = false
+	cd.canceled = false
 }
 
 // OpenTool opens the dialog for confirming a tool call.
 func (cd *ConfirmDialog) OpenTool(toolID, toolName, toolInput string) {
-	cd.State = FilteredListOpen
-	cd.Kind = ConfirmTool
-	cd.ToolID = toolID
-	cd.ToolName = toolName
-	cd.ToolInput = toolInput
+	cd.state = FilteredListOpen
+	cd.kind = ConfirmTool
+	cd.toolID = toolID
+	cd.toolName = toolName
+	cd.toolInput = toolInput
 	// Derive description from tool input (up to 2 line-break segments).
 	// HardWrap in buildContentLines handles wrapping long lines, and the
 	// 2-row cap with "..." handles overflow beyond 2 rows.
@@ -137,21 +161,21 @@ func (cd *ConfirmDialog) OpenTool(toolID, toolName, toolInput string) {
 	// the 2-row "..." truncation prematurely.
 	desc = strings.TrimRight(desc, "\n")
 	cd.Description = desc
-	cd.Confirmed = false
-	cd.Canceled = false
+	cd.confirmed = false
+	cd.canceled = false
 }
 
 // Close closes the dialog without committing any action.
 // This is equivalent to the user pressing esc.
 func (cd *ConfirmDialog) Close() {
-	cd.State = FilteredListClosed
-	cd.Kind = ConfirmNone
+	cd.state = FilteredListClosed
+	cd.kind = ConfirmNone
 	cd.Description = ""
-	cd.ToolID = ""
-	cd.ToolName = ""
-	cd.ToolInput = ""
-	cd.Confirmed = false
-	cd.Canceled = false
+	cd.toolID = ""
+	cd.toolName = ""
+	cd.toolInput = ""
+	cd.confirmed = false
+	cd.canceled = false
 }
 
 // ---- Key Handling ----
@@ -167,13 +191,13 @@ func (cd *ConfirmDialog) HandleKeyMsg(msg tea.KeyMsg) bool {
 
 	switch key {
 	case keyY, keyYCapital:
-		cd.Confirmed = true
-		cd.State = FilteredListClosed
+		cd.confirmed = true
+		cd.state = FilteredListClosed
 		return true
 
 	case keyN, keyNCapital, keyEsc:
-		cd.Canceled = true
-		cd.State = FilteredListClosed
+		cd.canceled = true
+		cd.state = FilteredListClosed
 		return true
 	}
 
@@ -184,10 +208,10 @@ func (cd *ConfirmDialog) HandleKeyMsg(msg tea.KeyMsg) bool {
 // ConsumeResult returns the result flags and resets them.
 // Returns (confirmed, canceled).
 func (cd *ConfirmDialog) ConsumeResult() (bool, bool) {
-	confirmed := cd.Confirmed
-	canceled := cd.Canceled
-	cd.Confirmed = false
-	cd.Canceled = false
+	confirmed := cd.confirmed
+	canceled := cd.canceled
+	cd.confirmed = false
+	cd.canceled = false
 	return confirmed, canceled
 }
 
@@ -214,7 +238,7 @@ func (cd *ConfirmDialog) View() tea.View {
 	// Render with bordered box — border uses error color for visual warning.
 	// Pass fixed height so the window is always the same size, same as
 	// ModelSelector and ModelSelector overlays.
-	box := cd.Styles.RenderBorderedBox(content, cd.Width, cd.Styles.ColorError, ConfirmContentRows)
+	box := cd.styles.RenderBorderedBox(content, cd.Width, cd.styles.ColorError, ConfirmContentRows)
 
 	return tea.NewView("\n" + box + "\n")
 }
@@ -251,7 +275,7 @@ func (cd *ConfirmDialog) buildContentLines() []string {
 	// If the body exceeds the available rows, truncate from the bottom.
 	if len(body) > maxBodyLines {
 		body = body[:maxBodyLines-1]
-		body = append(body, cd.wrapAndCenter("...", cd.Styles.System, innerWidth)[0])
+		body = append(body, cd.wrapAndCenter("...", cd.styles.System, innerWidth)[0])
 	}
 
 	for len(body) < maxBodyLines {
@@ -259,7 +283,7 @@ func (cd *ConfirmDialog) buildContentLines() []string {
 	}
 
 	lines := body
-	lines = append(lines, cd.wrapAndCenter("y / n", cd.Styles.System, innerWidth)[0])
+	lines = append(lines, cd.wrapAndCenter("y / n", cd.styles.System, innerWidth)[0])
 	lines = append(lines, "")
 
 	return lines
@@ -267,15 +291,15 @@ func (cd *ConfirmDialog) buildContentLines() []string {
 
 // buildTitleText returns the title string for the current dialog kind.
 func (cd *ConfirmDialog) buildTitleText() string {
-	switch cd.Kind {
+	switch cd.kind {
 	case ConfirmQuit:
 		return "Exit AlayaCore?"
 	case ConfirmCancel:
 		return "Cancel current task?"
 	case ConfirmTool:
 		msg := "Allow "
-		if cd.ToolName != "" {
-			msg += fmt.Sprintf("%q", cd.ToolName)
+		if cd.toolName != "" {
+			msg += fmt.Sprintf("%q", cd.toolName)
 		} else {
 			msg += "this tool"
 		}
@@ -288,7 +312,7 @@ func (cd *ConfirmDialog) buildTitleText() string {
 // renderTitleLine hard-wraps the styled title, takes only 1 row.
 // If it overflows, truncates and appends "...", then centers it.
 func (cd *ConfirmDialog) renderTitleLine(titleText string, innerWidth int) string {
-	styled := cd.Styles.Confirm.Render(titleText)
+	styled := cd.styles.Confirm.Render(titleText)
 	wrapped := ansi.Hardwrap(styled, innerWidth, false)
 	lines := strings.Split(wrapped, "\n")
 
@@ -328,7 +352,7 @@ func (cd *ConfirmDialog) renderDescriptionRows(innerWidth int) []string {
 
 	styled := make([]string, 2)
 	for i, line := range rawDesc {
-		styled[i] = cd.Styles.System.Render(line)
+		styled[i] = cd.styles.System.Render(line)
 	}
 
 	maxW := 0

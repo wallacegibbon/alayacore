@@ -172,8 +172,8 @@ func (m *Terminal) handleConfirmResult() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	kind := m.confirmOverlay.Kind
-	toolID := m.confirmOverlay.ToolID
+	kind := m.confirmOverlay.Kind()
+	toolID := m.confirmOverlay.ToolID()
 	m.confirmOverlay.Close()
 
 	fromCmd := m.confirmFromCommand
@@ -268,9 +268,9 @@ func (m *Terminal) handleOverlayModelSelector(msg tea.KeyMsg) (tea.Model, tea.Cm
 func (m *Terminal) handleOverlayConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// 'e' opens the full tool input in an external editor for inspection
 	// (view-only — dialog stays open after editor closes)
-	if msg.String() == keyE && m.confirmOverlay.Kind == ConfirmTool && m.confirmOverlay.ToolInput != "" {
-		content := m.confirmOverlay.ToolInput
-		if toolName := m.confirmOverlay.ToolName; toolName != "" && strings.HasPrefix(content, toolName+": ") {
+	if msg.String() == keyE && m.confirmOverlay.Kind() == ConfirmTool && m.confirmOverlay.ToolInput() != "" {
+		content := m.confirmOverlay.ToolInput()
+		if toolName := m.confirmOverlay.ToolName(); toolName != "" && strings.HasPrefix(content, toolName+": ") {
 			content = content[len(toolName)+2:]
 		}
 		return m, m.editor.OpenForDisplay(content)
