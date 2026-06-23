@@ -252,6 +252,8 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 		CreatedAt: data.CreatedAt,
 	}
 	s.reasoningLevel = data.ReasoningLevel
+	s.videoFPS = data.VideoFPS
+	s.videoRes = data.VideoRes
 	s.ContextTokens = data.ContextTokens
 	s.histCounter = uint64(len(s.Contents))
 

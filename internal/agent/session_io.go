@@ -358,7 +358,7 @@ func (s *Session) handleReason(args []string) {
 // Usage: :video_config <fps> <resolution>
 //
 //	fps:        frames per second (positive integer, e.g. 2)
-//	resolution: 1=default, 2=max
+//	resolution: 0=default, 1=max
 func (s *Session) handleVideoConfig(args []string) {
 	if len(args) < 2 {
 		s.writeError("usage: :video_config <fps> <resolution>  (resolution: 0=default, 1=max)")

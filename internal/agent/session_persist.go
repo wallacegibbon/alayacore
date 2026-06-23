@@ -48,12 +48,14 @@ func LoadSession(path string) (*SessionData, error) {
 func (s *Session) saveContentToFile(path string, contents []llm.ContentPart) error {
 	data := SessionData{
 		SessionMeta: SessionMeta{
-			MessageVersion: MessageVersion,
 			CreatedAt:      s.CreatedAt,
 			UpdatedAt:      time.Now(),
-			ReasoningLevel: s.reasoningLevel,
 			ActiveModel:    s.activeModelName(),
+			MessageVersion: MessageVersion,
+			ReasoningLevel: s.reasoningLevel,
 			ContextTokens:  s.ContextTokens,
+			VideoFPS:       s.videoFPS,
+			VideoRes:       s.videoRes,
 		},
 		Contents: contents,
 	}

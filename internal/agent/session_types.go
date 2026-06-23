@@ -91,6 +91,14 @@ type ReasoningMsg struct {
 
 func (ReasoningMsg) SystemMsgType() string { return "reasoning" }
 
+// VideoConfigMsg carries the video FPS and resolution (type "video_config").
+type VideoConfigMsg struct {
+	FPS int `json:"fps"`
+	Res int `json:"res"`
+}
+
+func (VideoConfigMsg) SystemMsgType() string { return "video_config" }
+
 // MessageVersionMsg carries the TLV message format version (type "version").
 // Sent as the first TagSystemMsg frame so adapters can validate format
 // compatibility before processing subsequent messages.
@@ -110,10 +118,12 @@ const MessageVersion = 8
 type SessionMeta struct {
 	CreatedAt      time.Time `config:"created_at"`
 	UpdatedAt      time.Time `config:"updated_at"`
-	ReasoningLevel int       `config:"reasoning_level"`
 	ActiveModel    string    `config:"active_model,omitempty"`
-	ContextTokens  int64     `config:"context_tokens,omitempty"`
 	MessageVersion int       `config:"message_version,omitempty"`
+	ReasoningLevel int       `config:"reasoning_level"`
+	ContextTokens  int64     `config:"context_tokens,omitempty"`
+	VideoFPS       int       `config:"video_fps"`
+	VideoRes       int       `config:"video_res"`
 }
 
 // taskResultCh carries the final content list from the task goroutine to run().

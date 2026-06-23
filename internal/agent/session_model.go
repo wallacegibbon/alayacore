@@ -177,6 +177,7 @@ func (s *Session) SetVideoConfig(fps int, resolution int) {
 	if s.provider != nil {
 		s.provider.SetVideoConfig(fps, resolution)
 	}
+	s.sendSystemInfo("video_config")
 }
 
 func createProviderFromConfig(config *ModelConfig, debugAPI bool, proxyURL string) (llm.Provider, error) {

@@ -10,6 +10,7 @@ package agent
 //     handleTaskDone()                 → sendSystemInfo("task")  — task completion
 //     handleModelSet/ModelLoad         → sendSystemInfo("model") — model switch
 //     SetReasoningLevel()              → sendSystemInfo("reasoning")
+//     SetVideoConfig()                 → sendSystemInfo("video_config")
 //     handleThemeSet()                 → sendSystemInfo("theme")
 //
 //   Best-effort broadcasts (UI responsiveness optimization):
@@ -134,7 +135,7 @@ func (s *Session) requestSystemInfo() {
 
 // sendSystemInfo sends one or more TagSystemMsg frames to the adapter.
 // kind selects which messages to send: "task", "model", "theme",
-// "reasoning", or "all".
+// "reasoning", "video_config", or "all".
 // Must only be called from the run() goroutine.
 func (s *Session) sendSystemInfo(kind string) {
 	switch kind {
@@ -146,6 +147,7 @@ func (s *Session) sendSystemInfo(kind string) {
 		s.sendThemeListMsg()
 		s.sendThemeMsg()
 		s.sendReasoningMsg()
+		s.sendVideoConfigMsg()
 	case "task":
 		s.sendTaskMsg()
 	case "model":
@@ -154,6 +156,8 @@ func (s *Session) sendSystemInfo(kind string) {
 		s.sendThemeMsg()
 	case "reasoning":
 		s.sendReasoningMsg()
+	case "video_config":
+		s.sendVideoConfigMsg()
 	}
 }
 
@@ -243,4 +247,8 @@ func (s *Session) sendThemeListMsg() {
 
 func (s *Session) sendReasoningMsg() {
 	s.writeSystemMsg(ReasoningMsg{Level: s.reasoningLevel})
+}
+
+func (s *Session) sendVideoConfigMsg() {
+	s.writeSystemMsg(VideoConfigMsg{FPS: s.videoFPS, Res: s.videoRes})
 }
