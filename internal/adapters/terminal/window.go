@@ -296,7 +296,10 @@ func (w *Window) LineCount() int {
 
 // UpdateLineCountFast attempts to compute the line count without a full render.
 // Returns (lineCount, ok). If ok is false, the caller must call Render().
-// This is the fast path for line height updates during streaming (~58μs vs full Render).
+// This fast path (~58μs) only applies when the renderer's internal cache is
+// still valid (e.g. after resize or theme change, not after content append).
+// During streaming, every append invalidates the cache, so this returns false
+// and ensureLineHeights falls through to the full Render (~100-200μs).
 func (w *Window) UpdateLineCountFast(width int) (int, bool) {
 	if w.renderer == nil {
 		return 0, false

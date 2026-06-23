@@ -374,7 +374,8 @@ func (wb *WindowBuffer) ensureLineHeights() {
 		w := wb.windows[wb.dirtyIndex]
 		// Only render and count lines for visible windows
 		if w.Visible {
-			// Fast path: try UpdateLineCountFast first (~58μs vs full Render).
+			// Fast path: try UpdateLineCountFast first (~58μs when cache valid,
+			// otherwise falls through to full Render ~100-200μs).
 			if lc, ok := w.UpdateLineCountFast(wb.width); ok {
 				oldHeight := wb.lineHeights[wb.dirtyIndex]
 				wb.lineHeights[wb.dirtyIndex] = lc
