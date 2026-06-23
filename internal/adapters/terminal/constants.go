@@ -2,6 +2,9 @@ package terminal
 
 import "time"
 
+// Separator is the visual separator between sections in a window.
+const Separator = "---"
+
 // Timing constants for UI responsiveness.
 const (
 	// ThemePreviewDebounce is the delay before applying a theme preview

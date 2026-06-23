@@ -157,7 +157,7 @@ func (r *userRenderer) BuildInner(width int, folded bool, styles *Styles) (strin
 			}
 			if textBlock.Len() > 0 {
 				textBlock.WriteString("\n")
-				textBlock.WriteString(styles.System.Render("---"))
+				textBlock.WriteString(styles.System.Render(Separator))
 				textBlock.WriteString("\n")
 			}
 			textBlock.WriteString(styles.Prompt.Render("> "))
@@ -176,7 +176,7 @@ func (r *userRenderer) BuildInner(width int, folded bool, styles *Styles) (strin
 	// Media portion
 	if media != "" {
 		var mediaBlock strings.Builder
-		mediaBlock.WriteString(styles.System.Render("---"))
+		mediaBlock.WriteString(styles.System.Render(Separator))
 		mediaBlock.WriteString("\n")
 		mediaBlock.WriteString(styles.Attachment.Render(media))
 		if innerWidth > 0 {
@@ -209,7 +209,7 @@ type toolRenderer struct {
 
 func (r *toolRenderer) Tag() string { return stream.TagAssistantF }
 
-// showSeparator returns true if the tool should display an OUTPUT: separator
+// showSeparator returns true if the tool should display a separator
 // between the call input and its result. Only diff-style tools (edit_file,
 // write_file) show a separator — other tools append output directly.
 func (r *toolRenderer) showSeparator() bool {
@@ -271,7 +271,7 @@ func (r *toolRenderer) BuildInner(width int, folded bool, styles *Styles) (strin
 		var result strings.Builder
 		result.WriteString(call)
 
-		sep := styles.System.Render("---")
+		sep := styles.System.Render(Separator)
 		styled := styleMultiline(prepareContent(r.output), styles.Text)
 		if innerWidth > 0 {
 			styled = wrapContent(styled, innerWidth)
