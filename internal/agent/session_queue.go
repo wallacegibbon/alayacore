@@ -78,7 +78,7 @@ func (s *Session) runSummarize(ctx context.Context, taskContent []llm.ContentPar
 
 	s.summarizeBackup(contents)
 
-	prompt := SummarizePrompt
+	prompt := summarizePrompt
 
 	s.writeNotify("Summarizing conversation...")
 
