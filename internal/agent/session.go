@@ -263,6 +263,9 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 
 // replayContentsToAdapter sends all content parts to the adapter with history IDs,
 // so the adapter can reference them by ID even after session reload.
+// MB is emitted at User boundaries (not every role transition) because
+// writeColored already flushes pending user content on any non-user tag.
+// Assistant messages create their own windows without needing MB.
 func (s *Session) replayContentsToAdapter() error {
 	var lastRole llm.MessageRole
 	for _, part := range s.Contents {
@@ -270,17 +273,19 @@ func (s *Session) replayContentsToAdapter() error {
 		if err != nil {
 			return fmt.Errorf("corrupt session file: failed to serialize content part (HistoryID=%d): %w", part.GetHistoryID(), err)
 		}
-		// Emit MB between messages (role transitions) so the adapter
-		// can group parts into windows. User → Assistant or Assistant → User.
-		if lastRole != "" && part.GetRole() != lastRole {
+	// Emit MB at User role boundaries so the adapter groups each
+	// user message into one window. Assistant messages are flushed
+	// automatically by writeColored (non-user tag triggers flush).
+	if lastRole != "" && part.GetRole() == llm.RoleUser && lastRole != llm.RoleUser {
 			s.writeTLV(stream.TagMessageBoundary, "")
 		}
 		lastRole = part.GetRole()
 		s.writeTLV(tag, stream.WrapDelta(strconv.FormatUint(part.GetHistoryID(), 10), content))
 	}
 
-	// Final MB to flush the last message.
-	if len(s.Contents) > 0 {
+// Final MB to flush the last message (ensures the last user message
+// is rendered even if no assistant response follows).
+if len(s.Contents) > 0 {
 		s.writeTLV(stream.TagMessageBoundary, "")
 	}
 	return nil
