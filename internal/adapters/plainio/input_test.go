@@ -18,7 +18,7 @@ func TestReadPrompts_SingleLine(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Should emit TLV(UT, "hello") followed by MB
+	// Should emit TLV(UT, "hello") followed by UE
 	tag, value, err := stream.ReadTLV(&buf)
 	if err != nil {
 		t.Fatalf("failed to read TLV: %v", err)
@@ -29,13 +29,13 @@ func TestReadPrompts_SingleLine(t *testing.T) {
 	if value != "hello" {
 		t.Errorf("expected value 'hello', got %q", value)
 	}
-	// MB
+	// UE
 	tag, _, err = stream.ReadTLV(&buf)
 	if err != nil {
-		t.Fatalf("failed to read MB TLV: %v", err)
+		t.Fatalf("failed to read UE TLV: %v", err)
 	}
 	if tag != stream.TagUserEnd {
-		t.Errorf("expected MB tag, got %s", tag)
+		t.Errorf("expected UE tag, got %s", tag)
 	}
 }
 
@@ -48,7 +48,7 @@ func TestReadPrompts_MultiLineBackslash(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Should emit TLV(UT, "first line\nsecond line\nthird line") followed by MB
+	// Should emit TLV(UT, "first line\nsecond line\nthird line") followed by UE
 	tag, value, err := stream.ReadTLV(&buf)
 	if err != nil {
 		t.Fatalf("failed to read TLV: %v", err)
@@ -59,13 +59,13 @@ func TestReadPrompts_MultiLineBackslash(t *testing.T) {
 	if value != "first line\nsecond line\nthird line" {
 		t.Errorf("expected multi-line value, got %q", value)
 	}
-	// MB
+	// UE
 	tag, _, err = stream.ReadTLV(&buf)
 	if err != nil {
-		t.Fatalf("failed to read MB TLV: %v", err)
+		t.Fatalf("failed to read UE TLV: %v", err)
 	}
 	if tag != stream.TagUserEnd {
-		t.Errorf("expected MB tag, got %s", tag)
+		t.Errorf("expected UE tag, got %s", tag)
 	}
 }
 
@@ -80,7 +80,7 @@ func TestReadPrompts_TrailingBackslash(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Should emit TLV(UT, "hello") followed by MB
+	// Should emit TLV(UT, "hello") followed by UE
 	tag, value, err := stream.ReadTLV(&buf)
 	if err != nil {
 		t.Fatalf("failed to read TLV: %v", err)
@@ -91,13 +91,13 @@ func TestReadPrompts_TrailingBackslash(t *testing.T) {
 	if value != "hello" {
 		t.Errorf("expected 'hello', got %q", value)
 	}
-	// MB
+	// UE
 	tag, _, err = stream.ReadTLV(&buf)
 	if err != nil {
-		t.Fatalf("failed to read MB TLV: %v", err)
+		t.Fatalf("failed to read UE TLV: %v", err)
 	}
 	if tag != stream.TagUserEnd {
-		t.Errorf("expected MB tag, got %s", tag)
+		t.Errorf("expected UE tag, got %s", tag)
 	}
 }
 
@@ -110,7 +110,7 @@ func TestReadPrompts_MultipleLines(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Each prompt is followed by MB.
+	// Each prompt is followed by UE.
 	for i, expected := range []string{"first", "second", "third"} {
 		tag, value, err := stream.ReadTLV(&buf)
 		if err != nil {
@@ -122,13 +122,13 @@ func TestReadPrompts_MultipleLines(t *testing.T) {
 		if value != expected {
 			t.Errorf("prompt %d: expected %q, got %q", i, expected, value)
 		}
-		// MB
+		// UE
 		tag, _, err = stream.ReadTLV(&buf)
 		if err != nil {
-			t.Fatalf("prompt %d: failed to read MB TLV: %v", i, err)
+			t.Fatalf("prompt %d: failed to read UE TLV: %v", i, err)
 		}
 		if tag != stream.TagUserEnd {
-			t.Errorf("prompt %d: expected MB tag, got %s", i, tag)
+			t.Errorf("prompt %d: expected UE tag, got %s", i, tag)
 		}
 	}
 }
@@ -142,7 +142,7 @@ func TestReadPrompts_EmptyLines(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Each prompt is followed by MB.
+	// Each prompt is followed by UE.
 	for i, expected := range []string{"hello", "world"} {
 		tag, value, err := stream.ReadTLV(&buf)
 		if err != nil {
@@ -154,13 +154,13 @@ func TestReadPrompts_EmptyLines(t *testing.T) {
 		if value != expected {
 			t.Errorf("prompt %d: expected %q, got %q", i, expected, value)
 		}
-		// MB
+		// UE
 		tag, _, err = stream.ReadTLV(&buf)
 		if err != nil {
-			t.Fatalf("prompt %d: failed to read MB TLV: %v", i, err)
+			t.Fatalf("prompt %d: failed to read UE TLV: %v", i, err)
 		}
 		if tag != stream.TagUserEnd {
-			t.Errorf("prompt %d: expected MB tag, got %s", i, tag)
+			t.Errorf("prompt %d: expected UE tag, got %s", i, tag)
 		}
 	}
 
@@ -179,7 +179,7 @@ func TestReadPrompts_EOFPartialLine(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Partial prompt on EOF should also flush with MB.
+	// Partial prompt on EOF should also flush with UE.
 	tag, value, err := stream.ReadTLV(&buf)
 	if err != nil {
 		t.Fatalf("failed to read TLV: %v", err)
@@ -190,13 +190,13 @@ func TestReadPrompts_EOFPartialLine(t *testing.T) {
 	if value != "partial prompt" {
 		t.Errorf("expected 'partial prompt', got %q", value)
 	}
-	// MB
+	// UE
 	tag, _, err = stream.ReadTLV(&buf)
 	if err != nil {
-		t.Fatalf("failed to read MB TLV: %v", err)
+		t.Fatalf("failed to read UE TLV: %v", err)
 	}
 	if tag != stream.TagUserEnd {
-		t.Errorf("expected MB tag, got %s", tag)
+		t.Errorf("expected UE tag, got %s", tag)
 	}
 }
 
@@ -209,7 +209,7 @@ func TestReadPrompts_Command(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Commands should emit UT without MB.
+	// Commands should emit UT without UE.
 	tag, value, err := stream.ReadTLV(&buf)
 	if err != nil {
 		t.Fatalf("failed to read TLV: %v", err)
@@ -221,7 +221,7 @@ func TestReadPrompts_Command(t *testing.T) {
 		t.Errorf("expected ':cancel', got %q", value)
 	}
 
-	// Should be no MB after command
+	// Should be no UE after command
 	tag, _, err = stream.ReadTLV(&buf)
 	if err == nil {
 		t.Errorf("expected EOF after command, got tag %s", tag)
@@ -250,13 +250,13 @@ func TestReadPrompts_QuitCommand(t *testing.T) {
 		t.Errorf("expected 'some text', got %q", value)
 	}
 
-	// MB after first prompt
+	// UE after first prompt
 	tag, _, err = stream.ReadTLV(&buf)
 	if err != nil {
-		t.Fatalf("failed to read MB TLV: %v", err)
+		t.Fatalf("failed to read UE TLV: %v", err)
 	}
 	if tag != stream.TagUserEnd {
-		t.Errorf("expected MB tag, got %s", tag)
+		t.Errorf("expected UE tag, got %s", tag)
 	}
 
 	// Should be no more data
@@ -285,13 +285,13 @@ func TestReadPrompts_BackslashThenEOF(t *testing.T) {
 	if value != "hello" {
 		t.Errorf("expected 'hello', got %q", value)
 	}
-	// MB
+	// UE
 	tag, _, err = stream.ReadTLV(&buf)
 	if err != nil {
-		t.Fatalf("failed to read MB TLV: %v", err)
+		t.Fatalf("failed to read UE TLV: %v", err)
 	}
 	if tag != stream.TagUserEnd {
-		t.Errorf("expected MB tag, got %s", tag)
+		t.Errorf("expected UE tag, got %s", tag)
 	}
 }
 
