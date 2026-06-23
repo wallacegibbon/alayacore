@@ -41,10 +41,6 @@ import (
 	"github.com/alayacore/alayacore/internal/theme"
 )
 
-// userContentPart is a single piece of user content (text or media label)
-// awaiting assembly into a display window. Parts arrive in order via TLV
-// frames (UT, UI/UV/UA/UD) and are flushed into one window on MB or
-// before the next non-user tag.
 // outputWriter parses TLV from the session and writes styled content to the WindowBuffer.
 // It implements io.Writer for the agent/session output stream.
 type outputWriter struct {
