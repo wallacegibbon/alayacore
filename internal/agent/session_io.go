@@ -378,14 +378,8 @@ func (s *Session) handleConfirmCommand(args []string) {
 	*p <- llm.ToolConfirmResponse{ID: id, Allowed: allowed}
 }
 
-// startTaskOrCmd starts a task goroutine for an unrecognized command.
-// text is the full raw input; name is the first word for routing.
-// :continue and :summarize run their own handlers; everything else is
-// treated as a normal prompt with the raw text as content.
-// Known commands like :continue and :summarize are routed to specific
-// handlers; all others are treated as a normal prompt with the command
-// text as content.
-func (s *Session) startTaskOrCmd(text, name string) {
+// startTaskContinue starts a task goroutine for :continue.
+func (s *Session) startTaskContinue() {
 	if s.activeTask != nil {
 		s.writeError("Cannot run command while a task is running. Please wait or cancel first.")
 		return
@@ -398,14 +392,24 @@ func (s *Session) startTaskOrCmd(text, name string) {
 	copy(taskContent, s.Contents)
 	taskCtx, taskCancel := context.WithCancel(s.sessionCtx)
 	s.activeTask = &taskHandle{cancel: taskCancel, step: 0}
-	switch name {
-	case CommandNameContinue:
-		go s.runContinue(taskCtx, taskContent)
-	case CommandNameSummarize:
-		go s.runSummarize(taskCtx, taskContent)
-	default:
-		go s.runTask(taskCtx, taskContent, []llm.ContentPart{&llm.TextPart{Text: text}})
+	go s.runContinue(taskCtx, taskContent)
+}
+
+// startTaskSummarize starts a task goroutine for :summarize.
+func (s *Session) startTaskSummarize() {
+	if s.activeTask != nil {
+		s.writeError("Cannot run command while a task is running. Please wait or cancel first.")
+		return
 	}
+	if err := s.ensureAgentInitialized(); err != nil {
+		s.writeError(err.Error())
+		return
+	}
+	taskContent := make([]llm.ContentPart, len(s.Contents))
+	copy(taskContent, s.Contents)
+	taskCtx, taskCancel := context.WithCancel(s.sessionCtx)
+	s.activeTask = &taskHandle{cancel: taskCancel, step: 0}
+	go s.runSummarize(taskCtx, taskContent)
 }
 
 // handleInputMsg processes a parsed input message. Called from run() goroutine.
@@ -445,19 +449,27 @@ func (s *Session) handleInputMsg(msg inputMsg) {
 	args := fields[1:]
 
 	cmdDef, ok := LookupCommand(name)
-	if !ok {
-		s.startTaskOrCmd(raw, name)
+	if ok {
+		switch cmdDef.Policy {
+		case CmdImmediate:
+			cmdDef.Handler(s, s.sessionCtx, args)
+		case CmdIdle:
+			if s.activeTask != nil {
+				s.writeError("Cannot run this command while a task is in progress. Please wait or cancel the current task.")
+				return
+			}
+			cmdDef.Handler(s, s.sessionCtx, args)
+		}
 		return
 	}
 
-	switch cmdDef.Policy {
-	case CmdImmediate:
-		cmdDef.Handler(s, s.sessionCtx, args)
-	case CmdIdle:
-		if s.activeTask != nil {
-			s.writeError("Cannot run this command while a task is in progress. Please wait or cancel the current task.")
-			return
-		}
-		cmdDef.Handler(s, s.sessionCtx, args)
+	// Task commands — :continue and :summarize run in their own goroutine.
+	switch name {
+	case CommandNameContinue:
+		s.startTaskContinue()
+	case CommandNameSummarize:
+		s.startTaskSummarize()
+	default:
+		s.writeError(fmt.Sprintf("unknown command: %s", name))
 	}
 }
