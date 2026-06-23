@@ -5,7 +5,7 @@ package terminal
 // boundaries while preserving ANSI styles across line breaks, and
 // display-width-aware truncation with progressive suffix degradation.
 //
-// Used by Window (renderGenericContent, rebuildCache), tool.go
+// Used by Window.renderer.BuildInner, tool.go
 // (RenderDiffContent), model_selector.go, help_window.go,
 // theme_selector.go, input_component.go, and tests.
 

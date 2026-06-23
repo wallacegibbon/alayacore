@@ -26,7 +26,10 @@
 //   - tui.go: Main Terminal model, message routing, and status bar
 //   - keybinds.go: Declarative key binding configuration
 //   - output.go: TLV parsing and styled rendering
-//   - window.go: Virtual scrolling, DisplayModel, and diff display
+//   - display.go: DisplayModel, virtual scrolling, and cursor navigation
+//   - window.go: Window struct with polymorphic WindowRendering interface
+//   - window_renderer.go: Renderers for text, user, and tool windows
+//   - window_buffer.go: WindowBuffer, line tracking, and virtual rendering
 //   - styles.go: Lipgloss style derivation from theme.Theme
 //   - input_component.go: Input handling and external editor support
 //   - model_selector.go: Model switching UI with fuzzy search
