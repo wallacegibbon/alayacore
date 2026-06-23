@@ -917,3 +917,40 @@ func BenchmarkWrapContentVsLipglossWrap(b *testing.B) {
 		}
 	})
 }
+
+// BenchmarkAppendVsFullWrap_LongContent compares incremental append to
+// full re-wrap on very long content (5000+ lines). This is the scenario
+// that matters during streaming of a long LLM response.
+func BenchmarkAppendVsFullWrap_LongContent(b *testing.B) {
+	styles := NewStyles(theme.DefaultTheme())
+	longContent := strings.Repeat("This is a line of content that wraps at 80 columns. ", 500)
+
+	b.Run("incremental", func(b *testing.B) {
+		wb := NewWindowBuffer(80, styles)
+		wb.AppendOrUpdate("AT", "stream", longContent)
+		wb.GetTotalLines()
+		wb.GetAll(-1) // pre-render to populate wrappedLines
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			wb.AppendOrUpdate("AT", "stream", " delta")
+			wb.GetTotalLines()
+		}
+	})
+
+	b.Run("full-rewrap", func(b *testing.B) {
+		wb := NewWindowBuffer(80, styles)
+		wb.AppendOrUpdate("AT", "stream", longContent)
+		wb.GetTotalLines()
+		wb.GetAll(-1)
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			if idx, ok := wb.idIndex["stream"]; ok {
+				wb.windows[idx].Invalidate()
+			}
+			wb.AppendOrUpdate("AT", "stream", " delta")
+			wb.GetTotalLines()
+		}
+	})
+}
