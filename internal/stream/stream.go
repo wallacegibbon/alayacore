@@ -18,10 +18,10 @@ const (
 	TagAssistantF = "AF" // JSON: id, type, name, input, status (function arguments)
 	TagUserT      = "UT" // User text input
 	TagUserF      = "UF" // JSON: id, output, status (function result)
-	TagUserI      = "UI" // User image — DataURI: data:image/...;base64,...
-	TagUserV      = "UV" // User video — DataURI: data:video/...;base64,...
-	TagUserA      = "UA" // User audio — DataURI: data:audio/...;base64,...
-	TagUserD      = "UD" // User document — DataURI: data:application/...;base64,...
+	TagUserI      = "UI" // User image — data:image/...;base64,... or URL
+	TagUserV      = "UV" // User video — data:video/...;base64,... or URL
+	TagUserA      = "UA" // User audio — data:audio/...;base64,... or URL
+	TagUserD      = "UD" // User document — data:application/...;base64,... or URL
 
 	TagSystemMsg = "SM" // System message JSON: {"type":"...","data":{...}}
 )

@@ -6,7 +6,7 @@ Non-obvious patterns when working with LLM provider implementations.
 
 ## OpenAI multimodal content format
 
-All media types (image, audio, video, document) are stored as **DataURI** in the domain layer (`data:{mime};base64,...`). The OpenAI provider transmits them as follows:
+All media types (image, audio, video, document) are stored as a **URI** in the domain layer — either a data URI (`data:{mime};base64,...`) or a plain URL (`https://...`). The OpenAI provider transmits them as follows:
 
 | Content Part | OpenAI Wire Format |
 |---|---|
@@ -15,10 +15,12 @@ All media types (image, audio, video, document) are stored as **DataURI** in the
 | `VideoPart` | `{"type":"video_url","video_url":{"url":"data:video/...;base64,..."},"fps":2,"media_resolution":"default"}` |
 | `DocumentPart` | ❌ Not supported (skipped) |
 
+All media types accept either a **data URI** (`data:{mime};base64,...`) or a plain **URL** (`https://...`).
+
 Key points:
-- **Image** and **video** use the `url` field with a DataURI value.
-- **Audio** uses the `data` field — also a full DataURI (not raw base64), and does **not** include a separate `format` field.
-- **Video** includes additional parameters `fps` and `media_resolution` (hardcoded to `2` and `"default"` respectively).
+- **Image** and **video** use the `url` field with the URI value.
+- **Audio** uses the `data` field — accepts both a full data URI and a URL, and does **not** include a separate `format` field.
+- **Video** includes additional parameters `fps` and `media_resolution` (defaults to `2` and `"default"`, configurable via `:video_config`).
 - **Document** (e.g. PDF) is silently skipped as OpenAI Chat Completions API has no document content block.
 
 > **Note:** These wire formats are compatible with providers that extend the OpenAI-style API to support multimodal input (e.g. DeepSeek, Qwen, MiniMax, StepFun). Standard OpenAI Chat Completions API only supports `image_url` and `input_audio` natively; `video_url` is a non-standard extension.

@@ -14,10 +14,10 @@ type ContentPart interface { isContentPart() }
 // Implementations:
 type TextPart       struct { Text string }
 type ReasoningPart  struct { Text string }
-type ImagePart      struct { DataURI string }
-type AudioPart      struct { DataURI string }
-type VideoPart      struct { DataURI string }
-type DocumentPart   struct { DataURI string }
+type ImagePart      struct { URI string }
+type AudioPart      struct { URI string }
+type VideoPart      struct { URI string }
+type DocumentPart   struct { URI string }
 type ToolInputPart  struct { ID, ToolName string; Input json.RawMessage }
 type ToolOutputPart struct { ID string; Output []ContentPart; IsError bool }
 
@@ -332,9 +332,9 @@ Message{
     Role: "user",
     Content: []ContentPart{
         TextPart{Text: "Describe this multimedia"},
-        ImagePart{DataURI: "data:image/jpeg;base64,/9j/4AAQ..."},
-        AudioPart{DataURI: "data:audio/wav;base64,UklGR..."},
-        VideoPart{DataURI: "data:video/mp4;base64,AAAA..."},
+        ImagePart{URI: "data:image/jpeg;base64,/9j/4AAQ..."},
+        AudioPart{URI: "data:audio/wav;base64,UklGR..."},
+        VideoPart{URI: "data:video/mp4;base64,AAAA..."},
     },
 }
 ```
@@ -366,10 +366,10 @@ Message{
 }
 ```
 
-> **Note:** All media content parts store data as **DataURI** (`data:{mime};base64,...`) in the domain layer. Each provider extracts or passes through the format it needs:
-> - OpenAI `image_url` / `video_url`: passes DataURI directly as the `url` field
-> - OpenAI `input_audio`: passes DataURI directly as the `data` field
-> - Anthropic: parses the DataURI to extract `media_type` and raw base64 `data` separately
+> **Note:** All media content parts store a URI (`data:{mime};base64,...` or `https://...`) in the domain layer. Each provider extracts or passes through the format it needs:
+> - OpenAI `image_url` / `video_url`: passes the URI directly as the `url` field
+> - OpenAI `input_audio`: passes the URI directly as the `data` field
+> - Anthropic: parses data URIs to extract `media_type` and raw base64 `data`; plain URLs use the `url` source type
 
 ### Wire Format Differences (Anthropic vs OpenAI)
 

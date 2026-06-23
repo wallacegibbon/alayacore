@@ -12,10 +12,10 @@ Sample TLV messages for `alayacore --rawio`.
 
 ```
 UT  → stdin   User text
-UI  → stdin   User image (DataURI: data:image/...;base64,...)
-UV  → stdin   User video (DataURI: data:video/...;base64,...)
-UA  → stdin   User audio (DataURI: data:audio/...;base64,...)
-UD  → stdin   User document (DataURI: data:application/...;base64,...)
+UI  → stdin   User image (data:image/...;base64,... or URL)
+UV  → stdin   User video (data:video/...;base64,... or URL)
+UA  → stdin   User audio (data:audio/...;base64,... or URL)
+UD  → stdin   User document (data:application/...;base64,... or URL)
 AT  ← stdout  Assistant text (delta: \x00<id>\x00<content>)
 AR  ← stdout  Assistant reasoning (delta: \x00<id>\x00<content>)
 AF  ← stdout  Function/tool lifecycle (JSON)
@@ -158,7 +158,10 @@ at-delta-new-step.bin          AT \x00 6 \x00 Next step (new stream)
 at-plain.bin                   AT "plain text without stream id"
 ar-delta.bin                   AR \x00 5 \x00 thinking...
 ui-image.bin                   UI data:image/jpeg;base64,...
-sm-message-version.bin         SM {"type":"version","data":{"message_version":7}}
+ui-image-url.bin               UI https://example-files.cnbj1.mi-fds.com/example-files/image/image_example.png
+ua-audio-url.bin               UA https://example-files.cnbj1.mi-fds.com/example-files/audio/audio_example.wav
+uv-video-url.bin               UV https://example-files.cnbj1.mi-fds.com/example-files/video/video_example.mp4
+sm-message-version.bin         SM {"type":"version","data":{"message_version":8}}
 sm-model-list.bin              SM {"type":"model_list","data":{"models":[{"id":0,"name":"Anthropic / Claude Haiku 4",...},{"id":4,"name":"DeepSeek / DeepSeek-V4 Flash",...}],"model_config_path":"..."}}
 sm-model.bin                   SM {"type":"model","data":{"active_id":4,"active_name":"DeepSeek / DeepSeek-V4 Flash","context_limit":1000000}}
 sm-theme-list.bin              SM {"type":"theme_list","data":{"themes":[{"name":"theme-dark",...},{"name":"theme-light",...}]}}

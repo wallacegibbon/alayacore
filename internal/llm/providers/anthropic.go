@@ -107,8 +107,9 @@ type anthropicContentBlock struct {
 
 type anthropicImageSource struct {
 	Type      string `json:"type"`
-	MediaType string `json:"media_type"`
-	Data      string `json:"data"`
+	MediaType string `json:"media_type,omitempty"`
+	Data      string `json:"data,omitempty"`
+	URL       string `json:"url,omitempty"`
 }
 
 type anthropicTool struct {
@@ -753,13 +754,13 @@ func anthropicPartToBlock(part llm.ContentPart) *anthropicContentBlock {
 			Text: v.Text,
 		}
 	case *llm.ImagePart:
-		return anthropicMediaBlock(anthropicBlockTypeImage, v.DataURI)
+		return anthropicMediaBlock(anthropicBlockTypeImage, v.URI)
 	case *llm.VideoPart:
-		return anthropicMediaBlock(anthropicBlockTypeVideo, v.DataURI)
+		return anthropicMediaBlock(anthropicBlockTypeVideo, v.URI)
 	case *llm.AudioPart:
-		return anthropicMediaBlock(anthropicBlockTypeAudio, v.DataURI)
+		return anthropicMediaBlock(anthropicBlockTypeAudio, v.URI)
 	case *llm.DocumentPart:
-		return anthropicMediaBlock(anthropicBlockTypeDocument, v.DataURI)
+		return anthropicMediaBlock(anthropicBlockTypeDocument, v.URI)
 	case *llm.ReasoningPart:
 		text := v.Text
 		return &anthropicContentBlock{
@@ -801,9 +802,10 @@ func anthropicPartToBlock(part llm.ContentPart) *anthropicContentBlock {
 	return nil
 }
 
-// parseDataURI parses a Data URI into media type and base64 data.
+// parseDataURI parses a data URI into media type and base64 data.
 // Input: "data:image/jpeg;base64,/9j/4AAQ..."
 // Output: "image/jpeg", "/9j/4AAQ...", true
+// Returns ok=false for non-data URIs (e.g. plain URLs).
 func parseDataURI(uri string) (mediaType, data string, ok bool) {
 	const prefix = "data:"
 	if !strings.HasPrefix(uri, prefix) {
@@ -824,18 +826,24 @@ func parseDataURI(uri string) (mediaType, data string, ok bool) {
 }
 
 // anthropicMediaBlock builds an anthropicContentBlock for media types
-// (image, video, audio, document) that use a base64 data URI source.
-func anthropicMediaBlock(blockType, dataURI string) *anthropicContentBlock {
-	mediaType, b64, ok := parseDataURI(dataURI)
-	if !ok {
-		return nil
+// (image, video, audio, document). Accepts both data URIs and plain URLs.
+func anthropicMediaBlock(blockType, uri string) *anthropicContentBlock {
+	if mediaType, b64, ok := parseDataURI(uri); ok {
+		return &anthropicContentBlock{
+			Type: blockType,
+			Source: &anthropicImageSource{
+				Type:      "base64",
+				MediaType: mediaType,
+				Data:      b64,
+			},
+		}
 	}
+	// Plain URL — use as-is.
 	return &anthropicContentBlock{
 		Type: blockType,
 		Source: &anthropicImageSource{
-			Type:      "base64",
-			MediaType: mediaType,
-			Data:      b64,
+			Type: "url",
+			URL:  uri,
 		},
 	}
 }

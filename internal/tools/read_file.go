@@ -42,9 +42,9 @@ type mediaTypeEntry struct {
 }
 
 var mediaMimePrefixes = []mediaTypeEntry{
-	{prefix: "image/", newPart: func(u string) llm.ContentPart { return &llm.ImagePart{DataURI: u} }},
-	{prefix: "video/", newPart: func(u string) llm.ContentPart { return &llm.VideoPart{DataURI: u} }},
-	{prefix: "audio/", newPart: func(u string) llm.ContentPart { return &llm.AudioPart{DataURI: u} }},
+	{prefix: "image/", newPart: func(u string) llm.ContentPart { return &llm.ImagePart{URI: u} }},
+	{prefix: "video/", newPart: func(u string) llm.ContentPart { return &llm.VideoPart{URI: u} }},
+	{prefix: "audio/", newPart: func(u string) llm.ContentPart { return &llm.AudioPart{URI: u} }},
 }
 
 // documentMimePrefixes are MIME type prefixes for document files (PDF, Office, etc.).
@@ -125,7 +125,7 @@ func matchMediaType(mimeType string) (func(dataURI string) llm.ContentPart, bool
 	}
 	for _, prefix := range documentMimePrefixes {
 		if strings.HasPrefix(mimeType, prefix) {
-			return func(u string) llm.ContentPart { return &llm.DocumentPart{DataURI: u} }, true
+			return func(u string) llm.ContentPart { return &llm.DocumentPart{URI: u} }, true
 		}
 	}
 	return nil, false

@@ -606,14 +606,14 @@ func openaiConvertToolOutputs(contents []llm.ContentPart) []openAIMessage {
 		}
 		// Build combined text from all content parts.
 		// TextParts contribute their text directly; ImageParts contribute
-		// their data URI so the model can still access the image data.
+		// their URI so the model can still access the image data.
 		var textParts []string
 		for _, cp := range tr.Output {
 			switch v := cp.(type) {
 			case *llm.TextPart:
 				textParts = append(textParts, v.Text)
 			case *llm.ImagePart:
-				textParts = append(textParts, v.DataURI)
+				textParts = append(textParts, v.URI)
 			}
 		}
 		combined := strings.Join(textParts, "\n")
@@ -691,18 +691,18 @@ func openaiConvertRegularContent(apiMsg *openAIMessage, contents []llm.ContentPa
 			contentParts = append(contentParts, map[string]any{
 				"type": "image_url",
 				"image_url": map[string]string{
-					"url": v.DataURI,
+					"url": v.URI,
 				},
 			})
 		case *llm.AudioPart:
 			contentParts = append(contentParts, map[string]any{
 				"type": "input_audio",
 				"input_audio": map[string]string{
-					"data": v.DataURI,
+					"data": v.URI,
 				},
 			})
 		case *llm.VideoPart:
-			contentParts = append(contentParts, openAIVideoPart(v.DataURI, videoFPS, videoRes))
+			contentParts = append(contentParts, openAIVideoPart(v.URI, videoFPS, videoRes))
 		case *llm.DocumentPart:
 			// Document (PDF) is not supported by OpenAI Chat Completions API.
 			// The protocol supports DocumentPart, but this provider cannot handle it.

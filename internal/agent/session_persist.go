@@ -212,13 +212,13 @@ func contentPartToTLV(part llm.ContentPart) (tag string, content string, err err
 		}
 		return stream.TagUserT, p.Text, nil
 	case *llm.ImagePart:
-		return stream.TagUserI, p.DataURI, nil
+		return stream.TagUserI, p.URI, nil
 	case *llm.VideoPart:
-		return stream.TagUserV, p.DataURI, nil
+		return stream.TagUserV, p.URI, nil
 	case *llm.AudioPart:
-		return stream.TagUserA, p.DataURI, nil
+		return stream.TagUserA, p.URI, nil
 	case *llm.DocumentPart:
-		return stream.TagUserD, p.DataURI, nil
+		return stream.TagUserD, p.URI, nil
 	case *llm.ReasoningPart:
 		return stream.TagAssistantR, p.Text, nil
 	case *llm.ToolInputPart:
@@ -257,13 +257,13 @@ func contentPartFromTLV(tag string, content []byte) (llm.ContentPart, error) {
 	case stream.TagUserT:
 		return &llm.TextPart{Text: cleanContent, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}}, nil
 	case stream.TagUserI:
-		return &llm.ImagePart{DataURI: cleanContent, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}}, nil
+		return &llm.ImagePart{URI: cleanContent, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}}, nil
 	case stream.TagUserV:
-		return &llm.VideoPart{DataURI: cleanContent, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}}, nil
+		return &llm.VideoPart{URI: cleanContent, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}}, nil
 	case stream.TagUserA:
-		return &llm.AudioPart{DataURI: cleanContent, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}}, nil
+		return &llm.AudioPart{URI: cleanContent, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}}, nil
 	case stream.TagUserD:
-		return &llm.DocumentPart{DataURI: cleanContent, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}}, nil
+		return &llm.DocumentPart{URI: cleanContent, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}}, nil
 	case stream.TagAssistantT:
 		return &llm.TextPart{Text: cleanContent, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant}}, nil
 	case stream.TagAssistantR:

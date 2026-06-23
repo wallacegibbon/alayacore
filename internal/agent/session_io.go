@@ -479,13 +479,13 @@ func (s *Session) inputPump() {
 
 		switch tag {
 		case stream.TagUserI:
-			pendingAttachments = append(pendingAttachments, &llm.ImagePart{DataURI: value})
+			pendingAttachments = append(pendingAttachments, &llm.ImagePart{URI: value})
 		case stream.TagUserV:
-			pendingAttachments = append(pendingAttachments, &llm.VideoPart{DataURI: value})
+			pendingAttachments = append(pendingAttachments, &llm.VideoPart{URI: value})
 		case stream.TagUserA:
-			pendingAttachments = append(pendingAttachments, &llm.AudioPart{DataURI: value})
+			pendingAttachments = append(pendingAttachments, &llm.AudioPart{URI: value})
 		case stream.TagUserD:
-			pendingAttachments = append(pendingAttachments, &llm.DocumentPart{DataURI: value})
+			pendingAttachments = append(pendingAttachments, &llm.DocumentPart{URI: value})
 		case stream.TagUserT:
 			s.handleInputUserText(value, &pendingAttachments)
 

@@ -66,28 +66,28 @@ type TextPart struct {
 	Text string
 }
 
-// ImagePart represents an image content (DataURI: data:image/...;base64,...)
+// ImagePart represents an image content (data:image/...;base64,... or URL)
 type ImagePart struct {
 	ContentPartMeta
-	DataURI string
+	URI string
 }
 
-// VideoPart represents a video content (DataURI: data:video/...;base64,...)
+// VideoPart represents a video content (data:video/...;base64,... or URL)
 type VideoPart struct {
 	ContentPartMeta
-	DataURI string
+	URI string
 }
 
-// AudioPart represents an audio content (DataURI: data:audio/...;base64,...)
+// AudioPart represents an audio content (data:audio/...;base64,... or URL)
 type AudioPart struct {
 	ContentPartMeta
-	DataURI string
+	URI string
 }
 
-// DocumentPart represents a document content (DataURI: data:application/...;base64,...)
+// DocumentPart represents a document content (data:application/...;base64,... or URL)
 type DocumentPart struct {
 	ContentPartMeta
-	DataURI string
+	URI string
 }
 
 // ReasoningPart represents reasoning/thinking content.
