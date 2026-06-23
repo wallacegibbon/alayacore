@@ -105,7 +105,10 @@ type sharedState struct {
 	ContextLimit  int64 // maximum context window size (input+output); set from model config
 
 	reasoningLevel int
-	histCounter    uint64
+	videoFPS       int    // default FPS for video attachments; 0 means provider default (2)
+	videoRes       string // "default" or "max"; empty means "default"
+
+	histCounter uint64
 
 	sessionCtx    context.Context
 	sessionCancel context.CancelFunc

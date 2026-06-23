@@ -34,7 +34,7 @@ var BuiltinTools = []ToolRegistration{
 // DefaultTools returns llm.Tool instances for all available built-in tools.
 // Tools whose Available check returns false are omitted.
 func DefaultTools() []llm.Tool {
-	var result []llm.Tool
+	var result = make([]llm.Tool, 0, len(BuiltinTools))
 	for _, reg := range BuiltinTools {
 		if reg.Available != nil && !reg.Available() {
 			continue

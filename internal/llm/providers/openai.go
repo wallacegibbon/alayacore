@@ -201,6 +201,14 @@ func (p *OpenAIProvider) SetReasoningLevel(level int) {
 	p.reasoningLevel = level
 }
 
+// SetVideoConfig sets the default FPS and resolution for video attachments.
+// fps: frames per second (0 means default 2)
+// resolution: "default" or "max" (empty means "default")
+func (p *OpenAIProvider) SetVideoConfig(fps int, resolution string) {
+	p.videoFPS = fps
+	p.videoRes = resolution
+}
+
 // StreamMessages streams messages from OpenAI
 func (p *OpenAIProvider) StreamMessages(
 	ctx context.Context,
@@ -217,7 +225,7 @@ func (p *OpenAIProvider) StreamMessages(
 	if extraSystemPrompt != "" {
 		apiMessages = append(apiMessages, openAIMessage{Role: "system", Content: extraSystemPrompt})
 	}
-	apiMessages = append(apiMessages, openaiConvertContents(contents, p.reasoningLevel)...)
+	apiMessages = append(apiMessages, openaiConvertContents(contents, p.reasoningLevel, p.videoFPS, p.videoRes)...)
 
 	// Convert tools to OpenAI format
 	apiTools := make([]openAITool, 0, len(tools))
@@ -534,7 +542,7 @@ func (p *OpenAIProvider) handleDelta(delta openAIDelta, yield func(llm.StreamEve
 
 // openaiConvertContents converts domain ContentParts to OpenAI wire format.
 // It groups consecutive same-role ContentParts into API messages.
-func openaiConvertContents(contents []llm.ContentPart, reasoningLevel int) []openAIMessage {
+func openaiConvertContents(contents []llm.ContentPart, reasoningLevel int, videoFPS int, videoRes string) []openAIMessage {
 	apiMessages := make([]openAIMessage, 0, len(contents))
 	if len(contents) == 0 {
 		return apiMessages
@@ -561,7 +569,7 @@ func openaiConvertContents(contents []llm.ContentPart, reasoningLevel int) []ope
 		if role == llm.RoleAssistant && openaiHasToolInputs(chunk) {
 			openaiConvertToolInputs(&apiMsg, chunk)
 		} else {
-			openaiConvertRegularContent(&apiMsg, chunk)
+			openaiConvertRegularContent(&apiMsg, chunk, videoFPS, videoRes)
 		}
 
 		if role == llm.RoleAssistant {
@@ -670,7 +678,7 @@ func openaiConvertToolInputs(apiMsg *openAIMessage, contents []llm.ContentPart) 
 }
 
 // openaiConvertRegularContent handles conversion of regular text content.
-func openaiConvertRegularContent(apiMsg *openAIMessage, contents []llm.ContentPart) {
+func openaiConvertRegularContent(apiMsg *openAIMessage, contents []llm.ContentPart, videoFPS int, videoRes string) {
 	var contentParts []map[string]any
 	for _, part := range contents {
 		switch v := part.(type) {
@@ -694,14 +702,7 @@ func openaiConvertRegularContent(apiMsg *openAIMessage, contents []llm.ContentPa
 				},
 			})
 		case *llm.VideoPart:
-			contentParts = append(contentParts, map[string]any{
-				"type": "video_url",
-				"video_url": map[string]string{
-					"url": v.DataURI,
-				},
-				"fps":              2,
-				"media_resolution": "default",
-			})
+			contentParts = append(contentParts, openAIVideoPart(v.DataURI, videoFPS, videoRes))
 		case *llm.DocumentPart:
 			// Document (PDF) is not supported by OpenAI Chat Completions API.
 			// The protocol supports DocumentPart, but this provider cannot handle it.
@@ -715,5 +716,23 @@ func openaiConvertRegularContent(apiMsg *openAIMessage, contents []llm.ContentPa
 		// No content parts
 	default:
 		apiMsg.Content = contentParts
+	}
+}
+
+// openAIVideoPart builds a video_url content block with the given FPS and resolution.
+func openAIVideoPart(dataURI string, fps int, resolution string) map[string]any {
+	if fps == 0 {
+		fps = 2
+	}
+	if resolution == "" {
+		resolution = "default"
+	}
+	return map[string]any{
+		"type": "video_url",
+		"video_url": map[string]string{
+			"url": dataURI,
+		},
+		"fps":              fps,
+		"media_resolution": resolution,
 	}
 }

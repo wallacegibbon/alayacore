@@ -7,9 +7,9 @@ import (
 )
 
 var (
-	procTmpDir          string
-	procTmpDirOnce      sync.Once
-	procTmpDirCreated   bool // true when MkdirTemp succeeded; prevents Cleanup from removing the system temp root
+	procTmpDir        string
+	procTmpDirOnce    sync.Once
+	procTmpDirCreated bool // true when MkdirTemp succeeded; prevents Cleanup from removing the system temp root
 )
 
 // procTmpDirInit creates a per-process temporary directory under the

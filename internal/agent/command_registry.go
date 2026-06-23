@@ -21,6 +21,7 @@ const (
 	CommandNameConfirm         = "confirm"
 	CommandNameFork            = "fork"
 	CommandNameClearQueue      = "clear_queue"
+	CommandNameVideoConfig     = "video_config"
 )
 
 // SchedulePolicy specifies how and when a command is dispatched.
@@ -88,6 +89,8 @@ var commandDefs = []Command{
 		func(s *Session, _ context.Context, args []string) { s.handleFork(args) }},
 	{CommandNameClearQueue, "Clear all queued tasks without canceling the current task", "", ScheduleImmediate,
 		func(s *Session, _ context.Context, _ []string) { s.clearQueue() }},
+	{CommandNameVideoConfig, "Set video FPS and resolution", "<fps> <1|2>", ScheduleIdle,
+		func(s *Session, _ context.Context, args []string) { s.handleVideoConfig(args) }},
 }
 
 // LookupCommand returns the command metadata for name, or (nil, false).

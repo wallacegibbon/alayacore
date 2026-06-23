@@ -130,6 +130,7 @@ func (s *Session) ensureAgentInitialized() error {
 	}
 	if s.provider != nil {
 		s.provider.SetReasoningLevel(s.reasoningLevel)
+		s.provider.SetVideoConfig(s.videoFPS, s.videoRes)
 	}
 	return nil
 }
@@ -144,6 +145,7 @@ func (s *Session) initAgentFromConfig(modelConfig *ModelConfig) error {
 	s.provider = provider
 	if s.provider != nil {
 		s.provider.SetReasoningLevel(s.reasoningLevel)
+		s.provider.SetVideoConfig(s.videoFPS, s.videoRes)
 	}
 	return nil
 }
@@ -164,6 +166,17 @@ func (s *Session) SetReasoningLevel(level int) {
 		s.provider.SetReasoningLevel(level)
 	}
 	s.sendSystemInfo("reasoning")
+}
+
+// SetVideoConfig sets the default video FPS and resolution.
+// :video_config is ScheduleIdle so this is only called when no task is running.
+// The provider is synced immediately.
+func (s *Session) SetVideoConfig(fps int, resolution string) {
+	s.videoFPS = fps
+	s.videoRes = resolution
+	if s.provider != nil {
+		s.provider.SetVideoConfig(fps, resolution)
+	}
 }
 
 func createProviderFromConfig(config *ModelConfig, debugAPI bool, proxyURL string) (llm.Provider, error) {

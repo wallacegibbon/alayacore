@@ -26,7 +26,8 @@ func (m *mockProvider) StreamMessages(
 	return func(func(StreamEvent, error) bool) {}, nil
 }
 
-func (m *mockProvider) SetReasoningLevel(_ int) {}
+func (m *mockProvider) SetReasoningLevel(_ int)        {}
+func (m *mockProvider) SetVideoConfig(_ int, _ string) {}
 
 func TestAgentSystemPromptSeparation(t *testing.T) {
 	tests := []struct {

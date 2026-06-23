@@ -354,6 +354,34 @@ func (s *Session) handleReason(args []string) {
 	s.SetReasoningLevel(level)
 }
 
+// handleVideoConfig sets the default video FPS and resolution for video attachments.
+// Usage: :video_config <fps> <resolution>
+//
+//	fps:        frames per second (positive integer, e.g. 2)
+//	resolution: 1=default, 2=max
+func (s *Session) handleVideoConfig(args []string) {
+	if len(args) < 2 {
+		s.writeError("usage: :video_config <fps> <resolution>  (resolution: 1=default, 2=max)")
+		return
+	}
+	fps, err := strconv.Atoi(args[0])
+	if err != nil || fps < 1 {
+		s.writeError("usage: :video_config <fps> <resolution>  (fps must be a positive integer)")
+		return
+	}
+	res, err := strconv.Atoi(args[1])
+	if err != nil || res < 1 || res > 2 {
+		s.writeError("usage: :video_config <fps> <resolution>  (resolution: 1=default, 2=max)")
+		return
+	}
+	resolution := "default"
+	if res == 2 {
+		resolution = "max"
+	}
+	s.SetVideoConfig(fps, resolution)
+	s.writeNotifyf("Video config set: fps=%d, resolution=%s", fps, resolution)
+}
+
 // handleThemeSet sets the active theme, persists it to runtime config,
 // and sends updated system info so adapters receive the full theme data.
 func (s *Session) handleThemeSet(args []string) {
