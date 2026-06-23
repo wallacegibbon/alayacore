@@ -45,11 +45,6 @@ import (
 // awaiting assembly into a display window. Parts arrive in order via TLV
 // frames (UT, UI/UV/UA/UD) and are flushed into one window on MB or
 // before the next non-user tag.
-type userContentPart struct {
-	tag     string // original TLV tag (UT, UI, UV, UA, UD)
-	content string // text content or media URI
-}
-
 // outputWriter parses TLV from the session and writes styled content to the WindowBuffer.
 // It implements io.Writer for the agent/session output stream.
 type outputWriter struct {
@@ -61,17 +56,19 @@ type outputWriter struct {
 	nextWindowID atomic.Int64
 	status       sessionState // cached session state (status, models, queue)
 
-	// Pending user content — ordered list of parts accumulated until MB
-	// or next non-user tag triggers flushUserContent.
-	pendingUserParts []userContentPart
-	pendingUserID    string // history ID of the first part (used as window ID)
-	pendingUserMaxID uint64 // max history ID across all parts (used for history ordering)
+	// Active user window — set on first user frame (UT/UI/UV/UA/UD),
+	// cleared on MB or next non-user tag. Each new frame updates the
+	// window incrementally and marks dirty for immediate render.
+	activeUserWindowIdx int    // index into windowBuffer.windows, -1 = none
+	activeUserWindowID  string // window ID (for LookupID fallback)
+	pendingUserMaxID    uint64 // max history ID across all parts
 }
 
 func NewTerminalOutput(styles *Styles) *outputWriter { //nolint:revive // tests need access to internal methods
 	to := &outputWriter{
-		windowBuffer: NewWindowBuffer(DefaultWidth, styles),
-		status:       sessionState{mu: &sync.Mutex{}},
+		windowBuffer:        NewWindowBuffer(DefaultWidth, styles),
+		status:              sessionState{mu: &sync.Mutex{}},
+		activeUserWindowIdx: -1,
 	}
 	to.styles.Store(styles)
 	return to
@@ -135,7 +132,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 	to.triggerUpdateForTag(tag)
 
 	// Flush pending user content before any non-user tag.
-	if len(to.pendingUserParts) > 0 && !userTag(tag) {
+	if to.activeUserWindowIdx >= 0 && !userTag(tag) {
 		to.flushUserContent()
 	}
 
@@ -172,7 +169,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 
 	// Message boundary — flush pending user content as one window.
 	case stream.TagMessageBoundary:
-		if len(to.pendingUserParts) > 0 {
+		if to.activeUserWindowIdx >= 0 {
 			to.flushUserContent()
 		}
 
@@ -444,69 +441,43 @@ func mediaLabel(tag string) string {
 	return ""
 }
 
-// bufferUserContent accumulates a user content part. When flushed,
-// all accumulated parts appear as a single window with text first.
-// tag is the original TLV tag (UT, UI, UV, UA, UD) so the renderer
-// can distinguish text from different media types.
+// bufferUserContent processes one user content frame.
+// On the first frame, creates a new window. On subsequent frames,
+// updates the existing window incrementally via AppendFromTLV.
+// Always marks dirty so the next tick renders the latest state.
 func (to *outputWriter) bufferUserContent(id, content string, tag string) {
-	to.pendingUserParts = append(to.pendingUserParts, userContentPart{
-		tag:     tag,
-		content: content,
-	})
+	if to.activeUserWindowIdx < 0 {
+		// First frame — create the window
+		to.activeUserWindowID = id
+		to.activeUserWindowIdx = to.windowBuffer.AppendOrUpdate(stream.TagUserT, id, "")
+		to.windowBuffer.windows[to.activeUserWindowIdx].Visible = true
+	}
 
-	// Track the max history ID from the TLV delta.
+	// Track max history ID
 	if hid, err := strconv.ParseUint(id, 10, 64); err == nil && hid > to.pendingUserMaxID {
 		to.pendingUserMaxID = hid
 	}
-	// First part's history ID becomes the window ID.
-	if to.pendingUserID == "" {
-		to.pendingUserID = id
-	}
+
+	// Feed the frame to the window's userRenderer
+	to.windowBuffer.windows[to.activeUserWindowIdx].AppendFromTLV(tag, content)
+	to.dirty.Store(true)
 }
 
-// flushUserContent creates a single window from all accumulated user content.
+// flushUserContent finalizes the active user window (sets HistoryID)
+// and resets the active window tracking.
 func (to *outputWriter) flushUserContent() {
-	if len(to.pendingUserParts) == 0 {
+	if to.activeUserWindowIdx < 0 {
 		return
 	}
-
-	// Create the window and feed all parts in order.
-	// The userRenderer accumulates text and media separately and
-	// renders them correctly at display time.
-	idx := to.windowBuffer.AppendOrUpdate(stream.TagUserT, to.pendingUserID, "")
-	for _, p := range to.pendingUserParts {
-		to.windowBuffer.windows[idx].AppendFromTLV(p.tag, p.content)
-	}
-	to.windowBuffer.windows[idx].Visible = true
-	to.windowBuffer.SetHistoryID(idx, to.pendingUserMaxID)
-
-	to.pendingUserParts = nil
-	to.pendingUserID = ""
+	to.windowBuffer.SetHistoryID(to.activeUserWindowIdx, to.pendingUserMaxID)
+	to.activeUserWindowIdx = -1
+	to.activeUserWindowID = ""
 	to.pendingUserMaxID = 0
 }
 
 // SetWindowWidth updates the window buffer width.
 func (to *outputWriter) SetWindowWidth(width int) {
 	to.windowBuffer.SetWidth(width)
-}
-
-// joinLines joins non-empty strings with newlines, skipping empty entries.
-func joinLines(parts []string) string {
-	if len(parts) == 0 {
-		return ""
-	}
-	n := 0
-	for _, p := range parts {
-		n += len(p) + 1 // content + possible newline
-	}
-	buf := make([]byte, 0, n)
-	for i, p := range parts {
-		if i > 0 {
-			buf = append(buf, '\n')
-		}
-		buf = append(buf, p...)
-	}
-	return string(buf)
 }
 
 // extractToolOutputDisplayText extracts display text from a tool result content JSON array.
