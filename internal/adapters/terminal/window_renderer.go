@@ -142,7 +142,7 @@ func (r *userRenderer) Invalidate() {}
 // Multiple text parts are separated with "---" in System color.
 func (r *userRenderer) BuildInner(width int, folded bool, styles *Styles) (string, int) {
 	innerWidth := max(0, width-BorderInnerPadding)
-	media := strings.Join(r.mediaParts, "\n")
+	media := strings.Join(r.mediaParts, "  ")
 
 	var parts []string
 
@@ -178,7 +178,7 @@ func (r *userRenderer) BuildInner(width int, folded bool, styles *Styles) (strin
 		var mediaBlock strings.Builder
 		mediaBlock.WriteString(styles.System.Render("MEDIA:"))
 		mediaBlock.WriteString("\n")
-		mediaBlock.WriteString(styleMultiline(media, styles.Attachment))
+		mediaBlock.WriteString(styles.Attachment.Render(media))
 		if innerWidth > 0 {
 			mediaBlockStr := wrapContent(mediaBlock.String(), innerWidth)
 			parts = append(parts, mediaBlockStr)
