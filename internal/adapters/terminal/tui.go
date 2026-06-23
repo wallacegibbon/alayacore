@@ -170,24 +170,9 @@ func (m *Terminal) Init() tea.Cmd {
 		}
 	}
 
-	return tea.Batch(
-		tea.Tick(TickInterval, func(_ time.Time) tea.Msg {
-			return tickMsg{}
-		}),
-		m.waitForDirty(),
-	)
-}
-
-// dirtyMsg is sent when the output writer signals an immediate display update.
-type dirtyMsg struct{}
-
-// waitForDirty returns a command that fires when the output writer's dirty
-// channel is signaled, providing faster-than-tick display updates.
-func (m *Terminal) waitForDirty() tea.Cmd {
-	return func() tea.Msg {
-		<-m.out.DirtyCh()
-		return dirtyMsg{}
-	}
+	return tea.Tick(TickInterval, func(_ time.Time) tea.Msg {
+		return tickMsg{}
+	})
 }
 
 // Update handles all incoming messages and routes them to appropriate handlers.
@@ -208,9 +193,6 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tickMsg:
 		return m.handleTick()
-
-	case dirtyMsg:
-		return m.handleDirtyMsg()
 
 	case themePreviewMsg:
 		return m.handleThemePreview(msg)
@@ -235,31 +217,6 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Default: pass to input component
 	m.input.updateFromMsg(msg)
 	return m, nil
-}
-
-// handleDirtyMsg processes an immediate display update request from the
-// output writer (faster than waiting for the next tick).
-func (m *Terminal) handleDirtyMsg() (tea.Model, tea.Cmd) {
-	// Process dirty flag (may have been set multiple times since last drain)
-	if m.out.DrainDirty() {
-		if m.out.WindowBuffer().WindowCount() > 0 {
-			m.updateStatus()
-			m.updateDisplayHeight()
-			if m.display.shouldFollow() {
-				m.display.SetCursorToLastWindow()
-			}
-			m.display.updateContent()
-		}
-
-		// Update model selector if models changed
-		modelSnap := m.out.SnapshotModels()
-		_ = m.modelSelector.LoadModels(modelSnap.Models, modelSnap.ActiveID)
-	} else {
-		m.updateStatus()
-	}
-
-	// Re-arm the dirty listener
-	return m, m.waitForDirty()
 }
 
 // tickMsg is sent periodically to update the display.
