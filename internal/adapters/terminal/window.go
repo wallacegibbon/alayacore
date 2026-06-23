@@ -56,6 +56,18 @@ type WindowRendering interface {
 	Invalidate()
 }
 
+// borderCache caches the border-wrapped render output for a Window.
+// This is separate from any internal cache inside the renderer
+// (e.g. textRenderer.wrappedLines for streaming optimization).
+type borderCache struct {
+	valid     bool
+	width     int
+	folded    bool
+	rendered  string // full output with border
+	inner     string // inner content (for cursor border swap)
+	lineCount int
+}
+
 // Window represents a single display window.
 //
 // Hot-path fields (.Visible, .Folded, .ID, .HistoryID) are struct fields
@@ -71,16 +83,7 @@ type Window struct {
 	renderer WindowRendering
 
 	// border caches the border-wrapped render output.
-	// This is separate from any internal cache inside the renderer
-	// (e.g. textRenderer.wrappedLines for streaming optimization).
-	border struct {
-		valid     bool
-		width     int
-		folded    bool
-		rendered  string // full output with border
-		inner     string // inner content (for cursor border swap)
-		lineCount int
-	}
+	border borderCache
 }
 
 // NewWindow creates a window with the appropriate renderer for the given tag.
