@@ -172,17 +172,18 @@ func (m *InputField) View() string {
 	visible, cursorIdx := m.buildVisibleText()
 
 	var v string
-	if m.focused && cursorIdx < len(visible) {
+	switch {
+	case m.focused && cursorIdx < len(visible):
 		pre := string(visible[:cursorIdx])
 		at := string(visible[cursorIdx])
 		post := string(visible[cursorIdx+1:])
 		v += styleText(pre)
 		v += m.cursorRender(at)
 		v += styleText(post)
-	} else if m.focused {
+	case m.focused:
 		v += styleText(string(visible))
 		v += m.cursorRender(" ")
-	} else {
+	default:
 		// Blurred: render text without cursor
 		v += styleText(string(visible))
 	}
