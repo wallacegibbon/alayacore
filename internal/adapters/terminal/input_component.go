@@ -1,14 +1,15 @@
 package terminal
 
+// InputModel handles text input.
+
 import (
-	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 )
 
 // InputModel handles text input.
 type InputModel struct {
-	input         textinput.Model
+	input         *InputField
 	focused       bool
 	editorContent string
 	styles        *Styles
@@ -17,7 +18,7 @@ type InputModel struct {
 
 // NewInputModel creates a new input model
 func NewInputModel(styles *Styles) InputModel {
-	input := textinput.New()
+	input := NewInputField()
 	input.Placeholder = "Enter your prompt..."
 	input.Focus()
 	input.Prompt = "> "
@@ -56,13 +57,19 @@ func (m InputModel) View() tea.View {
 
 // updateInputStyles updates the text input styles based on current theme
 func (m InputModel) updateInputStyles() {
-	styles := textinput.DefaultStyles(true)
-	styles.Focused.Prompt = lipgloss.NewStyle().Foreground(m.styles.ColorAccent).Bold(true)
-	styles.Blurred.Prompt = lipgloss.NewStyle().Foreground(m.styles.ColorDim).Bold(true)
-	styles.Focused.Text = lipgloss.NewStyle()
-	styles.Blurred.Text = lipgloss.NewStyle().Foreground(m.styles.ColorDim)
-	styles.Cursor.Color = m.styles.CursorColor
-	m.input.SetStyles(styles)
+	m.input.SetStyles(
+		inputFieldStyle{
+			Prompt:      lipgloss.NewStyle().Foreground(m.styles.ColorAccent).Bold(true),
+			Text:        lipgloss.NewStyle(),
+			Placeholder: lipgloss.NewStyle().Foreground(m.styles.ColorMuted),
+		},
+		inputFieldStyle{
+			Prompt:      lipgloss.NewStyle().Foreground(m.styles.ColorDim).Bold(true),
+			Text:        lipgloss.NewStyle().Foreground(m.styles.ColorDim),
+			Placeholder: lipgloss.NewStyle().Foreground(m.styles.ColorDim),
+		},
+		m.styles.CursorColor,
+	)
 }
 
 // Focus sets focus on the input
@@ -130,13 +137,7 @@ func (m InputModel) RenderWithBorder(blockInput bool) string {
 	}
 
 	// Set input styles based on focus state
-	styles := textinput.DefaultStyles(true)
-	styles.Focused.Prompt = lipgloss.NewStyle().Foreground(m.styles.ColorAccent).Bold(true)
-	styles.Blurred.Prompt = lipgloss.NewStyle().Foreground(m.styles.ColorDim).Bold(true)
-	styles.Focused.Text = lipgloss.NewStyle()
-	styles.Blurred.Text = lipgloss.NewStyle().Foreground(m.styles.ColorDim)
-	styles.Cursor.Color = m.styles.CursorColor
-	m.input.SetStyles(styles)
+	m.updateInputStyles()
 
 	if blockInput {
 		return m.styles.RenderBorderedBox("", m.width, borderColor)

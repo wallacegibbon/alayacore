@@ -20,7 +20,6 @@ package terminal
 import (
 	"image/color"
 
-	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 )
 
@@ -42,7 +41,7 @@ type FilteredListCore struct {
 	Styles      *Styles
 	HasFocus    bool
 
-	FilterInput        textinput.Model
+	FilterInput        *InputField
 	FilterInputFocused bool
 	lastFilterValue    string
 }
@@ -75,7 +74,19 @@ func (fl *FilteredListCore) SetHasFocus(hasFocus bool) {
 
 // updateFilterInputStyles applies current styles to the filter input.
 func (fl *FilteredListCore) updateFilterInputStyles() {
-	fl.Styles.ApplyTextInputStyles(&fl.FilterInput, fl.FilterInputFocused && fl.HasFocus)
+	fl.FilterInput.SetStyles(
+		inputFieldStyle{
+			Prompt:      fl.Styles.Input,
+			Text:        fl.Styles.Text,
+			Placeholder: fl.Styles.System,
+		},
+		inputFieldStyle{
+			Prompt:      fl.Styles.Input,
+			Text:        fl.Styles.System,
+			Placeholder: fl.Styles.System,
+		},
+		fl.Styles.CursorColor,
+	)
 }
 
 // HandleTabKey toggles focus between the filter input and the list.

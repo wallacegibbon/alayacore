@@ -8,7 +8,6 @@ import (
 	"image/color"
 	"strings"
 
-	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
@@ -51,9 +50,9 @@ func NewModelSelector(styles *Styles) *ModelSelector {
 	return ms
 }
 
-// newFilterInput creates a shared textinput for filtering.
-func newFilterInput(placeholder string) textinput.Model {
-	input := textinput.New()
+// newFilterInput creates a shared InputField for filtering.
+func newFilterInput(placeholder string) *InputField {
+	input := NewInputField()
 	input.Placeholder = placeholder
 	input.Prompt = "/ "
 	input.SetWidth(50)

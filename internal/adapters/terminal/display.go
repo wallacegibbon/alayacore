@@ -4,7 +4,6 @@ package terminal
 // It manages scrolling, cursor navigation, and auto-follow behavior.
 
 import (
-	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/alayacore/alayacore/internal/stream"
@@ -12,7 +11,7 @@ import (
 
 // DisplayModel holds the viewport over WindowBuffer content.
 type DisplayModel struct {
-	viewport       viewport.Model
+	scrollView     *ScrollView
 	windowBuffer   *WindowBuffer
 	styles         *Styles
 	width          int
@@ -25,9 +24,8 @@ type DisplayModel struct {
 
 // NewDisplayModel creates a new display model
 func NewDisplayModel(windowBuffer *WindowBuffer, styles *Styles) DisplayModel {
-	vp := viewport.New(viewport.WithWidth(DefaultWidth), viewport.WithHeight(DefaultHeight))
 	return DisplayModel{
-		viewport:       vp,
+		scrollView:     NewScrollView(DefaultWidth, DefaultHeight),
 		windowBuffer:   windowBuffer,
 		styles:         styles,
 		width:          DefaultWidth,
@@ -45,28 +43,28 @@ func (m *DisplayModel) Init() tea.Cmd { return nil }
 func (m *DisplayModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if windowMsg, ok := msg.(tea.WindowSizeMsg); ok {
 		m.width = windowMsg.Width
-		m.viewport.SetWidth(max(0, windowMsg.Width))
+		m.scrollView.SetWidth(max(0, windowMsg.Width))
 	}
 	return m, nil
 }
 
 // View renders the display
 func (m *DisplayModel) View() tea.View {
-	return tea.NewView(m.viewport.View())
+	return tea.NewView(m.scrollView.View())
 }
 
 func (m *DisplayModel) SetHeight(height int) {
 	m.height = height
-	m.viewport.SetHeight(max(0, height))
+	m.scrollView.SetHeight(max(0, height))
 }
 
 func (m *DisplayModel) GetHeight() int {
-	return m.viewport.Height()
+	return m.scrollView.Height()
 }
 
 func (m *DisplayModel) SetWidth(width int) {
 	m.width = width
-	m.viewport.SetWidth(max(0, width))
+	m.scrollView.SetWidth(max(0, width))
 }
 
 func (m *DisplayModel) SetDisplayFocused(focused bool) {
@@ -78,7 +76,7 @@ func (m *DisplayModel) SetStyles(styles *Styles) {
 }
 
 func (m *DisplayModel) YOffset() int {
-	return m.viewport.YOffset()
+	return m.scrollView.YOffset()
 }
 
 // updateContent updates the viewport content from the window buffer
@@ -89,9 +87,9 @@ func (m *DisplayModel) updateContent() {
 	}
 
 	totalLines := m.windowBuffer.GetTotalLines()
-	viewportHeight := m.viewport.Height()
+	viewportHeight := m.scrollView.Height()
 
-	targetYOffset := m.viewport.YOffset()
+	targetYOffset := m.scrollView.YOffset()
 	if m.autoFollow && totalLines > viewportHeight {
 		targetYOffset = max(0, totalLines-viewportHeight)
 	}
@@ -104,40 +102,40 @@ func (m *DisplayModel) updateContent() {
 	}
 	m.lastContent = newContent
 
-	m.viewport.SetContent(newContent)
+	m.scrollView.SetContent(newContent)
 
 	if m.autoFollow {
-		m.viewport.GotoBottom()
+		m.scrollView.GotoBottom()
 	}
 }
 
 // ScrollDown scrolls down by lines
 func (m *DisplayModel) ScrollDown(lines int) {
-	m.viewport.ScrollDown(lines)
+	m.scrollView.ScrollDown(lines)
 }
 
 // AtBottom returns whether viewport is at bottom
 func (m *DisplayModel) AtBottom() bool {
-	return m.viewport.AtBottom()
+	return m.scrollView.AtBottom()
 }
 
 // ScrollUp scrolls up by lines
 func (m *DisplayModel) ScrollUp(lines int) {
-	m.viewport.ScrollUp(lines)
+	m.scrollView.ScrollUp(lines)
 }
 
 // GotoBottom goes to bottom
 func (m *DisplayModel) GotoBottom() {
-	m.viewport.GotoBottom()
+	m.scrollView.GotoBottom()
 }
 
 // GotoTop goes to top
 func (m *DisplayModel) GotoTop() {
-	m.viewport.GotoTop()
+	m.scrollView.GotoTop()
 }
 
 func (m *DisplayModel) UpdateHeight(totalHeight int) {
-	m.viewport.SetHeight(max(0, totalHeight-LayoutGap))
+	m.scrollView.SetHeight(max(0, totalHeight-LayoutGap))
 	m.updateContent()
 }
 
@@ -289,15 +287,15 @@ func (m *DisplayModel) EnsureCursorVisible() {
 	}
 
 	startLine, endLine := m.windowBuffer.GetWindowLineRange(m.windowCursor)
-	viewportTop := m.viewport.YOffset()
-	viewportBottom := viewportTop + m.viewport.Height()
+	viewportTop := m.scrollView.YOffset()
+	viewportBottom := viewportTop + m.scrollView.Height()
 
 	if endLine <= viewportTop {
 		// Entirely above — show the bottom edge
-		m.viewport.SetYOffset(max(0, endLine-m.viewport.Height()))
+		m.scrollView.SetYOffset(max(0, endLine-m.scrollView.Height()))
 	} else if startLine >= viewportBottom {
 		// Entirely below — show the top edge
-		m.viewport.SetYOffset(startLine)
+		m.scrollView.SetYOffset(startLine)
 	}
 }
 
@@ -310,7 +308,7 @@ func (m *DisplayModel) ScrollCursorToTop() {
 		return
 	}
 	startLine, _ := m.windowBuffer.GetWindowLineRange(m.windowCursor)
-	m.viewport.SetYOffset(startLine)
+	m.scrollView.SetYOffset(startLine)
 }
 
 // ValidateCursor ensures the window cursor is valid and visible.
@@ -365,8 +363,8 @@ func (m *DisplayModel) MoveWindowCursorToTop() bool {
 		return false
 	}
 
-	viewportTop := m.viewport.YOffset()
-	viewportBottom := viewportTop + m.viewport.Height()
+	viewportTop := m.scrollView.YOffset()
+	viewportBottom := viewportTop + m.scrollView.Height()
 	found := false
 
 	m.windowBuffer.ForEachVisibleRanged(func(i int, startLine, endLine int) bool {
@@ -398,8 +396,8 @@ func (m *DisplayModel) MoveWindowCursorToBottom() bool {
 		return false
 	}
 
-	viewportTop := m.viewport.YOffset()
-	viewportBottom := viewportTop + m.viewport.Height()
+	viewportTop := m.scrollView.YOffset()
+	viewportBottom := viewportTop + m.scrollView.Height()
 	found := false
 
 	m.windowBuffer.ForEachVisibleBackwardRanged(func(i int, startLine, endLine int) bool {
@@ -431,8 +429,8 @@ func (m *DisplayModel) MoveWindowCursorToCenter() bool {
 	}
 
 	// Calculate the center line of the visible viewport
-	viewportHeight := m.viewport.Height()
-	viewportTop := m.viewport.YOffset()
+	viewportHeight := m.scrollView.Height()
+	viewportTop := m.scrollView.YOffset()
 	viewportCenter := viewportTop + viewportHeight/2
 
 	// First, try to find the window that contains the viewport center line

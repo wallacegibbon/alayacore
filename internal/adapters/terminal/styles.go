@@ -7,7 +7,6 @@ package terminal
 import (
 	"image/color"
 
-	"charm.land/bubbles/v2/textinput"
 	"charm.land/lipgloss/v2"
 	"github.com/alayacore/alayacore/internal/theme"
 )
@@ -121,20 +120,4 @@ func NewStyles(t *theme.Theme) *Styles {
 
 func DefaultStyles() *Styles {
 	return NewStyles(theme.DefaultTheme())
-}
-
-// ApplyTextInputStyles applies focused or blurred styles to a textinput.Model.
-func (s *Styles) ApplyTextInputStyles(input *textinput.Model, focused bool) {
-	var styles textinput.Styles
-	if focused {
-		styles = textinput.DefaultStyles(true)
-		styles.Focused.Prompt = lipgloss.NewStyle().Foreground(s.ColorAccent).Bold(true)
-		styles.Focused.Placeholder = lipgloss.NewStyle().Foreground(s.ColorMuted)
-	} else {
-		styles = textinput.DefaultStyles(false)
-		styles.Blurred.Prompt = lipgloss.NewStyle().Foreground(s.ColorMuted)
-		styles.Blurred.Placeholder = lipgloss.NewStyle().Foreground(s.ColorDim)
-	}
-	styles.Cursor.Color = s.CursorColor
-	input.SetStyles(styles)
 }
