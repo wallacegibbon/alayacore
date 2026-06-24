@@ -146,7 +146,7 @@ func (m *InputField) ensureCursorVisible() {
 	switch {
 	case cursorCell < m.offset:
 		m.offset = cursorCell
-	case cursorCell >= visibleEnd:
+	case cursorCell > visibleEnd:
 		m.offset = cursorCell - m.width + 2
 		if m.offset < 0 {
 			m.offset = 0
@@ -156,41 +156,62 @@ func (m *InputField) ensureCursorVisible() {
 
 // View implements tea.Model.
 func (m *InputField) View() string {
+	// Clamp pos to valid range as a safety measure.
+	if m.pos < 0 {
+		m.pos = 0
+	} else if m.pos > len(m.value) {
+		m.pos = len(m.value)
+	}
+
 	if len(m.value) == 0 && m.Placeholder != "" {
 		return m.placeholderView()
 	}
 
 	styles := m.activeStyle()
 	styleText := styles.Text.Inline(true).Render
-	visible := m.buildVisibleText()
-	cursorCell := max(0, runesWidth(m.value[:m.pos])-m.offset)
+	visible, cursorIdx := m.buildVisibleText()
 
 	var v string
-	if cursorCell < len(visible) {
-		v += styleText(visible[:cursorCell])
-		v += m.cursorRender(string(visible[cursorCell]))
-		v += styleText(visible[cursorCell+1:])
-	} else {
-		v += styleText(visible)
+	if m.focused && cursorIdx < len(visible) {
+		pre := string(visible[:cursorIdx])
+		at := string(visible[cursorIdx])
+		post := string(visible[cursorIdx+1:])
+		v += styleText(pre)
+		v += m.cursorRender(at)
+		v += styleText(post)
+	} else if m.focused {
+		v += styleText(string(visible))
 		v += m.cursorRender(" ")
+	} else {
+		// Blurred: render text without cursor
+		v += styleText(string(visible))
 	}
 
-	valWidth := ansi.StringWidth(visible)
-	if m.width > 0 && valWidth < m.width {
-		padding := m.width - valWidth
-		if cursorCell >= len(visible) {
-			padding++
+	if m.focused {
+		visibleStr := string(visible)
+		valWidth := ansi.StringWidth(visibleStr)
+		if m.width > 0 && valWidth < m.width {
+			padding := m.width - valWidth
+			if cursorIdx >= len(visible) {
+				padding-- // cursor(" ") already occupies 1 cell
+			}
+			if padding < 0 {
+				padding = 0
+			}
+			v += styleText(strings.Repeat(" ", padding))
 		}
-		v += styleText(strings.Repeat(" ", padding))
 	}
 
 	return m.promptRender() + v
 }
 
-func (m *InputField) buildVisibleText() string {
+// buildVisibleText returns the visible portion of the value as runes
+// and the cursor's character index within them.
+func (m *InputField) buildVisibleText() (visible []rune, cursorIdx int) {
 	if len(m.value) == 0 {
-		return ""
+		return nil, 0
 	}
+	// Find start index by cell offset
 	startIdx := 0
 	for cells, i := 0, 0; i < len(m.value); i++ {
 		w := rw.RuneWidth(m.value[i])
@@ -204,28 +225,44 @@ func (m *InputField) buildVisibleText() string {
 		}
 		cells += w
 	}
-	var visible strings.Builder
-	for cells := 0; startIdx < len(m.value); startIdx++ {
-		w := rw.RuneWidth(m.value[startIdx])
+	// Build visible runes up to width
+	var vis []rune
+	visibleStart := startIdx
+	cells := 0
+	for i := visibleStart; i < len(m.value); i++ {
+		w := rw.RuneWidth(m.value[i])
 		if cells+w > m.width {
 			break
 		}
-		visible.WriteRune(m.value[startIdx])
+		vis = append(vis, m.value[i])
 		cells += w
 	}
-	return visible.String()
+	// Compute cursor character index within visible
+	cursorChars := 0
+	for i := visibleStart; i < len(m.value) && i < m.pos; i++ {
+		cursorChars++
+	}
+	return vis, cursorChars
 }
 
 func (m *InputField) placeholderView() string {
-	v := m.cursorRender(" ")
+	styles := m.activeStyle()
+	var v string
+	if m.focused {
+		v = m.cursorRender(" ")
+	} else {
+		v = " "
+	}
 	placeholder := m.Placeholder
 	if m.width > 0 && ansi.StringWidth(placeholder) > m.width-1 {
 		placeholder = truncatePlaceholder(placeholder, m.width-1)
 	}
-	v += m.activeStyle().Placeholder.Inline(true).Render(placeholder)
-	valWidth := ansi.StringWidth(v)
-	if m.width > 0 && valWidth < m.width {
-		v += strings.Repeat(" ", m.width-valWidth)
+	v += styles.Placeholder.Inline(true).Render(placeholder)
+	if m.focused {
+		valWidth := ansi.StringWidth(v)
+		if m.width > 0 && valWidth < m.width {
+			v += strings.Repeat(" ", m.width-valWidth)
+		}
 	}
 	return m.promptRender() + v
 }
@@ -276,7 +313,7 @@ func (m *InputField) SetStyles(focused, blurred inputFieldStyle, cursorColor col
 
 func (m *InputField) rebuildRenderFuncs() {
 	styles := m.activeStyle()
-	cursorBG := lipgloss.NewStyle().Background(m.cursorColor).Foreground(lipgloss.Color("0"))
+	cursorBG := lipgloss.NewStyle().Background(m.cursorColor)
 	m.cursorRender = func(s string) string { return cursorBG.Render(s) }
 	m.promptRender = func() string { return styles.Prompt.Inline(true).Render(m.Prompt) }
 }
@@ -294,7 +331,7 @@ func runesWidth(runes []rune) int {
 }
 
 func printableRune(key string) (rune, bool) {
-	if len(key) != 1 {
+	if len([]rune(key)) != 1 {
 		return 0, false
 	}
 	r := []rune(key)[0]
