@@ -153,7 +153,9 @@ func (r *userRenderer) ToolInfo() *ToolInfo { return nil }
 func (r *userRenderer) AppendFromTLV(tag string, value string) {
 	switch tag {
 	case stream.TagUserT:
-		r.textParts = append(r.textParts, value)
+		if value != "" {
+			r.textParts = append(r.textParts, value)
+		}
 	case stream.TagUserI:
 		r.mediaParts = append(r.mediaParts, "📎 Image")
 	case stream.TagUserV:
