@@ -10,6 +10,7 @@ All optimizations are working correctly:
 - ✅ **Incremental content append** — O(delta) per frame via `appendDeltaToLines`, avoids O(n) full re-wrap
 - ✅ **Incremental line height tracking** — `TryLineCount` reads `len(wrappedLines)` in ~58μs, no full render needed
 - ✅ **Streaming stays under 1ms** — average 236μs per full cycle, well within 250ms tick budget
+- ✅ **Custom ScrollView** (<1KB) replaces Bubbles viewport — View() is **~350ns** (down from ~10μs), zero allocs
 
 ## How Streaming Works
 

@@ -86,7 +86,7 @@ Press `Space` on any window to collapse it — the window shows the first 2 line
 
 ### Virtual Scrolling
 
-The display uses virtual scrolling to handle large outputs efficiently. Only visible windows are rendered, giving a 3.5x speedup over naive rendering. See [virtual-rendering-performance.md](virtual-rendering-performance.md) for details.
+The display uses virtual scrolling to handle large outputs efficiently. Only visible windows are rendered, giving a 4.4x speedup over naive rendering (see [performance analysis](internal/virtual-rendering-performance.md) for details).
 
 ### Sentinel values
 
