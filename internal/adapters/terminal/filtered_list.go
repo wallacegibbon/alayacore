@@ -73,15 +73,18 @@ func (fl *FilteredListCore) SetHasFocus(hasFocus bool) {
 }
 
 // updateFilterInputStyles applies current styles to the filter input.
+// The prompt (e.g. "/") uses the same color as the border so it visually
+// tracks the focus state: focused border color when editing, blurred border
+// color when the list is focused.
 func (fl *FilteredListCore) updateFilterInputStyles() {
 	fl.FilterInput.SetStyles(
 		inputFieldStyle{
-			Prompt:      fl.Styles.Input,
+			Prompt:      fl.Styles.Input.Foreground(fl.Styles.BorderFocused),
 			Text:        fl.Styles.Text,
 			Placeholder: fl.Styles.System,
 		},
 		inputFieldStyle{
-			Prompt:      fl.Styles.Input,
+			Prompt:      fl.Styles.Input.Foreground(fl.Styles.BorderBlurred),
 			Text:        fl.Styles.System,
 			Placeholder: fl.Styles.System,
 		},
