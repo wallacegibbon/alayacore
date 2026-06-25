@@ -47,6 +47,7 @@ func NewInputField() *InputField {
 		width:   20,
 		Prompt:  "> ",
 		focused: true,
+		goalCol: -1,
 	}
 }
 
@@ -194,6 +195,7 @@ func (m *InputField) handlePaste(msg tea.PasteMsg) {
 	}
 	m.value = slices.Insert(m.value, m.pos, filtered...)
 	m.pos += len(filtered)
+	m.goalCol = -1
 	m.ensureCursorVisible()
 }
 
@@ -428,28 +430,27 @@ func (m *InputField) ensureGoalColumn() {
 	m.goalCol = runesWidth(m.value[ls:m.pos])
 }
 
-// moveLeft moves the cursor one position left, wrapping to the end of the
-// previous line when at the start of a line.
+// moveLeft moves the cursor one position left.
+// Stops at the start of a line (no wrapping to previous line).
 func (m *InputField) moveLeft() {
 	if m.pos <= 0 {
 		return
 	}
-	if m.value[m.pos-1] == '\n' {
-		m.pos-- // skip past the \n
-		for m.pos > 0 && m.value[m.pos-1] != '\n' {
-			m.pos--
-		}
-	} else {
-		m.pos--
+	if m.pos <= m.lineStart(m.pos) {
+		return // at start of line, don't wrap
 	}
+	m.pos--
 	m.goalCol = -1
 }
 
-// moveRight moves the cursor one position right, wrapping to the start of the
-// next line when at the end of a line.
+// moveRight moves the cursor one position right.
+// Stops at the end of a line (no wrapping to next line).
 func (m *InputField) moveRight() {
 	if m.pos >= len(m.value) {
 		return
+	}
+	if m.pos >= m.lineEnd(m.pos) {
+		return // at end of line, don't wrap
 	}
 	m.pos++
 	m.goalCol = -1
