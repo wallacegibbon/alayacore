@@ -23,7 +23,7 @@ The session layer manages conversation state, task execution, and model interact
 |-----------|-------------|
 | `Session` | Main struct managing conversation state and message history |
 | `Session` | Manages conversation state, executes prompts |
-| `ModelManager` | Loads and manages AI model configurations from `model.conf`. Never writes to the file. |
+| `ModelManager` | Loads and manages AI model configurations from `model.conf`. Persists edits from `:model_sync` back to the file. |
 | `RuntimeManager` | Persists runtime settings (active model, active theme) to `runtime.conf` |
 | `CommandDefinitions` | Static metadata for session commands (`:save`, `:cancel`, etc.) |
 | `ContextTokens` | Tracks conversation context size across API calls. See [context-tracking.md](context-tracking.md). |

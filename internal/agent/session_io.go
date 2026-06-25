@@ -140,8 +140,8 @@ func (s *Session) handleModelLoad() {
 }
 
 // handleModelSync replaces all models with JSON content from an adapter
-// editor session. The JSON is base64-encoded to protect spaces in string
-// values from strings.Fields splitting.
+// editor session. The JSON is received as a single string (cut on first
+// space), so string values with spaces (e.g. model names) are preserved.
 func (s *Session) handleModelSync(args string) {
 	if s.ModelManager == nil {
 		s.writeError("model manager not initialized")

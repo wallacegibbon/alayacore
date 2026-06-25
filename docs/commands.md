@@ -27,6 +27,7 @@ These commands are rejected with an error if a task is currently running:
 |---------|--------|
 | `:model_set <id>` | Switch to a model by numeric ID |
 | `:model_load` | Reload model configs from the config file |
+| `:model_sync` | Apply edited model config (sent by UI, not user-facing) |
 | `:video_config <fps> <0\|1>` | Set video FPS and resolution (0=default, 1=max) |
 
 ## Task Commands

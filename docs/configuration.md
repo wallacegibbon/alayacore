@@ -17,7 +17,7 @@ AlayaCore has three configuration files: model config, runtime config, and theme
 **Default location**: `~/.alayacore/model.conf`
 **Override**: `--model-config /path/to/model.conf`
 
-This file defines one or more LLM models that AlayaCore can use. It is auto-created with a default Ollama configuration on first run. **AlayaCore never writes to this file after initialization** — you must edit it manually.
+This file defines one or more LLM models that AlayaCore can use. It is auto-created with a default Ollama configuration on first run. Model edits made via the UI (pressing `e` in the model selector) are sent to the session via `:model_sync` and persisted back to this file automatically.
 
 ### Format
 
@@ -89,8 +89,8 @@ Press `Ctrl+L` to open the model selector. From there:
 |-----|--------|
 | `j` / `k` | Navigate models |
 | `Enter` | Select model |
-| `e` | Open config file in `$EDITOR` (or `vim`) |
-| `r` | Reload models after editing |
+| `e` | Edit models in `$EDITOR` (temp file with model.conf format) |
+| `r` | Reload models from config file |
 
 When you select a model:
 
