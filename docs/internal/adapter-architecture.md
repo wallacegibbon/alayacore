@@ -10,7 +10,7 @@ The adapter layer handles user interaction and translates between user actions a
 |-----------|-------------|
 | `Terminal` | Main Bubble Tea model composing all UI components |
 | `DisplayModel` | Renders assistant output with virtual scrolling |
-| `InputModel` | Handles user text input |
+| `PromptInput` | Handles user text input |
 | `ModelSelector` | Modal for switching between AI models |
 | `ThemeSelector` | Modal for switching between color themes |
 | `OutputWriter` | Parses TLV from session and renders styled content |
@@ -90,7 +90,7 @@ main.go → config.Parse() → Settings
 
 ```
 User types prompt
-  → InputModel captures input
+  → PromptInput captures input
     → Emit TLV(UT, prompt), TLV(UE)
       → inputPump reads TLV, stages content, flushes on UE
         → runTask() (task goroutine)

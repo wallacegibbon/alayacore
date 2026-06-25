@@ -20,7 +20,7 @@ func TestStatusBarShowsLastMaxStepsOnError(t *testing.T) {
 	terminal := &Terminal{
 		out:           out,
 		display:       NewDisplayModel(out.WindowBuffer(), styles),
-		input:         NewInputModel(styles),
+		input:         NewPromptInput(styles),
 		editor:        NewEditor(),
 		windowWidth:   80,
 		windowHeight:  24,
@@ -52,7 +52,7 @@ func TestStatusBarShowsCurrentStepsDuringProgress(t *testing.T) {
 	terminal := &Terminal{
 		out:           out,
 		display:       NewDisplayModel(out.WindowBuffer(), styles),
-		input:         NewInputModel(styles),
+		input:         NewPromptInput(styles),
 		editor:        NewEditor(),
 		windowWidth:   80,
 		windowHeight:  24,

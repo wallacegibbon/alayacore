@@ -78,7 +78,7 @@ func TestSpaceKeyDoesNothingInInputWindow(t *testing.T) {
 	}
 
 	// The space should be passed to input handler (we don't verify input value here
-	// as that tests input component behavior, not the space key routing)
+	// as that tests prompt input behavior, not the space key routing)
 }
 
 func TestSpaceKeyDoesNothingWithNoWindow(t *testing.T) {

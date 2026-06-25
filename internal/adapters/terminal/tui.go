@@ -90,7 +90,7 @@ type Terminal struct {
 
 	// UI components
 	display        DisplayModel
-	input          InputModel
+	input          PromptInput
 	modelSelector  *ModelSelector
 	themeSelector  *ThemeSelector
 	themeManager   *ThemeManager
@@ -138,7 +138,7 @@ func NewTerminalWithTheme(
 		appConfig:      appCfg,
 		editor:         editor,
 		display:        NewDisplayModel(out.WindowBuffer(), styles),
-		input:          NewInputModel(styles),
+		input:          NewPromptInput(styles),
 		modelSelector:  NewModelSelector(styles),
 		themeSelector:  NewThemeSelector(styles),
 		themeManager:   themeManager,
@@ -216,11 +216,10 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleFocus()
 
 	case tea.PasteMsg:
-		m.input.updateFromMsg(msg)
-		return m, nil
+		return m.handlePaste(msg)
 	}
 
-	// Default: pass to input component
+	// Default: pass to prompt input
 	m.input.updateFromMsg(msg)
 	return m, nil
 }
@@ -312,7 +311,7 @@ func (m *Terminal) handleEditorFinished(msg EditorFinishedMsg) (tea.Model, tea.C
 			// Strip trailing newlines that text editors add by default
 			content := strings.TrimRight(msg.Content, "\n")
 			m.input.editorContent = content
-			m.input.SetValue(FormatEditorContent(content))
+			m.input.SetValue(FormatEditorContent(content, m.input.input.width))
 			m.input.CursorEnd()
 			m.focusInput()
 		}
@@ -708,5 +707,27 @@ func (m *Terminal) handleFocus() (tea.Model, tea.Cmd) {
 	}
 	m.display.updateContent()
 
+	return m, nil
+}
+
+// handlePaste handles clipboard paste events.
+// Multi-line pastes are treated like external editor content: stored in
+// editorContent and shown as a summary. Single-line pastes pass through
+// to the input field for normal inline editing.
+func (m *Terminal) handlePaste(msg tea.PasteMsg) (tea.Model, tea.Cmd) {
+	// Normalize line endings: terminals may send \r, \n, or \r\n.
+	content := strings.ReplaceAll(msg.Content, "\r\n", "\n")
+	content = strings.ReplaceAll(content, "\r", "\n")
+
+	if strings.Contains(content, "\n") {
+		// Multi-line paste — treat like external editor content.
+		content = strings.TrimRight(content, "\n")
+		m.input.editorContent = content
+		m.input.SetValue(FormatEditorContent(content, m.input.input.width))
+		m.input.CursorEnd()
+	} else {
+		// Single-line paste — pass to input field for inline editing.
+		m.input.updateFromMsg(msg)
+	}
 	return m, nil
 }

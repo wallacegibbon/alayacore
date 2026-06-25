@@ -231,8 +231,9 @@ func (m *Terminal) handleEditorStart(msg editorStartMsg) (tea.Model, tea.Cmd) {
 	})
 }
 
-// FormatEditorContent formats editor content for preview in the input field
-func FormatEditorContent(content string) string {
+// FormatEditorContent formats editor content for preview in the input field.
+// maxWidth is the available text width (cells) of the input field.
+func FormatEditorContent(content string, maxWidth int) string {
 	lineCount := strings.Count(content, "\n") + 1
 
 	// For single-line content, show it just like regular user input (no suffix)
@@ -240,18 +241,24 @@ func FormatEditorContent(content string) string {
 		return content
 	}
 
-	// For multi-line content, show summary with line count and preview
-	preview := strings.Fields(content)
-	var previewText string
+	prefix := fmt.Sprintf("[%d lines] ", lineCount)
+	suffix := " (press Enter to send)"
+	avail := maxWidth - len(prefix) - len(suffix)
+
+	firstLine, _, _ := strings.Cut(content, "\n")
+	previewText := strings.TrimSpace(firstLine)
+
 	switch {
-	case len(preview) > 0 && len(preview[0]) > 20:
-		previewText = preview[0][:20] + "..."
-	case len(preview) > 0:
-		previewText = preview[0]
-	default:
+	case avail <= 0:
+		return strings.TrimRight(prefix, " ")
+	case previewText == "":
 		previewText = "(empty)"
+	case len(previewText) > avail && avail > 3:
+		previewText = previewText[:avail-3] + "..."
+	case len(previewText) > avail:
+		previewText = previewText[:avail]
 	}
-	return fmt.Sprintf("[%d lines] %s (press Enter to send)", lineCount, previewText)
+	return prefix + previewText + suffix
 }
 
 func getEditorCommand(editorCmd string) string {

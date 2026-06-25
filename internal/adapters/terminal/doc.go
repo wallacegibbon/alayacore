@@ -13,7 +13,7 @@
 //	The terminal UI follows the Bubble Tea architecture (Elm-style):
 //	  - Terminal: The main model that composes all components
 //	  - DisplayModel: Renders assistant output with virtual scrolling
-//	  - InputModel: Handles user text input with external editor support
+//	  - PromptInput: Handles user text input with external editor support
 //	  - Status bar: Shows session status (tokens, model info)
 //	  - ModelSelector: Modal for switching between AI models
 //
@@ -31,7 +31,7 @@
 //   - window_renderer.go: Renderers for text, user, and tool windows
 //   - window_buffer.go: WindowBuffer, line tracking, and virtual rendering
 //   - styles.go: Lipgloss style derivation from theme.Theme
-//   - input_component.go: Input handling and external editor support
+//   - prompt_input.go: Input handling and external editor support
 //   - model_selector.go: Model switching UI with fuzzy search
 //   - theme_manager.go: Wrapper around theme.Manager with startup warnings
 //   - theme_selector.go: Theme selection UI with live preview

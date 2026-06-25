@@ -168,41 +168,77 @@ func TestEditorFinishedMsgMultiline(t *testing.T) {
 }
 
 func TestFormatEditorContent(t *testing.T) {
+	const defaultWidth = 72 // DefaultWidth - InputPaddingH = 80 - 8
+
 	tests := []struct {
 		name     string
 		content  string
+		maxWidth int
 		expected string
 	}{
 		{
 			name:     "single line short",
 			content:  "hello world",
+			maxWidth: defaultWidth,
 			expected: "hello world",
 		},
 		{
 			name:     "single line long",
 			content:  "this is a very long single line that exceeds the hundred character limit and should be shown as-is",
+			maxWidth: defaultWidth,
 			expected: "this is a very long single line that exceeds the hundred character limit and should be shown as-is",
 		},
 		{
 			name:     "empty content",
 			content:  "",
+			maxWidth: defaultWidth,
 			expected: "",
 		},
 		{
 			name:     "two lines",
 			content:  "line1\nline2",
+			maxWidth: defaultWidth,
 			expected: "[2 lines] line1 (press Enter to send)",
 		},
 		{
 			name:     "three lines",
 			content:  "line1\nline2\nline3",
+			maxWidth: defaultWidth,
 			expected: "[3 lines] line1 (press Enter to send)",
+		},
+		{
+			name:     "first line with multiple words",
+			content:  "hello world\nfoo bar",
+			maxWidth: defaultWidth,
+			expected: "[2 lines] hello world (press Enter to send)",
+		},
+		{
+			name:     "first line truncated to available width",
+			content:  "this is a very long first line that exceeds forty characters\nsecond line",
+			maxWidth: defaultWidth,
+			// avail = 72 - len("[2 lines] ") - len(" (press Enter to send)")
+			//       = 72 - 10 - 22 = 40
+			// preview[:40-3] + "..." = preview[:37] + "..."
+			expected: "[2 lines] this is a very long first line that e... (press Enter to send)",
+		},
+		{
+			name:     "first line blank",
+			content:  "\nsecond line",
+			maxWidth: defaultWidth,
+			expected: "[2 lines] (empty) (press Enter to send)",
+		},
+		{
+			name:     "narrow terminal no room for preview",
+			content:  "hello\nworld",
+			maxWidth: 20,
+			// avail = 20 - 10 - 22 = -12 → show just the count
+			expected: "[2 lines]",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := FormatEditorContent(tt.content)
+			result := FormatEditorContent(tt.content, tt.maxWidth)
 			if result != tt.expected {
 				t.Errorf("Expected '%s', got '%s'", tt.expected, result)
 			}
@@ -762,7 +798,7 @@ func TestEKeyDoesNothingInInputWindow(t *testing.T) {
 	}
 
 	// The key is passed to input handler - we don't verify input value here
-	// as that tests input component behavior, not the 'e' key routing
+	// as that tests prompt input behavior, not the 'e' key routing
 }
 
 func TestDisplayEditorFinishedDoesNotPopulateInput(t *testing.T) {

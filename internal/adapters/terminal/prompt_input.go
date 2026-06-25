@@ -1,14 +1,16 @@
 package terminal
 
-// InputModel handles text input.
+// PromptInput handles text input with external editor support.
+// It wraps an InputField for single-line editing and stores multi-line
+// content (from external editor or paste) in editorContent.
 
 import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 )
 
-// InputModel handles text input.
-type InputModel struct {
+// PromptInput handles text input.
+type PromptInput struct {
 	input         *InputField
 	focused       bool
 	editorContent string
@@ -16,15 +18,15 @@ type InputModel struct {
 	width         int
 }
 
-// NewInputModel creates a new input model
-func NewInputModel(styles *Styles) InputModel {
+// NewPromptInput creates a new prompt input.
+func NewPromptInput(styles *Styles) PromptInput {
 	input := NewInputField()
 	input.Placeholder = "Enter your prompt..."
 	input.Focus()
 	input.Prompt = "> "
 	input.SetWidth(max(0, DefaultWidth-InputPaddingH))
 
-	return InputModel{
+	return PromptInput{
 		input:   input,
 		focused: true,
 		styles:  styles,
@@ -32,13 +34,13 @@ func NewInputModel(styles *Styles) InputModel {
 	}
 }
 
-// Init initializes the input model
-func (m InputModel) Init() tea.Cmd {
+// Init initializes the prompt input.
+func (m PromptInput) Init() tea.Cmd {
 	return nil
 }
 
-// Update handles messages for the input model
-func (m InputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+// Update handles messages for the prompt input.
+func (m PromptInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if msg, ok := msg.(tea.WindowSizeMsg); ok {
 		m.width = msg.Width
 		m.input.SetWidth(max(0, msg.Width-InputPaddingH))
@@ -49,14 +51,14 @@ func (m InputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// View renders the input field
-func (m InputModel) View() tea.View {
+// View renders the input field.
+func (m PromptInput) View() tea.View {
 	m.updateInputStyles()
 	return tea.NewView(m.input.View())
 }
 
-// updateInputStyles updates the text input styles based on current theme
-func (m InputModel) updateInputStyles() {
+// updateInputStyles updates the text input styles based on current theme.
+func (m PromptInput) updateInputStyles() {
 	m.input.SetStyles(
 		inputFieldStyle{
 			Prompt:      lipgloss.NewStyle().Foreground(m.styles.ColorAccent).Bold(true),
@@ -72,49 +74,49 @@ func (m InputModel) updateInputStyles() {
 	)
 }
 
-// Focus sets focus on the input
-func (m *InputModel) Focus() {
+// Focus sets focus on the input.
+func (m *PromptInput) Focus() {
 	m.focused = true
 	m.input.Focus()
 }
 
-// Blur removes focus from the input
-func (m *InputModel) Blur() {
+// Blur removes focus from the input.
+func (m *PromptInput) Blur() {
 	m.focused = false
 	m.input.Blur()
 }
 
-func (m InputModel) IsFocused() bool {
+func (m PromptInput) IsFocused() bool {
 	return m.focused
 }
 
-func (m InputModel) Value() string {
+func (m PromptInput) Value() string {
 	return m.input.Value()
 }
 
-func (m *InputModel) SetValue(value string) {
+func (m *PromptInput) SetValue(value string) {
 	m.input.SetValue(value)
 }
 
-// Clear clears the input and editor content
-func (m *InputModel) Clear() {
+// Clear clears the input and editor content.
+func (m *PromptInput) Clear() {
 	m.input.SetValue("")
 	m.editorContent = ""
 }
 
-// GetPrompt returns the actual prompt text (editor content or input value)
-func (m InputModel) GetPrompt() string {
+// GetPrompt returns the actual prompt text (editor content or input value).
+func (m PromptInput) GetPrompt() string {
 	if m.editorContent != "" {
 		return m.editorContent
 	}
 	return m.input.Value()
 }
 
-func (m InputModel) GetEditorContent() string {
+func (m PromptInput) GetEditorContent() string {
 	return m.editorContent
 }
 
-func (m *InputModel) ClearEditorContent() {
+func (m *PromptInput) ClearEditorContent() {
 	m.editorContent = ""
 }
 
@@ -130,7 +132,7 @@ func (m *Terminal) OpenEditor() tea.Cmd {
 // RenderWithBorder renders the input with a border.
 // When blockInput is true, renders an empty bordered box (visually indicating
 // that input is blocked by an overlay) instead of the active input field.
-func (m InputModel) RenderWithBorder(blockInput bool) string {
+func (m PromptInput) RenderWithBorder(blockInput bool) string {
 	borderColor := m.styles.BorderFocused
 	if !m.focused {
 		borderColor = m.styles.BorderBlurred
@@ -146,23 +148,23 @@ func (m InputModel) RenderWithBorder(blockInput bool) string {
 	return m.styles.RenderBorderedBox(m.input.View(), m.width, borderColor)
 }
 
-func (m *InputModel) SetWidth(width int) {
+func (m *PromptInput) SetWidth(width int) {
 	m.width = width
 	m.input.SetWidth(max(0, width-InputPaddingH))
 }
 
-func (m *InputModel) SetStyles(styles *Styles) {
+func (m *PromptInput) SetStyles(styles *Styles) {
 	m.styles = styles
 	m.updateInputStyles()
 }
 
-// CursorEnd moves cursor to end
-func (m *InputModel) CursorEnd() {
+// CursorEnd moves cursor to end.
+func (m *PromptInput) CursorEnd() {
 	m.input.CursorEnd()
 }
 
-// updateFromMsg handles a message and updates internal state (non-tea.Model interface)
-func (m *InputModel) updateFromMsg(msg tea.Msg) {
+// updateFromMsg handles a message and updates internal state (non-tea.Model interface).
+func (m *PromptInput) updateFromMsg(msg tea.Msg) {
 	oldValue := m.input.Value()
 	m.input, _ = m.input.Update(msg)
 	newValue := m.input.Value()
@@ -174,4 +176,4 @@ func (m *InputModel) updateFromMsg(msg tea.Msg) {
 	}
 }
 
-var _ tea.Model = (*InputModel)(nil)
+var _ tea.Model = (*PromptInput)(nil)
