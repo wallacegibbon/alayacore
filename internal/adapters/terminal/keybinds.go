@@ -451,7 +451,7 @@ func (m *Terminal) handleGlobalKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 		return nil, true
 
 	case keyCtrlS:
-		return m.submitCommand(agentpkg.CommandNameSave, false), true
+		return m.handleSaveKey(), true
 
 	case keyCtrlL:
 		m.openModelSelector()
@@ -470,6 +470,21 @@ func (m *Terminal) handleGlobalKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 	}
 
 	return nil, false
+}
+
+// handleSaveKey handles the Ctrl+S save shortcut.
+// If no session file is bound, it focuses the input and inserts ":save "
+// so the user can type a filename (same pattern as Ctrl+F for :fork).
+// If a session file is bound, it submits the save command directly.
+func (m *Terminal) handleSaveKey() tea.Cmd {
+	if m.appConfig.Cfg.Session == "" {
+		m.focusInput()
+		m.input.SetValue(":save ")
+		m.input.CursorEnd()
+		m.display.updateContent()
+		return nil
+	}
+	return m.submitCommand(agentpkg.CommandNameSave, false)
 }
 
 // handleFallback handles any key not consumed by display or global handlers.
