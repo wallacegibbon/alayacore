@@ -86,15 +86,15 @@ func (m *InputField) handleKeyMsg(msg tea.KeyMsg) (*InputField, tea.Cmd) {
 // handleMovement returns true if the key was a cursor movement.
 func (m *InputField) handleMovement(key string) bool {
 	switch {
-	case key == "left" || key == "ctrl+b":
+	case key == "left":
 		m.pos = max(0, m.pos-1)
-	case key == "right" || key == "ctrl+f":
+	case key == "right":
 		m.pos = min(len(m.value), m.pos+1)
-	case key == "home" || key == "ctrl+a":
+	case key == "home":
 		m.pos = 0
 		m.offset = 0
 		return true
-	case key == "end" || key == "ctrl+e":
+	case key == "end":
 		m.pos = len(m.value)
 	default:
 		return false
@@ -106,14 +106,14 @@ func (m *InputField) handleMovement(key string) bool {
 // handleDeletion returns true if the key was a deletion action.
 func (m *InputField) handleDeletion(key string) bool {
 	switch {
-	case key == "backspace" || key == "ctrl+h":
+	case key == "backspace":
 		if m.pos > 0 {
 			m.value = slices.Delete(m.value, m.pos-1, m.pos)
 			m.pos--
 		} else {
 			return true
 		}
-	case key == "delete" || key == "ctrl+d":
+	case key == "delete":
 		if m.pos < len(m.value) {
 			m.value = slices.Delete(m.value, m.pos, m.pos+1)
 		}

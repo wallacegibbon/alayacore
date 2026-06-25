@@ -85,8 +85,8 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
-	// 9. Default: pass to input
-	return m.handleInputKeys(msg)
+	// 9. Fallback: pass to input field (no-op when display focused)
+	return m.handleFallback(msg)
 }
 
 // handleThemeSelectorKeys handles input when theme selector is open.
@@ -467,37 +467,30 @@ func (m *Terminal) handleGlobalKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 	case keyCtrlH, keyF1:
 		m.openHelpWindow()
 		return nil, true
-
-	case keyEnter:
-		return m.handleSubmit(), true
 	}
 
 	return nil, false
 }
 
-// handleInputKeys handles keys when input is focused (default behavior).
-func (m *Terminal) handleInputKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Input-only global shortcuts
-	if m.focusedWindow == focusInput {
-		switch msg.String() {
-		case keyCtrlO:
-			return m, m.OpenEditor()
-		case keyCtrlC:
-			m.input.SetValue("")
-			m.input.editorContent = ""
-			return m, nil
-		}
+// handleFallback handles any key not consumed by display or global handlers.
+func (m *Terminal) handleFallback(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Don't touch the input field when user is navigating the display
+	if m.focusedWindow != focusInput {
+		return m, nil
 	}
 
-	// Block keys that would modify input content unexpectedly
 	switch msg.String() {
-	case keyCtrlU, keyCtrlD:
-		// Swallow to prevent textinput's default clear-line / delete-char
+	case keyEnter:
+		return m, m.handleSubmit()
+	case keyCtrlO:
+		return m, m.OpenEditor()
+	case keyCtrlC:
+		m.input.SetValue("")
+		m.input.editorContent = ""
 		return m, nil
 	}
 
 	m.input.updateFromMsg(msg)
-
 	return m, nil
 }
 
