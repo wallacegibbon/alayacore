@@ -57,8 +57,12 @@ func (m *InputField) Update(msg tea.Msg) (*InputField, tea.Cmd) {
 	if !m.focused {
 		return m, nil
 	}
-	if msg, ok := msg.(tea.KeyMsg); ok {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
 		return m.handleKeyMsg(msg)
+	case tea.PasteMsg:
+		m.handlePaste(msg)
+		return m, nil
 	}
 	return m, nil
 }
@@ -135,6 +139,17 @@ func (m *InputField) handleInsertion(key string) bool {
 		return true
 	}
 	return false
+}
+
+// handlePaste inserts pasted text at the cursor position.
+func (m *InputField) handlePaste(msg tea.PasteMsg) {
+	runes := []rune(msg.Content)
+	if len(runes) == 0 {
+		return
+	}
+	m.value = slices.Insert(m.value, m.pos, runes...)
+	m.pos += len(runes)
+	m.ensureCursorVisible()
 }
 
 func (m *InputField) ensureCursorVisible() {
