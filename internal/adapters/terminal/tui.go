@@ -8,6 +8,8 @@ package terminal
 //   - TLV protocol communication with the session
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"math"
@@ -16,6 +18,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	agentpkg "github.com/alayacore/alayacore/internal/agent"
 	"github.com/alayacore/alayacore/internal/app"
 	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/stream"
@@ -321,9 +324,42 @@ func (m *Terminal) handleEditorFinished(msg EditorFinishedMsg) (tea.Model, tea.C
 		}
 		return m, nil
 
+	case EditorActionModelSync:
+		if msg.Content != "" {
+			// Editor returns key-value block format. Convert to JSON for TLV transport.
+			jsonContent := convertKVToJSON(msg.Content)
+			// Base64-encode to preserve content across TLV
+			encoded := base64.StdEncoding.EncodeToString([]byte(jsonContent))
+			m.emitCommand(fmt.Sprintf(":model_sync %s", encoded))
+		}
+		return m, nil
+
 	default:
 		return m, nil
 	}
+}
+
+// convertKVToJSON parses key-value block format (model.conf style) and
+// returns JSON array of ModelConfig, suitable for :model_sync transport.
+func convertKVToJSON(kvContent string) string {
+	blocks := config.ParseKeyValueBlocks(kvContent)
+	models := make([]agentpkg.ModelConfig, 0, len(blocks))
+	for _, block := range blocks {
+		block = strings.TrimSpace(block)
+		if block == "" {
+			continue
+		}
+		var m agentpkg.ModelConfig
+		config.ParseKeyValueWithWarnings(block, &m)
+		if m.Name != "" || m.ModelName != "" {
+			models = append(models, m)
+		}
+	}
+	data, err := json.Marshal(models)
+	if err != nil {
+		return ""
+	}
+	return string(data)
 }
 
 // updateDisplayHeight updates the display viewport height based on window size.

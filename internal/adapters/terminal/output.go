@@ -312,13 +312,12 @@ func (to *outputWriter) handleSystemModel(data json.RawMessage) {
 
 func (to *outputWriter) handleSystemModelList(data json.RawMessage) {
 	var m struct {
-		Models          []agentpkg.ModelInfo `json:"models"`
-		ModelConfigPath string               `json:"model_config_path"`
+		Models []agentpkg.ModelConfig `json:"models"`
 	}
 	if json.Unmarshal(data, &m) != nil {
 		return
 	}
-	to.status.updateModelList(m.Models, m.ModelConfigPath)
+	to.status.updateModelList(m.Models)
 }
 
 func (to *outputWriter) handleSystemTheme(data json.RawMessage) {

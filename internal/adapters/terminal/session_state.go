@@ -39,10 +39,9 @@ type sessionState struct {
 	videoRes int
 
 	// Model fields
-	models          []agentpkg.ModelInfo
+	models          []agentpkg.ModelConfig
 	activeModelID   int
 	activeModelName string
-	modelConfigPath string
 
 	// Theme — active theme broadcast by the session via TagSystemMsg.
 	// The terminal reads this in updateStatus() and applies the theme visually
@@ -96,10 +95,9 @@ func (s *sessionState) updateModel(activeID int, activeName string, contextLimit
 }
 
 // updateModelList atomically replaces the full model list.
-func (s *sessionState) updateModelList(models []agentpkg.ModelInfo, configPath string) {
+func (s *sessionState) updateModelList(models []agentpkg.ModelConfig) {
 	s.mu.Lock()
 	s.models = models
-	s.modelConfigPath = configPath
 	// Also sync active name if models list provides it
 	for _, m := range models {
 		if m.ID == s.activeModelID {
@@ -201,7 +199,6 @@ func (s *sessionState) snapshotModels() ModelSnapshot {
 	defer s.mu.Unlock()
 	snap := ModelSnapshot{
 		ActiveID:   s.activeModelID,
-		ConfigPath: s.modelConfigPath,
 		ActiveName: s.activeModelName,
 	}
 	if s.models != nil {

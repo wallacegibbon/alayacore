@@ -39,8 +39,7 @@ func (ModelMsg) SystemMsgType() string { return "model" }
 // ModelListMsg carries the full model list (type "model_list").
 // Only sent when models change.
 type ModelListMsg struct {
-	Models          []ModelInfo `json:"models"`
-	ModelConfigPath string      `json:"model_config_path,omitempty"`
+	Models []ModelConfig `json:"models"`
 }
 
 func (ModelListMsg) SystemMsgType() string { return "model_list" }

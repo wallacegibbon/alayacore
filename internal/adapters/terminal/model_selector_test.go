@@ -125,8 +125,8 @@ func TestModelSelectorCtrlCClearsSearch(t *testing.T) {
 
 	// Set up some test models
 	models := []searchableModel{
-		{ModelInfo: agentpkg.ModelInfo{Name: "OpenAI GPT-4", ProtocolType: "openai", ModelName: "gpt-4"}},
-		{ModelInfo: agentpkg.ModelInfo{Name: "Zhipu / GLM-5", ProtocolType: "anthropic", ModelName: "glm-5"}},
+		{ModelConfig: agentpkg.ModelConfig{Name: "OpenAI GPT-4", ProtocolType: "openai", ModelName: "gpt-4"}},
+		{ModelConfig: agentpkg.ModelConfig{Name: "Zhipu / GLM-5", ProtocolType: "anthropic", ModelName: "glm-5"}},
 	}
 	ms.SetModels(models)
 	ms.Open()
@@ -170,8 +170,8 @@ func TestModelSelectorSetModelsUpdatesFilteredModels(t *testing.T) {
 
 	// Set up initial models
 	models := []searchableModel{
-		{ModelInfo: agentpkg.ModelInfo{Name: "OpenAI GPT-4", ProtocolType: "openai", ModelName: "gpt-4"}},
-		{ModelInfo: agentpkg.ModelInfo{Name: "Zhipu / GLM-5", ProtocolType: "anthropic", ModelName: "glm-5"}},
+		{ModelConfig: agentpkg.ModelConfig{Name: "OpenAI GPT-4", ProtocolType: "openai", ModelName: "gpt-4"}},
+		{ModelConfig: agentpkg.ModelConfig{Name: "Zhipu / GLM-5", ProtocolType: "anthropic", ModelName: "glm-5"}},
 	}
 	ms.SetModels(models)
 	ms.Open()
@@ -196,9 +196,9 @@ func TestModelSelectorSetModelsUpdatesFilteredModels(t *testing.T) {
 	// Now set new models (simulating reload after editing config file)
 	// The search value is still "gpt", so without the fix, filteredModels wouldn't update
 	newModels := []searchableModel{
-		{ModelInfo: agentpkg.ModelInfo{Name: "OpenAI GPT-4o", ProtocolType: "openai", ModelName: "gpt-4o"}},
-		{ModelInfo: agentpkg.ModelInfo{Name: "OpenAI GPT-4", ProtocolType: "openai", ModelName: "gpt-4"}},
-		{ModelInfo: agentpkg.ModelInfo{Name: "Claude 3.5", ProtocolType: "anthropic", ModelName: "claude-3.5"}},
+		{ModelConfig: agentpkg.ModelConfig{Name: "OpenAI GPT-4o", ProtocolType: "openai", ModelName: "gpt-4o"}},
+		{ModelConfig: agentpkg.ModelConfig{Name: "OpenAI GPT-4", ProtocolType: "openai", ModelName: "gpt-4"}},
+		{ModelConfig: agentpkg.ModelConfig{Name: "Claude 3.5", ProtocolType: "anthropic", ModelName: "claude-3.5"}},
 	}
 	ms.SetModels(newModels)
 
@@ -222,7 +222,7 @@ func TestModelSelectorLoadModelsBeforeOpen(t *testing.T) {
 
 	// Simulate the output having models (loaded during session creation)
 	// but the model selector hasn't received them yet.
-	models := []agentpkg.ModelInfo{
+	models := []agentpkg.ModelConfig{
 		{ID: 1, Name: "Model A", ProtocolType: "openai", ModelName: "model-a"},
 		{ID: 2, Name: "Model B", ProtocolType: "anthropic", ModelName: "model-b"},
 		{ID: 3, Name: "Model C", ProtocolType: "anthropic", ModelName: "model-c"},
@@ -262,7 +262,7 @@ func TestModelSelectorOpenBeforeLoadModelsThenTick(t *testing.T) {
 	}
 
 	// Now simulate the first tick loading models from output
-	models := []agentpkg.ModelInfo{
+	models := []agentpkg.ModelConfig{
 		{ID: 1, Name: "Model A", ProtocolType: "openai", ModelName: "model-a"},
 		{ID: 2, Name: "Model B", ProtocolType: "anthropic", ModelName: "model-b"},
 		{ID: 3, Name: "Model C", ProtocolType: "anthropic", ModelName: "model-c"},
@@ -291,7 +291,7 @@ func TestModelSelectorLoadModelsPreservesSelection(t *testing.T) {
 	ms := NewModelSelector(styles)
 
 	// Set up initial models via LoadModels
-	models := []agentpkg.ModelInfo{
+	models := []agentpkg.ModelConfig{
 		{ID: 1, Name: "Model A", ProtocolType: "openai", ModelName: "model-a"},
 		{ID: 2, Name: "Model B", ProtocolType: "anthropic", ModelName: "model-b"},
 	}
@@ -303,7 +303,7 @@ func TestModelSelectorLoadModelsPreservesSelection(t *testing.T) {
 
 	// Reload models (simulating 'r' key — user-triggered reload)
 	// The selection should be preserved when selector is open and models already existed
-	newModels := []agentpkg.ModelInfo{
+	newModels := []agentpkg.ModelConfig{
 		{ID: 1, Name: "Model A", ProtocolType: "openai", ModelName: "model-a"},
 		{ID: 2, Name: "Model B", ProtocolType: "anthropic", ModelName: "model-b"},
 		{ID: 3, Name: "Model C", ProtocolType: "anthropic", ModelName: "model-c"},

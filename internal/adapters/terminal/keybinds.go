@@ -595,18 +595,39 @@ func (m *Terminal) switchToSelectedModel() {
 	}
 }
 
-// openModelConfigFile opens the model config file with $EDITOR.
+// openModelConfigFile opens model config in $EDITOR for editing.
+// Instead of opening the real model.conf, it serializes the current
+// model list to a temp file in key-value block format. After the user
+// saves and closes the editor, the edited content is sent back to the
+// session via :model_sync for validation and persistence.
 func (m *Terminal) openModelConfigFile() tea.Cmd {
-	path := m.out.SnapshotModels().ConfigPath
-	if path == "" {
+	snap := m.out.SnapshotModels()
+
+	// Serialize current models to key-value format
+	content := serializeModelsForEdit(snap.Models)
+	if content == "" {
 		return func() tea.Msg {
 			return EditorFinishedMsg{
-				Err:      fmt.Errorf("no model config file path configured"),
-				Action:   EditorActionReloadConfig,
+				Err:      fmt.Errorf("no models to edit"),
+				Action:   EditorActionModelSync,
 				FileType: "model_config",
 			}
 		}
 	}
 
-	return m.editor.OpenFile(path, "model_config")
+	return m.editor.OpenForModelEdit(content)
+}
+
+// serializeModelsForEdit serializes models to the key-value block format
+// (same as model.conf). Terminal users are familiar with this format for
+// $EDITOR editing. Other adapters may use JSON instead.
+func serializeModelsForEdit(models []agentpkg.ModelConfig) string {
+	if len(models) == 0 {
+		return ""
+	}
+	blocks := make([]string, 0, len(models))
+	for _, m := range models {
+		blocks = append(blocks, agentpkg.SerializeModelConfig(m))
+	}
+	return strings.Join(blocks, "\n---\n") + "\n"
 }

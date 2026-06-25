@@ -37,10 +37,9 @@ type StatusSnapshot struct {
 
 // ModelSnapshot holds a consistent point-in-time view of model state.
 type ModelSnapshot struct {
-	Models     []agentpkg.ModelInfo
+	Models     []agentpkg.ModelConfig
 	ActiveID   int
 	ActiveName string
-	ConfigPath string
 }
 
 // ============================================================================

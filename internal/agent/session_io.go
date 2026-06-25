@@ -10,6 +10,7 @@ package agent
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -138,6 +139,50 @@ func (s *Session) handleModelLoad() {
 	if model := s.ModelManager.GetActive(); model != nil {
 		if err := s.SwitchModel(model); err != nil {
 			s.writeError("Failed to reinitialize model after reload: " + err.Error())
+		}
+	}
+
+	s.sendModelListMsg()
+}
+
+// handleModelSync replaces all models with content from an adapter editor session.
+// The content is base64-encoded key-value block format (same as model.conf).
+// Called when the user finishes editing models in an external editor via the adapter.
+func (s *Session) handleModelSync(args []string) {
+	if s.ModelManager == nil {
+		s.writeError("model manager not initialized")
+		return
+	}
+
+	if len(args) == 0 {
+		s.writeError("usage: :model_sync <base64-content>")
+		return
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(args[0])
+	if err != nil {
+		s.writeError(fmt.Sprintf("model_sync: invalid base64 content: %v", err))
+		return
+	}
+	content := string(decoded)
+
+	msgs := s.ModelManager.SyncFromContent(content)
+
+	// Report validation messages
+	for _, m := range msgs {
+		s.writeError(m)
+	}
+
+	// Re-resolve the active model
+	s.setActiveFromRuntimeConfig()
+	s.setActiveFromSessionMeta()
+	s.setActiveFromCliFlag()
+
+	// Re-initialize the provider/agent with the (potentially edited)
+	// model config
+	if model := s.ModelManager.GetActive(); model != nil {
+		if err := s.SwitchModel(model); err != nil {
+			s.writeError("Failed to reinitialize model after sync: " + err.Error())
 		}
 	}
 

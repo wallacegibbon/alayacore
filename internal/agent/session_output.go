@@ -198,8 +198,7 @@ func (s *Session) sendModelListMsg() {
 		return
 	}
 	s.writeSystemMsg(ModelListMsg{
-		Models:          s.ModelManager.GetModels(),
-		ModelConfigPath: s.ModelManager.GetFilePath(),
+		Models: s.ModelManager.GetModels(),
 	})
 }
 

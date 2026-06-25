@@ -12,6 +12,7 @@ const (
 	CommandNameSave        = "save"
 	CommandNameModelSet    = "model_set"
 	CommandNameModelLoad   = "model_load"
+	CommandNameModelSync   = "model_sync"
 	CommandNameReason      = "reason"
 	CommandNameThemeSet    = "theme_set"
 	CommandNameConfirm     = "confirm"
@@ -54,6 +55,8 @@ var commandDefs = []Command{
 		func(s *Session, _ context.Context, args []string) { s.handleModelSet(args) }},
 	{CommandNameModelLoad, "Reload models from configuration file", "", CmdIdle,
 		func(s *Session, _ context.Context, _ []string) { s.handleModelLoad() }},
+	{CommandNameModelSync, "Replace all models with edited content", "<content>", CmdIdle,
+		func(s *Session, _ context.Context, args []string) { s.handleModelSync(args) }},
 	{CommandNameReason, "Set reasoning level (0=off, 1=normal, 2=max)", "[0|1|2]", CmdIdle,
 		func(s *Session, _ context.Context, args []string) { s.handleReason(args) }},
 	{CommandNameThemeSet, "Set the active theme", "<name>", CmdImmediate,

@@ -2,14 +2,13 @@ package agent
 
 // ModelManager is responsible for loading model definitions from a
 // key-value config file (model.conf) and managing them in memory.
-// It never writes to the config file – all persistence is manual via
-// a text editor. The session layer uses ModelManager only through its
-// query/update methods and receives safe JSON-ready views via ModelInfo.
+// All persistence is handled internally; adapters interact via TLV messages.
 //
 // All methods are called from the session's run() goroutine only, so no
 // synchronization is needed.
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
@@ -19,32 +18,21 @@ import (
 	"github.com/alayacore/alayacore/internal/config"
 )
 
-// ModelConfig represents a model configuration
+// ModelConfig represents a model configuration.
+// JSON tags are used for TLV serialization to adapters.
 type ModelConfig struct {
-	ID           int    // Runtime ID (generated, not persisted)
-	Name         string `config:"name"`          // Display name
-	ProtocolType string `config:"protocol_type"` // "openai" or "anthropic"
-	BaseURL      string `config:"base_url"`      // API server URL
-	APIKey       string `config:"api_key"`       // API key
-	ModelName    string `config:"model_name"`    // Model identifier
-	ContextLimit int    `config:"context_limit"` // Maximum context length (0 means unlimited)
-	MaxTokens    int    `config:"max_tokens"`    // Maximum output tokens (0 means use provider default)
+	ID           int    `json:"id" config:"-"`                        // Runtime ID (generated, not persisted)
+	Name         string `json:"name" config:"name"`                   // Display name
+	ProtocolType string `json:"protocol_type" config:"protocol_type"` // "openai" or "anthropic"
+	BaseURL      string `json:"base_url" config:"base_url"`           // API server URL
+	APIKey       string `json:"api_key" config:"api_key"`             // API key
+	ModelName    string `json:"model_name" config:"model_name"`       // Model identifier
+	ContextLimit int    `json:"context_limit" config:"context_limit"` // Maximum context length (0 means unlimited)
+	MaxTokens    int    `json:"max_tokens" config:"max_tokens"`       // Maximum output tokens (0 means use provider default)
 }
 
-// ModelInfo is the safe version for JSON responses (no API key)
-type ModelInfo struct {
-	ID           int    `json:"id"`
-	Name         string `json:"name"`
-	ProtocolType string `json:"protocol_type"`
-	BaseURL      string `json:"base_url"`
-	ModelName    string `json:"model_name"`
-	ContextLimit int    `json:"context_limit"`
-	MaxTokens    int    `json:"max_tokens"`
-}
-
-// ModelManager manages model configurations
-// NOTE: ModelManager NEVER writes to the model config file.
-// Users must edit the file with a text editor (press 'e' in model selector).
+// ModelManager manages model configurations.
+// It owns both the in-memory model list and the config file on disk.
 type ModelManager struct {
 	models      []ModelConfig
 	activeID    int
@@ -208,6 +196,26 @@ func parseModelConfig(content string) ([]ModelConfig, []string) {
 	return models, msgs
 }
 
+// SerializeModelConfig serializes a single ModelConfig to the key-value
+// block format used by model.conf on disk.
+// SerializeModelConfig serializes a single ModelConfig to the key-value
+// block format used by model.conf on disk.
+func SerializeModelConfig(m ModelConfig) string {
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("name: %q\n", m.Name))
+	b.WriteString(fmt.Sprintf("protocol_type: %q\n", m.ProtocolType))
+	b.WriteString(fmt.Sprintf("base_url: %q\n", m.BaseURL))
+	b.WriteString(fmt.Sprintf("api_key: %q\n", m.APIKey))
+	b.WriteString(fmt.Sprintf("model_name: %q\n", m.ModelName))
+	if m.ContextLimit > 0 {
+		fmt.Fprintf(&b, "context_limit: %d\n", m.ContextLimit)
+	}
+	if m.MaxTokens > 0 {
+		fmt.Fprintf(&b, "max_tokens: %d\n", m.MaxTokens)
+	}
+	return strings.TrimSuffix(b.String(), "\n")
+}
+
 // validateModel checks required fields and returns errors for any issues found.
 // A model with errors is unusable and should not be added to the model list.
 func validateModel(m ModelConfig) []string {
@@ -257,23 +265,68 @@ func (mm *ModelManager) AddModel(m ModelConfig) int {
 	return m.ID
 }
 
-// GetModels returns all models (without API keys).
-// BaseURL is sanitized to strip any embedded credentials
-// (e.g. https://key@api.example.com → https://api.example.com).
-func (mm *ModelManager) GetModels() []ModelInfo {
-	result := make([]ModelInfo, len(mm.models))
-	for i, m := range mm.models {
-		result[i] = ModelInfo{
-			ID:           m.ID,
-			Name:         m.Name,
-			ProtocolType: m.ProtocolType,
-			BaseURL:      sanitizeBaseURL(m.BaseURL),
-			ModelName:    m.ModelName,
-			ContextLimit: m.ContextLimit,
-			MaxTokens:    m.MaxTokens,
+// GetModels returns all models with full details (including API keys).
+func (mm *ModelManager) GetModels() []ModelConfig {
+	result := make([]ModelConfig, len(mm.models))
+	copy(result, mm.models)
+	return result
+}
+
+// SyncFromContent replaces all models with parsed JSON content, persists to the
+// config file, and returns validation messages.  The JSON format matches the
+// ModelListMsg wire format ([]ModelConfig).
+func (mm *ModelManager) SyncFromContent(content string) []string {
+	var models []ModelConfig
+	if err := json.Unmarshal([]byte(content), &models); err != nil {
+		return []string{fmt.Sprintf("model_sync: invalid JSON: %v", err)}
+	}
+
+	valid := make([]ModelConfig, 0, len(models))
+	var msgs []string
+	for i, m := range models {
+		if errs := validateModel(m); len(errs) > 0 {
+			for _, err := range errs {
+				msgs = append(msgs, fmt.Sprintf("model %d: %s", i+1, err))
+			}
+			continue
+		}
+		valid = append(valid, m)
+	}
+
+	// If all models were rejected, don't touch current state
+	if len(valid) == 0 && len(models) > 0 {
+		return msgs
+	}
+
+	// Assign new IDs
+	mm.nextID = 1
+	for i := range valid {
+		valid[i].ID = mm.nextID
+		mm.nextID++
+	}
+
+	mm.models = valid
+	mm.warnings = msgs
+	mm.hasRejected = false
+
+	// Persist to config file in key-value format
+	if mm.filePath != "" {
+		if err := mm.writeConfigFile(); err != nil {
+			msgs = append(msgs, fmt.Sprintf("warning: failed to persist model config: %v", err))
 		}
 	}
-	return result
+
+	return msgs
+}
+
+// writeConfigFile persists the current models to the config file in key-value format.
+func (mm *ModelManager) writeConfigFile() error {
+	blocks := make([]string, 0, len(mm.models))
+	for _, m := range mm.models {
+		blocks = append(blocks, SerializeModelConfig(m))
+	}
+	data := strings.Join(blocks, "\n---\n") + "\n"
+	return os.WriteFile(mm.filePath, []byte(data), 0600)
 }
 
 // GetModel returns a model by ID (includes API key for internal use)
@@ -345,16 +398,4 @@ func (mm *ModelManager) SetActiveByName(name string) error {
 		return fmt.Errorf("model_set: model not found: %q", name)
 	}
 	return mm.SetActive(id)
-}
-
-// sanitizeBaseURL strips userinfo (credentials) from a URL string.
-// This prevents API keys embedded in the base_url from leaking through
-// GetModels() to adapters and log output.
-func sanitizeBaseURL(rawURL string) string {
-	u, err := url.Parse(rawURL)
-	if err != nil || u.User == nil {
-		return rawURL
-	}
-	u.User = nil
-	return u.String()
 }

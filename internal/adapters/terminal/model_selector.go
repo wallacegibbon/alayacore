@@ -14,10 +14,10 @@ import (
 	agentpkg "github.com/alayacore/alayacore/internal/agent"
 )
 
-// searchableModel wraps agentpkg.ModelInfo with a pre-computed
+// searchableModel wraps agentpkg.ModelConfig with a pre-computed
 // lowercase search string for fuzzy matching.
 type searchableModel struct {
-	agentpkg.ModelInfo
+	agentpkg.ModelConfig
 	searchStr string // lowercase "id name context provider" — matches what users see in the list
 }
 
@@ -61,19 +61,19 @@ func newFilterInput(placeholder string) *InputField {
 
 // --- Model Management ---
 
-func (ms *ModelSelector) GetActiveModel() *agentpkg.ModelInfo {
+func (ms *ModelSelector) GetActiveModel() *agentpkg.ModelConfig {
 	if ms.activeModel == nil {
 		return nil
 	}
-	return &ms.activeModel.ModelInfo
+	return &ms.activeModel.ModelConfig
 }
 
 func (ms *ModelSelector) SetActiveModel(m *searchableModel) { ms.activeModel = m }
 
-func (ms *ModelSelector) GetModels() []agentpkg.ModelInfo {
-	result := make([]agentpkg.ModelInfo, len(ms.models))
+func (ms *ModelSelector) GetModels() []agentpkg.ModelConfig {
+	result := make([]agentpkg.ModelConfig, len(ms.models))
 	for i := range ms.models {
-		result[i] = ms.models[i].ModelInfo
+		result[i] = ms.models[i].ModelConfig
 	}
 	return result
 }
@@ -87,7 +87,7 @@ func (ms *ModelSelector) SetModels(models []searchableModel) {
 	ms.updateFilteredModels()
 }
 
-func (ms *ModelSelector) LoadModels(models []agentpkg.ModelInfo, activeID int) tea.Cmd {
+func (ms *ModelSelector) LoadModels(models []agentpkg.ModelConfig, activeID int) tea.Cmd {
 	// Skip update if model list hasn't changed.
 	if ms.modelsUnchangedSinceLastLoad(models) {
 		for i := range ms.models {
@@ -115,8 +115,8 @@ func (ms *ModelSelector) LoadModels(models []agentpkg.ModelInfo, activeID int) t
 
 	for i, m := range models {
 		ms.models[i] = searchableModel{
-			ModelInfo: m,
-			searchStr: buildSearchStr(&searchableModel{ModelInfo: m}),
+			ModelConfig: m,
+			searchStr:   buildSearchStr(&searchableModel{ModelConfig: m}),
 		}
 		if m.ID == activeID {
 			ms.activeModel = &ms.models[i]
@@ -145,7 +145,7 @@ func (ms *ModelSelector) LoadModels(models []agentpkg.ModelInfo, activeID int) t
 // identical to the currently cached models. SetModels may have been called
 // independently between LoadModels calls, so we check both ms.models length
 // AND ms.lastModelCount.
-func (ms *ModelSelector) modelsUnchangedSinceLastLoad(models []agentpkg.ModelInfo) bool {
+func (ms *ModelSelector) modelsUnchangedSinceLastLoad(models []agentpkg.ModelConfig) bool {
 	if len(models) != len(ms.models) || len(models) != ms.lastModelCount {
 		return false
 	}
