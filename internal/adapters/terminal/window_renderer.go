@@ -170,13 +170,26 @@ func (r *userRenderer) AppendFromTLV(tag string, value string) {
 
 func (r *userRenderer) Invalidate() {}
 
-// BuildInner renders the user message: optional "> " prefix + text + media section.
+// BuildInner renders the user message: media section first (on top), then text below.
+// This matches the natural content order: media parts precede the text part.
 // Multiple text parts are separated with "---" in System color.
 func (r *userRenderer) BuildInner(width int, _ bool, styles *Styles) (string, int) {
 	innerWidth := max(0, width-BorderInnerPadding)
 	media := strings.Join(r.mediaParts, "  ")
 
 	var parts []string
+
+	// Media portion — rendered first (on top)
+	if media != "" {
+		var mediaBlock strings.Builder
+		mediaBlock.WriteString(styles.Attachment.Render(media))
+		if innerWidth > 0 {
+			mediaBlockStr := wrapContent(mediaBlock.String(), innerWidth)
+			parts = append(parts, mediaBlockStr)
+		} else {
+			parts = append(parts, mediaBlock.String())
+		}
+	}
 
 	// Text portion: each text part gets "> " prefix, separated by "---"
 	if len(r.textParts) > 0 {
@@ -202,22 +215,6 @@ func (r *userRenderer) BuildInner(width int, _ bool, styles *Styles) (string, in
 				styledText = wrapContent(styledText, innerWidth)
 			}
 			parts = append(parts, styledText)
-		}
-	}
-
-	// Media portion — separated from text by "---" only when text exists
-	if media != "" {
-		var mediaBlock strings.Builder
-		if len(parts) > 0 {
-			mediaBlock.WriteString(styles.System.Render(Separator))
-			mediaBlock.WriteString("\n")
-		}
-		mediaBlock.WriteString(styles.Attachment.Render(media))
-		if innerWidth > 0 {
-			mediaBlockStr := wrapContent(mediaBlock.String(), innerWidth)
-			parts = append(parts, mediaBlockStr)
-		} else {
-			parts = append(parts, mediaBlock.String())
 		}
 	}
 
