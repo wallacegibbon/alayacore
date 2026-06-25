@@ -203,7 +203,15 @@ func (m *InputField) ensureCursorVisible() {
 	if m.width <= 0 {
 		return
 	}
-	lineStart, _ := m.currentLine(m.pos)
+	lineStart, lineEnd := m.currentLine(m.pos)
+	lineWidth := runesWidth(m.value[lineStart:lineEnd])
+
+	// If the entire line fits within the viewport, no scrolling needed.
+	if lineWidth <= m.width {
+		m.offset = 0
+		return
+	}
+
 	relPos := m.pos - lineStart // cursor position within current line
 	cursorCell := runesWidth(m.value[lineStart : lineStart+relPos])
 	visibleEnd := m.offset + m.width
