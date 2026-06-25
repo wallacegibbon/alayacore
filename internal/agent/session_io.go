@@ -10,7 +10,6 @@ package agent
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -35,20 +34,16 @@ func (s *Session) cancelTask() {
 	s.writeError("nothing to cancel")
 }
 
-func (s *Session) saveSession(args []string) {
+func (s *Session) saveSession(args string) {
 	var path string
-	switch len(args) {
-	case 0:
+	if args == "" {
 		if s.SessionFile == "" {
 			s.writeError("no session file set")
 			return
 		}
 		path = s.SessionFile
-	case 1:
-		path = config.ExpandPath(args[0])
-	default:
-		s.writeError("usage: :save [filename]")
-		return
+	} else {
+		path = config.ExpandPath(args)
 	}
 
 	if err := s.saveContentToFile(path, s.Contents); err != nil {
@@ -58,21 +53,20 @@ func (s *Session) saveSession(args []string) {
 	}
 }
 
-func (s *Session) handleModelSet(args []string) {
+func (s *Session) handleModelSet(args string) {
 	if s.ModelManager == nil {
 		s.writeError("model manager not initialized")
 		return
 	}
 
-	if len(args) == 0 {
+	if args == "" {
 		s.writeError("usage: :model_set <id>")
 		return
 	}
 
-	modelIDStr := args[0]
-	modelID, err := strconv.Atoi(modelIDStr)
+	modelID, err := strconv.Atoi(args)
 	if err != nil {
-		s.writeError(fmt.Sprintf("model_set: invalid model ID: %s", modelIDStr))
+		s.writeError(fmt.Sprintf("model_set: invalid model ID: %s", args))
 		return
 	}
 	model := s.ModelManager.GetModel(modelID)
@@ -148,25 +142,18 @@ func (s *Session) handleModelLoad() {
 // handleModelSync replaces all models with JSON content from an adapter
 // editor session. The JSON is base64-encoded to protect spaces in string
 // values from strings.Fields splitting.
-func (s *Session) handleModelSync(args []string) {
+func (s *Session) handleModelSync(args string) {
 	if s.ModelManager == nil {
 		s.writeError("model manager not initialized")
 		return
 	}
 
-	if len(args) == 0 {
-		s.writeError("usage: :model_sync <base64-json>")
+	if args == "" {
+		s.writeError("usage: :model_sync <json>")
 		return
 	}
 
-	decoded, err := base64.StdEncoding.DecodeString(args[0])
-	if err != nil {
-		s.writeError(fmt.Sprintf("model_sync: invalid base64: %v", err))
-		return
-	}
-	content := string(decoded)
-
-	msgs := s.ModelManager.SyncFromContent(content)
+	msgs := s.ModelManager.SyncFromContent(args)
 
 	// Report validation messages
 	for _, m := range msgs {
@@ -189,8 +176,12 @@ func (s *Session) handleModelSync(args []string) {
 	s.sendModelListMsg()
 }
 
-func (s *Session) handleReason(args []string) {
-	level, err := strconv.Atoi(args[0])
+func (s *Session) handleReason(args string) {
+	if args == "" {
+		s.writeError("usage: :reason [0|1|2]  (0=off, 1=normal, 2=max)")
+		return
+	}
+	level, err := strconv.Atoi(args)
 	if err != nil || level < config.ReasoningLevelOff || level > config.ReasoningLevelMax {
 		s.writeError("usage: :reason [0|1|2]  (0=off, 1=normal, 2=max)")
 		return
@@ -203,17 +194,18 @@ func (s *Session) handleReason(args []string) {
 //
 //	fps:        frames per second (positive integer, e.g. 2)
 //	resolution: 0=default, 1=max
-func (s *Session) handleVideoConfig(args []string) {
-	if len(args) < 2 {
+func (s *Session) handleVideoConfig(args string) {
+	fields := strings.Fields(args)
+	if len(fields) < 2 {
 		s.writeError("usage: :video_config <fps> <resolution>  (resolution: 0=default, 1=max)")
 		return
 	}
-	fps, err := strconv.Atoi(args[0])
+	fps, err := strconv.Atoi(fields[0])
 	if err != nil || fps < 1 {
 		s.writeError("usage: :video_config <fps> <resolution>  (fps must be a positive integer)")
 		return
 	}
-	res, err := strconv.Atoi(args[1])
+	res, err := strconv.Atoi(fields[1])
 	if err != nil || res < 0 || res > 1 {
 		s.writeError("usage: :video_config <fps> <resolution>  (resolution: 0=default, 1=max)")
 		return
@@ -223,12 +215,12 @@ func (s *Session) handleVideoConfig(args []string) {
 
 // handleThemeSet sets the active theme, persists it to runtime config,
 // and sends updated system info so adapters receive the full theme data.
-func (s *Session) handleThemeSet(args []string) {
-	if len(args) == 0 {
+func (s *Session) handleThemeSet(args string) {
+	if args == "" {
 		s.writeError("usage: :theme_set <name>")
 		return
 	}
-	name := args[0]
+	name := args
 
 	// Validate that the theme exists before persisting.
 	if s.ThemesFolder != "" {
@@ -336,15 +328,16 @@ func (s *Session) handleInputFrame(tag, value string, staged []llm.ContentPart) 
 // handleFork saves all content from the start of the session up to (and
 // including) the content identified by history ID to a session file.
 // Usage: :fork <history_id> <filename>
-func (s *Session) handleFork(args []string) {
-	if len(args) < 2 {
+func (s *Session) handleFork(args string) {
+	fields := strings.Fields(args)
+	if len(fields) < 2 {
 		s.writeError("usage: :fork <history_id> <filename>")
 		return
 	}
 
-	id, err := strconv.ParseUint(args[0], 10, 64)
+	id, err := strconv.ParseUint(fields[0], 10, 64)
 	if err != nil {
-		s.writeError(fmt.Sprintf("invalid history ID: %s", args[0]))
+		s.writeError(fmt.Sprintf("invalid history ID: %s", fields[0]))
 		return
 	}
 
@@ -361,7 +354,7 @@ func (s *Session) handleFork(args []string) {
 		return
 	}
 
-	path := config.ExpandPath(args[1])
+	path := config.ExpandPath(fields[1])
 	if err := s.saveContentToFile(path, s.Contents[:endIdx+1]); err != nil {
 		s.writeError(fmt.Sprintf("failed to fork: %v", err))
 		return
@@ -372,13 +365,14 @@ func (s *Session) handleFork(args []string) {
 // handleConfirmCommand processes a `:confirm <id> yes|no` command.
 // It writes the response to the task goroutine's pending confirmation
 // channel.  Called from the run() goroutine via the command registry.
-func (s *Session) handleConfirmCommand(args []string) {
-	if len(args) != 2 {
+func (s *Session) handleConfirmCommand(args string) {
+	fields := strings.Fields(args)
+	if len(fields) != 2 {
 		s.writeError("usage: :confirm <id> yes|no")
 		return
 	}
 
-	id := args[0]
+	id := fields[0]
 	p := s.confirmCh.Load()
 	if p == nil {
 		s.writeError("No pending tool confirmation")
@@ -386,7 +380,7 @@ func (s *Session) handleConfirmCommand(args []string) {
 	}
 
 	var allowed bool
-	switch args[1] {
+	switch fields[1] {
 	case "yes":
 		allowed = true
 	case "no":
@@ -445,15 +439,13 @@ func (s *Session) handleInputMsg(msg inputMsg) {
 		return
 	}
 
-	// Command dispatch.
-	fields := strings.Fields(msg.cmd)
-	if len(fields) == 0 {
+	// Command dispatch: split on first space only.
+	// Each handler parses the args string as appropriate for its command.
+	name, args, _ := strings.Cut(msg.cmd, " ")
+	if name == "" {
 		s.writeError("empty command")
 		return
 	}
-
-	name := fields[0]
-	args := fields[1:]
 
 	// Registry commands.
 	if cmdDef, ok := LookupCommand(name); ok {
@@ -481,7 +473,6 @@ func (s *Session) handleInputMsg(msg inputMsg) {
 	}
 }
 
-// handlePrompt starts a task goroutine for a user prompt.
 // Called from handleInputMsg when the input is not a command.
 func (s *Session) handlePrompt(contentParts []llm.ContentPart) {
 	if s.activeTask != nil {

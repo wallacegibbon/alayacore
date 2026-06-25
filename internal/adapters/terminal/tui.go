@@ -8,7 +8,6 @@ package terminal
 //   - TLV protocol communication with the session
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -334,12 +333,9 @@ func (m *Terminal) handleEditorFinished(msg EditorFinishedMsg) (tea.Model, tea.C
 			}
 			m.pendingModelSyncOrig = ""
 
-			// Editor returns key-value block format. Convert to JSON for TLV transport.
+			// Editor returns key-value block format. Convert to JSON and send.
 			jsonContent := convertKVToJSON(msg.Content)
-			// Base64-encode to preserve JSON through strings.Fields splitting
-			// on whitespace (model names contain spaces).
-			encoded := base64.StdEncoding.EncodeToString([]byte(jsonContent))
-			m.emitCommand(fmt.Sprintf(":model_sync %s", encoded))
+			m.emitCommand(fmt.Sprintf(":model_sync %s", jsonContent))
 		}
 		return m, nil
 
