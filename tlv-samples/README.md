@@ -186,7 +186,7 @@ ui-image-url.bin               UI https://example-files.cnbj1.mi-fds.com/example
 ua-audio-url.bin               UA https://example-files.cnbj1.mi-fds.com/example-files/audio/audio_example.wav
 uv-video-url.bin               UV https://example-files.cnbj1.mi-fds.com/example-files/video/video_example.mp4
 sm-message-version.bin         SM {"type":"version","data":{"message_version":8}}
-sm-model-list.bin              SM {"type":"model_list","data":{"models":[{"id":0,"name":"Anthropic / Claude Haiku 4",...},{"id":4,"name":"DeepSeek / DeepSeek-V4 Flash",...}],"model_config_path":"..."}}
+sm-model-list.bin              SM {"type":"model_list","data":{"models":[{"id":0,"name":"Anthropic / Claude Haiku 4",...},{"id":4,"name":"DeepSeek / DeepSeek-V4 Flash",...}]}}
 sm-model.bin                   SM {"type":"model","data":{"active_id":4,"active_name":"DeepSeek / DeepSeek-V4 Flash","context_limit":1000000}}
 sm-theme-list.bin              SM {"type":"theme_list","data":{"themes":[{"name":"theme-dark",...},{"name":"theme-light",...}]}}
 sm-theme.bin                   SM {"type":"theme","data":{"name":"theme-dark"}}
