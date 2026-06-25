@@ -501,7 +501,6 @@ func (m *Terminal) handleFallback(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.OpenEditor()
 	case keyCtrlC:
 		m.input.SetValue("")
-		m.input.editorContent = ""
 		return m, nil
 	}
 
@@ -513,10 +512,9 @@ func (m *Terminal) handleFallback(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // Command Handling
 // ============================================================================
 
-// handleSubmit processes the input when Enter is pressed.
+// handleSubmit processes the input when Shift+Enter is pressed.
 func (m *Terminal) handleSubmit() tea.Cmd {
-	prompt := strings.TrimSpace(m.input.GetPrompt())
-	m.input.editorContent = ""
+	prompt := strings.TrimSpace(m.input.Value())
 
 	if prompt == "" {
 		return nil

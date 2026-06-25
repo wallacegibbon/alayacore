@@ -74,15 +74,9 @@ func TestEditorFinishedMsg(t *testing.T) {
 		t.Fatal("Update returned nil model")
 	}
 
-	// For single-line content, input should show the content without any suffix
 	inputValue := terminal.input.Value()
 	if inputValue != "test content from editor" {
-		t.Errorf("Expected exact content in input for single line, got '%s'", inputValue)
-	}
-
-	// editorContent should preserve original content
-	if terminal.input.editorContent != "test content from editor" {
-		t.Errorf("Expected editorContent 'test content from editor', got '%s'", terminal.input.editorContent)
+		t.Errorf("Expected exact content in input, got '%s'", inputValue)
 	}
 }
 
@@ -101,10 +95,9 @@ func TestEditorFinishedMsgWithWhitespace(t *testing.T) {
 		t.Fatal("Update returned nil model")
 	}
 
-	// editorContent should preserve leading/trailing spaces but strip trailing newlines
-	// (text editors add a trailing newline by default, which should be removed)
-	if terminal.input.editorContent != "  content with leading and trailing spaces  " {
-		t.Errorf("Expected to preserve spaces but strip trailing newline, got '%s'", terminal.input.editorContent)
+	// Should preserve leading/trailing spaces but strip trailing newlines.
+	if terminal.input.Value() != "  content with leading and trailing spaces  " {
+		t.Errorf("Expected to preserve spaces but strip trailing newline, got '%s'", terminal.input.Value())
 	}
 }
 
@@ -123,20 +116,9 @@ func TestEditorFinishedMsgWithMultipleTrailingNewlines(t *testing.T) {
 		t.Fatal("Update returned nil model")
 	}
 
-	// All trailing newlines should be stripped
-	if terminal.input.editorContent != "content with multiple trailing newlines" {
-		t.Errorf("Expected to strip all trailing newlines, got '%s'", terminal.input.editorContent)
-	}
-}
-
-func TestEditorContentSubmittedOnEnter(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
-	terminal.input.editorContent = "line1\nline2\nline3"
-
-	// editorContent is cleared before submission when Enter is pressed
-	// This test verifies the logic flow that checks editorContent first
-	if terminal.input.editorContent != "line1\nline2\nline3" {
-		t.Errorf("Expected editorContent to be set before Enter, got '%s'", terminal.input.editorContent)
+	// All trailing newlines should be stripped.
+	if terminal.input.Value() != "content with multiple trailing newlines" {
+		t.Errorf("Expected to strip all trailing newlines, got '%s'", terminal.input.Value())
 	}
 }
 
@@ -155,106 +137,9 @@ func TestEditorFinishedMsgMultiline(t *testing.T) {
 		t.Fatal("Update returned nil model")
 	}
 
-	// For multi-line content, input should show summary with line count
-	inputValue := terminal.input.Value()
-	if !strings.Contains(inputValue, "[3 lines]") {
-		t.Errorf("Expected line count summary for multi-line content, got '%s'", inputValue)
-	}
-
-	// editorContent should preserve original content
-	if terminal.input.editorContent != "line1\nline2\nline3" {
-		t.Errorf("Expected editorContent to preserve multi-line content, got '%s'", terminal.input.editorContent)
-	}
-}
-
-func TestFormatEditorContent(t *testing.T) {
-	const defaultWidth = 72 // DefaultWidth - InputPaddingH = 80 - 8
-
-	tests := []struct {
-		name     string
-		content  string
-		maxWidth int
-		expected string
-	}{
-		{
-			name:     "single line short",
-			content:  "hello world",
-			maxWidth: defaultWidth,
-			expected: "hello world",
-		},
-		{
-			name:     "single line long",
-			content:  "this is a very long single line that exceeds the hundred character limit and should be shown as-is",
-			maxWidth: defaultWidth,
-			expected: "this is a very long single line that exceeds the hundred character limit and should be shown as-is",
-		},
-		{
-			name:     "empty content",
-			content:  "",
-			maxWidth: defaultWidth,
-			expected: "",
-		},
-		{
-			name:     "two lines",
-			content:  "line1\nline2",
-			maxWidth: defaultWidth,
-			expected: "[2 lines] line1 (press Enter to send)",
-		},
-		{
-			name:     "three lines",
-			content:  "line1\nline2\nline3",
-			maxWidth: defaultWidth,
-			expected: "[3 lines] line1 (press Enter to send)",
-		},
-		{
-			name:     "first line with multiple words",
-			content:  "hello world\nfoo bar",
-			maxWidth: defaultWidth,
-			expected: "[2 lines] hello world (press Enter to send)",
-		},
-		{
-			name:     "first line truncated to available width",
-			content:  "this is a very long first line that exceeds forty characters\nsecond line",
-			maxWidth: defaultWidth,
-			// avail = 72 - len("[2 lines] ") - len(" (press Enter to send)")
-			//       = 72 - 10 - 22 = 40
-			// preview[:40-3] + "..." = preview[:37] + "..."
-			expected: "[2 lines] this is a very long first line that e... (press Enter to send)",
-		},
-		{
-			name:     "first line blank",
-			content:  "\nsecond line",
-			maxWidth: defaultWidth,
-			expected: "[2 lines] (empty) (press Enter to send)",
-		},
-		{
-			name:     "narrow terminal no room for preview",
-			content:  "hello\nworld",
-			maxWidth: 20,
-			// avail = 20 - 10 - 22 = -12 → show just the count
-			expected: "[2 lines]",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := FormatEditorContent(tt.content, tt.maxWidth)
-			if result != tt.expected {
-				t.Errorf("Expected '%s', got '%s'", tt.expected, result)
-			}
-		})
-	}
-}
-
-func TestEditorContentUsedInsteadOfInputValue(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
-	terminal.input.editorContent = "editor content"
-	terminal.input.SetValue("input value")
-
-	// When editorContent is set, it should be used instead of input value
-	// This is verified by checking that editorContent has the right value
-	if terminal.input.editorContent != "editor content" {
-		t.Errorf("Expected editorContent to be 'editor content', got '%s'", terminal.input.editorContent)
+	// Multi-line content should be stored directly in the input value.
+	if terminal.input.Value() != "line1\nline2\nline3" {
+		t.Errorf("Expected multi-line content preserved in input, got '%s'", terminal.input.Value())
 	}
 }
 
@@ -817,11 +702,6 @@ func TestDisplayEditorFinishedDoesNotPopulateInput(t *testing.T) {
 	// Input should remain unchanged
 	if terminal.input.Value() != "original input" {
 		t.Errorf("Input should not be modified after display editor closes, got '%s'", terminal.input.Value())
-	}
-
-	// editorContent should remain empty
-	if terminal.input.editorContent != "" {
-		t.Errorf("editorContent should be empty after display editor closes, got '%s'", terminal.input.editorContent)
 	}
 }
 

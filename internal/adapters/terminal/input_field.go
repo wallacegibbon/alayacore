@@ -1,9 +1,8 @@
 package terminal
 
-// InputField is a single-line text input component.
-// Supports: text entry, basic deletion, cursor navigation,
-// placeholder, prompt prefix, horizontal scrolling, focus/blur styling.
-// Multi-line editing is handled by the external editor (Ctrl+O).
+// InputField is a text input component supporting multi-line content with a
+// single-line display. Users navigate lines with up/down arrows, and the
+// visible area shows only the line containing the cursor.
 
 import (
 	"image/color"
@@ -17,10 +16,12 @@ import (
 	rw "github.com/mattn/go-runewidth"
 )
 
-// InputField is the Bubble Tea model for a single-line text input.
+// InputField is the Bubble Tea model for a text input with multi-line support
+// but single-line display. Cursor up/down navigates between lines.
 type InputField struct {
 	value       []rune
 	pos         int // cursor position in value
+	goalCol     int // remembered column position for up/down navigation (-1 = none)
 	offset      int // horizontal scroll offset (cells)
 	width       int // visible width (cells)
 	Prompt      string
@@ -87,15 +88,25 @@ func (m *InputField) handleKeyMsg(msg tea.KeyMsg) (*InputField, tea.Cmd) {
 func (m *InputField) handleMovement(key string) bool {
 	switch {
 	case key == "left":
-		m.pos = max(0, m.pos-1)
+		m.moveLeft()
 	case key == "right":
-		m.pos = min(len(m.value), m.pos+1)
+		m.moveRight()
+	case key == "up":
+		if !m.moveLineUp() {
+			return true
+		}
+	case key == "down":
+		if !m.moveLineDown() {
+			return true
+		}
 	case key == "home":
-		m.pos = 0
+		m.pos = m.lineStart(m.pos)
 		m.offset = 0
+		m.goalCol = -1
 		return true
 	case key == "end":
-		m.pos = len(m.value)
+		m.pos = m.lineEnd(m.pos)
+		m.goalCol = -1
 	default:
 		return false
 	}
@@ -107,16 +118,9 @@ func (m *InputField) handleMovement(key string) bool {
 func (m *InputField) handleDeletion(key string) bool {
 	switch {
 	case key == "backspace":
-		if m.pos > 0 {
-			m.value = slices.Delete(m.value, m.pos-1, m.pos)
-			m.pos--
-		} else {
-			return true
-		}
+		m.deleteBackward()
 	case key == "delete":
-		if m.pos < len(m.value) {
-			m.value = slices.Delete(m.value, m.pos, m.pos+1)
-		}
+		m.deleteForward()
 	default:
 		return false
 	}
@@ -133,12 +137,14 @@ func (m *InputField) handleInsertion(key string) bool {
 	if key == "space" {
 		m.value = slices.Insert(m.value, m.pos, ' ')
 		m.pos++
+		m.goalCol = -1
 		m.ensureCursorVisible()
 		return true
 	}
 	if r, ok := printableRune(key); ok {
 		m.value = slices.Insert(m.value, m.pos, r)
 		m.pos++
+		m.goalCol = -1
 		m.ensureCursorVisible()
 		return true
 	}
@@ -146,17 +152,32 @@ func (m *InputField) handleInsertion(key string) bool {
 }
 
 // handlePaste inserts pasted text at the cursor position.
-// Non-printable control characters are filtered out to avoid breaking the
-// single-line layout (e.g. newlines would cause border rendering issues).
+// Control characters are filtered out, except for newlines which are
+// allowed to support multi-line paste.
 func (m *InputField) handlePaste(msg tea.PasteMsg) {
 	runes := []rune(msg.Content)
 	if len(runes) == 0 {
 		return
 	}
-	// Filter out control characters (same policy as handleInsertion).
-	filtered := make([]rune, 0, len(runes))
-	for _, r := range runes {
-		if isPrintableRune(r) {
+	// Normalize line endings: handle \r\n and \r.
+	normalized := make([]rune, 0, len(runes))
+	for i := 0; i < len(runes); i++ {
+		switch runes[i] {
+		case '\r':
+			if i+1 < len(runes) && runes[i+1] == '\n' {
+				i++ // skip \r in \r\n
+			}
+			normalized = append(normalized, '\n')
+		case '\n':
+			normalized = append(normalized, '\n')
+		default:
+			normalized = append(normalized, runes[i])
+		}
+	}
+	// Filter out non-printable control characters, but keep newlines.
+	filtered := make([]rune, 0, len(normalized))
+	for _, r := range normalized {
+		if r == '\n' || isPrintableRune(r) {
 			filtered = append(filtered, r)
 		}
 	}
@@ -172,12 +193,14 @@ func (m *InputField) ensureCursorVisible() {
 	if m.width <= 0 {
 		return
 	}
-	cursorCell := runesWidth(m.value[:m.pos])
+	lineStart, _ := m.currentLine(m.pos)
+	relPos := m.pos - lineStart // cursor position within current line
+	cursorCell := runesWidth(m.value[lineStart : lineStart+relPos])
 	visibleEnd := m.offset + m.width
 	switch {
 	case cursorCell < m.offset:
 		m.offset = cursorCell
-	case cursorCell > visibleEnd:
+	case cursorCell >= visibleEnd:
 		m.offset = cursorCell - m.width + 2
 		if m.offset < 0 {
 			m.offset = 0
@@ -200,6 +223,7 @@ func (m *InputField) View() string {
 
 	styles := m.activeStyle()
 	styleText := styles.Text.Inline(true).Render
+
 	visible, cursorIdx := m.buildVisibleText()
 
 	var v string
@@ -219,34 +243,45 @@ func (m *InputField) View() string {
 		v += styleText(string(visible))
 	}
 
-	if m.focused {
-		visibleStr := string(visible)
-		valWidth := ansi.StringWidth(visibleStr)
-		if m.width > 0 && valWidth < m.width {
-			padding := m.width - valWidth
-			if cursorIdx >= len(visible) {
-				padding-- // cursor(" ") already occupies 1 cell
-			}
-			if padding < 0 {
-				padding = 0
-			}
-			v += styleText(strings.Repeat(" ", padding))
-		}
+	if !m.focused {
+		return m.promptRender() + v
 	}
+
+	// When focused, pad with spaces to fill the input width.
+	visibleStr := string(visible)
+	valWidth := ansi.StringWidth(visibleStr)
+	if m.width <= 0 || valWidth >= m.width {
+		return m.promptRender() + v
+	}
+	padding := m.width - valWidth
+	if cursorIdx >= len(visible) {
+		padding-- // cursor(" ") already occupies 1 cell
+	}
+	if padding < 0 {
+		padding = 0
+	}
+	v += styleText(strings.Repeat(" ", padding))
 
 	return m.promptRender() + v
 }
 
-// buildVisibleText returns the visible portion of the value as runes
+// buildVisibleText returns the visible portion of the current line as runes
 // and the cursor's character index within them.
 func (m *InputField) buildVisibleText() (visible []rune, cursorIdx int) {
 	if len(m.value) == 0 {
 		return nil, 0
 	}
-	// Find start index by cell offset
+	lineStart, lineEnd := m.currentLine(m.pos)
+	line := m.value[lineStart:lineEnd]
+	relPos := m.pos - lineStart // cursor position within the line
+
+	if len(line) == 0 {
+		return nil, 0
+	}
+	// Find start index by cell offset within the line.
 	startIdx := 0
-	for cells, i := 0, 0; i < len(m.value); i++ {
-		w := rw.RuneWidth(m.value[i])
+	for cells, i := 0, 0; i < len(line); i++ {
+		w := rw.RuneWidth(line[i])
 		if cells >= m.offset {
 			startIdx = i
 			break
@@ -257,21 +292,21 @@ func (m *InputField) buildVisibleText() (visible []rune, cursorIdx int) {
 		}
 		cells += w
 	}
-	// Build visible runes up to width
+	// Build visible runes up to width.
 	var vis []rune
 	visibleStart := startIdx
 	cells := 0
-	for i := visibleStart; i < len(m.value); i++ {
-		w := rw.RuneWidth(m.value[i])
+	for i := visibleStart; i < len(line); i++ {
+		w := rw.RuneWidth(line[i])
 		if cells+w > m.width {
 			break
 		}
-		vis = append(vis, m.value[i])
+		vis = append(vis, line[i])
 		cells += w
 	}
-	// Compute cursor character index within visible
+	// Compute cursor character index within visible.
 	cursorChars := 0
-	for i := visibleStart; i < len(m.value) && i < m.pos; i++ {
+	for i := visibleStart; i < len(line) && i < relPos; i++ {
 		cursorChars++
 	}
 	return vis, cursorChars
@@ -290,12 +325,14 @@ func (m *InputField) placeholderView() string {
 		placeholder = truncatePlaceholder(placeholder, m.width-1)
 	}
 	v += styles.Placeholder.Inline(true).Render(placeholder)
-	if m.focused {
-		valWidth := ansi.StringWidth(v)
-		if m.width > 0 && valWidth < m.width {
-			v += strings.Repeat(" ", m.width-valWidth)
-		}
+	if !m.focused {
+		return m.promptRender() + v
 	}
+	valWidth := ansi.StringWidth(v)
+	if m.width <= 0 || valWidth >= m.width {
+		return m.promptRender() + v
+	}
+	v += strings.Repeat(" ", m.width-valWidth)
 	return m.promptRender() + v
 }
 
@@ -320,14 +357,165 @@ func (m *InputField) IsFocused() bool { return m.focused }
 
 func (m *InputField) Value() string { return string(m.value) }
 
+// CursorPos returns the cursor position (in runes) within the current value.
+func (m *InputField) CursorPos() int { return m.pos }
+
+// currentLine returns the start and end indices (exclusive) of the line
+// containing the given position. An empty line (just \n) has start == end.
+func (m *InputField) currentLine(pos int) (start, end int) {
+	if len(m.value) == 0 {
+		return 0, 0
+	}
+	// Clamp pos to valid range.
+	if pos < 0 {
+		pos = 0
+	} else if pos > len(m.value) {
+		pos = len(m.value)
+	}
+	// Scan backwards to find line start.
+	start = pos
+	for start > 0 && m.value[start-1] != '\n' {
+		start--
+	}
+	// Scan forwards to find line end.
+	end = pos
+	for end < len(m.value) && m.value[end] != '\n' {
+		end++
+	}
+	return start, end
+}
+
+// LineCount returns the number of lines in the value.
+func (m *InputField) LineCount() int {
+	if len(m.value) == 0 {
+		return 1 // one empty line
+	}
+	count := 1
+	for _, r := range m.value {
+		if r == '\n' {
+			count++
+		}
+	}
+	return count
+}
+
+// lineStart returns the start index of the line containing pos.
+func (m *InputField) lineStart(pos int) int {
+	s, _ := m.currentLine(pos)
+	return s
+}
+
+// lineEnd returns the end index (exclusive) of the line containing pos.
+func (m *InputField) lineEnd(pos int) int {
+	_, e := m.currentLine(pos)
+	return e
+}
+
+// ensureGoalColumn sets goalCol from the current cursor column if not set.
+func (m *InputField) ensureGoalColumn() {
+	if m.goalCol >= 0 {
+		return
+	}
+	ls := m.lineStart(m.pos)
+	m.goalCol = runesWidth(m.value[ls:m.pos])
+}
+
+// moveLeft moves the cursor one position left, wrapping to the end of the
+// previous line when at the start of a line.
+func (m *InputField) moveLeft() {
+	if m.pos <= 0 {
+		return
+	}
+	if m.value[m.pos-1] == '\n' {
+		m.pos-- // skip past the \n
+		for m.pos > 0 && m.value[m.pos-1] != '\n' {
+			m.pos--
+		}
+	} else {
+		m.pos--
+	}
+	m.goalCol = -1
+}
+
+// moveRight moves the cursor one position right, wrapping to the start of the
+// next line when at the end of a line.
+func (m *InputField) moveRight() {
+	if m.pos >= len(m.value) {
+		return
+	}
+	m.pos++
+	m.goalCol = -1
+}
+
+// moveLineUp moves the cursor up one line, maintaining the column position.
+// Returns false if already on the first line.
+func (m *InputField) moveLineUp() bool {
+	ls := m.lineStart(m.pos)
+	if ls == 0 {
+		return false
+	}
+	m.ensureGoalColumn()
+	prevEnd := ls - 1 // position of the \n at end of previous line
+	prevStart := m.lineStart(prevEnd)
+	prevLen := runesWidth(m.value[prevStart:prevEnd])
+	target := min(m.goalCol, prevLen)
+	m.pos = prevStart + runeIndexAtWidth(m.value[prevStart:prevEnd], target)
+	return true
+}
+
+// moveLineDown moves the cursor down one line, maintaining the column position.
+// Returns false if already on the last line.
+func (m *InputField) moveLineDown() bool {
+	le := m.lineEnd(m.pos)
+	if le >= len(m.value) {
+		return false
+	}
+	m.ensureGoalColumn()
+	nextStart := le + 1
+	nextEnd := m.lineEnd(nextStart)
+	nextLen := runesWidth(m.value[nextStart:nextEnd])
+	target := min(m.goalCol, nextLen)
+	m.pos = nextStart + runeIndexAtWidth(m.value[nextStart:nextEnd], target)
+	return true
+}
+
+// deleteBackward deletes the character before the cursor (backspace).
+// At the start of a line, it joins with the previous line by removing the \n.
+func (m *InputField) deleteBackward() {
+	if m.pos <= 0 {
+		return
+	}
+	if m.value[m.pos-1] == '\n' {
+		ls := m.lineStart(m.pos)
+		m.pos = ls                                       // go to start of current line
+		m.value = slices.Delete(m.value, m.pos-1, m.pos) // delete the \n
+	} else {
+		m.value = slices.Delete(m.value, m.pos-1, m.pos)
+		m.pos--
+	}
+	m.goalCol = -1
+}
+
+// deleteForward deletes the character at the cursor (delete key).
+// At the end of a line, it joins with the next line by removing the \n.
+func (m *InputField) deleteForward() {
+	if m.pos >= len(m.value) {
+		return
+	}
+	m.value = slices.Delete(m.value, m.pos, m.pos+1)
+	m.goalCol = -1
+}
+
 func (m *InputField) CursorEnd() {
 	m.pos = len(m.value)
+	m.goalCol = -1
 	m.ensureCursorVisible()
 }
 
 func (m *InputField) SetValue(s string) {
 	m.value = []rune(s)
 	m.pos = len(m.value)
+	m.goalCol = -1
 	m.ensureCursorVisible()
 }
 
@@ -360,6 +548,21 @@ func runesWidth(runes []rune) int {
 		w += rw.RuneWidth(r)
 	}
 	return w
+}
+
+// runeIndexAtWidth returns the rune index into runes where the accumulated
+// cell width first meets or exceeds targetWidth. If targetWidth exceeds the
+// total width, returns len(runes).
+func runeIndexAtWidth(runes []rune, targetWidth int) int {
+	cells := 0
+	for i, r := range runes {
+		w := rw.RuneWidth(r)
+		if cells+w > targetWidth {
+			return i
+		}
+		cells += w
+	}
+	return len(runes)
 }
 
 func isPrintableRune(r rune) bool {

@@ -231,36 +231,6 @@ func (m *Terminal) handleEditorStart(msg editorStartMsg) (tea.Model, tea.Cmd) {
 	})
 }
 
-// FormatEditorContent formats editor content for preview in the input field.
-// maxWidth is the available text width (cells) of the input field.
-func FormatEditorContent(content string, maxWidth int) string {
-	lineCount := strings.Count(content, "\n") + 1
-
-	// For single-line content, show it just like regular user input (no suffix)
-	if lineCount == 1 {
-		return content
-	}
-
-	prefix := fmt.Sprintf("[%d lines] ", lineCount)
-	suffix := " (press Enter to send)"
-	avail := maxWidth - len(prefix) - len(suffix)
-
-	firstLine, _, _ := strings.Cut(content, "\n")
-	previewText := strings.TrimSpace(firstLine)
-
-	switch {
-	case avail <= 0:
-		return strings.TrimRight(prefix, " ")
-	case previewText == "":
-		previewText = "(empty)"
-	case len(previewText) > avail && avail > 3:
-		previewText = previewText[:avail-3] + "..."
-	case len(previewText) > avail:
-		previewText = previewText[:avail]
-	}
-	return prefix + previewText + suffix
-}
-
 func getEditorCommand(editorCmd string) string {
 	if editorCmd != "" {
 		return editorCmd

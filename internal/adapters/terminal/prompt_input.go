@@ -1,8 +1,7 @@
 package terminal
 
 // PromptInput handles text input with external editor support.
-// It wraps an InputField for single-line editing and stores multi-line
-// content (from external editor or paste) in editorContent.
+// It wraps an InputField which supports multi-line content.
 
 import (
 	tea "charm.land/bubbletea/v2"
@@ -11,11 +10,10 @@ import (
 
 // PromptInput handles text input.
 type PromptInput struct {
-	input         *InputField
-	focused       bool
-	editorContent string
-	styles        *Styles
-	width         int
+	input   *InputField
+	focused bool
+	styles  *Styles
+	width   int
 }
 
 // NewPromptInput creates a new prompt input.
@@ -59,9 +57,14 @@ func (m PromptInput) View() tea.View {
 
 // updateInputStyles updates the text input styles based on current theme.
 func (m PromptInput) updateInputStyles() {
+	// Use error color when there are multiple lines as a brighter visual cue.
+	promptColor := m.styles.ColorAccent
+	if m.input.LineCount() > 1 {
+		promptColor = m.styles.ColorError
+	}
 	m.input.SetStyles(
 		inputFieldStyle{
-			Prompt:      lipgloss.NewStyle().Foreground(m.styles.ColorAccent).Bold(true),
+			Prompt:      lipgloss.NewStyle().Foreground(promptColor).Bold(true),
 			Text:        lipgloss.NewStyle(),
 			Placeholder: lipgloss.NewStyle().Foreground(m.styles.ColorMuted),
 		},
@@ -98,35 +101,14 @@ func (m *PromptInput) SetValue(value string) {
 	m.input.SetValue(value)
 }
 
-// Clear clears the input and editor content.
+// Clear clears the input.
 func (m *PromptInput) Clear() {
 	m.input.SetValue("")
-	m.editorContent = ""
-}
-
-// GetPrompt returns the actual prompt text (editor content or input value).
-func (m PromptInput) GetPrompt() string {
-	if m.editorContent != "" {
-		return m.editorContent
-	}
-	return m.input.Value()
-}
-
-func (m PromptInput) GetEditorContent() string {
-	return m.editorContent
-}
-
-func (m *PromptInput) ClearEditorContent() {
-	m.editorContent = ""
 }
 
 // OpenEditor opens the external editor for multi-line input.
 func (m *Terminal) OpenEditor() tea.Cmd {
-	content := m.input.editorContent
-	if content == "" {
-		content = m.input.Value()
-	}
-	return m.editor.Open(content)
+	return m.editor.Open(m.input.Value())
 }
 
 // RenderWithBorder renders the input with a border.
@@ -163,17 +145,14 @@ func (m *PromptInput) CursorEnd() {
 	m.input.CursorEnd()
 }
 
+// CursorPos returns the cursor position (in runes) within the input field.
+func (m PromptInput) CursorPos() int {
+	return m.input.CursorPos()
+}
+
 // updateFromMsg handles a message and updates internal state (non-tea.Model interface).
 func (m *PromptInput) updateFromMsg(msg tea.Msg) {
-	oldValue := m.input.Value()
 	m.input, _ = m.input.Update(msg)
-	newValue := m.input.Value()
-
-	// Clear editor content if user manually edits the input field.
-	// This ensures manual input takes precedence over editor-sourced content.
-	if m.editorContent != "" && oldValue != newValue {
-		m.editorContent = ""
-	}
 }
 
 var _ tea.Model = (*PromptInput)(nil)
