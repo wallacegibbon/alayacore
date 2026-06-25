@@ -103,15 +103,16 @@ type Terminal struct {
 	inProgress bool
 
 	// State
-	quitting           bool
-	confirmFromCommand bool   // tracks if cancel came from :cancel command (vs Ctrl+G)
-	focusedWindow      string // "input" or "display"
-	windowWidth        int
-	windowHeight       int
-	styles             *Styles
-	hasFocus           bool   // tracks whether the terminal has application focus
-	activeTheme        string // cached from system info updates
-	appliedTheme       string // last theme name that was visually applied (for detecting session-driven changes)
+	quitting             bool
+	confirmFromCommand   bool   // tracks if cancel came from :cancel command (vs Ctrl+G)
+	focusedWindow        string // "input" or "display"
+	windowWidth          int
+	pendingModelSyncOrig string // original KV content before editor opened, for no-op detection
+	windowHeight         int
+	styles               *Styles
+	hasFocus             bool   // tracks whether the terminal has application focus
+	activeTheme          string // cached from system info updates
+	appliedTheme         string // last theme name that was visually applied (for detecting session-driven changes)
 
 	// Theme preview debouncing
 	themePreviewID int // ID of the current pending theme preview
@@ -326,6 +327,13 @@ func (m *Terminal) handleEditorFinished(msg EditorFinishedMsg) (tea.Model, tea.C
 
 	case EditorActionModelSync:
 		if msg.Content != "" {
+			// Skip no-op: editor didn't change anything
+			if strings.TrimRight(msg.Content, "\n\r") == strings.TrimRight(m.pendingModelSyncOrig, "\n\r") {
+				m.pendingModelSyncOrig = ""
+				return m, nil
+			}
+			m.pendingModelSyncOrig = ""
+
 			// Editor returns key-value block format. Convert to JSON for TLV transport.
 			jsonContent := convertKVToJSON(msg.Content)
 			// Base64-encode to preserve JSON through strings.Fields splitting

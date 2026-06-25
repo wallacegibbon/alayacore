@@ -615,6 +615,9 @@ func (m *Terminal) openModelConfigFile() tea.Cmd {
 		}
 	}
 
+	// Save original content for no-op detection
+	m.pendingModelSyncOrig = content
+
 	return m.editor.OpenForModelEdit(content)
 }
 
