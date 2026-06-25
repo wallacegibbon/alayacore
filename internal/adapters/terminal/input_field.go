@@ -125,6 +125,10 @@ func (m *InputField) handleDeletion(key string) bool {
 }
 
 // handleInsertion returns true if the key was a character or space insertion.
+// Note: "space" is handled separately because KeyMsg.String() reports the space
+// key as "space" (not " "), so it can't go through printableRune's single-rune
+// check. The filtering policy is the same as handlePaste: both ultimately use
+// isPrintableRune to accept/reject control characters.
 func (m *InputField) handleInsertion(key string) bool {
 	if key == "space" {
 		m.value = slices.Insert(m.value, m.pos, ' ')
@@ -142,13 +146,25 @@ func (m *InputField) handleInsertion(key string) bool {
 }
 
 // handlePaste inserts pasted text at the cursor position.
+// Non-printable control characters are filtered out to avoid breaking the
+// single-line layout (e.g. newlines would cause border rendering issues).
 func (m *InputField) handlePaste(msg tea.PasteMsg) {
 	runes := []rune(msg.Content)
 	if len(runes) == 0 {
 		return
 	}
-	m.value = slices.Insert(m.value, m.pos, runes...)
-	m.pos += len(runes)
+	// Filter out control characters (same policy as handleInsertion).
+	filtered := make([]rune, 0, len(runes))
+	for _, r := range runes {
+		if isPrintableRune(r) {
+			filtered = append(filtered, r)
+		}
+	}
+	if len(filtered) == 0 {
+		return
+	}
+	m.value = slices.Insert(m.value, m.pos, filtered...)
+	m.pos += len(filtered)
 	m.ensureCursorVisible()
 }
 
@@ -346,12 +362,16 @@ func runesWidth(runes []rune) int {
 	return w
 }
 
+func isPrintableRune(r rune) bool {
+	return !unicode.IsControl(r) && r != 0x7f
+}
+
 func printableRune(key string) (rune, bool) {
 	if len([]rune(key)) != 1 {
 		return 0, false
 	}
 	r := []rune(key)[0]
-	if unicode.IsControl(r) || r == 0x7f {
+	if !isPrintableRune(r) {
 		return 0, false
 	}
 	return r, true
