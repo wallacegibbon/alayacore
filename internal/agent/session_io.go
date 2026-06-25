@@ -10,7 +10,6 @@ package agent
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -145,9 +144,9 @@ func (s *Session) handleModelLoad() {
 	s.sendModelListMsg()
 }
 
-// handleModelSync replaces all models with content from an adapter editor session.
-// The content is base64-encoded key-value block format (same as model.conf).
-// Called when the user finishes editing models in an external editor via the adapter.
+// handleModelSync replaces all models with JSON content from an adapter
+// editor session. The JSON is compact (no whitespace) and matches the
+// ModelListMsg wire format ([]ModelConfig).
 func (s *Session) handleModelSync(args []string) {
 	if s.ModelManager == nil {
 		s.writeError("model manager not initialized")
@@ -155,16 +154,11 @@ func (s *Session) handleModelSync(args []string) {
 	}
 
 	if len(args) == 0 {
-		s.writeError("usage: :model_sync <base64-content>")
+		s.writeError("usage: :model_sync <json>")
 		return
 	}
 
-	decoded, err := base64.StdEncoding.DecodeString(args[0])
-	if err != nil {
-		s.writeError(fmt.Sprintf("model_sync: invalid base64 content: %v", err))
-		return
-	}
-	content := string(decoded)
+	content := args[0]
 
 	msgs := s.ModelManager.SyncFromContent(content)
 
