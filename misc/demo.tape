@@ -29,7 +29,7 @@ Enter
 Sleep 500ms
 Show
 
-Type "alayacore"
+Type "./alayacore"
 Enter
 Sleep 1s
 

@@ -32,13 +32,13 @@ Show
 # ── Test 1 ──────────────────────────────────────────────────────────
 Type "# Use directly"
 Enter
-Type "alayacore --plainio"
+Type "./alayacore --plainio"
 Enter
 
 Sleep 500ms
 Type "My kernel version"
 Enter
-Sleep 3s
+Sleep 4s
 
 # ── Exit ────────────────────────────────────────────────────────────
 
@@ -51,6 +51,6 @@ Sleep 1s
 Type "# Use with pipe"
 Enter
 Sleep 500ms
-Type "echo 'My kernel version' | alayacore --plainio"
+Type "echo 'My kernel version' | ./alayacore --plainio"
 Enter
 Sleep 5s
