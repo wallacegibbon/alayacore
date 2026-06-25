@@ -185,7 +185,7 @@ ui-image.bin                   UI data:image/jpeg;base64,...
 ui-image-url.bin               UI https://example-files.cnbj1.mi-fds.com/example-files/image/image_example.png
 ua-audio-url.bin               UA https://example-files.cnbj1.mi-fds.com/example-files/audio/audio_example.wav
 uv-video-url.bin               UV https://example-files.cnbj1.mi-fds.com/example-files/video/video_example.mp4
-ut-model-sync.bin              UT ":model_sync [{\"id\":0,\"name\":\"Anthropic / Claude Haiku 4\",...}]    — sync edited model config"
+ut-model-sync.bin              UT ":model_sync <base64>    — sync edited model config (base64-encoded JSON)"
 sm-message-version.bin         SM {"type":"version","data":{"message_version":8}}
 sm-model-list.bin              SM {"type":"model_list","data":{"models":[{"id":0,"name":"Anthropic / Claude Haiku 4",...},{"id":4,"name":"DeepSeek / DeepSeek-V4 Flash",...}]}}
 sm-model.bin                   SM {"type":"model","data":{"active_id":4,"active_name":"DeepSeek / DeepSeek-V4 Flash","context_limit":1000000}}
