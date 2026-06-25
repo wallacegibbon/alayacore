@@ -184,6 +184,14 @@ func (m *InputField) handlePaste(msg tea.PasteMsg) {
 	if len(filtered) == 0 {
 		return
 	}
+	// Trim trailing newlines (matches editor behavior — terminals often
+	// add a trailing newline on paste).
+	for len(filtered) > 0 && filtered[len(filtered)-1] == '\n' {
+		filtered = filtered[:len(filtered)-1]
+	}
+	if len(filtered) == 0 {
+		return
+	}
 	m.value = slices.Insert(m.value, m.pos, filtered...)
 	m.pos += len(filtered)
 	m.ensureCursorVisible()
