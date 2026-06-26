@@ -21,7 +21,7 @@
 //   - A clean exit (EOF with no errors) returns code 0.
 //
 // Output format:
-//   - Assistant text/reasoning: printed directly (stream ID prefix stripped).
+//   - Assistant text/reasoning: printed directly (history ID prefix stripped).
 //     A blank line is inserted when consecutive deltas belong to different
 //     stream groups or different message types.
 //   - User prompts: prefixed with "> ".

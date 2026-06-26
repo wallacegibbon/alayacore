@@ -55,7 +55,7 @@
 //
 // NUL bytes (\x00) are used as delimiters because they can never appear in
 // normal UTF-8 text, making the split unambiguous. See WrapDelta and
-// UnwrapDelta in stream_id.go.
+// UnwrapDelta in stream.go.
 //
 // The id is derived from historyCount + blockIndex:
 //   - User content (UT, UI, cancel AT): historyCount (incremented on echo)

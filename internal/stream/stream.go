@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"io"
+	"strings"
 	"sync"
 )
 
@@ -134,6 +135,34 @@ func ReadTLV(input io.Reader) (string, string, error) {
 	}
 
 	return tag, string(valueBuf), nil
+}
+
+// WrapDelta prepends a NUL-delimited history ID to content for streaming.
+// Format: \x00<id>\x00<content>
+func WrapDelta(id string, content string) string {
+	return "\x00" + id + "\x00" + content
+}
+
+// UnwrapDelta extracts the NUL-delimited history ID prefix from a value.
+// Returns (id, content, true) on success, ("", value, false) if the
+// value has no NUL prefix (e.g. plain text from session replay).
+func UnwrapDelta(value string) (id string, content string, ok bool) {
+	if len(value) == 0 || value[0] != 0 {
+		return "", value, false
+	}
+
+	endIdx := strings.IndexByte(value[1:], 0)
+	if endIdx == -1 {
+		return "", value, false
+	}
+	endIdx++
+
+	id = value[1:endIdx]
+	if id == "" {
+		return "", value, false
+	}
+
+	return id, value[endIdx+1:], true
 }
 
 // NopInput is a Reader that always returns EOF.

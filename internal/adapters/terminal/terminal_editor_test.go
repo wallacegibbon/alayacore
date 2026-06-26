@@ -399,18 +399,18 @@ func TestCtrlUClearsInput(t *testing.T) {
 
 func TestWindowBufferDeltaRouting(t *testing.T) {
 	out := NewTerminalOutput(DefaultStyles())
-	// Write assistant text delta with stream ID
-	err := stream.WriteTLV(out, stream.TagAssistantT, stream.WrapDelta("stream1", "Hello"))
+	// Write assistant text delta with history ID
+	err := stream.WriteTLV(out, stream.TagAssistantT, stream.WrapDelta("1", "Hello"))
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
-	// Write another delta with same stream ID
-	err = stream.WriteTLV(out, stream.TagAssistantT, stream.WrapDelta("stream1", " world"))
+	// Write another delta with same history ID
+	err = stream.WriteTLV(out, stream.TagAssistantT, stream.WrapDelta("1", " world"))
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
-	// Write different stream ID
-	err = stream.WriteTLV(out, stream.TagAssistantT, stream.WrapDelta("stream2", "Another"))
+	// Write different history ID
+	err = stream.WriteTLV(out, stream.TagAssistantT, stream.WrapDelta("2", "Another"))
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
@@ -419,16 +419,16 @@ func TestWindowBufferDeltaRouting(t *testing.T) {
 	if len(windows) != 2 {
 		t.Errorf("Expected 2 windows, got %d", len(windows))
 	}
-	// Find window with ID stream1
+	// Find window with latest first delta (ID "1")
 	var win1 *Window
 	for _, w := range windows {
-		if w.ID == "stream1" {
+		if w.ID == "1" {
 			win1 = w
 			break
 		}
 	}
 	if win1 == nil {
-		t.Fatal("Window with ID stream1 not found")
+		t.Fatal("Window with ID \"1\" not found")
 		return
 	}
 	// Content should have both deltas concatenated
@@ -436,16 +436,16 @@ func TestWindowBufferDeltaRouting(t *testing.T) {
 	if !strings.Contains(win1.RawContent(), "Hello") || !strings.Contains(win1.RawContent(), "world") {
 		t.Errorf("Window content missing expected parts, got: %q", win1.RawContent())
 	}
-	// Check stream2 window exists
+	// Check window with ID "2" exists
 	var win2 *Window
 	for _, w := range windows {
-		if w.ID == "stream2" {
+		if w.ID == "2" {
 			win2 = w
 			break
 		}
 	}
 	if win2 == nil {
-		t.Fatal("Window with ID stream2 not found")
+		t.Fatal("Window with ID \"2\" not found")
 	}
 }
 
@@ -513,8 +513,8 @@ func TestWindowBufferNonDeltaMessages(t *testing.T) {
 
 func TestWindowBufferEdgeCases(t *testing.T) {
 	out := NewTerminalOutput(DefaultStyles())
-	// Delta message without valid NUL-delimited stream ID (plain text)
-	err := stream.WriteTLV(out, stream.TagAssistantT, "plain text without stream ID")
+	// Delta message without valid NUL-delimited history ID (plain text)
+	err := stream.WriteTLV(out, stream.TagAssistantT, "plain text without history ID")
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
@@ -528,7 +528,7 @@ func TestWindowBufferEdgeCases(t *testing.T) {
 		t.Errorf("Expected generated window ID, got %s", windows[0].ID)
 	}
 	// Mixed delta and non-delta messages
-	err = stream.WriteTLV(out, stream.TagAssistantT, stream.WrapDelta("stream2", "Delta"))
+	err = stream.WriteTLV(out, stream.TagAssistantT, stream.WrapDelta("3", "Delta"))
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}

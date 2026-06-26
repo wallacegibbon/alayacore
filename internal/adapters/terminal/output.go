@@ -134,12 +134,12 @@ func (to *outputWriter) writeColored(tag string, value string) {
 	}
 
 	switch tag {
-	// Text content tags — may carry NUL-delimited stream ID for live deltas,
+	// Text content tags — may carry NUL-delimited history ID for live deltas,
 	// or plain text when replayed from a saved session file.
 	case stream.TagAssistantT, stream.TagAssistantR:
 		id, content, ok := stream.UnwrapDelta(value)
 		if !ok {
-			// No stream ID (e.g. replayed from session file) — each message
+			// No history ID (e.g. replayed from session file) — each message
 			// gets its own window.
 			id = to.generateWindowID()
 			content = value

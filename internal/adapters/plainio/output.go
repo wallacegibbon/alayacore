@@ -16,7 +16,7 @@ import (
 // It parses TLV messages and prints human-readable text to stdout.
 //
 // Concurrency: the session writes from two goroutines (task and run),
-// so a mutex protects the buffer, tag/stream-ID state, and the close-once
+// so a mutex protects the buffer, tag/history-ID state, and the close-once
 // guard for errorCh. See stream/doc.go for the full contract.
 type stdoutOutput struct {
 	writer        io.Writer
@@ -128,16 +128,16 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 
 // handleTextDelta handles AT (assistant text) and AR (reasoning text) tags.
 // It prints a separator when transitioning between different tags or
-// stream IDs, then prints the content delta.
+// history IDs, then prints the content delta.
 func (o *stdoutOutput) handleTextDelta(tag, value string) {
 	id, content, _ := stream.UnwrapDelta(value)
 	// When id is "" (replayed from session file, no NUL prefix),
-	// we just track it as-is — no stream transition to detect.
+	// we just track it as-is — no history transition to detect.
 	if o.lastHistoryID != "" && o.lastTag != tag {
 		// Transitioning from a different tag → separator
 		fmt.Fprintln(o.writer)
 	} else if o.lastHistoryID != "" && id != o.lastHistoryID {
-		// Same tag but different stream → separator
+		// Same tag but different history ID → separator
 		fmt.Fprintln(o.writer)
 	}
 	o.lastTag = tag
@@ -149,7 +149,7 @@ func (o *stdoutOutput) handleTextDelta(tag, value string) {
 }
 
 // emitSeparator prints a newline if the previous visible tag differs from the
-// new tag and the previous frame was streamed (had a non-empty stream ID).
+// new tag and the previous frame was streamed (had a non-empty history ID).
 // It updates lastTag to the new tag.
 // handleMediaTag prints a media label (image/video/audio/document).
 func (o *stdoutOutput) handleMediaTag(tag, value string) {

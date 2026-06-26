@@ -12,7 +12,7 @@
 // Data Model:
 //
 //	The session stores conversation history as a flat, ordered slice of
-//	ContentPart, where each item has a stable ID matching the TLV stream ID
+//	ContentPart, where each item has a stable ID matching the TLV history ID
 //	sent to the adapter. This enables the adapter to reference individual
 //	content blocks by ID (e.g. ":save 5") without any secondary index.
 //	Each ContentPart carries its own Role, so provider conversion functions

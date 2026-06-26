@@ -13,10 +13,10 @@ func TestNewlineBetweenDifferentStreamGroups(t *testing.T) {
 		writer: &buf,
 	}
 
-	// Simulate: assistant text delta with NUL-delimited stream IDs
+	// Simulate: assistant text delta with NUL-delimited history IDs
 	msg1 := stream.EncodeTLV(stream.TagAssistantT, stream.WrapDelta("1", "hello "))
 	msg2 := stream.EncodeTLV(stream.TagAssistantT, stream.WrapDelta("1", "world"))
-	// New step: different stream ID
+	// New step: different history ID
 	msg3 := stream.EncodeTLV(stream.TagAssistantT, stream.WrapDelta("2", "new step"))
 
 	o.Write(msg1)

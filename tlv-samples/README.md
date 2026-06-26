@@ -26,21 +26,21 @@ SM  ← stdout  System message (JSON: {"type":"...","data":{...}})
 
 ## Delta Messages (AT, AR)
 
-AT and AR use NUL-delimited stream IDs for incremental streaming:
+AT and AR use NUL-delimited history IDs for incremental streaming:
 
 ```
-\x00<stream-id>\x00<content>
+\x00<history-id>\x00<content>
 ```
 
-**Stream ID format:** a flat monotonic history counter (e.g. `1`, `2`, `3`).
+**History ID format:** a flat monotonic history counter (e.g. `1`, `2`, `3`).
 Each content block (text, reasoning, tool call) in a given step receives a
 unique ID from this counter. Successive deltas for the same block reuse the
 same ID so the adapter can reassemble them.
 
-**Stream ID:**
-- Same stream ID → content is a continuation of that stream
-- Different stream ID → different stream (may be concurrent)
-- No NUL prefix → plain text, no stream ID
+**History ID:**
+- Same history ID → content is a continuation of that stream
+- Different history ID → different stream (may be concurrent)
+- No NUL prefix → plain text, no history ID
 
 ## Function Lifecycle (AF, UF)
 
@@ -174,7 +174,7 @@ ut-empty.bin                   UT "" (length 0)
 at-delta-hello.bin             AT \x00 1 \x00 Hello
 at-delta-world.bin             AT \x00 1 \x00 world (same stream)
 at-delta-new-step.bin          AT \x00 2 \x00 Next step (new stream)
-at-plain.bin                   AT "plain text without stream id"
+at-plain.bin                   AT "plain text without history id"
 ar-delta.bin                   AR \x00 3 \x00 thinking...
 ui-image.bin                   UI data:image/jpeg;base64,...
 ui-image-url.bin               UI https://example-files.cnbj1.mi-fds.com/example-files/image/image_example.png
