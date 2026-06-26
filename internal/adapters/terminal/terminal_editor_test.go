@@ -400,17 +400,17 @@ func TestCtrlUClearsInput(t *testing.T) {
 func TestWindowBufferDeltaRouting(t *testing.T) {
 	out := NewTerminalOutput(DefaultStyles())
 	// Write assistant text delta with history ID
-	err := stream.WriteTLV(out, stream.TagAssistantT, stream.WrapDelta("1", "Hello"))
+	err := stream.WriteTLV(out, stream.TagAssistantT, stream.WrapID("1", "Hello"))
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
 	// Write another delta with same history ID
-	err = stream.WriteTLV(out, stream.TagAssistantT, stream.WrapDelta("1", " world"))
+	err = stream.WriteTLV(out, stream.TagAssistantT, stream.WrapID("1", " world"))
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
 	// Write different history ID
-	err = stream.WriteTLV(out, stream.TagAssistantT, stream.WrapDelta("2", "Another"))
+	err = stream.WriteTLV(out, stream.TagAssistantT, stream.WrapID("2", "Another"))
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
@@ -528,7 +528,7 @@ func TestWindowBufferEdgeCases(t *testing.T) {
 		t.Errorf("Expected generated window ID, got %s", windows[0].ID)
 	}
 	// Mixed delta and non-delta messages
-	err = stream.WriteTLV(out, stream.TagAssistantT, stream.WrapDelta("3", "Delta"))
+	err = stream.WriteTLV(out, stream.TagAssistantT, stream.WrapID("3", "Delta"))
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}

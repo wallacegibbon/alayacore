@@ -272,7 +272,7 @@ func (s *Session) replayContentsToAdapter() error {
 			return fmt.Errorf("corrupt session file: failed to serialize content part (HistoryID=%d): %w", part.GetHistoryID(), err)
 		}
 
-		s.writeTLV(tag, stream.WrapDelta(strconv.FormatUint(part.GetHistoryID(), 10), content))
+		s.writeTLV(tag, stream.WrapID(strconv.FormatUint(part.GetHistoryID(), 10), content))
 	}
 
 	return nil

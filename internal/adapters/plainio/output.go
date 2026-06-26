@@ -81,7 +81,7 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 		o.handleTextDelta(tag, value)
 
 	case stream.TagUserT:
-		_, content, ok := stream.UnwrapDelta(value)
+		_, content, ok := stream.UnwrapID(value)
 		if !ok {
 			content = value
 		}
@@ -92,7 +92,7 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 		o.handleSystemMsg(value)
 
 	case stream.TagAssistantF:
-		_, payload, ok := stream.UnwrapDelta(value)
+		_, payload, ok := stream.UnwrapID(value)
 		if !ok {
 			payload = value
 		}
@@ -105,7 +105,7 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 		fmt.Fprintf(o.writer, "%s\n", payload)
 
 	case stream.TagUserF:
-		_, payload, ok := stream.UnwrapDelta(value)
+		_, payload, ok := stream.UnwrapID(value)
 		if !ok {
 			payload = value
 		}
@@ -130,7 +130,7 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 // It prints a separator when transitioning between different tags or
 // history IDs, then prints the content delta.
 func (o *stdoutOutput) handleTextDelta(tag, value string) {
-	id, content, _ := stream.UnwrapDelta(value)
+	id, content, _ := stream.UnwrapID(value)
 	// When id is "" (replayed from session file, no NUL prefix),
 	// we just track it as-is — no history transition to detect.
 	if o.lastHistoryID != "" && o.lastTag != tag {
@@ -153,7 +153,7 @@ func (o *stdoutOutput) handleTextDelta(tag, value string) {
 // It updates lastTag to the new tag.
 // handleMediaTag prints a media label (image/video/audio/document).
 func (o *stdoutOutput) handleMediaTag(tag, value string) {
-	stream.UnwrapDelta(value)
+	stream.UnwrapID(value)
 	o.emitSeparator(tag)
 	label := map[string]string{
 		stream.TagUserI: "image",

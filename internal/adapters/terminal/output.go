@@ -137,7 +137,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 	// Text content tags — may carry NUL-delimited history ID for live deltas,
 	// or plain text when replayed from a saved session file.
 	case stream.TagAssistantT, stream.TagAssistantR:
-		id, content, ok := stream.UnwrapDelta(value)
+		id, content, ok := stream.UnwrapID(value)
 		if !ok {
 			// No history ID (e.g. replayed from session file) — each message
 			// gets its own window.
@@ -150,7 +150,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 	// User text tag — may carry NUL-delimited historyID
 	// User content tags — accumulated until next non-user tag triggers flush.
 	case stream.TagUserT:
-		id, content, ok := stream.UnwrapDelta(value)
+		id, content, ok := stream.UnwrapID(value)
 		if !ok {
 			id = to.generateWindowID()
 			content = value
@@ -158,7 +158,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 		to.bufferUserContent(id, content, stream.TagUserT)
 
 	case stream.TagUserI, stream.TagUserV, stream.TagUserA, stream.TagUserD:
-		id, _, ok := stream.UnwrapDelta(value)
+		id, _, ok := stream.UnwrapID(value)
 		if !ok {
 			id = to.generateWindowID()
 		}
@@ -167,7 +167,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 	// Function lifecycle (JSON: id, type, name, input, status)
 	// May carry NUL-delimited historyID prefix
 	case stream.TagAssistantF:
-		id, payload, ok := stream.UnwrapDelta(value)
+		id, payload, ok := stream.UnwrapID(value)
 		if !ok {
 			payload = value
 		}
@@ -196,7 +196,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 	// Function result (JSON: id, content, is_error)
 	// May carry NUL-delimited historyID prefix
 	case stream.TagUserF:
-		id, payload, ok := stream.UnwrapDelta(value)
+		id, payload, ok := stream.UnwrapID(value)
 		if !ok {
 			payload = value
 		}

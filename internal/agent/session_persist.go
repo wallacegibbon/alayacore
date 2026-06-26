@@ -249,7 +249,7 @@ func contentPartToTLV(part llm.ContentPart) (tag string, content string, err err
 // rebuilt when the session is loaded.
 func contentPartFromTLV(tag string, content []byte) (llm.ContentPart, error) {
 	cleanContent := string(content)
-	if _, stripped, ok := stream.UnwrapDelta(cleanContent); ok {
+	if _, stripped, ok := stream.UnwrapID(cleanContent); ok {
 		cleanContent = stripped
 	}
 

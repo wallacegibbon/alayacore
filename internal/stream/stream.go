@@ -137,16 +137,16 @@ func ReadTLV(input io.Reader) (string, string, error) {
 	return tag, string(valueBuf), nil
 }
 
-// WrapDelta prepends a NUL-delimited history ID to content for streaming.
+// WrapID prepends a NUL-delimited history ID to content.
 // Format: \x00<id>\x00<content>
-func WrapDelta(id string, content string) string {
+func WrapID(id string, content string) string {
 	return "\x00" + id + "\x00" + content
 }
 
-// UnwrapDelta extracts the NUL-delimited history ID prefix from a value.
+// UnwrapID extracts the NUL-delimited history ID prefix from a value.
 // Returns (id, content, true) on success, ("", value, false) if the
 // value has no NUL prefix (e.g. plain text from session replay).
-func UnwrapDelta(value string) (id string, content string, ok bool) {
+func UnwrapID(value string) (id string, content string, ok bool) {
 	if len(value) == 0 || value[0] != 0 {
 		return "", value, false
 	}

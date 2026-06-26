@@ -212,7 +212,7 @@ type bufferOutput struct {
 	*bytes.Buffer
 }
 
-func TestWrapUnwrapDelta(t *testing.T) {
+func TestWrapUnwrapID(t *testing.T) {
 	tests := []struct {
 		name    string
 		id      string
@@ -229,8 +229,8 @@ func TestWrapUnwrapDelta(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			wrapped := WrapDelta(tt.id, tt.content)
-			gotID, gotContent, ok := UnwrapDelta(wrapped)
+			wrapped := WrapID(tt.id, tt.content)
+			gotID, gotContent, ok := UnwrapID(wrapped)
 
 			if tt.id == "" {
 				if ok {
@@ -240,7 +240,7 @@ func TestWrapUnwrapDelta(t *testing.T) {
 			}
 
 			if !ok {
-				t.Fatalf("UnwrapDelta returned ok=false for %q", wrapped)
+				t.Fatalf("UnwrapID returned ok=false for %q", wrapped)
 			}
 			if gotID != tt.id {
 				t.Errorf("id = %q, want %q", gotID, tt.id)
@@ -252,7 +252,7 @@ func TestWrapUnwrapDelta(t *testing.T) {
 	}
 }
 
-func TestUnwrapDelta_InvalidInput(t *testing.T) {
+func TestUnwrapID_InvalidInput(t *testing.T) {
 	tests := []struct {
 		name  string
 		value string
@@ -266,7 +266,7 @@ func TestUnwrapDelta_InvalidInput(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, ok := UnwrapDelta(tt.value)
+			_, _, ok := UnwrapID(tt.value)
 			if ok {
 				t.Errorf("expected ok=false for %q", tt.value)
 			}
@@ -277,11 +277,11 @@ func TestUnwrapDelta_InvalidInput(t *testing.T) {
 func TestWrapUnwrapRoundTrip(t *testing.T) {
 	id := "42"
 	delta := "some thinking content"
-	wrapped := WrapDelta(id, delta)
+	wrapped := WrapID(id, delta)
 
-	gotID, gotContent, ok := UnwrapDelta(wrapped)
+	gotID, gotContent, ok := UnwrapID(wrapped)
 	if !ok {
-		t.Fatal("UnwrapDelta failed")
+		t.Fatal("UnwrapID failed")
 	}
 	if gotID != id {
 		t.Errorf("id = %q, want %q", gotID, id)

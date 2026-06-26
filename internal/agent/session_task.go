@@ -50,7 +50,7 @@ func (s *Session) handleUserPrompt(ctx context.Context, contents []llm.ContentPa
 		part.SetRole(llm.RoleUser)
 		contents = append(contents, part)
 		if tag, val, err := contentPartToTLV(part); err == nil && tag != "" {
-			s.writeTLV(tag, stream.WrapDelta(strconv.FormatUint(id, 10), val))
+			s.writeTLV(tag, stream.WrapID(strconv.FormatUint(id, 10), val))
 		}
 	}
 
@@ -107,7 +107,7 @@ func (s *Session) doAutoSummarize(ctx context.Context, contents []llm.ContentPar
 	promptPart.SetRole(llm.RoleUser)
 	contents = append(contents, promptPart)
 	if tag, val, err := contentPartToTLV(promptPart); err == nil && tag != "" {
-		s.writeTLV(tag, stream.WrapDelta(strconv.FormatUint(id, 10), val))
+		s.writeTLV(tag, stream.WrapID(strconv.FormatUint(id, 10), val))
 	}
 
 	beforeLen := len(contents)
@@ -169,7 +169,7 @@ func (s *Session) buildSummary(fullContents []llm.ContentPart, beforeLen int, ou
 // writeTLVWithID formats the historyID and writes a TLV entry to the output stream.
 func (s *Session) writeTLVWithID(tag string, historyID uint64, data string) {
 	id := strconv.FormatUint(historyID, 10)
-	s.writeTLV(tag, stream.WrapDelta(id, data))
+	s.writeTLV(tag, stream.WrapID(id, data))
 }
 
 //nolint:gocyclo // callback-heavy; extracting harms readability.
@@ -424,6 +424,6 @@ func (s *Session) appendCancelMessage(contents []llm.ContentPart) []llm.ContentP
 			Role:      llm.RoleAssistant,
 		},
 	})
-	s.writeTLV(stream.TagAssistantT, stream.WrapDelta(strconv.FormatUint(id, 10), cancelMessage))
+	s.writeTLV(stream.TagAssistantT, stream.WrapID(strconv.FormatUint(id, 10), cancelMessage))
 	return contents
 }
