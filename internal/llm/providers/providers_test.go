@@ -1934,3 +1934,168 @@ func TestAnthropicOutputConfigMax(t *testing.T) {
 		t.Errorf("expected thinking.type=enabled, got %v", thinking["type"])
 	}
 }
+
+// ============================================================================
+// OpenAI reasoning_effort tests
+// ============================================================================
+
+// TestOpenAIReasoningEffortOff verifies that reasoning_effort is absent
+// and thinking.type=disabled when reasoning is disabled (level 0).
+func TestOpenAIReasoningEffortOff(t *testing.T) {
+	var requestBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+			t.Error(err)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"OK\"},\"finish_reason\":\"stop\"}]}\n\n")
+		fmt.Fprint(w, "data: [DONE]\n\n")
+	}))
+	defer server.Close()
+
+	provider, err := providers.NewOpenAI(
+		providers.WithOpenAIAPIKey("test-key"),
+		providers.WithOpenAIBaseURL(server.URL),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider.SetReasoningLevel(0)
+
+	messages := testMsg(llm.RoleUser, &llm.TextPart{Text: "Hi"})
+	events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range events {
+	}
+
+	if requestBody == nil {
+		t.Fatal("No request body captured")
+	}
+
+	// Should NOT have reasoning_effort when reasoning is off
+	if _, ok := requestBody["reasoning_effort"]; ok {
+		t.Error("reasoning_effort should NOT be present when reasoning is disabled (level 0)")
+	}
+
+	// thinking should be disabled
+	thinking, ok := requestBody["thinking"].(map[string]any)
+	if !ok {
+		t.Fatal("thinking field should be present")
+	}
+	if thinking["type"] != "disabled" {
+		t.Errorf("expected thinking.type=disabled, got %v", thinking["type"])
+	}
+}
+
+// TestOpenAIReasoningEffortNormal verifies reasoning_effort="high"
+// when reasoning is set to level 1 (normal).
+func TestOpenAIReasoningEffortNormal(t *testing.T) {
+	var requestBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+			t.Error(err)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"OK\"},\"finish_reason\":\"stop\"}]}\n\n")
+		fmt.Fprint(w, "data: [DONE]\n\n")
+	}))
+	defer server.Close()
+
+	provider, err := providers.NewOpenAI(
+		providers.WithOpenAIAPIKey("test-key"),
+		providers.WithOpenAIBaseURL(server.URL),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider.SetReasoningLevel(1)
+
+	messages := testMsg(llm.RoleUser, &llm.TextPart{Text: "Hi"})
+	events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range events {
+	}
+
+	if requestBody == nil {
+		t.Fatal("No request body captured")
+	}
+
+	re, ok := requestBody["reasoning_effort"].(string)
+	if !ok {
+		t.Fatal("reasoning_effort should be present when reasoning is enabled (level 1)")
+	}
+	if re != "high" {
+		t.Errorf("expected reasoning_effort='high', got %q", re)
+	}
+
+	thinking, ok := requestBody["thinking"].(map[string]any)
+	if !ok {
+		t.Fatal("thinking field should be present")
+	}
+	if thinking["type"] != "enabled" {
+		t.Errorf("expected thinking.type=enabled, got %v", thinking["type"])
+	}
+}
+
+// TestOpenAIReasoningEffortMax verifies reasoning_effort="xhigh"
+// when reasoning is set to level 2 (max). OpenAI uses "xhigh" for max
+// (unlike Anthropic which uses "max").
+func TestOpenAIReasoningEffortMax(t *testing.T) {
+	var requestBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+			t.Error(err)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"OK\"},\"finish_reason\":\"stop\"}]}\n\n")
+		fmt.Fprint(w, "data: [DONE]\n\n")
+	}))
+	defer server.Close()
+
+	provider, err := providers.NewOpenAI(
+		providers.WithOpenAIAPIKey("test-key"),
+		providers.WithOpenAIBaseURL(server.URL),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider.SetReasoningLevel(2)
+
+	messages := testMsg(llm.RoleUser, &llm.TextPart{Text: "Hi"})
+	events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range events {
+	}
+
+	if requestBody == nil {
+		t.Fatal("No request body captured")
+	}
+
+	re, ok := requestBody["reasoning_effort"].(string)
+	if !ok {
+		t.Fatal("reasoning_effort should be present when reasoning is enabled (level 2)")
+	}
+	if re != "xhigh" {
+		t.Errorf("expected reasoning_effort='xhigh', got %q", re)
+	}
+
+	thinking, ok := requestBody["thinking"].(map[string]any)
+	if !ok {
+		t.Fatal("thinking field should be present")
+	}
+	if thinking["type"] != "enabled" {
+		t.Errorf("expected thinking.type=enabled, got %v", thinking["type"])
+	}
+}
