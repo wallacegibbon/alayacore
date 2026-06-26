@@ -27,16 +27,13 @@ const (
 	boolFalse = "false"
 )
 
-// ResolveConfigPath returns the provided path, or the default ~/.alayacore/<filename>
-func ResolveConfigPath(providedPath, defaultFilename string) string {
-	if providedPath != "" {
-		return providedPath
-	}
+// defaultConfigDir returns the default configuration directory (~/.alayacore).
+func defaultConfigDir() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return ""
 	}
-	return filepath.Join(home, ".alayacore", defaultFilename)
+	return filepath.Join(home, ".alayacore")
 }
 
 // ExpandPath expands ~ to the user's home directory.
@@ -97,9 +94,9 @@ type Settings struct {
 	PlainIO       bool
 	RawIO         bool
 	DebugAPI      bool
-	ModelConfig   string
-	RuntimeConfig string
-	ThemesFolder  string
+	ModelConfig   string // derived from config-path + "model.conf"
+	RuntimeConfig string // derived from config-path + "runtime.conf"
+	ThemesFolder  string // derived from config-path + "themes"
 	Skills        []string
 	Session       string
 
@@ -125,18 +122,14 @@ func Parse() *Settings {
 	}
 
 	// Pre-compute default paths so they appear in --help output
-	defaultModelConfig := ResolveConfigPath("", "model.conf")
-	defaultRuntimeConfig := ResolveConfigPath("", "runtime.conf")
-	defaultThemesFolder := ResolveConfigPath("", "themes")
+	defaultConfigPath := defaultConfigDir()
 
 	// Core
 	showVersion := flag.Bool("version", false, "Show version information")
 	plainIO := flag.Bool("plainio", false, "Use plain stdin/stdout mode instead of terminal UI")
 	rawIO := flag.Bool("rawio", false, "Use raw TLV stdin/stdout mode instead of terminal UI (pipe TLV frames directly)")
 	debugAPI := flag.Bool("debug-api", false, "Write raw API requests and responses to log file")
-	modelConfig := flag.String("model-config", defaultModelConfig, "Model config file `path`")
-	runtimeConfig := flag.String("runtime-config", defaultRuntimeConfig, "Runtime config file `path`")
-	themesFolder := flag.String("themes", defaultThemesFolder, "Themes folder `path`")
+	configPath := flag.String("config-path", defaultConfigPath, "Config directory `path` (contains model.conf, runtime.conf, themes/)")
 	modelName := flag.String("model", "", "Model `name` to activate (must exist in model config; overrides runtime config)")
 	skill := &stringSlice{}
 	flag.Var(skill, "skill", "Skill `path` (can be specified multiple times)")
@@ -154,44 +147,49 @@ func Parse() *Settings {
 
 	flag.Parse()
 
-	// Collect skill paths
-	skillPaths := skill.Get()
-
-	// Merge system prompts with "\n\n" separator
-	var mergedSystemPrompt string
-	systemPrompts := systemPrompt.Get()
-	if len(systemPrompts) > 0 {
-		mergedSystemPrompt = strings.Join(systemPrompts, "\n\n")
-	}
-
-	// Parse tool-confirm list
-	var toolConfirmTools []string
-	if *toolConfirm != "" {
-		for _, name := range strings.Split(*toolConfirm, ",") {
-			name = strings.TrimSpace(name)
-			if name != "" {
-				toolConfirmTools = append(toolConfirmTools, name)
-			}
-		}
-	}
-
+	// Derive config file paths from config directory
+	cp := *configPath
 	s := &Settings{
 		ShowVersion:   *showVersion,
 		PlainIO:       *plainIO,
 		RawIO:         *rawIO,
 		DebugAPI:      *debugAPI,
-		ModelConfig:   *modelConfig,
-		RuntimeConfig: *runtimeConfig,
-		ThemesFolder:  *themesFolder,
-		Skills:        skillPaths,
+		ModelConfig:   filepath.Join(cp, "model.conf"),
+		RuntimeConfig: filepath.Join(cp, "runtime.conf"),
+		ThemesFolder:  filepath.Join(cp, "themes"),
+		Skills:        skill.Get(),
 		Session:       *session,
 		ModelName:     *modelName,
 		Proxy:         *proxy,
-		SystemPrompt:  mergedSystemPrompt,
+		SystemPrompt:  mergedSystemPrompt(systemPrompt),
 		MaxSteps:      *maxSteps,
 		AutoSummarize: *autoSummarize,
-		ToolConfirm:   toolConfirmTools,
+		ToolConfirm:   parseToolConfirm(*toolConfirm),
 	}
 
 	return s
+}
+
+// mergedSystemPrompt joins multiple --system values with "\n\n".
+func mergedSystemPrompt(sp *stringSlice) string {
+	prompts := sp.Get()
+	if len(prompts) == 0 {
+		return ""
+	}
+	return strings.Join(prompts, "\n\n")
+}
+
+// parseToolConfirm splits a comma-separated tool-confirm value.
+func parseToolConfirm(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+	var names []string
+	for _, name := range strings.Split(raw, ",") {
+		name = strings.TrimSpace(name)
+		if name != "" {
+			names = append(names, name)
+		}
+	}
+	return names
 }

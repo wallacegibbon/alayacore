@@ -4,8 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/alayacore/alayacore/internal/config"
 )
 
 func TestRuntimeManager(t *testing.T) {
@@ -42,17 +40,6 @@ func TestRuntimeManager(t *testing.T) {
 	rm2 := NewRuntimeManager(runtimePath)
 	if rm2.GetActiveModel() != "Test Model" {
 		t.Errorf("Expected 'Test Model' after reload, got: %s", rm2.GetActiveModel())
-	}
-}
-
-func TestRuntimeManagerDefaultPath(t *testing.T) {
-	// Default resolution is now in config.Parse(), not in the constructor.
-	// Verify that config.ResolveConfigPath produces the expected default.
-	home, _ := os.UserHomeDir()
-	expectedPath := filepath.Join(home, ".alayacore", "runtime.conf")
-	resolved := config.ResolveConfigPath("", "runtime.conf")
-	if resolved != expectedPath {
-		t.Errorf("Expected resolved path %s, got: %s", expectedPath, resolved)
 	}
 }
 

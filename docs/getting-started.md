@@ -49,14 +49,12 @@ export ALAYACORE_SHELL=zsh
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--model-config` | `~/.alayacore/model.conf` | Path to model configuration file |
+| `--config-path` | `~/.alayacore/` | Config directory path (contains `model.conf`, `runtime.conf`, `themes/`) |
 | `--model` | *(none)* | Model name to activate (must exist in `model.conf`). Highest priority — overrides session file frontmatter and runtime config. |
-| `--runtime-config` | `~/.alayacore/runtime.conf` | Path to runtime configuration file |
 | `--system` | *(none)* | Extra system prompt text. Repeatable: `--system "rule 1" --system "rule 2"` |
 | `--skill` | *(none)* | Path to a skill directory. Repeatable: `--skill ./skills1 --skill ./skills2` |
 | `--session` | *(none)* | Path to session file for loading/saving conversations |
 | `--proxy` | *(none)* | Proxy URL. Supports `http://`, `https://`, and `socks5://` schemes |
-| `--themes` | `~/.alayacore/themes/` | Path to themes directory |
 | `--max-steps` | `0` (no limit) | Maximum number of agent loop iterations per prompt. When set to 0 (the default), the agent loops until the model produces a final response. Exceeding this limit raises an error and reports an error — use `:continue` to retry. |
 | `--auto-summarize` | `false` | Automatically summarize when context exceeds 65% of `context_limit` |
 | `--tool-confirm` | *(none)* | Comma-separated tool `names` that require user confirmation before execution (e.g. `--tool-confirm execute_command,search_content`) |
@@ -72,8 +70,8 @@ export ALAYACORE_SHELL=zsh
 # Interactive session with default config
 alayacore
 
-# Custom model config
-alayacore --model-config ./my-model.conf
+# Custom config directory (must contain model.conf, runtime.conf, themes/)
+alayacore --config-path ./my-config
 
 # Override active model (must match a name in model.conf)
 alayacore --model "OpenAI GPT-4o"

@@ -27,8 +27,8 @@ alayacore --skill ./skills/weather
 # Multiple skill directories
 alayacore --skill ./skills/weather --skill ./skills/pdf
 
-# With custom model config
-alayacore --model-config ./my-model.conf --skill ./skills
+# With custom config directory
+alayacore --config-path ./my-config --skill ./skills
 ```
 
 ## Skill Directory Structure

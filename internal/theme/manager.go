@@ -22,8 +22,9 @@ type Manager struct {
 }
 
 // NewManager creates a new theme manager.
-// If themesFolder is empty, it defaults to ~/.alayacore/themes.
-// If the themes folder doesn't exist, it creates it with default themes.
+// themesFolder is the directory containing *.conf theme files.
+// If it's empty, theme listing is disabled.
+// If the directory doesn't exist, it's created with default themes.
 func NewManager(themesFolder string) *Manager {
 	tm := &Manager{themesFolder: themesFolder}
 	tm.initializeThemesFolder()

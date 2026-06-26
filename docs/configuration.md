@@ -1,6 +1,6 @@
 # Configuration
 
-AlayaCore has three configuration files: model config, runtime config, and theme files. All live under `~/.alayacore/` by default.
+AlayaCore has three configuration files: model config, runtime config, and theme files. All live under a single config directory — `~/.alayacore/` by default — making it easy to manage, back up, or share your entire configuration.
 
 ```
 ~/.alayacore/
@@ -12,10 +12,31 @@ AlayaCore has three configuration files: model config, runtime config, and theme
     └── theme-redpanda.conf
 ```
 
+## Config Directory
+
+**Default location**: `~/.alayacore/`
+**Override**: `--config-path /path/to/config-dir`
+
+Use a single `--config-path` flag to point to any directory with the same layout.
+This replaces the old per-file overrides (`--model-config`, `--runtime-config`, `--themes`).
+
+```bash
+# Use a custom config directory
+alayacore --config-path ./my-project-config
+
+# The directory should contain:
+#   model.conf       (required — auto-created if missing)
+#   runtime.conf     (auto-managed)
+#   themes/          (auto-created with defaults if missing)
+```
+
+> **Exception — Skills**: `--skill` is still a separate flag because skill
+> directories are project-specific and rarely live inside the config directory.
+> You can pass `--skill` multiple times for different paths.
+
 ## Model Config
 
-**Default location**: `~/.alayacore/model.conf`
-**Override**: `--model-config /path/to/model.conf`
+**Location**: `<config-path>/model.conf`
 
 This file defines one or more LLM models that AlayaCore can use. It is auto-created with a default Ollama configuration on first run. Model edits made via the UI (pressing `e` in the model selector) are sent to the session via `:model_sync` and persisted back to this file automatically.
 
@@ -99,8 +120,7 @@ When you select a model:
 
 ## Runtime Config
 
-**Default location**: `~/.alayacore/runtime.conf`
-**Override**: `--runtime-config /path/to/runtime.conf`
+**Location**: `<config-path>/runtime.conf`
 
 Auto-managed by AlayaCore. Persists your active model and theme selections across sessions.
 
@@ -115,13 +135,12 @@ When a session starts (or reloads via `:model_load`), the active model is resolv
 
 1. **`--model` CLI flag** — highest priority. If specified and the name exists in `model.conf`, it overrides everything else.
 2. **Session file frontmatter** — if loading a saved session (via `--session`), the `active_model` field in the file's frontmatter is applied next.
-3. **Runtime config** — `~/.alayacore/runtime.conf`. Persisted across sessions. Updated only when switching models in sessions without a file-specified model.
+3. **Runtime config** — `<config-path>/runtime.conf`. Persisted across sessions. Updated only when switching models in sessions without a file-specified model.
 4. **First model** — if none of the above are set or match, the first model in `model.conf` is used.
 
 ## Theme Configuration
 
-**Default location**: `~/.alayacore/themes/`
-**Override**: `--themes /path/to/themes`
+**Location**: `<config-path>/themes/`
 
 Themes are `.conf` files that define the TUI color scheme. If the themes directory doesn't exist, AlayaCore creates it with three defaults: `theme-dark.conf` (Catppuccin Mocha, the default), `theme-light.conf` (Catppuccin Latte), and `theme-redpanda.conf` (warm reddish-brown palette from [Redpanda](https://github.com/redpanda-data/redpanda-terminal-themes)).
 
