@@ -47,6 +47,10 @@ const (
 	anthropicDeltaTypeText      = "text_delta"
 	anthropicDeltaTypeThinking  = "thinking_delta"
 	anthropicDeltaTypeInputJSON = "input_json_delta"
+
+	// Anthropic reasoning effort values for output_config
+	anthropicReasoningEffortHigh = "high"
+	anthropicReasoningEffortMax  = "max"
 )
 
 // anthropicRequest represents the Anthropic API request
@@ -307,6 +311,15 @@ func (p *AnthropicProvider) StreamMessages(
 		Tools:     apiTools,
 		Stream:    true,
 		Thinking:  computeAnthropicReasoning(p.reasoningLevel),
+	}
+
+	// Set output_config when reasoning is enabled — maps reasoning level to effort.
+	if p.reasoningLevel > config.ReasoningLevelOff {
+		effort := anthropicReasoningEffortHigh
+		if p.reasoningLevel >= config.ReasoningLevelMax {
+			effort = anthropicReasoningEffortMax
+		}
+		reqBody.OutputConfig = &anthropicOutputConfig{Effort: effort}
 	}
 
 	// Build and send HTTP request

@@ -34,9 +34,9 @@ Use read_file to access specific sections.
 
 Or with error:
 ```
-Command completed with exit code 1.
+Exit Code: 1
 Output (5000 lines, 194.2KB) saved to: /tmp/alayacore-1234567890/cmd-12345.txt
-Use read_file to access the full output.
+Use read_file to access specific sections.
 ```
 
 - Agent uses `read_file` with line ranges to access specific sections

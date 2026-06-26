@@ -9,49 +9,49 @@ All providers eat different wire formats and emit the same domain types:
 ```go
 // llm/types.go — the domain types
 
-type ContentPart interface { isContentPart() }
-
-// Implementations:
-type TextPart       struct { Text string }
-type ReasoningPart  struct { Text string }
-type ImagePart      struct { URI string }
-type AudioPart      struct { URI string }
-type VideoPart      struct { URI string }
-type DocumentPart   struct { URI string }
-type ToolInputPart  struct { ID, ToolName string; Input json.RawMessage }
-type ToolOutputPart struct { ID string; Output []ContentPart; IsError bool }
-
-type Message struct {
-    Role     MessageRole   // "system" | "user" | "assistant" | "tool"
-    Contents []ContentPart
+// ContentPart is implemented by all content block types.
+// Each implementation embeds ContentPartMeta for HistoryID and Role.
+type ContentPart interface {
+	GetHistoryID() uint64
+	SetHistoryID(uint64)
+	GetRole() MessageRole
+	SetRole(MessageRole)
+	UpdateContentPartMeta(historyID uint64, role MessageRole)
 }
 
-type StreamEvent interface { isStreamEvent() }
-
 // Implementations:
-type TextDeltaEvent         struct { Delta string; Index int }
-type ReasoningDeltaEvent    struct { Delta string; Index int }
-type ToolInputStartEvent    struct { ID, ToolName string; Index int }
-type ToolInputCompleteEvent struct { ID string; Input json.RawMessage; Index int }
-type StepCompleteEvent      struct { Message; Usage; StopReason string }
+type TextPart       struct { ContentPartMeta; Text string }
+type ReasoningPart  struct { ContentPartMeta; Text string }
+type ImagePart      struct { ContentPartMeta; URI string }
+type AudioPart      struct { ContentPartMeta; URI string }
+type VideoPart      struct { ContentPartMeta; URI string }
+type DocumentPart   struct { ContentPartMeta; URI string }
+type ToolInputPart  struct { ContentPartMeta; ID string; Name string; Input json.RawMessage }
+type ToolOutputPart struct { ContentPartMeta; ID string; Output []ContentPart; IsError bool }
+
+// Messages are represented as flat []ContentPart slices.
+// There is no Message wrapper struct — role and history ID are stored
+// on each ContentPart via ContentPartMeta.
+
+type StreamEvent interface {
+	isStreamEvent()
+}
 ```
 
 ## Design: Domain Layer Models Anthropic, Not OpenAI
 
-The domain layer `Message.Contents []ContentPart` is practically a **generic version** of Anthropic's `[]anthropicContentBlock` array, **not** OpenAI's flat-field model.
+The domain layer `[]ContentPart` is practically a **generic version** of Anthropic's `[]anthropicContentBlock` array, **not** OpenAI's flat-field model.
 
 Compare the three representations for the same assistant message:
 
 ```go
-// Domain (llm/types.go) — array of ContentPart interfaces
-Message{
-    Role: "assistant",
-    Contents: []ContentPart{
-        ReasoningPart{Type:"reasoning", Text:"Let me think..."},
-        TextPart{Type:"text", Text:"The answer is 42"},
-        ToolInputPart{ID:"call_abc", ToolName:"read_file",
-                     Input: json.RawMessage(`{"path":"/tmp/foo"}`)},
-    },
+// Domain (llm/types.go) — flat array of ContentPart interfaces
+[]ContentPart{
+    &ReasoningPart{Text:"Let me think...", ContentPartMeta: {Role: "assistant"}},
+    &TextPart{Text:"The answer is 42", ContentPartMeta: {Role: "assistant"}},
+    &ToolInputPart{ID:"call_abc", Name:"read_file",
+                   Input: json.RawMessage(`{"path":"/tmp/foo"}`),
+                   ContentPartMeta: {Role: "assistant"}},
 }
 ```
 
@@ -92,7 +92,7 @@ for _, part := range msg.Contents {
     case llm.ReasoningPart:
         → {Type:"thinking", Thinking: &v.Text}
     case llm.ToolInputPart:
-        → {Type:"tool_use", ID: v.ID, Name: v.ToolName, Input: v.Input}
+        → {Type:"tool_use", ID: v.ID, Name: v.Name, Input: v.Input}
     case llm.ToolOutputPart:
         → {Type:"tool_result", ToolUseID: v.ID, Output: [...], IsError: v.IsError}
         // Output is an array of content blocks (text, image, etc.)
@@ -204,25 +204,21 @@ event: content_block_stop
 **Domain output (same for both):**
 ```go
 // Stream event at name arrival:
-ToolInputStartEvent{ID: "call_abc", ToolName: "read_file"}
+ToolInputStartEvent{ID: "call_abc", Name: "read_file"}
 
 // Stream event at completion (after all args received):
 ToolInputPart{
     ID: "call_abc",
-    ToolName:   "read_file",
+    Name:   "read_file",
     Input:      json.RawMessage(`{"path":"/tmp/foo"}`),
 }
 
-// Final message:
-Message{
-    Role: "assistant",
-    Content: []ContentPart{
-        ToolInputPart{
-            Type:       "tool_use",
-            ID: "call_abc",
-            ToolName:   "read_file",
-            Input:      json.RawMessage(`{"path":"/tmp/foo"}`),
-        },
+// Final content (flat []ContentPart — no Message wrapper):
+[]ContentPart{
+    &ToolInputPart{
+        ID: "call_abc",
+        Name:   "read_file",
+        Input:      json.RawMessage(`{"path":"/tmp/foo"}`),
     },
 }
 ```
@@ -251,31 +247,25 @@ Chunk 6: {"choices":[{"delta":{"tool_calls":[
 ```go
 // Interleaved stream events:
 ReasoningDeltaEvent{Delta: "Read file"}
-ToolInputStartEvent{ID: "call_abc", ToolName: "read_file"}
+ToolInputStartEvent{ID: "call_abc", Name: "read_file"}
 ReasoningDeltaEvent{Delta: " to check"}
 // (no more ReasoningDelta or ToolInputStart — just args accumulating)
 
 ToolInputPart{
     ID: "call_abc",
-    ToolName:   "read_file",
+    Name:   "read_file",
     Input:      json.RawMessage(`{"path":"/tmp/foo"}`),
 }
 
-// Final message — both in one Message.Contents:
-Message{
-    Role: "assistant",
-    Content: []ContentPart{
-        ReasoningPart{Type: "reasoning", Text: "Read file to check"},
-        ToolInputPart{
-            Type: "tool_use", ID: "call_abc",
-            ToolName: "read_file",
-            Input:    json.RawMessage(`{"path":"/tmp/foo"}`),
-        },
-    },
+// Final content — both parts in flat []ContentPart:
+[]ContentPart{
+    &ReasoningPart{Text: "Read file to check"},
+    &ToolInputPart{ID: "call_abc", Name: "read_file",
+        Input: json.RawMessage(`{"path":"/tmp/foo"}`)},
 }
 ```
 
-**Why this works:** The `openAIStreamState` has a single `toolAccumulators[index]` per tool call, storing both metadata and argument fragments. Reasoning text accumulates independently in `reasoningBuilder`. They never interfere. `getMessage()` simply appends all non-empty accumulators to the Content slice.
+**Why this works:** The `openAIStreamState` has a single `toolAccumulators[index]` per tool call, storing both metadata and argument fragments. Reasoning text accumulates independently in `reasoningBuilder`. They never interfere. `getContents()` simply appends all non-empty accumulators to the Content slice.
 
 ## Sending (Domain → Wire)
 
@@ -283,15 +273,13 @@ Message{
 
 **Domain input:**
 ```go
-Message{
-    Role: "assistant",
-    Content: []ContentPart{
-        ReasoningPart{Type: "reasoning", Text: "Let me read the file"},
-        ToolInputPart{
-            ID: "call_abc",
-            ToolName:   "read_file",
-            Input:      json.RawMessage(`{"path":"/tmp/foo"}`),
-        },
+// Flat []ContentPart — there is no Message wrapper struct
+[]ContentPart{
+    &ReasoningPart{Text: "Let me read the file"},
+    &ToolInputPart{
+        ID: "call_abc",
+        Name:   "read_file",
+        Input:      json.RawMessage(`{"path":"/tmp/foo"}`),
     },
 }
 ```
@@ -328,14 +316,12 @@ Message{
 
 **Domain input:**
 ```go
-Message{
-    Role: "user",
-    Content: []ContentPart{
-        TextPart{Text: "Describe this multimedia"},
-        ImagePart{URI: "data:image/jpeg;base64,/9j/4AAQ..."},
-        AudioPart{URI: "data:audio/wav;base64,UklGR..."},
-        VideoPart{URI: "data:video/mp4;base64,AAAA..."},
-    },
+// Flat []ContentPart — there is no Message wrapper struct
+[]ContentPart{
+    &TextPart{Text: "Describe this multimedia"},
+    &ImagePart{URI: "data:image/jpeg;base64,/9j/4AAQ..."},
+    &AudioPart{URI: "data:audio/wav;base64,UklGR..."},
+    &VideoPart{URI: "data:video/mp4;base64,AAAA..."},
 }
 ```
 
@@ -400,7 +386,7 @@ openAIToolAccumulator {
 }
 ```
 
-All three accumulate simultaneously during streaming. At `StepCompleteEvent`, they merge into a single `Message.Contents` slice.
+All three accumulate simultaneously during streaming. At `StepCompleteEvent`, they merge into a single `[]ContentPart` slice.
 
 ### Anthropic: Indexed block accumulator (like OpenAI)
 
@@ -417,4 +403,4 @@ anthropicStreamState {
 }
 ```
 
-Every wire event carries an `index` (start, delta, stop), just like OpenAI's `tool_calls[index]`. Blocks may arrive interleaved — block 1 can start before block 0 finishes. Each block is independently accumulated by index. `content_block_stop(i)` stores the result in `contentParts[i]`, and `getMessage()` sorts by index to produce the final ordered slice.
+Every wire event carries an `index` (start, delta, stop), just like OpenAI's `tool_calls[index]`. Blocks may arrive interleaved — block 1 can start before block 0 finishes. Each block is independently accumulated by index. `content_block_stop(i)` stores the result in `contentParts[i]`, and `getContents()` sorts by index to produce the final ordered slice.

@@ -21,8 +21,7 @@ The session layer manages conversation state, task execution, and model interact
 
 | Component | Description |
 |-----------|-------------|
-| `Session` | Main struct managing conversation state and message history |
-| `Session` | Manages conversation state, executes prompts |
+| `Session` | Main struct managing conversation state, message history, and task execution |
 | `ModelManager` | Loads and manages AI model configurations from `model.conf`. Persists edits from `:model_sync` back to the file. |
 | `RuntimeManager` | Persists runtime settings (active model, active theme) to `runtime.conf` |
 | `CommandDefinitions` | Static metadata for session commands (`:save`, `:cancel`, etc.) |
@@ -55,7 +54,7 @@ The session uses three goroutines for concurrent operation:
 When the input stream reaches EOF (e.g. a piped `echo` command closes stdin),
 the inputPump closes `inputMsgCh` and exits. If a task is still running, `run()`
 enters `drainUntilTaskDone()` to process state events and the task completion
-processed one by one before the session exits. This ensures that all output
+events one by one before the session exits. This ensures that all output
 (prompt echo, assistant response, tool results) is flushed and no pending
 prompts are abandoned.
 
@@ -72,7 +71,7 @@ stdin EOF ──▶ inputPump closes inputMsgCh ──▶ run() detects closed c
 
 **State ownership:**
 - The input pump goroutine is a pure TLV parser. It reads frames from the input stream, builds inputMsg values, and sends them to `run()` via `inputMsgCh`. It has zero knowledge of commands and never touches session state — not even for `:cancel` or `:confirm`. All command dispatch, cancellation, and output writing happens in `run()`.
-- `sendSystemInfo` runs only in the `run()` goroutine; the task goroutine requests updates via `infoUpdateCh`.
+- `sendSystemInfo` runs only in the `run()` goroutine; the task goroutine requests updates via `taskRefreshCh`.
 
 **Gotcha — everything is in run():** There is no "fast path" in the input pump for latency-critical commands. The `inputMsgCh` buffer is cap 100 but each message is processed in microseconds — the input channel drains orders of magnitude faster than a human can type or an LLM can stream. If you're tempted to add a special case to the input pump, ask: is the latency measurable? If not, keep it in `run()` where it belongs.
 
@@ -109,13 +108,16 @@ The agent layer handles LLM interaction and tool-calling orchestration.
 
 ```go
 Agent.Stream(ctx, messages, llm.StreamCallbacks{
-	OnTextDelta:         func(delta string, index int) error { ... },
-	OnReasoningDelta:    func(delta string, index int) error { ... },
-	OnToolInputStart:    func(id, name string) error { ... },
-	OnToolInputComplete: func(id string, input json.RawMessage) error { ... },
-	OnToolOutput:        func(id string, content []ContentPart, err error) error { ... },
+	OnTextDelta:         func(delta string, historyID uint64) error { ... },
+	OnReasoningDelta:    func(delta string, historyID uint64) error { ... },
+	OnToolInputStart:    func(toolCallID, name string, historyID uint64) error { ... },
+	OnToolInputComplete: func(toolCallID string, input json.RawMessage, historyID uint64) error { ... },
+	OnToolOutput:        func(toolCallID string, contents []ContentPart, err error, historyID uint64) error { ... },
+	OnToolConfirm:       func(requests []llm.ToolConfirmRequest) <-chan llm.ToolConfirmResponse { ... },
+	ToolNeedsConfirm:    func(name string) bool { ... },
 	OnStepStart:         func(step int) error { ... },
-	OnStepFinish:        func(msgs []Message, usage Usage) error { ... },
+	OnStepFinish:        func(contents []ContentPart, usage Usage) error { ... },
+	IDGen:               func() uint64 { ... },
 })
 ```
 
