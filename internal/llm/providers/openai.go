@@ -226,19 +226,6 @@ func (p *OpenAIProvider) StreamMessages(
 	}
 
 	// Build request body with thinking config
-	tc := computeReasoningConfig(p.reasoningLevel)
-	var reasoningEffort string
-	var thinking *openAIThinkingField
-	if tc.Enabled {
-		thinking = &openAIThinkingField{Type: "enabled"}
-		reasoningEffort = tc.Effort
-		if p.reasoningLevel >= config.ReasoningLevelMax {
-			reasoningEffort = "xhigh"
-		}
-	} else {
-		thinking = &openAIThinkingField{Type: "disabled"}
-	}
-
 	reqBody := openAIRequest{
 		Model:    p.model,
 		Messages: apiMessages,
@@ -247,8 +234,8 @@ func (p *OpenAIProvider) StreamMessages(
 		StreamOptions: &openAIStreamOptions{
 			IncludeUsage: true,
 		},
-		Thinking:        thinking,
-		ReasoningEffort: reasoningEffort,
+		Thinking:        computeOpenAIThinking(p.reasoningLevel),
+		ReasoningEffort: computeOpenAIReasoningEffort(p.reasoningLevel),
 	}
 	if p.maxTokens > 0 {
 		reqBody.MaxCompletionTokens = p.maxTokens
@@ -697,6 +684,28 @@ func openaiConvertRegularContent(apiMsg *openAIMessage, contents []llm.ContentPa
 	} else {
 		apiMsg.Content = contentParts
 	}
+}
+
+// computeOpenAIThinking returns the thinking field for an OpenAI request.
+// Returns "enabled" when reasoning is on, "disabled" when off.
+func computeOpenAIThinking(level int) *openAIThinkingField {
+	if level > config.ReasoningLevelOff {
+		return &openAIThinkingField{Type: "enabled"}
+	}
+	return &openAIThinkingField{Type: "disabled"}
+}
+
+// computeOpenAIReasoningEffort returns the reasoning_effort value.
+// Returns "high" for level 1, "xhigh" for level 2, empty string for off.
+// Empty string is dropped by omitempty in the JSON request.
+func computeOpenAIReasoningEffort(level int) string {
+	if level <= config.ReasoningLevelOff {
+		return ""
+	}
+	if level >= config.ReasoningLevelMax {
+		return "xhigh"
+	}
+	return "high"
 }
 
 func openAIVideoPart(uri string, fps int, resolution int) map[string]any {

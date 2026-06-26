@@ -47,10 +47,6 @@ const (
 	anthropicDeltaTypeText      = "text_delta"
 	anthropicDeltaTypeThinking  = "thinking_delta"
 	anthropicDeltaTypeInputJSON = "input_json_delta"
-
-	// Anthropic reasoning effort values for output_config
-	anthropicReasoningEffortHigh = "high"
-	anthropicReasoningEffortMax  = "max"
 )
 
 // anthropicRequest represents the Anthropic API request
@@ -304,22 +300,14 @@ func (p *AnthropicProvider) StreamMessages(
 
 	// Build request body
 	reqBody := anthropicRequest{
-		Model:     p.model,
-		Messages:  apiMessages,
-		MaxTokens: p.maxTokens,
-		System:    systemMessages,
-		Tools:     apiTools,
-		Stream:    true,
-		Thinking:  computeAnthropicReasoning(p.reasoningLevel),
-	}
-
-	// Set output_config when reasoning is enabled — maps reasoning level to effort.
-	if p.reasoningLevel > config.ReasoningLevelOff {
-		effort := anthropicReasoningEffortHigh
-		if p.reasoningLevel >= config.ReasoningLevelMax {
-			effort = anthropicReasoningEffortMax
-		}
-		reqBody.OutputConfig = &anthropicOutputConfig{Effort: effort}
+		Model:        p.model,
+		Messages:     apiMessages,
+		MaxTokens:    p.maxTokens,
+		System:       systemMessages,
+		Tools:        apiTools,
+		Stream:       true,
+		Thinking:     computeAnthropicReasoning(p.reasoningLevel),
+		OutputConfig: computeAnthropicOutputConfig(p.reasoningLevel),
 	}
 
 	// Build and send HTTP request
@@ -343,6 +331,19 @@ func computeAnthropicReasoning(level int) *anthropicThinkingField {
 		return &anthropicThinkingField{Type: "enabled"}
 	}
 	return &anthropicThinkingField{Type: "disabled"}
+}
+
+// computeAnthropicOutputConfig returns the output_config for the given reasoning level.
+// Returns nil when reasoning is off (level 0), so omitempty drops the field.
+func computeAnthropicOutputConfig(level int) *anthropicOutputConfig {
+	if level <= config.ReasoningLevelOff {
+		return nil
+	}
+	effort := "high"
+	if level >= config.ReasoningLevelMax {
+		effort = "max"
+	}
+	return &anthropicOutputConfig{Effort: effort}
 }
 
 // ============================================================================
