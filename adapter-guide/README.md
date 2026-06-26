@@ -1,7 +1,9 @@
 # Adapter Guide
 
-This directory provides TLV protocol reference for `alayacore --rawio`.
-The `tlv-samples/` subdirectory contains sample `.bin` frames; this document serves as an **adapter implementation guide** for developers building custom adapters.
+This document describes the TLV protocol used by `alayacore --rawio` and
+serves as an **adapter implementation guide** for developers building custom
+adapters. The `tlv-samples/` subdirectory contains sample `.bin` frames for
+reference.
 
 ## Wire Format
 
@@ -306,36 +308,49 @@ stdout: (echo)                         UT \x00 1 \x00 Run: ls -la
 ```
 ut-hello.bin                   UT "hello"
 ut-empty.bin                   UT "" (length 0)
+ut-echo-hello.bin              UT \x00 1 \x00 Hello                  ← stdout echo with history ID
+ut-echo-read-file.bin          UT \x00 5 \x00 Read the file main.go  ← stdout echo with history ID
 at-delta-hello.bin             AT \x00 1 \x00 Hello
 at-delta-world.bin             AT \x00 1 \x00 world (same stream)
 at-delta-new-step.bin          AT \x00 2 \x00 Next step (new stream)
 at-plain.bin                   AT "plain text without history id"
 ar-delta.bin                   AR \x00 3 \x00 thinking...
-ui-image.bin                   UI data:image/jpeg;base64,...
-ui-image-url.bin               UI https://example-files.cnbj1.mi-fds.com/example-files/image/image_example.png
-ua-audio-url.bin               UA https://example-files.cnbj1.mi-fds.com/example-files/audio/audio_example.wav
-uv-video-url.bin               UV https://example-files.cnbj1.mi-fds.com/example-files/video/video_example.mp4
-ut-model-sync.bin              UT ":model_sync [{\"id\":0,\"name\":\"Anthropic / Claude Haiku 4\",...}]    — sync edited model config"
+ui-image.bin                   UI data:image/jpeg;base64,...          ← stdin (no history ID)
+ui-image-url.bin               UI https://...                         ← stdin (no history ID)
+ui-echo-image.bin              UI \x00 2 \x00 data:image/jpeg;...     ← stdout echo with history ID
+ua-audio-url.bin               UA https://...                         ← stdin (no history ID)
+ua-echo-audio-url.bin          UA \x00 3 \x00 https://...             ← stdout echo with history ID
+uv-video-url.bin               UV https://...                         ← stdin (no history ID)
+uv-echo-video-url.bin          UV \x00 4 \x00 https://...             ← stdout echo with history ID
+ut-model-sync.bin              UT ":model_sync [...]"
 sm-message-version.bin         SM {"type":"version","data":{"message_version":8}}
-sm-model-list.bin              SM {"type":"model_list","data":{"models":[{"id":0,"name":"Anthropic / Claude Haiku 4",...},{"id":4,"name":"DeepSeek / DeepSeek-V4 Flash",...}]}}
-sm-model.bin                   SM {"type":"model","data":{"active_id":4,"active_name":"DeepSeek / DeepSeek-V4 Flash","context_limit":1000000}}
-sm-theme-list.bin              SM {"type":"theme_list","data":{"themes":[{"name":"theme-dark",...},{"name":"theme-light",...}]}}
-sm-theme.bin                   SM {"type":"theme","data":{"name":"theme-dark"}}
-sm-reasoning.bin               SM {"type":"reasoning","data":{"level":2}}
-sm-video-config.bin            SM {"type":"video_config","data":{"fps":5,"res":1}}
-sm-task-start.bin              SM {"type":"task","data":{"in_progress":true,"context":0}}
-sm-task-end.bin                SM {"type":"task","data":{"in_progress":false,"context":0}}
-sm-error.bin                   SM {"type":"error","data":{"text":"something broke"}}
-sm-notify.bin                  SM {"type":"notify","data":{"text":"all good"}}
+sm-model-list.bin              SM {"type":"model_list",...}
+sm-model.bin                   SM {"type":"model","data":...}
+sm-theme-list.bin              SM {"type":"theme_list",...}
+sm-theme.bin                   SM {"type":"theme","data":...}
+sm-reasoning.bin               SM {"type":"reasoning","data":...}
+sm-video-config.bin            SM {"type":"video_config","data":...}
+sm-task-start.bin              SM {"type":"task","data":{"in_progress":true,...}}
+sm-task-end.bin                SM {"type":"task","data":{"in_progress":false,...}}
+sm-error.bin                   SM {"type":"error","data":...}
+sm-notify.bin                  SM {"type":"notify","data":...}
 sm-tool-confirm.bin            SM {"type":"tool_confirm","data":{"id":"t1"}}
 ```
 
 ## Use
 
 ```sh
+# Pipe a user prompt to the agent
 cat tlv-samples/ut-read-file.bin | alayacore --rawio
+
+# Pipe a user prompt and decode the response frames
 cat tlv-samples/ut-read-file.bin | alayacore --rawio | go run ./misc/tlvcat.go
+
+# Decode a single frame (stdin or stdout direction)
 cat tlv-samples/af-read-file-start.bin | go run ./misc/tlvcat.go
+
+# Decode a user echo frame (agent → adapter, with history ID)
+cat tlv-samples/ut-echo-hello.bin | go run ./misc/tlvcat.go
 ```
 
 ## Generate Media Requests (Go)
