@@ -1761,3 +1761,176 @@ func TestAnthropicToolResultError(t *testing.T) {
 		}
 	}
 }
+
+// ============================================================================
+// Anthropic output_config tests
+// ============================================================================
+
+// TestAnthropicOutputConfigOff verifies that output_config is NOT sent
+// when reasoning is disabled (level 0).
+func TestAnthropicOutputConfigOff(t *testing.T) {
+	var requestBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+			t.Error(err)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		flusher, _ := w.(http.Flusher)
+		fmt.Fprint(w, "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_1\",\"role\":\"assistant\",\"content\":[]}}\n\n")
+		fmt.Fprint(w, "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"}}\n\n")
+		fmt.Fprint(w, "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
+		flusher.Flush()
+	}))
+	defer server.Close()
+
+	provider, err := providers.NewAnthropic(
+		providers.WithAPIKey("test-key"),
+		providers.WithBaseURL(server.URL),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider.SetReasoningLevel(0)
+
+	messages := testMsg(llm.RoleUser, &llm.TextPart{Text: "Hi"})
+	events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range events {
+	}
+
+	if requestBody == nil {
+		t.Fatal("No request body captured")
+	}
+
+	// Should NOT have output_config when reasoning is off
+	if _, ok := requestBody["output_config"]; ok {
+		t.Error("output_config should NOT be present when reasoning is disabled (level 0)")
+	}
+
+	// thinking should be disabled
+	thinking, ok := requestBody["thinking"].(map[string]any)
+	if !ok {
+		t.Fatal("thinking field should be present")
+	}
+	if thinking["type"] != "disabled" {
+		t.Errorf("expected thinking.type=disabled, got %v", thinking["type"])
+	}
+}
+
+// TestAnthropicOutputConfigNormal verifies output_config.effort is "high"
+// when reasoning is set to level 1 (normal).
+func TestAnthropicOutputConfigNormal(t *testing.T) {
+	var requestBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+			t.Error(err)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		flusher, _ := w.(http.Flusher)
+		fmt.Fprint(w, "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_1\",\"role\":\"assistant\",\"content\":[]}}\n\n")
+		fmt.Fprint(w, "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"}}\n\n")
+		fmt.Fprint(w, "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
+		flusher.Flush()
+	}))
+	defer server.Close()
+
+	provider, err := providers.NewAnthropic(
+		providers.WithAPIKey("test-key"),
+		providers.WithBaseURL(server.URL),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider.SetReasoningLevel(1)
+
+	messages := testMsg(llm.RoleUser, &llm.TextPart{Text: "Hi"})
+	events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range events {
+	}
+
+	if requestBody == nil {
+		t.Fatal("No request body captured")
+	}
+
+	oc, ok := requestBody["output_config"].(map[string]any)
+	if !ok {
+		t.Fatal("output_config should be present when reasoning is enabled (level 1)")
+	}
+	if oc["effort"] != "high" {
+		t.Errorf("expected output_config.effort='high', got %v", oc["effort"])
+	}
+
+	thinking, ok := requestBody["thinking"].(map[string]any)
+	if !ok {
+		t.Fatal("thinking field should be present")
+	}
+	if thinking["type"] != "enabled" {
+		t.Errorf("expected thinking.type=enabled, got %v", thinking["type"])
+	}
+}
+
+// TestAnthropicOutputConfigMax verifies output_config.effort is "max"
+// when reasoning is set to level 2 (max).
+func TestAnthropicOutputConfigMax(t *testing.T) {
+	var requestBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+			t.Error(err)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		flusher, _ := w.(http.Flusher)
+		fmt.Fprint(w, "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_1\",\"role\":\"assistant\",\"content\":[]}}\n\n")
+		fmt.Fprint(w, "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"}}\n\n")
+		fmt.Fprint(w, "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
+		flusher.Flush()
+	}))
+	defer server.Close()
+
+	provider, err := providers.NewAnthropic(
+		providers.WithAPIKey("test-key"),
+		providers.WithBaseURL(server.URL),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider.SetReasoningLevel(2)
+
+	messages := testMsg(llm.RoleUser, &llm.TextPart{Text: "Hi"})
+	events, err := provider.StreamMessages(context.Background(), messages, nil, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range events {
+	}
+
+	if requestBody == nil {
+		t.Fatal("No request body captured")
+	}
+
+	oc, ok := requestBody["output_config"].(map[string]any)
+	if !ok {
+		t.Fatal("output_config should be present when reasoning is enabled (level 2)")
+	}
+	if oc["effort"] != "max" {
+		t.Errorf("expected output_config.effort='max', got %v", oc["effort"])
+	}
+
+	thinking, ok := requestBody["thinking"].(map[string]any)
+	if !ok {
+		t.Fatal("thinking field should be present")
+	}
+	if thinking["type"] != "enabled" {
+		t.Errorf("expected thinking.type=enabled, got %v", thinking["type"])
+	}
+}
