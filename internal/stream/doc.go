@@ -57,20 +57,10 @@
 // normal UTF-8 text, making the split unambiguous. See WrapID and
 // UnwrapID in stream.go.
 //
-// The id is derived from historyCount + blockIndex:
-//   - User content (UT, UI, cancel AT): historyCount (incremented on echo)
-//   - Delta content (AT, AR, AF): historyCount + index
-//   - Tool results (UF): historyCount (incremented on result)
-//
-// The blockIndex uniquely identifies each content block within a step.
-//   - Anthropic: uses the content block index from the API.
-//     Blocks can interleave (e.g. thinking, text, thinking, text, tool_use),
-//     each with a unique sequential index regardless of type. This lets the
-//     adapter route deltas to the correct window — without it, two reasoning
-//     blocks in the same step would be indistinguishable.
-//   - OpenAI: reasoning blocks get index 0, text blocks get index 1,
-//     and tool calls get index 2+. OpenAI never emits multiple blocks of
-//     the same type, so fixed values are sufficient.
+// The id is a flat monotonic counter from the session's history counter:
+//   - User content (UT, UI, cancel AT): incremented on echo
+//   - Delta content (AT, AR, AF): incremented per content block
+//   - Tool results (UF): incremented on result
 //
 // Usage:
 //
