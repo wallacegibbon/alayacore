@@ -51,7 +51,7 @@ A blank line separates messages of different types.
 
 Plain IO can persist conversations using a **session file**, just like the
 TUI mode. The session file records every turn (prompts, assistant replies,
-tool calls, tool results) in Markdown format.
+tool calls, tool results) in key-value frontmatter + binary TLV format.
 
 **How it works:**
 
@@ -76,9 +76,7 @@ alayacore --plainio --session my-convo.md <<< "what is my name?"
 alayacore --plainio --session my-convo.md <<< "remember this fact: dogs are fluffy"
 ```
 
-Since the session file is plain Markdown, you can also read, edit, or
-version control it directly. To snapshot a conversation at a point in
-time, simply copy the file.
+Since the session file contains binary TLV data after the key-value frontmatter, it is not human-readable as plain text. Use `tlvcat.go` (in `misc/`) to inspect the contents, or use the `--plainio` mode to replay the conversation.
 
 ## Examples
 

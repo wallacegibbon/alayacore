@@ -86,7 +86,7 @@ stdin EOF ──▶ inputPump closes inputMsgCh ──▶ run() detects closed c
 - **Load** — On startup, AlayaCore starts a new empty session unless you specify `--session` to load an existing one.
 - **Auto-summarize** — When `--auto-summarize` is enabled and `context_limit` is set, AlayaCore automatically triggers `:summarize` when context reaches 65% of the limit.
 
-Session files use a Markdown-based format with YAML frontmatter. The body contains TLV-encoded conversation data (messages, tool calls, tool results) written directly as binary TLV records after the frontmatter.
+Session files use a key-value frontmatter + binary TLV body format. The frontmatter uses `---` delimiters with simple `key: value` lines (parsed by `config.ParseKeyValue`). The body contains TLV-encoded conversation data (messages, tool calls, tool results) written directly as binary TLV records after the frontmatter.
 
 The frontmatter includes a `message_version` field that tracks the TLV message encoding format. When loading a session, it must match `MessageVersion` exactly — any mismatch is rejected. The version is also broadcast to adapters as the first `TagSystemMsg` frame on startup (`{"type":"version","data":{"message_version":8}}`), so they can validate format compatibility before processing subsequent messages.
 
