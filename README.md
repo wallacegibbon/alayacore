@@ -104,7 +104,7 @@ See [providers.md](docs/providers.md) for provider-specific details.
 | [Terminal UI](docs/tui.md) | Keybindings, commands, windows, and navigation |
 | [Plain IO Mode](docs/plainio.md) | stdin/stdout for scripts and pipes |
 | [Raw IO Mode](docs/rawio.md) | Raw TLV frames on stdin/stdout for programmatic control |
-| [TLV Samples](tlv-samples/README.md) | Sample TLV messages for Raw IO protocol reference |
+| [Adapter Guide](adapter-guide/README.md) | TLV protocol reference for Raw IO — frame format, tags, and adapter implementation guide |
 | [Skills System](docs/skills.md) | Agent Skills specification, directory structure, SKILL.md format |
 | [Architecture](docs/architecture.md) | Layered architecture, TLV protocol, data flow, design decisions |
 | [Step Messages](docs/step-messages.md) | Message structure within an agentic step (assistant + tool results) |

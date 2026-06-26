@@ -63,7 +63,7 @@ This ensures both paths converge: the theme selector's live preview still applie
 
 ## TLV Protocol
 
-See [`tlv-samples/README.md`](../tlv-samples/README.md) for the full TLV
+See [`adapter-guide/README.md`](../adapter-guide/README.md) for the full TLV
 protocol spec — wire format, tags, delta messages, function lifecycle,
 and binary samples for every message type.
 

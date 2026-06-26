@@ -1,6 +1,7 @@
-# TLV Samples
+# Adapter Guide
 
-Sample TLV messages for `alayacore --rawio`.
+This directory provides TLV protocol reference for `alayacore --rawio`.
+The `tlv-samples/` subdirectory contains sample `.bin` frames; this document serves as an **adapter implementation guide** for developers building custom adapters.
 
 ## Wire Format
 
