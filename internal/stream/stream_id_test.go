@@ -10,12 +10,12 @@ func TestWrapUnwrapDelta(t *testing.T) {
 		id      string
 		content string
 	}{
-		{"normal text", "0|1|0", "Hello world"},
-		{"empty content", "0|1|1", ""},
-		{"content with brackets", "0|1|0", "[:fake-id:]this looks like a prefix"},
-		{"content starting with brackets", "0|2|1", "[:0-1-t:]fake prefix as content"},
-		{"unicode content", "0|1|0", "你好世界 🌍"},
-		{"special chars", "0|1|1", "tabs\there\nnewlines\nand \"quotes\""},
+		{"normal text", "1", "Hello world"},
+		{"empty content", "2", ""},
+		{"content after id", "1", "something after the NUL"},
+		{"more content after id", "3", "more content"},
+		{"unicode content", "4", "你好世界 🌍"},
+		{"special chars", "5", "tabs\there\nnewlines\nand \"quotes\""},
 		{"empty id would fail", "", "content"},
 	}
 
@@ -68,7 +68,7 @@ func TestUnwrapDelta_InvalidInput(t *testing.T) {
 
 func TestRoundTrip(t *testing.T) {
 	// Simulate the full session → adapter round trip
-	id := "3|5|2"
+	id := "42"
 	delta := "some thinking content"
 	wrapped := WrapDelta(id, delta)
 
