@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sync"
 	"sync/atomic"
 )
 
@@ -20,40 +19,54 @@ const (
 )
 
 // Client manages a connection to a single MCP server.
-// It handles the lifecycle: connect → initialize → list tools → call tools.
 //
-// The closed channel (accessible via Done) is atomically replaceable so
-// that a Client can be closed and reconnected without leaving a
-// permanently-closed channel behind.
+// CONCURRENCY MODEL:
+//   - transport: atomic.Value — safe for concurrent reads (sendRequest) without mutex
+//   - closeDone: atomic.Bool — Close() and monitor atomically claim the right
+//     to close closedCh via Swap(true). Only one succeeds, no mutex needed.
+//   - state: atomic.Int32 — CAS for safe state transitions
+//   - toolsCache: atomic.Value — atomic load/store, no lock
+//
+// A dedicated monitor goroutine watches transport.Done(). If the transport
+// dies unexpectedly (process crash, connection drop), it transitions the
+// client to StateFailed and signals it via closedCh.
+//
+// There is no Reconnect — if a server dies, the client stays failed.
+// The caller should create a new Client if it needs to reconnect.
+//
+// The closed channel (closedCh) is NOT replaced after creation — it is
+// closed once, either by Close() or by the monitor on unexpected death.
 type Client struct {
 	config    ServerConfig
-	transport Transport
+	transport atomic.Value // stores Transport or nil
 	state     atomic.Int32 // stores ClientState as int32
 
 	// Server capabilities reported during initialization.
 	capabilities ServerCapabilities
 	serverInfo   ImplementationInfo
 
-	// Tools cache — populated on initialization, refreshed on demand.
-	mu    sync.RWMutex
-	tools []Tool
+	// toolsCache stores []Tool or nil — atomically loadable/storable.
+	toolsCache atomic.Value
 
 	// Request ID counter.
 	reqID atomic.Int32
 
-	// closedCh is atomically replaceable so reconnection produces a
-	// fresh channel.  Closed via closeLocked; serialized by closeMu.
-	closeMu   sync.Mutex
-	closeDone bool
-	closedCh  atomic.Pointer[chan struct{}]
+	// closeDone is set to true when the client is shut down (either by
+	// Close() or by the monitor on transport death). The Swap(true) atomic
+	// ensures only one goroutine ever closes closedCh.
+	closeDone atomic.Bool
+
+	// closedCh is closed exactly once: by the first goroutine that
+	// sets closeDone to true (Close() or the transport death monitor).
+	closedCh chan struct{}
 }
 
 // NewClient creates a new MCP client. Call Connect() to establish the connection.
 func NewClient(config ServerConfig) *Client {
-	c := &Client{config: config}
-	ch := make(chan struct{})
-	c.closedCh.Store(&ch)
-	return c
+	return &Client{
+		config:   config,
+		closedCh: make(chan struct{}),
+	}
 }
 
 // Name returns the human-readable name of this server.
@@ -112,16 +125,16 @@ func (c *Client) doInitialize(ctx context.Context) error {
 // Supports cursor-based pagination per the MCP spec.
 // Results are cached; call with force=true to refresh.
 func (c *Client) ListTools(ctx context.Context, force bool) ([]Tool, error) {
-	c.mu.RLock()
-	if !force && c.tools != nil {
-		tools := c.tools
-		c.mu.RUnlock()
-		return tools, nil
+	if !force {
+		if tv := c.toolsCache.Load(); tv != nil {
+			if tools, ok := tv.([]Tool); ok {
+				return tools, nil
+			}
+		}
 	}
-	c.mu.RUnlock()
 
 	if c.State() != StateReady {
-		return nil, fmt.Errorf("mcp client %q: not ready (state=%d)", c.config.Name, c.State())
+		return nil, c.stateError("list tools")
 	}
 
 	allTools, err := c.listToolsAllPages(ctx)
@@ -129,16 +142,11 @@ func (c *Client) ListTools(ctx context.Context, force bool) ([]Tool, error) {
 		return nil, fmt.Errorf("list tools: %w", err)
 	}
 
-	c.mu.Lock()
-	c.tools = allTools
-	c.mu.Unlock()
-
+	c.toolsCache.Store(allTools)
 	return allTools, nil
 }
 
 // listToolsAllPages handles cursor-based pagination for tools/list.
-// The MCP protocol allows servers to return a nextCursor when there are
-// more tools than fit in a single response.
 func (c *Client) listToolsAllPages(ctx context.Context) ([]Tool, error) {
 	type listToolsParams struct {
 		Cursor string `json:"cursor,omitempty"`
@@ -177,7 +185,7 @@ func (c *Client) listToolsAllPages(ctx context.Context) ([]Tool, error) {
 // CallTool invokes a tool on the server and returns the result.
 func (c *Client) CallTool(ctx context.Context, name string, arguments json.RawMessage) (*CallToolResult, error) {
 	if c.State() != StateReady {
-		return nil, fmt.Errorf("mcp client %q: not ready (state=%d)", c.config.Name, c.State())
+		return nil, c.stateError(fmt.Sprintf("call %s", name))
 	}
 
 	result, err := c.sendRequest(ctx, methodCallTool, CallToolRequest{
@@ -202,60 +210,30 @@ func (c *Client) HasTools() bool {
 }
 
 // Close shuts down the client and its transport.
-// The Done channel is closed permanently; to re-use the client call
-// Reconnect instead.
+// The Done channel is closed permanently.
+// Safe to call concurrently — only the first call performs the shutdown.
 func (c *Client) Close() error {
-	c.closeMu.Lock()
-	defer c.closeMu.Unlock()
+	// closeDone ensures only one goroutine runs the shutdown.
+	if !c.closeDone.Swap(true) {
+		ch := c.closedCh
+		close(ch)
 
-	if c.closeDone {
-		return nil
-	}
-	c.closeDone = true
-
-	ch := c.closedCh.Load()
-	close(*ch)
-
-	if c.transport != nil {
-		err := c.transport.Close()
+		if tp := c.loadTransport(); tp != nil {
+			err := tp.Close()
+			c.state.Store(int32(StateDisconnected))
+			return err
+		}
 		c.state.Store(int32(StateDisconnected))
-		return err
 	}
-	c.state.Store(int32(StateDisconnected))
 	return nil
 }
 
 // Done returns a channel that closes when the client is shut down.
 func (c *Client) Done() <-chan struct{} {
-	return *c.closedCh.Load()
+	return c.closedCh
 }
 
-// Reconnect closes any existing connection and establishes a new one.
-// This allows re-using a Client after a connection failure without
-// creating a new instance.
-func (c *Client) Reconnect(ctx context.Context) error {
-	c.closeMu.Lock()
-	defer c.closeMu.Unlock()
-
-	// Close old transport.
-	if c.transport != nil {
-		c.transport.Close()
-	}
-	c.transport = nil
-
-	// Create a fresh closed channel for the new lifecycle.
-	ch := make(chan struct{})
-	c.closedCh.Store(&ch)
-	c.closeDone = false
-	c.state.Store(int32(StateDisconnected))
-	c.capabilities = ServerCapabilities{}
-	c.serverInfo = ImplementationInfo{}
-	c.tools = nil
-
-	return c.connectLocked(ctx)
-}
-
-// connectLocked is the inner connect logic, called with closeMu held.
+// connectLocked is the inner connect logic.
 func (c *Client) connectLocked(ctx context.Context) error {
 	if !c.state.CompareAndSwap(int32(StateDisconnected), int32(StateConnecting)) {
 		return fmt.Errorf("mcp client %q: already connecting", c.config.Name)
@@ -276,12 +254,15 @@ func (c *Client) connectLocked(ctx context.Context) error {
 			return fmt.Errorf("mcp client %q: %w", c.config.Name, err)
 		}
 	case c.config.URL != "":
-		transport = NewSSETransport(c.config.URL)
+		transport, err = NewSSETransport(c.config.URL, c.config.Debug)
+		if err != nil {
+			return fmt.Errorf("mcp client %q: %w", c.config.Name, err)
+		}
 	default:
 		return fmt.Errorf("mcp client %q: no command or URL specified", c.config.Name)
 	}
 
-	c.transport = transport
+	c.storeTransport(transport)
 	c.state.Store(int32(StateInitializing))
 	if err := c.doInitialize(ctx); err != nil {
 		transport.Close()
@@ -289,13 +270,96 @@ func (c *Client) connectLocked(ctx context.Context) error {
 	}
 
 	c.state.Store(int32(StateReady))
+	c.startMonitor()
 	return nil
 }
+
+// ============================================================================
+// Transport Death Monitor
+// ============================================================================
+
+// startMonitor launches a goroutine that watches for transport death.
+// If the transport dies unexpectedly (process crash, connection drop),
+// the client transitions to StateFailed and signals it via Done().
+func (c *Client) startMonitor() {
+	tp := c.loadTransport()
+	if tp == nil {
+		return
+	}
+
+	go func() {
+		<-tp.Done()
+
+		// Only transition from Ready — Close() may have set Disconnected.
+		if !c.state.CompareAndSwap(int32(StateReady), int32(StateFailed)) {
+			return
+		}
+
+		// Claim the right to close closedCh.
+		// If Close() ran first (closeDone already true), skip.
+		if !c.closeDone.Swap(true) {
+			ch := c.closedCh
+			close(ch)
+		}
+	}()
+}
+
+// Ping sends a ping request to check server health.
+// Returns nil if the server is alive and responsive.
+func (c *Client) Ping(ctx context.Context) error {
+	if c.State() != StateReady {
+		return c.stateError("ping")
+	}
+	_, err := c.sendRequest(ctx, methodPing, nil)
+	return err
+}
+
+// ============================================================================
+// Transport access helpers
+// ============================================================================
+
+// loadTransport returns the current transport, or nil.
+func (c *Client) loadTransport() Transport {
+	v := c.transport.Load()
+	if v == nil {
+		return nil
+	}
+	tp, ok := v.(Transport)
+	if !ok {
+		return nil
+	}
+	return tp
+}
+
+// storeTransport sets the current transport.
+func (c *Client) storeTransport(t Transport) {
+	if t == nil {
+		c.transport.Store(nil)
+	} else {
+		c.transport.Store(t)
+	}
+}
+
+// stateError returns a descriptive error for the current client state.
+func (c *Client) stateError(string) error {
+	st := c.State()
+	switch st {
+	case StateFailed:
+		return fmt.Errorf("mcp client %q: server connection lost", c.config.Name)
+	default:
+		return fmt.Errorf("mcp client %q: not ready (state=%d)", c.config.Name, st)
+	}
+}
+
+// ============================================================================
+// JSON-RPC Request/Response
+// ============================================================================
 
 // sendRequest sends a JSON-RPC request and returns the response result.
 // Request/response matching is handled by the transport layer via request ID.
 func (c *Client) sendRequest(ctx context.Context, method string, params any) (json.RawMessage, error) {
-	if c.transport == nil {
+	tp := c.loadTransport()
+	if tp == nil {
 		return nil, fmt.Errorf("mcp client %q: no transport", c.config.Name)
 	}
 
@@ -306,7 +370,7 @@ func (c *Client) sendRequest(ctx context.Context, method string, params any) (js
 	default:
 	}
 
-	id := int(c.reqID.Add(1))
+	id := requestID(fmt.Sprintf("%d", c.reqID.Add(1)))
 	var paramsData json.RawMessage
 	if params != nil {
 		data, err := json.Marshal(params)
@@ -323,12 +387,13 @@ func (c *Client) sendRequest(ctx context.Context, method string, params any) (js
 		Params:  paramsData,
 	}
 
-	return c.transport.SendReceive(ctx, req)
+	return tp.SendReceive(ctx, req)
 }
 
 // sendNotification sends a JSON-RPC notification (no response expected).
 func (c *Client) sendNotification(_ context.Context, method string, params any) error {
-	if c.transport == nil {
+	tp := c.loadTransport()
+	if tp == nil {
 		return fmt.Errorf("mcp client %q: no transport", c.config.Name)
 	}
 
@@ -343,12 +408,12 @@ func (c *Client) sendNotification(_ context.Context, method string, params any) 
 
 	req := jsonrpcRequest{
 		JSONRPC: jsonrpcVersion,
-		ID:      0, // notification: no ID
+		ID:      requestID(""), // notification: no ID (omitempty omits empty string)
 		Method:  method,
 		Params:  paramsData,
 	}
 
-	return c.transport.Send(req)
+	return tp.Send(req)
 }
 
 // Ensure interfaces are satisfied.

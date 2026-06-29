@@ -20,11 +20,39 @@ import (
 // jsonrpcVersion is the JSON-RPC protocol version string.
 const jsonrpcVersion = "2.0"
 
+// requestID is a JSON-RPC request identifier that accepts both string and
+// number IDs from JSON for spec compatibility (JSON-RPC 2.0 allows both).
+// Internally it is stored as a string for uniform comparison in dispatch maps.
+type requestID string
+
+// UnmarshalJSON accepts both JSON string and number as request ID.
+func (id *requestID) UnmarshalJSON(data []byte) error {
+	// Try string first (most MCP SDKs use string IDs).
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		*id = requestID(s)
+		return nil
+	}
+
+	// Fall back to number.
+	var n json.Number
+	if err := json.Unmarshal(data, &n); err != nil {
+		return fmt.Errorf("requestID: cannot unmarshal %s", string(data))
+	}
+	*id = requestID(n.String())
+	return nil
+}
+
+// MarshalJSON returns the request ID as a JSON string.
+func (id requestID) MarshalJSON() ([]byte, error) {
+	return json.Marshal(string(id))
+}
+
 // jsonrpcRequest is a JSON-RPC 2.0 request object.
-// ID is omitempty so that notifications (ID=0) omit the id field entirely.
+// ID is omitted for notifications (zero value = empty string).
 type jsonrpcRequest struct {
 	JSONRPC string          `json:"jsonrpc"`
-	ID      int             `json:"id,omitempty"`
+	ID      requestID       `json:"id,omitempty"`
 	Method  string          `json:"method"`
 	Params  json.RawMessage `json:"params,omitempty"`
 }
@@ -32,7 +60,7 @@ type jsonrpcRequest struct {
 // jsonrpcResponse is a JSON-RPC 2.0 response object.
 type jsonrpcResponse struct {
 	JSONRPC string          `json:"jsonrpc"`
-	ID      int             `json:"id"`
+	ID      requestID       `json:"id"`
 	Result  json.RawMessage `json:"result,omitempty"`
 	Error   *jsonrpcError   `json:"error,omitempty"`
 }

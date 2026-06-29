@@ -163,25 +163,6 @@ func TestBuildDescription(t *testing.T) {
 	}
 }
 
-func TestServerFromToolName(t *testing.T) {
-	server, tool, ok := ServerFromToolName("my_server_query")
-	if !ok || server != "my_server" || tool != "query" {
-		t.Errorf("ServerFromToolName() = (%q, %q, %v)", server, tool, ok)
-	}
-
-	// No underscore - not a prefixed name.
-	_, _, ok = ServerFromToolName("tool")
-	if ok {
-		t.Error("ServerFromToolName() should be false for unprefixed name")
-	}
-
-	// Underscore at start.
-	_, _, ok = ServerFromToolName("_tool")
-	if ok {
-		t.Error("ServerFromToolName() should be false for leading underscore")
-	}
-}
-
 func TestSplitArgs(t *testing.T) {
 	tests := []struct {
 		input string

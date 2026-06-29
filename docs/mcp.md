@@ -65,8 +65,10 @@ Connects to an MCP server over Server-Sent Events (HTTP).
 --mcp-server "remote@https://mcp.example.com/sse"
 ```
 
-> **Note**: SSE transport is a placeholder and not yet implemented. Use
-> stdio transport for now.
+> **Note**: SSE transport is fully implemented. The client connects via
+> HTTP GET to the SSE endpoint, receives the POST endpoint URL from the
+> server's `endpoint` event, and sends JSON-RPC requests as HTTP POST
+> with responses arriving as SSE `message` events.
 
 ## Tool Naming
 
@@ -99,12 +101,12 @@ Agent Loop
         ▼
     Manager
       ├── Client "db"  ─── StdioTransport ─── npx @anthropic/mcp-db-server
-      └── Client "git" ─── StdioTransport ─── uvx mcp-git
+      └── Client "api" ─── SSETransport  ─── https://api.example.com/mcp/sse
 ```
 
-1. **Startup**: AlayaCore spawns each MCP server as a child process,
-   performs the MCP initialize handshake, and calls `tools/list` to
-   discover available tools.
+1. **Startup**: AlayaCore spawns each MCP server as a child process
+   (or connects via SSE), performs the MCP initialize handshake, and
+   calls `tools/list` to discover available tools.
 
 2. **Tool registration**: Each discovered tool is wrapped as an
    `llm.Tool` with the prefixed name and wired to route calls back
@@ -119,6 +121,13 @@ Agent Loop
    MCP tool response, the pending request is unregistered. When the
    server's response arrives, it is discarded — the server process
    is not affected.
+
+5. **Server crash**: If an MCP server process exits unexpectedly, a
+   monitor goroutine detects the death via the transport's Done channel,
+   transitions the client to a failed state, and signals via the client's
+   Done channel. Subsequent tool calls to that server return a clear
+   error: `mcp client "name": server connection lost`. The agent
+   handles this like any other tool failure.
 
 ## Debugging
 
@@ -148,8 +157,8 @@ JSON is pretty-printed for readability.
 ## Error Handling
 
 - **Connection failures**: If an MCP server cannot be started or
-  initialized, a warning is logged and the server is skipped. Other
-  servers are unaffected.
+  initialized, an error message is displayed via the adapter and the
+  server is skipped. Other servers are unaffected.
 
 - **Tool call failures**: If a tool call returns an error (JSON-RPC
   error or `isError: true`), the error message is included in the
@@ -167,7 +176,7 @@ JSON is pretty-printed for readability.
 | `tools/call` | ✅ Supported |
 | `initialize` / `initialized` | ✅ Supported |
 | Stdio transport | ✅ Supported |
-| SSE transport | 🚧 Placeholder |
+| SSE transport | ✅ Supported |
 | Resources | 🚧 Not yet used (responses are accepted) |
 | Prompts | 🚧 Not yet used |
 

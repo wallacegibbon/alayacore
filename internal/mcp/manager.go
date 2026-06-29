@@ -3,46 +3,58 @@ package mcp
 import (
 	"context"
 	"fmt"
-	"log"
-	"sync"
+	"sync/atomic"
 )
 
 // Manager manages multiple MCP server connections.
 // It provides a unified interface for tool discovery across all servers.
+//
+// CONCURRENCY: clients slice is stored in an atomic.Value and replaced
+// atomically on CloseAll. All read paths snapshot the slice and then
+// operate on that snapshot, avoiding TOCTOU races and eliminating
+// the need for a mutex on the hot path.
 type Manager struct {
-	mu      sync.RWMutex
-	clients []*Client
+	clients atomic.Value // stores []*Client or nil
 	closed  bool
 }
 
 // NewManager creates an MCP manager from server configurations.
 // It does NOT connect to any servers — call ConnectAll to establish connections.
 func NewManager(configs []ServerConfig) *Manager {
+	m := &Manager{}
 	clients := make([]*Client, 0, len(configs))
 	for _, cfg := range configs {
 		clients = append(clients, NewClient(cfg))
 	}
-	return &Manager{clients: clients}
+	m.clients.Store(clients)
+	return m
+}
+
+// loadClients returns a snapshot of the clients slice.
+func (m *Manager) loadClients() []*Client {
+	v := m.clients.Load()
+	if v == nil {
+		return nil
+	}
+	clients, ok := v.([]*Client)
+	if !ok {
+		return nil
+	}
+	return clients
 }
 
 // ConnectAll connects to all configured MCP servers and performs
-// initialization. Servers that fail to connect are logged but do not
-// prevent others from connecting.
+// initialization. Servers that fail to connect do not prevent others
+// from connecting.
 //
 // Returns a list of errors for failed connections so callers can
-// display warnings without aborting.
+// display warnings without aborting. Callers should display progress
+// information themselves.
 func (m *Manager) ConnectAll(ctx context.Context) []error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	var errs []error
-	for _, c := range m.clients {
-		log.Printf("MCP: connecting to %q...", c.Name())
+	for _, c := range m.loadClients() {
 		if err := c.Connect(ctx); err != nil {
 			errs = append(errs, fmt.Errorf("mcp server %q: %w", c.Name(), err))
-		} else {
-			log.Printf("MCP: connected to %q (%s v%s)",
-				c.Name(), c.ServerInfo().Name, c.ServerInfo().Version)
 		}
 	}
 	return errs
@@ -50,15 +62,12 @@ func (m *Manager) ConnectAll(ctx context.Context) []error {
 
 // DiscoverTools collects all tools from all connected MCP servers.
 // Returns a map keyed by server name for disambiguation.
-// Errors are logged; failing servers are skipped.
+// Failing servers are silently skipped; callers should log errors
+// externally if needed.
 func (m *Manager) DiscoverTools(ctx context.Context) map[string][]Tool {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
 	result := make(map[string][]Tool)
-	for _, c := range m.clients {
+	for _, c := range m.loadClients() {
 		if c.State() != StateReady {
-			log.Printf("MCP: skipping %q (state=%d)", c.Name(), c.State())
 			continue
 		}
 		if !c.HasTools() {
@@ -66,11 +75,9 @@ func (m *Manager) DiscoverTools(ctx context.Context) map[string][]Tool {
 		}
 		tools, err := c.ListTools(ctx, false)
 		if err != nil {
-			log.Printf("MCP: failed to list tools from %q: %v", c.Name(), err)
 			continue
 		}
 		if len(tools) > 0 {
-			log.Printf("MCP: %q exposes %d tool(s)", c.Name(), len(tools))
 			result[c.Name()] = tools
 		}
 	}
@@ -79,47 +86,40 @@ func (m *Manager) DiscoverTools(ctx context.Context) map[string][]Tool {
 
 // CallTool invokes a tool on the specified server.
 func (m *Manager) CallTool(ctx context.Context, serverName, toolName string, arguments []byte) (*CallToolResult, error) {
-	m.mu.RLock()
 	client := m.findClient(serverName)
-	m.mu.RUnlock()
-
 	if client == nil {
 		return nil, fmt.Errorf("mcp server %q not found", serverName)
 	}
-
 	return client.CallTool(ctx, toolName, arguments)
 }
 
 // CloseAll shuts down all MCP client connections.
 func (m *Manager) CloseAll() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	if m.closed {
 		return
 	}
 	m.closed = true
 
-	for _, c := range m.clients {
-		if err := c.Close(); err != nil {
-			log.Printf("MCP: error closing %q: %v", c.Name(), err)
-		}
+	for _, c := range m.loadClients() {
+		c.Close() // errors are intentionally discarded — nothing to report at shutdown
 	}
+	m.clients.Store([]*Client(nil))
 }
 
 // Clients returns a snapshot of all managed clients.
 func (m *Manager) Clients() []*Client {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	clients := make([]*Client, len(m.clients))
-	copy(clients, m.clients)
-	return clients
+	clients := m.loadClients()
+	if clients == nil {
+		return nil
+	}
+	result := make([]*Client, len(clients))
+	copy(result, clients)
+	return result
 }
 
-// findClient looks up a client by server name.
+// findClient looks up a client by server name from a snapshot.
 func (m *Manager) findClient(name string) *Client {
-	for _, c := range m.clients {
+	for _, c := range m.loadClients() {
 		if c.Name() == name {
 			return c
 		}

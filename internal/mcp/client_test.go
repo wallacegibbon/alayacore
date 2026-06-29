@@ -91,12 +91,12 @@ func TestClientInitialize(t *testing.T) {
 	}
 	initData, _ := json.Marshal(jsonrpcResponse{
 		JSONRPC: "2.0",
-		ID:      1,
+		ID:      requestID("1"),
 		Result:  mustMarshal(initResult),
 	})
 
 	client := NewClient(ServerConfig{Name: "test"})
-	client.transport = newMockTransport([]json.RawMessage{initData})
+	client.storeTransport(newMockTransport([]json.RawMessage{initData}))
 
 	ctx := context.Background()
 	if err := client.doInitialize(ctx); err != nil {
@@ -119,13 +119,13 @@ func TestClientListTools(t *testing.T) {
 		},
 	}
 	toolsData, _ := json.Marshal(jsonrpcResponse{
-		JSONRPC: "2.0", ID: 2,
+		JSONRPC: "2.0", ID: requestID("2"),
 		Result: mustMarshal(toolsResult),
 	})
 
 	client := NewClient(ServerConfig{Name: "test"})
 	client.state.Store(int32(StateReady))
-	client.transport = newMockTransport([]json.RawMessage{toolsData})
+	client.storeTransport(newMockTransport([]json.RawMessage{toolsData}))
 
 	// Need to set init state to skip initialize for this test.
 	client.capabilities.Tools = &struct{}{}
@@ -154,13 +154,13 @@ func TestClientCallTool(t *testing.T) {
 		},
 	}
 	callData, _ := json.Marshal(jsonrpcResponse{
-		JSONRPC: "2.0", ID: 1,
+		JSONRPC: "2.0", ID: requestID("1"),
 		Result: mustMarshal(callResult),
 	})
 
 	client := NewClient(ServerConfig{Name: "test"})
 	client.state.Store(int32(StateReady))
-	client.transport = newMockTransport([]json.RawMessage{callData})
+	client.storeTransport(newMockTransport([]json.RawMessage{callData}))
 
 	ctx := context.Background()
 	result, err := client.CallTool(ctx, "my_tool", json.RawMessage(`{"arg":"val"}`))

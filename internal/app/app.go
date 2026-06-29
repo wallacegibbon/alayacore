@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"time"
 
@@ -17,11 +16,11 @@ import (
 // This package provides shared initialization for all adapters.
 // It builds the system prompt, initializes tools, and creates the app config.
 
-const systemPromptIdentity = `You are a helpful AI assistant with access to tools for reading/writing files and executing commands.`
+const systemPromptIdentity = `You are a helpful AI assistant with access to a set of tools that you can use to accomplish tasks.`
 
 const systemPromptRules = `Never assume - verify with tools.`
 
-const systemPromptSearch = `Use search_content to locate code and patterns before using read_file for detailed inspection.`
+const systemPromptSearch = `Use search tools to locate code and patterns before using file read tools for detailed inspection.`
 
 const systemPromptSkills = `Check <available_skills> below; read the <location> file to load relevant skill instructions. Skill instructions may use relative paths - run them from the skill's directory (derived from <location>).`
 
@@ -36,8 +35,9 @@ type Config struct {
 	ToolConfirmTools  []string // Tool names requiring user confirmation
 
 	// MCP manager for lifecycle management (cleanup).
-	MCPServerTools []llm.Tool // Tools from MCP servers (subset of AgentTools)
-	MCPManager     *mcp.Manager
+	MCPServerTools   []llm.Tool // Tools from MCP servers (subset of AgentTools)
+	MCPManager       *mcp.Manager
+	MCPStartupErrors []string // Non-fatal errors from MCP startup, displayed via adapter
 }
 
 // Setup initializes the common app components
@@ -52,7 +52,7 @@ func Setup(cfg *config.Settings) (*Config, error) {
 	// ========================================================================
 	// MCP (Model Context Protocol) initialization
 	// ========================================================================
-	mcpManager, mcpServerTools := initMCP(cfg, &agentTools)
+	mcpManager, mcpServerTools, mcpErrors := initMCP(cfg, &agentTools)
 
 	// ========================================================================
 	// System Prompt Construction
@@ -92,22 +92,26 @@ func Setup(cfg *config.Settings) (*Config, error) {
 		ToolConfirmTools:  cfg.ToolConfirm,
 		MCPServerTools:    mcpServerTools,
 		MCPManager:        mcpManager,
+		MCPStartupErrors:  mcpErrors,
 	}, nil
 }
 
 // initMCP initializes MCP servers: parses configs, connects, discovers tools,
-// and injects them into agentTools.
-func initMCP(cfg *config.Settings, agentTools *[]llm.Tool) (*mcp.Manager, []llm.Tool) {
+// and injects them into agentTools. Warnings are returned for the caller
+// to display through the adapter (not printed here).
+func initMCP(cfg *config.Settings, agentTools *[]llm.Tool) (*mcp.Manager, []llm.Tool, []string) {
 	if len(cfg.MCPServers) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
+
+	warnings := make([]string, 0, len(cfg.MCPServers))
 
 	// Pre-allocate with the maximum possible size; unused capacity is negligible.
 	mcpConfigs := make([]mcp.ServerConfig, 0, len(cfg.MCPServers))
 	for _, raw := range cfg.MCPServers {
 		parsed, parseErr := mcp.ParseServerConfig(raw)
 		if parseErr != nil {
-			log.Printf("Warning: invalid --mcp-server config %q: %v", raw, parseErr)
+			warnings = append(warnings, fmt.Sprintf("invalid --mcp-server config %q: %v", raw, parseErr))
 			continue
 		}
 		parsed.Debug = cfg.DebugMCP
@@ -115,7 +119,7 @@ func initMCP(cfg *config.Settings, agentTools *[]llm.Tool) (*mcp.Manager, []llm.
 	}
 
 	if len(mcpConfigs) == 0 {
-		return nil, nil
+		return nil, nil, warnings
 	}
 
 	mcpManager := mcp.NewManager(mcpConfigs)
@@ -126,7 +130,7 @@ func initMCP(cfg *config.Settings, agentTools *[]llm.Tool) (*mcp.Manager, []llm.
 	connectCancel()
 
 	for _, connErr := range errs {
-		log.Printf("Warning: MCP server connection failed: %v", connErr)
+		warnings = append(warnings, fmt.Sprintf("MCP server connection failed: %v", connErr))
 	}
 
 	// Discover tools from connected servers.
@@ -141,5 +145,5 @@ func initMCP(cfg *config.Settings, agentTools *[]llm.Tool) (*mcp.Manager, []llm.
 		*agentTools = append(*agentTools, mcpServerTools...)
 	}
 
-	return mcpManager, mcpServerTools
+	return mcpManager, mcpServerTools, warnings
 }

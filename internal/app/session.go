@@ -67,6 +67,11 @@ func StartSession(cfg *Config, output io.Writer) (*agentpkg.Session, io.WriteClo
 		}
 	}
 
+	// Display MCP startup errors through the adapter as system error messages.
+	for _, e := range cfg.MCPStartupErrors {
+		stream.WriteSystemMsg(output, stream.ErrorMsg{Text: e}) //nolint:errcheck
+	}
+
 	// Check if we have any models available.
 	if !session.HasModels() {
 		return nil, nil, fmt.Errorf("%s", agentpkg.NoModelsErrorMessage(session.ModelConfigPath(), session.ModelManager.HasRejected()))

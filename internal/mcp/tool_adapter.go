@@ -157,27 +157,6 @@ func executeMCPTool(ctx context.Context, manager *Manager, serverName, toolName 
 	return parts, nil
 }
 
-// ServerFromToolName attempts to extract the server name from a prefixed
-// tool name by splitting on the last underscore.
-//
-// This is best-effort only: it fails when the tool name itself contains
-// underscores (e.g. "my_db_query_result" is ambiguous). Production code
-// does NOT use this function — tool routing goes through the closure
-// created by adaptTool, which captures the correct server+tool pair.
-//
-// Deprecated: do not use for runtime routing. Only exists for diagnostic
-// display purposes.
-//
-//	"my_server_query"  → "my_server", "query", true
-//	"bare_tool"        → "", "", false  (no prefix separator found)
-func ServerFromToolName(prefixedName string) (server, tool string, ok bool) {
-	idx := strings.LastIndex(prefixedName, "_")
-	if idx <= 0 || idx >= len(prefixedName)-1 {
-		return "", "", false
-	}
-	return prefixedName[:idx], prefixedName[idx+1:], true
-}
-
 // ParseServerConfig parses a single --mcp-server flag value.
 // Supported formats:
 //

@@ -22,3 +22,14 @@ func NewDebugWriter(baseName string) io.Writer {
 
 	return os.Stderr
 }
+
+// CleanupDebugWriter closes and removes a debug log file created by NewDebugWriter.
+// Use in tests to prevent accumulation of debug log files.
+// If w is not a file (e.g. stderr fallback), it does nothing.
+func CleanupDebugWriter(w io.Writer) {
+	if f, ok := w.(*os.File); ok && f != os.Stderr {
+		name := f.Name()
+		f.Close()
+		os.Remove(name)
+	}
+}
