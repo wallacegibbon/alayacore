@@ -38,6 +38,7 @@ type SSETransport struct {
 
 	closeOnce sync.Once
 	done      chan struct{}
+	doneOnce  sync.Once // guards close(done), used by both readLoop and Close
 	readerWg  sync.WaitGroup
 
 	debugWriter io.Writer
@@ -127,6 +128,7 @@ func NewSSETransport(url string, enableDebug bool) (*SSETransport, error) {
 // from the HTTP response stream.
 func (t *SSETransport) readLoop() {
 	defer t.readerWg.Done()
+	defer t.doneOnce.Do(func() { close(t.done) })
 	defer func() {
 		// If we exit without ever getting an endpoint, signal readiness
 		// (with failure) so NewSSETransport doesn't hang.
@@ -380,7 +382,7 @@ func (t *SSETransport) Close() error {
 		t.readerWg.Wait()
 
 		// Signal that transport is done.
-		close(t.done)
+		t.doneOnce.Do(func() { close(t.done) })
 	})
 	return nil
 }
