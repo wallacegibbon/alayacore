@@ -114,6 +114,13 @@ func (c *Client) doInitialize(ctx context.Context) error {
 		return fmt.Errorf("parse initialize result: %w", err)
 	}
 
+	// Verify protocol version compatibility per spec.
+	// If the server responds with a version we don't support, we MUST disconnect.
+	if result.ProtocolVersion != protocolVersion {
+		return fmt.Errorf("unsupported protocol version %q (client supports %q)",
+			result.ProtocolVersion, protocolVersion)
+	}
+
 	c.capabilities = result.Capabilities
 	c.serverInfo = result.ServerInfo
 

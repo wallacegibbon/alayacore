@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -208,6 +209,40 @@ func TestManagerEmpty(t *testing.T) {
 	}
 
 	m.CloseAll()
+}
+
+func TestClientInitialize_VersionMismatch(t *testing.T) {
+	// Server responds with a different protocol version — client must disconnect.
+	initResult := InitializeResult{
+		ProtocolVersion: "2024-11-05", // Different from our "2025-03-26"
+		Capabilities: ServerCapabilities{
+			Tools: &struct{}{},
+		},
+		ServerInfo: ImplementationInfo{
+			Name:    "old-server",
+			Version: "1.0.0",
+		},
+	}
+	initData, _ := json.Marshal(jsonrpcResponse{
+		JSONRPC: "2.0",
+		ID:      requestID("1"),
+		Result:  mustMarshal(initResult),
+	})
+
+	client := NewClient(ServerConfig{Name: "test"})
+	client.storeTransport(newMockTransport([]json.RawMessage{initData}))
+
+	ctx := context.Background()
+	err := client.doInitialize(ctx)
+	if err == nil {
+		t.Fatal("expected error for version mismatch, got nil")
+	}
+	if !strings.Contains(err.Error(), "unsupported protocol version") {
+		t.Errorf("expected 'unsupported protocol version' error, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "2024-11-05") {
+		t.Errorf("expected server version in error, got: %v", err)
+	}
 }
 
 func TestToolsToAgentTools(t *testing.T) {
