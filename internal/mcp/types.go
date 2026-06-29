@@ -228,7 +228,7 @@ type ReadResourceRequest struct {
 
 // ReadResourceResult is the result of the "resources/read" method.
 type ReadResourceResult struct {
-	Contents []ToolContent `json:"contents"`
+	Contents []ResourceContents `json:"contents"`
 }
 
 // ResourceContents represents the contents of a resource embedded in a

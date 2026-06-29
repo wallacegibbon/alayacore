@@ -247,8 +247,11 @@ func convertResourceContent(content ToolContent, serverName string) llm.ContentP
 	if content.Resource == nil {
 		return nil
 	}
-	rc := content.Resource
+	return convertResourceContents(content.Resource, serverName)
+}
 
+// convertResourceContents converts a ResourceContents to an AlayaCore ContentPart.
+func convertResourceContents(rc *ResourceContents, serverName string) llm.ContentPart {
 	switch {
 	case rc.Blob != "" && rc.MIMEType != "":
 		// Text MIME → decode base64 and return as text.
@@ -313,8 +316,8 @@ func executeReadResource(ctx context.Context, manager *Manager, serverName, uri 
 	}
 
 	parts := make([]llm.ContentPart, 0, len(result.Contents))
-	for _, content := range result.Contents {
-		part := convertToolContent(content, serverName)
+	for _, rc := range result.Contents {
+		part := convertResourceContents(&rc, serverName)
 		if part != nil {
 			parts = append(parts, part)
 		}
