@@ -206,6 +206,31 @@ type ToolContent struct {
 	Resource *ResourceContents `json:"resource,omitempty"`
 }
 
+// Resource represents a resource exposed by an MCP server.
+type Resource struct {
+	URI         string `json:"uri"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	MIMEType    string `json:"mimeType,omitempty"`
+	Size        *int64 `json:"size,omitempty"`
+}
+
+// ListResourcesResult is the result of the "resources/list" method.
+type ListResourcesResult struct {
+	Resources  []Resource `json:"resources"`
+	NextCursor string     `json:"nextCursor,omitempty"`
+}
+
+// ReadResourceRequest is the params for the "resources/read" method.
+type ReadResourceRequest struct {
+	URI string `json:"uri"`
+}
+
+// ReadResourceResult is the result of the "resources/read" method.
+type ReadResourceResult struct {
+	Contents []ToolContent `json:"contents"`
+}
+
 // ResourceContents represents the contents of a resource embedded in a
 // tool result or prompt message, per the MCP spec.
 type ResourceContents struct {

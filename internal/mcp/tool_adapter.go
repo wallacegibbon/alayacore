@@ -36,6 +36,22 @@ func ToolsToAgentTools(serverTools map[string][]Tool, manager *Manager) []llm.To
 	return toolsToAgentTools(serverTools, manager, defaultNaming)
 }
 
+// ResourcesToAgentTools creates a read_resource tool for each server that
+// advertised resource capability. The tool allows the LLM to read arbitrary
+// resources by URI.
+func ResourcesToAgentTools(clients []*Client, manager *Manager) []llm.Tool {
+	result := make([]llm.Tool, 0, len(clients))
+	for _, c := range clients {
+		if c.State() != StateReady || !c.HasResources() {
+			continue
+		}
+		serverName := c.Name()
+		tool := newReadResourceTool(serverName, manager)
+		result = append(result, tool)
+	}
+	return result
+}
+
 func toolsToAgentTools(serverTools map[string][]Tool, manager *Manager, strategy ToolNamingStrategy) []llm.Tool {
 	var result []llm.Tool
 
@@ -267,6 +283,45 @@ func convertResourceContent(content ToolContent, serverName string) llm.ContentP
 	default:
 		return nil
 	}
+}
+
+// newReadResourceTool creates a read_resource tool for a server that
+// supports the Resource capability.
+func newReadResourceTool(serverName string, manager *Manager) llm.Tool {
+	name := buildToolName(serverName, "read_resource", ToolNamePrefix)
+	description := fmt.Sprintf("Read a resource from MCP server %q by URI. "+
+		"Use resources/list to discover available URIs.", serverName)
+	schema := json.RawMessage(`{"type":"object","properties":{"uri":{"type":"string","description":"Resource URI to read"}},"required":["uri"]}`)
+
+	return llm.NewTool(name, description).
+		WithSchema(schema).
+		WithExecute(func(ctx context.Context, input json.RawMessage) ([]llm.ContentPart, error) {
+			var params struct {
+				URI string `json:"uri"`
+			}
+			if err := json.Unmarshal(input, &params); err != nil {
+				return nil, fmt.Errorf("invalid arguments: %w", err)
+			}
+			return executeReadResource(ctx, manager, serverName, params.URI)
+		}).
+		Build()
+}
+
+// executeReadResource reads a resource and converts the result to content parts.
+func executeReadResource(ctx context.Context, manager *Manager, serverName, uri string) ([]llm.ContentPart, error) {
+	result, err := manager.ReadResource(ctx, serverName, uri)
+	if err != nil {
+		return nil, err
+	}
+
+	parts := make([]llm.ContentPart, 0, len(result.Contents))
+	for _, content := range result.Contents {
+		part := convertToolContent(content, serverName)
+		if part != nil {
+			parts = append(parts, part)
+		}
+	}
+	return parts, nil
 }
 
 // ParseServerConfig parses a single --mcp-server flag value.

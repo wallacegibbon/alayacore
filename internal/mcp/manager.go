@@ -110,6 +110,15 @@ func (m *Manager) CallTool(ctx context.Context, serverName, toolName string, arg
 	return client.CallTool(ctx, toolName, arguments)
 }
 
+// ReadResource reads a resource by URI from the specified server.
+func (m *Manager) ReadResource(ctx context.Context, serverName, uri string) (*ReadResourceResult, error) {
+	client := m.findClient(serverName)
+	if client == nil {
+		return nil, fmt.Errorf("mcp server %q not found", serverName)
+	}
+	return client.ReadResource(ctx, uri)
+}
+
 // CloseAll shuts down all MCP client connections.
 func (m *Manager) CloseAll() {
 	if m.closed {

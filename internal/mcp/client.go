@@ -242,6 +242,69 @@ func (c *Client) HasTools() bool {
 	return c.capabilities.Tools != nil
 }
 
+// HasResources returns true if the server advertised resource support.
+func (c *Client) HasResources() bool {
+	return c.capabilities.Resources != nil
+}
+
+// ListResources fetches the list of available resources from the server.
+func (c *Client) ListResources(ctx context.Context) ([]Resource, error) {
+	if c.State() != StateReady {
+		return nil, c.stateError("list resources")
+	}
+
+	type listResourcesParams struct {
+		Cursor string `json:"cursor,omitempty"`
+	}
+
+	var all []Resource
+	var cursor string
+
+	for {
+		var params any
+		if cursor != "" {
+			params = listResourcesParams{Cursor: cursor}
+		}
+
+		result, err := c.sendRequest(ctx, methodListResources, params)
+		if err != nil {
+			return nil, err
+		}
+
+		var page ListResourcesResult
+		if err := json.Unmarshal(result, &page); err != nil {
+			return nil, fmt.Errorf("parse resources page: %w", err)
+		}
+
+		all = append(all, page.Resources...)
+		if page.NextCursor == "" {
+			break
+		}
+		cursor = page.NextCursor
+	}
+
+	return all, nil
+}
+
+// ReadResource reads a resource by URI from the server.
+func (c *Client) ReadResource(ctx context.Context, uri string) (*ReadResourceResult, error) {
+	if c.State() != StateReady {
+		return nil, c.stateError("read resource")
+	}
+
+	result, err := c.sendRequest(ctx, methodReadResource, ReadResourceRequest{URI: uri})
+	if err != nil {
+		return nil, fmt.Errorf("read resource %q on %q: %w", uri, c.config.Name, err)
+	}
+
+	var readResult ReadResourceResult
+	if err := json.Unmarshal(result, &readResult); err != nil {
+		return nil, fmt.Errorf("parse resources/read result: %w", err)
+	}
+
+	return &readResult, nil
+}
+
 // Close shuts down the client and its transport.
 // The Done channel is closed permanently.
 // Safe to call concurrently — only the first call performs the shutdown.

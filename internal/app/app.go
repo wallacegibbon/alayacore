@@ -150,5 +150,9 @@ func initMCP(cfg *config.Settings, agentTools *[]llm.Tool) (*mcp.Manager, []llm.
 		*agentTools = append(*agentTools, mcpServerTools...)
 	}
 
+	// Inject read_resource tools for servers that support Resources.
+	resourceTools := mcp.ResourcesToAgentTools(mcpManager.Clients(), mcpManager)
+	*agentTools = append(*agentTools, resourceTools...)
+
 	return mcpManager, mcpServerTools, warnings
 }
