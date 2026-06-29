@@ -375,6 +375,7 @@ func (c *Client) connectLocked(ctx context.Context) error {
 	}
 
 	c.state.Store(int32(StateReady))
+	c.startGETStream()
 	c.startMonitor()
 	return nil
 }
@@ -428,6 +429,18 @@ func (c *Client) handleNotification(method string) {
 	if method == "notifications/tools/list_changed" {
 		c.MarkStale("server tool list changed, restart required")
 	}
+}
+
+// startGETStream starts a long-lived GET SSE stream for Streamable HTTP transport
+// to receive server-to-client messages (e.g. notifications). This is best-effort;
+// if the server does not support GET streams (405), it's silently ignored.
+func (c *Client) startGETStream() {
+	st, ok := c.loadTransport().(*StreamableHTTPTransport)
+	if !ok {
+		return
+	}
+	// Use a background context; the stream is managed by the transport's Close().
+	_ = st.StartGETStream(context.Background(), st.handleServerRequest) //nolint:errcheck
 }
 
 // Ping sends a ping request to check server health.
