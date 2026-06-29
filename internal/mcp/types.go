@@ -208,11 +208,18 @@ type ToolContent struct {
 
 // Resource represents a resource exposed by an MCP server.
 type Resource struct {
-	URI         string `json:"uri"`
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-	MIMEType    string `json:"mimeType,omitempty"`
-	Size        *int64 `json:"size,omitempty"`
+	URI         string       `json:"uri"`
+	Name        string       `json:"name"`
+	Description string       `json:"description,omitempty"`
+	MIMEType    string       `json:"mimeType,omitempty"`
+	Annotations *Annotations `json:"annotations,omitempty"`
+	Size        *int64       `json:"size,omitempty"`
+}
+
+// Annotations represents optional metadata on resources and content items.
+type Annotations struct {
+	Audience []string `json:"audience,omitempty"` // "user" or "assistant"
+	Priority float64  `json:"priority,omitempty"` // 0.0 – 1.0
 }
 
 // ListResourcesResult is the result of the "resources/list" method.
