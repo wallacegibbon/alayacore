@@ -94,6 +94,7 @@ type Settings struct {
 	PlainIO       bool
 	RawIO         bool
 	DebugAPI      bool
+	DebugMCP      bool
 	ModelConfig   string // derived from config-path + "model.conf"
 	RuntimeConfig string // derived from config-path + "runtime.conf"
 	ThemesFolder  string // derived from config-path + "themes"
@@ -111,6 +112,9 @@ type Settings struct {
 	MaxSteps      int
 	AutoSummarize bool
 	ToolConfirm   []string // tool names requiring user confirmation
+
+	// MCP (Model Context Protocol) servers
+	MCPServers []string // raw flag values, parsed later
 }
 
 // Parse parses CLI flags and returns settings
@@ -129,6 +133,7 @@ func Parse() *Settings {
 	plainIO := flag.Bool("plainio", false, "Use plain stdin/stdout mode instead of terminal UI")
 	rawIO := flag.Bool("rawio", false, "Use raw TLV stdin/stdout mode instead of terminal UI (pipe TLV frames directly)")
 	debugAPI := flag.Bool("debug-api", false, "Write raw API requests and responses to log file")
+	debugMCP := flag.Bool("debug-mcp", false, "Write raw MCP JSON-RPC messages to log file")
 	configPath := flag.String("config-path", defaultConfigPath, "Config directory `path` (contains model.conf, runtime.conf, themes/)")
 	modelName := flag.String("model", "", "Model `name` to activate (must exist in model config; overrides runtime config)")
 	skill := &stringSlice{}
@@ -145,6 +150,10 @@ func Parse() *Settings {
 	autoSummarize := flag.Bool("auto-summarize", false, "Automatically summarize conversation when context exceeds 65% of limit")
 	toolConfirm := flag.String("tool-confirm", "", "Comma-separated tool `names` requiring user confirmation (e.g. execute_command,search_content)")
 
+	// MCP
+	mcpServer := &stringSlice{}
+	flag.Var(mcpServer, "mcp-server", "MCP server config: `name=command arg1 arg2` for stdio, `name@url` for SSE (can be specified multiple times)")
+
 	flag.Parse()
 
 	// Derive config file paths from config directory
@@ -154,6 +163,7 @@ func Parse() *Settings {
 		PlainIO:       *plainIO,
 		RawIO:         *rawIO,
 		DebugAPI:      *debugAPI,
+		DebugMCP:      *debugMCP,
 		ModelConfig:   filepath.Join(cp, "model.conf"),
 		RuntimeConfig: filepath.Join(cp, "runtime.conf"),
 		ThemesFolder:  filepath.Join(cp, "themes"),
@@ -165,6 +175,7 @@ func Parse() *Settings {
 		MaxSteps:      *maxSteps,
 		AutoSummarize: *autoSummarize,
 		ToolConfirm:   parseToolConfirm(*toolConfirm),
+		MCPServers:    mcpServer.Get(),
 	}
 
 	return s

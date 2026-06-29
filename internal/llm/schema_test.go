@@ -7,12 +7,12 @@ import (
 
 func TestGenerateSchema(t *testing.T) {
 	type TestInput struct {
-		Name        string  `json:"name" jsonschema:"required,description=The name of the item"`
-		Description string  `json:"description" jsonschema:"description=Optional description"`
-		Type        string  `json:"type" jsonschema:"required,description=The type,enum=foo|bar|baz"`
-		Count       int     `json:"count" jsonschema:"description=Number of items"`
-		Rate        float64 `json:"rate" jsonschema:"description=Rate per second"`
-		Enabled     bool    `json:"enabled" jsonschema:"description=Whether enabled"`
+		Name        string  `json:"name" jsonschema:"required" jsonschema_desc:"The name of the item"`
+		Description string  `json:"description" jsonschema_desc:"Optional description"`
+		Type        string  `json:"type" jsonschema:"required" jsonschema_enum:"foo|bar|baz" jsonschema_desc:"The type"`
+		Count       int     `json:"count" jsonschema_desc:"Number of items"`
+		Rate        float64 `json:"rate" jsonschema_desc:"Rate per second"`
+		Enabled     bool    `json:"enabled" jsonschema_desc:"Whether enabled"`
 	}
 
 	schema, err := GenerateSchema(TestInput{})
@@ -99,4 +99,42 @@ func TestGenerateSchema(t *testing.T) {
 	}
 
 	t.Logf("Generated schema: %s", string(schema))
+}
+
+func TestGenerateSchemaWithCommaInDescription(t *testing.T) {
+	type Input struct {
+		FileType string `json:"file_type" jsonschema_desc:"File type filter (e.g. go, python, rust)"`
+		Glob     string `json:"glob" jsonschema_desc:"Glob pattern (e.g. *.go, *.{ts,tsx})"`
+	}
+
+	schema, err := GenerateSchema(Input{})
+	if err != nil {
+		t.Fatalf("GenerateSchema failed: %v", err)
+	}
+
+	var parsed map[string]any
+	if err := json.Unmarshal(schema, &parsed); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+
+	props, ok := parsed["properties"].(map[string]any)
+	if !ok {
+		t.Fatal("properties is not an object")
+	}
+
+	ft, ok := props["file_type"].(map[string]any)
+	if !ok {
+		t.Fatal("file_type property is not an object")
+	}
+	if ft["description"] != "File type filter (e.g. go, python, rust)" {
+		t.Errorf("file_type description = %q, want %q", ft["description"], "File type filter (e.g. go, python, rust)")
+	}
+
+	g, ok := props["glob"].(map[string]any)
+	if !ok {
+		t.Fatal("glob property is not an object")
+	}
+	if g["description"] != "Glob pattern (e.g. *.go, *.{ts,tsx})" {
+		t.Errorf("glob description = %q, want %q", g["description"], "Glob pattern (e.g. *.go, *.{ts,tsx})")
+	}
 }

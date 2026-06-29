@@ -1,11 +1,15 @@
 package app
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"os"
+	"time"
 
 	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/llm"
+	"github.com/alayacore/alayacore/internal/mcp"
 	"github.com/alayacore/alayacore/internal/skills"
 	"github.com/alayacore/alayacore/internal/tools"
 )
@@ -30,6 +34,10 @@ type Config struct {
 	ExtraSystemPrompt string   // User-provided extra system prompt via --system flag
 	MaxSteps          int      // Maximum agent loop steps
 	ToolConfirmTools  []string // Tool names requiring user confirmation
+
+	// MCP manager for lifecycle management (cleanup).
+	MCPServerTools []llm.Tool // Tools from MCP servers (subset of AgentTools)
+	MCPManager     *mcp.Manager
 }
 
 // Setup initializes the common app components
@@ -40,6 +48,15 @@ func Setup(cfg *config.Settings) (*Config, error) {
 	}
 
 	agentTools := tools.DefaultTools()
+
+	// ========================================================================
+	// MCP (Model Context Protocol) initialization
+	// ========================================================================
+	mcpManager, mcpServerTools := initMCP(cfg, &agentTools)
+
+	// ========================================================================
+	// System Prompt Construction
+	// ========================================================================
 
 	// Build the default system prompt
 	rgAvailable := tools.RGAvailable()
@@ -70,8 +87,59 @@ func Setup(cfg *config.Settings) (*Config, error) {
 		SkillsMgr:         skillsManager,
 		AgentTools:        agentTools,
 		SystemPrompt:      systemPrompt,
-		ExtraSystemPrompt: cfg.SystemPrompt, // User-provided extra system prompt (supplemental, not replacement)
+		ExtraSystemPrompt: cfg.SystemPrompt,
 		MaxSteps:          cfg.MaxSteps,
 		ToolConfirmTools:  cfg.ToolConfirm,
+		MCPServerTools:    mcpServerTools,
+		MCPManager:        mcpManager,
 	}, nil
+}
+
+// initMCP initializes MCP servers: parses configs, connects, discovers tools,
+// and injects them into agentTools.
+func initMCP(cfg *config.Settings, agentTools *[]llm.Tool) (*mcp.Manager, []llm.Tool) {
+	if len(cfg.MCPServers) == 0 {
+		return nil, nil
+	}
+
+	// Pre-allocate with the maximum possible size; unused capacity is negligible.
+	mcpConfigs := make([]mcp.ServerConfig, 0, len(cfg.MCPServers))
+	for _, raw := range cfg.MCPServers {
+		parsed, parseErr := mcp.ParseServerConfig(raw)
+		if parseErr != nil {
+			log.Printf("Warning: invalid --mcp-server config %q: %v", raw, parseErr)
+			continue
+		}
+		parsed.Debug = cfg.DebugMCP
+		mcpConfigs = append(mcpConfigs, parsed)
+	}
+
+	if len(mcpConfigs) == 0 {
+		return nil, nil
+	}
+
+	mcpManager := mcp.NewManager(mcpConfigs)
+
+	// Connect with a per-server timeout.
+	connectCtx, connectCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	errs := mcpManager.ConnectAll(connectCtx)
+	connectCancel()
+
+	for _, connErr := range errs {
+		log.Printf("Warning: MCP server connection failed: %v", connErr)
+	}
+
+	// Discover tools from connected servers.
+	discoverCtx, discoverCancel := context.WithTimeout(context.Background(), 15*time.Second)
+	serverTools := mcpManager.DiscoverTools(discoverCtx)
+	discoverCancel()
+
+	var mcpServerTools []llm.Tool
+
+	if len(serverTools) > 0 {
+		mcpServerTools = mcp.ToolsToAgentTools(serverTools, mcpManager)
+		*agentTools = append(*agentTools, mcpServerTools...)
+	}
+
+	return mcpManager, mcpServerTools
 }

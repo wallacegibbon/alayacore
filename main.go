@@ -41,5 +41,10 @@ func main() {
 	// Clean up this process's temporary files under os.TempDir().
 	tools.Cleanup()
 
+	// Clean up MCP server connections (before os.Exit, which skips defers).
+	if appCfg.MCPManager != nil {
+		appCfg.MCPManager.CloseAll()
+	}
+
 	os.Exit(exitCode)
 }

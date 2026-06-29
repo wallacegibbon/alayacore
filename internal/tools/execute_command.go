@@ -17,7 +17,7 @@ import (
 const maxCommandOutput = 64 * 1024 // 64KB
 
 type executeCommandInput struct {
-	Command string `json:"command" jsonschema:"required,description=Command to execute"`
+	Command string `json:"command" jsonschema:"required" jsonschema_desc:"Command to execute"`
 }
 
 func NewExecuteCommandTool() llm.Tool {

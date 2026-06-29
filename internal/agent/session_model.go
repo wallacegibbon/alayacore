@@ -14,9 +14,9 @@ import (
 	"fmt"
 	"net/http"
 
-	debugpkg "github.com/alayacore/alayacore/internal/debug"
 	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/llm/factory"
+	"github.com/alayacore/alayacore/internal/llm/providers"
 )
 
 // SwitchModel switches the session to use a new model.
@@ -181,15 +181,15 @@ func createProviderFromConfig(config *ModelConfig, debugAPI bool, proxyURL strin
 	var err error
 	if proxyURL != "" {
 		if debugAPI {
-			client, err = debugpkg.NewHTTPClientWithProxyAndDebug(proxyURL)
+			client, err = providers.NewHTTPClientWithProxyAndDebug(proxyURL)
 		} else {
-			client, err = debugpkg.NewHTTPClientWithProxy(proxyURL)
+			client, err = providers.NewHTTPClientWithProxy(proxyURL)
 		}
 		if err != nil {
 			return nil, fmt.Errorf("provider: failed to create HTTP client with proxy: %w", err)
 		}
 	} else if debugAPI {
-		client = debugpkg.NewHTTPClient()
+		client = providers.NewHTTPClient()
 	}
 
 	return factory.NewProvider(factory.ProviderConfig{

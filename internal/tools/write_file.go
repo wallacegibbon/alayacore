@@ -10,8 +10,8 @@ import (
 
 // WriteFileInput represents the input for the write_file tool
 type WriteFileInput struct {
-	Path    string `json:"path" jsonschema:"required,description=File path to write"`
-	Content string `json:"content" jsonschema:"required,description=Content to write to the file"`
+	Path    string `json:"path" jsonschema:"required" jsonschema_desc:"File path to write"`
+	Content string `json:"content" jsonschema:"required" jsonschema_desc:"Content to write to the file"`
 }
 
 func NewWriteFileTool() llm.Tool {

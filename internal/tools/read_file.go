@@ -18,9 +18,9 @@ const maxTextReadSize = 64 * 1024 // 64KB limit for text files (~16K tokens)
 
 // ReadFileInput represents the input for the read_file tool
 type ReadFileInput struct {
-	Path      string `json:"path" jsonschema:"required,description=File path to read"`
-	StartLine int    `json:"start_line" jsonschema:"description=Starting line number (1-indexed)"`
-	NumLines  int    `json:"num_lines" jsonschema:"description=Number of lines to read from start_line"`
+	Path      string `json:"path" jsonschema:"required" jsonschema_desc:"File path to read"`
+	StartLine int    `json:"start_line" jsonschema_desc:"Starting line number (1-indexed)"`
+	NumLines  int    `json:"num_lines" jsonschema_desc:"Number of lines to read from start_line"`
 }
 
 func NewReadFileTool() llm.Tool {

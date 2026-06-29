@@ -14,9 +14,9 @@ import (
 
 // EditFileInput represents the input for the edit_file tool
 type EditFileInput struct {
-	Path      string `json:"path" jsonschema:"required,description=File path to edit"`
-	OldString string `json:"old_string" jsonschema:"required,description=Exact text to find and replace"`
-	NewString string `json:"new_string" jsonschema:"required,description=Replacement text"`
+	Path      string `json:"path" jsonschema:"required" jsonschema_desc:"File path to edit"`
+	OldString string `json:"old_string" jsonschema:"required" jsonschema_desc:"Exact text to find and replace"`
+	NewString string `json:"new_string" jsonschema:"required" jsonschema_desc:"Replacement text"`
 }
 
 // NewEditFileTool creates a tool for editing files using search/replace

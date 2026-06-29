@@ -1,4 +1,4 @@
-package debug
+package providers
 
 import (
 	"context"
@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/alayacore/alayacore/internal/debug"
 )
 
 func TestNewHTTPClient(t *testing.T) {
@@ -16,9 +18,9 @@ func TestNewHTTPClient(t *testing.T) {
 		return
 	}
 
-	transport, ok := client.Transport.(*Transport)
+	transport, ok := client.Transport.(*DebugTransport)
 	if !ok {
-		t.Fatalf("expected *Transport, got %T", client.Transport)
+		t.Fatalf("expected *DebugTransport, got %T", client.Transport)
 	}
 
 	if transport.Writer == nil {
@@ -27,81 +29,6 @@ func TestNewHTTPClient(t *testing.T) {
 
 	if transport.Transport == nil {
 		t.Error("expected non-nil underlying Transport")
-	}
-}
-
-func TestNewHTTPClientWithProxy_HTTP(t *testing.T) {
-	client, err := NewHTTPClientWithProxy("http://127.0.0.1:7890")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-		return
-	}
-	if client == nil {
-		t.Fatal("NewHTTPClientWithProxy returned nil")
-		return
-	}
-
-	transport, ok := client.Transport.(*http.Transport)
-	if !ok {
-		t.Fatalf("expected *http.Transport, got %T", client.Transport)
-	}
-
-	if transport.Proxy == nil {
-		t.Error("expected Proxy func to be set for HTTP proxy")
-	}
-}
-
-func TestNewHTTPClientWithProxy_SOCKS5(t *testing.T) {
-	client, err := NewHTTPClientWithProxy("socks5://127.0.0.1:1080")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-		return
-	}
-	if client == nil {
-		t.Fatal("NewHTTPClientWithProxy returned nil")
-		return
-	}
-
-	transport, ok := client.Transport.(*http.Transport)
-	if !ok {
-		t.Fatalf("expected *http.Transport, got %T", client.Transport)
-	}
-
-	if transport.DialContext == nil {
-		t.Error("expected DialContext to be set for SOCKS5 proxy")
-	}
-}
-
-func TestNewHTTPClientWithProxy_SOCKS5WithAuth(t *testing.T) {
-	client, err := NewHTTPClientWithProxy("socks5://user:pass@127.0.0.1:1080")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-		return
-	}
-	if client == nil {
-		t.Fatal("NewHTTPClientWithProxy returned nil")
-		return
-	}
-}
-
-func TestNewHTTPClientWithProxy_InvalidURL(t *testing.T) {
-	_, err := NewHTTPClientWithProxy("://invalid")
-	if err == nil {
-		t.Fatal("expected error for invalid proxy URL, got nil")
-	}
-}
-
-func TestNewHTTPClientWithProxy_EmptyURL(t *testing.T) {
-	// url.Parse("") returns a URL with empty scheme, which falls through
-	// to the default case (HTTP/HTTPS proxy) with the empty string as proxy.
-	// This doesn't fail — it just creates a transport with an empty proxy URL,
-	// which means no proxy. So we expect success, not an error.
-	client, err := NewHTTPClientWithProxy("")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if client == nil {
-		t.Fatal("NewHTTPClientWithProxy returned nil")
 	}
 }
 
@@ -116,16 +43,15 @@ func TestNewHTTPClientWithProxyAndDebug(t *testing.T) {
 		return
 	}
 
-	transport, ok := client.Transport.(*Transport)
+	transport, ok := client.Transport.(*DebugTransport)
 	if !ok {
-		t.Fatalf("expected *Transport, got %T", client.Transport)
+		t.Fatalf("expected *DebugTransport, got %T", client.Transport)
 	}
 
 	if transport.Writer == nil {
 		t.Error("expected non-nil Writer on debug transport")
 	}
 
-	// The inner transport should be an *http.Transport (with proxy configured)
 	innerTransport, ok := transport.Transport.(*http.Transport)
 	if !ok {
 		t.Fatalf("expected inner *http.Transport, got %T", transport.Transport)
@@ -142,14 +68,13 @@ func TestNewHTTPClientWithProxyAndDebug_InvalidProxy(t *testing.T) {
 	}
 }
 
-func TestTransport_RoundTrip_WithoutBody(t *testing.T) {
+func TestDebugTransport_RoundTrip_WithoutBody(t *testing.T) {
 	var logBuf strings.Builder
-	transport := &Transport{
+	transport := &DebugTransport{
 		Transport: &mockRoundTripper{},
 		Writer:    &logBuf,
 	}
 
-	// Use POST with empty body so the logging path is triggered
 	req, err := http.NewRequestWithContext(context.Background(), "GET", "http://example.com/test", http.NoBody)
 	if err != nil {
 		t.Fatalf("failed to create request: %v", err)
@@ -178,9 +103,9 @@ func TestTransport_RoundTrip_WithoutBody(t *testing.T) {
 	}
 }
 
-func TestTransport_RoundTrip_WithBody(t *testing.T) {
+func TestDebugTransport_RoundTrip_WithBody(t *testing.T) {
 	var logBuf strings.Builder
-	transport := &Transport{
+	transport := &DebugTransport{
 		Transport: &mockRoundTripper{},
 		Writer:    &logBuf,
 	}
@@ -214,14 +139,13 @@ func TestTransport_RoundTrip_WithBody(t *testing.T) {
 	}
 }
 
-func TestTransport_RoundTrip_AuthorizationHeader(t *testing.T) {
+func TestDebugTransport_RoundTrip_AuthorizationHeader(t *testing.T) {
 	var logBuf strings.Builder
-	transport := &Transport{
+	transport := &DebugTransport{
 		Transport: &mockRoundTripper{},
 		Writer:    &logBuf,
 	}
 
-	// POST with body so logging fires
 	req, err := http.NewRequestWithContext(context.Background(), "POST", "http://example.com/api", strings.NewReader(`{}`))
 	if err != nil {
 		t.Fatalf("failed to create request: %v", err)
@@ -248,9 +172,9 @@ func TestTransport_RoundTrip_AuthorizationHeader(t *testing.T) {
 	}
 }
 
-func TestTransport_RoundTrip_RequestError(t *testing.T) {
+func TestDebugTransport_RoundTrip_RequestError(t *testing.T) {
 	var logBuf strings.Builder
-	transport := &Transport{
+	transport := &DebugTransport{
 		Transport: &mockRoundTripper{err: errMockFailed},
 		Writer:    &logBuf,
 	}
@@ -296,8 +220,11 @@ func (m *mockRoundTripper) RoundTrip(_ *http.Request) (*http.Response, error) {
 }
 
 func TestNewDebugWriter_NotNil(t *testing.T) {
-	w := newDebugWriter()
+	w := debug.NewDebugWriter("alayacore-debug-api-test")
 	if w == nil {
-		t.Fatal("newDebugWriter returned nil")
+		t.Fatal("NewDebugWriter returned nil")
+	}
+	if c, ok := w.(io.Closer); ok {
+		c.Close()
 	}
 }

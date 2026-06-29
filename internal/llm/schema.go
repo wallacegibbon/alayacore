@@ -8,13 +8,14 @@ import (
 )
 
 // SchemaField tags for struct fields
-// Use like: `json:"name" jsonschema:"required,description=The name of the file"`
+// Use like: `json:"name" jsonschema:"required" jsonschema_desc:"The name of the file"`
 //
-// Supported tags:
-//   - required: marks the field as required
-//   - description=...: sets the field description
-//   - type=...: overrides the inferred type
-//   - enum=...: pipe-separated list of allowed values
+// Supported tags (each is an independent Go struct tag key, no delimiter
+// conflicts):
+//   - jsonschema:"required"           — marks the field as required
+//   - jsonschema_desc:"..."           — sets the field description
+//   - jsonschema_type:"..."           — overrides the inferred type
+//   - jsonschema_enum:"..."           — pipe-separated list of allowed values
 //
 // Type inference (automatic, no tag needed):
 //   - string → "string"
@@ -108,24 +109,7 @@ func GenerateSchema(v any) (json.RawMessage, error) {
 			Type: inferSchemaType(field.Type),
 		}
 
-		// Parse jsonschema tag
-		if tag := field.Tag.Get("jsonschema"); tag != "" {
-			parts := strings.Split(tag, ",")
-			for _, part := range parts {
-				part = strings.TrimSpace(part)
-				switch {
-				case part == "required":
-					required = append(required, fieldName)
-				case strings.HasPrefix(part, "description="):
-					schemaField.Description = strings.TrimPrefix(part, "description=")
-				case strings.HasPrefix(part, "type="):
-					schemaField.Type = strings.TrimPrefix(part, "type=")
-				case strings.HasPrefix(part, "enum="):
-					enumStr := strings.TrimPrefix(part, "enum=")
-					schemaField.Enum = strings.Split(enumStr, "|")
-				}
-			}
-		}
+		parseSchemaTag(&schemaField, field, fieldName, &required)
 
 		properties[fieldName] = schemaField
 	}
@@ -149,4 +133,25 @@ func MustGenerateSchema(v any) json.RawMessage {
 		panic(err)
 	}
 	return schema
+}
+
+// parseSchemaTag extracts directives from jsonschema struct tags.
+// Each directive is an independent Go struct tag key:
+//
+//	`jsonschema:"required" jsonschema_desc:"..." jsonschema_type:"..." jsonschema_enum:"..."`
+//
+// This avoids delimiter conflicts that plague flat-string formats.
+func parseSchemaTag(sf *SchemaField, field reflect.StructField, fieldName string, required *[]string) {
+	if _, ok := field.Tag.Lookup("jsonschema"); ok {
+		*required = append(*required, fieldName)
+	}
+	if desc, ok := field.Tag.Lookup("jsonschema_desc"); ok {
+		sf.Description = desc
+	}
+	if typeVal, ok := field.Tag.Lookup("jsonschema_type"); ok {
+		sf.Type = typeVal
+	}
+	if enumStr, ok := field.Tag.Lookup("jsonschema_enum"); ok {
+		sf.Enum = strings.Split(enumStr, "|")
+	}
 }
