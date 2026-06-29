@@ -168,7 +168,7 @@ func readMediaFile(path, mimeType string) ([]llm.ContentPart, error) {
 	sizeKB := float64(len(data)) / 1024
 
 	return []llm.ContentPart{
-		&llm.TextPart{Text: fmt.Sprintf("Read %s (%.1fKB)", filepath.Base(path), sizeKB)},
+		&llm.TextPart{Text: fmt.Sprintf("Read %s (%.1fKB, %s)", filepath.Base(path), sizeKB, mimeType)},
 		llm.MediaContentPart(mimeType, dataURI),
 	}, nil
 }
