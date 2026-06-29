@@ -99,12 +99,13 @@ func NewStdioTransport(command string, args []string, env map[string]string, ena
 
 // readLoop is the dedicated background goroutine that reads all JSON-RPC
 // response lines from the scanner and dispatches them by request ID.
+// Server-to-client requests (e.g. ping) are handled inline.
 func (t *StdioTransport) readLoop() {
 	defer t.readerWg.Done()
 
 	for t.scanner.Scan() {
 		data := t.scanner.Bytes()
-		if err := parseAndDispatchJSONRPC(data, t.pending, &t.pendingMu, t.debugWriter); err != nil {
+		if err := parseAndDispatchJSONRPC(data, t.pending, &t.pendingMu, t.debugWriter, t.handleServerRequest); err != nil {
 			// Malformed line — log and skip (server bug or protocol mismatch).
 			log.Printf("MCP: malformed response line (len=%d): %v",
 				len(data), err)
@@ -120,9 +121,38 @@ func (t *StdioTransport) readLoop() {
 	t.pendingMu.Unlock()
 }
 
-// Send writes a JSON-RPC request as a newline-terminated JSON message.
-// The context is not used for stdio writes (pipe writes are synchronous)
-// but is accepted for interface compatibility.
+// handleServerRequest handles a JSON-RPC request from the server (e.g. ping).
+// Responses are sent back through the transport.
+func (t *StdioTransport) handleServerRequest(id requestID, method string) {
+	switch method {
+	case methodPing:
+		// Respond with empty result.
+		resp := jsonrpcResponse{
+			JSONRPC: jsonrpcVersion,
+			ID:      id,
+			Result:  json.RawMessage(`{}`),
+		}
+		data, _ := json.Marshal(resp) //nolint:errcheck // static struct, cannot fail
+		t.mu.Lock()
+		t.stdin.Write(append(data, '\n')) //nolint:errcheck // best-effort
+		t.mu.Unlock()
+
+	default:
+		// Method not found — respond with error.
+		resp := jsonrpcResponse{
+			JSONRPC: jsonrpcVersion,
+			ID:      id,
+			Error: &jsonrpcError{
+				Code:    -32601, // METHOD_NOT_FOUND
+				Message: "Method not found: " + method,
+			},
+		}
+		data, _ := json.Marshal(resp) //nolint:errcheck // static struct, cannot fail
+		t.mu.Lock()
+		t.stdin.Write(append(data, '\n')) //nolint:errcheck // best-effort
+		t.mu.Unlock()
+	}
+}
 func (t *StdioTransport) Send(ctx context.Context, req jsonrpcRequest) error {
 	_ = ctx
 	t.mu.Lock()

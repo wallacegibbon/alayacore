@@ -202,7 +202,8 @@ func (t *SSETransport) handleSSEEvent(eventType, data string, endpointReceived *
 
 		// Parse and dispatch the JSON-RPC message (single or batch).
 		// dispatchResponse handles debug logging for each response.
-		if err := parseAndDispatchJSONRPC([]byte(data), t.pending, &t.pendingMu, t.debugWriter); err != nil {
+		// Server-to-client requests (e.g. ping) are handled inline.
+		if err := parseAndDispatchJSONRPC([]byte(data), t.pending, &t.pendingMu, t.debugWriter, t.handleServerRequest); err != nil {
 			log.Printf("MCP SSE: malformed response: %v", err)
 		}
 
@@ -323,6 +324,37 @@ func (t *SSETransport) sendPOST(ctx context.Context, req jsonrpcRequest) error {
 	return nil
 }
 
+// sendResponse sends a JSON-RPC response via HTTP POST to the message endpoint.
+func (t *SSETransport) sendResponse(ctx context.Context, resp jsonrpcResponse) error {
+	data, err := json.Marshal(resp)
+	if err != nil {
+		return fmt.Errorf("marshal response: %w", err)
+	}
+
+	if t.debugWriter != nil {
+		fmt.Fprintf(t.debugWriter, ">>> (response) %s\n", formatJSON(data))
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", t.messageURL, strings.NewReader(string(data)))
+	if err != nil {
+		return fmt.Errorf("create POST request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Accept", "application/json")
+
+	httpResp, err := t.httpClient.Do(httpReq)
+	if err != nil {
+		return fmt.Errorf("POST: %w", err)
+	}
+	httpResp.Body.Close()
+
+	if httpResp.StatusCode < 200 || httpResp.StatusCode >= 300 {
+		return fmt.Errorf("POST: unexpected status %d", httpResp.StatusCode)
+	}
+
+	return nil
+}
+
 // Close shuts down the SSE connection.
 // Order: close SSE response body (unblocks scanner) → wait for reader →
 // close done channel.
@@ -348,6 +380,29 @@ func (t *SSETransport) Close() error {
 		close(t.done)
 	})
 	return nil
+}
+
+// handleServerRequest handles a JSON-RPC request from the server (e.g. ping).
+// Responses are sent via HTTP POST to the message endpoint (best-effort).
+func (t *SSETransport) handleServerRequest(id requestID, method string) {
+	switch method {
+	case methodPing:
+		t.sendResponse(context.Background(), jsonrpcResponse{ //nolint:errcheck // best-effort
+			JSONRPC: jsonrpcVersion,
+			ID:      id,
+			Result:  json.RawMessage(`{}`),
+		})
+
+	default:
+		t.sendResponse(context.Background(), jsonrpcResponse{ //nolint:errcheck // best-effort
+			JSONRPC: jsonrpcVersion,
+			ID:      id,
+			Error: &jsonrpcError{
+				Code:    -32601,
+				Message: "Method not found: " + method,
+			},
+		})
+	}
 }
 
 // Done returns a channel that closes when the transport is shut down.

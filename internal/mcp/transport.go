@@ -95,13 +95,34 @@ func dispatchResponse(resp jsonrpcResponse, pending map[requestID]chan<- jsonrpc
 	// No pending request for this ID — discard the response.
 }
 
+// ServerRequestHandler is a callback for handling server-to-client requests.
+// These are JSON-RPC requests sent by the server to the client (e.g. ping,
+// sampling/createMessage, roots/list). The handler should respond to the
+// request using the transport's Send method.
+type ServerRequestHandler func(id requestID, method string)
+
 // parseAndDispatchJSONRPC parses a JSON-RPC message (single response or
 // batch array) and dispatches all contained responses to waiting callers.
 // Returns nil on success, or an error if the data cannot be parsed.
 //
 // Per the MCP spec, implementations MUST support receiving JSON-RPC batches.
-func parseAndDispatchJSONRPC(data []byte, pending map[requestID]chan<- jsonrpcResponse, mu sync.Locker, debugWriter io.Writer) error {
-	// Try single response first (common case).
+// Server-to-client requests are detected and forwarded to handleServerReq.
+func parseAndDispatchJSONRPC(data []byte, pending map[requestID]chan<- jsonrpcResponse, mu sync.Locker, debugWriter io.Writer, handleServerReq ServerRequestHandler) error {
+	// Check for server-to-client requests first.
+	// A JSON-RPC request has a "method" field and an "id" field.
+	var reqFields struct {
+		Method string    `json:"method"`
+		ID     requestID `json:"id"`
+	}
+	if err := json.Unmarshal(data, &reqFields); err == nil && reqFields.Method != "" {
+		if reqFields.ID != "" && handleServerReq != nil {
+			handleServerReq(reqFields.ID, reqFields.Method)
+		}
+		// Notifications (no ID) are silently accepted.
+		return nil
+	}
+
+	// Try single response (most common case).
 	var resp jsonrpcResponse
 	if err := json.Unmarshal(data, &resp); err == nil {
 		dispatchResponse(resp, pending, mu, debugWriter, data)

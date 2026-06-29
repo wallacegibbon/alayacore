@@ -13,7 +13,7 @@ func TestParseAndDispatchJSONRPC_Single(t *testing.T) {
 	pending["1"] = resultCh
 
 	data := []byte(`{"jsonrpc":"2.0","id":"1","result":{"hello":"world"}}`)
-	err := parseAndDispatchJSONRPC(data, pending, &mu, nil)
+	err := parseAndDispatchJSONRPC(data, pending, &mu, nil, nil)
 	if err != nil {
 		t.Fatalf("parseAndDispatchJSONRPC() error = %v", err)
 	}
@@ -48,7 +48,7 @@ func TestParseAndDispatchJSONRPC_Batch(t *testing.T) {
 		{"jsonrpc":"2.0","id":"1","result":{"status":"ok"}},
 		{"jsonrpc":"2.0","id":"2","result":{"count":42}}
 	]`)
-	err := parseAndDispatchJSONRPC(data, pending, &mu, nil)
+	err := parseAndDispatchJSONRPC(data, pending, &mu, nil, nil)
 	if err != nil {
 		t.Fatalf("parseAndDispatchJSONRPC() error = %v", err)
 	}
@@ -82,7 +82,7 @@ func TestParseAndDispatchJSONRPC_Malformed(t *testing.T) {
 		`[{"jsonrpc":"2.0"},"bad"]`, // batch with non-object element
 	}
 	for _, tc := range tests {
-		err := parseAndDispatchJSONRPC([]byte(tc), pending, &mu, nil)
+		err := parseAndDispatchJSONRPC([]byte(tc), pending, &mu, nil, nil)
 		if err == nil {
 			t.Errorf("expected error for input %q", tc)
 		}
@@ -94,7 +94,7 @@ func TestParseAndDispatchJSONRPC_Malformed(t *testing.T) {
 		`{"jsonrpc":"2.0"}`,
 	}
 	for _, tc := range okCases {
-		err := parseAndDispatchJSONRPC([]byte(tc), pending, &mu, nil)
+		err := parseAndDispatchJSONRPC([]byte(tc), pending, &mu, nil, nil)
 		if err != nil {
 			t.Errorf("unexpected error for input %q: %v", tc, err)
 		}
@@ -107,7 +107,7 @@ func TestParseAndDispatchJSONRPC_NoPending(t *testing.T) {
 
 	// Response for an unknown ID should not panic or hang.
 	data := []byte(`{"jsonrpc":"2.0","id":"unknown","result":{}}`)
-	err := parseAndDispatchJSONRPC(data, pending, &mu, nil)
+	err := parseAndDispatchJSONRPC(data, pending, &mu, nil, nil)
 	if err != nil {
 		t.Fatalf("parseAndDispatchJSONRPC() error = %v", err)
 	}
@@ -143,7 +143,7 @@ func TestParseAndDispatchJSONRPC_NoPendingForBatchItem(t *testing.T) {
 		{"jsonrpc":"2.0","id":"1","result":{"a":1}},
 		{"jsonrpc":"2.0","id":"999","result":{"b":2}}
 	]`)
-	err := parseAndDispatchJSONRPC(data, pending, &mu, nil)
+	err := parseAndDispatchJSONRPC(data, pending, &mu, nil, nil)
 	if err != nil {
 		t.Fatalf("parseAndDispatchJSONRPC() error = %v", err)
 	}
@@ -162,5 +162,52 @@ func TestParseAndDispatchJSONRPC_NoPendingForBatchItem(t *testing.T) {
 	mu.Unlock()
 	if ok {
 		t.Error("pending entry 1 was not cleaned up")
+	}
+}
+
+func TestParseAndDispatchJSONRPC_ServerRequest(t *testing.T) {
+	pending := make(map[requestID]chan<- jsonrpcResponse)
+	var mu sync.Mutex
+
+	var handledID requestID
+	var handledMethod string
+	handler := func(id requestID, method string) {
+		handledID = id
+		handledMethod = method
+	}
+
+	// Server sends a ping request.
+	data := []byte(`{"jsonrpc":"2.0","id":"srv-1","method":"ping"}`)
+	err := parseAndDispatchJSONRPC(data, pending, &mu, nil, handler)
+	if err != nil {
+		t.Fatalf("parseAndDispatchJSONRPC() error = %v", err)
+	}
+
+	if handledID != "srv-1" {
+		t.Errorf("handledID = %q, want %q", handledID, "srv-1")
+	}
+	if handledMethod != "ping" {
+		t.Errorf("handledMethod = %q, want %q", handledMethod, "ping")
+	}
+}
+
+func TestParseAndDispatchJSONRPC_ServerNotification(t *testing.T) {
+	// Notifications (no ID) should be silently accepted without calling handler.
+	pending := make(map[requestID]chan<- jsonrpcResponse)
+	var mu sync.Mutex
+
+	called := false
+	handler := func(id requestID, method string) {
+		called = true
+	}
+
+	data := []byte(`{"jsonrpc":"2.0","method":"notifications/tools/list_changed"}`)
+	err := parseAndDispatchJSONRPC(data, pending, &mu, nil, handler)
+	if err != nil {
+		t.Fatalf("parseAndDispatchJSONRPC() error = %v", err)
+	}
+
+	if called {
+		t.Error("handler was called for a notification (no ID)")
 	}
 }
