@@ -43,6 +43,23 @@ func (m *Manager) loadClients() []*Client {
 	return clients
 }
 
+// ServerInstructions returns a map of server name → initialization
+// instructions for all connected servers that provided them.
+// These instructions can be injected into the system prompt to improve
+// the LLM's understanding of available tools and resources.
+func (m *Manager) ServerInstructions() map[string]string {
+	result := make(map[string]string)
+	for _, c := range m.loadClients() {
+		if c.State() != StateReady {
+			continue
+		}
+		if instr := c.Instructions(); instr != "" {
+			result[c.Name()] = instr
+		}
+	}
+	return result
+}
+
 // ConnectAll connects to all configured MCP servers and performs
 // initialization. Servers that fail to connect do not prevent others
 // from connecting.

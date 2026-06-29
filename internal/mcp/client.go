@@ -46,6 +46,9 @@ type Client struct {
 	// Server capabilities reported during initialization.
 	capabilities ServerCapabilities
 	serverInfo   ImplementationInfo
+	// Instructions from the server's InitializeResult, used by clients
+	// to improve the LLM's understanding of available tools/resources.
+	instructions string
 
 	// toolsCache stores []Tool or nil — atomically loadable/storable.
 	toolsCache atomic.Value
@@ -86,6 +89,13 @@ func (c *Client) ServerInfo() ImplementationInfo {
 	return c.serverInfo
 }
 
+// Instructions returns the server's instructions from initialization, if any.
+// These can be used by clients to improve the LLM's understanding of
+// available tools, resources, etc.
+func (c *Client) Instructions() string {
+	return c.instructions
+}
+
 // Connect establishes the transport and performs MCP initialization.
 // Returns an error if the connection or handshake fails.
 func (c *Client) Connect(ctx context.Context) error {
@@ -123,6 +133,7 @@ func (c *Client) doInitialize(ctx context.Context) error {
 
 	c.capabilities = result.Capabilities
 	c.serverInfo = result.ServerInfo
+	c.instructions = result.Instructions
 
 	// Send initialized notification (no response expected).
 	_ = c.sendNotification(ctx, methodNotificationsInitialized, nil) //nolint:errcheck

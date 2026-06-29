@@ -79,6 +79,14 @@ func Setup(cfg *config.Settings) (*Config, error) {
 		systemPrompt = systemPrompt + "\n\nCurrent working directory: " + cwd
 	}
 
+	// Append MCP server instructions (hints from servers about how to use
+	// their tools/resources effectively).
+	if mcpManager != nil {
+		for serverName, instructions := range mcpManager.ServerInstructions() {
+			systemPrompt += fmt.Sprintf("\n\nInstructions from MCP server %q:\n%s", serverName, instructions)
+		}
+	}
+
 	return &Config{
 		Cfg:               cfg,
 		SkillsMgr:         skillsManager,
