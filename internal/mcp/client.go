@@ -444,6 +444,13 @@ func (c *Client) connectLocked(ctx context.Context) error {
 		return fmt.Errorf("mcp client %q initialize: %w", c.config.Name, err)
 	}
 
+	// Set the negotiated protocol version on Streamable HTTP transport
+	// so it can include the MCP-Protocol-Version header on all subsequent
+	// HTTP requests (required by spec 2025-11-25).
+	if st, ok := transport.(*StreamableHTTPTransport); ok {
+		st.SetProtocolVersion(protocolVersion)
+	}
+
 	c.state.Store(int32(StateReady))
 	c.startGETStream()
 	c.startMonitor()

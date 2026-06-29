@@ -71,7 +71,7 @@ responses arriving as SSE `message` events.
 --mcp-server "remote=sse:https://example.com/sse"
 ```
 
-### http — Streamable HTTP Transport (2025-03-26)
+### http — Streamable HTTP Transport (2025-11-25)
 
 ```
 name=http:url
@@ -181,8 +181,8 @@ directory. Each run creates a new file so historical logs are preserved:
 
 ```
 MCP debug log started for: npx @anthropic/mcp-db-server
->>> initialize {"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"alayacore","version":"0.1.0"}}
-<<< {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-03-26","capabilities":{"tools":{}},"serverInfo":{"name":"mcp-db","version":"1.0.0"}}}
+>>> initialize {"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"alayacore","version":"0.1.0"}}
+<<< {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-11-25","capabilities":{"tools":{}},"serverInfo":{"name":"mcp-db","version":"1.0.0"}}}
 >>> notifications/initialized
 >>> tools/list
 <<< {"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"query","description":"Run SQL query","inputSchema":{"type":"object"}}]}}
@@ -215,19 +215,60 @@ JSON is pretty-printed for readability.
 
 ## Protocol Support
 
-| MCP Feature | Status |
-|-------------|--------|
-| `initialize` / `initialized` | ✅ Supported |
-| `tools/list` (with cursor pagination) | ✅ Supported |
-| `tools/call` | ✅ Supported |
-| `resources/list` / `resources/read` | ✅ Supported (via `read_resource` tool) |
-| `prompts/list` / `prompts/get` | ✅ Supported (via `get_prompt` tool) |
-| `ping` | ✅ Supported |
-| `notifications/cancelled` | ✅ Supported |
-| `notifications/tools/list_changed` | ✅ Supported (marks server stale) |
-| Stdio transport | ✅ Supported |
-| Streamable HTTP transport (2025-11-25) | ✅ Supported |
-| SSE transport (2024-11-05, legacy) | ✅ Supported |
+AlayaCore implements the MCP **client** side of the protocol (it acts as
+an MCP Host). The table below covers spec `2025-11-25`.
+
+### ✅ Implemented
+
+| Feature | Notes |
+|---------|-------|
+| `initialize` / `initialized` | Version negotiation, capability exchange |
+| `tools/list` | With cursor-based pagination |
+| `tools/call` | With content type conversion (text, image, audio, resource, resource_link) |
+| `resources/list` / `resources/read` | Exposed as `{server}_read_resource` tool |
+| `prompts/list` / `prompts/get` | Exposed as `{server}_get_prompt` tool |
+| `ping` | Both client → server and server → client |
+| `notifications/cancelled` | Best-effort on context cancellation |
+| `notifications/tools/list_changed` | Marks server stale, requires restart |
+| Stdio transport | NDJSON, graceful shutdown (stdin→SIGTERM→SIGKILL) |
+| Streamable HTTP transport | JSON + SSE responses, GET stream, `Mcp-Session-Id`, `MCP-Protocol-Version` header |
+| SSE transport (legacy) | Endpoint discovery, relative URL resolution |
+| Cursor pagination | All list methods |
+
+### ❌ Not Implemented
+
+| Feature | Spec Section | Reason |
+|---------|-------------|--------|
+| `_meta` / `progressToken` | General fields, Progress | Progress notifications; optional, we don't initiate long-running ops |
+| `resources/subscribe` / `resources/unsubscribe` | Resources | Resource change subscription; not needed for agent use case |
+| `notifications/resources/list_changed` | Resources | We don't cache resource lists (fetched on demand) |
+| `notifications/resources/updated` | Resources | Requires subscribe; not implemented |
+| `notifications/prompts/list_changed` | Prompts | We don't cache prompt lists (fetched on demand) |
+| `notifications/progress` | Progress | Requires `progressToken` in `_meta` |
+| `notifications/message` (logging) | Logging | Server log messages; optional |
+| `logging/setLevel` | Server → Logging | Server log level control |
+| `completion/complete` | Server → Completions | Argument autocomplete suggestions |
+| `roots/list` / `roots/list_changed` | Client → Roots | Not needed; agent doesn't expose file system roots |
+| `sampling/createMessage` | Client → Sampling | Server-initiated LLM sampling; not needed |
+| Client `elicitation` capability | Client → Elicitation | Server requests user info; not needed (agent controls the loop) |
+| Client `tasks` capability | Client → Tasks | Task-augmented execution (polling pattern) |
+| Server `tasks` capability | Server → Tasks | Task-augmented execution (polling pattern) |
+| `server/discover` | Server → Discover | Advertise supported protocol versions (draft) |
+| `subscriptions/listen` | Server → Subscriptions | Long-lived notification channel (draft) |
+| OAuth 2.1 authorization | Authorization | Not needed for tools-only use |
+
+### Schema Coverage
+
+Our Go types match the `2025-11-25` JSON Schema for all implemented
+features. Known omissions (all optional):
+
+| Field | Types |
+|-------|-------|
+| `_meta map[string]any` | Tool, CallToolResult, Resource, Prompt, InitializeRequest, InitializeResult, ListToolsResult, ListResourcesResult, ListPromptsResult, ReadResourceResult, GetPromptResult, TextContent, ImageContent, AudioContent, ResourceLink, EmbeddedResource |
+| `annotations` on content blocks | TextContent, ImageContent, AudioContent, ResourceLink, EmbeddedResource |
+
+These are silently ignored by Go's JSON decoder and have no functional
+impact.
 
 ## Technical Notes
 

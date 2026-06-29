@@ -20,7 +20,7 @@ import (
 // ============================================================================
 //
 // StreamableHTTPTransport implements the MCP Streamable HTTP transport
-// defined in specification 2025-03-26. It replaces the legacy HTTP+SSE
+// defined in specification 2025-11-25. It replaces the legacy HTTP+SSE
 // transport from 2024-11-05.
 //
 // Protocol overview:
@@ -35,11 +35,17 @@ import (
 // the transport falls back to legacy HTTP+SSE (2024-11-05).
 
 // StreamableHTTPTransport communicates with an MCP server using the
-// Streamable HTTP transport (spec 2025-03-26).
+// Streamable HTTP transport (spec 2025-11-25).
 type StreamableHTTPTransport struct {
 	endpointURL string
 	sessionID   string // Mcp-Session-Id from server, if any
 	httpClient  *http.Client
+
+	// negotiatedVersion is the protocol version negotiated during
+	// initialization. It is set after the initialize handshake and is
+	// included as the MCP-Protocol-Version header on all subsequent
+	// HTTP requests (required by spec 2025-11-25).
+	negotiatedVersion string
 
 	// SSE stream from a POST response that's still active.
 	// Only one POST-response SSE stream can be active at a time.
@@ -254,6 +260,14 @@ func (t *StreamableHTTPTransport) SetNotificationHandler(h NotificationHandler) 
 	t.notificationHandler = h
 }
 
+// SetProtocolVersion sets the protocol version negotiated during initialization.
+// This version is included as the MCP-Protocol-Version header on all subsequent
+// HTTP requests, as required by the MCP Streamable HTTP specification.
+// If not set, the header is omitted.
+func (t *StreamableHTTPTransport) SetProtocolVersion(version string) {
+	t.negotiatedVersion = version
+}
+
 // ============================================================================
 // GET SSE Stream (Server-to-Client Messages)
 // ============================================================================
@@ -296,6 +310,9 @@ func (t *StreamableHTTPTransport) StartGETStream(ctx context.Context, handler Se
 		return fmt.Errorf("create GET request: %w", err)
 	}
 	httpReq.Header.Set("Accept", "text/event-stream")
+	if t.negotiatedVersion != "" {
+		httpReq.Header.Set("MCP-Protocol-Version", t.negotiatedVersion)
+	}
 	if t.sessionID != "" {
 		httpReq.Header.Set("Mcp-Session-Id", t.sessionID)
 	}
@@ -390,6 +407,9 @@ func (t *StreamableHTTPTransport) doPOST(ctx context.Context, req jsonrpcRequest
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Accept", "application/json, text/event-stream")
+	if t.negotiatedVersion != "" {
+		httpReq.Header.Set("MCP-Protocol-Version", t.negotiatedVersion)
+	}
 	if t.sessionID != "" {
 		httpReq.Header.Set("Mcp-Session-Id", t.sessionID)
 	}
@@ -551,6 +571,9 @@ func (t *StreamableHTTPTransport) sendResponse(ctx context.Context, resp jsonrpc
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Accept", "application/json, text/event-stream")
+	if t.negotiatedVersion != "" {
+		httpReq.Header.Set("MCP-Protocol-Version", t.negotiatedVersion)
+	}
 	if t.sessionID != "" {
 		httpReq.Header.Set("Mcp-Session-Id", t.sessionID)
 	}

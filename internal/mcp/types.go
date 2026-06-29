@@ -135,21 +135,23 @@ type ImplementationInfo struct {
 	Version     string `json:"version"`
 	Title       string `json:"title,omitempty"`
 	Description string `json:"description,omitempty"`
-	URL         string `json:"url,omitempty"`
+	URL         string `json:"websiteUrl,omitempty"`
+	Icons       []Icon `json:"icons,omitempty"`
 }
 
 // Icon represents an optional icon for tools, resources, or prompts.
 type Icon struct {
-	Src      string `json:"src"`
-	MIMEType string `json:"mimeType,omitempty"`
-	Sizes    string `json:"sizes,omitempty"`
+	Src      string   `json:"src"`
+	MIMEType string   `json:"mimeType,omitempty"`
+	Sizes    []string `json:"sizes,omitempty"`
+	Theme    string   `json:"theme,omitempty"`
 }
 
 // ToolExecution describes execution options for a tool.
 type ToolExecution struct {
-	// Indicates whether this tool supports task-augmented execution.
+	// TaskSupport indicates whether this tool supports task-augmented execution.
 	// "forbidden" (default), "optional", or "required".
-	Task string `json:"task,omitempty"`
+	TaskSupport string `json:"taskSupport,omitempty"`
 }
 
 // Tool represents a tool exposed by an MCP server.
@@ -227,22 +229,22 @@ type ToolContent struct {
 	Text string `json:"text,omitempty"`
 	// Data is base64-encoded binary data for types "image" and "audio".
 	Data string `json:"data,omitempty"`
-	// MIMEType describes the media type for "image", "audio", and "resource".
+	// MIMEType describes the media type for "image", "audio", "resource_link", and "resource".
 	MIMEType string `json:"mimeType,omitempty"`
+	// URI is used for type "resource_link".
+	URI string `json:"uri,omitempty"`
+	// Name is used for type "resource_link".
+	Name string `json:"name,omitempty"`
 	// Resource is used for type "resource" — a reference to a resource
 	// with its contents embedded inline.
 	Resource *ResourceContents `json:"resource,omitempty"`
-	// ResourceLink is used for type "resource_link" — a reference to a
-	// resource without its contents (uri + metadata only).
-	ResourceLink *Resource `json:"resource_link,omitempty"`
-	// Name is used for type "resource_link".
-	Name string `json:"name,omitempty"`
 }
 
 // Resource represents a resource exposed by an MCP server.
 type Resource struct {
 	URI         string       `json:"uri"`
 	Name        string       `json:"name"`
+	Title       string       `json:"title,omitempty"`
 	Description string       `json:"description,omitempty"`
 	MIMEType    string       `json:"mimeType,omitempty"`
 	Annotations *Annotations `json:"annotations,omitempty"`
@@ -252,8 +254,9 @@ type Resource struct {
 
 // Annotations represents optional metadata on resources and content items.
 type Annotations struct {
-	Audience []string `json:"audience,omitempty"` // "user" or "assistant"
-	Priority float64  `json:"priority,omitempty"` // 0.0 – 1.0
+	Audience     []string `json:"audience,omitempty"`     // "user" or "assistant"
+	Priority     float64  `json:"priority,omitempty"`     // 0.0 – 1.0
+	LastModified string   `json:"lastModified,omitempty"` // ISO 8601 formatted string
 }
 
 // ListResourcesResult is the result of the "resources/list" method.
@@ -275,6 +278,7 @@ type ReadResourceResult struct {
 // Prompt represents a prompt or prompt template exposed by an MCP server.
 type Prompt struct {
 	Name        string           `json:"name"`
+	Title       string           `json:"title,omitempty"`
 	Description string           `json:"description,omitempty"`
 	Arguments   []PromptArgument `json:"arguments,omitempty"`
 	Icons       []Icon           `json:"icons,omitempty"`
@@ -283,6 +287,7 @@ type Prompt struct {
 // PromptArgument describes an argument a prompt template accepts.
 type PromptArgument struct {
 	Name        string `json:"name"`
+	Title       string `json:"title,omitempty"`
 	Description string `json:"description,omitempty"`
 	Required    bool   `json:"required,omitempty"`
 }
@@ -377,7 +382,7 @@ type ServerConfig struct {
 
 // HTTP transport type constants.
 const (
-	TransportStreamable = "streamable" // Streamable HTTP (2025-03-26)
+	TransportStreamable = "streamable" // Streamable HTTP (2025-11-25)
 	TransportSSE        = "sse"        // legacy HTTP+SSE (2024-11-05)
 )
 

@@ -307,19 +307,19 @@ func convertResourceContents(rc *ResourceContents, serverName string) llm.Conten
 // convertResourceLinkContent converts a ResourceLink content to a ContentPart.
 // ResourceLink is a reference to a resource without its content inline.
 func convertResourceLinkContent(content ToolContent, serverName string) llm.ContentPart {
-	rl := content.ResourceLink
-	if rl == nil {
-		// No ResourceLink struct; nothing to render.
+	if content.URI == "" {
 		return nil
 	}
-
-	if rl.MIMEType != "" {
-		return &llm.TextPart{
-			Text: fmt.Sprintf("[Resource from %s: %s (%s)]", serverName, rl.Name, rl.MIMEType),
-		}
+	name := content.Name
+	if name == "" {
+		name = content.URI
+	}
+	label := fmt.Sprintf("[Resource from %s: %s]", serverName, name)
+	if content.MIMEType != "" {
+		label = fmt.Sprintf("[Resource from %s: %s (%s)]", serverName, name, content.MIMEType)
 	}
 	return &llm.TextPart{
-		Text: fmt.Sprintf("[Resource from %s: %s]", serverName, rl.Name),
+		Text: fmt.Sprintf("%s\nURI: %s", label, content.URI),
 	}
 }
 
