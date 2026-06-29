@@ -3,6 +3,9 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
+	"sync"
 	"time"
 )
 
@@ -59,4 +62,60 @@ func formatJSON(data []byte) string {
 		return string(data)
 	}
 	return string(pretty)
+}
+
+// ============================================================================
+// JSON-RPC Message Dispatch
+// ============================================================================
+
+// dispatchResponse sends a JSON-RPC response to the waiting caller by
+// matching request ID. If no caller is waiting, the response is discarded.
+// The pending map must be protected by mu.
+func dispatchResponse(resp jsonrpcResponse, pending map[requestID]chan<- jsonrpcResponse, mu sync.Locker, debugWriter io.Writer, rawData []byte) {
+	mu.Lock()
+	ch, ok := pending[resp.ID]
+	if ok {
+		delete(pending, resp.ID)
+	}
+	mu.Unlock()
+
+	if debugWriter != nil && rawData != nil {
+		fmt.Fprintf(debugWriter, "<<< %s\n", formatJSON(rawData))
+	}
+
+	if ok {
+		// Non-blocking send; channel has buffer 1 and receiver is
+		// waiting (unless context was canceled after lookup).
+		select {
+		case ch <- resp:
+		default:
+		}
+		close(ch)
+	}
+	// No pending request for this ID — discard the response.
+}
+
+// parseAndDispatchJSONRPC parses a JSON-RPC message (single response or
+// batch array) and dispatches all contained responses to waiting callers.
+// Returns nil on success, or an error if the data cannot be parsed.
+//
+// Per the MCP spec, implementations MUST support receiving JSON-RPC batches.
+func parseAndDispatchJSONRPC(data []byte, pending map[requestID]chan<- jsonrpcResponse, mu sync.Locker, debugWriter io.Writer) error {
+	// Try single response first (common case).
+	var resp jsonrpcResponse
+	if err := json.Unmarshal(data, &resp); err == nil {
+		dispatchResponse(resp, pending, mu, debugWriter, data)
+		return nil
+	}
+
+	// Try as a JSON-RPC batch (array of responses).
+	var batch []jsonrpcResponse
+	if err := json.Unmarshal(data, &batch); err == nil {
+		for _, r := range batch {
+			dispatchResponse(r, pending, mu, debugWriter, data)
+		}
+		return nil
+	}
+
+	return fmt.Errorf("invalid JSON-RPC message: %s", string(data))
 }

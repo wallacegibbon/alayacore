@@ -103,35 +103,12 @@ func (t *StdioTransport) readLoop() {
 	defer t.readerWg.Done()
 
 	for t.scanner.Scan() {
-		var resp jsonrpcResponse
-		if err := json.Unmarshal(t.scanner.Bytes(), &resp); err != nil {
+		data := t.scanner.Bytes()
+		if err := parseAndDispatchJSONRPC(data, t.pending, &t.pendingMu, t.debugWriter); err != nil {
 			// Malformed line — log and skip (server bug or protocol mismatch).
 			log.Printf("MCP: malformed response line (len=%d): %v",
-				len(t.scanner.Bytes()), err)
-			continue
+				len(data), err)
 		}
-
-		t.pendingMu.Lock()
-		ch, ok := t.pending[resp.ID]
-		if ok {
-			delete(t.pending, resp.ID)
-		}
-		t.pendingMu.Unlock()
-
-		if t.debugWriter != nil {
-			fmt.Fprintf(t.debugWriter, "<<< %s\n", formatJSON(t.scanner.Bytes()))
-		}
-
-		if ok {
-			// Non-blocking send; channel has buffer 1 and receiver is
-			// waiting (unless context was canceled after lookup).
-			select {
-			case ch <- resp:
-			default:
-			}
-			close(ch)
-		}
-		// No pending request for this ID — discard the response.
 	}
 
 	// Scanner error or EOF — close all remaining pending channels.

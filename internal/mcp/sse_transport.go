@@ -200,31 +200,10 @@ func (t *SSETransport) handleSSEEvent(eventType, data string, endpointReceived *
 			return // ignore messages before endpoint
 		}
 
-		if t.debugWriter != nil {
-			fmt.Fprintf(t.debugWriter, "<<< %s\n", formatJSON([]byte(data)))
-		}
-
-		// Parse the JSON-RPC response.
-		var resp jsonrpcResponse
-		if err := json.Unmarshal([]byte(data), &resp); err != nil {
+		// Parse and dispatch the JSON-RPC message (single or batch).
+		// dispatchResponse handles debug logging for each response.
+		if err := parseAndDispatchJSONRPC([]byte(data), t.pending, &t.pendingMu, t.debugWriter); err != nil {
 			log.Printf("MCP SSE: malformed response: %v", err)
-			return
-		}
-
-		// Dispatch to the waiting caller by request ID.
-		t.pendingMu.Lock()
-		ch, ok := t.pending[resp.ID]
-		if ok {
-			delete(t.pending, resp.ID)
-		}
-		t.pendingMu.Unlock()
-
-		if ok {
-			select {
-			case ch <- resp:
-			default:
-			}
-			close(ch)
 		}
 
 	default:
