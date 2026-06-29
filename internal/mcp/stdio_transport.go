@@ -37,6 +37,9 @@ type StdioTransport struct {
 	readerWg  sync.WaitGroup
 
 	debugWriter io.Writer // non-nil when --debug-mcp is enabled; logs raw JSON-RPC
+
+	// Notification handler for server-to-client notifications.
+	notificationHandler NotificationHandler
 }
 
 // NewStdioTransport creates a stdio transport that spawns the given command.
@@ -105,7 +108,7 @@ func (t *StdioTransport) readLoop() {
 
 	for t.scanner.Scan() {
 		data := t.scanner.Bytes()
-		if err := parseAndDispatchJSONRPC(data, t.pending, &t.pendingMu, t.debugWriter, t.handleServerRequest); err != nil {
+		if err := parseAndDispatchJSONRPC(data, t.pending, &t.pendingMu, t.debugWriter, t.handleServerRequest, t.notificationHandler); err != nil {
 			// Malformed line — log and skip (server bug or protocol mismatch).
 			log.Printf("MCP: malformed response line (len=%d): %v",
 				len(data), err)
@@ -153,6 +156,12 @@ func (t *StdioTransport) handleServerRequest(id requestID, method string) {
 		t.mu.Unlock()
 	}
 }
+
+// SetNotificationHandler registers a handler for server-to-client notifications.
+func (t *StdioTransport) SetNotificationHandler(h NotificationHandler) {
+	t.notificationHandler = h
+}
+
 func (t *StdioTransport) Send(ctx context.Context, req jsonrpcRequest) error {
 	_ = ctx
 	t.mu.Lock()

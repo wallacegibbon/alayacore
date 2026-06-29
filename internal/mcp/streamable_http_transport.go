@@ -59,6 +59,9 @@ type StreamableHTTPTransport struct {
 	readerWg  sync.WaitGroup
 
 	debugWriter io.Writer
+
+	// Notification handler for server-to-client notifications.
+	notificationHandler NotificationHandler
 }
 
 // sseReadCloser wraps an io.ReadCloser (HTTP response body) with the
@@ -241,6 +244,11 @@ func (t *StreamableHTTPTransport) Done() <-chan struct{} {
 	return t.done
 }
 
+// SetNotificationHandler registers a handler for server-to-client notifications.
+func (t *StreamableHTTPTransport) SetNotificationHandler(h NotificationHandler) {
+	t.notificationHandler = h
+}
+
 // ============================================================================
 // GET SSE Stream (Server-to-Client Messages)
 // ============================================================================
@@ -324,7 +332,7 @@ func (t *StreamableHTTPTransport) StartGETStream(ctx context.Context, handler Se
 			close(t.getSSEClosed)
 		}()
 
-		t.readSSELoop(sr, handler)
+		t.readSSELoop(sr, handler, t.notificationHandler)
 	}()
 
 	return nil
@@ -332,7 +340,7 @@ func (t *StreamableHTTPTransport) StartGETStream(ctx context.Context, handler Se
 
 // readSSELoop reads SSE events from a stream and dispatches them.
 // Used for both POST-response SSE streams and GET SSE streams.
-func (t *StreamableHTTPTransport) readSSELoop(sr *sseReadCloser, handler ServerRequestHandler) {
+func (t *StreamableHTTPTransport) readSSELoop(sr *sseReadCloser, handler ServerRequestHandler, notifHandler NotificationHandler) {
 	for {
 		eventType, data, err := sr.readEvent()
 		if err != nil {
@@ -346,7 +354,7 @@ func (t *StreamableHTTPTransport) readSSELoop(sr *sseReadCloser, handler ServerR
 
 		switch eventType {
 		case "message":
-			if err := parseAndDispatchJSONRPC([]byte(data), t.pending, &t.pendingMu, t.debugWriter, handler); err != nil {
+			if err := parseAndDispatchJSONRPC([]byte(data), t.pending, &t.pendingMu, t.debugWriter, handler, notifHandler); err != nil {
 				log.Printf("MCP Streamable HTTP: malformed message: %v", err)
 			}
 		default:
@@ -460,7 +468,7 @@ func (t *StreamableHTTPTransport) readSSEResponse(ctx context.Context, resp *htt
 	readDone := make(chan struct{})
 	go func() {
 		defer close(readDone)
-		t.readSSELoop(sr, t.handleServerRequest)
+		t.readSSELoop(sr, t.handleServerRequest, t.notificationHandler)
 	}()
 
 	select {

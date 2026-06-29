@@ -42,6 +42,9 @@ type SSETransport struct {
 
 	debugWriter io.Writer
 	ready       chan struct{} // closed after endpoint event is received
+
+	// Notification handler for server-to-client notifications.
+	notificationHandler NotificationHandler
 }
 
 // setupSSERequest creates an HTTP GET request for SSE connection.
@@ -203,7 +206,7 @@ func (t *SSETransport) handleSSEEvent(eventType, data string, endpointReceived *
 		// Parse and dispatch the JSON-RPC message (single or batch).
 		// dispatchResponse handles debug logging for each response.
 		// Server-to-client requests (e.g. ping) are handled inline.
-		if err := parseAndDispatchJSONRPC([]byte(data), t.pending, &t.pendingMu, t.debugWriter, t.handleServerRequest); err != nil {
+		if err := parseAndDispatchJSONRPC([]byte(data), t.pending, &t.pendingMu, t.debugWriter, t.handleServerRequest, t.notificationHandler); err != nil {
 			log.Printf("MCP SSE: malformed response: %v", err)
 		}
 
@@ -403,6 +406,11 @@ func (t *SSETransport) handleServerRequest(id requestID, method string) {
 			},
 		})
 	}
+}
+
+// SetNotificationHandler registers a handler for server-to-client notifications.
+func (t *SSETransport) SetNotificationHandler(h NotificationHandler) {
+	t.notificationHandler = h
 }
 
 // Done returns a channel that closes when the transport is shut down.

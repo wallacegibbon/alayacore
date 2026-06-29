@@ -18,6 +18,7 @@ const (
 	StateInitializing
 	StateReady
 	StateFailed
+	StateStale // server tool list changed, needs restart
 )
 
 // Client manages a connection to a single MCP server.
@@ -49,6 +50,9 @@ type Client struct {
 	// Instructions from the server's InitializeResult, used by clients
 	// to improve the LLM's understanding of available tools/resources.
 	instructions string
+
+	// staleReason is set when the server is marked stale (e.g. tool list changed).
+	staleReason string
 
 	// toolsCache stores []Tool or nil — atomically loadable/storable.
 	toolsCache atomic.Value
@@ -94,6 +98,15 @@ func (c *Client) ServerInfo() ImplementationInfo {
 // available tools, resources, etc.
 func (c *Client) Instructions() string {
 	return c.instructions
+}
+
+// MarkStale marks the server as stale, indicating its tool list has changed
+// and a restart is needed. Subsequent tool calls will return an error
+// describing the reason.
+func (c *Client) MarkStale(reason string) {
+	c.state.Store(int32(StateStale))
+	c.staleReason = reason
+	c.toolsCache.Store(nil)
 }
 
 // Connect establishes the transport and performs MCP initialization.
@@ -291,6 +304,7 @@ func (c *Client) connectLocked(ctx context.Context) error {
 	}
 
 	c.storeTransport(transport)
+	c.setupNotificationHandler(transport)
 	c.state.Store(int32(StateInitializing))
 	if err := c.doInitialize(ctx); err != nil {
 		transport.Close()
@@ -330,6 +344,27 @@ func (c *Client) startMonitor() {
 			close(ch)
 		}
 	}()
+}
+
+// setupNotificationHandler registers a notification handler on the transport
+// so the client can react to server-to-client notifications (e.g. tool list changes).
+func (c *Client) setupNotificationHandler(tp Transport) {
+	h := NotificationHandler(c.handleNotification)
+	switch t := tp.(type) {
+	case *StdioTransport:
+		t.SetNotificationHandler(h)
+	case *SSETransport:
+		t.SetNotificationHandler(h)
+	case *StreamableHTTPTransport:
+		t.SetNotificationHandler(h)
+	}
+}
+
+// handleNotification processes a server-to-client notification.
+func (c *Client) handleNotification(method string) {
+	if method == "notifications/tools/list_changed" {
+		c.MarkStale("server tool list changed, restart required")
+	}
 }
 
 // Ping sends a ping request to check server health.
@@ -374,6 +409,8 @@ func (c *Client) stateError(string) error {
 	switch st {
 	case StateFailed:
 		return fmt.Errorf("mcp client %q: server connection lost", c.config.Name)
+	case StateStale:
+		return fmt.Errorf("mcp client %q: %s", c.config.Name, c.staleReason)
 	default:
 		return fmt.Errorf("mcp client %q: not ready (state=%d)", c.config.Name, st)
 	}
