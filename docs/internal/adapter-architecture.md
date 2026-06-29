@@ -77,9 +77,10 @@ main.go → config.Parse() → Settings
         app.Setup(Settings)
                 ↓
         ├── skills.NewManager(skillPaths)
-        ├── tools.NewReadFileTool(), etc.
-        ├── tools.RGAvailable() → conditionally register search_content tool
-        └── Build system prompt (with SEARCH section if rg available)
+        ├── tools.DefaultTools(cfg.BuiltinTools)  → filtered built-in tools
+        │   (all tools: read_file, write_file, edit_file, execute_command, search_content)
+        │   (controlled by --builtin-tools flag; empty = no builtin tools)
+        └── Build system prompt
                 ↓
         terminal.NewAdapter(appConfig)  or  plainio.NewAdapter(appConfig)  or  rawio.NewAdapter(appConfig)
                 ↓

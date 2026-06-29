@@ -11,7 +11,7 @@ The entry point wires together all components:
 1. **`config.Parse()`** — Parses CLI flags into `config.Settings`
 2. **`app.Setup()`** — Initializes shared components:
    - Skills manager (loads skill metadata from `--skill` directories)
-   - Tools (`read_file`, `edit_file`, `write_file`, `execute_command`, and conditionally `search_content`)
+   - Tools (`read_file`, `edit_file`, `write_file`, `execute_command`, `search_content` — controlled via `--builtin-tools` flag)
    - System prompt (default + skills section/fragment when configured + current working directory)
 3. **Adapter creation** — Starts the terminal, PlainIO, or RawIO adapter
 
@@ -131,11 +131,16 @@ Messages are appended incrementally in `OnStepFinish` so they're preserved even 
 | `edit_file` | Search/replace edits on existing files | Medium | — |
 | `write_file` | Create or overwrite files | Dangerous | — |
 | `execute_command` | Execute commands in the detected shell (cross-platform). Large output (>64KB) saved to a temp file under `os.TempDir()/alayacore-<suffix>/cmd-*.txt`; only file path and metadata returned. | Most Dangerous | — |
-| `search_content` | Search file contents using ripgrep (`rg`). Results exceeding `max_lines` (default 100) saved to a temp file under `os.TempDir()/alayacore-<suffix>/search-*.txt`; only match count and file path returned. | Safe | Requires `rg` binary |
+| `search_content` | Search file contents using ripgrep (`rg`). Results exceeding `max_lines` (default 100) saved to a temp file under `os.TempDir()/alayacore-<suffix>/search-*.txt`; only match count and file path returned. | Safe | Requires `rg` binary on system |
 
 Each tool is implemented with type-safe input structs and auto-generated JSON schemas. All tools accept a `context.Context` parameter and respect cancellation — `:cancel` will interrupt long-running tool execution. See [schema-improvements.md](schema-improvements.md) for the pattern.
 
-The `search_content` tool is conditionally registered — it is only available when the `rg` binary is found on the system `PATH` at startup. When available, the system prompt includes an instruction to prefer `search_content` over reading files chunk by chunk to locate code and patterns. This instruction is omitted when `rg` is not installed.
+Built-in tools are controlled via the `--builtin-tools` flag:
+- **Not specified** (default): all five built-in tools are available.
+- **Empty** (`--builtin-tools=`): no built-in tools are available (the agent relies solely on MCP tools).
+- **List** (`--builtin-tools=read_file,write_file`): only the specified tools are available.
+
+The system prompt always includes guidance to use search tools before reading files, as this applies regardless of whether the search is done via the built-in `search_content` or an MCP-provided search tool.
 
 #### Shell Detection (`internal/tools/shell/`)
 

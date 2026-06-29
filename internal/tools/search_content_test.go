@@ -3,18 +3,21 @@ package tools
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 )
 
-func TestRGAvailable(t *testing.T) {
-	_ = RGAvailable()
+// rgAvailable checks whether ripgrep is on the system, for test skipping.
+func rgAvailable() bool {
+	_, err := exec.LookPath("rg")
+	return err == nil
 }
 
 func TestSearchContentBasicSearch(t *testing.T) {
-	if !RGAvailable() {
+	if !rgAvailable() {
 		t.Skip("rg not available on system")
 	}
 
@@ -44,7 +47,7 @@ func TestSearchContentBasicSearch(t *testing.T) {
 }
 
 func TestSearchContentNoMatches(t *testing.T) {
-	if !RGAvailable() {
+	if !rgAvailable() {
 		t.Skip("rg not available on system")
 	}
 
@@ -85,7 +88,7 @@ func TestSearchContentEmptyPattern(t *testing.T) {
 }
 
 func TestSearchContentFileTypeFilter(t *testing.T) {
-	if !RGAvailable() {
+	if !rgAvailable() {
 		t.Skip("rg not available on system")
 	}
 
@@ -120,7 +123,7 @@ func TestSearchContentFileTypeFilter(t *testing.T) {
 }
 
 func TestSearchContentIgnoreCase(t *testing.T) {
-	if !RGAvailable() {
+	if !rgAvailable() {
 		t.Skip("rg not available on system")
 	}
 
@@ -162,7 +165,7 @@ func TestSearchContentIgnoreCase(t *testing.T) {
 }
 
 func TestSearchContentMaxLinesGlobal(t *testing.T) {
-	if !RGAvailable() {
+	if !rgAvailable() {
 		t.Skip("rg not available on system")
 	}
 
@@ -200,7 +203,7 @@ func TestSearchContentMaxLinesGlobal(t *testing.T) {
 }
 
 func TestSearchContentPatternLooksLikeFlag(t *testing.T) {
-	if !RGAvailable() {
+	if !rgAvailable() {
 		t.Skip("rg not available on system")
 	}
 

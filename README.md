@@ -54,7 +54,7 @@ On first run, AlayaCore auto-creates a default model config at `~/.alayacore/mod
 ## Features
 
 - 🤖 **Autonomous tool-calling loop** — The LLM plans, calls tools, and iterates until the task is done (no step limit by default; optionally bounded with `--max-steps`).
-- 🛠️ **Five built-in tools** — `read_file`, `edit_file`, `write_file`, `execute_command`, `search_content` (when ripgrep `rg` is available).
+- 🛠️ **Five built-in tools** — `read_file`, `edit_file`, `write_file`, `execute_command`, `search_content`. Controlled via `--builtin-tools` (default: all enabled).
 - 🌐 **Cross-platform** — Runs on Linux, macOS, and Windows. The `execute_command` tool auto-detects the shell (bash/zsh/sh on Unix, PowerShell/cmd on Windows).
 - 🧠 **Any LLM provider** — OpenAI, Anthropic, DeepSeek, Qwen, Ollama, LM Studio. Multiple models in one config, switch at runtime.
 - 🖥️ **Streaming TUI** — Real-time output with virtual scrolling, foldable windows, and vim-like keybindings.
@@ -69,7 +69,7 @@ On first run, AlayaCore auto-creates a default model config at `~/.alayacore/mod
 ## System Requirements
 
 - **OS**: Linux, macOS, or Windows
-- **Optional**: [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`) — enables the `search_content` tool
+- **Note**: The `search_content` tool requires [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`) to be installed on the system.
 
 ## Building from Source
 

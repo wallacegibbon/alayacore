@@ -23,15 +23,6 @@ type SearchContentInput struct {
 
 const defaultSearchContentMaxLines = 100
 
-// RGAvailable checks whether ripgrep (rg) is available on this system.
-// Used at startup to conditionally register the search_content tool.
-// If rg is not found, the tool is omitted entirely, so executeSearchContent
-// can rely on rg being present without a redundant LookPath check.
-func RGAvailable() bool {
-	_, err := exec.LookPath("rg")
-	return err == nil
-}
-
 // NewSearchContentTool creates the search_content tool for use by the agent.
 func NewSearchContentTool() llm.Tool {
 	return llm.NewTool(
@@ -80,8 +71,7 @@ func buildSearchContentArgs(args SearchContentInput) []string {
 }
 
 // runSearch executes ripgrep and returns a structured result.
-// rg availability is guaranteed by RGAvailable() at tool registration time,
-// so no exec.LookPath check is needed here.
+// The caller must ensure rg is available before calling this function.
 func runSearch(ctx context.Context, args SearchContentInput) (searchResult, error) {
 	if args.Pattern == "" {
 		return searchResult{}, fmt.Errorf("pattern is required")
@@ -122,8 +112,7 @@ func runSearch(ctx context.Context, args SearchContentInput) (searchResult, erro
 			return result, nil
 		}
 
-		// Non-exit error (e.g. binary doesn't exist) — shouldn't happen
-		// since RGAvailable() verified rg at startup, but handle gracefully.
+		// Non-exit error (e.g. binary doesn't exist).
 		return searchResult{}, execErr
 	}
 

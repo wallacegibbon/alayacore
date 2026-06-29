@@ -112,6 +112,7 @@ type Settings struct {
 	MaxSteps      int
 	AutoSummarize bool
 	ToolConfirm   []string // tool names requiring user confirmation
+	BuiltinTools  []string // built-in tools to enable (nil = all enabled, empty = none)
 
 	// MCP (Model Context Protocol) servers
 	MCPServers []string // raw flag values, parsed later
@@ -149,6 +150,7 @@ func Parse() *Settings {
 	maxSteps := flag.Int("max-steps", DefaultMaxSteps, "Maximum agent loop steps (0 = no limit)")
 	autoSummarize := flag.Bool("auto-summarize", false, "Automatically summarize conversation when context exceeds 65% of limit")
 	toolConfirm := flag.String("tool-confirm", "", "Comma-separated tool `names` requiring user confirmation (e.g. execute_command,search_content)")
+	flag.String("builtin-tools", "", "Comma-separated built-in tool `names` to enable (empty = no builtin tools, unspecified = all tools)")
 
 	// MCP
 	mcpServer := &stringSlice{}
@@ -158,6 +160,21 @@ func Parse() *Settings {
 
 	// Derive config file paths from config directory
 	cp := *configPath
+
+	// Detect if --builtin-tools was explicitly provided (even if empty).
+	var builtinToolsVal []string // nil = not provided (all tools enabled)
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "builtin-tools" {
+			raw := f.Value.String()
+			if raw == "" {
+				// --builtin-tools= (empty) → no builtin tools, use MCP
+				builtinToolsVal = []string{}
+			} else {
+				builtinToolsVal = parseToolConfirm(raw)
+			}
+		}
+	})
+
 	s := &Settings{
 		ShowVersion:   *showVersion,
 		PlainIO:       *plainIO,
@@ -175,6 +192,7 @@ func Parse() *Settings {
 		MaxSteps:      *maxSteps,
 		AutoSummarize: *autoSummarize,
 		ToolConfirm:   parseToolConfirm(*toolConfirm),
+		BuiltinTools:  builtinToolsVal,
 		MCPServers:    mcpServer.Get(),
 	}
 

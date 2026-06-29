@@ -16,11 +16,11 @@ import (
 // This package provides shared initialization for all adapters.
 // It builds the system prompt, initializes tools, and creates the app config.
 
-const systemPromptIdentity = `You are a helpful AI assistant with access to a set of tools that you can use to accomplish tasks.`
+const systemPromptBase = `You are a helpful AI assistant with access to a set of tools that you can use to accomplish tasks.
 
-const systemPromptRules = `Never assume - verify with tools.`
+Never assume - verify with tools.
 
-const systemPromptSearch = `Use search tools to locate code and patterns before using file read tools for detailed inspection.`
+Use search tools to locate code and patterns before using file read tools for detailed inspection.`
 
 const systemPromptSkills = `Check <available_skills> below; read the <location> file to load relevant skill instructions. Skill instructions may use relative paths - run them from the skill's directory (derived from <location>).`
 
@@ -47,7 +47,10 @@ func Setup(cfg *config.Settings) (*Config, error) {
 		return nil, fmt.Errorf("failed to initialize skills: %w", err)
 	}
 
-	agentTools := tools.DefaultTools()
+	agentTools, err := tools.DefaultTools(cfg.BuiltinTools)
+	if err != nil {
+		return nil, fmt.Errorf("invalid --builtin-tools: %w", err)
+	}
 
 	// ========================================================================
 	// MCP (Model Context Protocol) initialization
@@ -59,13 +62,7 @@ func Setup(cfg *config.Settings) (*Config, error) {
 	// ========================================================================
 
 	// Build the default system prompt
-	rgAvailable := tools.RGAvailable()
-	var systemPrompt string
-	if rgAvailable {
-		systemPrompt = systemPromptIdentity + "\n\n" + systemPromptRules + "\n\n" + systemPromptSearch
-	} else {
-		systemPrompt = systemPromptIdentity + "\n\n" + systemPromptRules
-	}
+	systemPrompt := systemPromptBase
 
 	// Only include SKILLS section when skills are actually available
 	skillsFragment := skillsManager.GenerateSystemPromptFragment()

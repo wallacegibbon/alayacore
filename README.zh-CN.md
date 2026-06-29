@@ -54,7 +54,7 @@ go install github.com/alayacore/alayacore@latest
 ## 功能特性
 
 - 🤖 **自主工具调用循环** — LLM 规划、调用工具并迭代，直到任务完成（默认无步骤限制，可通过 `--max-steps` 可选设限）。
-- 🛠️ **五种内置工具** — `read_file`、`edit_file`、`write_file`、`execute_command`、`search_content`（需安装 ripgrep `rg`）。
+- 🛠️ **五种内置工具** — `read_file`、`edit_file`、`write_file`、`execute_command`、`search_content`。通过 `--builtin-tools` 控制（默认全部启用）。
 - 🌐 **跨平台** — 支持 Linux、macOS 和 Windows。`execute_command` 工具可自动检测 shell（Unix 上为 bash/zsh/sh，Windows 上为 PowerShell/cmd）。
 - 🧠 **支持任何 LLM 提供商** — OpenAI、Anthropic、DeepSeek、Qwen、Ollama、LM Studio。一个配置文件支持多个模型，运行时可切换。
 - 🖥️ **流式 TUI** — 实时输出，支持虚拟滚动、可折叠窗口和类 Vim 快捷键。
@@ -69,7 +69,7 @@ go install github.com/alayacore/alayacore@latest
 ## 系统要求
 
 - **操作系统**：Linux、macOS 或 Windows
-- **可选**：[ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`) — 启用 `search_content` 工具
+- **注意**：`search_content` 工具需要系统中安装 [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`)。
 
 ## 从源码构建
 
