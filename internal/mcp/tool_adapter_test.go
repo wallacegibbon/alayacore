@@ -43,6 +43,29 @@ func TestParseServerConfig_Stdio(t *testing.T) {
 			input:   "db=exec:", // empty command
 			wantErr: true,
 		},
+		// With environment variables.
+		{
+			input: "db=exec:DB_HOST=localhost DB_PORT=5432 npx @anthropic/mcp-db-server",
+			want: ServerConfig{
+				Name:    "db",
+				Command: "npx",
+				Args:    []string{"@anthropic/mcp-db-server"},
+				Env:     map[string]string{"DB_HOST": "localhost", "DB_PORT": "5432"},
+			},
+		},
+		{
+			input: "git=exec:TOKEN=abc123 uvx mcp-git",
+			want: ServerConfig{
+				Name:    "git",
+				Command: "uvx",
+				Args:    []string{"mcp-git"},
+				Env:     map[string]string{"TOKEN": "abc123"},
+			},
+		},
+		{
+			input:   "db=exec:ONLY_ENV=1", // no command after env
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -65,6 +88,15 @@ func TestParseServerConfig_Stdio(t *testing.T) {
 					for i := range got.Args {
 						if got.Args[i] != tt.want.Args[i] {
 							t.Errorf("Args[%d] = %q, want %q", i, got.Args[i], tt.want.Args[i])
+						}
+					}
+				}
+				if len(got.Env) != len(tt.want.Env) {
+					t.Errorf("Env = %v, want %v", got.Env, tt.want.Env)
+				} else {
+					for k, v := range tt.want.Env {
+						if got.Env[k] != v {
+							t.Errorf("Env[%q] = %q, want %q", k, got.Env[k], v)
 						}
 					}
 				}

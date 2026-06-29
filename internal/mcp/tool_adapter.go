@@ -434,15 +434,7 @@ func ParseServerConfig(raw string) (ServerConfig, error) {
 
 	switch transport {
 	case "exec":
-		parts := splitArgs(value)
-		if len(parts) == 0 {
-			return ServerConfig{}, fmt.Errorf("invalid MCP server config: %q (empty command)", raw)
-		}
-		return ServerConfig{
-			Name:    name,
-			Command: parts[0],
-			Args:    parts[1:],
-		}, nil
+		return parseExecConfig(name, value, raw)
 
 	case "sse":
 		if value == "" {
@@ -479,6 +471,39 @@ func parseTransportPrefix(s string) (transport, value string, ok bool) {
 		}
 	}
 	return "", "", false
+}
+
+// parseExecConfig parses the value part of "exec:..." and extracts
+// KEY=VALUE environment variables from the front of the command line.
+func parseExecConfig(name, value, raw string) (ServerConfig, error) {
+	parts := splitArgs(value)
+	if len(parts) == 0 {
+		return ServerConfig{}, fmt.Errorf("invalid MCP server config: %q (empty command)", raw)
+	}
+
+	var env map[string]string
+	cmdStart := 0
+	for cmdStart < len(parts) {
+		k, v, found := strings.Cut(parts[cmdStart], "=")
+		if !found || k == "" || v == "" {
+			break
+		}
+		if env == nil {
+			env = make(map[string]string)
+		}
+		env[k] = v
+		cmdStart++
+	}
+	if cmdStart >= len(parts) {
+		return ServerConfig{}, fmt.Errorf("invalid MCP server config: %q (no command after env vars)", raw)
+	}
+
+	return ServerConfig{
+		Name:    name,
+		Command: parts[cmdStart],
+		Args:    parts[cmdStart+1:],
+		Env:     env,
+	}, nil
 }
 
 // splitArgs splits a command string into tokens, respecting quoted strings.
