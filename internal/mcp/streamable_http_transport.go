@@ -58,7 +58,7 @@ type StreamableHTTPTransport struct {
 	done      chan struct{}
 	readerWg  sync.WaitGroup
 
-	debugWriter io.Writer
+	debugWriter io.WriteCloser
 
 	// Notification handler for server-to-client notifications.
 	notificationHandler NotificationHandler
@@ -232,6 +232,11 @@ func (t *StreamableHTTPTransport) Close() error {
 
 		// Wait for goroutines.
 		t.readerWg.Wait()
+
+		// Close debug log file if open.
+		if t.debugWriter != nil {
+			t.debugWriter.Close()
+		}
 
 		// Signal done.
 		close(t.done)

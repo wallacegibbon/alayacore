@@ -41,7 +41,7 @@ type SSETransport struct {
 	doneOnce  sync.Once // guards close(done), used by both readLoop and Close
 	readerWg  sync.WaitGroup
 
-	debugWriter io.Writer
+	debugWriter io.WriteCloser
 	ready       chan struct{} // closed after endpoint event is received
 
 	// Notification handler for server-to-client notifications.
@@ -380,6 +380,11 @@ func (t *SSETransport) Close() error {
 
 		// Wait for readLoop to finish.
 		t.readerWg.Wait()
+
+		// Close debug log file if open.
+		if t.debugWriter != nil {
+			t.debugWriter.Close()
+		}
 
 		// Signal that transport is done.
 		t.doneOnce.Do(func() { close(t.done) })

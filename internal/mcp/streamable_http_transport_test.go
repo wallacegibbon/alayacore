@@ -11,6 +11,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/alayacore/alayacore/internal/debug"
 )
 
 // ============================================================================
@@ -578,6 +580,7 @@ func TestStreamableHTTP_DebugLogging(t *testing.T) {
 
 	transport := NewStreamableHTTPTransport(server.URL(), true)
 	defer transport.Close()
+	t.Cleanup(func() { debug.CleanupDebugWriter(transport.debugWriter) })
 
 	ctx := context.Background()
 	_, err := transport.SendReceive(ctx, jsonrpcRequest{

@@ -11,6 +11,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/alayacore/alayacore/internal/debug"
 )
 
 // ============================================================================
@@ -757,6 +759,7 @@ func TestSSETransport_DebugLogging(t *testing.T) {
 		t.Fatalf("NewSSETransport() error = %v", err)
 	}
 	defer transport.Close()
+	t.Cleanup(func() { debug.CleanupDebugWriter(transport.debugWriter) })
 
 	ctx := context.Background()
 	resultData := json.RawMessage(`{"ok":true}`)

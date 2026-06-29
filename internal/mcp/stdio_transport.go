@@ -36,7 +36,7 @@ type StdioTransport struct {
 	pendingMu sync.Mutex
 	readerWg  sync.WaitGroup
 
-	debugWriter io.Writer // non-nil when --debug-mcp is enabled; logs raw JSON-RPC
+	debugWriter io.WriteCloser // non-nil when --debug-mcp is enabled; logs raw JSON-RCP
 
 	// Notification handler for server-to-client notifications.
 	notificationHandler NotificationHandler
@@ -295,6 +295,11 @@ func (t *StdioTransport) Close() error {
 
 		// Wait for readLoop to finish processing pending responses.
 		t.readerWg.Wait()
+
+		// Close debug log file if open.
+		if t.debugWriter != nil {
+			t.debugWriter.Close()
+		}
 
 		// Signal that transport is done.
 		close(t.done)

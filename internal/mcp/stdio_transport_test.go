@@ -11,6 +11,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/alayacore/alayacore/internal/debug"
 )
 
 // ============================================================================
@@ -593,6 +595,7 @@ func TestStdioTransport_DebugLogging(t *testing.T) {
 	// Debug mode should not crash.
 	transport := newStdioTestTransport(t, nil, true)
 	waitForReady(t, transport)
+	t.Cleanup(func() { debug.CleanupDebugWriter(transport.debugWriter) })
 
 	ctx := context.Background()
 	resp, err := transport.SendReceive(ctx, jsonrpcRequest{
