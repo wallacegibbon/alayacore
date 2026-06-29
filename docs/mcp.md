@@ -78,7 +78,7 @@ name=http:url
 ```
 
 Connects to an MCP server using the new Streamable HTTP transport (spec
-2025-03-26). The server provides a single HTTP endpoint for both POST
+2025-11-25). The server provides a single HTTP endpoint for both POST
 and GET. Responses can be immediate JSON or SSE streams.
 
 ```bash
@@ -226,7 +226,7 @@ JSON is pretty-printed for readability.
 | `notifications/cancelled` | ✅ Supported |
 | `notifications/tools/list_changed` | ✅ Supported (marks server stale) |
 | Stdio transport | ✅ Supported |
-| Streamable HTTP transport (2025-03-26) | ✅ Supported |
+| Streamable HTTP transport (2025-11-25) | ✅ Supported |
 | SSE transport (2024-11-05, legacy) | ✅ Supported |
 
 ## Technical Notes

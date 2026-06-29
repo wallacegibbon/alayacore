@@ -104,27 +104,6 @@ func runMCPServer() {
 		// Special behavior based on method prefix
 		// ------------------------------------------------------------------
 
-		// Batch mode: respond with a JSON array containing two responses.
-		// The first response matches the original request ID; the second
-		// is for an additional (potentially unknown) ID.
-		if strings.HasPrefix(msg.Method, "batch/") {
-			resp1 := jsonrpcResponse{
-				JSONRPC: "2.0",
-				ID:      msg.ID,
-				Result:  json.RawMessage(`{"batch":true,"index":0}`),
-			}
-			resp2 := jsonrpcResponse{
-				JSONRPC: "2.0",
-				ID:      requestID("batch-extra"),
-				Result:  json.RawMessage(`{"batch":true,"index":1}`),
-			}
-			batch := []jsonrpcResponse{resp1, resp2}
-			bData, _ := json.Marshal(batch)
-			os.Stdout.Write(bData)
-			os.Stdout.Write([]byte("\n"))
-			continue
-		}
-
 		// Error mode: method starting with "error/" triggers an error response.
 		if strings.HasPrefix(msg.Method, "error/") {
 			code := -32601
@@ -481,59 +460,6 @@ func TestStdioTransport_ServerPing(t *testing.T) {
 	}
 	if result["echo_method"] != "s2c/ping_test" {
 		t.Errorf("echo_method = %v, want %q", result["echo_method"], "s2c/ping_test")
-	}
-}
-
-func TestStdioTransport_BatchResponse(t *testing.T) {
-	if os.Getenv("MCP_TEST_SERVER") == "1" {
-		return
-	}
-
-	// The test server responds with a JSON-RPC batch array when the
-	// method starts with "batch/". The batch contains two responses:
-	// one matching the original request ID, and an extra one for "batch-extra".
-	transport := newStdioTestTransport(t, nil, false)
-	waitForReady(t, transport)
-
-	// Register a pending request for the original ID and the extra one.
-	ch1 := make(chan jsonrpcResponse, 1)
-	chExtra := make(chan jsonrpcResponse, 1)
-
-	transport.pendingMu.Lock()
-	transport.pending["req1"] = ch1
-	transport.pending["batch-extra"] = chExtra
-	transport.pendingMu.Unlock()
-
-	// Send a request with "batch/" prefix to trigger batch response.
-	ctx := context.Background()
-	_, err := transport.SendReceive(ctx, jsonrpcRequest{
-		JSONRPC: "2.0",
-		ID:      requestID("req1"),
-		Method:  "batch/test",
-	})
-	if err != nil {
-		t.Fatalf("SendReceive() error = %v", err)
-	}
-
-	// The first response (matching our request) was consumed by SendReceive.
-	// The extra response should be dispatched to chExtra.
-	select {
-	case <-chExtra:
-		// ok
-	case <-time.After(time.Second):
-		t.Fatal("timeout waiting for extra batch response")
-	}
-
-	// Pending map should be cleaned up for both entries.
-	transport.pendingMu.Lock()
-	_, ok1 := transport.pending["req1"]
-	_, ok2 := transport.pending["batch-extra"]
-	transport.pendingMu.Unlock()
-	if ok1 {
-		t.Error("pending req1 not cleaned up")
-	}
-	if ok2 {
-		t.Error("pending batch-extra not cleaned up")
 	}
 }
 

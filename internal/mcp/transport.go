@@ -106,11 +106,11 @@ type ServerRequestHandler func(id requestID, method string)
 // notifications/tools/list_changed).
 type NotificationHandler func(method string)
 
-// parseAndDispatchJSONRPC parses a JSON-RPC message (single response or
-// batch array) and dispatches all contained responses to waiting callers.
-// Returns nil on success, or an error if the data cannot be parsed.
+// parseAndDispatchJSONRPC parses a JSON-RPC message and dispatches
+// responses to waiting callers. Returns nil on success, or an error
+// if the data cannot be parsed.
 //
-// Per the MCP spec, implementations MUST support receiving JSON-RPC batches.
+// Per the MCP spec (2025-11-25), batch responses are no longer supported.
 // Server-to-client requests are detected and forwarded to handleServerReq.
 // Server-to-client notifications (no ID) are forwarded to handleNotification.
 func parseAndDispatchJSONRPC(data []byte, pending map[requestID]chan<- jsonrpcResponse, mu sync.Locker, debugWriter io.Writer, handleServerReq ServerRequestHandler, handleNotification NotificationHandler) error {
@@ -130,19 +130,10 @@ func parseAndDispatchJSONRPC(data []byte, pending map[requestID]chan<- jsonrpcRe
 		return nil
 	}
 
-	// Try single response (most common case).
+	// Try single response.
 	var resp jsonrpcResponse
 	if err := json.Unmarshal(data, &resp); err == nil {
 		dispatchResponse(resp, pending, mu, debugWriter, data)
-		return nil
-	}
-
-	// Try as a JSON-RPC batch (array of responses).
-	var batch []jsonrpcResponse
-	if err := json.Unmarshal(data, &batch); err == nil {
-		for _, r := range batch {
-			dispatchResponse(r, pending, mu, debugWriter, data)
-		}
 		return nil
 	}
 

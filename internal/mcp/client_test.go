@@ -82,7 +82,7 @@ func (m *mockTransport) Done() <-chan struct{} {
 func TestClientInitialize(t *testing.T) {
 	// Mock MCP initialize response.
 	initResult := InitializeResult{
-		ProtocolVersion: "2025-03-26",
+		ProtocolVersion: "2025-11-25",
 		Capabilities: ServerCapabilities{
 			Tools: &struct{}{},
 		},
@@ -214,7 +214,7 @@ func TestManagerEmpty(t *testing.T) {
 func TestClientInitialize_VersionMismatch(t *testing.T) {
 	// Server responds with a different protocol version — client must disconnect.
 	initResult := InitializeResult{
-		ProtocolVersion: "2024-11-05", // Different from our "2025-03-26"
+		ProtocolVersion: "2024-11-05", // Different from our "2025-11-25"
 		Capabilities: ServerCapabilities{
 			Tools: &struct{}{},
 		},

@@ -91,7 +91,10 @@ type ClientCapabilities struct {
 	// Roots is optional root resource support.
 	Roots *struct{} `json:"roots,omitempty"`
 	// Sampling is optional LLM sampling support.
-	Sampling *struct{} `json:"sampling,omitempty"`
+	Sampling *struct {
+		Tools   *struct{} `json:"tools,omitempty"`
+		Context *struct{} `json:"context,omitempty"`
+	} `json:"sampling,omitempty"`
 }
 
 // ServerCapabilities describes the capabilities the server supports.
@@ -128,18 +131,42 @@ type InitializeResult struct {
 
 // ImplementationInfo describes the name and version of the implementation.
 type ImplementationInfo struct {
-	Name    string `json:"name"`
-	Version string `json:"version"`
+	Name        string `json:"name"`
+	Version     string `json:"version"`
+	Title       string `json:"title,omitempty"`
+	Description string `json:"description,omitempty"`
+	URL         string `json:"url,omitempty"`
+}
+
+// Icon represents an optional icon for tools, resources, or prompts.
+type Icon struct {
+	Src      string `json:"src"`
+	MIMEType string `json:"mimeType,omitempty"`
+	Sizes    string `json:"sizes,omitempty"`
+}
+
+// ToolExecution describes execution options for a tool.
+type ToolExecution struct {
+	// Indicates whether this tool supports task-augmented execution.
+	// "forbidden" (default), "optional", or "required".
+	Task string `json:"task,omitempty"`
 }
 
 // Tool represents a tool exposed by an MCP server.
 // This is the response type for tools/list.
 type Tool struct {
 	Name        string          `json:"name"`
+	Title       string          `json:"title,omitempty"`
 	Description string          `json:"description,omitempty"`
 	InputSchema json.RawMessage `json:"inputSchema"`
 	// Annotations are optional hints about the tool's behavior.
 	Annotations *ToolAnnotations `json:"annotations,omitempty"`
+	// Icon metadata for the tool.
+	Icons []Icon `json:"icons,omitempty"`
+	// Execution options.
+	Execution *ToolExecution `json:"execution,omitempty"`
+	// Optional output schema for structured content.
+	OutputSchema json.RawMessage `json:"outputSchema,omitempty"`
 }
 
 // ToolAnnotations provides optional hints about a tool to clients.
@@ -181,8 +208,9 @@ type CallToolRequest struct {
 
 // CallToolResult is the result of the "tools/call" method.
 type CallToolResult struct {
-	Content []ToolContent `json:"content"`
-	IsError bool          `json:"isError,omitempty"`
+	Content    []ToolContent  `json:"content"`
+	Structured map[string]any `json:"structuredContent,omitempty"`
+	IsError    bool           `json:"isError,omitempty"`
 }
 
 // ToolContent represents a piece of content in a tool call result.
@@ -204,6 +232,11 @@ type ToolContent struct {
 	// Resource is used for type "resource" — a reference to a resource
 	// with its contents embedded inline.
 	Resource *ResourceContents `json:"resource,omitempty"`
+	// ResourceLink is used for type "resource_link" — a reference to a
+	// resource without its contents (uri + metadata only).
+	ResourceLink *Resource `json:"resource_link,omitempty"`
+	// Name is used for type "resource_link".
+	Name string `json:"name,omitempty"`
 }
 
 // Resource represents a resource exposed by an MCP server.
@@ -213,6 +246,7 @@ type Resource struct {
 	Description string       `json:"description,omitempty"`
 	MIMEType    string       `json:"mimeType,omitempty"`
 	Annotations *Annotations `json:"annotations,omitempty"`
+	Icons       []Icon       `json:"icons,omitempty"`
 	Size        *int64       `json:"size,omitempty"`
 }
 
@@ -243,6 +277,7 @@ type Prompt struct {
 	Name        string           `json:"name"`
 	Description string           `json:"description,omitempty"`
 	Arguments   []PromptArgument `json:"arguments,omitempty"`
+	Icons       []Icon           `json:"icons,omitempty"`
 }
 
 // PromptArgument describes an argument a prompt template accepts.
@@ -288,7 +323,7 @@ type ResourceContents struct {
 }
 
 // MCP protocol version constant.
-const protocolVersion = "2025-03-26"
+const protocolVersion = "2025-11-25"
 
 // Method names.
 const (

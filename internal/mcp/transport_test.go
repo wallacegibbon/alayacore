@@ -35,51 +35,12 @@ func TestParseAndDispatchJSONRPC_Single(t *testing.T) {
 	}
 }
 
-func TestParseAndDispatchJSONRPC_Batch(t *testing.T) {
-	pending := make(map[requestID]chan<- jsonrpcResponse)
-	var mu sync.Mutex
-	ch1 := make(chan jsonrpcResponse, 1)
-	ch2 := make(chan jsonrpcResponse, 1)
-	pending["1"] = ch1
-	pending["2"] = ch2
-
-	// Batch response with two results.
-	data := []byte(`[
-		{"jsonrpc":"2.0","id":"1","result":{"status":"ok"}},
-		{"jsonrpc":"2.0","id":"2","result":{"count":42}}
-	]`)
-	err := parseAndDispatchJSONRPC(data, pending, &mu, nil, nil, nil)
-	if err != nil {
-		t.Fatalf("parseAndDispatchJSONRPC() error = %v", err)
-	}
-
-	// Both responses should arrive.
-	select {
-	case resp := <-ch1:
-		if resp.ID != "1" {
-			t.Errorf("resp1.ID = %q, want %q", resp.ID, "1")
-		}
-	default:
-		t.Fatal("expected response 1 on channel")
-	}
-
-	select {
-	case resp := <-ch2:
-		if resp.ID != "2" {
-			t.Errorf("resp2.ID = %q, want %q", resp.ID, "2")
-		}
-	default:
-		t.Fatal("expected response 2 on channel")
-	}
-}
-
 func TestParseAndDispatchJSONRPC_Malformed(t *testing.T) {
 	pending := make(map[requestID]chan<- jsonrpcResponse)
 	var mu sync.Mutex
 
 	tests := []string{
 		`not json`,
-		`[{"jsonrpc":"2.0"},"bad"]`, // batch with non-object element
 	}
 	for _, tc := range tests {
 		err := parseAndDispatchJSONRPC([]byte(tc), pending, &mu, nil, nil, nil)
@@ -128,40 +89,6 @@ func TestDispatchResponse_CleanupOnSend(t *testing.T) {
 	mu.Unlock()
 	if ok {
 		t.Error("pending entry was not cleaned up after dispatch")
-	}
-}
-
-func TestParseAndDispatchJSONRPC_NoPendingForBatchItem(t *testing.T) {
-	pending := make(map[requestID]chan<- jsonrpcResponse)
-	var mu sync.Mutex
-
-	// Batch where one ID has a pending listener and another doesn't.
-	ch := make(chan jsonrpcResponse, 1)
-	pending["1"] = ch
-
-	data := []byte(`[
-		{"jsonrpc":"2.0","id":"1","result":{"a":1}},
-		{"jsonrpc":"2.0","id":"999","result":{"b":2}}
-	]`)
-	err := parseAndDispatchJSONRPC(data, pending, &mu, nil, nil, nil)
-	if err != nil {
-		t.Fatalf("parseAndDispatchJSONRPC() error = %v", err)
-	}
-
-	// ID "1" should be delivered.
-	select {
-	case <-ch:
-		// ok
-	default:
-		t.Fatal("expected response for id 1")
-	}
-
-	// Pending should be cleaned up.
-	mu.Lock()
-	_, ok := pending["1"]
-	mu.Unlock()
-	if ok {
-		t.Error("pending entry 1 was not cleaned up")
 	}
 }
 
