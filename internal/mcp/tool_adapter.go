@@ -270,67 +270,119 @@ func convertResourceContent(content ToolContent, serverName string) llm.ContentP
 }
 
 // ParseServerConfig parses a single --mcp-server flag value.
-// Supported formats:
+// Unified format: name=transport:value
 //
-//	"name=command arg1 arg2"       — stdio transport
-//	"name@url"                    — HTTP transport (auto-detect)
-//	"name@sse+url"                — explicit legacy SSE transport
-//	"name@streamable+url"         — explicit Streamable HTTP transport
+// Examples:
+//
+//	name=exec:command arg1 arg2      — stdio transport
+//	name=sse:url                     — legacy SSE transport
+//	name=http:url                    — Streamable HTTP transport
+//	name=url                         — HTTP auto-detect (no transport prefix)
+//	name=command arg1 arg2           — stdio (backwards compat)
+//	name@url                         — HTTP auto-detect (backwards compat)
+//	name@sse+url                     — explicit legacy SSE (backwards compat)
+//	name@streamable+url              — explicit Streamable HTTP (backwards compat)
 func ParseServerConfig(raw string) (ServerConfig, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return ServerConfig{}, fmt.Errorf("empty MCP server config")
 	}
 
-	// Try stdio format first: name=command arg1 arg2
 	// Check for '=' before '@' because command args may contain '@'
 	// (e.g. "db=npx @anthropic/mcp-db-server").
 	if idx := strings.Index(raw, "="); idx > 0 {
 		name := raw[:idx]
 		rest := raw[idx+1:]
 		if name == "" || rest == "" {
-			return ServerConfig{}, fmt.Errorf("invalid MCP server config: %q (name or command empty)", raw)
+			return ServerConfig{}, fmt.Errorf("invalid MCP server config: %q (name or value empty)", raw)
 		}
-
-		parts := splitArgs(rest)
-		if len(parts) == 0 {
-			return ServerConfig{}, fmt.Errorf("invalid MCP server config: %q (no command)", raw)
-		}
-
-		return ServerConfig{
-			Name:    name,
-			Command: parts[0],
-			Args:    parts[1:],
-		}, nil
+		return parseEqFormat(name, rest)
 	}
 
-	// Try HTTP format: name@[transport+]url
+	// name@url format (HTTP only, backwards compatible).
 	if idx := strings.Index(raw, "@"); idx > 0 {
 		name := raw[:idx]
 		rest := raw[idx+1:]
 		if name == "" || rest == "" {
 			return ServerConfig{}, fmt.Errorf("invalid MCP server config: %q (name or URL empty)", raw)
 		}
-
 		cfg := ServerConfig{Name: name}
 		cfg.URL, cfg.TransportType = parseTransportPrefix(rest)
 		return cfg, nil
 	}
 
-	return ServerConfig{}, fmt.Errorf("invalid MCP server config: %q (expected name=command or name@url)", raw)
+	return ServerConfig{}, fmt.Errorf("invalid MCP server config: %q (expected name=value or name@url)", raw)
 }
 
-// parseTransportPrefix checks for an explicit transport prefix ("sse+" or
-// "streamable+") before the URL and returns the clean URL and transport type.
+// parseEqFormat parses the "name=value" format.
+// The value can be:
+//   - transport:value  (e.g. "exec:node server.js", "sse:url", "http:url")
+//   - command args     (backwards compatible stdio, no recognized prefix)
+func parseEqFormat(name, rest string) (ServerConfig, error) {
+	// Check for known transport: prefix.
+	if transport, value, ok := parseTransportColon(rest); ok {
+		switch transport {
+		case "exec":
+			parts := splitArgs(value)
+			if len(parts) == 0 {
+				return ServerConfig{}, fmt.Errorf("invalid MCP server config %q: no command after exec: prefix", rest)
+			}
+			return ServerConfig{
+				Name:    name,
+				Command: parts[0],
+				Args:    parts[1:],
+			}, nil
+		case "sse":
+			return ServerConfig{
+				Name:          name,
+				URL:           value,
+				TransportType: TransportSSE,
+			}, nil
+		case "http":
+			return ServerConfig{
+				Name:          name,
+				URL:           value,
+				TransportType: TransportStreamable,
+			}, nil
+		default:
+			return ServerConfig{}, fmt.Errorf("invalid MCP server config %q: unknown transport %q", rest, transport)
+		}
+	}
+
+	// No transport prefix — treat as stdio (backwards compatible).
+	parts := splitArgs(rest)
+	if len(parts) == 0 {
+		return ServerConfig{}, fmt.Errorf("invalid MCP server config: %q (no command)", rest)
+	}
+	return ServerConfig{
+		Name:    name,
+		Command: parts[0],
+		Args:    parts[1:],
+	}, nil
+}
+
+// parseTransportColon checks if s starts with a known transport prefix
+// followed by ":". Returns the transport name, the rest, and true if matched.
+// Known transports: exec, sse, http.
+func parseTransportColon(s string) (transport, value string, ok bool) {
+	known := []string{"exec", "sse", "http"}
+	for _, t := range known {
+		if strings.HasPrefix(s, t+":") {
+			return t, s[len(t)+1:], true
+		}
+	}
+	return "", "", false
+}
+
+// parseTransportPrefix checks for explicit transport prefix ("sse+" or
+// "streamable+") before the URL (used in name@url format).
 func parseTransportPrefix(raw string) (url string, transport string) {
-	// Check for streamable+ prefix first (longer match to avoid partial match).
 	if strings.HasPrefix(raw, "streamable+") {
 		return raw[len("streamable+"):], TransportStreamable
 	}
 	if strings.HasPrefix(raw, "sse+") {
 		return raw[len("sse+"):], TransportSSE
 	}
-	// No explicit prefix — auto-detect.
 	return raw, TransportAuto
 }
 

@@ -35,6 +35,23 @@ func TestParseServerConfig_Stdio(t *testing.T) {
 				Args:    []string{"/path/to/server.py", "--port", "8080"},
 			},
 		},
+		// Unified format: exec: prefix
+		{
+			input: "db=exec:npx @anthropic/mcp-db-server",
+			want: ServerConfig{
+				Name:    "db",
+				Command: "npx",
+				Args:    []string{"@anthropic/mcp-db-server"},
+			},
+		},
+		{
+			input: "git=exec:uvx mcp-git",
+			want: ServerConfig{
+				Name:    "git",
+				Command: "uvx",
+				Args:    []string{"mcp-git"},
+			},
+		},
 		{
 			input:   "",
 			wantErr: true,
@@ -73,12 +90,13 @@ func TestParseServerConfig_Stdio(t *testing.T) {
 	}
 }
 
-func TestParseServerConfig_SSE(t *testing.T) {
+func TestParseServerConfig_HTTP(t *testing.T) {
 	tests := []struct {
 		input   string
 		want    ServerConfig
 		wantErr bool
 	}{
+		// @url format (backwards compat)
 		{
 			input: "remote@https://mcp.example.com/sse",
 			want: ServerConfig{
@@ -87,6 +105,7 @@ func TestParseServerConfig_SSE(t *testing.T) {
 				TransportType: TransportAuto,
 			},
 		},
+		// @sse+url (backwards compat)
 		{
 			input: "remote@sse+https://mcp.example.com/sse",
 			want: ServerConfig{
@@ -95,8 +114,27 @@ func TestParseServerConfig_SSE(t *testing.T) {
 				TransportType: TransportSSE,
 			},
 		},
+		// @streamable+url (backwards compat)
 		{
 			input: "remote@streamable+https://example.com/mcp",
+			want: ServerConfig{
+				Name:          "remote",
+				URL:           "https://example.com/mcp",
+				TransportType: TransportStreamable,
+			},
+		},
+		// Unified format: name=sse:url
+		{
+			input: "remote=sse:https://mcp.example.com/sse",
+			want: ServerConfig{
+				Name:          "remote",
+				URL:           "https://mcp.example.com/sse",
+				TransportType: TransportSSE,
+			},
+		},
+		// Unified format: name=http:url
+		{
+			input: "remote=http:https://example.com/mcp",
 			want: ServerConfig{
 				Name:          "remote",
 				URL:           "https://example.com/mcp",
@@ -135,41 +173,32 @@ func TestParseServerConfig_SSE(t *testing.T) {
 	}
 }
 
-func TestParseTransportPrefix(t *testing.T) {
+func TestParseTransportColon(t *testing.T) {
 	tests := []struct {
 		input     string
-		wantURL   string
 		wantTrans string
+		wantValue string
+		wantOK    bool
 	}{
-		{
-			input:     "https://example.com/mcp",
-			wantURL:   "https://example.com/mcp",
-			wantTrans: TransportAuto,
-		},
-		{
-			input:     "sse+https://example.com/sse",
-			wantURL:   "https://example.com/sse",
-			wantTrans: TransportSSE,
-		},
-		{
-			input:     "streamable+https://example.com/mcp",
-			wantURL:   "https://example.com/mcp",
-			wantTrans: TransportStreamable,
-		},
-		{
-			input:     "streamable+http://localhost:8080/mcp",
-			wantURL:   "http://localhost:8080/mcp",
-			wantTrans: TransportStreamable,
-		},
+		{input: "exec:node server.js", wantTrans: "exec", wantValue: "node server.js", wantOK: true},
+		{input: "sse:https://example.com/sse", wantTrans: "sse", wantValue: "https://example.com/sse", wantOK: true},
+		{input: "http:https://example.com/mcp", wantTrans: "http", wantValue: "https://example.com/mcp", wantOK: true},
+		{input: "node server.js", wantOK: false},
+		{input: "unknown:stuff", wantOK: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			gotURL, gotTrans := parseTransportPrefix(tt.input)
-			if gotURL != tt.wantURL {
-				t.Errorf("url = %q, want %q", gotURL, tt.wantURL)
+			gotTrans, gotValue, gotOK := parseTransportColon(tt.input)
+			if gotOK != tt.wantOK {
+				t.Errorf("ok = %v, want %v", gotOK, tt.wantOK)
 			}
-			if gotTrans != tt.wantTrans {
-				t.Errorf("transport = %q, want %q", gotTrans, tt.wantTrans)
+			if gotOK {
+				if gotTrans != tt.wantTrans {
+					t.Errorf("transport = %q, want %q", gotTrans, tt.wantTrans)
+				}
+				if gotValue != tt.wantValue {
+					t.Errorf("value = %q, want %q", gotValue, tt.wantValue)
+				}
 			}
 		})
 	}
