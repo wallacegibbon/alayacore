@@ -145,19 +145,26 @@ type Tool struct {
 // ToolAnnotations provides optional hints about a tool to clients.
 // NOTE: all properties are hints — they are not guaranteed to provide
 // a faithful description of tool behavior.
+//
+// Spec defaults (when pointer is nil/feld absent):
+//
+//	ReadOnlyHint:    false
+//	DestructiveHint: true
+//	IdempotentHint:  false
+//	OpenWorldHint:   true
 type ToolAnnotations struct {
 	// A human-readable title for the tool.
 	Title string `json:"title,omitempty"`
 	// If true, the tool does not modify its environment. Default: false.
-	ReadOnlyHint bool `json:"readOnlyHint,omitempty"`
+	ReadOnlyHint *bool `json:"readOnlyHint,omitempty"`
 	// If true, the tool may perform destructive updates. Default: true.
-	DestructiveHint bool `json:"destructiveHint,omitempty"`
+	DestructiveHint *bool `json:"destructiveHint,omitempty"`
 	// If true, calling the tool repeatedly with the same arguments has no
 	// additional effect. Default: false.
-	IdempotentHint bool `json:"idempotentHint,omitempty"`
+	IdempotentHint *bool `json:"idempotentHint,omitempty"`
 	// If true, this tool may interact with an "open world" of external
 	// entities. Default: true.
-	OpenWorldHint bool `json:"openWorldHint,omitempty"`
+	OpenWorldHint *bool `json:"openWorldHint,omitempty"`
 }
 
 // ListToolsResult is the result of the "tools/list" method.

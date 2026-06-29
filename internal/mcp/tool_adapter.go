@@ -99,22 +99,30 @@ func buildDescription(serverName, description string, annotations *ToolAnnotatio
 // formatAnnotations returns a short bracketed hint string describing
 // the tool's behavior annotations, or empty string if none are set.
 // Examples: "[Read-only]" "[Destructive]" "[Idempotent]" "[Read-only, Idempotent]"
+//
+// Spec defaults (when pointer is nil):
+//
+//	readOnlyHint:    false — skip
+//	destructiveHint: true  — include
+//	idempotentHint:  false — skip
+//	openWorldHint:   true  — include
 func formatAnnotations(a *ToolAnnotations) string {
 	if a == nil {
 		return ""
 	}
 
 	var hints []string
-	if a.ReadOnlyHint {
+
+	if a.ReadOnlyHint != nil && *a.ReadOnlyHint {
 		hints = append(hints, "Read-only")
 	}
-	if a.DestructiveHint {
+	if a.DestructiveHint == nil || *a.DestructiveHint {
 		hints = append(hints, "Destructive")
 	}
-	if a.IdempotentHint {
+	if a.IdempotentHint != nil && *a.IdempotentHint {
 		hints = append(hints, "Idempotent")
 	}
-	if a.OpenWorldHint {
+	if a.OpenWorldHint == nil || *a.OpenWorldHint {
 		hints = append(hints, "Open-world")
 	}
 
