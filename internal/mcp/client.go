@@ -274,9 +274,19 @@ func (c *Client) connectLocked(ctx context.Context) error {
 			return fmt.Errorf("mcp client %q: %w", c.config.Name, err)
 		}
 	case c.config.URL != "":
-		transport, err = NewSSETransport(c.config.URL, c.config.Debug)
-		if err != nil {
-			return fmt.Errorf("mcp client %q: %w", c.config.Name, err)
+		// Try Streamable HTTP first (spec 2025-03-26).
+		// If the server returns 4xx, fall back to legacy HTTP+SSE (2024-11-05).
+		detectCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		streamableOk, detectErr := DetectStreamableHTTP(detectCtx, c.config.URL)
+		cancel()
+		if detectErr == nil && streamableOk {
+			transport = NewStreamableHTTPTransport(c.config.URL, c.config.Debug)
+		} else {
+			// Fall back to legacy SSE transport.
+			transport, err = NewSSETransport(c.config.URL, c.config.Debug)
+			if err != nil {
+				return fmt.Errorf("mcp client %q: %w", c.config.Name, err)
+			}
 		}
 	default:
 		return fmt.Errorf("mcp client %q: no command or URL specified", c.config.Name)
