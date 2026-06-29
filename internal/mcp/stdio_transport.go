@@ -7,8 +7,11 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"os/exec"
 	"sync"
+	"syscall"
+	"time"
 
 	"github.com/alayacore/alayacore/internal/debug"
 )
@@ -141,7 +144,10 @@ func (t *StdioTransport) readLoop() {
 }
 
 // Send writes a JSON-RPC request as a newline-terminated JSON message.
-func (t *StdioTransport) Send(req jsonrpcRequest) error {
+// The context is not used for stdio writes (pipe writes are synchronous)
+// but is accepted for interface compatibility.
+func (t *StdioTransport) Send(ctx context.Context, req jsonrpcRequest) error {
+	_ = ctx
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -204,7 +210,7 @@ func (t *StdioTransport) SendReceive(ctx context.Context, req jsonrpcRequest) (j
 		}
 	}()
 
-	if err := t.Send(req); err != nil {
+	if err := t.Send(ctx, req); err != nil {
 		return nil, fmt.Errorf("send: %w", err)
 	}
 
@@ -234,22 +240,45 @@ func (t *StdioTransport) SendReceive(ctx context.Context, req jsonrpcRequest) (j
 	}
 }
 
-// Close terminates the MCP server process.
-// Order: kill process (closes pipes, unblocks scanner) → wait for reader →
-// close stdin → signal done.
+// Close terminates the MCP server process gracefully per the MCP spec:
+//  1. Close stdin to signal EOF to the server
+//  2. Wait for the server to exit (with timeout)
+//  3. SIGTERM if still running
+//  4. SIGKILL if still running after another timeout
 func (t *StdioTransport) Close() error {
 	t.closeOnce.Do(func() {
-		// Kill the process first — this closes stdout pipe, which
-		// unblocks the scanner and lets readLoop exit.
-		if t.cmd != nil && t.cmd.Process != nil {
-			t.cmd.Process.Kill() //nolint:errcheck // SIGKILL always succeeds on Unix, best-effort on Windows
+		// Step 1: Close stdin to signal EOF.
+		t.stdin.Close()
+
+		// Step 2: Wait for the process to exit on its own.
+		done := make(chan struct{})
+		go func() {
+			t.cmd.Wait() //nolint:errcheck // exit status captured in done signal
+			close(done)
+		}()
+
+		select {
+		case <-done:
+			// Process exited cleanly.
+		case <-time.After(2 * time.Second):
+			// Step 3: SIGTERM.
+			if t.cmd != nil && t.cmd.Process != nil {
+				t.cmd.Process.Signal(os.Signal(syscall.SIGTERM)) //nolint:errcheck // best-effort
+			}
+			select {
+			case <-done:
+				// Process exited after SIGTERM.
+			case <-time.After(3 * time.Second):
+				// Step 4: SIGKILL.
+				if t.cmd != nil && t.cmd.Process != nil {
+					t.cmd.Process.Kill() //nolint:errcheck // SIGKILL always succeeds on Unix
+				}
+				<-done
+			}
 		}
 
 		// Wait for readLoop to finish processing pending responses.
 		t.readerWg.Wait()
-
-		// Close stdin.
-		t.stdin.Close()
 
 		// Signal that transport is done.
 		close(t.done)

@@ -13,7 +13,9 @@ var sseEndpointTimeout = 30 * time.Second
 // MCP uses JSON-RPC 2.0 over stdio, SSE, or other transports.
 type Transport interface {
 	// Send marshals and sends a JSON-RPC notification (no response expected).
-	Send(req jsonrpcRequest) error
+	// The context is used for cancellation and timeout — particularly for
+	// transports where sending may block (e.g. SSE HTTP POST).
+	Send(ctx context.Context, req jsonrpcRequest) error
 
 	// SendReceive sends a JSON-RPC request and waits for the matching
 	// response, matched by request ID. Context cancellation unregisters

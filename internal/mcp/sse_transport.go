@@ -233,36 +233,10 @@ func (t *SSETransport) handleSSEEvent(eventType, data string, endpointReceived *
 }
 
 // Send sends a JSON-RPC notification (no response expected) via HTTP POST.
-func (t *SSETransport) Send(req jsonrpcRequest) error {
-	data, err := json.Marshal(req)
-	if err != nil {
-		return fmt.Errorf("marshal request: %w", err)
-	}
-
-	if t.debugWriter != nil {
-		fmt.Fprintf(t.debugWriter, ">>> %s %s\n", req.Method, formatJSON(data))
-	}
-
-	// POST to the message endpoint.
-	httpReq, err := http.NewRequestWithContext(context.Background(), "POST", t.messageURL, strings.NewReader(string(data)))
-	if err != nil {
-		return fmt.Errorf("create POST request: %w", err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Accept", "application/json")
-
-	resp, err := t.httpClient.Do(httpReq)
-	if err != nil {
-		return fmt.Errorf("POST: %w", err)
-	}
-	resp.Body.Close()
-
-	// For notifications, any 2xx status is success.
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("POST: unexpected status %d", resp.StatusCode)
-	}
-
-	return nil
+// The context controls the HTTP request lifetime — if it expires or is
+// canceled, the POST is aborted.
+func (t *SSETransport) Send(ctx context.Context, req jsonrpcRequest) error {
+	return t.sendPOST(ctx, req)
 }
 
 // SendReceive sends a JSON-RPC request and waits for the matching response

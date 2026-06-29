@@ -3,8 +3,10 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync/atomic"
+	"time"
 )
 
 // ClientState represents the state of an MCP client connection.
@@ -357,6 +359,10 @@ func (c *Client) stateError(string) error {
 
 // sendRequest sends a JSON-RPC request and returns the response result.
 // Request/response matching is handled by the transport layer via request ID.
+//
+// If the context is canceled while waiting for a response, a best-effort
+// cancellation notification is sent to the server so it can abort
+// processing early.
 func (c *Client) sendRequest(ctx context.Context, method string, params any) (json.RawMessage, error) {
 	tp := c.loadTransport()
 	if tp == nil {
@@ -387,11 +393,42 @@ func (c *Client) sendRequest(ctx context.Context, method string, params any) (js
 		Params:  paramsData,
 	}
 
-	return tp.SendReceive(ctx, req)
+	result, err := tp.SendReceive(ctx, req)
+	if err != nil {
+		// If the request was canceled (user :cancel, timeout), send a
+		// best-effort cancellation notification so the server can abort
+		// processing. This is a notification (fire-and-forget), so we
+		// don't wait for it.
+		// Per spec, the initialize request MUST NOT be canceled.
+		if method != methodInitialize && (errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
+			c.sendCanceledNotification(id, err)
+		}
+		return nil, err
+	}
+	return result, nil
+}
+
+// sendCanceledNotification sends a cancellation notification to the
+// server as a best-effort hint that it should abort processing of the given
+// request. Uses a short timeout context so it doesn't block indefinitely.
+func (c *Client) sendCanceledNotification(id requestID, cause error) {
+	reason := "request canceled"
+	if errors.Is(cause, context.DeadlineExceeded) {
+		reason = "timeout"
+	}
+
+	// Use a short timeout so a slow/hung server doesn't block shutdown.
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	_ = c.sendNotification(ctx, methodNotificationsCanceled, CanceledNotificationParams{ //nolint:errcheck // best-effort
+		RequestID: id,
+		Reason:    reason,
+	})
 }
 
 // sendNotification sends a JSON-RPC notification (no response expected).
-func (c *Client) sendNotification(_ context.Context, method string, params any) error {
+func (c *Client) sendNotification(ctx context.Context, method string, params any) error {
 	tp := c.loadTransport()
 	if tp == nil {
 		return fmt.Errorf("mcp client %q: no transport", c.config.Name)
@@ -413,7 +450,7 @@ func (c *Client) sendNotification(_ context.Context, method string, params any) 
 		Params:  paramsData,
 	}
 
-	return tp.Send(req)
+	return tp.Send(ctx, req)
 }
 
 // Ensure interfaces are satisfied.

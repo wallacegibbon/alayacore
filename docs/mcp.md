@@ -118,9 +118,11 @@ Agent Loop
    format and returned to the agent.
 
 4. **Cancellation**: If the user cancels a task while waiting for an
-   MCP tool response, the pending request is unregistered. When the
-   server's response arrives, it is discarded — the server process
-   is not affected.
+   MCP tool response, the pending request is unregistered and a
+   `notifications/cancelled` notification is sent to the server
+   (best-effort) so it can abort processing early. Whether or not
+   the server receives the notification, any late response from the
+   server is discarded.
 
 5. **Server crash**: If an MCP server process exits unexpectedly, a
    monitor goroutine detects the death via the transport's Done channel,

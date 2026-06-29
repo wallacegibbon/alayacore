@@ -113,48 +113,114 @@ func executeMCPTool(ctx context.Context, manager *Manager, serverName, toolName 
 	// Convert MCP CallToolResult content to AlayaCore ContentParts.
 	parts := make([]llm.ContentPart, 0, len(result.Content))
 	for _, content := range result.Content {
-		switch content.Type {
-		case "text":
-			parts = append(parts, &llm.TextPart{Text: content.Text})
-
-		case "resource":
-			// Resource with base64 blob — embed as data URI so the LLM
-			// receives the actual content (same pattern as read_file).
-			switch {
-			case content.Blob != "" && content.MIMEType != "":
-				dataURI := fmt.Sprintf("data:%s;base64,%s", content.MIMEType, content.Blob)
-				switch {
-				case strings.HasPrefix(content.MIMEType, "image/"):
-					parts = append(parts, &llm.ImagePart{URI: dataURI})
-				case strings.HasPrefix(content.MIMEType, "video/"):
-					parts = append(parts, &llm.VideoPart{URI: dataURI})
-				case strings.HasPrefix(content.MIMEType, "audio/"):
-					parts = append(parts, &llm.AudioPart{URI: dataURI})
-				default:
-					// Document or unknown type — use DocumentPart.
-					parts = append(parts, &llm.DocumentPart{URI: dataURI})
-				}
-			case content.Blob != "":
-				// Blob without MIME type — wrap with metadata.
-				parts = append(parts, &llm.TextPart{
-					Text: fmt.Sprintf("[Resource from %s: %s (base64, %d bytes)]",
-						serverName, content.URI, len(content.Blob)),
-				})
-			case content.URI != "":
-				parts = append(parts, &llm.TextPart{
-					Text: fmt.Sprintf("[Resource from %s: %s]", serverName, content.URI),
-				})
-			}
-
-		default:
-			// Unknown content type — include as text if available.
-			if content.Text != "" {
-				parts = append(parts, &llm.TextPart{Text: content.Text})
-			}
+		part := convertToolContent(content, serverName)
+		if part != nil {
+			parts = append(parts, part)
 		}
 	}
 
 	return parts, nil
+}
+
+// convertToolContent converts a single MCP ToolContent to an AlayaCore ContentPart.
+// Returns nil if the content cannot be converted.
+//
+//nolint:gocyclo // content type dispatch is inherently a switch; each case is simple.
+func convertToolContent(content ToolContent, serverName string) llm.ContentPart {
+	switch content.Type {
+	case "text":
+		return &llm.TextPart{Text: content.Text}
+
+	case "image":
+		return convertImageContent(content, serverName)
+
+	case "audio":
+		return convertAudioContent(content, serverName)
+
+	case "resource":
+		return convertResourceContent(content, serverName)
+
+	default:
+		// Unknown content type — include as text if available.
+		if content.Text != "" {
+			return &llm.TextPart{Text: content.Text}
+		}
+		return nil
+	}
+}
+
+// convertImageContent converts an image content part.
+func convertImageContent(content ToolContent, serverName string) llm.ContentPart {
+	if content.Data != "" && content.MIMEType != "" {
+		dataURI := fmt.Sprintf("data:%s;base64,%s", content.MIMEType, content.Data)
+		return &llm.ImagePart{URI: dataURI}
+	}
+	if content.Data != "" {
+		return &llm.TextPart{
+			Text: fmt.Sprintf("[Image from %s: %d bytes base64 data]",
+				serverName, len(content.Data)),
+		}
+	}
+	return nil
+}
+
+// convertAudioContent converts an audio content part.
+func convertAudioContent(content ToolContent, serverName string) llm.ContentPart {
+	if content.Data != "" && content.MIMEType != "" {
+		dataURI := fmt.Sprintf("data:%s;base64,%s", content.MIMEType, content.Data)
+		return &llm.AudioPart{URI: dataURI}
+	}
+	if content.Data != "" {
+		return &llm.TextPart{
+			Text: fmt.Sprintf("[Audio from %s: %d bytes base64 data]",
+				serverName, len(content.Data)),
+		}
+	}
+	return nil
+}
+
+// convertResourceContent converts an embedded resource content part.
+func convertResourceContent(content ToolContent, serverName string) llm.ContentPart {
+	if content.Resource == nil {
+		return nil
+	}
+	rc := content.Resource
+
+	switch {
+	case rc.Blob != "" && rc.MIMEType != "":
+		// Base64 blob with known MIME type — embed as data URI.
+		dataURI := fmt.Sprintf("data:%s;base64,%s", rc.MIMEType, rc.Blob)
+		switch {
+		case strings.HasPrefix(rc.MIMEType, "image/"):
+			return &llm.ImagePart{URI: dataURI}
+		case strings.HasPrefix(rc.MIMEType, "video/"):
+			return &llm.VideoPart{URI: dataURI}
+		case strings.HasPrefix(rc.MIMEType, "audio/"):
+			return &llm.AudioPart{URI: dataURI}
+		default:
+			return &llm.DocumentPart{URI: dataURI}
+		}
+
+	case rc.Blob != "":
+		// Blob without MIME type.
+		return &llm.TextPart{
+			Text: fmt.Sprintf("[Resource from %s: %s (base64, %d bytes)]",
+				serverName, rc.URI, len(rc.Blob)),
+		}
+
+	case rc.Text != "":
+		// Text content.
+		return &llm.TextPart{Text: rc.Text}
+
+	case rc.URI != "":
+		// URI reference only.
+		return &llm.TextPart{
+			Text: fmt.Sprintf("[Resource from %s: %s]", serverName, rc.URI),
+		}
+
+	default:
+		return nil
+	}
 }
 
 // ParseServerConfig parses a single --mcp-server flag value.

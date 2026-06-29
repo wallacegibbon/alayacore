@@ -351,7 +351,7 @@ func TestSSETransport_SendNotification(t *testing.T) {
 	defer transport.Close()
 
 	// Send a notification (ID=0, no response expected).
-	err = transport.Send(jsonrpcRequest{
+	err = transport.Send(context.Background(), jsonrpcRequest{
 		JSONRPC: "2.0",
 		ID:      requestID(""),
 		Method:  "notifications/initialized",
@@ -776,7 +776,7 @@ func TestSSETransport_DebugLogging(t *testing.T) {
 	}
 
 	// Also test notification with debug logging.
-	err = transport.Send(jsonrpcRequest{
+	err = transport.Send(context.Background(), jsonrpcRequest{
 		JSONRPC: "2.0",
 		ID:      requestID(""),
 		Method:  "notifications/initialized",

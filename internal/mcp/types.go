@@ -120,6 +120,10 @@ type InitializeResult struct {
 	ProtocolVersion string             `json:"protocolVersion"`
 	Capabilities    ServerCapabilities `json:"capabilities"`
 	ServerInfo      ImplementationInfo `json:"serverInfo"`
+	// Instructions describing how to use the server and its features.
+	// This can be used by clients to improve the LLM's understanding of
+	// available tools, resources, etc.
+	Instructions string `json:"instructions,omitempty"`
 }
 
 // ImplementationInfo describes the name and version of the implementation.
@@ -134,6 +138,26 @@ type Tool struct {
 	Name        string          `json:"name"`
 	Description string          `json:"description,omitempty"`
 	InputSchema json.RawMessage `json:"inputSchema"`
+	// Annotations are optional hints about the tool's behavior.
+	Annotations *ToolAnnotations `json:"annotations,omitempty"`
+}
+
+// ToolAnnotations provides optional hints about a tool to clients.
+// NOTE: all properties are hints — they are not guaranteed to provide
+// a faithful description of tool behavior.
+type ToolAnnotations struct {
+	// A human-readable title for the tool.
+	Title string `json:"title,omitempty"`
+	// If true, the tool does not modify its environment. Default: false.
+	ReadOnlyHint bool `json:"readOnlyHint,omitempty"`
+	// If true, the tool may perform destructive updates. Default: true.
+	DestructiveHint bool `json:"destructiveHint,omitempty"`
+	// If true, calling the tool repeatedly with the same arguments has no
+	// additional effect. Default: false.
+	IdempotentHint bool `json:"idempotentHint,omitempty"`
+	// If true, this tool may interact with an "open world" of external
+	// entities. Default: true.
+	OpenWorldHint bool `json:"openWorldHint,omitempty"`
 }
 
 // ListToolsResult is the result of the "tools/list" method.
@@ -155,14 +179,34 @@ type CallToolResult struct {
 }
 
 // ToolContent represents a piece of content in a tool call result.
+//
+// The MCP spec defines four content types:
+//
+//	text:     {"type":"text", "text":"..."}
+//	image:    {"type":"image", "data":"base64...", "mimeType":"..."}
+//	audio:    {"type":"audio", "data":"base64...", "mimeType":"..."}
+//	resource: {"type":"resource", "resource":{"uri":"...","mimeType":"...","text|blob":"..."}}
 type ToolContent struct {
 	Type string `json:"type"`
 	// Text is used for type "text".
 	Text string `json:"text,omitempty"`
-	// URI/MIMEType are used for type "resource".
-	URI      string `json:"uri,omitempty"`
+	// Data is base64-encoded binary data for types "image" and "audio".
+	Data string `json:"data,omitempty"`
+	// MIMEType describes the media type for "image", "audio", and "resource".
 	MIMEType string `json:"mimeType,omitempty"`
-	// Blob is base64-encoded binary data for type "resource".
+	// Resource is used for type "resource" — a reference to a resource
+	// with its contents embedded inline.
+	Resource *ResourceContents `json:"resource,omitempty"`
+}
+
+// ResourceContents represents the contents of a resource embedded in a
+// tool result or prompt message, per the MCP spec.
+type ResourceContents struct {
+	URI      string `json:"uri"`
+	MIMEType string `json:"mimeType,omitempty"`
+	// Text is the text content (mutually exclusive with Blob).
+	Text string `json:"text,omitempty"`
+	// Blob is base64-encoded binary data (mutually exclusive with Text).
 	Blob string `json:"blob,omitempty"`
 }
 
@@ -180,7 +224,16 @@ const (
 	methodGetPrompt                = "prompts/get"
 	methodPing                     = "ping"
 	methodNotificationsInitialized = "notifications/initialized"
+	methodNotificationsCanceled    = "notifications/cancelled" //nolint:misspell // MCP spec method name
 )
+
+// CanceledNotificationParams is sent by the client to inform the server
+// that a previously-issued request is canceled. The server SHOULD stop
+// processing and return an error with code -32800 (Request Canceled).
+type CanceledNotificationParams struct {
+	RequestID requestID `json:"requestId"`
+	Reason    string    `json:"reason,omitempty"`
+}
 
 // ServerConfig describes how to connect to an MCP server.
 type ServerConfig struct {

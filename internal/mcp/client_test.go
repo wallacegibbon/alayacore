@@ -24,7 +24,8 @@ func newMockTransport(responses []json.RawMessage) *mockTransport {
 	}
 }
 
-func (m *mockTransport) Send(req jsonrpcRequest) error {
+func (m *mockTransport) Send(ctx context.Context, req jsonrpcRequest) error {
+	_ = ctx
 	m.mu.Lock()
 	m.requests = append(m.requests, req)
 	m.mu.Unlock()
