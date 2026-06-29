@@ -225,8 +225,8 @@ an MCP Host). The table below covers spec `2025-11-25`.
 | `initialize` / `initialized` | Version negotiation, capability exchange |
 | `tools/list` | With cursor-based pagination |
 | `tools/call` | With content type conversion (text, image, audio, resource, resource_link) |
-| `resources/list` / `resources/read` | Exposed as `{server}_read_resource` tool |
-| `prompts/list` / `prompts/get` | Exposed as `{server}_get_prompt` tool |
+| `resources/list` / `resources/read` | Pre-fetched at startup and injected into system prompt; exposed as `{server}_read_resource` tool |
+| `prompts/list` / `prompts/get` | Pre-fetched at startup and injected into system prompt; exposed as `{server}_get_prompt` tool |
 | `ping` | Both client → server and server → client |
 | `notifications/cancelled` | Best-effort on context cancellation |
 | `notifications/tools/list_changed` | Marks server stale, requires restart |
@@ -241,9 +241,9 @@ an MCP Host). The table below covers spec `2025-11-25`.
 |---------|-------------|--------|
 | `_meta` / `progressToken` | General fields, Progress | Progress notifications; optional, we don't initiate long-running ops |
 | `resources/subscribe` / `resources/unsubscribe` | Resources | Resource change subscription; not needed for agent use case |
-| `notifications/resources/list_changed` | Resources | We don't cache resource lists (fetched on demand) |
+| `notifications/resources/list_changed` | Resources | Resource lists are fetched at startup and injected into the system prompt; dynamic updates not required |
 | `notifications/resources/updated` | Resources | Requires subscribe; not implemented |
-| `notifications/prompts/list_changed` | Prompts | We don't cache prompt lists (fetched on demand) |
+| `notifications/prompts/list_changed` | Prompts | Prompt lists are fetched at startup and injected into the system prompt; dynamic updates not required |
 | `notifications/progress` | Progress | Requires `progressToken` in `_meta` |
 | `notifications/message` (logging) | Logging | Server log messages; optional |
 | `logging/setLevel` | Server → Logging | Server log level control |

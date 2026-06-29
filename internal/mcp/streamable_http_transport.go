@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -366,7 +367,7 @@ func (t *StreamableHTTPTransport) readSSELoop(sr *sseReadCloser, handler ServerR
 	for {
 		eventType, data, err := sr.readEvent()
 		if err != nil {
-			if err != io.EOF {
+			if err != io.EOF && !errors.Is(err, context.Canceled) {
 				if t.debugWriter != nil {
 					fmt.Fprintf(t.debugWriter, "SSE read error: %v\n", err)
 				}

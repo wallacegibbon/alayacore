@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/alayacore/alayacore/internal/config"
@@ -55,7 +56,7 @@ func Setup(cfg *config.Settings) (*Config, error) {
 	// ========================================================================
 	// MCP (Model Context Protocol) initialization
 	// ========================================================================
-	mcpManager, mcpServerTools, mcpErrors := initMCP(cfg, &agentTools)
+	mcpManager, mcpServerTools, mcpErrors, mcpResourcesCtx, mcpPromptsCtx := initMCP(cfg, &agentTools)
 
 	// ========================================================================
 	// System Prompt Construction
@@ -87,6 +88,15 @@ func Setup(cfg *config.Settings) (*Config, error) {
 		}
 	}
 
+	// Append pre-fetched resource and prompt lists so the LLM knows what
+	// resources and prompts are available without needing to discover them.
+	if mcpResourcesCtx != "" {
+		systemPrompt += mcpResourcesCtx
+	}
+	if mcpPromptsCtx != "" {
+		systemPrompt += mcpPromptsCtx
+	}
+
 	return &Config{
 		Cfg:               cfg,
 		SkillsMgr:         skillsManager,
@@ -104,9 +114,12 @@ func Setup(cfg *config.Settings) (*Config, error) {
 // initMCP initializes MCP servers: parses configs, connects, discovers tools,
 // and injects them into agentTools. Warnings are returned for the caller
 // to display through the adapter (not printed here).
-func initMCP(cfg *config.Settings, agentTools *[]llm.Tool) (*mcp.Manager, []llm.Tool, []string) {
+//
+// It also pre-fetches resource and prompt lists from connected servers and
+// returns them as formatted strings for injection into the system prompt.
+func initMCP(cfg *config.Settings, agentTools *[]llm.Tool) (*mcp.Manager, []llm.Tool, []string, string, string) {
 	if len(cfg.MCPServers) == 0 {
-		return nil, nil, nil
+		return nil, nil, nil, "", ""
 	}
 
 	warnings := make([]string, 0, len(cfg.MCPServers))
@@ -124,7 +137,7 @@ func initMCP(cfg *config.Settings, agentTools *[]llm.Tool) (*mcp.Manager, []llm.
 	}
 
 	if len(mcpConfigs) == 0 {
-		return nil, nil, warnings
+		return nil, nil, warnings, "", ""
 	}
 
 	mcpManager := mcp.NewManager(mcpConfigs)
@@ -158,5 +171,95 @@ func initMCP(cfg *config.Settings, agentTools *[]llm.Tool) (*mcp.Manager, []llm.
 	promptTools := mcp.PromptsToAgentTools(mcpManager.Clients(), mcpManager)
 	*agentTools = append(*agentTools, promptTools...)
 
-	return mcpManager, mcpServerTools, warnings
+	// Pre-fetch resource and prompt lists from connected servers.
+	listCtx, listCancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer listCancel()
+
+	resCtx := buildResourcesContext(listCtx, mcpManager)
+	promptCtx := buildPromptsContext(listCtx, mcpManager)
+
+	return mcpManager, mcpServerTools, warnings, resCtx, promptCtx
+}
+
+// buildResourcesContext fetches the resource list from all connected servers
+// and returns a formatted string suitable for injection into the system prompt.
+func buildResourcesContext(ctx context.Context, m *mcp.Manager) string {
+	clients := m.Clients()
+	if len(clients) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	for _, c := range clients {
+		if c.State() != mcp.StateReady || !c.HasResources() {
+			continue
+		}
+		resources, err := c.ListResources(ctx)
+		if err != nil {
+			continue
+		}
+		if len(resources) == 0 {
+			continue
+		}
+
+		b.WriteString(fmt.Sprintf("\n\nAvailable resources from MCP server %q:", c.Name()))
+		for _, r := range resources {
+			b.WriteString(fmt.Sprintf("\n  - %s", r.URI))
+			if r.Name != "" {
+				b.WriteString(fmt.Sprintf(" (name: %q", r.Name))
+				if r.Description != "" {
+					b.WriteString(fmt.Sprintf(", description: %q", r.Description))
+				}
+				if r.MIMEType != "" {
+					b.WriteString(fmt.Sprintf(", mimeType: %q", r.MIMEType))
+				}
+				b.WriteString(")")
+			} else if r.Description != "" {
+				b.WriteString(fmt.Sprintf(" (description: %q)", r.Description))
+			}
+		}
+	}
+	return b.String()
+}
+
+// buildPromptsContext fetches the prompt list from all connected servers
+// and returns a formatted string suitable for injection into the system prompt.
+func buildPromptsContext(ctx context.Context, m *mcp.Manager) string {
+	clients := m.Clients()
+	if len(clients) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	for _, c := range clients {
+		if c.State() != mcp.StateReady || !c.HasPrompts() {
+			continue
+		}
+		prompts, err := c.ListPrompts(ctx)
+		if err != nil {
+			continue
+		}
+		if len(prompts) == 0 {
+			continue
+		}
+
+		b.WriteString(fmt.Sprintf("\n\nAvailable prompts from MCP server %q:", c.Name()))
+		for _, p := range prompts {
+			b.WriteString(fmt.Sprintf("\n  - %s", p.Name))
+			if p.Description != "" {
+				b.WriteString(fmt.Sprintf(" (description: %q)", p.Description))
+			}
+			if len(p.Arguments) > 0 {
+				b.WriteString("\n    Arguments:")
+				for _, a := range p.Arguments {
+					required := ""
+					if a.Required {
+						required = " (required)"
+					}
+					b.WriteString(fmt.Sprintf("\n      - %s: %s%s", a.Name, a.Description, required))
+				}
+			}
+		}
+	}
+	return b.String()
 }

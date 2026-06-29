@@ -73,7 +73,14 @@ func toolsToAgentTools(serverTools map[string][]Tool, manager *Manager, strategy
 
 	for serverName, tools := range serverTools {
 		for _, tool := range tools {
-			adapted := adaptTool(serverName, tool, manager, strategy)
+			adapted, err := adaptTool(serverName, tool, manager, strategy)
+			if err != nil {
+				// Skip tools with invalid schemas. A single malformed tool
+				// should not prevent other valid tools from being used.
+				// The warning is intentionally discarded here — the caller
+				// (app.go) already collects errors via MCPStartupErrors.
+				continue
+			}
 			result = append(result, adapted)
 		}
 	}
@@ -82,20 +89,23 @@ func toolsToAgentTools(serverTools map[string][]Tool, manager *Manager, strategy
 }
 
 // adaptTool converts a single MCP tool to an llm.Tool.
-func adaptTool(serverName string, tool Tool, manager *Manager, strategy ToolNamingStrategy) llm.Tool {
+// Returns a zero-value Tool and an error if the tool has an invalid schema.
+func adaptTool(serverName string, tool Tool, manager *Manager, strategy ToolNamingStrategy) (llm.Tool, error) {
 	name := buildToolName(serverName, tool.Name, strategy)
 	description := buildDescription(serverName, tool.Description, tool.Annotations)
 
-	// MCP inputSchema is already a valid JSON Schema object.
-	// We pass it directly to the tool definition.
-	schema := tool.InputSchema
+	schema, err := sanitizeInputSchema(tool.InputSchema)
+	if err != nil {
+		return llm.Tool{}, fmt.Errorf("tool %q on server %q: invalid inputSchema: %w",
+			tool.Name, serverName, err)
+	}
 
 	return llm.NewTool(name, description).
 		WithSchema(schema).
 		WithExecute(func(ctx context.Context, input json.RawMessage) ([]llm.ContentPart, error) {
 			return executeMCPTool(ctx, manager, serverName, tool.Name, input)
 		}).
-		Build()
+		Build(), nil
 }
 
 // buildToolName creates the final tool name based on the naming strategy.
@@ -328,7 +338,7 @@ func convertResourceLinkContent(content ToolContent, serverName string) llm.Cont
 func newReadResourceTool(serverName string, manager *Manager) llm.Tool {
 	name := buildToolName(serverName, "read_resource", ToolNamePrefix)
 	description := fmt.Sprintf("Read a resource from MCP server %q by URI. "+
-		"Use resources/list to discover available URIs.", serverName)
+		"Available resource URIs are listed in the system prompt — refer to them above.", serverName)
 	schema := json.RawMessage(`{"type":"object","properties":{"uri":{"type":"string","description":"Resource URI to read"}},"required":["uri"]}`)
 
 	return llm.NewTool(name, description).
@@ -368,7 +378,7 @@ func newGetPromptTool(serverName string, manager *Manager) llm.Tool {
 	name := buildToolName(serverName, "get_prompt", ToolNamePrefix)
 	description := fmt.Sprintf("Get a prompt from MCP server %q by name. "+
 		"Prompts are templated message sequences that can be injected into the conversation. "+
-		"Use prompts/list to discover available prompt names.", serverName)
+		"Available prompt names are listed in the system prompt — refer to them above.", serverName)
 	schema := json.RawMessage(`{
 		"type":"object",
 		"properties":{
@@ -562,4 +572,84 @@ func splitArgs(input string) []string {
 		args = append(args, current.String())
 	}
 	return args
+}
+
+// maxSchemaDepth is the maximum allowed nesting depth for an MCP tool's
+// inputSchema. This prevents DoS attacks via deeply nested JSON Schema.
+const maxSchemaDepth = 20
+
+// sanitizeInputSchema validates and sanitizes an MCP tool's inputSchema
+// before passing it to the LLM provider. Returns the original schema
+// unchanged if valid, or an error if it violates security constraints.
+//
+// Security checks:
+//   - Root must be a JSON object (not null, array, or primitive).
+//   - No external $ref URIs (http/https) — prevents SSRF if the LLM
+//     provider attempts to dereference them.
+//   - Nesting depth limited to maxSchemaDepth — prevents DoS via
+//     deeply nested schemas (anyOf/allOf/oneOf bombs).
+func sanitizeInputSchema(raw json.RawMessage) (json.RawMessage, error) {
+	if len(raw) == 0 {
+		return nil, fmt.Errorf("schema is empty")
+	}
+
+	var schema any
+	if err := json.Unmarshal(raw, &schema); err != nil {
+		return nil, fmt.Errorf("invalid JSON: %w", err)
+	}
+
+	// Root must be an object.
+	rootObj, ok := schema.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("root must be a JSON object, got %T", schema)
+	}
+
+	// Walk the schema tree checking for external $ref and depth.
+	if err := walkSchema(rootObj, 0); err != nil {
+		return nil, err
+	}
+
+	// Schema passes all checks — return it unchanged.
+	return raw, nil
+}
+
+// walkSchema recursively walks a JSON Schema tree checking for:
+//   - External $ref values (http/https)
+//   - Nesting depth exceeding maxSchemaDepth
+//
+// It returns an error if any constraint is violated.
+func walkSchema(node map[string]any, depth int) error {
+	if depth > maxSchemaDepth {
+		return fmt.Errorf("schema nesting exceeds maximum depth of %d", maxSchemaDepth)
+	}
+
+	// Check for external $ref.
+	if ref, ok := node["$ref"]; ok {
+		refStr, ok := ref.(string)
+		if ok && (len(refStr) > 0) {
+			if strings.HasPrefix(refStr, "http://") || strings.HasPrefix(refStr, "https://") {
+				return fmt.Errorf("external $ref not allowed: %q", refStr)
+			}
+		}
+	}
+
+	// Recurse into all sub-objects and arrays of objects.
+	for _, val := range node {
+		switch v := val.(type) {
+		case map[string]any:
+			if err := walkSchema(v, depth+1); err != nil {
+				return err
+			}
+		case []any:
+			for _, item := range v {
+				if itemObj, ok := item.(map[string]any); ok {
+					if err := walkSchema(itemObj, depth+1); err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
+
+	return nil
 }

@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -286,4 +287,225 @@ func mustMarshal(v any) json.RawMessage {
 		panic(err)
 	}
 	return data
+}
+
+func TestSanitizeInputSchema_Valid(t *testing.T) {
+	tests := []struct {
+		name   string
+		schema json.RawMessage
+	}{
+		{"empty object", json.RawMessage(`{"type":"object"}`)},
+		{"with properties", json.RawMessage(`{"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}`)},
+		{"with nested properties", json.RawMessage(`{"type":"object","properties":{"addr":{"type":"object","properties":{"city":{"type":"string"}}}}}`)},
+		{"with array items", json.RawMessage(`{"type":"object","properties":{"tags":{"type":"array","items":{"type":"string"}}}}`)},
+		{"with allOf", json.RawMessage(`{"allOf":[{"type":"object"},{"required":["name"]}]}`)},
+		{"with local $ref", json.RawMessage(`{"type":"object","properties":{"user":{"$ref":"#/$defs/User"}},"$defs":{"User":{"type":"object"}}}`)},
+		{"with anyOf", json.RawMessage(`{"type":"object","properties":{"id":{"anyOf":[{"type":"string"},{"type":"integer"}]}}}`)},
+		{"with additionalProperties", json.RawMessage(`{"type":"object","additionalProperties":{"type":"string"}}`)},
+		{"no params (recommended)", json.RawMessage(`{"type":"object","additionalProperties":false}`)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := sanitizeInputSchema(tt.schema)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			// Must return the original bytes unchanged.
+			if string(result) != string(tt.schema) {
+				t.Errorf("returned schema differs from input:\ngot:  %s\nwant: %s", string(result), string(tt.schema))
+			}
+		})
+	}
+}
+
+func TestSanitizeInputSchema_Invalid(t *testing.T) {
+	tests := []struct {
+		name        string
+		schema      json.RawMessage
+		containsErr string
+	}{
+		{
+			name:        "empty schema",
+			schema:      json.RawMessage(``),
+			containsErr: "empty",
+		},
+		{
+			name:        "null schema",
+			schema:      json.RawMessage(`null`),
+			containsErr: "root must be a JSON object",
+		},
+		{
+			name:        "array schema",
+			schema:      json.RawMessage(`["a","b"]`),
+			containsErr: "root must be a JSON object",
+		},
+		{
+			name:        "string schema",
+			schema:      json.RawMessage(`"hello"`),
+			containsErr: "root must be a JSON object",
+		},
+		{
+			name:        "number schema",
+			schema:      json.RawMessage(`42`),
+			containsErr: "root must be a JSON object",
+		},
+		{
+			name:        "external http $ref at root",
+			schema:      json.RawMessage(`{"$ref":"http://evil.com/schema"}`),
+			containsErr: "external",
+		},
+		{
+			name:        "external https $ref in property",
+			schema:      json.RawMessage(`{"type":"object","properties":{"x":{"$ref":"https://internal.corp/schema"}}}`),
+			containsErr: "external",
+		},
+		{
+			name:        "external $ref in items",
+			schema:      json.RawMessage(`{"type":"object","properties":{"items":{"type":"array","items":{"$ref":"http://attacker.net/s"}}}}`),
+			containsErr: "external",
+		},
+		{
+			name:        "external $ref in allOf",
+			schema:      json.RawMessage(`{"allOf":[{"$ref":"https://malicious.io/s"}]}`),
+			containsErr: "external",
+		},
+		{
+			name:        "external $ref in anyOf",
+			schema:      json.RawMessage(`{"anyOf":[{"type":"object"},{"$ref":"http://evil/s"}]}`),
+			containsErr: "external",
+		},
+		{
+			name:        "external $ref in oneOf",
+			schema:      json.RawMessage(`{"oneOf":[{"$ref":"http://evil/s"}]}`),
+			containsErr: "external",
+		},
+		{
+			name:        "external $ref in if/then",
+			schema:      json.RawMessage(`{"if":{"$ref":"http://evil/s"},"then":{"type":"object"}}`),
+			containsErr: "external",
+		},
+		{
+			name:        "external $ref in $defs",
+			schema:      json.RawMessage(`{"$defs":{"X":{"$ref":"http://evil/s"}},"type":"object"}`),
+			containsErr: "external",
+		},
+		{
+			name:        "deeply nested schema exceeds limit",
+			schema:      buildDeepSchema(21),
+			containsErr: "exceeds maximum depth",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := sanitizeInputSchema(tt.schema)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.containsErr) {
+				t.Errorf("error %q does not contain %q", err.Error(), tt.containsErr)
+			}
+		})
+	}
+}
+
+// buildDeepSchema creates a JSON Schema with nested depth levels of
+// {"next":{"type":"object",...}} for testing depth limits.
+func buildDeepSchema(depth int) json.RawMessage {
+	if depth <= 0 {
+		return json.RawMessage(`{"type":"object"}`)
+	}
+	inner := buildDeepSchema(depth - 1)
+	data := fmt.Sprintf(`{"type":"object","properties":{"nested":%s}}`, string(inner))
+	return json.RawMessage(data)
+}
+
+func TestSanitizeInputSchema_WithXMcpHeader(t *testing.T) {
+	// x-mcp-header is a JSON Schema extension property.
+	// It should be safely ignored (not rejected) by the sanitizer.
+	schema := json.RawMessage(`{
+		"type":"object",
+		"properties":{
+			"region":{
+				"type":"string",
+				"x-mcp-header":"Region"
+			}
+		},
+		"required":["region"]
+	}`)
+	_, err := sanitizeInputSchema(schema)
+	if err != nil {
+		t.Fatalf("schema with x-mcp-header should be accepted, got error: %v", err)
+	}
+}
+
+func TestSanitizeInputSchema_ExternalRefInEnum(t *testing.T) {
+	// $ref values that are local (JSON pointer) should be accepted.
+	schema := json.RawMessage(`{
+		"type":"object",
+		"properties":{
+			"status":{
+				"enum":["active","inactive"],
+				"$ref":"#/$defs/Status"
+			}
+		}
+	}`)
+	_, err := sanitizeInputSchema(schema)
+	if err != nil {
+		t.Fatalf("local $ref should be accepted, got error: %v", err)
+	}
+}
+
+func TestSanitizeInputSchema_NotRef(t *testing.T) {
+	// "not" keyword should be traversed for $ref checking.
+	schema := json.RawMessage(`{
+		"not":{"$ref":"http://evil.com/schema"}
+	}`)
+	_, err := sanitizeInputSchema(schema)
+	if err == nil {
+		t.Fatal("expected error for external $ref in not, got nil")
+	}
+	if !strings.Contains(err.Error(), "external") {
+		t.Errorf("error %q should mention external $ref", err.Error())
+	}
+}
+
+func TestSanitizeInputSchema_AdditionalPropertiesObj(t *testing.T) {
+	// additionalProperties as an object should be traversed.
+	schema := json.RawMessage(`{
+		"type":"object",
+		"additionalProperties":{"$ref":"http://evil.com/s"}
+	}`)
+	_, err := sanitizeInputSchema(schema)
+	if err == nil {
+		t.Fatal("expected error for external $ref in additionalProperties, got nil")
+	}
+}
+
+func TestToolsToAgentTools_SkipsInvalidSchema(t *testing.T) {
+	m := NewManager([]ServerConfig{
+		{Name: "srv1", Command: "echo", Args: []string{"hello"}},
+	})
+
+	serverTools := map[string][]Tool{
+		"srv1": {
+			{Name: "good", Description: "Valid tool", InputSchema: json.RawMessage(`{"type":"object"}`)},
+			{Name: "bad", Description: "Invalid schema", InputSchema: json.RawMessage(`null`)},
+			{Name: "evil", Description: "External ref", InputSchema: json.RawMessage(`{"$ref":"http://evil.com/s"}`)},
+			{Name: "deep", Description: "Too deep", InputSchema: buildDeepSchema(21)},
+			{Name: "also_good", Description: "Another valid tool", InputSchema: json.RawMessage(`{"type":"object","properties":{"x":{"type":"string"}}}`)},
+		},
+	}
+
+	agentTools := ToolsToAgentTools(serverTools, m)
+	if len(agentTools) != 2 {
+		t.Fatalf("expected 2 valid tools (good, also_good), got %d", len(agentTools))
+	}
+	if agentTools[0].Definition.Name != "srv1_good" {
+		t.Errorf("first tool name = %q, want %q", agentTools[0].Definition.Name, "srv1_good")
+	}
+	if agentTools[1].Definition.Name != "srv1_also_good" {
+		t.Errorf("second tool name = %q, want %q", agentTools[1].Definition.Name, "srv1_also_good")
+	}
 }
