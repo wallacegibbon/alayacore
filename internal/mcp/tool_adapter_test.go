@@ -12,31 +12,6 @@ func TestParseServerConfig_Stdio(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			input: "db=npx @anthropic/mcp-db-server",
-			want: ServerConfig{
-				Name:    "db",
-				Command: "npx",
-				Args:    []string{"@anthropic/mcp-db-server"},
-			},
-		},
-		{
-			input: "git=uvx mcp-git",
-			want: ServerConfig{
-				Name:    "git",
-				Command: "uvx",
-				Args:    []string{"mcp-git"},
-			},
-		},
-		{
-			input: "search=python /path/to/server.py --port 8080",
-			want: ServerConfig{
-				Name:    "search",
-				Command: "python",
-				Args:    []string{"/path/to/server.py", "--port", "8080"},
-			},
-		},
-		// Unified format: exec: prefix
-		{
 			input: "db=exec:npx @anthropic/mcp-db-server",
 			want: ServerConfig{
 				Name:    "db",
@@ -57,7 +32,15 @@ func TestParseServerConfig_Stdio(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			input:   "=command",
+			input:   "=exec:cmd",
+			wantErr: true,
+		},
+		{
+			input:   "name=npx", // no transport: prefix
+			wantErr: true,
+		},
+		{
+			input:   "db=exec:", // empty command
 			wantErr: true,
 		},
 	}
@@ -96,34 +79,6 @@ func TestParseServerConfig_HTTP(t *testing.T) {
 		want    ServerConfig
 		wantErr bool
 	}{
-		// @url format (backwards compat)
-		{
-			input: "remote@https://mcp.example.com/sse",
-			want: ServerConfig{
-				Name:          "remote",
-				URL:           "https://mcp.example.com/sse",
-				TransportType: TransportAuto,
-			},
-		},
-		// @sse+url (backwards compat)
-		{
-			input: "remote@sse+https://mcp.example.com/sse",
-			want: ServerConfig{
-				Name:          "remote",
-				URL:           "https://mcp.example.com/sse",
-				TransportType: TransportSSE,
-			},
-		},
-		// @streamable+url (backwards compat)
-		{
-			input: "remote@streamable+https://example.com/mcp",
-			want: ServerConfig{
-				Name:          "remote",
-				URL:           "https://example.com/mcp",
-				TransportType: TransportStreamable,
-			},
-		},
-		// Unified format: name=sse:url
 		{
 			input: "remote=sse:https://mcp.example.com/sse",
 			want: ServerConfig{
@@ -132,7 +87,6 @@ func TestParseServerConfig_HTTP(t *testing.T) {
 				TransportType: TransportSSE,
 			},
 		},
-		// Unified format: name=http:url
 		{
 			input: "remote=http:https://example.com/mcp",
 			want: ServerConfig{
@@ -142,11 +96,27 @@ func TestParseServerConfig_HTTP(t *testing.T) {
 			},
 		},
 		{
-			input:   "@url",
+			input:   "name=",
 			wantErr: true,
 		},
 		{
-			input:   "name@",
+			input:   "=sse:url",
+			wantErr: true,
+		},
+		{
+			input:   "name=sse:", // empty URL
+			wantErr: true,
+		},
+		{
+			input:   "name=http:", // empty URL
+			wantErr: true,
+		},
+		{
+			input:   "name@url", // old @ format
+			wantErr: true,
+		},
+		{
+			input:   "name=ssh:host", // unknown transport
 			wantErr: true,
 		},
 	}
@@ -173,7 +143,7 @@ func TestParseServerConfig_HTTP(t *testing.T) {
 	}
 }
 
-func TestParseTransportColon(t *testing.T) {
+func TestParseTransportPrefix(t *testing.T) {
 	tests := []struct {
 		input     string
 		wantTrans string
@@ -185,10 +155,11 @@ func TestParseTransportColon(t *testing.T) {
 		{input: "http:https://example.com/mcp", wantTrans: "http", wantValue: "https://example.com/mcp", wantOK: true},
 		{input: "node server.js", wantOK: false},
 		{input: "unknown:stuff", wantOK: false},
+		{input: "", wantOK: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			gotTrans, gotValue, gotOK := parseTransportColon(tt.input)
+			gotTrans, gotValue, gotOK := parseTransportPrefix(tt.input)
 			if gotOK != tt.wantOK {
 				t.Errorf("ok = %v, want %v", gotOK, tt.wantOK)
 			}
@@ -199,28 +170,6 @@ func TestParseTransportColon(t *testing.T) {
 				if gotValue != tt.wantValue {
 					t.Errorf("value = %q, want %q", gotValue, tt.wantValue)
 				}
-			}
-		})
-	}
-}
-
-func TestSanitizeName(t *testing.T) {
-	tests := []struct {
-		input string
-		want  string
-	}{
-		{"simple", "simple"},
-		{"with spaces", "with_spaces"},
-		{"path/to/server", "path_to_server"},
-		{"name:port", "name_port"},
-		{"UPPERCASE", "UPPERCASE"},
-		{"mixed-CASE_123", "mixed-CASE_123"},
-		{"special!@#chars", "specialchars"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			if got := sanitizeName(tt.input); got != tt.want {
-				t.Errorf("sanitizeName() = %q, want %q", got, tt.want)
 			}
 		})
 	}
@@ -318,7 +267,6 @@ func TestSplitArgs(t *testing.T) {
 }
 
 func TestToolJSON(t *testing.T) {
-	// Verify Tool JSON serialization/deserialization matches MCP spec.
 	tool := Tool{
 		Name:        "read_file",
 		Description: "Read contents of a file",
@@ -344,7 +292,6 @@ func TestToolJSON(t *testing.T) {
 }
 
 func TestCallToolResultJSON(t *testing.T) {
-	// Verify CallToolResult JSON matches MCP spec.
 	result := CallToolResult{
 		Content: []ToolContent{
 			{Type: "text", Text: "Hello from MCP"},

@@ -272,9 +272,8 @@ type ServerConfig struct {
 
 // HTTP transport type constants.
 const (
-	TransportAuto       = ""           // auto-detect between Streamable HTTP and legacy SSE
-	TransportStreamable = "streamable" // explicit Streamable HTTP (2025-03-26)
-	TransportSSE        = "sse"        // explicit legacy SSE (2024-11-05)
+	TransportStreamable = "streamable" // Streamable HTTP (2025-03-26)
+	TransportSSE        = "sse"        // legacy HTTP+SSE (2024-11-05)
 )
 
 // RPCError represents a JSON-RPC error response.

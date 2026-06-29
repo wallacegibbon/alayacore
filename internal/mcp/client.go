@@ -283,18 +283,8 @@ func (c *Client) connectLocked(ctx context.Context) error {
 		case TransportStreamable:
 			transport = NewStreamableHTTPTransport(c.config.URL, c.config.Debug)
 		default:
-			// Auto-detect: try Streamable HTTP first, fall back to legacy SSE.
-			detectCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-			streamableOk, detectErr := DetectStreamableHTTP(detectCtx, c.config.URL)
-			cancel()
-			if detectErr == nil && streamableOk {
-				transport = NewStreamableHTTPTransport(c.config.URL, c.config.Debug)
-			} else {
-				transport, err = NewSSETransport(c.config.URL, c.config.Debug)
-				if err != nil {
-					return fmt.Errorf("mcp client %q: %w", c.config.Name, err)
-				}
-			}
+			return fmt.Errorf("mcp client %q: unknown transport type %q for URL %s",
+				c.config.Name, c.config.TransportType, c.config.URL)
 		}
 	default:
 		return fmt.Errorf("mcp client %q: no command or URL specified", c.config.Name)
