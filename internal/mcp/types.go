@@ -255,7 +255,7 @@ type ServerConfig struct {
 	// Args are the command-line arguments for stdio transport.
 	Args []string
 
-	// URL is the SSE endpoint URL for HTTP transport.
+	// URL is the MCP endpoint URL for HTTP transport.
 	// If URL is set, Command must be empty.
 	URL string
 
@@ -264,7 +264,18 @@ type ServerConfig struct {
 
 	// Debug enables logging of raw JSON-RPC messages to a file.
 	Debug bool
+
+	// TransportType specifies the HTTP transport variant.
+	// Empty string means auto-detect.
+	TransportType string
 }
+
+// HTTP transport type constants.
+const (
+	TransportAuto       = ""           // auto-detect between Streamable HTTP and legacy SSE
+	TransportStreamable = "streamable" // explicit Streamable HTTP (2025-03-26)
+	TransportSSE        = "sse"        // explicit legacy SSE (2024-11-05)
+)
 
 // RPCError represents a JSON-RPC error response.
 type RPCError struct {

@@ -82,8 +82,25 @@ func TestParseServerConfig_SSE(t *testing.T) {
 		{
 			input: "remote@https://mcp.example.com/sse",
 			want: ServerConfig{
-				Name: "remote",
-				URL:  "https://mcp.example.com/sse",
+				Name:          "remote",
+				URL:           "https://mcp.example.com/sse",
+				TransportType: TransportAuto,
+			},
+		},
+		{
+			input: "remote@sse+https://mcp.example.com/sse",
+			want: ServerConfig{
+				Name:          "remote",
+				URL:           "https://mcp.example.com/sse",
+				TransportType: TransportSSE,
+			},
+		},
+		{
+			input: "remote@streamable+https://example.com/mcp",
+			want: ServerConfig{
+				Name:          "remote",
+				URL:           "https://example.com/mcp",
+				TransportType: TransportStreamable,
 			},
 		},
 		{
@@ -110,6 +127,49 @@ func TestParseServerConfig_SSE(t *testing.T) {
 				if got.URL != tt.want.URL {
 					t.Errorf("URL = %q, want %q", got.URL, tt.want.URL)
 				}
+				if got.TransportType != tt.want.TransportType {
+					t.Errorf("TransportType = %q, want %q", got.TransportType, tt.want.TransportType)
+				}
+			}
+		})
+	}
+}
+
+func TestParseTransportPrefix(t *testing.T) {
+	tests := []struct {
+		input     string
+		wantURL   string
+		wantTrans string
+	}{
+		{
+			input:     "https://example.com/mcp",
+			wantURL:   "https://example.com/mcp",
+			wantTrans: TransportAuto,
+		},
+		{
+			input:     "sse+https://example.com/sse",
+			wantURL:   "https://example.com/sse",
+			wantTrans: TransportSSE,
+		},
+		{
+			input:     "streamable+https://example.com/mcp",
+			wantURL:   "https://example.com/mcp",
+			wantTrans: TransportStreamable,
+		},
+		{
+			input:     "streamable+http://localhost:8080/mcp",
+			wantURL:   "http://localhost:8080/mcp",
+			wantTrans: TransportStreamable,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			gotURL, gotTrans := parseTransportPrefix(tt.input)
+			if gotURL != tt.wantURL {
+				t.Errorf("url = %q, want %q", gotURL, tt.wantURL)
+			}
+			if gotTrans != tt.wantTrans {
+				t.Errorf("transport = %q, want %q", gotTrans, tt.wantTrans)
 			}
 		})
 	}

@@ -272,8 +272,10 @@ func convertResourceContent(content ToolContent, serverName string) llm.ContentP
 // ParseServerConfig parses a single --mcp-server flag value.
 // Supported formats:
 //
-//	"name=command arg1 arg2"    — stdio transport
-//	"name@url"                 — SSE transport
+//	"name=command arg1 arg2"       — stdio transport
+//	"name@url"                    — HTTP transport (auto-detect)
+//	"name@sse+url"                — explicit legacy SSE transport
+//	"name@streamable+url"         — explicit Streamable HTTP transport
 func ParseServerConfig(raw string) (ServerConfig, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -302,17 +304,34 @@ func ParseServerConfig(raw string) (ServerConfig, error) {
 		}, nil
 	}
 
-	// Try SSE format: name@url
+	// Try HTTP format: name@[transport+]url
 	if idx := strings.Index(raw, "@"); idx > 0 {
 		name := raw[:idx]
-		url := raw[idx+1:]
-		if name == "" || url == "" {
+		rest := raw[idx+1:]
+		if name == "" || rest == "" {
 			return ServerConfig{}, fmt.Errorf("invalid MCP server config: %q (name or URL empty)", raw)
 		}
-		return ServerConfig{Name: name, URL: url}, nil
+
+		cfg := ServerConfig{Name: name}
+		cfg.URL, cfg.TransportType = parseTransportPrefix(rest)
+		return cfg, nil
 	}
 
 	return ServerConfig{}, fmt.Errorf("invalid MCP server config: %q (expected name=command or name@url)", raw)
+}
+
+// parseTransportPrefix checks for an explicit transport prefix ("sse+" or
+// "streamable+") before the URL and returns the clean URL and transport type.
+func parseTransportPrefix(raw string) (url string, transport string) {
+	// Check for streamable+ prefix first (longer match to avoid partial match).
+	if strings.HasPrefix(raw, "streamable+") {
+		return raw[len("streamable+"):], TransportStreamable
+	}
+	if strings.HasPrefix(raw, "sse+") {
+		return raw[len("sse+"):], TransportSSE
+	}
+	// No explicit prefix — auto-detect.
+	return raw, TransportAuto
 }
 
 // splitArgs splits a command string into tokens, respecting quoted strings.
