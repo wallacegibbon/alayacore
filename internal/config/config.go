@@ -154,7 +154,7 @@ func Parse() *Settings {
 
 	// MCP
 	mcpServer := &stringSlice{}
-	flag.Var(mcpServer, "mcp-server", "MCP server config: `name=command arg1 arg2` for stdio, `name@url` for SSE (can be specified multiple times)")
+	flag.Var(mcpServer, "mcp-server", "MCP server config: `name=transport:value` where transport is exec, sse, or http (can be specified multiple times)")
 
 	flag.Parse()
 

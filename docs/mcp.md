@@ -5,20 +5,26 @@ toolset. MCP (Model Context Protocol) is an open standard that defines
 how LLMs discover and invoke tools from external services — databases,
 APIs, web scraping, code analysis, and more.
 
-When MCP servers are configured, their tools are automatically discovered
-and merged with AlayaCore's built-in tools (`read_file`, `write_file`,
-`execute_command`, etc.). The agent can use all of them transparently
-in the same tool-calling loop.
+When MCP servers are configured, their tools and resources are automatically
+discovered and merged with AlayaCore's built-in tools (`read_file`,
+`write_file`, `execute_command`, etc.). The agent can use all of them
+transparently in the same tool-calling loop.
 
 ## Quick Start
 
 ```bash
 # Connect to an MCP server via stdio
-alayacore --mcp-server "db=npx @anthropic/mcp-db-server"
+alayacore --mcp-server "db=exec:npx @anthropic/mcp-db-server"
 
 # Multiple servers
-alayacore --mcp-server "db=npx @anthropic/mcp-db-server" \
-          --mcp-server "git=uvx mcp-git"
+alayacore --mcp-server "db=exec:npx @anthropic/mcp-db-server" \
+          --mcp-server "git=exec:uvx mcp-git"
+
+# Connect to a remote MCP server via Streamable HTTP
+alayacore --mcp-server "remote=http:https://example.com/mcp"
+
+# Connect via legacy SSE
+alayacore --mcp-server "remote=sse:https://example.com/sse"
 ```
 
 ## CLI Flags
@@ -30,45 +36,51 @@ alayacore --mcp-server "db=npx @anthropic/mcp-db-server" \
 
 ## `--mcp-server` Format
 
-Two formats are supported:
+Single unified format: `name=transport:value`
 
-### Stdio Transport
+### exec — Stdio Transport
 
 ```
-name=command arg1 arg2 ...
+name=exec:command arg1 arg2 ...
 ```
 
-The name is used for tool name prefixing and logging. The command is
-executed as a subprocess; JSON-RPC messages are sent/received over
-stdin/stdout as newline-delimited JSON (NDJSON).
+The server is spawned as a subprocess; JSON-RPC messages are sent/received
+over stdin/stdout as newline-delimited JSON (NDJSON).
 
 ```bash
-# Simple command
---mcp-server "db=npx @anthropic/mcp-db-server"
-
-# Command with arguments
---mcp-server "search=python /path/to/server.py --port 8080"
-
-# Commands with quoted arguments
---mcp-server "git=uvx mcp-git --repo /path/to/repo"
+--mcp-server "db=exec:npx @anthropic/mcp-db-server"
+--mcp-server "git=exec:uvx mcp-git --repo /path/to/repo"
+--mcp-server "search=exec:python /path/to/server.py --port 8080"
 ```
 
-### SSE Transport
+### sse — Legacy HTTP+SSE Transport (2024-11-05)
 
 ```
-name@url
+name=sse:url
 ```
 
-Connects to an MCP server over Server-Sent Events (HTTP).
+Connects to an MCP server over Server-Sent Events. The client connects via
+HTTP GET to the SSE endpoint, receives the POST endpoint URL from the
+server's `endpoint` event, and sends JSON-RPC requests as HTTP POST with
+responses arriving as SSE `message` events.
 
 ```bash
---mcp-server "remote@https://mcp.example.com/sse"
+--mcp-server "remote=sse:https://example.com/sse"
 ```
 
-> **Note**: SSE transport is fully implemented. The client connects via
-> HTTP GET to the SSE endpoint, receives the POST endpoint URL from the
-> server's `endpoint` event, and sends JSON-RPC requests as HTTP POST
-> with responses arriving as SSE `message` events.
+### http — Streamable HTTP Transport (2025-03-26)
+
+```
+name=http:url
+```
+
+Connects to an MCP server using the new Streamable HTTP transport (spec
+2025-03-26). The server provides a single HTTP endpoint for both POST
+and GET. Responses can be immediate JSON or SSE streams.
+
+```bash
+--mcp-server "remote=http:https://example.com/mcp"
+```
 
 ## Tool Naming
 
@@ -79,7 +91,7 @@ built-in tools and between servers:
 <server>_<tool>
 ```
 
-For example, with `--mcp-server "db=npx @anthropic/mcp-db-server"`:
+For example, with `--mcp-server "db=exec:npx @anthropic/mcp-db-server"`:
 
 | Original tool name | Prefixed name | Description |
 |--------------------|---------------|-------------|
@@ -89,6 +101,20 @@ For example, with `--mcp-server "db=npx @anthropic/mcp-db-server"`:
 The prefixed name is set as the tool's `name` in the API `tools` parameter,
 so the LLM always uses it when making tool calls.
 
+## Injected Tools
+
+In addition to the tools exposed by the server's `tools/list`, AlayaCore
+injects the following utility tools for each server that supports the
+corresponding capability:
+
+| Tool | Capability | Parameters | Description |
+|------|-----------|------------|-------------|
+| `{server}_read_resource` | Resources | `uri` (required) | Read a resource by URI |
+| `{server}_get_prompt` | Prompts | `name` (required), `arguments` (optional) | Get a prompt template with arguments |
+
+These tools allow the LLM to access server resources and prompts directly
+within the conversation.
+
 ## How It Works
 
 ```
@@ -96,21 +122,24 @@ Agent Loop
   │
   ├── Built-in tools (read_file, write_file, ...)
   │
-  └── MCP tools (db_query, git_status, ...)
+  └── MCP tools (db_query, git_status, db_read_resource, db_get_prompt, ...)
         │
         ▼
     Manager
       ├── Client "db"  ─── StdioTransport ─── npx @anthropic/mcp-db-server
-      └── Client "api" ─── SSETransport  ─── https://api.example.com/mcp/sse
+      ├── Client "git" ─── StdioTransport ─── uvx mcp-git
+      ├── Client "api" ─── SSETransport  ─── https://api.example.com/sse
+      └── Client "mcp" ─── StreamableHTTP  ─── https://example.com/mcp
 ```
 
-1. **Startup**: AlayaCore spawns each MCP server as a child process
-   (or connects via SSE), performs the MCP initialize handshake, and
-   calls `tools/list` to discover available tools.
+1. **Startup**: AlayaCore creates the appropriate transport for each
+   server (stdio, SSE, or Streamable HTTP), performs the MCP initialize
+   handshake, and calls `tools/list` to discover available tools.
 
 2. **Tool registration**: Each discovered tool is wrapped as an
    `llm.Tool` with the prefixed name and wired to route calls back
-   to the originating server.
+   to the originating server. For servers that support Resources or
+   Prompts, `read_resource` and `get_prompt` tools are injected.
 
 3. **Tool execution**: When the agent calls a tool, the request is
    sent as a JSON-RPC `tools/call` message to the corresponding
@@ -131,15 +160,21 @@ Agent Loop
    error: `mcp client "name": server connection lost`. The agent
    handles this like any other tool failure.
 
+6. **Stale detection**: If a server notifies that its tool list has
+   changed (`notifications/tools/list_changed`), the client is marked
+   stale and subsequent tool calls return a message asking the user
+   to restart AlayaCore.
+
 ## Debugging
 
 Use `--debug-mcp` to log all JSON-RPC messages:
 
 ```bash
-alayacore --debug-mcp --mcp-server "db=npx @anthropic/mcp-db-server"
+alayacore --debug-mcp --mcp-server "db=exec:npx @anthropic/mcp-db-server"
 ```
 
-This creates `alayacore-debug-mcp-0.log` in the current directory:
+This creates `alayacore-debug-mcp-N.log` (N = 0, 1, 2, ...) in the current
+directory. Each run creates a new file so historical logs are preserved:
 
 ```
 MCP debug log started for: npx @anthropic/mcp-db-server
@@ -170,17 +205,26 @@ JSON is pretty-printed for readability.
   subsequent tool calls to that server fail with a connection error.
   The agent handles this like any other tool failure.
 
+- **Stale server**: If the server's tool list changes at runtime
+  (`notifications/tools/list_changed`), the server is marked stale
+  and tool calls return: `mcp client "name": server tool list changed,
+  restart required`.
+
 ## Protocol Support
 
 | MCP Feature | Status |
 |-------------|--------|
-| `tools/list` | ✅ Supported (with cursor pagination) |
-| `tools/call` | ✅ Supported |
 | `initialize` / `initialized` | ✅ Supported |
+| `tools/list` (with cursor pagination) | ✅ Supported |
+| `tools/call` | ✅ Supported |
+| `resources/list` / `resources/read` | ✅ Supported (via `read_resource` tool) |
+| `prompts/list` / `prompts/get` | ✅ Supported (via `get_prompt` tool) |
+| `ping` | ✅ Supported |
+| `notifications/cancelled` | ✅ Supported |
+| `notifications/tools/list_changed` | ✅ Supported (marks server stale) |
 | Stdio transport | ✅ Supported |
-| SSE transport | ✅ Supported |
-| Resources | 🚧 Not yet used (responses are accepted) |
-| Prompts | 🚧 Not yet used |
+| Streamable HTTP transport (2025-03-26) | ✅ Supported |
+| SSE transport (2024-11-05, legacy) | ✅ Supported |
 
 ## Technical Notes
 
