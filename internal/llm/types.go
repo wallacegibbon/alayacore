@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"iter"
+	"strings"
 )
 
 // DefaultMaxTokens is the default maximum output tokens when the user
@@ -88,6 +89,26 @@ type AudioPart struct {
 type DocumentPart struct {
 	ContentPartMeta
 	URI string
+}
+
+// MediaContentPart returns the appropriate ContentPart for a MIME type.
+// Supported prefixes:
+//
+//	image/ → ImagePart
+//	video/ → VideoPart
+//	audio/ → AudioPart
+//	default → DocumentPart
+func MediaContentPart(mimeType, dataURI string) ContentPart {
+	switch {
+	case strings.HasPrefix(mimeType, "image/"):
+		return &ImagePart{URI: dataURI}
+	case strings.HasPrefix(mimeType, "video/"):
+		return &VideoPart{URI: dataURI}
+	case strings.HasPrefix(mimeType, "audio/"):
+		return &AudioPart{URI: dataURI}
+	default:
+		return &DocumentPart{URI: dataURI}
+	}
 }
 
 // ReasoningPart represents reasoning/thinking content.

@@ -252,16 +252,7 @@ func convertResourceContent(content ToolContent, serverName string) llm.ContentP
 	case rc.Blob != "" && rc.MIMEType != "":
 		// Base64 blob with known MIME type — embed as data URI.
 		dataURI := fmt.Sprintf("data:%s;base64,%s", rc.MIMEType, rc.Blob)
-		switch {
-		case strings.HasPrefix(rc.MIMEType, "image/"):
-			return &llm.ImagePart{URI: dataURI}
-		case strings.HasPrefix(rc.MIMEType, "video/"):
-			return &llm.VideoPart{URI: dataURI}
-		case strings.HasPrefix(rc.MIMEType, "audio/"):
-			return &llm.AudioPart{URI: dataURI}
-		default:
-			return &llm.DocumentPart{URI: dataURI}
-		}
+		return llm.MediaContentPart(rc.MIMEType, dataURI)
 
 	case rc.Blob != "":
 		// Blob without MIME type.
