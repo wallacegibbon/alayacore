@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -250,7 +251,13 @@ func convertResourceContent(content ToolContent, serverName string) llm.ContentP
 
 	switch {
 	case rc.Blob != "" && rc.MIMEType != "":
-		// Base64 blob with known MIME type — embed as data URI.
+		// Text MIME → decode base64 and return as text.
+		if strings.HasPrefix(rc.MIMEType, "text/") {
+			if decoded, err := base64.StdEncoding.DecodeString(rc.Blob); err == nil {
+				return &llm.TextPart{Text: string(decoded)}
+			}
+		}
+		// Known media type (image, video, audio, etc.) → data URI.
 		dataURI := fmt.Sprintf("data:%s;base64,%s", rc.MIMEType, rc.Blob)
 		return llm.MediaContentPart(rc.MIMEType, dataURI)
 

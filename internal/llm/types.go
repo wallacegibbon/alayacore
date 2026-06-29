@@ -98,6 +98,9 @@ type DocumentPart struct {
 //	video/ → VideoPart
 //	audio/ → AudioPart
 //	default → DocumentPart
+//
+// Note: text/* MIME types should be decoded to TextPart by the caller
+// before calling this function.
 func MediaContentPart(mimeType, dataURI string) ContentPart {
 	switch {
 	case strings.HasPrefix(mimeType, "image/"):
