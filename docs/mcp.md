@@ -47,9 +47,12 @@ name=exec:command arg1 arg2 ...
 The server is spawned as a subprocess; JSON-RPC messages are sent/received
 over stdin/stdout as newline-delimited JSON (NDJSON).
 
+`KEY=VALUE` tokens before the command are treated as environment variables
+and passed to the subprocess (in addition to the current process environment):
+
 ```bash
---mcp-server "db=exec:npx @anthropic/mcp-db-server"
---mcp-server "git=exec:uvx mcp-git --repo /path/to/repo"
+--mcp-server "db=exec:DB_HOST=localhost DB_PORT=5432 npx @anthropic/mcp-db-server"
+--mcp-server "git=exec:GIT_DIR=/repo uvx mcp-git"
 --mcp-server "search=exec:python /path/to/server.py --port 8080"
 ```
 

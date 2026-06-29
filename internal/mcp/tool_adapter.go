@@ -402,12 +402,14 @@ func executeGetPrompt(ctx context.Context, manager *Manager, serverName, name st
 // Supported transports:
 //
 //	exec — stdio subprocess, value is command line
+//	      KEY=VALUE tokens before the command are set as environment variables
 //	sse  — legacy HTTP+SSE transport, value is URL
 //	http — Streamable HTTP transport, value is URL
 //
 // Examples:
 //
 //	db=exec:npx @anthropic/mcp-db-server
+//	db=exec:DB_HOST=localhost DB_PORT=5432 npx @anthropic/mcp-db-server
 //	remote=sse:https://example.com/sse
 //	remote=http:https://example.com/mcp
 func ParseServerConfig(raw string) (ServerConfig, error) {
