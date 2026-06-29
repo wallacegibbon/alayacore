@@ -152,14 +152,39 @@ func TestBuildToolName(t *testing.T) {
 }
 
 func TestBuildDescription(t *testing.T) {
-	got := buildDescription("db", "Query the database")
+	got := buildDescription("db", "Query the database", nil)
 	if got != `MCP tool from server "db": Query the database` {
 		t.Errorf("buildDescription() = %q", got)
 	}
 
-	got = buildDescription("db", "")
+	got = buildDescription("db", "", nil)
 	if got != `MCP tool from server "db"` {
 		t.Errorf("buildDescription(empty) = %q", got)
+	}
+
+	// With annotations.
+	got = buildDescription("db", "Query the database", &ToolAnnotations{
+		ReadOnlyHint:   true,
+		IdempotentHint: true,
+	})
+	want := `MCP tool from server "db": Query the database [Read-only, Idempotent]`
+	if got != want {
+		t.Errorf("buildDescription(with annotations) = %q, want %q", got, want)
+	}
+
+	// Destructive only.
+	got = buildDescription("git", "Delete branch", &ToolAnnotations{
+		DestructiveHint: true,
+	})
+	want = `MCP tool from server "git": Delete branch [Destructive]`
+	if got != want {
+		t.Errorf("buildDescription(destructive) = %q, want %q", got, want)
+	}
+
+	// All false → no hint appended.
+	got = buildDescription("db", "Query", &ToolAnnotations{})
+	if got != `MCP tool from server "db": Query` {
+		t.Errorf("buildDescription(all false) = %q, want without hint", got)
 	}
 }
 

@@ -52,7 +52,7 @@ func toolsToAgentTools(serverTools map[string][]Tool, manager *Manager, strategy
 // adaptTool converts a single MCP tool to an llm.Tool.
 func adaptTool(serverName string, tool Tool, manager *Manager, strategy ToolNamingStrategy) llm.Tool {
 	name := buildToolName(serverName, tool.Name, strategy)
-	description := buildDescription(serverName, tool.Description)
+	description := buildDescription(serverName, tool.Description, tool.Annotations)
 
 	// MCP inputSchema is already a valid JSON Schema object.
 	// We pass it directly to the tool definition.
@@ -78,12 +78,50 @@ func buildToolName(serverName, toolName string, strategy ToolNamingStrategy) str
 	}
 }
 
-// buildDescription formats the tool description including origin info.
-func buildDescription(serverName, description string) string {
+// buildDescription formats the tool description including origin info
+// and behavior annotations.
+func buildDescription(serverName, description string, annotations *ToolAnnotations) string {
+	var b strings.Builder
 	if description == "" {
-		return fmt.Sprintf("MCP tool from server %q", serverName)
+		b.WriteString(fmt.Sprintf("MCP tool from server %q", serverName))
+	} else {
+		b.WriteString(fmt.Sprintf("MCP tool from server %q: %s", serverName, description))
 	}
-	return fmt.Sprintf("MCP tool from server %q: %s", serverName, description)
+
+	if hint := formatAnnotations(annotations); hint != "" {
+		b.WriteString(" ")
+		b.WriteString(hint)
+	}
+
+	return b.String()
+}
+
+// formatAnnotations returns a short bracketed hint string describing
+// the tool's behavior annotations, or empty string if none are set.
+// Examples: "[Read-only]" "[Destructive]" "[Idempotent]" "[Read-only, Idempotent]"
+func formatAnnotations(a *ToolAnnotations) string {
+	if a == nil {
+		return ""
+	}
+
+	var hints []string
+	if a.ReadOnlyHint {
+		hints = append(hints, "Read-only")
+	}
+	if a.DestructiveHint {
+		hints = append(hints, "Destructive")
+	}
+	if a.IdempotentHint {
+		hints = append(hints, "Idempotent")
+	}
+	if a.OpenWorldHint {
+		hints = append(hints, "Open-world")
+	}
+
+	if len(hints) == 0 {
+		return ""
+	}
+	return "[" + strings.Join(hints, ", ") + "]"
 }
 
 // sanitizeName replaces characters that are problematic in tool names.
