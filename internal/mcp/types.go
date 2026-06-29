@@ -238,6 +238,44 @@ type ReadResourceResult struct {
 	Contents []ResourceContents `json:"contents"`
 }
 
+// Prompt represents a prompt or prompt template exposed by an MCP server.
+type Prompt struct {
+	Name        string           `json:"name"`
+	Description string           `json:"description,omitempty"`
+	Arguments   []PromptArgument `json:"arguments,omitempty"`
+}
+
+// PromptArgument describes an argument a prompt template accepts.
+type PromptArgument struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Required    bool   `json:"required,omitempty"`
+}
+
+// ListPromptsResult is the result of the "prompts/list" method.
+type ListPromptsResult struct {
+	Prompts    []Prompt `json:"prompts"`
+	NextCursor string   `json:"nextCursor,omitempty"`
+}
+
+// GetPromptRequest is the params for the "prompts/get" method.
+type GetPromptRequest struct {
+	Name      string            `json:"name"`
+	Arguments map[string]string `json:"arguments,omitempty"`
+}
+
+// GetPromptResult is the result of the "prompts/get" method.
+type GetPromptResult struct {
+	Description string          `json:"description,omitempty"`
+	Messages    []PromptMessage `json:"messages"`
+}
+
+// PromptMessage is a single message in a prompt result.
+type PromptMessage struct {
+	Role    string      `json:"role"` // "user" or "assistant"
+	Content ToolContent `json:"content"`
+}
+
 // ResourceContents represents the contents of a resource embedded in a
 // tool result or prompt message, per the MCP spec.
 type ResourceContents struct {

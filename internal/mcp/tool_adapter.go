@@ -53,6 +53,21 @@ func ResourcesToAgentTools(clients []*Client, manager *Manager) []llm.Tool {
 	return result
 }
 
+// PromptsToAgentTools creates a get_prompt tool for each server that
+// advertised prompt capability.
+func PromptsToAgentTools(clients []*Client, manager *Manager) []llm.Tool {
+	result := make([]llm.Tool, 0, len(clients))
+	for _, c := range clients {
+		if c.State() != StateReady || !c.HasPrompts() {
+			continue
+		}
+		serverName := c.Name()
+		tool := newGetPromptTool(serverName, manager)
+		result = append(result, tool)
+	}
+	return result
+}
+
 func toolsToAgentTools(serverTools map[string][]Tool, manager *Manager, strategy ToolNamingStrategy) []llm.Tool {
 	var result []llm.Tool
 
@@ -320,6 +335,62 @@ func executeReadResource(ctx context.Context, manager *Manager, serverName, uri 
 		part := convertResourceContents(&rc, serverName)
 		if part != nil {
 			parts = append(parts, part)
+		}
+	}
+	return parts, nil
+}
+
+// newGetPromptTool creates a get_prompt tool for a server that supports
+// the Prompt capability.
+func newGetPromptTool(serverName string, manager *Manager) llm.Tool {
+	name := buildToolName(serverName, "get_prompt", ToolNamePrefix)
+	description := fmt.Sprintf("Get a prompt from MCP server %q by name. "+
+		"Prompts are templated message sequences that can be injected into the conversation. "+
+		"Use prompts/list to discover available prompt names.", serverName)
+	schema := json.RawMessage(`{
+		"type":"object",
+		"properties":{
+			"name":{"type":"string","description":"Prompt name"},
+			"arguments":{"type":"object","description":"Optional template arguments","additionalProperties":{"type":"string"}}
+		},
+		"required":["name"]
+	}`)
+
+	return llm.NewTool(name, description).
+		WithSchema(schema).
+		WithExecute(func(ctx context.Context, input json.RawMessage) ([]llm.ContentPart, error) {
+			var params struct {
+				Name      string            `json:"name"`
+				Arguments map[string]string `json:"arguments,omitempty"`
+			}
+			if err := json.Unmarshal(input, &params); err != nil {
+				return nil, fmt.Errorf("invalid arguments: %w", err)
+			}
+			return executeGetPrompt(ctx, manager, serverName, params.Name, params.Arguments)
+		}).
+		Build()
+}
+
+// executeGetPrompt fetches a prompt and converts the messages to content parts.
+func executeGetPrompt(ctx context.Context, manager *Manager, serverName, name string, args map[string]string) ([]llm.ContentPart, error) {
+	result, err := manager.GetPrompt(ctx, serverName, name, args)
+	if err != nil {
+		return nil, err
+	}
+
+	var parts []llm.ContentPart
+	if result.Description != "" {
+		parts = append(parts, &llm.TextPart{Text: fmt.Sprintf("[Prompt: %s]", result.Description)})
+	}
+	for _, msg := range result.Messages {
+		role := msg.Role
+		content := convertToolContent(msg.Content, serverName)
+		if content != nil {
+			if role == "assistant" {
+				parts = append(parts, &llm.TextPart{Text: "[Assistant]"}, content)
+			} else {
+				parts = append(parts, &llm.TextPart{Text: "[User]"}, content)
+			}
 		}
 	}
 	return parts, nil

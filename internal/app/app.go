@@ -154,5 +154,9 @@ func initMCP(cfg *config.Settings, agentTools *[]llm.Tool) (*mcp.Manager, []llm.
 	resourceTools := mcp.ResourcesToAgentTools(mcpManager.Clients(), mcpManager)
 	*agentTools = append(*agentTools, resourceTools...)
 
+	// Inject get_prompt tools for servers that support Prompts.
+	promptTools := mcp.PromptsToAgentTools(mcpManager.Clients(), mcpManager)
+	*agentTools = append(*agentTools, promptTools...)
+
 	return mcpManager, mcpServerTools, warnings
 }

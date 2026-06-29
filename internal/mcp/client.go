@@ -248,6 +248,8 @@ func (c *Client) HasResources() bool {
 }
 
 // ListResources fetches the list of available resources from the server.
+//
+//nolint:dupl // similar to ListPrompts by spec design
 func (c *Client) ListResources(ctx context.Context) ([]Resource, error) {
 	if c.State() != StateReady {
 		return nil, c.stateError("list resources")
@@ -303,6 +305,74 @@ func (c *Client) ReadResource(ctx context.Context, uri string) (*ReadResourceRes
 	}
 
 	return &readResult, nil
+}
+
+// HasPrompts returns true if the server advertised prompt support.
+func (c *Client) HasPrompts() bool {
+	return c.capabilities.Prompts != nil
+}
+
+// ListPrompts fetches the list of available prompts from the server.
+//
+//nolint:dupl // similar to ListResources by spec design
+func (c *Client) ListPrompts(ctx context.Context) ([]Prompt, error) {
+	if c.State() != StateReady {
+		return nil, c.stateError("list prompts")
+	}
+
+	type listPromptsParams struct {
+		Cursor string `json:"cursor,omitempty"`
+	}
+
+	var all []Prompt
+	var cursor string
+
+	for {
+		var params any
+		if cursor != "" {
+			params = listPromptsParams{Cursor: cursor}
+		}
+
+		result, err := c.sendRequest(ctx, methodListPrompts, params)
+		if err != nil {
+			return nil, err
+		}
+
+		var page ListPromptsResult
+		if err := json.Unmarshal(result, &page); err != nil {
+			return nil, fmt.Errorf("parse prompts page: %w", err)
+		}
+
+		all = append(all, page.Prompts...)
+		if page.NextCursor == "" {
+			break
+		}
+		cursor = page.NextCursor
+	}
+
+	return all, nil
+}
+
+// GetPrompt fetches a prompt by name with optional arguments.
+func (c *Client) GetPrompt(ctx context.Context, name string, args map[string]string) (*GetPromptResult, error) {
+	if c.State() != StateReady {
+		return nil, c.stateError("get prompt")
+	}
+
+	result, err := c.sendRequest(ctx, methodGetPrompt, GetPromptRequest{
+		Name:      name,
+		Arguments: args,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("get prompt %q on %q: %w", name, c.config.Name, err)
+	}
+
+	var promptResult GetPromptResult
+	if err := json.Unmarshal(result, &promptResult); err != nil {
+		return nil, fmt.Errorf("parse prompts/get result: %w", err)
+	}
+
+	return &promptResult, nil
 }
 
 // Close shuts down the client and its transport.

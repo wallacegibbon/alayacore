@@ -119,6 +119,15 @@ func (m *Manager) ReadResource(ctx context.Context, serverName, uri string) (*Re
 	return client.ReadResource(ctx, uri)
 }
 
+// GetPrompt fetches a prompt by name from the specified server.
+func (m *Manager) GetPrompt(ctx context.Context, serverName, name string, args map[string]string) (*GetPromptResult, error) {
+	client := m.findClient(serverName)
+	if client == nil {
+		return nil, fmt.Errorf("mcp server %q not found", serverName)
+	}
+	return client.GetPrompt(ctx, name, args)
+}
+
 // CloseAll shuts down all MCP client connections.
 func (m *Manager) CloseAll() {
 	if m.closed {
