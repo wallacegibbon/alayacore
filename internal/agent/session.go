@@ -89,10 +89,9 @@ type runState struct {
 
 	mcpUpdateCh chan MCPUpdateEvent // buffered(10), receives MCP init results (internal to session)
 
-	// mcpInitSkip is closed when the user skips MCP initialization
-	// (Ctrl+G on the init overlay). The watcher goroutine exits early
-	// and no MCP results are applied.
-	mcpInitSkip chan struct{}
+	// mcpAsyncInit stores the AsyncInit reference so SkipCurrent() can
+	// be called from handleMCPInitSkip (Ctrl+G on init overlay).
+	mcpAsyncInit *mcp.AsyncInit
 
 	// OAuth authorization sequence — owned by run() goroutine.
 	// When the initial MCPUpdateEvent has PendingOAuthServers, the run()
@@ -176,8 +175,6 @@ func (s *Session) startMCPInitWatcher(asyncInit *mcp.AsyncInit) {
 		select {
 		case <-asyncInit.Done():
 		case <-s.sessionCtx.Done():
-			return
-		case <-s.mcpInitSkip:
 			return
 		}
 
@@ -279,7 +276,6 @@ func NewSession(cfg SessionConfig) *Session {
 			taskResultCh:  make(chan []llm.ContentPart, 1),
 			taskRefreshCh: make(chan struct{}, 1),
 			mcpUpdateCh:   make(chan MCPUpdateEvent, 10),
-			mcpInitSkip:   make(chan struct{}),
 			oauthResultCh: make(chan oauthResult, 10),
 		},
 		sharedState: sharedState{
@@ -300,6 +296,7 @@ func NewSession(cfg SessionConfig) *Session {
 
 	// Start async MCP init watcher — the session manages init internally.
 	if cfg.AsyncInit != nil {
+		s.mcpAsyncInit = cfg.AsyncInit
 		s.startMCPInitWatcher(cfg.AsyncInit)
 	}
 
@@ -325,7 +322,6 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 			taskResultCh:  make(chan []llm.ContentPart, 1),
 			taskRefreshCh: make(chan struct{}, 1),
 			mcpUpdateCh:   make(chan MCPUpdateEvent, 10),
-			mcpInitSkip:   make(chan struct{}),
 			oauthResultCh: make(chan oauthResult, 10),
 		},
 		sharedState: sharedState{

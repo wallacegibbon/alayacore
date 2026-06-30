@@ -41,6 +41,8 @@ type AsyncInit struct {
 
 	// saved configs for reconnecting after OAuth auth
 	configs []ServerConfig
+
+	skipCh chan struct{} // closed to skip the current server during connect phase
 }
 
 // NewAsyncInit creates a new AsyncInit from server configurations.
@@ -50,6 +52,7 @@ func NewAsyncInit(configs []ServerConfig) *AsyncInit {
 		manager: NewManager(configs),
 		done:    make(chan struct{}),
 		configs: configs,
+		skipCh:  make(chan struct{}, 1),
 	}
 }
 
@@ -85,6 +88,39 @@ func (a *AsyncInit) Configs() []ServerConfig {
 	return a.configs
 }
 
+// SkipCurrent signals the connection loop to skip the current server
+// and move to the next one. Has no effect if the connect phase has
+// already completed (all servers connected or timed out).
+func (a *AsyncInit) SkipCurrent() {
+	select {
+	case a.skipCh <- struct{}{}:
+	default:
+	}
+}
+
+// errSkipRequested is a sentinel error returned by connectWithSkip when
+// the user requests skipping the current server.
+var errSkipRequested = fmt.Errorf("skip requested")
+
+// connectWithSkip connects a client, but allows the user to skip it
+// via the skipCh channel. Returns errSkipRequested if skipped.
+func (a *AsyncInit) connectWithSkip(ctx context.Context, c *Client) error {
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- c.Connect(ctx)
+	}()
+	select {
+	case err := <-errCh:
+		return err
+	case <-a.skipCh:
+		// Close the client to free resources, then report skipped.
+		c.Close()
+		return errSkipRequested
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
 func (a *AsyncInit) run(ctx context.Context) {
 	defer close(a.done)
 
@@ -100,7 +136,13 @@ func (a *AsyncInit) run(ctx context.Context) {
 		if needsAuth(c) {
 			continue // needs interactive OAuth — skip for now
 		}
-		if err := c.Connect(connectCtx); err != nil {
+		// Try connecting, but allow user to skip this specific server
+		// via SkipCurrent() (e.g., when it hangs).
+		if err := a.connectWithSkip(connectCtx, c); err != nil {
+			if err == errSkipRequested {
+				connErrs = append(connErrs, fmt.Errorf("skipped server %q", c.Name()))
+				continue
+			}
 			connErrs = append(connErrs, err)
 		}
 	}

@@ -499,19 +499,14 @@ func (s *Session) handlePrompt(contentParts []llm.ContentPart) {
 
 // handleMCPInitSkip handles the :mcp_init_skip command.
 // Called when the user presses Ctrl+G on the init overlay.
-// Close the mcpInitSkip channel to abort the watcher, set mcpReady,
-// and notify the adapter to close the init overlay.
+// Tells AsyncInit to skip the currently connecting server
+// and move to the next one. The init overlay is dismissed
+// but init continues in the background.
 func (s *Session) handleMCPInitSkip() {
-	select {
-	case <-s.mcpInitSkip:
-		// Already closed — nothing to do.
-	default:
-		close(s.mcpInitSkip)
+	if ai := s.mcpAsyncInit; ai != nil {
+		ai.SkipCurrent()
+		s.writeNotify("Skipping current MCP server connection...")
 	}
-	s.mcpReady.Store(true)
-
-	// Notify adapter that init is "done" (no MCP tools loaded).
-	s.sendMCPInitMsg("ready", 0, nil)
 }
 
 // handleMCPAuth handles the :mcp_auth command.

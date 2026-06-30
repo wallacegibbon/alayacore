@@ -145,6 +145,11 @@ type Terminal struct {
 	// session sends the next SM message.
 	lastMCPAuthServer string
 
+	// mcpInitOverlayDismissed is set when the user dismisses the init
+	// overlay (Ctrl+G for skip), preventing the tick handler from
+	// immediately reopening it while async init is still running.
+	mcpInitOverlayDismissed bool
+
 	// Async session loading state.
 	// When true, Init() kicks off the loading in a goroutine and View()
 	// renders a loading screen instead of the normal TUI.
@@ -375,17 +380,24 @@ func (m *Terminal) handleTick() (tea.Model, tea.Cmd) {
 // handleMCPInitOverlay manages the MCP initialization overlay lifecycle.
 // Reads MCPInitStatus from the session's system messages (type "mcp_init")
 // to show or hide the overlay — no polling of AsyncMCP needed.
+//
+// The user can dismiss the overlay with Ctrl+G (skips current server).
+// Once dismissed, it won't reopen until the status changes to something
+// other than "starting" (init completion resets the flag).
 func (m *Terminal) handleMCPInitOverlay() {
 	status := m.out.SnapshotStatus().MCPInitStatus
 
 	switch status {
 	case "starting":
-		// Init in progress — show the overlay if not already open.
-		if !m.confirmOverlay.IsOpen() {
+		// Init in progress — show the overlay if not already open
+		// and not dismissed by the user.
+		if !m.confirmOverlay.IsOpen() && !m.mcpInitOverlayDismissed {
 			m.openConfirmMCPInit()
 		}
 	case "ready", "auth_required":
-		// Init complete — close the overlay if it's open.
+		// Init complete — close the overlay if it's open and
+		// reset the dismiss flag so future init phases trigger it.
+		m.mcpInitOverlayDismissed = false
 		if m.confirmOverlay.IsOpen() && m.confirmOverlay.Kind() == ConfirmMCPInit {
 			m.confirmOverlay.Close()
 			m.restoreFocusAfterConfirm()

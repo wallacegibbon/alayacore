@@ -228,7 +228,8 @@ func (m *Terminal) handleConfirmCanceled(kind ConfirmKind, toolID string, fromCm
 		return m, scheduleTick()
 
 	case ConfirmMCPInit:
-		// Ctrl+G on init overlay — skip MCP initialization entirely.
+		// Ctrl+G on init overlay — skip current server and dismiss overlay.
+		m.mcpInitOverlayDismissed = true
 		m.restoreFocusAfterConfirm()
 		m.emitCommand(":mcp_init_skip")
 		return m, scheduleTick()
