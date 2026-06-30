@@ -75,6 +75,12 @@ func (m *DisplayModel) SetStyles(styles *Styles) {
 	m.styles = styles
 }
 
+// ForceContentDirty clears the cached content so the next updateContent
+// regenerates and sets the scroll content even if nothing changed.
+func (m *DisplayModel) ForceContentDirty() {
+	m.lastContent = ""
+}
+
 func (m *DisplayModel) YOffset() int {
 	return m.scrollView.YOffset()
 }

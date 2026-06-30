@@ -113,6 +113,17 @@ type Terminal struct {
 
 	// Theme preview debouncing
 	themePreviewID int // ID of the current pending theme preview
+
+	// Force-redraw counter: incremented on Ctrl-R; View() toggles an
+	// invisible SGR reset when odd so the renderer detects a changed
+	// view and performs a full repaint rather than early-returning.
+	forceRedraw uint64
+
+	// pendingForceRedraw is set by handleRedraw before sending a synthetic
+	// WindowSizeMsg.  handleWindowSize consumes it; the view toggle already
+	// happened in handleRedraw, so resize()'s s.clear=true can take effect
+	// on the same flush.
+	pendingForceRedraw bool
 }
 
 // NewTerminalWithTheme creates a new Terminal model with a custom theme.
@@ -241,6 +252,14 @@ func (m *Terminal) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 	// don't scroll to make it visible — the user's scroll position is
 	// preserved across resizes and suspend/resume cycles.
 	m.display.ClampCursor()
+
+	// If this is a synthetic resize triggered by Ctrl-R, consume the flag.
+	// The view toggle already happened in handleRedraw, and resize() just
+	// armed the renderer's clear flag — the next flush will do a full
+	// clear+repaint.
+	if m.pendingForceRedraw {
+		m.pendingForceRedraw = false
+	}
 
 	// Re-render display content with new width (windowBuffer was marked dirty by SetWindowWidth)
 	m.display.updateContent()
@@ -502,12 +521,20 @@ func (m *Terminal) View() tea.View {
 	// a tool confirmation arrives while the model selector is open.
 	if m.confirmOverlay.IsOpen() {
 		fullContent := m.confirmOverlay.RenderOverlay(overlayContent, m.windowWidth, m.windowHeight)
+		// Toggle invisible suffix on Ctrl-R to force full repaint
+		if m.forceRedraw&1 == 1 {
+			fullContent += "\x1b[0m"
+		}
 		v := tea.NewView(fullContent)
 		v.AltScreen = true
 		v.ReportFocus = true
 		return v
 	}
 
+	// Toggle invisible suffix on Ctrl-R to force full repaint
+	if m.forceRedraw&1 == 1 {
+		overlayContent += "\x1b[0m"
+	}
 	v := tea.NewView(overlayContent)
 	v.AltScreen = true
 	v.ReportFocus = true

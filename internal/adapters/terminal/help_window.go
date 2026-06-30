@@ -101,6 +101,7 @@ func buildHelpItems() []HelpItem {
 		{ID: nextID(), Key: "Ctrl+S", Description: "Save session", Type: HelpItemKey},
 		{ID: nextID(), Key: "Ctrl+O", Description: "Open in editor (main input)", Type: HelpItemKey},
 		{ID: nextID(), Key: "Ctrl+L", Description: "Open model selector", Type: HelpItemKey},
+		{ID: nextID(), Key: "Ctrl+R", Description: "Force redraw screen", Type: HelpItemKey},
 		{ID: nextID(), Key: "Ctrl+P", Description: "Open theme selector", Type: HelpItemKey},
 		{ID: nextID(), Key: "Ctrl+Z", Description: "Suspend process", Type: HelpItemKey},
 		// Display Mode

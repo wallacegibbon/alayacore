@@ -487,6 +487,9 @@ func (m *Terminal) handleGlobalKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 	case keyCtrlQ:
 		return nil, true
 
+	case keyCtrlR:
+		return m.handleRedraw(), true
+
 	case keyCtrlH, keyF1:
 		m.openHelpWindow()
 		return nil, true
@@ -508,6 +511,33 @@ func (m *Terminal) handleSaveKey() tea.Cmd {
 		return nil
 	}
 	return m.submitCommand(agentpkg.CommandNameSave, false)
+}
+
+// handleRedraw handles the Ctrl+R force-redraw shortcut.
+//
+// Layer 1 (synchronous, always works): toggle forceRedraw so View()
+// appends/removes an invisible SGR reset, making the view content differ
+// from the last rendered frame.  This guarantees the next flush won't
+// early-return.
+//
+// Layer 2 & 3 (best-effort, arm full repaint): tea.ClearScreen sets
+// s.clear=true on the renderer; the synthetic WindowSizeMsg does the same
+// via resize() and also resets Touched=nil.  If either command arrives the
+// flush becomes a full clear+repaint instead of a diff.  If both are
+// dropped (rare), the view change from layer 1 still ensures a diff-based
+// redraw that covers every content cell.
+func (m *Terminal) handleRedraw() tea.Cmd {
+	m.forceRedraw++
+	m.display.ForceContentDirty()
+	m.display.updateContent()
+
+	m.pendingForceRedraw = true
+	return tea.Batch(
+		tea.ClearScreen,
+		func() tea.Msg {
+			return tea.WindowSizeMsg{Width: m.windowWidth, Height: m.windowHeight}
+		},
+	)
 }
 
 // handleFallback handles any key not consumed by display or global handlers.

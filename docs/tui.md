@@ -30,6 +30,7 @@ AlayaCore's terminal UI is built with [Bubble Tea](https://github.com/charmbrace
 | `Ctrl+S` | Save session |
 | `Ctrl+O` | Open in editor (`$EDITOR`) for multi-line input |
 | `Ctrl+L` | Open model selector |
+| `Ctrl+R` | Force redraw screen |
 | `Ctrl+P` | Open theme selector |
 | `Ctrl+H` | Open help window |
 | `Ctrl+G` | Cancel current task (with confirmation) |
