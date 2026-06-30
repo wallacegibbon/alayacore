@@ -204,11 +204,23 @@ func (m *Terminal) handleConfirmCanceled(kind ConfirmKind, toolID string, fromCm
 		m.input.SetValue("")
 	}
 
-	if kind == ConfirmTool {
+	switch kind {
+	case ConfirmTool:
 		m.emitCommand(":confirm " + toolID + " no")
 		m.restoreFocusAfterConfirm()
 		if id, toolName, toolInput, ok := m.out.GetPendingToolConfirm(); ok {
 			m.openConfirmTool(id, toolName, toolInput)
+		}
+		return m, scheduleTick()
+
+	case ConfirmMCPAuth:
+		m.restoreFocusAfterConfirm()
+		if toolID != "" {
+			m.emitCommand(":mcp_auth " + toolID + " no")
+		}
+		// Check for more pending auth servers
+		if nextName, nextURL, ok := m.out.GetPendingMCPAuth(); ok {
+			m.openConfirmMCPAuth(nextName, nextURL)
 		}
 		return m, scheduleTick()
 	}
@@ -238,6 +250,17 @@ func (m *Terminal) handleConfirmConfirmed(kind ConfirmKind, toolID string, fromC
 		m.restoreFocusAfterConfirm()
 		if nextID, nextName, nextInput, ok := m.out.GetPendingToolConfirm(); ok {
 			m.openConfirmTool(nextID, nextName, nextInput)
+		}
+		return m, scheduleTick()
+
+	case ConfirmMCPAuth:
+		m.restoreFocusAfterConfirm()
+		if toolID != "" {
+			m.emitCommand(":mcp_auth " + toolID + " yes")
+		}
+		// Check for more pending auth servers
+		if nextName, nextURL, ok := m.out.GetPendingMCPAuth(); ok {
+			m.openConfirmMCPAuth(nextName, nextURL)
 		}
 		return m, scheduleTick()
 	}

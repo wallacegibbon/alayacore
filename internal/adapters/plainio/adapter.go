@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 
+	agentpkg "github.com/alayacore/alayacore/internal/agent"
 	"github.com/alayacore/alayacore/internal/app"
 )
 
@@ -26,6 +27,29 @@ type Adapter struct {
 // NewAdapter creates a new plainio adapter.
 func NewAdapter(cfg *app.Config) *Adapter {
 	return &Adapter{Config: cfg}
+}
+
+// forwardMCPInit waits for async MCP initialization and forwards results to the session.
+// Runs in a background goroutine. MCP errors are written as TagSystemMsg error frames
+// which plainio displays inline.
+func (a *Adapter) forwardMCPInit(session *agentpkg.Session) {
+	<-a.Config.AsyncMCP.Done()
+	tools, sysFrag, errs := a.Config.AsyncMCP.Result()
+
+	mgr := a.Config.AsyncMCP.Manager()
+	pendingOAuth := mgr.PendingAuthServers()
+
+	session.MCPUpdateChan() <- agentpkg.MCPUpdateEvent{
+		Tools:              tools,
+		SystemPromptSuffix: sysFrag,
+		Manager:            mgr,
+		PendingOAuthCount:  int32(len(pendingOAuth)), //nolint:gosec // len(pendingOAuth) is small (<100)
+	}
+
+	// Log non-fatal errors via the session's error output.
+	for _, e := range errs {
+		_ = e
+	}
 }
 
 // Start runs the plainio adapter. It blocks until the session finishes.
@@ -43,6 +67,11 @@ func (a *Adapter) Start() int {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return 1
+	}
+
+	// Forward async MCP initialization results to the session.
+	if a.Config.AsyncMCP != nil {
+		go a.forwardMCPInit(session)
 	}
 
 	exitCh := make(chan int, 1)

@@ -30,10 +30,11 @@ const ConfirmContentRows = 8
 type ConfirmKind int
 
 const (
-	ConfirmNone   ConfirmKind = iota // No dialog active
-	ConfirmQuit                      // Confirm exit
-	ConfirmCancel                    // Confirm cancel current request
-	ConfirmTool                      // Confirm tool execution
+	ConfirmNone    ConfirmKind = iota // No dialog active
+	ConfirmQuit                       // Confirm exit
+	ConfirmCancel                     // Confirm cancel current request
+	ConfirmTool                       // Confirm tool execution
+	ConfirmMCPAuth                    // Confirm MCP OAuth authorization
 )
 
 // ConfirmDialog manages a floating confirmation overlay.
@@ -139,6 +140,21 @@ func (cd *ConfirmDialog) OpenCancel() {
 	cd.confirmed = false
 	cd.canceled = false
 }
+
+// OpenMCPAuth opens the dialog for confirming MCP OAuth authorization.
+func (cd *ConfirmDialog) OpenMCPAuth(serverName, serverURL string) {
+	cd.state = FilteredListOpen
+	cd.kind = ConfirmMCPAuth
+	cd.toolID = serverName
+	cd.toolName = serverName
+	cd.toolInput = serverURL
+	cd.Description = fmt.Sprintf("Server: %s\n%s", serverName, serverURL)
+	cd.confirmed = false
+	cd.canceled = false
+}
+
+// MCPAuthServer returns the server name for MCP auth confirmations.
+func (cd *ConfirmDialog) MCPAuthServer() string { return cd.toolID }
 
 // OpenTool opens the dialog for confirming a tool call.
 func (cd *ConfirmDialog) OpenTool(toolID, toolName, toolInput string) {
@@ -304,6 +320,14 @@ func (cd *ConfirmDialog) buildTitleText() string {
 			msg += "this tool"
 		}
 		return msg + " to run?"
+	case ConfirmMCPAuth:
+		msg := "Authorize MCP server "
+		if cd.toolName != "" {
+			msg += fmt.Sprintf("%q", cd.toolName)
+		} else {
+			msg += "?"
+		}
+		return msg + "?"
 	default:
 		return ""
 	}

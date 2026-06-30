@@ -2,12 +2,10 @@ package app
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/llm"
@@ -76,12 +74,25 @@ type Config struct {
 	MaxSteps          int      // Maximum agent loop steps
 	ToolConfirmTools  []string // Tool names requiring user confirmation
 
-	// MCP manager for lifecycle management (cleanup).
+	// AsyncMCP provides asynchronous MCP initialization.
+	// If non-nil, MCP servers are configured and initialization is
+	// running in the background. The adapter should wait for
+	// AsyncMCP.Done() after starting the UI and forward results
+	// to the session via MCPUpdateEvent.
+	AsyncMCP *mcp.AsyncInit
+
+	// MCPManager for lifecycle management (cleanup).
+	// May be nil initially; set from AsyncMCP.Manager() after init.
 	MCPManager       *mcp.Manager
-	MCPStartupErrors []string // Non-fatal errors from MCP startup, displayed via adapter
+	MCPStartupErrors []string // Non-fatal errors from MCP startup (config parsing)
 }
 
-// Setup initializes the common app components
+// Setup initializes the common app components.
+//
+// Fast path: skills, built-in tools, MCP config parsing (no connections).
+// MCP initialization (connect, discover) runs asynchronously via cfg.AsyncMCP.
+// The adapter should start the UI immediately and forward MCP results
+// to the session when AsyncMCP.Done() is closed.
 func Setup(cfg *config.Settings) (*Config, error) {
 	skillsManager, err := skills.NewManager(cfg.Skills)
 	if err != nil {
@@ -94,14 +105,12 @@ func Setup(cfg *config.Settings) (*Config, error) {
 	}
 
 	// ========================================================================
-	// MCP (Model Context Protocol) initialization
+	// MCP (Model Context Protocol) — async initialization
 	// ========================================================================
-	mcpManager, mcpTools, mcpResourcesCtx, mcpPromptsCtx, mcpErrors := initMCP(cfg)
-
-	agentTools = append(agentTools, mcpTools...)
+	asyncMCP, mcpErrors := initMCPAsync(cfg)
 
 	// ========================================================================
-	// System Prompt Construction
+	// System Prompt Construction (base — without MCP sections)
 	// ========================================================================
 
 	// Build the default system prompt
@@ -122,47 +131,32 @@ func Setup(cfg *config.Settings) (*Config, error) {
 		systemPrompt = systemPrompt + "\n\nCurrent working directory: " + cwd
 	}
 
-	// Append MCP server instructions (hints from servers about how to use
-	// their tools/resources effectively).
-	if mcpManager != nil {
-		for serverName, instructions := range mcpManager.ServerInstructions() {
-			systemPrompt += fmt.Sprintf("\n\nInstructions from MCP server %q:\n%s", serverName, instructions)
-		}
-	}
-
-	// Append pre-fetched resource and prompt lists so the LLM knows what
-	// resources and prompts are available without needing to discover them.
-	if mcpResourcesCtx != "" {
-		systemPrompt += mcpResourcesCtx
-	}
-	if mcpPromptsCtx != "" {
-		systemPrompt += mcpPromptsCtx
-	}
+	// Note: MCP sections (instructions, resources, prompts) are NOT added here.
+	// They'll be appended dynamically when async MCP init completes via
+	// the MCPUpdateEvent sent to the session.
 
 	return &Config{
 		Cfg:               cfg,
 		SkillsMgr:         skillsManager,
-		AgentTools:        agentTools,
+		AgentTools:        agentTools, // no MCP tools yet
 		SystemPrompt:      systemPrompt,
 		ExtraSystemPrompt: cfg.SystemPrompt,
 		MaxSteps:          cfg.MaxSteps,
 		ToolConfirmTools:  cfg.ToolConfirm,
-		MCPManager:        mcpManager,
+		AsyncMCP:          asyncMCP,
 		MCPStartupErrors:  mcpErrors,
 	}, nil
 }
 
-// initMCP initializes MCP servers from mcp.conf, connects, discovers tools,
-// and returns the discovered MCP tools. Warnings are returned for the caller
-// to display through the adapter (not printed here).
-//
-// It also pre-fetches resource and prompt lists from connected servers and
-// returns them as formatted strings for injection into the system prompt.
-func initMCP(cfg *config.Settings) (*mcp.Manager, []llm.Tool, string, string, []string) {
+// initMCPAsync starts asynchronous MCP initialization.
+// Returns an AsyncInit (nil if no MCP servers configured) and any config
+// parsing warnings. The AsyncInit is already started in a background
+// goroutine — call AsyncInit.Done() to wait for completion.
+func initMCPAsync(cfg *config.Settings) (*mcp.AsyncInit, []string) {
 	// Load MCP configurations from mcp.conf
 	mcpConfigs, startupErrors := loadMCPConfigs(cfg)
 	if len(mcpConfigs) == 0 {
-		return nil, nil, "", "", startupErrors
+		return nil, startupErrors
 	}
 
 	// Set debug mode from global config.
@@ -177,110 +171,9 @@ func initMCP(cfg *config.Settings) (*mcp.Manager, []llm.Tool, string, string, []
 		}
 	}
 
-	mcpManager := mcp.NewManager(mcpConfigs)
-
-	// Connect with a per-server timeout.
-	connectCtx, connectCancel := context.WithTimeout(context.Background(), 30*time.Second)
-	connErrs := mcpManager.ConnectAll(connectCtx)
-	connectCancel()
-
-	for _, connErr := range connErrs {
-		// Servers needing interactive auth are expected — skip them here,
-		// they'll be handled by the adapter's handlePendingAuth().
-		if errors.Is(connErr, mcp.ErrNeedsAuth) {
-			continue
-		}
-		startupErrors = append(startupErrors, fmt.Sprintf("MCP server connection failed: %v", connErr))
-	}
-
-	var mcpTools []llm.Tool
-
-	// Discover tools from connected servers.
-	discoverCtx, discoverCancel := context.WithTimeout(context.Background(), 15*time.Second)
-	serverTools := mcpManager.DiscoverTools(discoverCtx)
-	discoverCancel()
-
-	if len(serverTools) > 0 {
-		mcpTools = append(mcpTools, mcp.ToolsToAgentTools(serverTools, mcpManager)...)
-	}
-
-	// Inject read_resource tools for servers that support Resources.
-	resourceTools := mcp.ResourcesToAgentTools(mcpManager.Clients(), mcpManager)
-	mcpTools = append(mcpTools, resourceTools...)
-
-	// Inject get_prompt tools for servers that support Prompts.
-	promptTools := mcp.PromptsToAgentTools(mcpManager.Clients(), mcpManager)
-	mcpTools = append(mcpTools, promptTools...)
-
-	// Pre-fetch resource and prompt lists from connected servers.
-	listCtx, listCancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer listCancel()
-
-	resCtx := buildResourcesContext(listCtx, mcpManager)
-	promptCtx := buildPromptsContext(listCtx, mcpManager)
-
-	return mcpManager, mcpTools, resCtx, promptCtx, startupErrors
-}
-
-// buildResourcesContext fetches the resource list from all connected servers
-// and returns a formatted string suitable for injection into the system prompt.
-func buildResourcesContext(ctx context.Context, m *mcp.Manager) string {
-	serverResources := m.DiscoverResources(ctx)
-	if len(serverResources) == 0 {
-		return ""
-	}
-
-	var b strings.Builder
-	for serverName, resources := range serverResources {
-		b.WriteString(fmt.Sprintf("\n\nAvailable resources from MCP server %q:", serverName))
-		for _, r := range resources {
-			b.WriteString(fmt.Sprintf("\n  - %s", r.URI))
-			if r.Name != "" {
-				b.WriteString(fmt.Sprintf(" (name: %q", r.Name))
-				if r.Description != "" {
-					b.WriteString(fmt.Sprintf(", description: %q", r.Description))
-				}
-				if r.MIMEType != "" {
-					b.WriteString(fmt.Sprintf(", mimeType: %q", r.MIMEType))
-				}
-				b.WriteString(")")
-			} else if r.Description != "" {
-				b.WriteString(fmt.Sprintf(" (description: %q)", r.Description))
-			}
-		}
-	}
-	return b.String()
-}
-
-// buildPromptsContext fetches the prompt list from all connected servers
-// and returns a formatted string suitable for injection into the system prompt.
-func buildPromptsContext(ctx context.Context, m *mcp.Manager) string {
-	serverPrompts := m.DiscoverPrompts(ctx)
-	if len(serverPrompts) == 0 {
-		return ""
-	}
-
-	var b strings.Builder
-	for serverName, prompts := range serverPrompts {
-		b.WriteString(fmt.Sprintf("\n\nAvailable prompts from MCP server %q:", serverName))
-		for _, p := range prompts {
-			b.WriteString(fmt.Sprintf("\n  - %s", p.Name))
-			if p.Description != "" {
-				b.WriteString(fmt.Sprintf(" (description: %q)", p.Description))
-			}
-			if len(p.Arguments) > 0 {
-				b.WriteString("\n    Arguments:")
-				for _, a := range p.Arguments {
-					required := ""
-					if a.Required {
-						required = " (required)"
-					}
-					b.WriteString(fmt.Sprintf("\n      - %s: %s%s", a.Name, a.Description, required))
-				}
-			}
-		}
-	}
-	return b.String()
+	asyncMCP := mcp.NewAsyncInit(mcpConfigs)
+	asyncMCP.Start(context.Background())
+	return asyncMCP, startupErrors
 }
 
 // createTokenStore creates a FileTokenStore for persisting MCP OAuth tokens.

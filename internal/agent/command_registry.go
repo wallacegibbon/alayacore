@@ -18,6 +18,7 @@ const (
 	CommandNameConfirm     = "confirm"
 	CommandNameFork        = "fork"
 	CommandNameVideoConfig = "video_config"
+	CommandNameMCPAuth     = "mcp_auth"
 )
 
 // CmdPolicy specifies how and when a command is dispatched.
@@ -69,6 +70,8 @@ var commandDefs = []Command{
 		func(s *Session, _ context.Context, args string) { s.handleFork(args) }},
 	{CommandNameVideoConfig, "Set video FPS and resolution", "<fps> <0|1>", CmdIdle,
 		func(s *Session, _ context.Context, args string) { s.handleVideoConfig(args) }},
+	{CommandNameMCPAuth, "Authorize (yes) or skip (no) an MCP OAuth server", "<name> yes|no", CmdIdle,
+		func(s *Session, ctx context.Context, args string) { s.handleMCPAuth(ctx, args) }},
 }
 
 // LookupCommand returns the command metadata for name, or (nil, false).

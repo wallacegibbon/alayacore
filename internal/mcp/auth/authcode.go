@@ -34,6 +34,8 @@ type AuthCodeConfig struct {
 //  6. Returns the obtained Token
 //
 // The ctx parameter controls the overall timeout (e.g., 5 minutes).
+//
+//nolint:gocyclo // OAuth code flow has many sequential steps by spec
 func RunAuthCodeFlow(ctx context.Context, meta *ASMetadata, cfg *AuthCodeConfig) (*Token, error) {
 	// 1. Generate PKCE params.
 	pkce, err := NewPKCE()

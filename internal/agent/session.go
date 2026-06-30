@@ -25,6 +25,7 @@ package agent
 //     taskCancel (func call)     — run() → task (cancellation via cancelRunningTask)
 //     taskResultCh                 — task → run (full ContentParts list)
 //     taskRefreshCh               — task → run() (best-effort system-info refresh; see session_output.go)
+//     mcpUpdateCh (MCPUpdateEvent) — adapter → run() (async MCP init results, OAuth completions)
 //
 // Related files:
 //   - session_types.go — type definitions (Task, SessionConfig, etc.)
@@ -84,6 +85,8 @@ type runState struct {
 	taskEventCh   chan TaskEvent
 	taskResultCh  chan []llm.ContentPart
 	taskRefreshCh chan struct{}
+
+	mcpUpdateCh chan MCPUpdateEvent // buffered(10), receives MCP init & OAuth auth results from adapter
 }
 
 // activeTaskStep returns the current step of the active task, or 0 if idle.
@@ -116,6 +119,9 @@ type sharedState struct {
 	confirmCh atomic.Pointer[chan<- llm.ToolConfirmResponse]
 
 	outputBroken atomic.Bool
+
+	mcpReady     atomic.Bool  // set to true after MCP init completes and tools are loaded
+	pendingOAuth atomic.Int32 // >0 when OAuth servers still need authorization
 }
 
 // Session manages conversation state and task execution.
@@ -135,6 +141,23 @@ type Session struct {
 // Done returns a channel that is closed when run() has exited.
 func (s *Session) Done() <-chan struct{} {
 	return s.runDoneCh
+}
+
+// MCPUpdateChan returns the channel for sending MCP initialization results.
+// The adapter sends an MCPUpdateEvent on this channel when async MCP init
+// completes. The session's run() goroutine processes it to add tools,
+// update the system prompt, and mark MCP as ready.
+//
+// Must only be called before the session's Start() method returns — the
+// channel is read by the run() goroutine after Start().
+func (s *Session) MCPUpdateChan() chan<- MCPUpdateEvent {
+	return s.mcpUpdateCh
+}
+
+// MCPIsReady reports whether MCP initialization has completed and tools
+// are available. Used by handlePrompt to reject messages before MCP is ready.
+func (s *Session) MCPIsReady() bool {
+	return s.mcpReady.Load()
 }
 
 func (s *Session) HasModels() bool {
@@ -192,6 +215,7 @@ func NewSession(cfg SessionConfig) *Session {
 			taskEventCh:   make(chan TaskEvent, 64),
 			taskResultCh:  make(chan []llm.ContentPart, 1),
 			taskRefreshCh: make(chan struct{}, 1),
+			mcpUpdateCh:   make(chan MCPUpdateEvent, 10),
 		},
 		sharedState: sharedState{
 			sessionCtx:    ctx,
@@ -230,6 +254,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 			taskEventCh:   make(chan TaskEvent, 64),
 			taskResultCh:  make(chan []llm.ContentPart, 1),
 			taskRefreshCh: make(chan struct{}, 1),
+			mcpUpdateCh:   make(chan MCPUpdateEvent, 10),
 		},
 		sharedState: sharedState{
 			sessionCtx:    ctx,

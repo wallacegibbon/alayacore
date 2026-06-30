@@ -259,6 +259,13 @@ func (m *Terminal) handleTick() (tea.Model, tea.Cmd) {
 		}
 	}
 
+	// Check for pending MCP OAuth authorization requests
+	if !m.confirmOverlay.IsOpen() {
+		if serverName, serverURL, ok := m.out.GetPendingMCPAuth(); ok {
+			m.openConfirmMCPAuth(serverName, serverURL)
+		}
+	}
+
 	// Check if display needs refresh (dirty flag)
 	if m.out.DrainDirty() {
 		if m.out.WindowBuffer().WindowCount() > 0 {
@@ -634,6 +641,14 @@ func (m *Terminal) openConfirmCancel() {
 // openConfirmTool opens the tool-execution confirmation dialog.
 func (m *Terminal) openConfirmTool(id, toolName, toolInput string) {
 	m.confirmOverlay.OpenTool(id, toolName, toolInput)
+	m.input.Blur()
+	m.display.SetDisplayFocused(false)
+	m.display.updateContent()
+}
+
+// openConfirmMCPAuth opens the MCP OAuth authorization confirmation dialog.
+func (m *Terminal) openConfirmMCPAuth(serverName, serverURL string) {
+	m.confirmOverlay.OpenMCPAuth(serverName, serverURL)
 	m.input.Blur()
 	m.display.SetDisplayFocused(false)
 	m.display.updateContent()

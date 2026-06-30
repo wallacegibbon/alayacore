@@ -179,6 +179,17 @@ func (m *Manager) CloseAll() {
 	m.clients.Store([]*Client(nil))
 }
 
+// ActiveServerCount returns the number of connected (StateReady) servers.
+func (m *Manager) ActiveServerCount() int {
+	count := 0
+	for _, c := range m.loadClients() {
+		if c.State() == StateReady {
+			count++
+		}
+	}
+	return count
+}
+
 // Clients returns a snapshot of all managed clients.
 func (m *Manager) Clients() []*Client {
 	clients := m.loadClients()
@@ -211,6 +222,22 @@ func (m *Manager) PendingAuthServers() []PendingAuthServer {
 		}
 	}
 	return pending
+}
+
+// PendingAuthServer returns info about a specific server that needs OAuth,
+// or nil if the server doesn't exist or is already authorized.
+func (m *Manager) PendingAuthServer(name string) *PendingAuthServer {
+	c := m.findClient(name)
+	if c == nil {
+		return nil
+	}
+	if c.config.Auth == nil || c.config.Auth.Type != AuthTypeAuthorizationCode || c.config.Auth.obtainedToken != nil {
+		return nil
+	}
+	return &PendingAuthServer{
+		Name:      c.Name(),
+		ServerURL: c.config.URL,
+	}
 }
 
 // AuthorizeServer performs the interactive OAuth authorization code flow

@@ -395,6 +395,17 @@ func (to *outputWriter) GetPendingToolConfirm() (id, toolName, toolInput string,
 	return to.status.takeToolConfirmPending()
 }
 
+// SetMCPAuthPending adds a pending MCP OAuth authorization request.
+func (to *outputWriter) SetMCPAuthPending(serverName, serverURL string) {
+	to.status.setMCPAuthPending(serverName, serverURL)
+}
+
+// GetPendingMCPAuth returns any pending MCP OAuth authorization request
+// and clears it. Returns (serverName, serverURL, ok).
+func (to *outputWriter) GetPendingMCPAuth() (serverName, serverURL string, ok bool) {
+	return to.status.takeMCPAuthPending()
+}
+
 // SnapshotStatus returns a consistent point-in-time view of session status.
 func (to *outputWriter) SnapshotStatus() StatusSnapshot {
 	return to.status.snapshotStatus()

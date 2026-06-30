@@ -54,6 +54,11 @@ type sessionState struct {
 	// the Terminal tick handler to open the confirm overlay.
 	// Stored as a queue so multiple confirms arriving at once aren't lost.
 	pendingToolConfirms []toolConfirmPending
+
+	// Pending MCP auth confirms — set by waitMCPInit (or handleSystemMsg),
+	// consumed by the Terminal tick handler to open the confirm overlay
+	// for OAuth authorization. Each entry is a server needing auth.
+	pendingMCPAuth []mcpAuthPending
 }
 
 // toolConfirmPending holds a single pending tool confirmation.
@@ -61,6 +66,12 @@ type toolConfirmPending struct {
 	ID    string
 	Name  string
 	Input string
+}
+
+// mcpAuthPending holds a pending MCP OAuth authorization request.
+type mcpAuthPending struct {
+	ServerName string
+	ServerURL  string
 }
 
 // updateTask atomically updates task progress fields.
@@ -170,6 +181,28 @@ func (s *sessionState) takeToolConfirmPending() (id, toolName, toolInput string,
 	p := s.pendingToolConfirms[0]
 	s.pendingToolConfirms = s.pendingToolConfirms[1:]
 	return p.ID, p.Name, p.Input, true
+}
+
+// setMCPAuthPending appends a pending MCP OAuth authorization request.
+func (s *sessionState) setMCPAuthPending(serverName, serverURL string) {
+	s.mu.Lock()
+	s.pendingMCPAuth = append(s.pendingMCPAuth, mcpAuthPending{
+		ServerName: serverName, ServerURL: serverURL,
+	})
+	s.mu.Unlock()
+}
+
+// takeMCPAuthPending pops the next pending MCP OAuth authorization request.
+// Returns (serverName, serverURL, ok). If no pending requests, ok is false.
+func (s *sessionState) takeMCPAuthPending() (serverName, serverURL string, ok bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.pendingMCPAuth) == 0 {
+		return "", "", false
+	}
+	p := s.pendingMCPAuth[0]
+	s.pendingMCPAuth = s.pendingMCPAuth[1:]
+	return p.ServerName, p.ServerURL, true
 }
 
 // snapshotStatus returns a consistent point-in-time view of session status.

@@ -2,6 +2,11 @@
 
 package agent
 
+import (
+	"github.com/alayacore/alayacore/internal/llm"
+	"github.com/alayacore/alayacore/internal/mcp"
+)
+
 // Session actor model: channel-based state communication between the
 // task goroutine and the run() goroutine.
 //
@@ -43,6 +48,23 @@ type SetContextTokensEvent struct {
 }
 
 func (SetContextTokensEvent) taskEvent() {}
+
+// MCPUpdateEvent is sent from the adapter to the session's run() goroutine
+// when asynchronous MCP initialization completes or when an OAuth
+// authorization flow completes. The run() goroutine applies the updates
+// (tools + system prompt) and manages the pending-OAuth counter.
+//
+// PendingOAuthCount is the number of OAuth servers that still need user
+// authorization. Set by the initial async init event; the session adds
+// this to its internal pendingOAuth counter. Each skipMCPAuth or
+// completed OAuth authorization decrements the counter. When it reaches
+// zero, mcpReady becomes true and user messages are accepted.
+type MCPUpdateEvent struct {
+	Tools              []llm.Tool
+	SystemPromptSuffix string
+	Manager            *mcp.Manager
+	PendingOAuthCount  int32 // number of OAuth servers needing auth; 0 if none
+}
 
 // sendEvent sends a task event to the run() goroutine.
 // Blocks until the event is received. The buffered channel (capacity 64)

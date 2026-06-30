@@ -67,6 +67,10 @@ type OutputWriter interface {
 	// Confirm dialog support
 	GetPendingToolConfirm() (id, toolName, toolInput string, ok bool)
 
+	// MCP auth dialog support
+	SetMCPAuthPending(serverName, serverURL string)
+	GetPendingMCPAuth() (serverName, serverURL string, ok bool)
+
 	// Update signaling
 	DrainDirty() bool // returns true if display was dirty, clears the flag
 	WindowBuffer() *WindowBuffer

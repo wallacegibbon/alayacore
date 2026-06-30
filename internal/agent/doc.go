@@ -33,9 +33,15 @@
 //	     via a message channel.
 //
 //	The only mutable state accessed from more than one goroutine are:
-//	  - atomic fields for outputBroken, outputBroken, and confirmCh
+//	  - atomic fields for outputBroken, outputBroken, confirmCh, mcpReady,
+//	    and pendingOAuth
 //	  - A few buffered channels for cancellation, completion signaling,
-//	    and system-info refresh requests.
+//	    system-info refresh, and MCP update events (mcpUpdateCh).
+//
+//	mcpUpdateCh is special: the write end is held by the adapter's
+//	background goroutine (waitMCPInit/forwardMCPInit/handleMCPAuth),
+//	while the read end is in the run() goroutine. This follows the same
+//	actor-model pattern — no mutex needed.
 //
 //	All other session state (agent, provider, ContextTokens, ContextLimit,
 //	reasoningLevel, histCounter) is owned by a single goroutine and

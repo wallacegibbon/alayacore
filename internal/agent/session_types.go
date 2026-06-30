@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/alayacore/alayacore/internal/llm"
+	"github.com/alayacore/alayacore/internal/mcp"
 	"github.com/alayacore/alayacore/internal/skills"
 	"github.com/alayacore/alayacore/internal/theme"
 )
@@ -144,6 +145,10 @@ type SessionConfig struct {
 
 	// External dependencies
 	SkillsMgr *skills.Manager
+
+	// MCP manager for tool execution and lifecycle management.
+	// Set during async initialization; may be nil initially.
+	MCPManager *mcp.Manager
 
 	// Override
 	OverrideActiveModel string // If set, overrides the active model (must exist in model config)

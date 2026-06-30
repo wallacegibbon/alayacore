@@ -209,6 +209,11 @@ func (t *StreamableHTTPTransport) SendReceive(ctx context.Context, req jsonrpcRe
 		// SSE stream — read events until we get the matching response.
 		return t.readSSEResponse(ctx, resp, req.ID)
 
+	case "text/plain":
+		// Plain text response — likely an HTTP-level error message.
+		defer resp.Body.Close()
+		return t.readTextResponse(resp.Body)
+
 	default:
 		resp.Body.Close()
 		return nil, fmt.Errorf("POST: unexpected Content-Type %q", contentType)
@@ -474,6 +479,23 @@ func (t *StreamableHTTPTransport) readJSONResponse(body io.ReadCloser) (json.Raw
 		}
 	}
 	return resp.Result, nil
+}
+
+// readTextResponse reads a text/plain response body and returns it as an
+// RPCError with code -32000 (server error). Text responses indicate an
+// HTTP-level error (e.g. "Forbidden: insufficient scopes").
+//
+//nolint:unparam // result 0 is always nil — signature matches readJSONResponse
+func (t *StreamableHTTPTransport) readTextResponse(body io.ReadCloser) (json.RawMessage, error) {
+	data, err := io.ReadAll(body)
+	if err != nil {
+		return nil, fmt.Errorf("read text response: %w", err)
+	}
+	msg := strings.TrimSpace(string(data))
+	if msg == "" {
+		msg = "empty text/plain response"
+	}
+	return nil, &RPCError{Code: -32000, Message: msg}
 }
 
 // readSSEResponse reads an SSE stream from a POST response, dispatching

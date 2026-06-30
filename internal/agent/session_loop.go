@@ -26,6 +26,7 @@ import (
 //   - Task state changes (via task goroutine → taskEventCh)
 //   - Task completion signals (via taskResultCh)
 //   - System info refresh requests (via taskRefreshCh)
+//   - MCP initialization & OAuth authorization results (via mcpUpdateCh)
 func (s *Session) run() {
 	defer close(s.runDoneCh)
 	defer s.sessionCancel()
@@ -59,10 +60,72 @@ func (s *Session) run() {
 		case <-s.taskRefreshCh:
 			s.sendSystemInfo("task")
 
+		case update := <-s.mcpUpdateCh:
+			s.applyMCPUpdate(update)
+
 		case <-s.sessionCtx.Done():
 			return
 		}
 	}
+}
+
+// applyMCPUpdate applies MCP initialization results to the session.
+// Called from the run() goroutine when the adapter sends an MCPUpdateEvent.
+func (s *Session) applyMCPUpdate(update MCPUpdateEvent) {
+	// 1. Append MCP tools to BaseTools.
+	s.BaseTools = append(s.BaseTools, update.Tools...)
+
+	// 2. Append MCP system prompt fragments (instructions + resources + prompts).
+	s.SystemPrompt += update.SystemPromptSuffix
+
+	// 3. Store MCP manager for lifecycle management.
+	s.MCPManager = update.Manager
+
+	// 4. If the agent was already created, recreate it to include updated tools.
+	if s.agent != nil {
+		s.agent = nil
+		s.provider = nil
+	}
+
+	// 5. Track pending OAuth count.
+	//
+	//    The initial event from waitMCPInit carries PendingOAuthCount = N
+	//    (number of servers needing OAuth). Each server subsequently gets
+	//    either skipMCPAuth (user said "no") or a successful OAuth flow
+	//    (handleMCPAuth goroutine completes) — both decrement the counter.
+	//
+	//    When the counter reaches zero, mcpReady is set and user messages
+	//    are accepted.
+	if update.PendingOAuthCount > 0 {
+		s.pendingOAuth.Add(update.PendingOAuthCount)
+		// Reset ready flag in case skipMCPAuth raced ahead and set it.
+		s.mcpReady.Store(false)
+	}
+
+	// 6. Mark MCP as ready only when there are no pending OAuth servers.
+	if s.pendingOAuth.Load() == 0 {
+		s.mcpReady.Store(true)
+	}
+
+	// 7. Send system info so the adapter can update its status display.
+	s.sendSystemInfo("all")
+
+	// 8. Notify the user.
+	if update.PendingOAuthCount > 0 {
+		s.writeNotifyf("MCP servers partially initialized. %d OAuth %s need authorization — use :mcp_auth <name> yes|no.",
+			s.pendingOAuth.Load(), pluralizeServer(s.pendingOAuth.Load()))
+	} else if s.pendingOAuth.Load() == 0 {
+		s.writeNotifyf("MCP servers initialized: %d servers, %d tools loaded",
+			update.Manager.ActiveServerCount(), len(update.Tools))
+	}
+}
+
+// pluralizeServer returns "server" or "servers" based on count.
+func pluralizeServer(n int32) string {
+	if n == 1 {
+		return "server"
+	}
+	return "servers"
 }
 
 // handleTaskDone processes a task completion signal from the task goroutine.
@@ -97,7 +160,8 @@ func (s *Session) flushPendingEvents() {
 }
 
 // drainUntilTaskDone processes task events and completion signals until the
-// currently running task finishes.
+// currently running task finishes. Also drains any pending MCP updates so
+// they aren't lost during shutdown.
 func (s *Session) drainUntilTaskDone() {
 	for {
 		select {
@@ -108,6 +172,8 @@ func (s *Session) drainUntilTaskDone() {
 			return
 		case <-s.taskRefreshCh:
 			s.sendSystemInfo("task")
+		case update := <-s.mcpUpdateCh:
+			s.applyMCPUpdate(update)
 		case <-s.sessionCtx.Done():
 			return
 		}

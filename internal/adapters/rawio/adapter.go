@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 
+	agentpkg "github.com/alayacore/alayacore/internal/agent"
 	"github.com/alayacore/alayacore/internal/app"
 )
 
@@ -25,6 +26,23 @@ func NewAdapter(cfg *app.Config) *Adapter {
 	return &Adapter{Config: cfg}
 }
 
+// forwardMCPInit waits for async MCP initialization and forwards results to the session.
+// Runs in a background goroutine.
+func (a *Adapter) forwardMCPInit(session *agentpkg.Session) {
+	<-a.Config.AsyncMCP.Done()
+	tools, sysFrag, _ := a.Config.AsyncMCP.Result()
+
+	mgr := a.Config.AsyncMCP.Manager()
+	pendingOAuth := mgr.PendingAuthServers()
+
+	session.MCPUpdateChan() <- agentpkg.MCPUpdateEvent{
+		Tools:              tools,
+		SystemPromptSuffix: sysFrag,
+		Manager:            mgr,
+		PendingOAuthCount:  int32(len(pendingOAuth)), //nolint:gosec // len(pendingOAuth) is small (<100)
+	}
+}
+
 // Start runs the rawio adapter. It blocks until the session finishes.
 // Returns 0 on success, 1 on any error (startup or task failure).
 // The controlling process reads stdout and handles TLV itself.
@@ -34,6 +52,11 @@ func (a *Adapter) Start() int {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return 1
+	}
+
+	// Forward async MCP initialization results to the session.
+	if a.Config.AsyncMCP != nil {
+		go a.forwardMCPInit(session)
 	}
 
 	// Pipe stdin to the session.
