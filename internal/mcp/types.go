@@ -77,6 +77,12 @@ type jsonrpcError struct {
 // MCP Protocol Types (subset needed for tool support)
 // ============================================================================
 
+// Meta is an optional metadata object for experimental features, as defined by
+// the MCP spec (_meta?: { [key: string]: unknown }). It carries
+// implementation-specific data that parties may use to extend the protocol
+// without waiting for the specification to add new fields.
+type Meta map[string]json.RawMessage
+
 // ClientCapabilities describes the capabilities the client supports.
 type ClientCapabilities struct {
 	// Experimental non-standard capabilities.
@@ -168,6 +174,7 @@ type InitializeResult struct {
 	// This can be used by clients to improve the LLM's understanding of
 	// available tools, resources, etc.
 	Instructions string `json:"instructions,omitempty"`
+	Meta         Meta   `json:"_meta,omitempty"`
 }
 
 // ImplementationInfo describes the name and version of the implementation.
@@ -210,6 +217,8 @@ type Tool struct {
 	Execution *ToolExecution `json:"execution,omitempty"`
 	// Optional output schema for structured content.
 	OutputSchema json.RawMessage `json:"outputSchema,omitempty"`
+	// Meta is an optional metadata object for experimental features.
+	Meta Meta `json:"_meta,omitempty"`
 }
 
 // ToolAnnotations provides optional hints about a tool to clients.
@@ -241,6 +250,7 @@ type ToolAnnotations struct {
 type ListToolsResult struct {
 	Tools      []Tool `json:"tools"`
 	NextCursor string `json:"nextCursor,omitempty"`
+	Meta       Meta   `json:"_meta,omitempty"`
 }
 
 // CallToolRequest is the params for the "tools/call" method.
@@ -254,6 +264,7 @@ type CallToolResult struct {
 	Content    []ToolContent  `json:"content"`
 	Structured map[string]any `json:"structuredContent,omitempty"`
 	IsError    bool           `json:"isError,omitempty"`
+	Meta       Meta           `json:"_meta,omitempty"`
 }
 
 // ToolContent represents a piece of content in a tool call result.
@@ -291,6 +302,7 @@ type Resource struct {
 	Annotations *Annotations `json:"annotations,omitempty"`
 	Icons       []Icon       `json:"icons,omitempty"`
 	Size        *int64       `json:"size,omitempty"`
+	Meta        Meta         `json:"_meta,omitempty"`
 }
 
 // Annotations represents optional metadata on resources and content items.
@@ -304,6 +316,7 @@ type Annotations struct {
 type ListResourcesResult struct {
 	Resources  []Resource `json:"resources"`
 	NextCursor string     `json:"nextCursor,omitempty"`
+	Meta       Meta       `json:"_meta,omitempty"`
 }
 
 // ReadResourceRequest is the params for the "resources/read" method.
@@ -314,6 +327,7 @@ type ReadResourceRequest struct {
 // ReadResourceResult is the result of the "resources/read" method.
 type ReadResourceResult struct {
 	Contents []ResourceContents `json:"contents"`
+	Meta     Meta               `json:"_meta,omitempty"`
 }
 
 // Prompt represents a prompt or prompt template exposed by an MCP server.
@@ -323,6 +337,7 @@ type Prompt struct {
 	Description string           `json:"description,omitempty"`
 	Arguments   []PromptArgument `json:"arguments,omitempty"`
 	Icons       []Icon           `json:"icons,omitempty"`
+	Meta        Meta             `json:"_meta,omitempty"`
 }
 
 // PromptArgument describes an argument a prompt template accepts.
@@ -337,6 +352,7 @@ type PromptArgument struct {
 type ListPromptsResult struct {
 	Prompts    []Prompt `json:"prompts"`
 	NextCursor string   `json:"nextCursor,omitempty"`
+	Meta       Meta     `json:"_meta,omitempty"`
 }
 
 // GetPromptRequest is the params for the "prompts/get" method.
@@ -349,6 +365,7 @@ type GetPromptRequest struct {
 type GetPromptResult struct {
 	Description string          `json:"description,omitempty"`
 	Messages    []PromptMessage `json:"messages"`
+	Meta        Meta            `json:"_meta,omitempty"`
 }
 
 // PromptMessage is a single message in a prompt result.
