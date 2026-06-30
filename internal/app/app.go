@@ -55,7 +55,8 @@ func Setup(cfg *config.Settings) (*Config, error) {
 	// ========================================================================
 	// MCP (Model Context Protocol) initialization
 	// ========================================================================
-	mcpManager, mcpErrors, mcpResourcesCtx, mcpPromptsCtx := initMCP(cfg, &agentTools)
+	mcpTools, mcpManager, mcpErrors, mcpResourcesCtx, mcpPromptsCtx := initMCP(cfg)
+	agentTools = append(agentTools, mcpTools...)
 
 	// ========================================================================
 	// System Prompt Construction
@@ -110,14 +111,14 @@ func Setup(cfg *config.Settings) (*Config, error) {
 }
 
 // initMCP initializes MCP servers: parses configs, connects, discovers tools,
-// and injects them into agentTools. Warnings are returned for the caller
+// and returns the discovered MCP tools. Warnings are returned for the caller
 // to display through the adapter (not printed here).
 //
 // It also pre-fetches resource and prompt lists from connected servers and
 // returns them as formatted strings for injection into the system prompt.
-func initMCP(cfg *config.Settings, agentTools *[]llm.Tool) (*mcp.Manager, []string, string, string) {
+func initMCP(cfg *config.Settings) ([]llm.Tool, *mcp.Manager, []string, string, string) {
 	if len(cfg.MCPServers) == 0 {
-		return nil, nil, "", ""
+		return nil, nil, nil, "", ""
 	}
 
 	warnings := make([]string, 0, len(cfg.MCPServers))
@@ -135,7 +136,7 @@ func initMCP(cfg *config.Settings, agentTools *[]llm.Tool) (*mcp.Manager, []stri
 	}
 
 	if len(mcpConfigs) == 0 {
-		return nil, warnings, "", ""
+		return nil, nil, warnings, "", ""
 	}
 
 	mcpManager := mcp.NewManager(mcpConfigs)
@@ -149,23 +150,24 @@ func initMCP(cfg *config.Settings, agentTools *[]llm.Tool) (*mcp.Manager, []stri
 		warnings = append(warnings, fmt.Sprintf("MCP server connection failed: %v", connErr))
 	}
 
+	var mcpTools []llm.Tool
+
 	// Discover tools from connected servers.
 	discoverCtx, discoverCancel := context.WithTimeout(context.Background(), 15*time.Second)
 	serverTools := mcpManager.DiscoverTools(discoverCtx)
 	discoverCancel()
 
 	if len(serverTools) > 0 {
-		mcpTools := mcp.ToolsToAgentTools(serverTools, mcpManager)
-		*agentTools = append(*agentTools, mcpTools...)
+		mcpTools = append(mcpTools, mcp.ToolsToAgentTools(serverTools, mcpManager)...)
 	}
 
 	// Inject read_resource tools for servers that support Resources.
 	resourceTools := mcp.ResourcesToAgentTools(mcpManager.Clients(), mcpManager)
-	*agentTools = append(*agentTools, resourceTools...)
+	mcpTools = append(mcpTools, resourceTools...)
 
 	// Inject get_prompt tools for servers that support Prompts.
 	promptTools := mcp.PromptsToAgentTools(mcpManager.Clients(), mcpManager)
-	*agentTools = append(*agentTools, promptTools...)
+	mcpTools = append(mcpTools, promptTools...)
 
 	// Pre-fetch resource and prompt lists from connected servers.
 	listCtx, listCancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -174,7 +176,7 @@ func initMCP(cfg *config.Settings, agentTools *[]llm.Tool) (*mcp.Manager, []stri
 	resCtx := buildResourcesContext(listCtx, mcpManager)
 	promptCtx := buildPromptsContext(listCtx, mcpManager)
 
-	return mcpManager, warnings, resCtx, promptCtx
+	return mcpTools, mcpManager, warnings, resCtx, promptCtx
 }
 
 // buildResourcesContext fetches the resource list from all connected servers
