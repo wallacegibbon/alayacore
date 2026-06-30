@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -384,7 +383,9 @@ func (t *StreamableHTTPTransport) readSSELoop(sr *sseReadCloser, handler ServerR
 		switch eventType {
 		case "message":
 			if err := parseAndDispatchJSONRPC([]byte(data), t.pending, &t.pendingMu, t.debugWriter, handler, notifHandler); err != nil {
-				log.Printf("MCP Streamable HTTP: malformed message: %v", err)
+				if t.debugWriter != nil {
+					fmt.Fprintf(t.debugWriter, "MCP Streamable HTTP: malformed message: %v\n", err)
+				}
 			}
 		default:
 			// Unknown event type — ignore per spec.

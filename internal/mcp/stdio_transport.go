@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"sync"
@@ -113,9 +112,10 @@ func (t *StdioTransport) readLoop() {
 	for t.scanner.Scan() {
 		data := t.scanner.Bytes()
 		if err := parseAndDispatchJSONRPC(data, t.pending, &t.pendingMu, t.debugWriter, t.handleServerRequest, t.notificationHandler); err != nil {
-			// Malformed line — log and skip (server bug or protocol mismatch).
-			log.Printf("MCP: malformed response line (len=%d): %v",
-				len(data), err)
+			if t.debugWriter != nil {
+				fmt.Fprintf(t.debugWriter, "MCP: malformed response line (len=%d): %v\n",
+					len(data), err)
+			}
 		}
 	}
 

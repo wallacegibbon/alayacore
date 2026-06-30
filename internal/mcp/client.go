@@ -488,8 +488,8 @@ func (c *Client) startGETStream() {
 	// Use a background context; the stream is managed by the transport's Close().
 	if err := st.StartGETStream(context.Background(), st.handleServerRequest); err != nil {
 		// 405 Method Not Allowed is expected for servers that don't support GET streams.
-		// Other errors are unexpected but non-fatal — log them for debugging.
-		if !strings.Contains(err.Error(), "405") {
+		// Other errors are unexpected but non-fatal — only log with --debug-mcp.
+		if !strings.Contains(err.Error(), "405") && c.config.Debug {
 			log.Printf("MCP: GET SSE stream failed for %q: %v", c.config.Name, err)
 		}
 	}
