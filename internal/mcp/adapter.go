@@ -388,7 +388,7 @@ func executeGetPrompt(ctx context.Context, manager *Manager, serverName, name st
 		role := msg.Role
 		content := convertToolContent(msg.Content, serverName)
 		if content != nil {
-			if role == "assistant" {
+			if role == RoleAssistant {
 				parts = append(parts, &llm.TextPart{Text: "[Assistant]"}, content)
 			} else {
 				parts = append(parts, &llm.TextPart{Text: "[User]"}, content)

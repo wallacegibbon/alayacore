@@ -307,9 +307,9 @@ type Resource struct {
 
 // Annotations represents optional metadata on resources and content items.
 type Annotations struct {
-	Audience     []string `json:"audience,omitempty"`     // "user" or "assistant"
-	Priority     float64  `json:"priority,omitempty"`     // 0.0 – 1.0
-	LastModified string   `json:"lastModified,omitempty"` // ISO 8601 formatted string
+	Audience     []Role  `json:"audience,omitempty"`     // "user" or "assistant"
+	Priority     float64 `json:"priority,omitempty"`     // 0.0 – 1.0
+	LastModified string  `json:"lastModified,omitempty"` // ISO 8601 formatted string
 }
 
 // ListResourcesResult is the result of the "resources/list" method.
@@ -370,9 +370,20 @@ type GetPromptResult struct {
 
 // PromptMessage is a single message in a prompt result.
 type PromptMessage struct {
-	Role    string      `json:"role"` // "user" or "assistant"
+	Role    Role        `json:"role"` // "user" or "assistant"
 	Content ToolContent `json:"content"`
 }
+
+// Role represents the sender or recipient of a message in a conversation.
+// Per the MCP spec, the only valid values are "user" and "assistant".
+type Role string
+
+const (
+	// RoleUser represents a user message.
+	RoleUser Role = "user"
+	// RoleAssistant represents an assistant message.
+	RoleAssistant Role = "assistant"
+)
 
 // ResourceContents represents the contents of a resource embedded in a
 // tool result or prompt message, per the MCP spec.
