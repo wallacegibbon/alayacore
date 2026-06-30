@@ -497,6 +497,23 @@ func (s *Session) handlePrompt(contentParts []llm.ContentPart) {
 	go s.runTask(taskCtx, taskContent, contentParts)
 }
 
+// handleMCPInitSkip handles the :mcp_init_skip command.
+// Called when the user presses Ctrl+G on the init overlay.
+// Close the mcpInitSkip channel to abort the watcher, set mcpReady,
+// and notify the adapter to close the init overlay.
+func (s *Session) handleMCPInitSkip() {
+	select {
+	case <-s.mcpInitSkip:
+		// Already closed — nothing to do.
+	default:
+		close(s.mcpInitSkip)
+	}
+	s.mcpReady.Store(true)
+
+	// Notify adapter that init is "done" (no MCP tools loaded).
+	s.sendMCPInitMsg("ready", 0, nil)
+}
+
 // handleMCPAuth handles the :mcp_auth command.
 //
 // Usage: :mcp_auth <server_name> yes|no

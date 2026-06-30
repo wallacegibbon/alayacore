@@ -89,6 +89,11 @@ type runState struct {
 
 	mcpUpdateCh chan MCPUpdateEvent // buffered(10), receives MCP init results (internal to session)
 
+	// mcpInitSkip is closed when the user skips MCP initialization
+	// (Ctrl+G on the init overlay). The watcher goroutine exits early
+	// and no MCP results are applied.
+	mcpInitSkip chan struct{}
+
 	// OAuth authorization sequence — owned by run() goroutine.
 	// When the initial MCPUpdateEvent has PendingOAuthServers, the run()
 	// goroutine cycles through them one at a time, sending confirm SM
@@ -171,6 +176,8 @@ func (s *Session) startMCPInitWatcher(asyncInit *mcp.AsyncInit) {
 		select {
 		case <-asyncInit.Done():
 		case <-s.sessionCtx.Done():
+			return
+		case <-s.mcpInitSkip:
 			return
 		}
 
@@ -272,6 +279,7 @@ func NewSession(cfg SessionConfig) *Session {
 			taskResultCh:  make(chan []llm.ContentPart, 1),
 			taskRefreshCh: make(chan struct{}, 1),
 			mcpUpdateCh:   make(chan MCPUpdateEvent, 10),
+			mcpInitSkip:   make(chan struct{}),
 			oauthResultCh: make(chan oauthResult, 10),
 		},
 		sharedState: sharedState{
@@ -317,6 +325,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 			taskResultCh:  make(chan []llm.ContentPart, 1),
 			taskRefreshCh: make(chan struct{}, 1),
 			mcpUpdateCh:   make(chan MCPUpdateEvent, 10),
+			mcpInitSkip:   make(chan struct{}),
 			oauthResultCh: make(chan oauthResult, 10),
 		},
 		sharedState: sharedState{

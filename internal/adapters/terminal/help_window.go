@@ -76,6 +76,7 @@ func buildHelpItems() []HelpItem {
 		{ID: nextID(), IsSection: true, Description: "Commands"},
 		{ID: nextID(), Key: ":confirm <id> <yes|no>", Description: "Confirm or deny pending tool", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":mcp_auth <name> <yes|no>", Description: "Authorize MCP OAuth server", Type: HelpItemCommand},
+		{ID: nextID(), Key: ":mcp_init_skip", Description: "Skip MCP initialization", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":continue", Description: "Retry last prompt", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":reason <0|1|2>", Description: "Set reasoning level", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":cancel", Description: "Cancel current task", Type: HelpItemCommand},

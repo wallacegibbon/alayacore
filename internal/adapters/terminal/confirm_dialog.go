@@ -238,8 +238,12 @@ func (cd *ConfirmDialog) HandleKeyMsg(msg tea.KeyMsg) bool {
 		return false
 	}
 
-	// For the init overlay, consume all keys (init can't be canceled).
+	// For the init overlay, only Ctrl+G cancels (skips MCP initialization).
 	if cd.kind == ConfirmMCPInit {
+		if msg.String() == keyCtrlG {
+			cd.canceled = true
+			cd.state = FilteredListClosed
+		}
 		return true
 	}
 

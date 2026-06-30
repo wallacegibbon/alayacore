@@ -226,6 +226,12 @@ func (m *Terminal) handleConfirmCanceled(kind ConfirmKind, toolID string, fromCm
 		// Session owns the OAuth sequence — it will send the next
 		// mcp_auth:confirm (or mcp_auth:done) via SM message.
 		return m, scheduleTick()
+
+	case ConfirmMCPInit:
+		// Ctrl+G on init overlay — skip MCP initialization entirely.
+		m.restoreFocusAfterConfirm()
+		m.emitCommand(":mcp_init_skip")
+		return m, scheduleTick()
 	}
 
 	m.restoreFocusAfterConfirm()
