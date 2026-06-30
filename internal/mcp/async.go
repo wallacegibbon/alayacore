@@ -88,15 +88,17 @@ func (a *AsyncInit) Configs() []ServerConfig {
 func (a *AsyncInit) run(ctx context.Context) {
 	defer close(a.done)
 
-	// 1. Connect non-OAuth servers.
-	//    OAuth servers (authorization_code) are handled by the adapter's
-	//    handlePendingAuth() interactive flow — skip them here to avoid
-	//    racing with handlePendingAuth's AuthorizeServer().
+	// 1. Connect servers.
+	//    Skip servers that truly need interactive OAuth authorization
+	//    (no valid token on disk) — they'll be handled by the adapter's
+	//    :mcp_auth <name> yes|no flow.
+	//    Servers that already have a valid token (loaded from disk by
+	//    needsAuth) are connected normally.
 	connectCtx, connectCancel := context.WithTimeout(ctx, 30*time.Second)
 	var connErrs []error
 	for _, c := range a.manager.Clients() {
-		if c.config.Auth != nil && c.config.Auth.Type == AuthTypeAuthorizationCode {
-			continue // handled by adapter's handlePendingAuth()
+		if needsAuth(c) {
+			continue // needs interactive OAuth — skip for now
 		}
 		if err := c.Connect(connectCtx); err != nil {
 			connErrs = append(connErrs, err)
