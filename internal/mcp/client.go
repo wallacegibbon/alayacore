@@ -410,8 +410,13 @@ func (c *Client) setupNotificationHandler(tp Transport) {
 
 // handleNotification processes a server-to-client notification.
 func (c *Client) handleNotification(method string) {
-	if method == "notifications/tools/list_changed" {
+	switch method {
+	case methodNotificationsToolsListChanged:
 		c.MarkStale("server tool list changed, restart required")
+	case methodNotificationsResourcesListChanged:
+		c.MarkStale("server resource list changed, restart required")
+	case methodNotificationsPromptsListChanged:
+		c.MarkStale("server prompt list changed, restart required")
 	}
 }
 

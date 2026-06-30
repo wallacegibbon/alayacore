@@ -57,8 +57,12 @@ func NewStdioTransport(command string, args []string, env map[string]string, ena
 		return nil, fmt.Errorf("create stdout pipe: %w", err)
 	}
 
-	// MCP servers typically log to stderr; forward it to our stderr.
-	cmd.Stderr = nil // Let server's stderr flow to our stderr by default
+	// MCP servers may write diagnostics to stderr, but these are internal
+	// logs, not protocol errors. Protocol-level errors (failed tool calls,
+	// connection issues, etc.) are already surfaced to the user through
+	// JSON-RPC error responses. Leave stderr unmanaged so it flows to
+	// the parent process's stderr naturally.
+	cmd.Stderr = nil
 
 	// Set environment variables.
 	if len(env) > 0 {

@@ -401,16 +401,19 @@ const protocolVersion = "2025-11-25"
 
 // Method names.
 const (
-	methodInitialize               = "initialize"
-	methodListTools                = "tools/list"
-	methodCallTool                 = "tools/call"
-	methodListResources            = "resources/list"
-	methodReadResource             = "resources/read"
-	methodListPrompts              = "prompts/list"
-	methodGetPrompt                = "prompts/get"
-	methodPing                     = "ping"
-	methodNotificationsInitialized = "notifications/initialized"
-	methodNotificationsCanceled    = "notifications/cancelled" //nolint:misspell // MCP spec method name
+	methodInitialize                        = "initialize"
+	methodListTools                         = "tools/list"
+	methodCallTool                          = "tools/call"
+	methodListResources                     = "resources/list"
+	methodReadResource                      = "resources/read"
+	methodListPrompts                       = "prompts/list"
+	methodGetPrompt                         = "prompts/get"
+	methodPing                              = "ping"
+	methodNotificationsInitialized          = "notifications/initialized"
+	methodNotificationsCanceled             = "notifications/cancelled" //nolint:misspell // MCP spec method name
+	methodNotificationsToolsListChanged     = "notifications/tools/list_changed"
+	methodNotificationsResourcesListChanged = "notifications/resources/list_changed"
+	methodNotificationsPromptsListChanged   = "notifications/prompts/list_changed"
 )
 
 // CanceledNotificationParams is sent by the client to inform the server
