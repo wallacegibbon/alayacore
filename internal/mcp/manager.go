@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"sync"
 	"sync/atomic"
 )
 
@@ -82,22 +83,58 @@ func (m *Manager) ConnectAll(ctx context.Context) []error {
 // Failing servers are silently skipped; callers should log errors
 // externally if needed.
 func (m *Manager) DiscoverTools(ctx context.Context) map[string][]Tool {
-	result := make(map[string][]Tool)
-	for _, c := range m.loadClients() {
-		if c.State() != StateReady {
+	return discoverConcurrent(ctx, m.loadClients(),
+		func(c *Client) bool { return c.HasTools() },
+		func(ctx context.Context, c *Client) ([]Tool, error) { return c.ListTools(ctx) },
+	)
+}
+
+// DiscoverResources collects all resources from all connected MCP servers.
+// Returns a map keyed by server name for disambiguation.
+// Failing servers are silently skipped.
+func (m *Manager) DiscoverResources(ctx context.Context) map[string][]Resource {
+	return discoverConcurrent(ctx, m.loadClients(),
+		func(c *Client) bool { return c.HasResources() },
+		func(ctx context.Context, c *Client) ([]Resource, error) { return c.ListResources(ctx) },
+	)
+}
+
+// DiscoverPrompts collects all prompts from all connected MCP servers.
+// Returns a map keyed by server name for disambiguation.
+// Failing servers are silently skipped.
+func (m *Manager) DiscoverPrompts(ctx context.Context) map[string][]Prompt {
+	return discoverConcurrent(ctx, m.loadClients(),
+		func(c *Client) bool { return c.HasPrompts() },
+		func(ctx context.Context, c *Client) ([]Prompt, error) { return c.ListPrompts(ctx) },
+	)
+}
+
+// discoverConcurrent is a generic helper that runs discovery across all
+// clients concurrently. It only considers clients that are StateReady and
+// pass the capability check. Each client is listed independently; failures
+// are silently skipped.
+func discoverConcurrent[T any](ctx context.Context, clients []*Client, hasCapability func(*Client) bool, list func(context.Context, *Client) ([]T, error)) map[string][]T {
+	result := make(map[string][]T)
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	for _, c := range clients {
+		if c.State() != StateReady || !hasCapability(c) {
 			continue
 		}
-		if !c.HasTools() {
-			continue
-		}
-		tools, err := c.ListTools(ctx)
-		if err != nil {
-			continue
-		}
-		if len(tools) > 0 {
-			result[c.Name()] = tools
-		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			items, err := list(ctx, c)
+			if err != nil || len(items) == 0 {
+				return
+			}
+			mu.Lock()
+			result[c.Name()] = items
+			mu.Unlock()
+		}()
 	}
+	wg.Wait()
 	return result
 }
 

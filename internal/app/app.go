@@ -183,25 +183,14 @@ func initMCP(cfg *config.Settings) (*mcp.Manager, []llm.Tool, string, string, []
 // buildResourcesContext fetches the resource list from all connected servers
 // and returns a formatted string suitable for injection into the system prompt.
 func buildResourcesContext(ctx context.Context, m *mcp.Manager) string {
-	clients := m.Clients()
-	if len(clients) == 0 {
+	serverResources := m.DiscoverResources(ctx)
+	if len(serverResources) == 0 {
 		return ""
 	}
 
 	var b strings.Builder
-	for _, c := range clients {
-		if c.State() != mcp.StateReady || !c.HasResources() {
-			continue
-		}
-		resources, err := c.ListResources(ctx)
-		if err != nil {
-			continue
-		}
-		if len(resources) == 0 {
-			continue
-		}
-
-		b.WriteString(fmt.Sprintf("\n\nAvailable resources from MCP server %q:", c.Name()))
+	for serverName, resources := range serverResources {
+		b.WriteString(fmt.Sprintf("\n\nAvailable resources from MCP server %q:", serverName))
 		for _, r := range resources {
 			b.WriteString(fmt.Sprintf("\n  - %s", r.URI))
 			if r.Name != "" {
@@ -224,25 +213,14 @@ func buildResourcesContext(ctx context.Context, m *mcp.Manager) string {
 // buildPromptsContext fetches the prompt list from all connected servers
 // and returns a formatted string suitable for injection into the system prompt.
 func buildPromptsContext(ctx context.Context, m *mcp.Manager) string {
-	clients := m.Clients()
-	if len(clients) == 0 {
+	serverPrompts := m.DiscoverPrompts(ctx)
+	if len(serverPrompts) == 0 {
 		return ""
 	}
 
 	var b strings.Builder
-	for _, c := range clients {
-		if c.State() != mcp.StateReady || !c.HasPrompts() {
-			continue
-		}
-		prompts, err := c.ListPrompts(ctx)
-		if err != nil {
-			continue
-		}
-		if len(prompts) == 0 {
-			continue
-		}
-
-		b.WriteString(fmt.Sprintf("\n\nAvailable prompts from MCP server %q:", c.Name()))
+	for serverName, prompts := range serverPrompts {
+		b.WriteString(fmt.Sprintf("\n\nAvailable prompts from MCP server %q:", serverName))
 		for _, p := range prompts {
 			b.WriteString(fmt.Sprintf("\n  - %s", p.Name))
 			if p.Description != "" {
