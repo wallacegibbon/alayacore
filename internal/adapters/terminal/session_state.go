@@ -42,10 +42,15 @@ type sessionState struct {
 	// Values: "" (no MCP), "starting", "ready", "auth_required".
 	mcpInitStatus string
 
-	// MCP auth status — tracks the currently authorizing server during OAuth flow.
-	mcpAuthServer     string
-	mcpAuthInProgress bool
-	mcpAuthJustDone   bool // set to true on mcp_auth:done/error, consumed by takeMCPAuthDone
+	// MCP auth status — session-driven OAuth overlay state.
+	// MCPAuthStatus values:
+	//   ""        — no active OAuth overlay
+	//   "confirm" — session wants a y/n confirm dialog for mcpAuthServer
+	//   "in_progress" — OAuth flow is running for mcpAuthServer
+	//   "done"   — all OAuth servers processed, close overlay
+	mcpAuthStatus   string
+	mcpAuthServer   string
+	mcpAuthServerURL string
 
 	// Model fields
 	models          []agentpkg.ModelConfig
@@ -63,11 +68,6 @@ type sessionState struct {
 	// the Terminal tick handler to open the confirm overlay.
 	// Stored as a queue so multiple confirms arriving at once aren't lost.
 	pendingToolConfirms []toolConfirmPending
-
-	// Pending MCP auth confirms — set by waitMCPInit (or handleSystemMsg),
-	// consumed by the Terminal tick handler to open the confirm overlay
-	// for OAuth authorization. Each entry is a server needing auth.
-	pendingMCPAuth []mcpAuthPending
 }
 
 // toolConfirmPending holds a single pending tool confirmation.
@@ -75,12 +75,6 @@ type toolConfirmPending struct {
 	ID    string
 	Name  string
 	Input string
-}
-
-// mcpAuthPending holds a pending MCP OAuth authorization request.
-type mcpAuthPending struct {
-	ServerName string
-	ServerURL  string
 }
 
 // updateTask atomically updates task progress fields.
@@ -178,32 +172,15 @@ func (s *sessionState) updateMCPInitStatus(status string) {
 	s.mu.Unlock()
 }
 
-// updateMCPAuth atomically updates the MCP OAuth authorization status.
+// updateMCPAuth atomically updates the MCP OAuth overlay state.
 // Called when the session sends an mcp_auth system message.
-func (s *sessionState) updateMCPAuth(server, status string) {
+// Status values: "confirm", "in_progress", "done".
+func (s *sessionState) updateMCPAuth(server, url, status string) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	switch status {
-	case "in_progress":
-		s.mcpAuthServer = server
-		s.mcpAuthInProgress = true
-		s.mcpAuthJustDone = false
-	case "done", "error":
-		s.mcpAuthServer = ""
-		s.mcpAuthInProgress = false
-		s.mcpAuthJustDone = true
-	}
-}
-
-// takeMCPAuthDone returns whether an MCP authorization just completed
-// (mcp_auth:done or mcp_auth:error was received) since the last call.
-// This is a one-shot flag — it's reset to false after reading.
-func (s *sessionState) takeMCPAuthDone() bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	v := s.mcpAuthJustDone
-	s.mcpAuthJustDone = false
-	return v
+	s.mcpAuthStatus = status
+	s.mcpAuthServer = server
+	s.mcpAuthServerURL = url
+	s.mu.Unlock()
 }
 
 // setToolConfirmPending appends a pending tool confirmation request.
@@ -228,28 +205,6 @@ func (s *sessionState) takeToolConfirmPending() (id, toolName, toolInput string,
 	return p.ID, p.Name, p.Input, true
 }
 
-// setMCPAuthPending appends a pending MCP OAuth authorization request.
-func (s *sessionState) setMCPAuthPending(serverName, serverURL string) {
-	s.mu.Lock()
-	s.pendingMCPAuth = append(s.pendingMCPAuth, mcpAuthPending{
-		ServerName: serverName, ServerURL: serverURL,
-	})
-	s.mu.Unlock()
-}
-
-// takeMCPAuthPending pops the next pending MCP OAuth authorization request.
-// Returns (serverName, serverURL, ok). If no pending requests, ok is false.
-func (s *sessionState) takeMCPAuthPending() (serverName, serverURL string, ok bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if len(s.pendingMCPAuth) == 0 {
-		return "", "", false
-	}
-	p := s.pendingMCPAuth[0]
-	s.pendingMCPAuth = s.pendingMCPAuth[1:]
-	return p.ServerName, p.ServerURL, true
-}
-
 // snapshotStatus returns a consistent point-in-time view of session status.
 func (s *sessionState) snapshotStatus() StatusSnapshot {
 	s.mu.Lock()
@@ -269,8 +224,9 @@ func (s *sessionState) snapshotStatus() StatusSnapshot {
 		VideoFPS:          s.videoFPS,
 		VideoRes:          s.videoRes,
 		MCPInitStatus:     s.mcpInitStatus,
+		MCPAuthStatus:     s.mcpAuthStatus,
 		MCPAuthServer:     s.mcpAuthServer,
-		MCPAuthInProgress: s.mcpAuthInProgress,
+		MCPAuthServerURL:  s.mcpAuthServerURL,
 	}
 }
 

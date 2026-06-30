@@ -38,9 +38,15 @@ type StatusSnapshot struct {
 	// Values: "" (no MCP or not started), "starting", "ready", "auth_required".
 	MCPInitStatus string
 
-	// MCP auth status — set when an OAuth authorization flow is running.
-	MCPAuthServer     string // server currently being authorized (empty if none)
-	MCPAuthInProgress bool   // true while OAuth flow is in progress
+	// MCP auth status — session-driven OAuth overlay state.
+	// MCPAuthStatus values:
+	//   ""        — no active OAuth overlay
+	//   "confirm" — session wants a y/n confirm dialog for MCPAuthServer
+	//   "in_progress" — OAuth flow is running for MCPAuthServer
+	//   "done"   — all OAuth servers processed, close overlay
+	MCPAuthStatus   string
+	MCPAuthServer   string // server currently being prompted/authorized
+	MCPAuthServerURL string // URL for the confirm dialog
 }
 
 // ModelSnapshot holds a consistent point-in-time view of model state.
@@ -74,11 +80,6 @@ type OutputWriter interface {
 
 	// Confirm dialog support
 	GetPendingToolConfirm() (id, toolName, toolInput string, ok bool)
-
-	// MCP auth dialog support
-	SetMCPAuthPending(serverName, serverURL string)
-	GetPendingMCPAuth() (serverName, serverURL string, ok bool)
-	TakeMCPAuthDone() bool // one-shot: returns true if mcp_auth:done was received since last check
 
 	// Update signaling
 	DrainDirty() bool // returns true if display was dirty, clears the flag

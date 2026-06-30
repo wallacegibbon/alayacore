@@ -107,10 +107,18 @@ type MCPInitMsg struct {
 func (MCPInitMsg) SystemMsgType() string { return "mcp_init" }
 
 // MCPAuthMsg communicates MCP OAuth authorization progress (type "mcp_auth").
-// Sent by the OAuth goroutine so the adapter can show a status overlay.
+// Sent by the session's run() goroutine so the adapter can show overlays.
+//
+// Status values:
+//   "confirm"     — session wants user to confirm authorizing this server
+//   "in_progress" — OAuth flow is running for this server
+//   "done"        — all OAuth servers have been processed
+//
+// URL is only set for "confirm" status.
 type MCPAuthMsg struct {
-	Server string `json:"server"`
-	Status string `json:"status"` // "in_progress", "done", "error"
+	Server string `json:"server,omitempty"`
+	URL    string `json:"url,omitempty"`
+	Status string `json:"status"`
 	Error  string `json:"error,omitempty"`
 }
 

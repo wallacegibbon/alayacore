@@ -375,41 +375,30 @@ func (to *outputWriter) handleSystemVideoConfig(data json.RawMessage) {
 }
 
 // handleSystemMCPInit processes an mcp_init system message.
-// Updates the MCP initialization phase and optionally sets up
-// pending OAuth authorization requests for the TUI confirm dialogs.
+// Updates the MCP initialization phase for the init overlay.
 func (to *outputWriter) handleSystemMCPInit(data json.RawMessage) {
 	var msg struct {
-		Status      string `json:"status"`
-		PendingAuth []struct {
-			Name string `json:"name"`
-			URL  string `json:"url"`
-		} `json:"pending_auth"`
-	}
-	if json.Unmarshal(data, &msg) != nil {
-		return
-	}
-	to.status.updateMCPInitStatus(msg.Status)
-
-	// For "auth_required", set up pending OAuth confirm dialogs.
-	if msg.Status == "auth_required" {
-		for _, s := range msg.PendingAuth {
-			to.status.setMCPAuthPending(s.Name, s.URL)
-		}
-	}
-}
-
-// handleSystemMCPAuth processes an mcp_auth system message.
-// Updates the MCP authorization status so the Terminal can show
-// a progress overlay during OAuth flow.
-func (to *outputWriter) handleSystemMCPAuth(data json.RawMessage) {
-	var msg struct {
-		Server string `json:"server"`
 		Status string `json:"status"`
 	}
 	if json.Unmarshal(data, &msg) != nil {
 		return
 	}
-	to.status.updateMCPAuth(msg.Server, msg.Status)
+	to.status.updateMCPInitStatus(msg.Status)
+}
+
+// handleSystemMCPAuth processes an mcp_auth system message.
+// Updates the MCP auth overlay state (confirm, in_progress, done)
+// so the Terminal can show/hide the appropriate overlay.
+func (to *outputWriter) handleSystemMCPAuth(data json.RawMessage) {
+	var msg struct {
+		Server string `json:"server,omitempty"`
+		URL    string `json:"url,omitempty"`
+		Status string `json:"status"`
+	}
+	if json.Unmarshal(data, &msg) != nil {
+		return
+	}
+	to.status.updateMCPAuth(msg.Server, msg.URL, msg.Status)
 }
 
 // handleSystemToolConfirm processes a tool_confirm system message.
@@ -435,24 +424,6 @@ func (to *outputWriter) handleSystemToolConfirm(data json.RawMessage) {
 // GetPendingToolConfirm returns any pending tool confirmation and clears it.
 func (to *outputWriter) GetPendingToolConfirm() (id, toolName, toolInput string, ok bool) {
 	return to.status.takeToolConfirmPending()
-}
-
-// TakeMCPAuthDone returns whether an MCP authorization just completed
-// since the last check. This is a one-shot consumable flag used by the
-// TUI to know when to close the progress overlay.
-func (to *outputWriter) TakeMCPAuthDone() bool {
-	return to.status.takeMCPAuthDone()
-}
-
-// SetMCPAuthPending adds a pending MCP OAuth authorization request.
-func (to *outputWriter) SetMCPAuthPending(serverName, serverURL string) {
-	to.status.setMCPAuthPending(serverName, serverURL)
-}
-
-// GetPendingMCPAuth returns any pending MCP OAuth authorization request
-// and clears it. Returns (serverName, serverURL, ok).
-func (to *outputWriter) GetPendingMCPAuth() (serverName, serverURL string, ok bool) {
-	return to.status.takeMCPAuthPending()
 }
 
 // SnapshotStatus returns a consistent point-in-time view of session status.

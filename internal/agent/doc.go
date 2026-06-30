@@ -33,15 +33,18 @@
 //	     via a message channel.
 //
 //	The only mutable state accessed from more than one goroutine are:
-//	  - atomic fields for outputBroken, outputBroken, confirmCh, mcpReady,
-//	    and pendingOAuth
+//	  - atomic fields for outputBroken, confirmCh, and mcpReady
 //	  - A few buffered channels for cancellation, completion signaling,
 //	    system-info refresh, and MCP update events (mcpUpdateCh).
 //
-//	mcpUpdateCh receives MCP initialization and OAuth authorization
-//	results. The write end is internal to the session (startMCPInitWatcher
-//	goroutine + handleMCPAuth goroutine), while the read end is in the
-//	run() goroutine. The adapter never touches this channel — all
+//	mcpUpdateCh receives MCP initialization results. The write end is
+//	internal to the session (startMCPInitWatcher goroutine), while the
+//	read end is in the run() goroutine. The adapter never touches this
+//	channel — all adapter communication goes through TLV frames.
+//
+//	OAuth authorization results flow through oauthResultCh from the
+//	short-lived AuthorizeServer goroutine back to run(), which owns
+//	the entire OAuth sequence state (pendingOAuthServers list + index).
 //	communication with adapters goes through TLV frames.
 //
 //	All other session state (agent, provider, ContextTokens, ContextLimit,

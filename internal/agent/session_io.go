@@ -19,7 +19,6 @@ import (
 
 	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/llm"
-	"github.com/alayacore/alayacore/internal/mcp"
 	"github.com/alayacore/alayacore/internal/stream"
 )
 
@@ -482,15 +481,9 @@ func (s *Session) handlePrompt(contentParts []llm.ContentPart) {
 		return
 	}
 	// Wait for MCP initialization to complete before accepting prompts.
-	// Check pending OAuth first — if servers need authorization, the user
-	// must handle them (via :mcp_auth <name> yes|no) before sending messages.
-	if n := s.pendingOAuth.Load(); n > 0 {
-		s.writeError(fmt.Sprintf("MCP OAuth authorization in progress (%d %s). "+
-			"Please complete or skip authorization first.", n, pluralizeServer(n)))
-		return
-	}
 	if !s.mcpReady.Load() {
-		s.writeError("MCP servers are still initializing. Please wait...")
+		s.writeError("MCP servers are still initializing or OAuth authorization is pending. " +
+			"Please wait for initialization to complete.")
 		return
 	}
 	if err := s.ensureAgentInitialized(); err != nil {
@@ -508,8 +501,10 @@ func (s *Session) handlePrompt(contentParts []llm.ContentPart) {
 //
 // Usage: :mcp_auth <server_name> yes|no
 //
-// Matches the :confirm <id> yes|no pattern — the action is always
-// required. "yes" runs the OAuth authorization flow; "no" skips it.
+// The session owns the OAuth sequence (pendingOAuthServers list), so
+// "no" simply advances to the next server and "yes" starts an async
+// AuthorizeServer goroutine. Results arrive via oauthResultCh and are
+// processed by handleOAuthResult in the run() loop.
 func (s *Session) handleMCPAuth(_ context.Context, args string) {
 	name, action, _ := strings.Cut(args, " ")
 	if name == "" || action == "" {
@@ -517,23 +512,44 @@ func (s *Session) handleMCPAuth(_ context.Context, args string) {
 		return
 	}
 
-	if action == "no" {
-		// Ensure the initial MCP update has been applied (MCPManager set).
-		// If applyMCPUpdate hasn't run yet, the pendingOAuth counter isn't
-		// initialized yet — reject to avoid losing the decrement.
-		if s.MCPManager == nil {
-			s.writeError("MCP servers are still initializing. Please wait...")
-			return
-		}
-		s.skipMCPAuth(name)
-		return
-	}
-
-	if action != "yes" {
+	switch action {
+	case "no":
+		s.skipCurrentMCPAuth(name)
+	case "yes":
+		s.startMCPAuth(name)
+	default:
 		s.writeError("usage: :mcp_auth <server_name> yes|no")
+	}
+}
+
+// skipCurrentMCPAuth handles the "no" response for the current server.
+// Cancels any running OAuth goroutine and advances to the next server.
+func (s *Session) skipCurrentMCPAuth(name string) {
+	// Verify the name matches the current pending server.
+	if s.pendingOAuthIdx >= len(s.pendingOAuthServers) {
+		s.writeError(fmt.Sprintf("Server %q is not in the pending list", name))
+		return
+	}
+	current := s.pendingOAuthServers[s.pendingOAuthIdx]
+	if current.Name != name {
+		s.writeError(fmt.Sprintf("Server %q is not the current authorization prompt", name))
 		return
 	}
 
+	// Cancel any running OAuth so the goroutine exits promptly.
+	if s.oauthCancel != nil {
+		s.oauthCancel()
+		s.oauthCancel = nil
+	}
+
+	s.writeNotifyf("Skipped authorization for MCP server %q.", name)
+	s.pendingOAuthIdx++
+	s.advanceMCPAuth()
+}
+
+// startMCPAuth handles the "yes" response for the current server.
+// Starts an OAuth authorization goroutine and notifies the adapter.
+func (s *Session) startMCPAuth(name string) {
 	mgr := s.MCPManager
 	if mgr == nil {
 		s.writeError("MCP servers are still initializing. Please wait...")
@@ -546,113 +562,47 @@ func (s *Session) handleMCPAuth(_ context.Context, args string) {
 		return
 	}
 
-	s.writeNotifyf("Authorizing MCP server %q (%s)...", name, pending.ServerURL)
-	s.writeNotify("A browser window will open for authentication.")
-
-	// Run the OAuth flow in a background goroutine since it blocks
-	// for interactive user input (browser + callback).
-	go func() {
-		// Notify adapter that OAuth authorization is in progress
-		// so it can show a status overlay in the TUI.
-		s.sendMCPAuthMsg(name, "in_progress")
-
-		authCtx, authCancel := context.WithTimeout(context.Background(), 5*time.Minute)
-		defer authCancel()
-
-		// Store cancel func so skipMCPAuth can abort this flow.
-		s.oauthCancels.Store(name, authCancel)
-		defer s.oauthCancels.Delete(name)
-
-		tools, err := mgr.AuthorizeServer(authCtx, name)
-		if err != nil {
-			s.writeError(fmt.Sprintf("MCP auth failed for %q: %v", name, err))
-			s.sendMCPAuthMsg(name, "error")
-			return
-		}
-
-		// Build system prompt fragment (server instructions).
-		var frag strings.Builder
-		for _, c := range mgr.Clients() {
-			if c.Name() == name {
-				if instr := c.Instructions(); instr != "" {
-					frag.WriteString(fmt.Sprintf("\n\nInstructions from MCP server %q:\n%s", name, instr))
-				}
-				break
-			}
-		}
-
-		// Convert tools.
-		serverTools := map[string][]mcp.Tool{name: tools}
-		agentTools := mcp.ToolsToAgentTools(serverTools, mgr)
-
-		// Add resource/prompt tools if available.
-		agentTools = append(agentTools, mcp.ResourcesToAgentTools(mgr.Clients(), mgr)...)
-		agentTools = append(agentTools, mcp.PromptsToAgentTools(mgr.Clients(), mgr)...)
-
-		// Decrement pending OAuth counter — this server is now done
-		// (either authorized or failed). If it reaches zero, mcpReady
-		// will be set, unblocking user messages.
-		n := s.pendingOAuth.Add(-1)
-		if n < 0 {
-			s.pendingOAuth.Store(0)
-			n = 0
-		}
-		if n == 0 {
-			s.mcpReady.Store(true)
-		}
-
-		// Send update to the run() goroutine. Use non-blocking send
-		// to avoid deadlock if the channel is full (should not happen
-		// in practice — run() consumes promptly).
-		event := MCPUpdateEvent{
-			Tools:              agentTools,
-			SystemPromptSuffix: frag.String(),
-			Manager:            mgr,
-		}
-		select {
-		case s.mcpUpdateCh <- event:
-		default:
-			// Channel full; unlikely, spin off delivery to avoid blocking.
-			go func() { s.mcpUpdateCh <- event }()
-		}
-
-		// Notify adapter that OAuth authorization is complete.
-		s.sendMCPAuthMsg(name, "done")
-
-		s.writeNotifyf("✓ MCP server %q authorized and connected (%d tools).", name, len(tools))
-	}()
-}
-
-// skipMCPAuth handles the :mcp_auth_skip command.
-// It decrements the pending OAuth counter, cancels any in-flight OAuth
-// flow for this server, and marks MCP as ready if no more OAuth servers
-// are pending.
-func (s *Session) skipMCPAuth(serverName string) {
-	if serverName == "" {
-		s.writeError("usage: :mcp_auth_skip <server_name>")
+	// Verify the name matches the current pending server.
+	if s.pendingOAuthIdx >= len(s.pendingOAuthServers) {
+		s.writeError(fmt.Sprintf("Server %q is not in the pending list", name))
+		return
+	}
+	current := s.pendingOAuthServers[s.pendingOAuthIdx]
+	if current.Name != name {
+		s.writeError(fmt.Sprintf("Server %q is not the current authorization prompt", name))
 		return
 	}
 
-	// Cancel any running OAuth flow for this server so the goroutine
-	// exits without decrementing pendingOAuth again.
-	if cancelVal, ok := s.oauthCancels.Load(serverName); ok {
-		if cancel, ok := cancelVal.(context.CancelFunc); ok {
-			cancel()
+	s.writeNotifyf("Authorizing MCP server %q (%s)...", name, pending.ServerURL)
+	s.writeNotify("A browser window will open for authentication.")
+
+	// Notify adapter that OAuth is starting (progress overlay).
+	s.sendMCPAuthInProgress(name)
+
+	// Create cancelable context for the OAuth goroutine.
+	authCtx, authCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	s.oauthCancel = authCancel
+
+	currentIdx := s.pendingOAuthIdx
+
+	// Run AuthorizeServer in a background goroutine since it blocks
+	// on interactive user input (browser + callback).
+	go func() {
+		defer authCancel()
+
+		tools, err := mgr.AuthorizeServer(authCtx, name)
+		if err != nil {
+			s.oauthResultCh <- oauthResult{name: name, err: err, idx: currentIdx}
+			return
 		}
-	}
 
-	n := s.pendingOAuth.Add(-1)
-	if n < 0 {
-		// Shouldn't happen, but be defensive.
-		s.pendingOAuth.Store(0)
-		n = 0
-	}
+		// Guard against TOCTOU: skipMCPAuth may have canceled the context
+		// just as AuthorizeServer succeeded.
+		if authCtx.Err() != nil {
+			s.oauthResultCh <- oauthResult{name: name, err: nil, idx: currentIdx}
+			return
+		}
 
-	if n == 0 {
-		s.mcpReady.Store(true)
-		s.sendSystemInfo("all")
-		s.writeNotifyf("MCP servers initialized (%d tools loaded).", len(s.BaseTools))
-	}
-
-	s.writeNotifyf("Skipped authorization for MCP server %q.", serverName)
+		s.oauthResultCh <- oauthResult{name: name, tools: tools, err: nil, idx: currentIdx}
+	}()
 }

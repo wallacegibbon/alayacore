@@ -258,7 +258,29 @@ func (s *Session) sendMCPInitMsg(status string, toolCount int, pending []MCPAuth
 	})
 }
 
-// sendMCPAuthMsg sends an MCP OAuth authorization status update to the adapter.
-func (s *Session) sendMCPAuthMsg(server, status string) {
-	s.writeSystemMsg(MCPAuthMsg{Server: server, Status: status})
+// sendMCPAuthConfirm sends an MCP OAuth confirmation prompt to the adapter.
+// The adapter shows a y/n confirm dialog for the given server.
+func (s *Session) sendMCPAuthConfirm(serverName, serverURL string) {
+	s.writeSystemMsg(MCPAuthMsg{
+		Server: serverName,
+		URL:    serverURL,
+		Status: "confirm",
+	})
+}
+
+// sendMCPAuthInProgress tells the adapter that the OAuth flow is running
+// for the given server (authorization in progress, waiting for browser).
+func (s *Session) sendMCPAuthInProgress(serverName string) {
+	s.writeSystemMsg(MCPAuthMsg{
+		Server: serverName,
+		Status: "in_progress",
+	})
+}
+
+// sendMCPAuthDone tells the adapter that all OAuth servers have been
+// processed. The adapter closes any remaining MCP overlay.
+func (s *Session) sendMCPAuthDone() {
+	s.writeSystemMsg(MCPAuthMsg{
+		Status: "done",
+	})
 }

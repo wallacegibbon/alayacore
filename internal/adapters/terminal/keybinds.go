@@ -223,10 +223,8 @@ func (m *Terminal) handleConfirmCanceled(kind ConfirmKind, toolID string, fromCm
 		if toolID != "" {
 			m.emitCommand(":mcp_auth " + toolID + " no")
 		}
-		// Check for more pending auth servers
-		if nextName, nextURL, ok := m.out.GetPendingMCPAuth(); ok {
-			m.openConfirmMCPAuth(nextName, nextURL)
-		}
+		// Session owns the OAuth sequence — it will send the next
+		// mcp_auth:confirm (or mcp_auth:done) via SM message.
 		return m, scheduleTick()
 	}
 

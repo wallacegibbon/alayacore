@@ -49,26 +49,27 @@ type SetContextTokensEvent struct {
 
 func (SetContextTokensEvent) taskEvent() {}
 
-// MCPUpdateEvent carries MCP initialization or OAuth authorization results
-// to the session's run() goroutine. It is sent internally (not from the
-// adapter — all adapter communication goes through TLV frames). The run()
-// goroutine applies the updates (tools + system prompt) and manages the
-// pending-OAuth counter.
-//
-// The initial event is produced by startMCPInitWatcher after AsyncInit
-// completes. Subsequent events are produced by the OAuth goroutine in
-// handleMCPAuth when a server authorization finishes.
-//
-// PendingOAuthCount is the number of OAuth servers that still need user
-// authorization. Set by the initial async init event; the session adds
-// this to its internal pendingOAuth counter. Each skipMCPAuth or
-// completed OAuth authorization decrements the counter. When it reaches
-// zero, mcpReady becomes true and user messages are accepted.
+// MCPUpdateEvent carries MCP initialization results to the session's run()
+// goroutine. It is sent internally by startMCPInitWatcher after AsyncInit
+// completes (not from OAuth — OAuth results go through oauthResultCh).
+// The run() goroutine applies the updates (tools + system prompt) and
+// starts the OAuth sequence if PendingOAuthServers is non-empty.
 type MCPUpdateEvent struct {
-	Tools              []llm.Tool
-	SystemPromptSuffix string
-	Manager            *mcp.Manager
-	PendingOAuthCount  int32 // number of OAuth servers needing auth; 0 if none
+	Tools                []llm.Tool
+	SystemPromptSuffix   string
+	Manager              *mcp.Manager
+	PendingOAuthServers  []MCPAuthServer // servers needing user OAuth; empty if none
+}
+
+// oauthResult carries the result of an OAuth authorization back to the
+// run() goroutine. The idx field identifies the server index this result
+// corresponds to, so stale results from already-skipped servers are
+// silently ignored.
+type oauthResult struct {
+	name  string
+	tools []mcp.Tool
+	err   error
+	idx   int
 }
 
 // sendEvent sends a task event to the run() goroutine.

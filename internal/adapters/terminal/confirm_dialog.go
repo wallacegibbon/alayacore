@@ -243,11 +243,11 @@ func (cd *ConfirmDialog) HandleKeyMsg(msg tea.KeyMsg) bool {
 		return true
 	}
 
-	// For the OAuth progress overlay, allow Esc/n/N to cancel and skip
-	// the current server. All other keys are consumed.
+	// For the OAuth progress overlay, allow n/N/Esc/Ctrl+G to cancel
+	// and skip the current server. All other keys are consumed.
 	if cd.kind == ConfirmMCPAuthProgress {
 		key := msg.String()
-		if key == keyN || key == keyNCapital || key == keyEsc {
+		if key == keyN || key == keyNCapital || key == keyEsc || key == keyCtrlG {
 			cd.canceled = true
 			cd.state = FilteredListClosed
 		}

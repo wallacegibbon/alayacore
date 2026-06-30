@@ -41,7 +41,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -88,7 +87,16 @@ type runState struct {
 	taskResultCh  chan []llm.ContentPart
 	taskRefreshCh chan struct{}
 
-	mcpUpdateCh chan MCPUpdateEvent // buffered(10), receives MCP init & OAuth auth results (internal to session)
+	mcpUpdateCh chan MCPUpdateEvent // buffered(10), receives MCP init results (internal to session)
+
+	// OAuth authorization sequence — owned by run() goroutine.
+	// When the initial MCPUpdateEvent has PendingOAuthServers, the run()
+	// goroutine cycles through them one at a time, sending confirm SM
+	// messages to the adapter and waiting for user responses.
+	pendingOAuthServers []MCPAuthServer // servers needing OAuth, in order
+	pendingOAuthIdx     int             // index of the server currently being prompted
+	oauthResultCh       chan oauthResult // goroutine → run(): AuthorizeServer result
+	oauthCancel         context.CancelFunc // cancels the currently running OAuth goroutine
 }
 
 // activeTaskStep returns the current step of the active task, or 0 if idle.
@@ -122,13 +130,7 @@ type sharedState struct {
 
 	outputBroken atomic.Bool
 
-	mcpReady     atomic.Bool  // set to true after MCP init completes and tools are loaded
-	pendingOAuth atomic.Int32 // >0 when OAuth servers still need authorization
-
-	// oauthCancels stores cancel functions for running OAuth goroutines,
-	// keyed by server name. Used by skipMCPAuth to abort an in-flight
-	// OAuth flow when the user skips a server mid-authorization.
-	oauthCancels sync.Map // map[string]context.CancelFunc
+	mcpReady atomic.Bool // set to true after MCP init completes and tools are loaded
 }
 
 // Session manages conversation state and task execution.
@@ -184,12 +186,16 @@ func (s *Session) startMCPInitWatcher(asyncInit *mcp.AsyncInit) {
 		pendingOAuth := mgr.PendingAuthServers()
 
 		// Forward tools + system prompt + manager to the run() goroutine.
+		authServers := make([]MCPAuthServer, len(pendingOAuth))
+		for i, ps := range pendingOAuth {
+			authServers[i] = MCPAuthServer{Name: ps.Name, URL: ps.ServerURL}
+		}
 		select {
 		case s.mcpUpdateCh <- MCPUpdateEvent{
-			Tools:              tools,
-			SystemPromptSuffix: sysFrag,
-			Manager:            mgr,
-			PendingOAuthCount:  int32(len(pendingOAuth)), //nolint:gosec // small count
+			Tools:                tools,
+			SystemPromptSuffix:   sysFrag,
+			Manager:              mgr,
+			PendingOAuthServers:  authServers,
 		}:
 		case <-s.sessionCtx.Done():
 			return
@@ -197,11 +203,7 @@ func (s *Session) startMCPInitWatcher(asyncInit *mcp.AsyncInit) {
 
 		// Phase 3: notify adapter of final status.
 		if len(pendingOAuth) > 0 {
-			servers := make([]MCPAuthServer, len(pendingOAuth))
-			for i, ps := range pendingOAuth {
-				servers[i] = MCPAuthServer{Name: ps.Name, URL: ps.ServerURL}
-			}
-			s.sendMCPInitMsg("auth_required", len(tools), servers)
+			s.sendMCPInitMsg("auth_required", len(tools), authServers)
 		} else {
 			s.sendMCPInitMsg("ready", len(tools), nil)
 		}
@@ -270,6 +272,7 @@ func NewSession(cfg SessionConfig) *Session {
 			taskResultCh:  make(chan []llm.ContentPart, 1),
 			taskRefreshCh: make(chan struct{}, 1),
 			mcpUpdateCh:   make(chan MCPUpdateEvent, 10),
+			oauthResultCh: make(chan oauthResult, 10),
 		},
 		sharedState: sharedState{
 			sessionCtx:    ctx,
@@ -314,6 +317,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 			taskResultCh:  make(chan []llm.ContentPart, 1),
 			taskRefreshCh: make(chan struct{}, 1),
 			mcpUpdateCh:   make(chan MCPUpdateEvent, 10),
+			oauthResultCh: make(chan oauthResult, 10),
 		},
 		sharedState: sharedState{
 			sessionCtx:    ctx,

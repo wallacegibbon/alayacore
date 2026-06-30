@@ -139,6 +139,12 @@ type Terminal struct {
 	// on the same flush.
 	pendingForceRedraw bool
 
+	// lastMCPAuthServer tracks the server name from the last mcp_auth:confirm
+	// or mcp_auth:in_progress that we showed an overlay for. Used to prevent
+	// re-opening a confirm dialog after the user responded but before the
+	// session sends the next SM message.
+	lastMCPAuthServer string
+
 	// Async session loading state.
 	// When true, Init() kicks off the loading in a goroutine and View()
 	// renders a loading screen instead of the normal TUI.
@@ -390,10 +396,14 @@ func (m *Terminal) handleMCPInitOverlay() {
 }
 
 // handleConfirmOverlays processes pending confirmations for tool execution
-// and MCP OAuth authorization. These are checked in priority order:
-//  1. Tool confirmation (from agent task)
-//  2. MCP OAuth authorization (from async init)
-//  3. MCP OAuth progress overlay lifecycle
+// and MCP OAuth authorization, driven by session SM messages.
+//
+// Priority order:
+//  1. Tool confirmation (from agent task) — session sends tool_confirm
+//  2. MCP OAuth state — session sends mcp_auth with status
+//     (confirm / in_progress / done)
+//
+// The adapter has no queue — it reacts to whatever the session tells it.
 func (m *Terminal) handleConfirmOverlays() {
 	// Tool confirmation (highest priority).
 	if !m.confirmOverlay.IsOpen() {
@@ -403,22 +413,52 @@ func (m *Terminal) handleConfirmOverlays() {
 		}
 	}
 
-	// MCP OAuth progress overlay lifecycle — close when auth completes.
-	if m.confirmOverlay.IsOpen() && m.confirmOverlay.Kind() == ConfirmMCPAuthProgress {
-		if m.out.TakeMCPAuthDone() {
+	// MCP OAuth — session-driven via mcp_auth SM messages.
+	m.handleMCPAuthOverlay()
+}
+
+// handleMCPAuthOverlay reacts to the current MCPAuthStatus from the session.
+// The session drives the entire OAuth sequence; the adapter just shows
+// whatever overlay the session tells it to show.
+func (m *Terminal) handleMCPAuthOverlay() {
+	st := m.out.SnapshotStatus()
+
+	switch st.MCPAuthStatus {
+	case "confirm":
+		// Ignore if we already showed a confirm dialog for this server
+		// and the user responded (session hasn't sent next message yet).
+		if st.MCPAuthServer == m.lastMCPAuthServer {
+			return
+		}
+		// If a progress overlay from a previous server is still open,
+		// close it first before showing the next confirm dialog.
+		if m.confirmOverlay.Kind() == ConfirmMCPAuthProgress {
+			m.confirmOverlay.Close()
+		}
+		// Show confirm dialog if no overlay is active (or only init overlay).
+		if !m.confirmOverlay.IsOpen() || m.confirmOverlay.Kind() == ConfirmMCPInit {
+			m.lastMCPAuthServer = st.MCPAuthServer
+			m.openConfirmMCPAuth(st.MCPAuthServer, st.MCPAuthServerURL)
+			m.display.updateContent()
+		}
+
+	case "in_progress":
+		m.lastMCPAuthServer = st.MCPAuthServer
+		// Session has started the OAuth flow for this server.
+		// Switch from confirm to progress overlay if needed.
+		if m.confirmOverlay.Kind() == ConfirmMCPAuth {
+			m.confirmOverlay.OpenMCPAuthProgress(st.MCPAuthServer)
+			m.display.updateContent()
+		}
+
+	case "done":
+		// All OAuth servers processed — close any MCP overlay.
+		m.lastMCPAuthServer = ""
+		if m.confirmOverlay.IsOpen() &&
+			(m.confirmOverlay.Kind() == ConfirmMCPAuth ||
+				m.confirmOverlay.Kind() == ConfirmMCPAuthProgress) {
 			m.confirmOverlay.Close()
 			m.restoreFocusAfterConfirm()
-			if nextName, nextURL, ok := m.out.GetPendingMCPAuth(); ok {
-				m.openConfirmMCPAuth(nextName, nextURL)
-			}
-		}
-		return
-	}
-
-	// MCP OAuth authorization prompt.
-	if !m.confirmOverlay.IsOpen() {
-		if serverName, serverURL, ok := m.out.GetPendingMCPAuth(); ok {
-			m.openConfirmMCPAuth(serverName, serverURL)
 		}
 	}
 }
