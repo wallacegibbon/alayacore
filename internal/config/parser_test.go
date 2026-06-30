@@ -161,3 +161,40 @@ func TestParseKeyValueTime(t *testing.T) {
 		t.Errorf("Expected %v, got %v", expected, cfg.CreatedAt)
 	}
 }
+
+type JSONConfig struct {
+	Scopes []string          `config:"scopes"`
+	Env    map[string]string `config:"env"`
+	Tags   []string          `config:"tags"`
+}
+
+func TestParseKeyValueJSON(t *testing.T) {
+	content := `scopes: ["read", "write"]
+env: {"TOKEN": "abc123", "HOST": "localhost"}
+tags: prod,us-east
+`
+	var cfg JSONConfig
+	ParseKeyValue(content, &cfg)
+
+	if len(cfg.Scopes) != 2 || cfg.Scopes[0] != "read" || cfg.Scopes[1] != "write" {
+		t.Errorf("Expected scopes [read write], got %v", cfg.Scopes)
+	}
+	if len(cfg.Env) != 2 || cfg.Env["TOKEN"] != "abc123" || cfg.Env["HOST"] != "localhost" {
+		t.Errorf("Expected env {TOKEN: abc123, HOST: localhost}, got %v", cfg.Env)
+	}
+	if len(cfg.Tags) != 2 || cfg.Tags[0] != "prod" || cfg.Tags[1] != "us-east" {
+		t.Errorf("Expected tags [prod us-east], got %v", cfg.Tags)
+	}
+}
+
+func TestParseKeyValueJSONPlainString(t *testing.T) {
+	// JSON values like ["single"] should not break plain string parsing.
+	content := `name: ["hello"]`
+	var cfg struct {
+		Name string `config:"name"`
+	}
+	ParseKeyValue(content, &cfg)
+	if cfg.Name != "[\"hello\"]" {
+		t.Errorf("Expected plain string '[\"hello\"]', got %q", cfg.Name)
+	}
+}

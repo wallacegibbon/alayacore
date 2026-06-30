@@ -312,7 +312,7 @@ func (r *tlvReader) read() (tag string, content []byte, err error) {
 			return "", nil, err
 		}
 		if b != '\n' && b != '\r' && b != ' ' && b != '\t' {
-			r.reader.UnreadByte() //nolint:errcheck
+			_ = r.reader.UnreadByte()
 			break
 		}
 	}

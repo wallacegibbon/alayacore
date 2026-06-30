@@ -56,7 +56,7 @@ func isMediaFile(path string) (mimeType string, ok bool) {
 	defer f.Close()
 
 	buf := make([]byte, 512)
-	n, _ := f.Read(buf) //nolint:errcheck // partial read is fine for sniffing
+	n, _ := f.Read(buf) // partial read is fine for sniffing
 
 	var contentMime string
 	if n > 0 {

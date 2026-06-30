@@ -589,7 +589,7 @@ func openaiConvertToolOutputs(contents []llm.ContentPart) []openAIMessage {
 			}
 		}
 		combined := strings.Join(textParts, "\n")
-		data, _ := json.Marshal(combined) //nolint:errcheck // string can't fail marshal
+		data, _ := json.Marshal(combined) // string can't fail marshal
 		if tr.IsError {
 			apiMsg.Content = fmt.Sprintf(`{"status":"error","data":%s}`, data)
 		} else {

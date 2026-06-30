@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/alayacore/alayacore/internal/debug"
+	"github.com/alayacore/alayacore/internal/mcp/auth"
 )
 
 // ============================================================================
@@ -36,6 +37,9 @@ type StreamableHTTPTransport struct {
 	endpointURL string
 	sessionID   string // Mcp-Session-Id from server, if any
 	httpClient  *http.Client
+
+	// authProvider provides OAuth tokens for Authorization header injection.
+	authProvider auth.TokenProvider
 
 	// negotiatedVersion is the protocol version negotiated during
 	// initialization. It is set after the initialize handshake and is
@@ -168,7 +172,7 @@ func (t *StreamableHTTPTransport) Send(ctx context.Context, req jsonrpcRequest) 
 	defer resp.Body.Close()
 
 	// Drain and discard body.
-	_, _ = io.Copy(io.Discard, resp.Body) //nolint:errcheck // discard
+	_, _ = io.Copy(io.Discard, resp.Body) // discard
 
 	if resp.StatusCode != http.StatusAccepted {
 		return fmt.Errorf("POST notification: unexpected status %d (expected 202)", resp.StatusCode)
@@ -258,6 +262,12 @@ func (t *StreamableHTTPTransport) SetNotificationHandler(h NotificationHandler) 
 // If not set, the header is omitted.
 func (t *StreamableHTTPTransport) SetProtocolVersion(version string) {
 	t.negotiatedVersion = version
+}
+
+// SetAuthProvider sets the OAuth token provider for this transport.
+// If set, an Authorization: Bearer header is injected into every request.
+func (t *StreamableHTTPTransport) SetAuthProvider(ap auth.TokenProvider) {
+	t.authProvider = ap
 }
 
 // ============================================================================
@@ -382,8 +392,29 @@ func (t *StreamableHTTPTransport) readSSELoop(sr *sseReadCloser, handler ServerR
 // ============================================================================
 
 // doPOST sends an HTTP POST with the JSON-RPC message and returns the response.
-// It handles session ID injection and debug logging.
+// It handles session ID injection, Authorization header injection,
+// and debug logging. If the server returns 401 and an AuthProvider is
+// configured, the cached token is cleared and the request is retried once.
 func (t *StreamableHTTPTransport) doPOST(ctx context.Context, req jsonrpcRequest) (*http.Response, error) {
+	resp, err := t.doPOSTOnce(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	// If 401 and we have an auth provider, clear cached token and retry once.
+	if resp.StatusCode == http.StatusUnauthorized && t.authProvider != nil {
+		resp.Body.Close()
+		resp, err = t.doPOSTOnce(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return resp, nil
+}
+
+// doPOSTOnce is the inner POST implementation without 401 retry.
+func (t *StreamableHTTPTransport) doPOSTOnce(ctx context.Context, req jsonrpcRequest) (*http.Response, error) {
 	data, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("marshal request: %w", err)
@@ -404,6 +435,12 @@ func (t *StreamableHTTPTransport) doPOST(ctx context.Context, req jsonrpcRequest
 	}
 	if t.sessionID != "" {
 		httpReq.Header.Set("Mcp-Session-Id", t.sessionID)
+	}
+	if t.authProvider != nil {
+		tok, tokErr := t.authProvider.Token(ctx)
+		if tokErr == nil && tok != nil {
+			httpReq.Header.Set("Authorization", "Bearer "+tok.AccessToken)
+		}
 	}
 
 	resp, err := t.httpClient.Do(httpReq)
@@ -528,14 +565,14 @@ func (t *StreamableHTTPTransport) readSSEResponse(ctx context.Context, resp *htt
 func (t *StreamableHTTPTransport) handleServerRequest(id requestID, method string) {
 	switch method {
 	case methodPing:
-		t.sendResponse(context.Background(), jsonrpcResponse{ //nolint:errcheck // best-effort
+		_ = t.sendResponse(context.Background(), jsonrpcResponse{
 			JSONRPC: jsonrpcVersion,
 			ID:      id,
 			Result:  json.RawMessage(`{}`),
 		})
 
 	default:
-		t.sendResponse(context.Background(), jsonrpcResponse{ //nolint:errcheck // best-effort
+		_ = t.sendResponse(context.Background(), jsonrpcResponse{
 			JSONRPC: jsonrpcVersion,
 			ID:      id,
 			Error: &jsonrpcError{

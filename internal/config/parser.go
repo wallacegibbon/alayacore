@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -114,6 +115,18 @@ func setField(fieldIdx int, v reflect.Value, value, key string) *ParseWarning {
 	}
 
 	field := v.Field(fieldIdx)
+
+	// JSON array or object: try json.Unmarshal for the field type.
+	// This enables values like scopes: ["read", "write"] or env: {"KEY": "val"}.
+	if len(value) > 0 && (value[0] == '[' || value[0] == '{') {
+		if field.CanAddr() && field.Addr().CanInterface() {
+			if err := json.Unmarshal([]byte(value), field.Addr().Interface()); err == nil {
+				return nil
+			}
+		}
+		// If json.Unmarshal fails, fall through to type-specific parsing
+		// so the existing comma-separated slice logic still works.
+	}
 
 	// time.Time
 	if field.Type() == reflect.TypeOf(time.Time{}) {

@@ -97,7 +97,7 @@ func NewStdioTransport(command string, args []string, env map[string]string, ena
 
 	// Monitor for process exit.
 	go func() {
-		cmd.Wait() //nolint:errcheck // process exit detected via close(t.done) by closeOnce
+		_ = cmd.Wait() // process exit detected via close(t.done) by closeOnce
 		t.closeOnce.Do(func() { close(t.done) })
 	}()
 
@@ -139,9 +139,9 @@ func (t *StdioTransport) handleServerRequest(id requestID, method string) {
 			ID:      id,
 			Result:  json.RawMessage(`{}`),
 		}
-		data, _ := json.Marshal(resp) //nolint:errcheck // static struct, cannot fail
+		data, _ := json.Marshal(resp) // static struct, cannot fail
 		t.mu.Lock()
-		t.stdin.Write(append(data, '\n')) //nolint:errcheck // best-effort
+		_, _ = t.stdin.Write(append(data, '\n'))
 		t.mu.Unlock()
 
 	default:
@@ -154,9 +154,9 @@ func (t *StdioTransport) handleServerRequest(id requestID, method string) {
 				Message: "Method not found: " + method,
 			},
 		}
-		data, _ := json.Marshal(resp) //nolint:errcheck // static struct, cannot fail
+		data, _ := json.Marshal(resp) // static struct, cannot fail
 		t.mu.Lock()
-		t.stdin.Write(append(data, '\n')) //nolint:errcheck // best-effort
+		_, _ = t.stdin.Write(append(data, '\n'))
 		t.mu.Unlock()
 	}
 }
@@ -273,7 +273,7 @@ func (t *StdioTransport) Close() error {
 		// Step 2: Wait for the process to exit on its own.
 		done := make(chan struct{})
 		go func() {
-			t.cmd.Wait() //nolint:errcheck // exit status captured in done signal
+			_ = t.cmd.Wait() // exit status captured in done signal
 			close(done)
 		}()
 
@@ -283,7 +283,7 @@ func (t *StdioTransport) Close() error {
 		case <-time.After(2 * time.Second):
 			// Step 3: SIGTERM.
 			if t.cmd != nil && t.cmd.Process != nil {
-				t.cmd.Process.Signal(os.Signal(syscall.SIGTERM)) //nolint:errcheck // best-effort
+				_ = t.cmd.Process.Signal(os.Signal(syscall.SIGTERM)) // best-effort
 			}
 			select {
 			case <-done:
@@ -291,7 +291,7 @@ func (t *StdioTransport) Close() error {
 			case <-time.After(3 * time.Second):
 				// Step 4: SIGKILL.
 				if t.cmd != nil && t.cmd.Process != nil {
-					t.cmd.Process.Kill() //nolint:errcheck // SIGKILL always succeeds on Unix
+					_ = t.cmd.Process.Kill() // SIGKILL always succeeds on Unix
 				}
 				<-done
 			}

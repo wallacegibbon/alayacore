@@ -97,6 +97,7 @@ type Settings struct {
 	DebugMCP      bool
 	ModelConfig   string // derived from config-path + "model.conf"
 	RuntimeConfig string // derived from config-path + "runtime.conf"
+	MCPConfigPath string // derived from config-path + "mcp.conf"
 	ThemesFolder  string // derived from config-path + "themes"
 	Skills        []string
 	Session       string
@@ -113,9 +114,6 @@ type Settings struct {
 	AutoSummarize bool
 	ToolConfirm   []string // tool names requiring user confirmation
 	BuiltinTools  []string // built-in tools to enable (nil = all enabled, empty = none)
-
-	// MCP (Model Context Protocol) servers
-	MCPServers []string // raw flag values, parsed later
 }
 
 // Parse parses CLI flags and returns settings
@@ -152,10 +150,6 @@ func Parse() *Settings {
 	toolConfirm := flag.String("tool-confirm", "", "Comma-separated tool `names` requiring user confirmation (e.g. execute_command,search_content)")
 	flag.String("builtin-tools", "", "Comma-separated built-in tool `names` to enable (empty = no builtin tools, unspecified = all tools)")
 
-	// MCP
-	mcpServer := &stringSlice{}
-	flag.Var(mcpServer, "mcp-server", "MCP server config: `name=https://URL` or `name=exec:command`; KEY=VALUE before exec command sets env vars (can be specified multiple times)")
-
 	flag.Parse()
 
 	// Derive config file paths from config directory
@@ -183,6 +177,7 @@ func Parse() *Settings {
 		DebugMCP:      *debugMCP,
 		ModelConfig:   filepath.Join(cp, "model.conf"),
 		RuntimeConfig: filepath.Join(cp, "runtime.conf"),
+		MCPConfigPath: filepath.Join(cp, "mcp.conf"),
 		ThemesFolder:  filepath.Join(cp, "themes"),
 		Skills:        skill.Get(),
 		Session:       *session,
@@ -193,7 +188,6 @@ func Parse() *Settings {
 		AutoSummarize: *autoSummarize,
 		ToolConfirm:   parseToolConfirm(*toolConfirm),
 		BuiltinTools:  builtinToolsVal,
-		MCPServers:    mcpServer.Get(),
 	}
 
 	return s

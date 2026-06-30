@@ -509,7 +509,7 @@ func TestDisplayMessagesWithToolCalls(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to serialize part: %v", err)
 		}
-		_ = stream.WriteTLV(mockOutput, tag, stream.WrapID(strconv.FormatUint(part.GetHistoryID(), 10), content)) //nolint:errcheck
+		_ = stream.WriteTLV(mockOutput, tag, stream.WrapID(strconv.FormatUint(part.GetHistoryID(), 10), content))
 	}
 
 	// Verify that output was written

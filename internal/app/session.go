@@ -69,7 +69,7 @@ func StartSession(cfg *Config, output io.Writer) (*agentpkg.Session, io.WriteClo
 
 	// Display MCP startup errors through the adapter as system error messages.
 	for _, e := range cfg.MCPStartupErrors {
-		stream.WriteSystemMsg(output, stream.ErrorMsg{Text: e}) //nolint:errcheck
+		_ = stream.WriteSystemMsg(output, stream.ErrorMsg{Text: e})
 	}
 
 	// Check if we have any models available.

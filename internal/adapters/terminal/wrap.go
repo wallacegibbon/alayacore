@@ -31,7 +31,7 @@ func wrapContent(s string, width int) string {
 	var buf bytes.Buffer
 	w := lipgloss.NewWrapWriter(&buf)
 	defer w.Close()
-	_, _ = io.WriteString(w, s) //nolint:errcheck // bytes.Buffer.Write never fails
+	_, _ = io.WriteString(w, s) // bytes.Buffer.Write never fails
 	return buf.String()
 }
 

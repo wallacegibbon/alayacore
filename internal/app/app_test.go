@@ -1,0 +1,168 @@
+package app
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/alayacore/alayacore/internal/config"
+)
+
+func TestLoadMCPConfigs_FileNotFound(t *testing.T) {
+	cfg := &config.Settings{MCPConfigPath: "/nonexistent/mcp.conf"}
+	configs, warnings := loadMCPConfigs(cfg)
+	if configs != nil {
+		t.Errorf("expected nil configs, got %v", configs)
+	}
+	if warnings != nil {
+		t.Errorf("expected no warnings, got %v", warnings)
+	}
+}
+
+func TestLoadMCPConfigs_ValidFile(t *testing.T) {
+	content := `---
+server: myapi
+url: "https://mcp.example.com"
+auth-type: client_credentials
+auth-token-endpoint: "https://auth.example.com/token"
+auth-client-id: "my-service"
+auth-client-secret: "s3cr3t"
+auth-scopes: ["read", "write"]
+---
+server: filesystem
+command: "npx"
+args: ["@anthropic/mcp-fs-server"]
+env: {"TOKEN": "abc123"}
+---
+server: public
+url: "https://public.example.com/mcp"
+---
+`
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "mcp.conf")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &config.Settings{MCPConfigPath: path}
+	configs, warnings := loadMCPConfigs(cfg)
+	if len(warnings) > 0 {
+		t.Errorf("unexpected warnings: %v", warnings)
+	}
+	if len(configs) != 3 {
+		t.Fatalf("expected 3 configs, got %d", len(configs))
+	}
+
+	// Check first config (myapi)
+	c0 := configs[0]
+	if c0.Name != "myapi" {
+		t.Errorf("expected name 'myapi', got %q", c0.Name)
+	}
+	if c0.URL != "https://mcp.example.com" {
+		t.Errorf("expected URL 'https://mcp.example.com', got %q", c0.URL)
+	}
+	if c0.Auth == nil {
+		t.Fatal("expected auth config")
+	}
+	if c0.Auth.Type != "client_credentials" {
+		t.Errorf("expected auth type 'client_credentials', got %q", c0.Auth.Type)
+	}
+	if c0.Auth.ClientID != "my-service" {
+		t.Errorf("expected client_id 'my-service', got %q", c0.Auth.ClientID)
+	}
+	if c0.Auth.TokenEndpoint != "https://auth.example.com/token" {
+		t.Errorf("expected token_endpoint 'https://auth.example.com/token', got %q", c0.Auth.TokenEndpoint)
+	}
+	if len(c0.Auth.Scopes) != 2 || c0.Auth.Scopes[0] != "read" || c0.Auth.Scopes[1] != "write" {
+		t.Errorf("expected scopes [read write], got %v", c0.Auth.Scopes)
+	}
+
+	// Check second config (filesystem — stdio)
+	c1 := configs[1]
+	if c1.Name != "filesystem" {
+		t.Errorf("expected name 'filesystem', got %q", c1.Name)
+	}
+	if c1.Command != "npx" {
+		t.Errorf("expected command 'npx', got %q", c1.Command)
+	}
+	if len(c1.Args) != 1 || c1.Args[0] != "@anthropic/mcp-fs-server" {
+		t.Errorf("expected args ['@anthropic/mcp-fs-server'], got %v", c1.Args)
+	}
+	if c1.Env["TOKEN"] != "abc123" {
+		t.Errorf("expected env TOKEN=abc123, got %q", c1.Env["TOKEN"])
+	}
+	if c1.Auth != nil {
+		t.Errorf("expected no auth for filesystem, got %v", c1.Auth)
+	}
+
+	// Check third config (public — no auth)
+	c2 := configs[2]
+	if c2.Name != "public" {
+		t.Errorf("expected name 'public', got %q", c2.Name)
+	}
+	if c2.Auth != nil {
+		t.Errorf("expected no auth for public, got %v", c2.Auth)
+	}
+}
+
+func TestLoadMCPConfigs_EmptyFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "mcp.conf")
+	if err := os.WriteFile(path, []byte(""), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &config.Settings{MCPConfigPath: path}
+	configs, warnings := loadMCPConfigs(cfg)
+	if len(configs) != 0 {
+		t.Errorf("expected 0 configs, got %d", len(configs))
+	}
+	if len(warnings) > 0 {
+		t.Errorf("unexpected warnings: %v", warnings)
+	}
+}
+
+func TestLoadMCPConfigs_CommentsOnly(t *testing.T) {
+	content := `# This is a comment
+# Another comment
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "mcp.conf")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &config.Settings{MCPConfigPath: path}
+	configs, warnings := loadMCPConfigs(cfg)
+	if len(configs) != 0 {
+		t.Errorf("expected 0 configs, got %d", len(configs))
+	}
+	if len(warnings) > 0 {
+		t.Errorf("unexpected warnings: %v", warnings)
+	}
+}
+
+func TestLoadMCPConfigs_EmptyServerName(t *testing.T) {
+	content := `---
+url: "https://example.com"
+---
+server: valid
+url: "https://valid.example.com"
+---
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "mcp.conf")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &config.Settings{MCPConfigPath: path}
+	configs, warnings := loadMCPConfigs(cfg)
+	if len(configs) != 1 {
+		t.Errorf("expected 1 config, got %d", len(configs))
+	}
+	if len(warnings) != 1 {
+		t.Errorf("expected 1 warning for empty server name, got %d", len(warnings))
+	}
+}

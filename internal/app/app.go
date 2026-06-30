@@ -2,17 +2,58 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/mcp"
+	"github.com/alayacore/alayacore/internal/mcp/auth"
 	"github.com/alayacore/alayacore/internal/skills"
 	"github.com/alayacore/alayacore/internal/tools"
 )
+
+// loadMCPConfigs reads mcp.conf from the config directory and parses it
+// into a slice of ServerConfig. Returns any parse/load errors as warnings.
+func loadMCPConfigs(cfg *config.Settings) ([]mcp.ServerConfig, []string) {
+	data, err := os.ReadFile(cfg.MCPConfigPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil // mcp.conf is optional
+		}
+		return nil, []string{fmt.Sprintf("reading mcp.conf: %v", err)}
+	}
+
+	blocks := config.ParseKeyValueBlocks(string(data))
+	configs := make([]mcp.ServerConfig, 0, len(blocks))
+	var warnings []string
+
+	for _, block := range blocks {
+		block = strings.TrimSpace(block)
+		if block == "" || strings.HasPrefix(block, "#") {
+			continue
+		}
+
+		var fileCfg mcp.ServerConfigFile
+		parseWarns := config.ParseKeyValueWithWarnings(block, &fileCfg)
+		for _, w := range parseWarns {
+			warnings = append(warnings, fmt.Sprintf("mcp.conf: %s", w.String()))
+		}
+
+		if fileCfg.Server == "" {
+			warnings = append(warnings, "mcp.conf: skipping block with empty server name")
+			continue
+		}
+
+		configs = append(configs, fileCfg.ToServerConfig())
+	}
+
+	return configs, warnings
+}
 
 // This package provides shared initialization for all adapters.
 // It builds the system prompt, initializes tools, and creates the app config.
@@ -111,33 +152,29 @@ func Setup(cfg *config.Settings) (*Config, error) {
 	}, nil
 }
 
-// initMCP initializes MCP servers: parses configs, connects, discovers tools,
+// initMCP initializes MCP servers from mcp.conf, connects, discovers tools,
 // and returns the discovered MCP tools. Warnings are returned for the caller
 // to display through the adapter (not printed here).
 //
 // It also pre-fetches resource and prompt lists from connected servers and
 // returns them as formatted strings for injection into the system prompt.
 func initMCP(cfg *config.Settings) (*mcp.Manager, []llm.Tool, string, string, []string) {
-	if len(cfg.MCPServers) == 0 {
-		return nil, nil, "", "", nil
-	}
-
-	startupErrors := make([]string, 0, len(cfg.MCPServers))
-
-	// Pre-allocate with the maximum possible size; unused capacity is negligible.
-	mcpConfigs := make([]mcp.ServerConfig, 0, len(cfg.MCPServers))
-	for _, raw := range cfg.MCPServers {
-		parsed, parseErr := mcp.ParseServerConfig(raw)
-		if parseErr != nil {
-			startupErrors = append(startupErrors, fmt.Sprintf("invalid --mcp-server config %q: %v", raw, parseErr))
-			continue
-		}
-		parsed.Debug = cfg.DebugMCP
-		mcpConfigs = append(mcpConfigs, parsed)
-	}
-
+	// Load MCP configurations from mcp.conf
+	mcpConfigs, startupErrors := loadMCPConfigs(cfg)
 	if len(mcpConfigs) == 0 {
 		return nil, nil, "", "", startupErrors
+	}
+
+	// Set debug mode from global config.
+	for i := range mcpConfigs {
+		mcpConfigs[i].Debug = cfg.DebugMCP
+	}
+
+	// Set up token persistence for all MCP servers.
+	if tokenStore := createTokenStore(cfg); tokenStore != nil {
+		for i := range mcpConfigs {
+			mcpConfigs[i].TokenStore = tokenStore
+		}
 	}
 
 	mcpManager := mcp.NewManager(mcpConfigs)
@@ -148,6 +185,11 @@ func initMCP(cfg *config.Settings) (*mcp.Manager, []llm.Tool, string, string, []
 	connectCancel()
 
 	for _, connErr := range connErrs {
+		// Servers needing interactive auth are expected — skip them here,
+		// they'll be handled by the adapter's handlePendingAuth().
+		if errors.Is(connErr, mcp.ErrNeedsAuth) {
+			continue
+		}
 		startupErrors = append(startupErrors, fmt.Sprintf("MCP server connection failed: %v", connErr))
 	}
 
@@ -239,4 +281,12 @@ func buildPromptsContext(ctx context.Context, m *mcp.Manager) string {
 		}
 	}
 	return b.String()
+}
+
+// createTokenStore creates a FileTokenStore for persisting MCP OAuth tokens.
+// Returns nil if the config directory cannot be determined.
+func createTokenStore(cfg *config.Settings) *auth.FileTokenStore {
+	// Derive token directory from the config path directory (parent of mcp.conf).
+	tokenDir := filepath.Join(filepath.Dir(cfg.MCPConfigPath), "mcp-tokens")
+	return auth.NewFileTokenStore(tokenDir)
 }

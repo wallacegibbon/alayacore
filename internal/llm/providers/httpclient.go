@@ -47,15 +47,15 @@ func (dr *debugReader) processContentBlock(block any) {
 	if !ok {
 		return
 	}
-	blockType, _ := blockMap["type"].(string) //nolint:errcheck // debug logging, optional field
+	blockType, _ := blockMap["type"].(string) // debug logging, optional field
 	switch blockType {
 	case "tool_use":
-		name, _ := blockMap["name"].(string)           //nolint:errcheck // debug logging
-		input, _ := blockMap["input"].(map[string]any) //nolint:errcheck // debug logging
-		inputJSON, _ := json.Marshal(input)            //nolint:errcheck // debug logging
+		name, _ := blockMap["name"].(string)           // debug logging
+		input, _ := blockMap["input"].(map[string]any) // debug logging
+		inputJSON, _ := json.Marshal(input)            // debug logging
 		fmt.Fprintf(dr.writer, "{ \"content\": { type: \"tool_use\", name: %q, input: %s } }\n", name, inputJSON)
 	case "thinking":
-		thinking, _ := blockMap["thinking"].(string) //nolint:errcheck // debug logging
+		thinking, _ := blockMap["thinking"].(string) // debug logging
 		if len(thinking) > 0 && dr.firstRead {
 			fmt.Fprintf(dr.writer, "<<< Response Stream\n")
 			fmt.Fprintf(dr.writer, "Chunks:\n")
@@ -77,7 +77,7 @@ func (dr *debugReader) processJSONLine(jsonStr string) {
 		}
 	}
 
-	formatted, _ := json.MarshalIndent(jsonData, "", "  ") //nolint:errcheck // debug logging
+	formatted, _ := json.MarshalIndent(jsonData, "", "  ") // debug logging
 	if dr.firstRead {
 		fmt.Fprintf(dr.writer, "<<< Response Stream\n")
 		fmt.Fprintf(dr.writer, "Chunks:\n")
@@ -131,7 +131,7 @@ func (t *DebugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	var isStreaming bool
 
 	if req.Body != nil {
-		requestBody, _ = io.ReadAll(req.Body) //nolint:errcheck // debug logging, best effort
+		requestBody, _ = io.ReadAll(req.Body) // debug logging, best effort
 		req.Body = io.NopCloser(bytes.NewReader(requestBody))
 
 		var formattedBody any
@@ -142,7 +142,7 @@ func (t *DebugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 				}
 			}
 
-			formattedBody, _ = json.MarshalIndent(formattedBody, "", "  ") //nolint:errcheck // debug logging
+			formattedBody, _ = json.MarshalIndent(formattedBody, "", "  ") // debug logging
 			fmt.Fprintf(w, ">>> Request\n")
 			fmt.Fprintf(w, "%s %s %s\n", req.Method, req.URL.Path, req.URL.RawQuery)
 			fmt.Fprintf(w, "Headers:\n")
@@ -189,16 +189,16 @@ func (t *DebugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 			Closer: resp.Body,
 		}
 	} else {
-		responseBody, _ := io.ReadAll(resp.Body) //nolint:errcheck // debug logging, best effort
+		responseBody, _ := io.ReadAll(resp.Body) // debug logging, best effort
 		resp.Body = io.NopCloser(bytes.NewReader(responseBody))
 
 		var formattedBody any
 		if err := json.Unmarshal(responseBody, &formattedBody); err == nil {
-			formattedBody, _ = json.MarshalIndent(formattedBody, "", "  ") //nolint:errcheck // debug logging
+			formattedBody, _ = json.MarshalIndent(formattedBody, "", "  ") // debug logging
 			fmt.Fprintf(w, "Body:\n")
 			fmt.Fprintf(w, "%s\n", formattedBody)
 		} else {
-			dump, _ := httputil.DumpResponse(resp, false) //nolint:errcheck // debug logging
+			dump, _ := httputil.DumpResponse(resp, false) // debug logging
 			fmt.Fprintf(w, "Body:\n")
 			fmt.Fprintf(w, "%s\n", dump)
 		}

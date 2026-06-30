@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/alayacore/alayacore/internal/config"
+	"github.com/alayacore/alayacore/internal/mcp/auth"
 )
 
 // ClientState represents the state of an MCP client connection.
@@ -43,9 +44,10 @@ const (
 // The closed channel (closedCh) is NOT replaced after creation — it is
 // closed once, either by Close() or by the monitor on unexpected death.
 type Client struct {
-	config    ServerConfig
-	transport atomic.Value // stores Transport or nil
-	state     atomic.Int32 // stores ClientState as int32
+	config     ServerConfig
+	tokenStore auth.TokenStore
+	transport  atomic.Value // stores Transport or nil
+	state      atomic.Int32 // stores ClientState as int32
 
 	// Server capabilities reported during initialization.
 	capabilities ServerCapabilities
@@ -73,8 +75,9 @@ type Client struct {
 // NewClient creates a new MCP client. Call Connect() to establish the connection.
 func NewClient(config ServerConfig) *Client {
 	return &Client{
-		config:   config,
-		closedCh: make(chan struct{}),
+		config:     config,
+		tokenStore: config.TokenStore,
+		closedCh:   make(chan struct{}),
 	}
 }
 
@@ -148,7 +151,7 @@ func (c *Client) doInitialize(ctx context.Context) error {
 	c.instructions = result.Instructions
 
 	// Send initialized notification (no response expected).
-	_ = c.sendNotification(ctx, methodNotificationsInitialized, nil) //nolint:errcheck
+	_ = c.sendNotification(ctx, methodNotificationsInitialized, nil)
 
 	return nil
 }
@@ -323,26 +326,24 @@ func (c *Client) connectLocked(ctx context.Context) error {
 		return fmt.Errorf("mcp client %q: already connecting", c.config.Name)
 	}
 	defer func() {
-		// Transition to StateFailed from any intermediate state
-		// (StateConnecting or StateInitializing) if we are exiting
-		// without reaching StateReady.
 		c.state.CompareAndSwap(int32(StateConnecting), int32(StateFailed))
 		c.state.CompareAndSwap(int32(StateInitializing), int32(StateFailed))
 	}()
 
-	var transport Transport
-	var err error
+	transport, err := c.createTransport()
+	if err != nil {
+		return err
+	}
 
-	switch {
-	case c.config.Command != "":
-		transport, err = NewStdioTransport(c.config.Command, c.config.Args, c.config.Env, c.config.Debug)
-		if err != nil {
-			return fmt.Errorf("mcp client %q: %w", c.config.Name, err)
-		}
-	case c.config.URL != "":
-		transport = NewStreamableHTTPTransport(c.config.URL, c.config.Debug)
-	default:
-		return fmt.Errorf("mcp client %q: no command or URL specified", c.config.Name)
+	// For authorization_code, try loading persisted token before skipping.
+	if c.needsPersistedAuth() {
+		transport.Close()
+		return ErrNeedsAuth
+	}
+
+	// Set up OAuth auth provider if configured.
+	if err := c.setupStreamableAuth(transport); err != nil {
+		return err
 	}
 
 	c.storeTransport(transport)
@@ -363,6 +364,62 @@ func (c *Client) connectLocked(ctx context.Context) error {
 	c.state.Store(int32(StateReady))
 	c.startGETStream()
 	c.startMonitor()
+	return nil
+}
+
+// createTransport creates a Transport based on the server config.
+func (c *Client) createTransport() (Transport, error) {
+	switch {
+	case c.config.Command != "":
+		t, err := NewStdioTransport(c.config.Command, c.config.Args, c.config.Env, c.config.Debug)
+		if err != nil {
+			return nil, fmt.Errorf("mcp client %q: %w", c.config.Name, err)
+		}
+		return t, nil
+	case c.config.URL != "":
+		return NewStreamableHTTPTransport(c.config.URL, c.config.Debug), nil
+	default:
+		return nil, fmt.Errorf("mcp client %q: no command or URL specified", c.config.Name)
+	}
+}
+
+// needsPersistedAuth returns true if the server needs authorization_code
+// auth but no token is available (in-memory or on disk).
+// If a persisted token is found, it sets obtainedToken and returns false.
+func (c *Client) needsPersistedAuth() bool {
+	if c.config.Auth == nil || c.config.Auth.Type != AuthTypeAuthorizationCode {
+		return false
+	}
+	if c.config.Auth.obtainedToken != nil {
+		return false
+	}
+	// Try loading from disk.
+	if c.tokenStore != nil {
+		loaded, loadErr := c.tokenStore.LoadToken(c.config.Name)
+		if loadErr == nil && loaded != nil && (loaded.Valid() || loaded.RefreshToken != "") {
+			c.config.Auth.obtainedToken = loaded
+			return false
+		}
+	}
+	return true
+}
+
+// setupStreamableAuth creates an auth provider for Streamable HTTP transport.
+func (c *Client) setupStreamableAuth(transport Transport) error {
+	ht, ok := transport.(*StreamableHTTPTransport)
+	if !ok || c.config.Auth == nil {
+		return nil
+	}
+	provider, err := newAuthProvider(c.config.Auth, c.tokenStore, c.config.Name)
+	if err != nil {
+		return fmt.Errorf("mcp client %q auth: %w", c.config.Name, err)
+	}
+	if provider != nil {
+		ht.SetAuthProvider(provider)
+		if pp, ok := provider.(*auth.PersistentTokenProvider); ok && c.config.URL != "" {
+			pp.SetResource(c.config.URL)
+		}
+	}
 	return nil
 }
 
@@ -446,6 +503,12 @@ func (c *Client) Ping(ctx context.Context) error {
 	}
 	_, err := c.sendRequest(ctx, methodPing, nil)
 	return err
+}
+
+// resetState resets the client state to Disconnected, allowing it to be
+// re-connected. This is used after ErrNeedsAuth to retry with a token.
+func (c *Client) resetState() {
+	c.state.Store(int32(StateDisconnected))
 }
 
 // ============================================================================
@@ -555,7 +618,7 @@ func (c *Client) sendCanceledNotification(id requestID, cause error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	_ = c.sendNotification(ctx, methodNotificationsCanceled, CanceledNotificationParams{ //nolint:errcheck // best-effort
+	_ = c.sendNotification(ctx, methodNotificationsCanceled, CanceledNotificationParams{ // best-effort
 		RequestID: id,
 		Reason:    reason,
 	})
@@ -588,4 +651,81 @@ func (c *Client) sendNotification(ctx context.Context, method string, params any
 }
 
 // Ensure interfaces are satisfied.
-var _ error = (*RPCError)(nil) //nolint:errcheck // compile-time interface check
+var _ error = (*RPCError)(nil) // compile-time interface check
+
+// newAuthProvider creates an auth.TokenProvider from the given AuthConfig.
+// Returns nil if config is nil or type is empty/unknown.
+// If tokenStore is non-nil and the auth type supports persistence, the
+// returned provider will persist and load tokens from the store and
+// automatically use refresh tokens for renewal.
+func newAuthProvider(cfg *AuthConfig, tokenStore auth.TokenStore, serverName string) (auth.TokenProvider, error) {
+	if cfg == nil {
+		return nil, nil
+	}
+
+	switch cfg.Type {
+	case AuthTypeStatic:
+		if cfg.Token == "" {
+			return nil, nil
+		}
+		return auth.NewCached(&auth.StaticProvider{
+			TokenValue: &auth.Token{
+				AccessToken: cfg.Token,
+				TokenType:   "Bearer",
+			},
+		}), nil
+
+	case AuthTypeClientCredentials:
+		if cfg.TokenEndpoint == "" || cfg.ClientID == "" {
+			return nil, fmt.Errorf("client_credentials requires token_endpoint and client_id")
+		}
+		// Client credentials already handles automatic re-authentication
+		// when tokens expire — wrap in cachedPersistent for disk cache.
+		inner := auth.NewCached(auth.NewClientCredentials(auth.ClientCredentialsConfig{
+			TokenEndpoint: cfg.TokenEndpoint,
+			ClientID:      cfg.ClientID,
+			ClientSecret:  cfg.ClientSecret,
+			PrivateKey:    cfg.PrivateKey,
+			Scopes:        cfg.Scopes,
+		}))
+		if tokenStore == nil {
+			return inner, nil
+		}
+		return auth.NewPersistentTokenProvider(inner, tokenStore, serverName, nil), nil
+
+	case AuthTypeAuthorizationCode:
+		if cfg.obtainedToken != nil {
+			// We have a token from the interactive flow — wrap in persistent
+			// provider so it gets cached and persisted.
+			base := auth.NewCached(&auth.StaticProvider{
+				TokenValue: cfg.obtainedToken,
+			})
+			if tokenStore == nil {
+				return base, nil
+			}
+			refreshCfg := &auth.RefreshConfig{
+				TokenEndpoint: cfg.TokenEndpoint,
+				ClientID:      cfg.ClientID,
+				ClientSecret:  cfg.ClientSecret,
+				Resource:      "", // will be set from server URL by caller
+			}
+			return auth.NewPersistentTokenProvider(base, tokenStore, serverName, refreshCfg), nil
+		}
+		// No token yet — try loading from disk via persistent provider.
+		if tokenStore != nil {
+			refreshCfg := &auth.RefreshConfig{
+				TokenEndpoint: cfg.TokenEndpoint,
+				ClientID:      cfg.ClientID,
+				ClientSecret:  cfg.ClientSecret,
+			}
+			// Inner is nil — we have no way to get a token except from
+			// disk or refresh. The caller (AuthorizeServer) will initiate
+			// the interactive flow if no token is found.
+			return auth.NewPersistentTokenProvider(nil, tokenStore, serverName, refreshCfg), nil
+		}
+		return nil, nil // no token yet, connect will be skipped by ErrNeedsAuth
+
+	default:
+		return nil, nil
+	}
+}

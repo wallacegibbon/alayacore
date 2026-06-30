@@ -53,7 +53,7 @@ func (s *Session) setActiveFromSessionMeta() {
 	if s.sessionMetaModel == "" || s.ModelManager == nil {
 		return
 	}
-	_ = s.ModelManager.SetActiveByName(s.sessionMetaModel) //nolint:errcheck // best-effort; model may no longer exist
+	_ = s.ModelManager.SetActiveByName(s.sessionMetaModel) // best-effort; model may no longer exist
 }
 
 // setActiveFromCliFlag applies the --model CLI flag override.

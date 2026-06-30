@@ -38,7 +38,7 @@ func (a *Adapter) Start() int {
 
 	// Pipe stdin to the session.
 	go func() {
-		_, _ = io.Copy(inputWriter, os.Stdin) //nolint:errcheck // stdin EOF is normal termination
+		_, _ = io.Copy(inputWriter, os.Stdin) // stdin EOF is normal termination
 		inputWriter.Close()
 	}()
 

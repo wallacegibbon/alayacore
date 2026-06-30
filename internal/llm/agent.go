@@ -450,7 +450,7 @@ func newToolOutput(callbacks StreamCallbacks, id string, contents []ContentPart,
 		contents = []ContentPart{&TextPart{Text: err.Error()}}
 	}
 	if callbacks.OnToolOutput != nil {
-		callbacks.OnToolOutput(id, contents, err, historyID) //nolint:errcheck
+		_ = callbacks.OnToolOutput(id, contents, err, historyID)
 	}
 	return &ToolOutputPart{ID: id, Output: contents, IsError: isError, ContentPartMeta: ContentPartMeta{HistoryID: historyID, Role: RoleTool}}
 }

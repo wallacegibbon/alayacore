@@ -10,9 +10,16 @@ package mcp
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/alayacore/alayacore/internal/mcp/auth"
 )
+
+// ErrNeedsAuth is returned by Connect() when the server requires
+// interactive OAuth authorization (authorization_code flow).
+var ErrNeedsAuth = errors.New("mcp server needs interactive authorization")
 
 // ============================================================================
 // JSON-RPC 2.0 Base Types
@@ -444,8 +451,75 @@ type ServerConfig struct {
 	// Env is additional environment variables for stdio transport.
 	Env map[string]string
 
+	// Auth configures OAuth authentication for this server.
+	Auth *AuthConfig
+
+	// TokenStore is used to persist and load OAuth tokens to/from disk.
+	// If nil, tokens are kept only in memory (lost on restart).
+	TokenStore auth.TokenStore
+
 	// Debug enables logging of raw JSON-RPC messages to a file.
 	Debug bool
+}
+
+// AuthType enumerates the supported OAuth authentication modes.
+type AuthType string
+
+const (
+	AuthTypeNone              AuthType = ""
+	AuthTypeStatic            AuthType = "static"
+	AuthTypeClientCredentials AuthType = "client_credentials"
+	AuthTypeAuthorizationCode AuthType = "authorization_code"
+)
+
+// AuthConfig configures OAuth authentication for an MCP server.
+type AuthConfig struct {
+	// Type selects the authentication mode.
+	Type AuthType
+
+	// TokenEndpoint is the OAuth token endpoint URL.
+	// If empty, it may be discovered from the authorization server metadata.
+	TokenEndpoint string
+
+	// ClientID is the OAuth client identifier.
+	ClientID string
+
+	// ClientSecret is the OAuth client secret (for client_credentials
+	// using secret-based auth, or authorization_code).
+	ClientSecret string
+
+	// PrivateKey is a PEM-encoded private key for JWT Bearer Assertion
+	// (RFC 7523), used with client_credentials.
+	PrivateKey string
+
+	// Scopes is the list of OAuth scopes to request.
+	Scopes []string
+
+	// Token is a pre-obtained access token (for static auth).
+	Token string
+
+	// obtainedToken is set by AuthorizeServer after the interactive
+	// authorization_code flow completes. It is not persisted.
+	obtainedToken *auth.Token
+}
+
+// ServerConfigFile is the on-disk structure for a single MCP server
+// configuration block in mcp.conf. It uses config tags for the
+// alayacore key-value config parser.
+type ServerConfigFile struct {
+	Server  string            `config:"server"`
+	URL     string            `config:"url"`
+	Command string            `config:"command"`
+	Args    []string          `config:"args"`
+	Env     map[string]string `config:"env"`
+
+	AuthType          string   `config:"auth-type"`
+	AuthTokenEndpoint string   `config:"auth-token-endpoint"`
+	AuthClientID      string   `config:"auth-client-id"`
+	AuthClientSecret  string   `config:"auth-client-secret"`
+	AuthPrivateKey    string   `config:"auth-private-key"`
+	AuthScopes        []string `config:"auth-scopes"`
+	AuthToken         string   `config:"auth-token"`
 }
 
 // RPCError represents a JSON-RPC error response.
@@ -457,6 +531,31 @@ type RPCError struct {
 
 func (e *RPCError) Error() string {
 	return fmt.Sprintf("MCP RPC error %d: %s", e.Code, e.Message)
+}
+
+// ToServerConfig converts a parsed config file entry to a ServerConfig.
+func (f *ServerConfigFile) ToServerConfig() ServerConfig {
+	cfg := ServerConfig{
+		Name:    f.Server,
+		URL:     f.URL,
+		Command: f.Command,
+		Args:    f.Args,
+		Env:     f.Env,
+	}
+
+	if f.AuthType != "" {
+		cfg.Auth = &AuthConfig{
+			Type:          AuthType(f.AuthType),
+			TokenEndpoint: f.AuthTokenEndpoint,
+			ClientID:      f.AuthClientID,
+			ClientSecret:  f.AuthClientSecret,
+			PrivateKey:    f.AuthPrivateKey,
+			Scopes:        f.AuthScopes,
+			Token:         f.AuthToken,
+		}
+	}
+
+	return cfg
 }
 
 // ============================================================================

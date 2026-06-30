@@ -88,7 +88,7 @@ removed: #f38ba8
 fold_indicator: "⁝"
 `
 	darkPath := filepath.Join(tm.themesFolder, "theme-dark.conf")
-	_ = os.WriteFile(darkPath, []byte(darkTheme), 0600) //nolint:errcheck // best-effort default creation
+	_ = os.WriteFile(darkPath, []byte(darkTheme), 0600) // best-effort default creation
 
 	lightTheme := `# AlayaCore Light Theme
 # Based on Catppuccin Latte color palette
@@ -132,7 +132,7 @@ removed: #d20f39
 fold_indicator: "⁝"
 `
 	lightPath := filepath.Join(tm.themesFolder, "theme-light.conf")
-	_ = os.WriteFile(lightPath, []byte(lightTheme), 0600) //nolint:errcheck // best-effort default creation
+	_ = os.WriteFile(lightPath, []byte(lightTheme), 0600) // best-effort default creation
 
 	redpandaTheme := `# AlayaCore Redpanda Dark Theme
 # Warm reddish-brown palette with red/orange dominant colors,
@@ -176,7 +176,7 @@ removed: #f9944f
 fold_indicator: "⁝"
 `
 	redpandaPath := filepath.Join(tm.themesFolder, "theme-redpanda.conf")
-	_ = os.WriteFile(redpandaPath, []byte(redpandaTheme), 0600) //nolint:errcheck // best-effort default creation
+	_ = os.WriteFile(redpandaPath, []byte(redpandaTheme), 0600) // best-effort default creation
 }
 
 // ReloadThemes reloads the list of available themes from the themes folder.

@@ -107,8 +107,7 @@ func newStreamableTestServer(t *testing.T, opts ...streamableTestOption) *stream
 	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()
-		//nolint:errcheck
-		http.Serve(listener, mux)
+		_ = http.Serve(listener, mux)
 	}()
 
 	return s
@@ -660,8 +659,7 @@ func TestStreamableHTTP_GETStreamMethodNotAllowed(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		//nolint:errcheck
-		http.Serve(listener, mux)
+		_ = http.Serve(listener, mux)
 	}()
 
 	serverURL := "http://" + listener.Addr().String()

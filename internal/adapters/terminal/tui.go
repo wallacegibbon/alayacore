@@ -28,14 +28,12 @@ import (
 // Errors are silently ignored — commands are best-effort and the
 // session may close the input stream at any time.
 func (m *Terminal) emitCommand(cmd string) {
-	//nolint:errcheck
 	_ = stream.WriteTLV(m.streamInput, stream.TagUserT, cmd)
 }
 
 // emitUE sends a TagUserEnd frame, flushing any staged content
 // as a complete user message.
 func (m *Terminal) emitUE() {
-	//nolint:errcheck
 	_ = stream.WriteTLV(m.streamInput, stream.TagUserEnd, "")
 }
 
