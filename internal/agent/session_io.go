@@ -559,6 +559,10 @@ func (s *Session) handleMCPAuth(_ context.Context, args string) {
 		authCtx, authCancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer authCancel()
 
+		// Store cancel func so skipMCPAuth can abort this flow.
+		s.oauthCancels.Store(name, authCancel)
+		defer s.oauthCancels.Delete(name)
+
 		tools, err := mgr.AuthorizeServer(authCtx, name)
 		if err != nil {
 			s.writeError(fmt.Sprintf("MCP auth failed for %q: %v", name, err))
@@ -620,12 +624,21 @@ func (s *Session) handleMCPAuth(_ context.Context, args string) {
 }
 
 // skipMCPAuth handles the :mcp_auth_skip command.
-// It decrements the pending OAuth counter and marks MCP as ready
-// if no more OAuth servers are pending.
+// It decrements the pending OAuth counter, cancels any in-flight OAuth
+// flow for this server, and marks MCP as ready if no more OAuth servers
+// are pending.
 func (s *Session) skipMCPAuth(serverName string) {
 	if serverName == "" {
 		s.writeError("usage: :mcp_auth_skip <server_name>")
 		return
+	}
+
+	// Cancel any running OAuth flow for this server so the goroutine
+	// exits without decrementing pendingOAuth again.
+	if cancelVal, ok := s.oauthCancels.Load(serverName); ok {
+		if cancel, ok := cancelVal.(context.CancelFunc); ok {
+			cancel()
+		}
 	}
 
 	n := s.pendingOAuth.Add(-1)

@@ -238,9 +238,19 @@ func (cd *ConfirmDialog) HandleKeyMsg(msg tea.KeyMsg) bool {
 		return false
 	}
 
-	// For informational overlays, consume all keys without any action.
-	// The user should wait for the operation to complete.
-	if cd.kind == ConfirmMCPAuthProgress || cd.kind == ConfirmMCPInit {
+	// For the init overlay, consume all keys (init can't be canceled).
+	if cd.kind == ConfirmMCPInit {
+		return true
+	}
+
+	// For the OAuth progress overlay, allow Esc/n/N to cancel and skip
+	// the current server. All other keys are consumed.
+	if cd.kind == ConfirmMCPAuthProgress {
+		key := msg.String()
+		if key == keyN || key == keyNCapital || key == keyEsc {
+			cd.canceled = true
+			cd.state = FilteredListClosed
+		}
 		return true
 	}
 
@@ -344,7 +354,7 @@ func (cd *ConfirmDialog) buildContentLines() []string {
 	case ConfirmMCPAuthProgress:
 		// Show a "please wait" message instead of y/n prompt.
 		lines = append(lines, cd.wrapAndCenter("Please complete authorization in your browser.", cd.styles.System, innerWidth)[0])
-		lines = append(lines, cd.wrapAndCenter("(this window will close automatically)", cd.styles.System, innerWidth)[0])
+		lines = append(lines, cd.wrapAndCenter("(n / Esc to skip this server)", cd.styles.System, innerWidth)[0])
 	case ConfirmMCPInit:
 		lines = append(lines, cd.wrapAndCenter("Please wait...", cd.styles.System, innerWidth)[0])
 		lines = append(lines, cd.wrapAndCenter("(this window will close automatically)", cd.styles.System, innerWidth)[0])

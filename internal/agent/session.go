@@ -41,6 +41,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -123,6 +124,11 @@ type sharedState struct {
 
 	mcpReady     atomic.Bool  // set to true after MCP init completes and tools are loaded
 	pendingOAuth atomic.Int32 // >0 when OAuth servers still need authorization
+
+	// oauthCancels stores cancel functions for running OAuth goroutines,
+	// keyed by server name. Used by skipMCPAuth to abort an in-flight
+	// OAuth flow when the user skips a server mid-authorization.
+	oauthCancels sync.Map // map[string]context.CancelFunc
 }
 
 // Session manages conversation state and task execution.
