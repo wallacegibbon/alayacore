@@ -11,6 +11,7 @@ package mcp
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 // ============================================================================
@@ -395,6 +396,118 @@ const (
 	ErrInvalidParams  = -32602 // Invalid method parameter(s).
 	ErrInternal       = -32603 // Internal JSON-RPC error.
 )
+
+// ============================================================================
+// Configuration Parsing
+// ============================================================================
+
+// ParseServerConfig parses a string in the form "name=https://..." or
+// "name=exec:command" into a ServerConfig.
+//
+// Examples:
+//
+//	myapi=https://mcp.example.com
+//	db=exec:npx @anthropic/mcp-db-server
+//	db=exec:DB_HOST=localhost DB_PORT=5432 npx @anthropic/mcp-db-server
+func ParseServerConfig(raw string) (ServerConfig, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ServerConfig{}, fmt.Errorf("empty MCP server config")
+	}
+
+	idx := strings.Index(raw, "=")
+	if idx <= 0 {
+		return ServerConfig{}, fmt.Errorf("invalid MCP server config: %q (expected name=value)", raw)
+	}
+
+	name := raw[:idx]
+	rest := raw[idx+1:]
+	if name == "" || rest == "" {
+		return ServerConfig{}, fmt.Errorf("invalid MCP server config: %q (name or value empty)", raw)
+	}
+
+	// exec: prefix → stdio transport
+	if strings.HasPrefix(rest, "exec:") {
+		return parseExecConfig(name, rest[len("exec:"):], raw)
+	}
+
+	// http:// or https:// prefix → Streamable HTTP transport
+	if strings.HasPrefix(rest, "http://") || strings.HasPrefix(rest, "https://") {
+		return ServerConfig{
+			Name: name,
+			URL:  rest,
+		}, nil
+	}
+
+	return ServerConfig{}, fmt.Errorf("invalid MCP server config: %q (expected https://URL or exec:command)", raw)
+}
+
+// parseExecConfig parses the value part of "exec:..." and extracts
+// KEY=VALUE environment variables from the front of the command line.
+func parseExecConfig(name, value, raw string) (ServerConfig, error) {
+	parts := splitArgs(value)
+	if len(parts) == 0 {
+		return ServerConfig{}, fmt.Errorf("invalid MCP server config: %q (empty command)", raw)
+	}
+
+	var env map[string]string
+	cmdStart := 0
+	for cmdStart < len(parts) {
+		k, v, found := strings.Cut(parts[cmdStart], "=")
+		if !found || k == "" || v == "" {
+			break
+		}
+		if env == nil {
+			env = make(map[string]string)
+		}
+		env[k] = v
+		cmdStart++
+	}
+	if cmdStart >= len(parts) {
+		return ServerConfig{}, fmt.Errorf("invalid MCP server config: %q (no command after env vars)", raw)
+	}
+
+	return ServerConfig{
+		Name:    name,
+		Command: parts[cmdStart],
+		Args:    parts[cmdStart+1:],
+		Env:     env,
+	}, nil
+}
+
+// splitArgs splits a command string into tokens, respecting quoted strings.
+func splitArgs(input string) []string {
+	var args []string
+	var current strings.Builder
+	inQuote := false
+	var quoteChar byte
+
+	for i := 0; i < len(input); i++ {
+		c := input[i]
+		switch {
+		case inQuote:
+			if c == quoteChar {
+				inQuote = false
+			} else {
+				current.WriteByte(c)
+			}
+		case c == '"' || c == '\'':
+			inQuote = true
+			quoteChar = c
+		case c == ' ' || c == '\t':
+			if current.Len() > 0 {
+				args = append(args, current.String())
+				current.Reset()
+			}
+		default:
+			current.WriteByte(c)
+		}
+	}
+	if current.Len() > 0 {
+		args = append(args, current.String())
+	}
+	return args
+}
 
 // MCP-specific error codes.
 const (

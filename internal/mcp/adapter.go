@@ -10,31 +10,26 @@ import (
 	"github.com/alayacore/alayacore/internal/llm"
 )
 
-// ToolNamingStrategy defines how MCP tool names are adapted to avoid
-// conflicts with built-in tools and across MCP servers.
-type ToolNamingStrategy int
-
-const (
-	// ToolNameKeep uses the original tool name.
-	// Risk of collision if two servers expose tools with the same name.
-	ToolNameKeep ToolNamingStrategy = iota
-
-	// ToolNamePrefix prepends the server name followed by "_" to each tool.
-	// E.g. "db_server_query" for server "db_server", tool "query".
-	// This is the safest strategy.
-	ToolNamePrefix
-)
-
-// defaultNaming is the naming strategy used by AlayaCore.
-const defaultNaming = ToolNamePrefix
-
 // ToolsToAgentTools converts a map of server→tools into a flat list
-// of llm.Tool instances, using the configured naming strategy.
+// of llm.Tool instances. Tool names are prefixed with the server name
+// to avoid collisions (e.g. "db_query" for server "db", tool "query").
 //
 // The returned tools delegate execution to the original MCP server
 // via the Manager.
 func ToolsToAgentTools(serverTools map[string][]Tool, manager *Manager) []llm.Tool {
-	return toolsToAgentTools(serverTools, manager, defaultNaming)
+	var result []llm.Tool
+	for serverName, tools := range serverTools {
+		for _, tool := range tools {
+			adapted, err := adaptTool(serverName, tool, manager)
+			if err != nil {
+				// Skip tools with invalid schemas. A single malformed tool
+				// should not prevent other valid tools from being used.
+				continue
+			}
+			result = append(result, adapted)
+		}
+	}
+	return result
 }
 
 // ResourcesToAgentTools creates a read_resource tool for each server that
@@ -68,30 +63,10 @@ func PromptsToAgentTools(clients []*Client, manager *Manager) []llm.Tool {
 	return result
 }
 
-func toolsToAgentTools(serverTools map[string][]Tool, manager *Manager, strategy ToolNamingStrategy) []llm.Tool {
-	var result []llm.Tool
-
-	for serverName, tools := range serverTools {
-		for _, tool := range tools {
-			adapted, err := adaptTool(serverName, tool, manager, strategy)
-			if err != nil {
-				// Skip tools with invalid schemas. A single malformed tool
-				// should not prevent other valid tools from being used.
-				// The warning is intentionally discarded here — the caller
-				// (app.go) already collects errors via MCPStartupErrors.
-				continue
-			}
-			result = append(result, adapted)
-		}
-	}
-
-	return result
-}
-
 // adaptTool converts a single MCP tool to an llm.Tool.
 // Returns a zero-value Tool and an error if the tool has an invalid schema.
-func adaptTool(serverName string, tool Tool, manager *Manager, strategy ToolNamingStrategy) (llm.Tool, error) {
-	name := buildToolName(serverName, tool.Name, strategy)
+func adaptTool(serverName string, tool Tool, manager *Manager) (llm.Tool, error) {
+	name := buildToolName(serverName, tool.Name)
 	description := buildDescription(serverName, tool.Description, tool.Annotations)
 
 	schema, err := sanitizeInputSchema(tool.InputSchema)
@@ -108,16 +83,11 @@ func adaptTool(serverName string, tool Tool, manager *Manager, strategy ToolNami
 		Build(), nil
 }
 
-// buildToolName creates the final tool name based on the naming strategy.
-func buildToolName(serverName, toolName string, strategy ToolNamingStrategy) string {
-	switch strategy {
-	case ToolNamePrefix:
-		// Sanitize names: replace spaces/non-alphanumeric with underscores.
-		safeServer := sanitizeName(serverName)
-		return safeServer + "_" + toolName
-	default:
-		return toolName
-	}
+// buildToolName creates the final tool name by prefixing with the
+// sanitized server name (e.g. "my_server_read_resource").
+func buildToolName(serverName, toolName string) string {
+	safeServer := sanitizeName(serverName)
+	return safeServer + "_" + toolName
 }
 
 // buildDescription formats the tool description including origin info
@@ -336,7 +306,7 @@ func convertResourceLinkContent(content ToolContent, serverName string) llm.Cont
 // newReadResourceTool creates a read_resource tool for a server that
 // supports the Resource capability.
 func newReadResourceTool(serverName string, manager *Manager) llm.Tool {
-	name := buildToolName(serverName, "read_resource", ToolNamePrefix)
+	name := buildToolName(serverName, "read_resource")
 	description := fmt.Sprintf("Read a resource from MCP server %q by URI. "+
 		"Available resource URIs are listed in the system prompt — refer to them above.", serverName)
 	schema := json.RawMessage(`{"type":"object","properties":{"uri":{"type":"string","description":"Resource URI to read"}},"required":["uri"]}`)
@@ -375,7 +345,7 @@ func executeReadResource(ctx context.Context, manager *Manager, serverName, uri 
 // newGetPromptTool creates a get_prompt tool for a server that supports
 // the Prompt capability.
 func newGetPromptTool(serverName string, manager *Manager) llm.Tool {
-	name := buildToolName(serverName, "get_prompt", ToolNamePrefix)
+	name := buildToolName(serverName, "get_prompt")
 	description := fmt.Sprintf("Get a prompt from MCP server %q by name. "+
 		"Prompts are templated message sequences that can be injected into the conversation. "+
 		"Available prompt names are listed in the system prompt — refer to them above.", serverName)
@@ -426,121 +396,6 @@ func executeGetPrompt(ctx context.Context, manager *Manager, serverName, name st
 		}
 	}
 	return parts, nil
-}
-
-// ParseServerConfig parses a single --mcp-server flag value.
-// Format: name=value
-//
-// Supported formats:
-//
-//	name=https://example.com/mcp                    → Streamable HTTP
-//	name=http://example.com/mcp                     → Streamable HTTP
-//	name=exec:command arg1 arg2 ...                 → Stdio subprocess
-//	name=exec:KEY=VALUE command arg1 arg2 ...       → Stdio with env vars
-//
-// Examples:
-//
-//	myapi=https://mcp.example.com
-//	db=exec:npx @anthropic/mcp-db-server
-//	db=exec:DB_HOST=localhost DB_PORT=5432 npx @anthropic/mcp-db-server
-func ParseServerConfig(raw string) (ServerConfig, error) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return ServerConfig{}, fmt.Errorf("empty MCP server config")
-	}
-
-	idx := strings.Index(raw, "=")
-	if idx <= 0 {
-		return ServerConfig{}, fmt.Errorf("invalid MCP server config: %q (expected name=value)", raw)
-	}
-
-	name := raw[:idx]
-	rest := raw[idx+1:]
-	if name == "" || rest == "" {
-		return ServerConfig{}, fmt.Errorf("invalid MCP server config: %q (name or value empty)", raw)
-	}
-
-	// exec: prefix → stdio transport
-	if strings.HasPrefix(rest, "exec:") {
-		return parseExecConfig(name, rest[len("exec:"):], raw)
-	}
-
-	// http:// or https:// prefix → Streamable HTTP transport
-	if strings.HasPrefix(rest, "http://") || strings.HasPrefix(rest, "https://") {
-		return ServerConfig{
-			Name: name,
-			URL:  rest,
-		}, nil
-	}
-
-	return ServerConfig{}, fmt.Errorf("invalid MCP server config: %q (expected https://URL or exec:command)", raw)
-}
-
-// parseExecConfig parses the value part of "exec:..." and extracts
-// KEY=VALUE environment variables from the front of the command line.
-func parseExecConfig(name, value, raw string) (ServerConfig, error) {
-	parts := splitArgs(value)
-	if len(parts) == 0 {
-		return ServerConfig{}, fmt.Errorf("invalid MCP server config: %q (empty command)", raw)
-	}
-
-	var env map[string]string
-	cmdStart := 0
-	for cmdStart < len(parts) {
-		k, v, found := strings.Cut(parts[cmdStart], "=")
-		if !found || k == "" || v == "" {
-			break
-		}
-		if env == nil {
-			env = make(map[string]string)
-		}
-		env[k] = v
-		cmdStart++
-	}
-	if cmdStart >= len(parts) {
-		return ServerConfig{}, fmt.Errorf("invalid MCP server config: %q (no command after env vars)", raw)
-	}
-
-	return ServerConfig{
-		Name:    name,
-		Command: parts[cmdStart],
-		Args:    parts[cmdStart+1:],
-		Env:     env,
-	}, nil
-}
-
-// splitArgs splits a command string into tokens, respecting quoted strings.
-func splitArgs(input string) []string {
-	var args []string
-	var current strings.Builder
-	inQuote := false
-	var quoteChar byte
-
-	for i := 0; i < len(input); i++ {
-		c := input[i]
-		switch {
-		case inQuote:
-			if c == quoteChar {
-				inQuote = false
-			} else {
-				current.WriteByte(c)
-			}
-		case c == '"' || c == '\'':
-			inQuote = true
-			quoteChar = c
-		case c == ' ' || c == '\t':
-			if current.Len() > 0 {
-				args = append(args, current.String())
-				current.Reset()
-			}
-		default:
-			current.WriteByte(c)
-		}
-	}
-	if current.Len() > 0 {
-		args = append(args, current.String())
-	}
-	return args
 }
 
 // maxSchemaDepth is the maximum allowed nesting depth for an MCP tool's

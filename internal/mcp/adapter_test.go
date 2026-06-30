@@ -167,16 +167,10 @@ func TestParseServerConfig_HTTP(t *testing.T) {
 }
 
 func TestBuildToolName(t *testing.T) {
-	got := buildToolName("my server", "do_something", ToolNamePrefix)
+	got := buildToolName("my server", "do_something")
 	want := "my_server_do_something"
 	if got != want {
 		t.Errorf("buildToolName() = %q, want %q", got, want)
-	}
-
-	got = buildToolName("any", "bare_tool", ToolNameKeep)
-	want = "bare_tool"
-	if got != want {
-		t.Errorf("buildToolName(keep) = %q, want %q", got, want)
 	}
 }
 
