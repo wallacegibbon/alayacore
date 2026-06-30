@@ -90,7 +90,7 @@ func (m *Manager) DiscoverTools(ctx context.Context) map[string][]Tool {
 		if !c.HasTools() {
 			continue
 		}
-		tools, err := c.ListTools(ctx, false)
+		tools, err := c.ListTools(ctx)
 		if err != nil {
 			continue
 		}

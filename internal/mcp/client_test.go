@@ -134,7 +134,7 @@ func TestClientListTools(t *testing.T) {
 	client.capabilities.Tools = &ServerToolCapabilities{}
 
 	ctx := context.Background()
-	tools, err := client.ListTools(ctx, false)
+	tools, err := client.ListTools(ctx)
 	if err != nil {
 		t.Fatalf("ListTools() error = %v", err)
 	}

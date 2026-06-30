@@ -32,7 +32,6 @@ const (
 //   - closeDone: atomic.Bool — Close() and monitor atomically claim the right
 //     to close closedCh via Swap(true). Only one succeeds, no mutex needed.
 //   - state: atomic.Int32 — CAS for safe state transitions
-//   - toolsCache: atomic.Value — atomic load/store, no lock
 //
 // A dedicated monitor goroutine watches transport.Done(). If the transport
 // dies unexpectedly (process crash, connection drop), it transitions the
@@ -57,9 +56,6 @@ type Client struct {
 
 	// staleReason is set when the server is marked stale (e.g. tool list changed).
 	staleReason string
-
-	// toolsCache stores []Tool or nil — atomically loadable/storable.
-	toolsCache atomic.Value
 
 	// Request ID counter.
 	reqID atomic.Int32
@@ -110,7 +106,6 @@ func (c *Client) Instructions() string {
 func (c *Client) MarkStale(reason string) {
 	c.state.Store(int32(StateStale))
 	c.staleReason = reason
-	c.toolsCache.Store(nil)
 }
 
 // Connect establishes the transport and performs MCP initialization.
@@ -160,27 +155,12 @@ func (c *Client) doInitialize(ctx context.Context) error {
 
 // ListTools fetches the list of available tools from the server.
 // Supports cursor-based pagination per the MCP spec.
-// Results are cached; call with force=true to refresh.
-func (c *Client) ListTools(ctx context.Context, force bool) ([]Tool, error) {
-	if !force {
-		if tv := c.toolsCache.Load(); tv != nil {
-			if tools, ok := tv.([]Tool); ok {
-				return tools, nil
-			}
-		}
-	}
-
+func (c *Client) ListTools(ctx context.Context) ([]Tool, error) {
 	if c.State() != StateReady {
 		return nil, c.stateError("list tools")
 	}
 
-	allTools, err := c.listToolsAllPages(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("list tools: %w", err)
-	}
-
-	c.toolsCache.Store(allTools)
-	return allTools, nil
+	return c.listToolsAllPages(ctx)
 }
 
 // listToolsAllPages handles cursor-based pagination for tools/list.
