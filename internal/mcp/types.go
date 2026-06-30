@@ -90,12 +90,34 @@ type ClientCapabilities struct {
 	// Experimental non-standard capabilities.
 	Experimental map[string]json.RawMessage `json:"experimental,omitempty"`
 	// Roots is optional root resource support.
-	Roots *struct{} `json:"roots,omitempty"`
+	Roots *ClientRootCapabilities `json:"roots,omitempty"`
 	// Sampling is optional LLM sampling support.
-	Sampling *struct {
-		Tools   *struct{} `json:"tools,omitempty"`
-		Context *struct{} `json:"context,omitempty"`
-	} `json:"sampling,omitempty"`
+	Sampling *ClientSamplingCapabilities `json:"sampling,omitempty"`
+	// Elicitation is optional server-elicitation support.
+	Elicitation *ClientElicitationCapabilities `json:"elicitation,omitempty"`
+}
+
+// ClientRootCapabilities describes the client's root resource capabilities.
+type ClientRootCapabilities struct {
+	// ListChanged indicates whether the client supports notifications for
+	// changes to the roots list.
+	ListChanged bool `json:"listChanged,omitempty"`
+}
+
+// ClientSamplingCapabilities describes the client's LLM sampling capabilities.
+type ClientSamplingCapabilities struct {
+	// Context indicates whether the client supports context inclusion
+	// via includeContext parameter.
+	Context *struct{} `json:"context,omitempty"`
+	// Tools indicates whether the client supports tool use via tools and
+	// toolChoice parameters.
+	Tools *struct{} `json:"tools,omitempty"`
+}
+
+// ClientElicitationCapabilities describes the client's elicitation capabilities.
+type ClientElicitationCapabilities struct {
+	Form *struct{} `json:"form,omitempty"`
+	URL  *struct{} `json:"url,omitempty"`
 }
 
 // ServerCapabilities describes the capabilities the server supports.
