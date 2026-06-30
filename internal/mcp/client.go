@@ -407,9 +407,11 @@ func (c *Client) connectLocked(ctx context.Context) error {
 		return fmt.Errorf("mcp client %q: already connecting", c.config.Name)
 	}
 	defer func() {
-		if c.state.Load() == int32(StateConnecting) {
-			c.state.Store(int32(StateFailed))
-		}
+		// Transition to StateFailed from any intermediate state
+		// (StateConnecting or StateInitializing) if we are exiting
+		// without reaching StateReady.
+		c.state.CompareAndSwap(int32(StateConnecting), int32(StateFailed))
+		c.state.CompareAndSwap(int32(StateInitializing), int32(StateFailed))
 	}()
 
 	var transport Transport
