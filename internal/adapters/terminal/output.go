@@ -258,6 +258,8 @@ func (to *outputWriter) handleSystemMsg(value string) {
 		to.handleSystemVideoConfig(env.Data)
 	case "tool_confirm":
 		to.handleSystemToolConfirm(env.Data)
+	case "mcp_auth":
+		to.handleSystemMCPAuth(env.Data)
 	}
 	to.dirty.Store(true)
 }
@@ -370,6 +372,20 @@ func (to *outputWriter) handleSystemVideoConfig(data json.RawMessage) {
 	to.status.updateVideoConfig(m.FPS, m.Res)
 }
 
+// handleSystemMCPAuth processes an mcp_auth system message.
+// Updates the MCP authorization status so the Terminal can show
+// a progress overlay during OAuth flow.
+func (to *outputWriter) handleSystemMCPAuth(data json.RawMessage) {
+	var msg struct {
+		Server string `json:"server"`
+		Status string `json:"status"`
+	}
+	if json.Unmarshal(data, &msg) != nil {
+		return
+	}
+	to.status.updateMCPAuth(msg.Server, msg.Status)
+}
+
 // handleSystemToolConfirm processes a tool_confirm system message.
 // Stores the pending state so the Terminal can open its confirm overlay.
 func (to *outputWriter) handleSystemToolConfirm(data json.RawMessage) {
@@ -393,6 +409,13 @@ func (to *outputWriter) handleSystemToolConfirm(data json.RawMessage) {
 // GetPendingToolConfirm returns any pending tool confirmation and clears it.
 func (to *outputWriter) GetPendingToolConfirm() (id, toolName, toolInput string, ok bool) {
 	return to.status.takeToolConfirmPending()
+}
+
+// TakeMCPAuthDone returns whether an MCP authorization just completed
+// since the last check. This is a one-shot consumable flag used by the
+// TUI to know when to close the progress overlay.
+func (to *outputWriter) TakeMCPAuthDone() bool {
+	return to.status.takeMCPAuthDone()
 }
 
 // SetMCPAuthPending adds a pending MCP OAuth authorization request.

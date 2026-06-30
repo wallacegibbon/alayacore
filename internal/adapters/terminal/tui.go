@@ -269,45 +269,90 @@ func (m *Terminal) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 
 // handleTick processes periodic updates for display and model switching.
 func (m *Terminal) handleTick() (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
-
-	// Check for pending tool confirmation from the session
-	if !m.confirmOverlay.IsOpen() {
-		if id, toolName, toolInput, ok := m.out.GetPendingToolConfirm(); ok {
-			m.openConfirmTool(id, toolName, toolInput)
-		}
-	}
-
-	// Check for pending MCP OAuth authorization requests
-	if !m.confirmOverlay.IsOpen() {
-		if serverName, serverURL, ok := m.out.GetPendingMCPAuth(); ok {
-			m.openConfirmMCPAuth(serverName, serverURL)
-		}
-	}
-
-	// Check if display needs refresh (dirty flag)
-	if m.out.DrainDirty() {
-		if m.out.WindowBuffer().WindowCount() > 0 {
-			m.updateStatus()
-			m.updateDisplayHeight()
-			if m.display.shouldFollow() {
-				m.display.SetCursorToLastWindow()
-			}
-			m.display.updateContent()
-		}
-
-		// Update model selector if models changed
-		modelSnap := m.out.SnapshotModels()
-		cmd = m.modelSelector.LoadModels(modelSnap.Models, modelSnap.ActiveID)
-	} else {
-		m.updateStatus()
-	}
+	m.handleMCPInitOverlay()
+	m.handleConfirmOverlays()
+	cmd := m.handleDisplayRefresh()
 	return m, tea.Batch(
 		tea.Tick(TickInterval, func(_ time.Time) tea.Msg {
 			return tickMsg{}
 		}),
 		cmd,
 	)
+}
+
+// handleMCPInitOverlay manages the MCP initialization overlay lifecycle.
+// Shows an informational overlay while async init is running, closes it
+// when init completes.
+func (m *Terminal) handleMCPInitOverlay() {
+	if m.appConfig.AsyncMCP == nil {
+		return
+	}
+	select {
+	case <-m.appConfig.AsyncMCP.Done():
+		if m.confirmOverlay.IsOpen() && m.confirmOverlay.Kind() == ConfirmMCPInit {
+			m.confirmOverlay.Close()
+			m.restoreFocusAfterConfirm()
+		}
+	default:
+		if !m.confirmOverlay.IsOpen() {
+			m.openConfirmMCPInit()
+		}
+	}
+}
+
+// handleConfirmOverlays processes pending confirmations for tool execution
+// and MCP OAuth authorization. These are checked in priority order:
+//  1. Tool confirmation (from agent task)
+//  2. MCP OAuth authorization (from async init)
+//  3. MCP OAuth progress overlay lifecycle
+func (m *Terminal) handleConfirmOverlays() {
+	// Tool confirmation (highest priority).
+	if !m.confirmOverlay.IsOpen() {
+		if id, toolName, toolInput, ok := m.out.GetPendingToolConfirm(); ok {
+			m.openConfirmTool(id, toolName, toolInput)
+			return
+		}
+	}
+
+	// MCP OAuth progress overlay lifecycle — close when auth completes.
+	if m.confirmOverlay.IsOpen() && m.confirmOverlay.Kind() == ConfirmMCPAuthProgress {
+		if m.out.TakeMCPAuthDone() {
+			m.confirmOverlay.Close()
+			m.restoreFocusAfterConfirm()
+			if nextName, nextURL, ok := m.out.GetPendingMCPAuth(); ok {
+				m.openConfirmMCPAuth(nextName, nextURL)
+			}
+		}
+		return
+	}
+
+	// MCP OAuth authorization prompt.
+	if !m.confirmOverlay.IsOpen() {
+		if serverName, serverURL, ok := m.out.GetPendingMCPAuth(); ok {
+			m.openConfirmMCPAuth(serverName, serverURL)
+		}
+	}
+}
+
+// handleDisplayRefresh checks if the display needs updating and returns
+// a tea.Cmd for model selector updates if models changed.
+func (m *Terminal) handleDisplayRefresh() tea.Cmd {
+	if !m.out.DrainDirty() {
+		m.updateStatus()
+		return nil
+	}
+
+	if m.out.WindowBuffer().WindowCount() > 0 {
+		m.updateStatus()
+		m.updateDisplayHeight()
+		if m.display.shouldFollow() {
+			m.display.SetCursorToLastWindow()
+		}
+		m.display.updateContent()
+	}
+
+	modelSnap := m.out.SnapshotModels()
+	return m.modelSelector.LoadModels(modelSnap.Models, modelSnap.ActiveID)
 }
 
 // handleEditorFinished handles completion of the external editor.
@@ -676,6 +721,14 @@ func (m *Terminal) openConfirmTool(id, toolName, toolInput string) {
 // openConfirmMCPAuth opens the MCP OAuth authorization confirmation dialog.
 func (m *Terminal) openConfirmMCPAuth(serverName, serverURL string) {
 	m.confirmOverlay.OpenMCPAuth(serverName, serverURL)
+	m.input.Blur()
+	m.display.SetDisplayFocused(false)
+	m.display.updateContent()
+}
+
+// openConfirmMCPInit opens the MCP initialization progress overlay.
+func (m *Terminal) openConfirmMCPInit() {
+	m.confirmOverlay.OpenMCPInit()
 	m.input.Blur()
 	m.display.SetDisplayFocused(false)
 	m.display.updateContent()

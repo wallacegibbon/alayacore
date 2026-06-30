@@ -38,6 +38,11 @@ type sessionState struct {
 	videoFPS int
 	videoRes int
 
+	// MCP auth status — tracks the currently authorizing server during OAuth flow.
+	mcpAuthServer     string
+	mcpAuthInProgress bool
+	mcpAuthJustDone   bool // set to true on mcp_auth:done/error, consumed by takeMCPAuthDone
+
 	// Model fields
 	models          []agentpkg.ModelConfig
 	activeModelID   int
@@ -161,6 +166,34 @@ func (s *sessionState) updateVideoConfig(fps, res int) {
 	s.mu.Unlock()
 }
 
+// updateMCPAuth atomically updates the MCP OAuth authorization status.
+// Called when the session sends an mcp_auth system message.
+func (s *sessionState) updateMCPAuth(server, status string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	switch status {
+	case "in_progress":
+		s.mcpAuthServer = server
+		s.mcpAuthInProgress = true
+		s.mcpAuthJustDone = false
+	case "done", "error":
+		s.mcpAuthServer = ""
+		s.mcpAuthInProgress = false
+		s.mcpAuthJustDone = true
+	}
+}
+
+// takeMCPAuthDone returns whether an MCP authorization just completed
+// (mcp_auth:done or mcp_auth:error was received) since the last call.
+// This is a one-shot flag — it's reset to false after reading.
+func (s *sessionState) takeMCPAuthDone() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	v := s.mcpAuthJustDone
+	s.mcpAuthJustDone = false
+	return v
+}
+
 // setToolConfirmPending appends a pending tool confirmation request.
 func (s *sessionState) setToolConfirmPending(id, toolName, toolInput string) {
 	s.mu.Lock()
@@ -210,19 +243,21 @@ func (s *sessionState) snapshotStatus() StatusSnapshot {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return StatusSnapshot{
-		ContextTokens:   s.contextTokens,
-		ContextLimit:    s.contextLimit,
-		InProgress:      s.inProgress,
-		CurrentStep:     s.currentStep,
-		MaxSteps:        s.maxSteps,
-		LastCurrentStep: s.lastCurrentStep,
-		LastMaxSteps:    s.lastMaxSteps,
-		TaskError:       s.lastTaskError,
-		ReasoningLevel:  s.reasoningLevel,
-		ActiveTheme:     s.activeTheme,
-		ActiveThemeData: s.activeThemeData,
-		VideoFPS:        s.videoFPS,
-		VideoRes:        s.videoRes,
+		ContextTokens:     s.contextTokens,
+		ContextLimit:      s.contextLimit,
+		InProgress:        s.inProgress,
+		CurrentStep:       s.currentStep,
+		MaxSteps:          s.maxSteps,
+		LastCurrentStep:   s.lastCurrentStep,
+		LastMaxSteps:      s.lastMaxSteps,
+		TaskError:         s.lastTaskError,
+		ReasoningLevel:    s.reasoningLevel,
+		ActiveTheme:       s.activeTheme,
+		ActiveThemeData:   s.activeThemeData,
+		VideoFPS:          s.videoFPS,
+		VideoRes:          s.videoRes,
+		MCPAuthServer:     s.mcpAuthServer,
+		MCPAuthInProgress: s.mcpAuthInProgress,
 	}
 }
 

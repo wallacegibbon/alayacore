@@ -552,12 +552,17 @@ func (s *Session) handleMCPAuth(_ context.Context, args string) {
 	// Run the OAuth flow in a background goroutine since it blocks
 	// for interactive user input (browser + callback).
 	go func() {
+		// Notify adapter that OAuth authorization is in progress
+		// so it can show a status overlay in the TUI.
+		s.sendMCPAuthMsg(name, "in_progress")
+
 		authCtx, authCancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer authCancel()
 
 		tools, err := mgr.AuthorizeServer(authCtx, name)
 		if err != nil {
 			s.writeError(fmt.Sprintf("MCP auth failed for %q: %v", name, err))
+			s.sendMCPAuthMsg(name, "error")
 			return
 		}
 
@@ -606,6 +611,9 @@ func (s *Session) handleMCPAuth(_ context.Context, args string) {
 			// Channel full; unlikely, spin off delivery to avoid blocking.
 			go func() { s.mcpUpdateCh <- event }()
 		}
+
+		// Notify adapter that OAuth authorization is complete.
+		s.sendMCPAuthMsg(name, "done")
 
 		s.writeNotifyf("✓ MCP server %q authorized and connected (%d tools).", name, len(tools))
 	}()

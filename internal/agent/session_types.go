@@ -83,6 +83,16 @@ type VideoConfigMsg struct {
 
 func (VideoConfigMsg) SystemMsgType() string { return "video_config" }
 
+// MCPAuthMsg communicates MCP OAuth authorization progress (type "mcp_auth").
+// Sent by the OAuth goroutine so the adapter can show a status overlay.
+type MCPAuthMsg struct {
+	Server string `json:"server"`
+	Status string `json:"status"` // "in_progress", "done", "error"
+	Error  string `json:"error,omitempty"`
+}
+
+func (MCPAuthMsg) SystemMsgType() string { return "mcp_auth" }
+
 // MessageVersionMsg carries the TLV message format version (type "version").
 // Sent as the first TagSystemMsg frame so adapters can validate format
 // compatibility before processing subsequent messages.

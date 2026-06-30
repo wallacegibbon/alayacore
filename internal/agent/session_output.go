@@ -248,3 +248,8 @@ func (s *Session) sendReasoningMsg() {
 func (s *Session) sendVideoConfigMsg() {
 	s.writeSystemMsg(VideoConfigMsg{FPS: s.videoFPS, Res: s.videoRes})
 }
+
+// sendMCPAuthMsg sends an MCP OAuth authorization status update to the adapter.
+func (s *Session) sendMCPAuthMsg(server, status string) {
+	s.writeSystemMsg(MCPAuthMsg{Server: server, Status: status})
+}
