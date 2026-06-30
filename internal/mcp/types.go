@@ -126,12 +126,38 @@ type ServerCapabilities struct {
 	Experimental map[string]json.RawMessage `json:"experimental,omitempty"`
 	// Logging is optional logging support.
 	Logging *struct{} `json:"logging,omitempty"`
+	// Completions is optional argument autocompletion support.
+	Completions *struct{} `json:"completions,omitempty"`
 	// Prompts is optional prompt template support.
-	Prompts *struct{} `json:"prompts,omitempty"`
+	Prompts *ServerPromptCapabilities `json:"prompts,omitempty"`
 	// Resources is optional resource support.
-	Resources *struct{} `json:"resources,omitempty"`
+	Resources *ServerResourceCapabilities `json:"resources,omitempty"`
 	// Tools is optional tool support.
-	Tools *struct{} `json:"tools,omitempty"`
+	Tools *ServerToolCapabilities `json:"tools,omitempty"`
+}
+
+// ServerPromptCapabilities describes the server's prompt capabilities.
+type ServerPromptCapabilities struct {
+	// ListChanged indicates whether the server supports notifications for
+	// changes to the prompt list.
+	ListChanged bool `json:"listChanged,omitempty"`
+}
+
+// ServerResourceCapabilities describes the server's resource capabilities.
+type ServerResourceCapabilities struct {
+	// Subscribe indicates whether the server supports subscribing to
+	// resource updates.
+	Subscribe bool `json:"subscribe,omitempty"`
+	// ListChanged indicates whether the server supports notifications for
+	// changes to the resource list.
+	ListChanged bool `json:"listChanged,omitempty"`
+}
+
+// ServerToolCapabilities describes the server's tool capabilities.
+type ServerToolCapabilities struct {
+	// ListChanged indicates whether the server supports notifications for
+	// changes to the tool list.
+	ListChanged bool `json:"listChanged,omitempty"`
 }
 
 // InitializeRequest is the params for the "initialize" method.

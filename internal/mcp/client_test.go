@@ -85,7 +85,7 @@ func TestClientInitialize(t *testing.T) {
 	initResult := InitializeResult{
 		ProtocolVersion: "2025-11-25",
 		Capabilities: ServerCapabilities{
-			Tools: &struct{}{},
+			Tools: &ServerToolCapabilities{},
 		},
 		ServerInfo: ImplementationInfo{
 			Name:    "test-server",
@@ -131,7 +131,7 @@ func TestClientListTools(t *testing.T) {
 	client.storeTransport(newMockTransport([]json.RawMessage{toolsData}))
 
 	// Need to set init state to skip initialize for this test.
-	client.capabilities.Tools = &struct{}{}
+	client.capabilities.Tools = &ServerToolCapabilities{}
 
 	ctx := context.Background()
 	tools, err := client.ListTools(ctx, false)
@@ -217,7 +217,7 @@ func TestClientInitialize_VersionMismatch(t *testing.T) {
 	initResult := InitializeResult{
 		ProtocolVersion: "2024-11-05", // Different from our "2025-11-25"
 		Capabilities: ServerCapabilities{
-			Tools: &struct{}{},
+			Tools: &ServerToolCapabilities{},
 		},
 		ServerInfo: ImplementationInfo{
 			Name:    "old-server",
