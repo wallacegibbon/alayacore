@@ -42,7 +42,7 @@ func (a *Adapter) Start() int {
 	output := newStdoutOutput()
 
 	// Load session
-	session, inputWriter, err := app.StartSession(a.Config, output)
+	session, inputWriter, err := app.StartSession(a.Config, output, nil)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return 1

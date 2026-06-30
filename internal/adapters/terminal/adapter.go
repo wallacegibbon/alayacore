@@ -1,7 +1,8 @@
 package terminal
 
 // Package terminal implements the terminal UI adapter for AlayaCore.
-// This file handles application startup, session loading, and error handling.
+// This file handles application startup, asynchronous session loading,
+// and error handling.
 
 import (
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"golang.org/x/term"
 
 	"github.com/alayacore/alayacore/internal/app"
+	"github.com/alayacore/alayacore/internal/stream"
 	"github.com/alayacore/alayacore/internal/theme"
 )
 
@@ -30,6 +32,10 @@ func NewAdapter(cfg *app.Config) *Adapter {
 }
 
 // Start runs the Terminal program. Returns exit code.
+//
+// The TUI starts immediately on slow machines, showing a loading spinner
+// while the session is loaded asynchronously. This avoids the long
+// "blank terminal" delay between pressing Enter and seeing the TUI.
 func (a *Adapter) Start() int {
 	// Note: OAuth MCP authorization is handled via the :mcp_auth command
 	// in the TUI, not synchronously before startup.
@@ -39,43 +45,44 @@ func (a *Adapter) Start() int {
 
 	terminalOutput := NewTerminalOutput(NewStyles(theme.DefaultTheme()))
 
-	// Get terminal size before loading session (so session loads with correct dimensions)
+	// Get terminal size before creating the TUI (so we can size the loading screen)
 	initialWidth, initialHeight := getTerminalSize()
 	terminalOutput.SetWindowWidth(initialWidth)
 
-	// Load session synchronously before starting the UI
-	_, inputWriter, err := app.StartSession(a.Config, terminalOutput)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return 1
-	}
+	// Create the input buffer BEFORE starting the TUI. The TUI gets the
+	// write end (streamInput) immediately; the session will read from
+	// the same buffer once loading completes.
+	inputBuffer := stream.NewSliceBuffer(100)
 
-	// The session manages async MCP initialization internally and sends
-	// progress via "mcp_init" and "mcp_auth" system messages. The TUI
-	// reacts to these messages in its tick handler — no goroutine needed.
-
-	// The session's first sendSystemInfo("all") has already been written to
-	// terminalOutput synchronously during StartSession. Read the active theme
-	// from the cached session state (default to default theme if not set).
-	activeThemeName := terminalOutput.SnapshotStatus().ActiveTheme
-	if activeThemeName == "" {
-		activeThemeName = defaultThemeName
-	}
+	// Create Terminal model in loading mode. The theme/styles here are for
+	// the loading screen only — the session's actual theme is applied
+	// after async loading completes.
+	activeThemeName := defaultThemeName
 	theme := themeManager.LoadTheme(activeThemeName)
 	styles := NewStyles(theme)
-
-	// Update output with new styles
 	terminalOutput.SetStyles(styles)
 
-	// Create terminal with initial window size, theme, and theme manager
-	t := NewTerminalWithTheme(terminalOutput, inputWriter, a.Config, initialWidth, initialHeight, theme, themeManager, activeThemeName)
+	t := NewTerminalWithTheme(
+		terminalOutput, inputBuffer, a.Config,
+		initialWidth, initialHeight,
+		theme, themeManager, activeThemeName,
+	)
+	t.loading = true // enter async loading mode
 
 	// Create and run the program.
 	// Bubbletea automatically opens the real TTY when stdin is piped
 	// (Unix: /dev/tty, Windows: CONIN$ + CONOUT$).
 	p := tea.NewProgram(t)
-	if _, err := p.Run(); err != nil {
+	finalModel, err := p.Run()
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error running terminal UI: %v\n", err)
+		return 1
+	}
+
+	// If the session failed to load asynchronously, report the error now
+	// that the terminal is back in cooked mode.
+	if term, ok := finalModel.(*Terminal); ok && term.loadingError != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", term.loadingError)
 		return 1
 	}
 

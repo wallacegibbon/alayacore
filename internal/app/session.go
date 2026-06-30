@@ -17,9 +17,6 @@ import (
 // StartSession loads (or creates) a session, validates it, and starts the
 // session goroutine. On success the returned session is ready to use.
 //
-// It creates the input pipe internally, returning the write end as
-// inputWriter so the adapter can feed TLV messages to the session.
-//
 // It handles:
 //   - LoadOrNewSession
 //   - InitError check (--model flag validation)
@@ -27,9 +24,15 @@ import (
 //   - HasModels check (no usable models → fatal)
 //   - session.Start()
 //
+// input is an optional pre-created input buffer. If nil, a new one is created.
+// On success the write end is returned so the adapter can feed TLV messages
+// to the session.
+//
 // Returns nil, nil, and an error if the session cannot be used.
-func StartSession(cfg *Config, output io.Writer) (*agentpkg.Session, io.WriteCloser, error) {
-	input := stream.NewSliceBuffer(100)
+func StartSession(cfg *Config, output io.Writer, input *stream.SliceBuffer) (*agentpkg.Session, io.WriteCloser, error) {
+	if input == nil {
+		input = stream.NewSliceBuffer(100)
+	}
 
 	session, _, err := agentpkg.LoadOrNewSession(agentpkg.SessionConfig{
 		Input:               input,

@@ -24,6 +24,20 @@ import (
 	"github.com/alayacore/alayacore/internal/theme"
 )
 
+// ============================================================================
+// Async Session Loading Messages
+// ============================================================================
+
+// sessionLoadedMsg is sent when the async session loading completes.
+type sessionLoadedMsg struct {
+	session *agentpkg.Session
+}
+
+// sessionLoadingErrorMsg is sent when the async session loading fails.
+type sessionLoadingErrorMsg struct {
+	err error
+}
+
 // emitCommand sends a user-level command to the session via TLV.
 // Errors are silently ignored — commands are best-effort and the
 // session may close the input stream at any time.
@@ -124,6 +138,12 @@ type Terminal struct {
 	// happened in handleRedraw, so resize()'s s.clear=true can take effect
 	// on the same flush.
 	pendingForceRedraw bool
+
+	// Async session loading state.
+	// When true, Init() kicks off the loading in a goroutine and View()
+	// renders a loading screen instead of the normal TUI.
+	loading      bool
+	loadingError error
 }
 
 // NewTerminalWithTheme creates a new Terminal model with a custom theme.
@@ -175,6 +195,7 @@ func NewTerminalWithTheme(
 }
 
 // Init starts the periodic tick loop for processing session updates.
+// When loading is true, it also kicks off async session loading.
 func (m *Terminal) Init() tea.Cmd {
 	// Display any buffered warnings from initialization
 	if m.themeManager != nil {
@@ -185,9 +206,39 @@ func (m *Terminal) Init() tea.Cmd {
 		}
 	}
 
-	return tea.Tick(TickInterval, func(_ time.Time) tea.Msg {
-		return tickMsg{}
-	})
+	cmds := []tea.Cmd{
+		tea.Tick(TickInterval, func(_ time.Time) tea.Msg {
+			return tickMsg{}
+		}),
+	}
+
+	// If in loading mode, kick off async session loading.
+	if m.loading {
+		cmds = append(cmds, m.loadSessionCmd())
+	}
+
+	return tea.Batch(cmds...)
+}
+
+// loadSessionCmd returns a tea.Cmd that runs app.StartSession in a goroutine.
+// It is only used when the TUI starts in loading mode (m.loading == true).
+// The session is nil, the input buffer already exists as m.streamInput.
+func (m *Terminal) loadSessionCmd() tea.Cmd {
+	return func() tea.Msg {
+		// streamInput is always a *stream.SliceBuffer in production.
+		input, ok := m.streamInput.(*stream.SliceBuffer)
+		if !ok {
+			return sessionLoadingErrorMsg{
+				err: fmt.Errorf("internal: streamInput is not a SliceBuffer"),
+			}
+		}
+
+		session, _, err := app.StartSession(m.appConfig, m.out, input)
+		if err != nil {
+			return sessionLoadingErrorMsg{err: err}
+		}
+		return sessionLoadedMsg{session: session}
+	}
 }
 
 // Update handles all incoming messages and routes them to appropriate handlers.
@@ -199,6 +250,33 @@ func (m *Terminal) Init() tea.Cmd {
 //  5. Focus/Blur - application focus changes
 //  6. Paste - clipboard paste
 func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Loading message handling — these take priority during startup.
+	switch msg := msg.(type) {
+	case sessionLoadedMsg:
+		m.loading = false
+		// The session's sendSystemInfo("all") was already written to the
+		// WindowBuffer during loading. Update the display to reflect it.
+		m.out.DrainDirty()
+		if m.out.WindowBuffer().WindowCount() > 0 {
+			m.updateStatus()
+			m.updateDisplayHeight()
+			if m.display.shouldFollow() {
+				m.display.SetCursorToLastWindow()
+			}
+			m.display.updateContent()
+		}
+		// Sync theme from the now-loaded session state.
+		snap := m.out.SnapshotStatus()
+		m.syncThemeFromSession(snap.ActiveTheme, snap.ActiveThemeData)
+		return m, nil
+
+	case sessionLoadingErrorMsg:
+		m.loading = false
+		m.loadingError = msg.err
+		m.quitting = true
+		return m, tea.Quit
+	}
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		return m.handleKeyMsg(msg)
@@ -269,6 +347,14 @@ func (m *Terminal) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 
 // handleTick processes periodic updates for display and model switching.
 func (m *Terminal) handleTick() (tea.Model, tea.Cmd) {
+	// During async loading, the only periodic task is to re-render the
+	// loading screen (spinner animation). Skip all session-driven updates.
+	if m.loading {
+		return m, tea.Tick(TickInterval, func(_ time.Time) tea.Msg {
+			return tickMsg{}
+		})
+	}
+
 	m.handleMCPInitOverlay()
 	m.handleConfirmOverlays()
 	cmd := m.handleDisplayRefresh()
@@ -535,6 +621,18 @@ func (m *Terminal) syncThemeFromSession(sessionTheme string, themeData *theme.Th
 
 // View renders the complete terminal UI.
 func (m *Terminal) View() tea.View {
+	// Loading screen: shown while the session is being loaded asynchronously.
+	if m.loading {
+		return m.renderLoadingView()
+	}
+	if m.loadingError != nil {
+		// Should not normally be reached since we quit on error,
+		// but provide a fallback view just in case.
+		v := tea.NewView(fmt.Sprintf("Session loading failed: %v\n", m.loadingError))
+		v.AltScreen = true
+		return v
+	}
+
 	var sb strings.Builder
 
 	// Display area
@@ -586,6 +684,33 @@ func (m *Terminal) View() tea.View {
 	v := tea.NewView(overlayContent)
 	v.AltScreen = true
 	v.ReportFocus = true
+	return v
+}
+
+// renderLoadingView renders the loading screen shown while the session is
+// being loaded asynchronously. It displays a centered message with a simple
+// spinner animation (updated by tickMsg) so the user gets instant feedback
+// even on slow machines.
+func (m *Terminal) renderLoadingView() tea.View {
+	// Simple spinner frames.
+	spinner := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+	frame := int(time.Now().UnixMilli()/150) % len(spinner)
+	spinnerChar := spinner[frame]
+
+	msg := fmt.Sprintf(" %s Loading session...", spinnerChar)
+	// Center the message vertically and horizontally (ASCII width ~= len).
+	contentWidth := len(msg)
+	padX := max(0, (m.windowWidth-contentWidth)/2)
+	padY := max(0, m.windowHeight/2-1)
+
+	var sb strings.Builder
+	sb.WriteString(strings.Repeat("\n", padY))
+	sb.WriteString(strings.Repeat(" ", padX))
+	sb.WriteString(msg)
+	sb.WriteString("\n")
+
+	v := tea.NewView(sb.String())
+	v.AltScreen = true
 	return v
 }
 

@@ -33,7 +33,7 @@ func NewAdapter(cfg *app.Config) *Adapter {
 // MCP initialization runs asynchronously — the session manages it
 // internally via AsyncInit. No adapter-side goroutine is needed.
 func (a *Adapter) Start() int {
-	session, inputWriter, err := app.StartSession(a.Config, os.Stdout)
+	session, inputWriter, err := app.StartSession(a.Config, os.Stdout, nil)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return 1

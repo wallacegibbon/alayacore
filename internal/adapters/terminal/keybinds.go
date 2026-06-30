@@ -25,6 +25,11 @@ import (
 
 // handleKeyMsg routes keyboard input to the appropriate handler.
 func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// During async session loading, ignore all keyboard input.
+	if m.loading {
+		return m, nil
+	}
+
 	// Ctrl+Z works from any context, including overlays
 	if msg.String() == keyCtrlZ {
 		return m, tea.Suspend
