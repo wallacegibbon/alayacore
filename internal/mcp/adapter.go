@@ -428,6 +428,16 @@ func sanitizeInputSchema(raw json.RawMessage) (json.RawMessage, error) {
 		return nil, fmt.Errorf("root must be a JSON object, got %T", schema)
 	}
 
+	// Per MCP spec, inputSchema must have type: "object" at the root.
+	typeVal, hasType := rootObj["type"]
+	if !hasType {
+		return nil, fmt.Errorf("schema must have a 'type' field at the root")
+	}
+	typeStr, ok := typeVal.(string)
+	if !ok || typeStr != "object" {
+		return nil, fmt.Errorf("root type must be \"object\", got %T=%v", typeVal, typeVal)
+	}
+
 	// Walk the schema tree checking for external $ref and depth.
 	if err := walkSchema(rootObj, 0); err != nil {
 		return nil, err

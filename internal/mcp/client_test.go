@@ -298,7 +298,7 @@ func TestSanitizeInputSchema_Valid(t *testing.T) {
 		{"with properties", json.RawMessage(`{"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}`)},
 		{"with nested properties", json.RawMessage(`{"type":"object","properties":{"addr":{"type":"object","properties":{"city":{"type":"string"}}}}}`)},
 		{"with array items", json.RawMessage(`{"type":"object","properties":{"tags":{"type":"array","items":{"type":"string"}}}}`)},
-		{"with allOf", json.RawMessage(`{"allOf":[{"type":"object"},{"required":["name"]}]}`)},
+		{"with allOf", json.RawMessage(`{"type":"object","allOf":[{"type":"object"},{"required":["name"]}]}`)},
 		{"with local $ref", json.RawMessage(`{"type":"object","properties":{"user":{"$ref":"#/$defs/User"}},"$defs":{"User":{"type":"object"}}}`)},
 		{"with anyOf", json.RawMessage(`{"type":"object","properties":{"id":{"anyOf":[{"type":"string"},{"type":"integer"}]}}}`)},
 		{"with additionalProperties", json.RawMessage(`{"type":"object","additionalProperties":{"type":"string"}}`)},
@@ -352,7 +352,7 @@ func TestSanitizeInputSchema_Invalid(t *testing.T) {
 		},
 		{
 			name:        "external http $ref at root",
-			schema:      json.RawMessage(`{"$ref":"http://evil.com/schema"}`),
+			schema:      json.RawMessage(`{"type":"object","$ref":"http://evil.com/schema"}`),
 			containsErr: "external",
 		},
 		{
@@ -367,28 +367,48 @@ func TestSanitizeInputSchema_Invalid(t *testing.T) {
 		},
 		{
 			name:        "external $ref in allOf",
-			schema:      json.RawMessage(`{"allOf":[{"$ref":"https://malicious.io/s"}]}`),
+			schema:      json.RawMessage(`{"type":"object","allOf":[{"$ref":"https://malicious.io/s"}]}`),
 			containsErr: "external",
 		},
 		{
 			name:        "external $ref in anyOf",
-			schema:      json.RawMessage(`{"anyOf":[{"type":"object"},{"$ref":"http://evil/s"}]}`),
+			schema:      json.RawMessage(`{"type":"object","anyOf":[{"type":"object"},{"$ref":"http://evil/s"}]}`),
 			containsErr: "external",
 		},
 		{
 			name:        "external $ref in oneOf",
-			schema:      json.RawMessage(`{"oneOf":[{"$ref":"http://evil/s"}]}`),
+			schema:      json.RawMessage(`{"type":"object","oneOf":[{"$ref":"http://evil/s"}]}`),
 			containsErr: "external",
 		},
 		{
 			name:        "external $ref in if/then",
-			schema:      json.RawMessage(`{"if":{"$ref":"http://evil/s"},"then":{"type":"object"}}`),
+			schema:      json.RawMessage(`{"type":"object","if":{"$ref":"http://evil/s"},"then":{"type":"object"}}`),
 			containsErr: "external",
 		},
 		{
 			name:        "external $ref in $defs",
 			schema:      json.RawMessage(`{"$defs":{"X":{"$ref":"http://evil/s"}},"type":"object"}`),
 			containsErr: "external",
+		},
+		{
+			name:        "root type is string instead of object",
+			schema:      json.RawMessage(`{"type":"string"}`),
+			containsErr: "root type must be \"object\"",
+		},
+		{
+			name:        "root type is number instead of object",
+			schema:      json.RawMessage(`{"type":"number"}`),
+			containsErr: "root type must be \"object\"",
+		},
+		{
+			name:        "root has no type field",
+			schema:      json.RawMessage(`{"properties":{"x":{"type":"string"}}}`),
+			containsErr: "must have a 'type' field",
+		},
+		{
+			name:        "root type is non-string value",
+			schema:      json.RawMessage(`{"type":["object","string"]}`),
+			containsErr: "root type must be \"object\"",
 		},
 		{
 			name:        "deeply nested schema exceeds limit",
@@ -460,6 +480,7 @@ func TestSanitizeInputSchema_ExternalRefInEnum(t *testing.T) {
 func TestSanitizeInputSchema_NotRef(t *testing.T) {
 	// "not" keyword should be traversed for $ref checking.
 	schema := json.RawMessage(`{
+		"type":"object",
 		"not":{"$ref":"http://evil.com/schema"}
 	}`)
 	_, err := sanitizeInputSchema(schema)
