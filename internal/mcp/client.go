@@ -160,11 +160,6 @@ func (c *Client) ListTools(ctx context.Context) ([]Tool, error) {
 		return nil, c.stateError("list tools")
 	}
 
-	return c.listToolsAllPages(ctx)
-}
-
-// listToolsAllPages handles cursor-based pagination for tools/list.
-func (c *Client) listToolsAllPages(ctx context.Context) ([]Tool, error) {
 	type listToolsParams struct {
 		Cursor string `json:"cursor,omitempty"`
 	}
