@@ -258,6 +258,8 @@ func (to *outputWriter) handleSystemMsg(value string) {
 		to.handleSystemVideoConfig(env.Data)
 	case "tool_confirm":
 		to.handleSystemToolConfirm(env.Data)
+	case "mcp_init":
+		to.handleSystemMCPInit(env.Data)
 	case "mcp_auth":
 		to.handleSystemMCPAuth(env.Data)
 	}
@@ -370,6 +372,30 @@ func (to *outputWriter) handleSystemVideoConfig(data json.RawMessage) {
 		return
 	}
 	to.status.updateVideoConfig(m.FPS, m.Res)
+}
+
+// handleSystemMCPInit processes an mcp_init system message.
+// Updates the MCP initialization phase and optionally sets up
+// pending OAuth authorization requests for the TUI confirm dialogs.
+func (to *outputWriter) handleSystemMCPInit(data json.RawMessage) {
+	var msg struct {
+		Status      string `json:"status"`
+		PendingAuth []struct {
+			Name string `json:"name"`
+			URL  string `json:"url"`
+		} `json:"pending_auth"`
+	}
+	if json.Unmarshal(data, &msg) != nil {
+		return
+	}
+	to.status.updateMCPInitStatus(msg.Status)
+
+	// For "auth_required", set up pending OAuth confirm dialogs.
+	if msg.Status == "auth_required" {
+		for _, s := range msg.PendingAuth {
+			to.status.setMCPAuthPending(s.Name, s.URL)
+		}
+	}
 }
 
 // handleSystemMCPAuth processes an mcp_auth system message.

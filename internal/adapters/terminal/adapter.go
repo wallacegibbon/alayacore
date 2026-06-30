@@ -50,12 +50,9 @@ func (a *Adapter) Start() int {
 		return 1
 	}
 
-	// If MCP is configured, start background goroutine to wait for async
-	// initialization and set up TUI-specific UI state (OAuth confirm dialogs).
-	// The session manages async init results internally.
-	if a.Config.AsyncMCP != nil {
-		go a.waitMCPInit(terminalOutput)
-	}
+	// The session manages async MCP initialization internally and sends
+	// progress via "mcp_init" and "mcp_auth" system messages. The TUI
+	// reacts to these messages in its tick handler — no goroutine needed.
 
 	// The session's first sendSystemInfo("all") has already been written to
 	// terminalOutput synchronously during StartSession. Read the active theme
@@ -83,26 +80,6 @@ func (a *Adapter) Start() int {
 	}
 
 	return 0
-}
-
-// waitMCPInit waits for async MCP initialization to complete and sets up
-// TUI-specific UI state (OAuth confirm dialogs). Runs in a background goroutine.
-// The session manages async init results internally — this function only
-// handles TUI-side concerns.
-func (a *Adapter) waitMCPInit(output *outputWriter) {
-	<-a.Config.AsyncMCP.Done()
-
-	// Log non-fatal errors (connection failures, etc.) to the output.
-	_, _, errs := a.Config.AsyncMCP.Result()
-	for _, e := range errs {
-		output.WriteError("%s", e)
-	}
-
-	// Add pending OAuth servers as confirm dialogs for the TUI.
-	mgr := a.Config.AsyncMCP.Manager()
-	for _, ps := range mgr.PendingAuthServers() {
-		output.SetMCPAuthPending(ps.Name, ps.ServerURL)
-	}
 }
 
 // getTerminalSize returns the current terminal size, or defaults if not a TTY.

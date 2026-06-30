@@ -281,22 +281,25 @@ func (m *Terminal) handleTick() (tea.Model, tea.Cmd) {
 }
 
 // handleMCPInitOverlay manages the MCP initialization overlay lifecycle.
-// Shows an informational overlay while async init is running, closes it
-// when init completes.
+// Reads MCPInitStatus from the session's system messages (type "mcp_init")
+// to show or hide the overlay — no polling of AsyncMCP needed.
 func (m *Terminal) handleMCPInitOverlay() {
-	if m.appConfig.AsyncMCP == nil {
-		return
-	}
-	select {
-	case <-m.appConfig.AsyncMCP.Done():
+	status := m.out.SnapshotStatus().MCPInitStatus
+
+	switch status {
+	case "starting":
+		// Init in progress — show the overlay if not already open.
+		if !m.confirmOverlay.IsOpen() {
+			m.openConfirmMCPInit()
+		}
+	case "ready", "auth_required":
+		// Init complete — close the overlay if it's open.
 		if m.confirmOverlay.IsOpen() && m.confirmOverlay.Kind() == ConfirmMCPInit {
 			m.confirmOverlay.Close()
 			m.restoreFocusAfterConfirm()
 		}
 	default:
-		if !m.confirmOverlay.IsOpen() {
-			m.openConfirmMCPInit()
-		}
+		// "" — no MCP configured; nothing to show.
 	}
 }
 

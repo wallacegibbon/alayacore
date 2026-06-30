@@ -83,6 +83,29 @@ type VideoConfigMsg struct {
 
 func (VideoConfigMsg) SystemMsgType() string { return "video_config" }
 
+// MCPAuthServer describes an MCP server that needs OAuth authorization.
+type MCPAuthServer struct {
+	Name string `json:"name"`
+	URL  string `json:"url"`
+}
+
+// MCPInitMsg communicates MCP initialization progress (type "mcp_init").
+// The adapter uses these messages to show/hide init overlays without
+// needing to poll AsyncMCP.Done().
+//
+// Status values:
+//   - "starting":     async init goroutine has started
+//   - "ready":        init complete, no OAuth needed
+//   - "auth_required": init complete, OAuth servers pending (in PendingAuth)
+type MCPInitMsg struct {
+	Status      string          `json:"status"`
+	ToolCount   int             `json:"tool_count,omitempty"`
+	ServerCount int             `json:"server_count,omitempty"`
+	PendingAuth []MCPAuthServer `json:"pending_auth,omitempty"`
+}
+
+func (MCPInitMsg) SystemMsgType() string { return "mcp_init" }
+
 // MCPAuthMsg communicates MCP OAuth authorization progress (type "mcp_auth").
 // Sent by the OAuth goroutine so the adapter can show a status overlay.
 type MCPAuthMsg struct {

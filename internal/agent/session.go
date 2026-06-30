@@ -145,22 +145,39 @@ func (s *Session) Done() <-chan struct{} {
 }
 
 // startMCPInitWatcher starts a goroutine that waits for asynchronous MCP
-// initialization and forwards the results to the run() goroutine via the
-// internal mcpUpdateCh channel. The adapter never touches this channel.
+// initialization and sends system messages to the adapter at each phase.
+// The adapter reacts to these messages without needing to poll AsyncMCP.
+//
+// Communication with the adapter goes through TLV system messages (type
+// "mcp_init" and "mcp_auth"). Internal results (tools, system prompt) are
+// forwarded to the run() goroutine via mcpUpdateCh.
 //
 // Must only be called from NewSession or RestoreFromSession (i.e., before
-// Start()). The goroutine exits when the init completes or the session
-// context is canceled.
+// Start()). The goroutine exits when init completes or the session context
+// is canceled.
 func (s *Session) startMCPInitWatcher(asyncInit *mcp.AsyncInit) {
 	go func() {
+		// Phase 1: init starting — adapter can show an overlay.
+		s.sendMCPInitMsg("starting", 0, nil)
+
 		select {
 		case <-asyncInit.Done():
 		case <-s.sessionCtx.Done():
 			return
 		}
-		tools, sysFrag, _ := asyncInit.Result()
+
+		// Phase 2: init complete — fetch results.
+		tools, sysFrag, errs := asyncInit.Result()
+
+		// Log non-fatal errors (connection failures, etc.) via TLV.
+		for _, e := range errs {
+			s.writeError(fmt.Sprintf("MCP: %v", e))
+		}
+
 		mgr := asyncInit.Manager()
 		pendingOAuth := mgr.PendingAuthServers()
+
+		// Forward tools + system prompt + manager to the run() goroutine.
 		select {
 		case s.mcpUpdateCh <- MCPUpdateEvent{
 			Tools:              tools,
@@ -169,6 +186,18 @@ func (s *Session) startMCPInitWatcher(asyncInit *mcp.AsyncInit) {
 			PendingOAuthCount:  int32(len(pendingOAuth)), //nolint:gosec // small count
 		}:
 		case <-s.sessionCtx.Done():
+			return
+		}
+
+		// Phase 3: notify adapter of final status.
+		if len(pendingOAuth) > 0 {
+			servers := make([]MCPAuthServer, len(pendingOAuth))
+			for i, ps := range pendingOAuth {
+				servers[i] = MCPAuthServer{Name: ps.Name, URL: ps.ServerURL}
+			}
+			s.sendMCPInitMsg("auth_required", len(tools), servers)
+		} else {
+			s.sendMCPInitMsg("ready", len(tools), nil)
 		}
 	}()
 }

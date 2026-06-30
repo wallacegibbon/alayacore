@@ -38,6 +38,10 @@ type sessionState struct {
 	videoFPS int
 	videoRes int
 
+	// MCP init status — tracks the initialization phase.
+	// Values: "" (no MCP), "starting", "ready", "auth_required".
+	mcpInitStatus string
+
 	// MCP auth status — tracks the currently authorizing server during OAuth flow.
 	mcpAuthServer     string
 	mcpAuthInProgress bool
@@ -166,6 +170,14 @@ func (s *sessionState) updateVideoConfig(fps, res int) {
 	s.mu.Unlock()
 }
 
+// updateMCPInitStatus atomically updates the MCP initialization phase.
+// Called when the session sends an mcp_init system message.
+func (s *sessionState) updateMCPInitStatus(status string) {
+	s.mu.Lock()
+	s.mcpInitStatus = status
+	s.mu.Unlock()
+}
+
 // updateMCPAuth atomically updates the MCP OAuth authorization status.
 // Called when the session sends an mcp_auth system message.
 func (s *sessionState) updateMCPAuth(server, status string) {
@@ -256,6 +268,7 @@ func (s *sessionState) snapshotStatus() StatusSnapshot {
 		ActiveThemeData:   s.activeThemeData,
 		VideoFPS:          s.videoFPS,
 		VideoRes:          s.videoRes,
+		MCPInitStatus:     s.mcpInitStatus,
 		MCPAuthServer:     s.mcpAuthServer,
 		MCPAuthInProgress: s.mcpAuthInProgress,
 	}

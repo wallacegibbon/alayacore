@@ -34,6 +34,10 @@ type StatusSnapshot struct {
 	VideoFPS        int
 	VideoRes        int
 
+	// MCP init status — reflects the current phase of MCP initialization.
+	// Values: "" (no MCP or not started), "starting", "ready", "auth_required".
+	MCPInitStatus string
+
 	// MCP auth status — set when an OAuth authorization flow is running.
 	MCPAuthServer     string // server currently being authorized (empty if none)
 	MCPAuthInProgress bool   // true while OAuth flow is in progress

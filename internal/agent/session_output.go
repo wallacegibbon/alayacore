@@ -249,6 +249,15 @@ func (s *Session) sendVideoConfigMsg() {
 	s.writeSystemMsg(VideoConfigMsg{FPS: s.videoFPS, Res: s.videoRes})
 }
 
+// sendMCPInitMsg sends an MCP initialization status update to the adapter.
+func (s *Session) sendMCPInitMsg(status string, toolCount int, pending []MCPAuthServer) {
+	s.writeSystemMsg(MCPInitMsg{
+		Status:      status,
+		ToolCount:   toolCount,
+		PendingAuth: pending,
+	})
+}
+
 // sendMCPAuthMsg sends an MCP OAuth authorization status update to the adapter.
 func (s *Session) sendMCPAuthMsg(server, status string) {
 	s.writeSystemMsg(MCPAuthMsg{Server: server, Status: status})
