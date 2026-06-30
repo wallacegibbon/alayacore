@@ -15,7 +15,7 @@ import (
 // the need for a mutex on the hot path.
 type Manager struct {
 	clients atomic.Value // stores []*Client or nil
-	closed  bool
+	closed  atomic.Bool
 }
 
 // NewManager creates an MCP manager from server configurations.
@@ -130,10 +130,9 @@ func (m *Manager) GetPrompt(ctx context.Context, serverName, name string, args m
 
 // CloseAll shuts down all MCP client connections.
 func (m *Manager) CloseAll() {
-	if m.closed {
+	if !m.closed.CompareAndSwap(false, true) {
 		return
 	}
-	m.closed = true
 
 	for _, c := range m.loadClients() {
 		c.Close() // errors are intentionally discarded — nothing to report at shutdown
