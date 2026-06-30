@@ -2,8 +2,7 @@
 //
 // It supports two modes:
 //   - Static: a pre-obtained token is provided directly in config
-//   - Client Credentials: token obtained from an OAuth token endpoint
-//     using either client_secret or JWT Bearer Assertion (RFC 7523)
+//   - Authorization Code: interactive OAuth flow with PKCE
 package auth
 
 import (

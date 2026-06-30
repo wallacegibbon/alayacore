@@ -64,6 +64,11 @@ func RunAuthCodeFlow(ctx context.Context, meta *ASMetadata, cfg *AuthCodeConfig)
 	resultCh := make(chan callbackResult, 1)
 
 	mux := http.NewServeMux()
+	// All sends to resultCh use non-blocking select so that the handler
+	// never blocks on a full channel (edge case: browser sends a second
+	// callback while the first is still being exchanged). If the channel
+	// is full, the duplicate callback is silently dropped — the first
+	// result wins, which is the correct behavior for OAuth.
 	mux.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
 		code := r.URL.Query().Get("code")
 		returnedState := r.URL.Query().Get("state")
@@ -71,21 +76,34 @@ func RunAuthCodeFlow(ctx context.Context, meta *ASMetadata, cfg *AuthCodeConfig)
 		errDesc := r.URL.Query().Get("error_description")
 
 		if errStr != "" {
-			resultCh <- callbackResult{err: fmt.Errorf("authorization error: %s: %s", errStr, errDesc)}
+			select {
+			case resultCh <- callbackResult{err: fmt.Errorf("authorization error: %s: %s", errStr, errDesc)}:
+			default:
+			}
 			_, _ = w.Write([]byte("Authorization failed. You can close this window."))
 			return
 		}
 		if returnedState != state {
-			resultCh <- callbackResult{err: fmt.Errorf("state mismatch: got %q, expected %q", returnedState, state)}
+			select {
+			case resultCh <- callbackResult{err: fmt.Errorf("state mismatch: got %q, expected %q", returnedState, state)}:
+			default:
+			}
 			_, _ = w.Write([]byte("State validation failed. You can close this window."))
 			return
 		}
 		if code == "" {
-			resultCh <- callbackResult{err: fmt.Errorf("no authorization code in callback")}
+			select {
+			case resultCh <- callbackResult{err: fmt.Errorf("no authorization code in callback")}:
+			default:
+			}
 			_, _ = w.Write([]byte("No authorization code received. You can close this window."))
 			return
 		}
-		resultCh <- callbackResult{code: code}
+		select {
+		case resultCh <- callbackResult{code: code}:
+		default:
+			// Already received a result, ignore duplicate callback.
+		}
 		_, _ = w.Write([]byte("Authorization successful! You can close this window and return to the terminal."))
 	})
 

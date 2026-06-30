@@ -23,10 +23,8 @@ func TestLoadMCPConfigs_ValidFile(t *testing.T) {
 	content := `---
 server: myapi
 url: "https://mcp.example.com"
-auth-type: client_credentials
-auth-token-endpoint: "https://auth.example.com/token"
-auth-client-id: "my-service"
-auth-client-secret: "s3cr3t"
+auth-type: static
+auth-token: "test-token"
 auth-scopes: ["read", "write"]
 ---
 server: filesystem
@@ -65,14 +63,14 @@ url: "https://public.example.com/mcp"
 	if c0.Auth == nil {
 		t.Fatal("expected auth config")
 	}
-	if c0.Auth.Type != "client_credentials" {
-		t.Errorf("expected auth type 'client_credentials', got %q", c0.Auth.Type)
+	if c0.Auth.Type != "static" {
+		t.Errorf("expected auth type 'static', got %q", c0.Auth.Type)
 	}
-	if c0.Auth.ClientID != "my-service" {
-		t.Errorf("expected client_id 'my-service', got %q", c0.Auth.ClientID)
+	if c0.Auth.Token != "test-token" {
+		t.Errorf("expected token 'test-token', got %q", c0.Auth.Token)
 	}
-	if c0.Auth.TokenEndpoint != "https://auth.example.com/token" {
-		t.Errorf("expected token_endpoint 'https://auth.example.com/token', got %q", c0.Auth.TokenEndpoint)
+	if c0.Auth.TokenEndpoint != "" {
+		t.Errorf("expected empty token_endpoint for static auth, got %q", c0.Auth.TokenEndpoint)
 	}
 	if len(c0.Auth.Scopes) != 2 || c0.Auth.Scopes[0] != "read" || c0.Auth.Scopes[1] != "write" {
 		t.Errorf("expected scopes [read write], got %v", c0.Auth.Scopes)

@@ -468,7 +468,6 @@ type AuthType string
 const (
 	AuthTypeNone              AuthType = ""
 	AuthTypeStatic            AuthType = "static"
-	AuthTypeClientCredentials AuthType = "client_credentials"
 	AuthTypeAuthorizationCode AuthType = "authorization_code"
 )
 
@@ -484,13 +483,8 @@ type AuthConfig struct {
 	// ClientID is the OAuth client identifier.
 	ClientID string
 
-	// ClientSecret is the OAuth client secret (for client_credentials
-	// using secret-based auth, or authorization_code).
+	// ClientSecret is the OAuth client secret (for authorization_code).
 	ClientSecret string
-
-	// PrivateKey is a PEM-encoded private key for JWT Bearer Assertion
-	// (RFC 7523), used with client_credentials.
-	PrivateKey string
 
 	// Scopes is the list of OAuth scopes to request.
 	Scopes []string
@@ -517,7 +511,6 @@ type ServerConfigFile struct {
 	AuthTokenEndpoint string   `config:"auth-token-endpoint"`
 	AuthClientID      string   `config:"auth-client-id"`
 	AuthClientSecret  string   `config:"auth-client-secret"`
-	AuthPrivateKey    string   `config:"auth-private-key"`
 	AuthScopes        []string `config:"auth-scopes"`
 	AuthToken         string   `config:"auth-token"`
 }
@@ -549,7 +542,6 @@ func (f *ServerConfigFile) ToServerConfig() ServerConfig {
 			TokenEndpoint: f.AuthTokenEndpoint,
 			ClientID:      f.AuthClientID,
 			ClientSecret:  f.AuthClientSecret,
-			PrivateKey:    f.AuthPrivateKey,
 			Scopes:        f.AuthScopes,
 			Token:         f.AuthToken,
 		}

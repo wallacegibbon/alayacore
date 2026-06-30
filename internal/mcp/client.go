@@ -658,7 +658,7 @@ var _ error = (*RPCError)(nil) // compile-time interface check
 // If tokenStore is non-nil and the auth type supports persistence, the
 // returned provider will persist and load tokens from the store and
 // automatically use refresh tokens for renewal.
-func newAuthProvider(cfg *AuthConfig, tokenStore auth.TokenStore, serverName string) (auth.TokenProvider, error) {
+func newAuthProvider(cfg *AuthConfig, tokenStore auth.TokenStore, serverName string) (auth.TokenProvider, error) { //nolint:unparam // error may be used by future auth types
 	if cfg == nil {
 		return nil, nil
 	}
@@ -674,24 +674,6 @@ func newAuthProvider(cfg *AuthConfig, tokenStore auth.TokenStore, serverName str
 				TokenType:   "Bearer",
 			},
 		}), nil
-
-	case AuthTypeClientCredentials:
-		if cfg.TokenEndpoint == "" || cfg.ClientID == "" {
-			return nil, fmt.Errorf("client_credentials requires token_endpoint and client_id")
-		}
-		// Client credentials already handles automatic re-authentication
-		// when tokens expire — wrap in cachedPersistent for disk cache.
-		inner := auth.NewCached(auth.NewClientCredentials(auth.ClientCredentialsConfig{
-			TokenEndpoint: cfg.TokenEndpoint,
-			ClientID:      cfg.ClientID,
-			ClientSecret:  cfg.ClientSecret,
-			PrivateKey:    cfg.PrivateKey,
-			Scopes:        cfg.Scopes,
-		}))
-		if tokenStore == nil {
-			return inner, nil
-		}
-		return auth.NewPersistentTokenProvider(inner, tokenStore, serverName, nil), nil
 
 	case AuthTypeAuthorizationCode:
 		if cfg.obtainedToken != nil {
