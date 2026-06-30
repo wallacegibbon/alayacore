@@ -588,10 +588,6 @@ func (t *StreamableHTTPTransport) sendResponse(ctx context.Context, resp jsonrpc
 	return nil
 }
 
-// ============================================================================
-// Backwards Compatibility Detection
-// ============================================================================
-
 // processSSELine parses a single SSE field line and updates event/data state.
 // The SSE spec allows an optional space after the "event:" and "data:" field names.
 func processSSELine(line string, currentEvent *string, currentData *strings.Builder) {
