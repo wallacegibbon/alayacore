@@ -10,7 +10,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"golang.org/x/term"
 
-	agentpkg "github.com/alayacore/alayacore/internal/agent"
 	"github.com/alayacore/alayacore/internal/app"
 	"github.com/alayacore/alayacore/internal/theme"
 )
@@ -45,16 +44,17 @@ func (a *Adapter) Start() int {
 	terminalOutput.SetWindowWidth(initialWidth)
 
 	// Load session synchronously before starting the UI
-	session, inputWriter, err := app.StartSession(a.Config, terminalOutput)
+	_, inputWriter, err := app.StartSession(a.Config, terminalOutput)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return 1
 	}
 
 	// If MCP is configured, start background goroutine to wait for async
-	// initialization and forward results to the session.
+	// initialization and set up TUI-specific UI state (OAuth confirm dialogs).
+	// The session manages async init results internally.
 	if a.Config.AsyncMCP != nil {
-		go a.waitMCPInit(session, terminalOutput)
+		go a.waitMCPInit(terminalOutput)
 	}
 
 	// The session's first sendSystemInfo("all") has already been written to
@@ -85,36 +85,22 @@ func (a *Adapter) Start() int {
 	return 0
 }
 
-// waitMCPInit waits for async MCP initialization to complete and forwards
-// the results to the session. Runs in a background goroutine.
-func (a *Adapter) waitMCPInit(session *agentpkg.Session, output *outputWriter) {
+// waitMCPInit waits for async MCP initialization to complete and sets up
+// TUI-specific UI state (OAuth confirm dialogs). Runs in a background goroutine.
+// The session manages async init results internally — this function only
+// handles TUI-side concerns.
+func (a *Adapter) waitMCPInit(output *outputWriter) {
 	<-a.Config.AsyncMCP.Done()
-	tools, sysFrag, errs := a.Config.AsyncMCP.Result()
-
-	mgr := a.Config.AsyncMCP.Manager()
-
-	// Check if there are OAuth servers still pending.
-	pendingOAuth := mgr.PendingAuthServers()
-
-	// Send update to the session's run() goroutine.
-	// If OAuth servers are pending (PendingOAuthCount > 0), the session
-	// will keep mcpReady=false and reject user messages until the counter
-	// reaches zero (each server is either authorized via :mcp_auth <name> yes
-	// or skipped via :mcp_auth <name> no).
-	session.MCPUpdateChan() <- agentpkg.MCPUpdateEvent{
-		Tools:              tools,
-		SystemPromptSuffix: sysFrag,
-		Manager:            mgr,
-		PendingOAuthCount:  int32(len(pendingOAuth)), //nolint:gosec // len(pendingOAuth) is small (<100)
-	}
 
 	// Log non-fatal errors (connection failures, etc.) to the output.
+	_, _, errs := a.Config.AsyncMCP.Result()
 	for _, e := range errs {
 		output.WriteError("%s", e)
 	}
 
 	// Add pending OAuth servers as confirm dialogs for the TUI.
-	for _, ps := range pendingOAuth {
+	mgr := a.Config.AsyncMCP.Manager()
+	for _, ps := range mgr.PendingAuthServers() {
 		output.SetMCPAuthPending(ps.Name, ps.ServerURL)
 	}
 }

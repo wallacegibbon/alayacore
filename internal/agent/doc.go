@@ -38,10 +38,11 @@
 //	  - A few buffered channels for cancellation, completion signaling,
 //	    system-info refresh, and MCP update events (mcpUpdateCh).
 //
-//	mcpUpdateCh is special: the write end is held by the adapter's
-//	background goroutine (waitMCPInit/forwardMCPInit/handleMCPAuth),
-//	while the read end is in the run() goroutine. This follows the same
-//	actor-model pattern — no mutex needed.
+//	mcpUpdateCh receives MCP initialization and OAuth authorization
+//	results. The write end is internal to the session (startMCPInitWatcher
+//	goroutine + handleMCPAuth goroutine), while the read end is in the
+//	run() goroutine. The adapter never touches this channel — all
+//	communication with adapters goes through TLV frames.
 //
 //	All other session state (agent, provider, ContextTokens, ContextLimit,
 //	reasoningLevel, histCounter) is owned by a single goroutine and

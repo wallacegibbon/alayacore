@@ -48,6 +48,7 @@ func StartSession(cfg *Config, output io.Writer) (*agentpkg.Session, io.WriteClo
 		SkillsMgr:           cfg.SkillsMgr,
 		OverrideActiveModel: cfg.Cfg.ModelName,
 		ToolConfirmTools:    cfg.ToolConfirmTools,
+		AsyncInit:           cfg.AsyncMCP,
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to load session: %w", err)

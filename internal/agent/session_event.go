@@ -49,10 +49,15 @@ type SetContextTokensEvent struct {
 
 func (SetContextTokensEvent) taskEvent() {}
 
-// MCPUpdateEvent is sent from the adapter to the session's run() goroutine
-// when asynchronous MCP initialization completes or when an OAuth
-// authorization flow completes. The run() goroutine applies the updates
-// (tools + system prompt) and manages the pending-OAuth counter.
+// MCPUpdateEvent carries MCP initialization or OAuth authorization results
+// to the session's run() goroutine. It is sent internally (not from the
+// adapter — all adapter communication goes through TLV frames). The run()
+// goroutine applies the updates (tools + system prompt) and manages the
+// pending-OAuth counter.
+//
+// The initial event is produced by startMCPInitWatcher after AsyncInit
+// completes. Subsequent events are produced by the OAuth goroutine in
+// handleMCPAuth when a server authorization finishes.
 //
 // PendingOAuthCount is the number of OAuth servers that still need user
 // authorization. Set by the initial async init event; the session adds

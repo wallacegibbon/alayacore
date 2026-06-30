@@ -76,9 +76,9 @@ type Config struct {
 
 	// AsyncMCP provides asynchronous MCP initialization.
 	// If non-nil, MCP servers are configured and initialization is
-	// running in the background. The adapter should wait for
-	// AsyncMCP.Done() after starting the UI and forward results
-	// to the session via MCPUpdateEvent.
+	// running in the background. The session manages init results
+	// internally (via startMCPInitWatcher) — the adapter only needs
+	// AsyncMCP for lifecycle checks (e.g. Done() for TUI overlay).
 	AsyncMCP *mcp.AsyncInit
 
 	// MCPManager for lifecycle management (cleanup).
@@ -91,8 +91,8 @@ type Config struct {
 //
 // Fast path: skills, built-in tools, MCP config parsing (no connections).
 // MCP initialization (connect, discover) runs asynchronously via cfg.AsyncMCP.
-// The adapter should start the UI immediately and forward MCP results
-// to the session when AsyncMCP.Done() is closed.
+// The session manages init results internally — the adapter only needs
+// AsyncMCP for TUI lifecycle checks (e.g. init overlay).
 func Setup(cfg *config.Settings) (*Config, error) {
 	skillsManager, err := skills.NewManager(cfg.Skills)
 	if err != nil {
@@ -132,8 +132,8 @@ func Setup(cfg *config.Settings) (*Config, error) {
 	}
 
 	// Note: MCP sections (instructions, resources, prompts) are NOT added here.
-	// They'll be appended dynamically when async MCP init completes via
-	// the MCPUpdateEvent sent to the session.
+	// They'll be appended dynamically when async MCP init completes —
+	// the session applies them internally via applyMCPUpdate.
 
 	return &Config{
 		Cfg:               cfg,

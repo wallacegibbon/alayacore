@@ -70,7 +70,8 @@ func (s *Session) run() {
 }
 
 // applyMCPUpdate applies MCP initialization results to the session.
-// Called from the run() goroutine when the adapter sends an MCPUpdateEvent.
+// Called from the run() goroutine when an MCPUpdateEvent is received
+// (either from startMCPInitWatcher or from a completed OAuth flow).
 func (s *Session) applyMCPUpdate(update MCPUpdateEvent) {
 	// 1. Append MCP tools to BaseTools.
 	s.BaseTools = append(s.BaseTools, update.Tools...)

@@ -160,6 +160,12 @@ type SessionConfig struct {
 	// Set during async initialization; may be nil initially.
 	MCPManager *mcp.Manager
 
+	// AsyncInit provides asynchronous MCP initialization.
+	// When non-nil, the session starts a goroutine that waits for
+	// AsyncInit.Done() and applies the results (tools, system prompt,
+	// manager) internally — no adapter involvement needed.
+	AsyncInit *mcp.AsyncInit
+
 	// Override
 	OverrideActiveModel string // If set, overrides the active model (must exist in model config)
 }

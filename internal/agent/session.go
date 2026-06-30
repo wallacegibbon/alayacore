@@ -25,7 +25,7 @@ package agent
 //     taskCancel (func call)     — run() → task (cancellation via cancelRunningTask)
 //     taskResultCh                 — task → run (full ContentParts list)
 //     taskRefreshCh               — task → run() (best-effort system-info refresh; see session_output.go)
-//     mcpUpdateCh (MCPUpdateEvent) — adapter → run() (async MCP init results, OAuth completions)
+//     mcpUpdateCh (MCPUpdateEvent) — internal (startMCPInitWatcher + OAuth goroutine) → run()
 //
 // Related files:
 //   - session_types.go — type definitions (Task, SessionConfig, etc.)
@@ -46,6 +46,7 @@ import (
 
 	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/llm"
+	"github.com/alayacore/alayacore/internal/mcp"
 	"github.com/alayacore/alayacore/internal/skills"
 	"github.com/alayacore/alayacore/internal/stream"
 )
@@ -86,7 +87,7 @@ type runState struct {
 	taskResultCh  chan []llm.ContentPart
 	taskRefreshCh chan struct{}
 
-	mcpUpdateCh chan MCPUpdateEvent // buffered(10), receives MCP init & OAuth auth results from adapter
+	mcpUpdateCh chan MCPUpdateEvent // buffered(10), receives MCP init & OAuth auth results (internal to session)
 }
 
 // activeTaskStep returns the current step of the active task, or 0 if idle.
@@ -143,15 +144,33 @@ func (s *Session) Done() <-chan struct{} {
 	return s.runDoneCh
 }
 
-// MCPUpdateChan returns the channel for sending MCP initialization results.
-// The adapter sends an MCPUpdateEvent on this channel when async MCP init
-// completes. The session's run() goroutine processes it to add tools,
-// update the system prompt, and mark MCP as ready.
+// startMCPInitWatcher starts a goroutine that waits for asynchronous MCP
+// initialization and forwards the results to the run() goroutine via the
+// internal mcpUpdateCh channel. The adapter never touches this channel.
 //
-// Must only be called before the session's Start() method returns — the
-// channel is read by the run() goroutine after Start().
-func (s *Session) MCPUpdateChan() chan<- MCPUpdateEvent {
-	return s.mcpUpdateCh
+// Must only be called from NewSession or RestoreFromSession (i.e., before
+// Start()). The goroutine exits when the init completes or the session
+// context is canceled.
+func (s *Session) startMCPInitWatcher(asyncInit *mcp.AsyncInit) {
+	go func() {
+		select {
+		case <-asyncInit.Done():
+		case <-s.sessionCtx.Done():
+			return
+		}
+		tools, sysFrag, _ := asyncInit.Result()
+		mgr := asyncInit.Manager()
+		pendingOAuth := mgr.PendingAuthServers()
+		select {
+		case s.mcpUpdateCh <- MCPUpdateEvent{
+			Tools:              tools,
+			SystemPromptSuffix: sysFrag,
+			Manager:            mgr,
+			PendingOAuthCount:  int32(len(pendingOAuth)), //nolint:gosec // small count
+		}:
+		case <-s.sessionCtx.Done():
+		}
+	}()
 }
 
 // MCPIsReady reports whether MCP initialization has completed and tools
@@ -233,6 +252,11 @@ func NewSession(cfg SessionConfig) *Session {
 		s.applyModelContextLimit(model)
 	}
 
+	// Start async MCP init watcher — the session manages init internally.
+	if cfg.AsyncInit != nil {
+		s.startMCPInitWatcher(cfg.AsyncInit)
+	}
+
 	s.sendSystemInfo("all")
 	return s
 }
@@ -275,6 +299,11 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 
 	// --model CLI flag takes highest priority: override whatever was resolved above.
 	s.setActiveFromCliFlag()
+
+	// Start async MCP init watcher — the session manages init internally.
+	if cfg.AsyncInit != nil {
+		s.startMCPInitWatcher(cfg.AsyncInit)
+	}
 
 	// Apply context limit from the resolved model so the status bar
 	// can show "tokens/limit (pct%)" immediately, before any API call.
