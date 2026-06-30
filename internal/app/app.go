@@ -121,14 +121,14 @@ func initMCP(cfg *config.Settings) ([]llm.Tool, *mcp.Manager, []string, string, 
 		return nil, nil, nil, "", ""
 	}
 
-	warnings := make([]string, 0, len(cfg.MCPServers))
+	startupErrors := make([]string, 0, len(cfg.MCPServers))
 
 	// Pre-allocate with the maximum possible size; unused capacity is negligible.
 	mcpConfigs := make([]mcp.ServerConfig, 0, len(cfg.MCPServers))
 	for _, raw := range cfg.MCPServers {
 		parsed, parseErr := mcp.ParseServerConfig(raw)
 		if parseErr != nil {
-			warnings = append(warnings, fmt.Sprintf("invalid --mcp-server config %q: %v", raw, parseErr))
+			startupErrors = append(startupErrors, fmt.Sprintf("invalid --mcp-server config %q: %v", raw, parseErr))
 			continue
 		}
 		parsed.Debug = cfg.DebugMCP
@@ -136,18 +136,18 @@ func initMCP(cfg *config.Settings) ([]llm.Tool, *mcp.Manager, []string, string, 
 	}
 
 	if len(mcpConfigs) == 0 {
-		return nil, nil, warnings, "", ""
+		return nil, nil, startupErrors, "", ""
 	}
 
 	mcpManager := mcp.NewManager(mcpConfigs)
 
 	// Connect with a per-server timeout.
 	connectCtx, connectCancel := context.WithTimeout(context.Background(), 30*time.Second)
-	errs := mcpManager.ConnectAll(connectCtx)
+	connErrs := mcpManager.ConnectAll(connectCtx)
 	connectCancel()
 
-	for _, connErr := range errs {
-		warnings = append(warnings, fmt.Sprintf("MCP server connection failed: %v", connErr))
+	for _, connErr := range connErrs {
+		startupErrors = append(startupErrors, fmt.Sprintf("MCP server connection failed: %v", connErr))
 	}
 
 	var mcpTools []llm.Tool
@@ -176,7 +176,7 @@ func initMCP(cfg *config.Settings) ([]llm.Tool, *mcp.Manager, []string, string, 
 	resCtx := buildResourcesContext(listCtx, mcpManager)
 	promptCtx := buildPromptsContext(listCtx, mcpManager)
 
-	return mcpTools, mcpManager, warnings, resCtx, promptCtx
+	return mcpTools, mcpManager, startupErrors, resCtx, promptCtx
 }
 
 // buildResourcesContext fetches the resource list from all connected servers
