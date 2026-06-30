@@ -301,7 +301,7 @@ type Resource struct {
 	MIMEType    string       `json:"mimeType,omitempty"`
 	Annotations *Annotations `json:"annotations,omitempty"`
 	Icons       []Icon       `json:"icons,omitempty"`
-	Size        *int64       `json:"size,omitempty"`
+	Size        *float64     `json:"size,omitempty"`
 	Meta        Meta         `json:"_meta,omitempty"`
 }
 
