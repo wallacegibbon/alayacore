@@ -108,10 +108,7 @@ func (s *Session) applyMCPUpdate(update MCPUpdateEvent) {
 		s.mcpReady.Store(true)
 	}
 
-	// 7. Send system info so the adapter can update its status display.
-	s.sendSystemInfo("all")
-
-	// 8. Notify the user.
+	// 7. Notify the user.
 	if update.PendingOAuthCount > 0 {
 		s.writeNotifyf("MCP servers partially initialized. %d OAuth %s need authorization — use :mcp_auth <name> yes|no.",
 			s.pendingOAuth.Load(), pluralizeServer(s.pendingOAuth.Load()))
