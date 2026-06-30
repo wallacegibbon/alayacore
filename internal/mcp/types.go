@@ -77,14 +77,6 @@ type jsonrpcError struct {
 // MCP Protocol Types (subset needed for tool support)
 // ============================================================================
 
-// ImplementationLevel indicates the MCP specification level.
-type ImplementationLevel string
-
-const (
-	LevelClient ImplementationLevel = "client"
-	LevelServer ImplementationLevel = "server"
-)
-
 // ClientCapabilities describes the capabilities the client supports.
 type ClientCapabilities struct {
 	// Experimental non-standard capabilities.
@@ -436,15 +428,6 @@ func (e *RPCError) Error() string {
 	return fmt.Sprintf("MCP RPC error %d: %s", e.Code, e.Message)
 }
 
-// Standard JSON-RPC error codes (from JSON-RPC 2.0 spec).
-const (
-	ErrParse          = -32700 // Invalid JSON was received by the server.
-	ErrInvalidRequest = -32600 // The JSON sent is not a valid Request object.
-	ErrMethodNotFound = -32601 // The method does not exist / is not available.
-	ErrInvalidParams  = -32602 // Invalid method parameter(s).
-	ErrInternal       = -32603 // Internal JSON-RPC error.
-)
-
 // ============================================================================
 // Configuration Parsing
 // ============================================================================
@@ -556,8 +539,3 @@ func splitArgs(input string) []string {
 	}
 	return args
 }
-
-// MCP-specific error codes.
-const (
-	ErrRequestCanceled = -32800 // The request was canceled by the client.
-)
