@@ -55,7 +55,7 @@ func Setup(cfg *config.Settings) (*Config, error) {
 	// ========================================================================
 	// MCP (Model Context Protocol) initialization
 	// ========================================================================
-	mcpTools, mcpManager, mcpErrors, mcpResourcesCtx, mcpPromptsCtx := initMCP(cfg)
+	mcpTools, mcpManager, mcpResourcesCtx, mcpPromptsCtx, mcpErrors := initMCP(cfg)
 	agentTools = append(agentTools, mcpTools...)
 
 	// ========================================================================
@@ -116,9 +116,9 @@ func Setup(cfg *config.Settings) (*Config, error) {
 //
 // It also pre-fetches resource and prompt lists from connected servers and
 // returns them as formatted strings for injection into the system prompt.
-func initMCP(cfg *config.Settings) ([]llm.Tool, *mcp.Manager, []string, string, string) {
+func initMCP(cfg *config.Settings) ([]llm.Tool, *mcp.Manager, string, string, []string) {
 	if len(cfg.MCPServers) == 0 {
-		return nil, nil, nil, "", ""
+		return nil, nil, "", "", nil
 	}
 
 	startupErrors := make([]string, 0, len(cfg.MCPServers))
@@ -136,7 +136,7 @@ func initMCP(cfg *config.Settings) ([]llm.Tool, *mcp.Manager, []string, string, 
 	}
 
 	if len(mcpConfigs) == 0 {
-		return nil, nil, startupErrors, "", ""
+		return nil, nil, "", "", startupErrors
 	}
 
 	mcpManager := mcp.NewManager(mcpConfigs)
@@ -176,7 +176,7 @@ func initMCP(cfg *config.Settings) ([]llm.Tool, *mcp.Manager, []string, string, 
 	resCtx := buildResourcesContext(listCtx, mcpManager)
 	promptCtx := buildPromptsContext(listCtx, mcpManager)
 
-	return mcpTools, mcpManager, startupErrors, resCtx, promptCtx
+	return mcpTools, mcpManager, resCtx, promptCtx, startupErrors
 }
 
 // buildResourcesContext fetches the resource list from all connected servers
