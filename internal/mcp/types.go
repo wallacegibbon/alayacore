@@ -374,17 +374,7 @@ type ServerConfig struct {
 
 	// Debug enables logging of raw JSON-RPC messages to a file.
 	Debug bool
-
-	// TransportType specifies the HTTP transport variant.
-	// Empty string means auto-detect.
-	TransportType string
 }
-
-// HTTP transport type constants.
-const (
-	TransportStreamable = "streamable" // Streamable HTTP (2025-11-25)
-	TransportSSE        = "sse"        // legacy HTTP+SSE (2024-11-05)
-)
 
 // RPCError represents a JSON-RPC error response.
 type RPCError struct {

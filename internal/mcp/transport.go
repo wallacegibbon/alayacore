@@ -6,14 +6,10 @@ import (
 	"fmt"
 	"io"
 	"sync"
-	"time"
 )
 
-// SSE endpoint discovery timeout.
-var sseEndpointTimeout = 30 * time.Second
-
 // Transport defines the interface for MCP communication channels.
-// MCP uses JSON-RPC 2.0 over stdio, SSE, or other transports.
+// MCP uses JSON-RPC 2.0 over stdio, Streamable HTTP, or other transports.
 type Transport interface {
 	// Send marshals and sends a JSON-RPC notification (no response expected).
 	// The context is used for cancellation and timeout — particularly for

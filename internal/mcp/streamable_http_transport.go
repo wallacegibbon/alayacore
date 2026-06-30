@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/alayacore/alayacore/internal/debug"
 )
@@ -21,8 +20,7 @@ import (
 // ============================================================================
 //
 // StreamableHTTPTransport implements the MCP Streamable HTTP transport
-// defined in specification 2025-11-25. It replaces the legacy HTTP+SSE
-// transport from 2024-11-05.
+// defined in specification 2025-11-25.
 //
 // Protocol overview:
 //   - Server exposes a single MCP endpoint URL supporting both POST and GET
@@ -31,9 +29,6 @@ import (
 //     (Content-Type: text/event-stream)
 //   - GET: client opens an SSE stream for server-to-client messages
 //   - Session management via Mcp-Session-Id header
-//
-// For backwards compatibility, if POST to the endpoint returns 4xx,
-// the transport falls back to legacy HTTP+SSE (2024-11-05).
 
 // StreamableHTTPTransport communicates with an MCP server using the
 // Streamable HTTP transport (spec 2025-11-25).
@@ -138,10 +133,6 @@ func (s *sseReadCloser) Close() error {
 // NewStreamableHTTPTransport creates a new Streamable HTTP transport.
 // It does NOT connect immediately; the first Send/SendReceive will POST
 // to the endpoint.
-//
-// For backwards compatibility: if this transport encounters 4xx on POST,
-// the caller should fall back to NewSSETransport. The detection logic
-// is in connectLocked in client.go.
 func NewStreamableHTTPTransport(endpointURL string, enableDebug bool) *StreamableHTTPTransport {
 	t := &StreamableHTTPTransport{
 		endpointURL: endpointURL,
@@ -601,44 +592,31 @@ func (t *StreamableHTTPTransport) sendResponse(ctx context.Context, resp jsonrpc
 // Backwards Compatibility Detection
 // ============================================================================
 
-// DetectStreamableHTTP attempts to detect whether the given URL supports
-// the Streamable HTTP transport by POSTing an initialize request.
-//
-// Returns true if the server supports Streamable HTTP (2xx response).
-// Returns false if the server returns 4xx (likely legacy SSE transport).
-// Returns an error for network failures or unexpected status codes.
-func DetectStreamableHTTP(ctx context.Context, url string) (bool, error) {
-	client := &http.Client{Timeout: 10 * time.Second}
+// processSSELine parses a single SSE field line and updates event/data state.
+// The SSE spec allows an optional space after the "event:" and "data:" field names.
+func processSSELine(line string, currentEvent *string, currentData *strings.Builder) {
+	switch {
+	case strings.HasPrefix(line, "event:"):
+		if len(line) > 6 && line[6] == ' ' {
+			*currentEvent = line[7:]
+		} else {
+			*currentEvent = line[6:]
+		}
 
-	initReq := jsonrpcRequest{
-		JSONRPC: jsonrpcVersion,
-		ID:      requestID("detect"),
-		Method:  methodInitialize,
-	}
-	data, err := json.Marshal(initReq)
-	if err != nil {
-		return false, fmt.Errorf("marshal: %w", err)
-	}
+	case strings.HasPrefix(line, "data:"):
+		if currentData.Len() > 0 {
+			currentData.WriteString("\n")
+		}
+		if len(line) > 5 && line[5] == ' ' {
+			currentData.WriteString(line[6:])
+		} else {
+			currentData.WriteString(line[5:])
+		}
 
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, strings.NewReader(string(data)))
-	if err != nil {
-		return false, fmt.Errorf("create request: %w", err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Accept", "application/json, text/event-stream")
+	case len(line) > 0 && line[0] == ':':
+		// Comment — ignore.
 
-	resp, err := client.Do(httpReq)
-	if err != nil {
-		return false, fmt.Errorf("POST: %w", err)
+	default:
+		// Unknown field — ignore per SSE spec.
 	}
-	resp.Body.Close()
-
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		return true, nil
-	}
-	if resp.StatusCode >= 400 && resp.StatusCode < 500 {
-		return false, nil // 4xx → likely legacy SSE
-	}
-
-	return false, fmt.Errorf("unexpected status %d", resp.StatusCode)
 }

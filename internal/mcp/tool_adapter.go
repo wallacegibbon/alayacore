@@ -429,21 +429,20 @@ func executeGetPrompt(ctx context.Context, manager *Manager, serverName, name st
 }
 
 // ParseServerConfig parses a single --mcp-server flag value.
-// Format: name=transport:value
+// Format: name=value
 //
-// Supported transports:
+// Supported formats:
 //
-//	exec — stdio subprocess, value is command line
-//	      KEY=VALUE tokens before the command are set as environment variables
-//	sse  — legacy HTTP+SSE transport, value is URL
-//	http — Streamable HTTP transport, value is URL
+//	name=https://example.com/mcp                    → Streamable HTTP
+//	name=http://example.com/mcp                     → Streamable HTTP
+//	name=exec:command arg1 arg2 ...                 → Stdio subprocess
+//	name=exec:KEY=VALUE command arg1 arg2 ...       → Stdio with env vars
 //
 // Examples:
 //
+//	myapi=https://mcp.example.com
 //	db=exec:npx @anthropic/mcp-db-server
 //	db=exec:DB_HOST=localhost DB_PORT=5432 npx @anthropic/mcp-db-server
-//	remote=sse:https://example.com/sse
-//	remote=http:https://example.com/mcp
 func ParseServerConfig(raw string) (ServerConfig, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -452,7 +451,7 @@ func ParseServerConfig(raw string) (ServerConfig, error) {
 
 	idx := strings.Index(raw, "=")
 	if idx <= 0 {
-		return ServerConfig{}, fmt.Errorf("invalid MCP server config: %q (expected name=transport:value)", raw)
+		return ServerConfig{}, fmt.Errorf("invalid MCP server config: %q (expected name=value)", raw)
 	}
 
 	name := raw[:idx]
@@ -461,50 +460,20 @@ func ParseServerConfig(raw string) (ServerConfig, error) {
 		return ServerConfig{}, fmt.Errorf("invalid MCP server config: %q (name or value empty)", raw)
 	}
 
-	transport, value, ok := parseTransportPrefix(rest)
-	if !ok {
-		return ServerConfig{}, fmt.Errorf("invalid MCP server config: %q (expected transport:value, where transport is exec, sse, or http)", raw)
+	// exec: prefix → stdio transport
+	if strings.HasPrefix(rest, "exec:") {
+		return parseExecConfig(name, rest[len("exec:"):], raw)
 	}
 
-	switch transport {
-	case "exec":
-		return parseExecConfig(name, value, raw)
-
-	case "sse":
-		if value == "" {
-			return ServerConfig{}, fmt.Errorf("invalid MCP server config: %q (empty URL)", raw)
-		}
+	// http:// or https:// prefix → Streamable HTTP transport
+	if strings.HasPrefix(rest, "http://") || strings.HasPrefix(rest, "https://") {
 		return ServerConfig{
-			Name:          name,
-			URL:           value,
-			TransportType: TransportSSE,
+			Name: name,
+			URL:  rest,
 		}, nil
-
-	case "http":
-		if value == "" {
-			return ServerConfig{}, fmt.Errorf("invalid MCP server config: %q (empty URL)", raw)
-		}
-		return ServerConfig{
-			Name:          name,
-			URL:           value,
-			TransportType: TransportStreamable,
-		}, nil
-
-	default:
-		return ServerConfig{}, fmt.Errorf("invalid MCP server config: %q: unknown transport %q", raw, transport)
 	}
-}
 
-// parseTransportPrefix checks if s starts with a known transport prefix
-// followed by ":". Returns the transport name, the rest, and true if matched.
-func parseTransportPrefix(s string) (transport, value string, ok bool) {
-	known := []string{"exec", "sse", "http"}
-	for _, t := range known {
-		if strings.HasPrefix(s, t+":") {
-			return t, s[len(t)+1:], true
-		}
-	}
-	return "", "", false
+	return ServerConfig{}, fmt.Errorf("invalid MCP server config: %q (expected https://URL or exec:command)", raw)
 }
 
 // parseExecConfig parses the value part of "exec:..." and extracts

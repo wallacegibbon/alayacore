@@ -112,19 +112,17 @@ func TestParseServerConfig_HTTP(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			input: "remote=sse:https://mcp.example.com/sse",
+			input: "remote=https://mcp.example.com/sse",
 			want: ServerConfig{
-				Name:          "remote",
-				URL:           "https://mcp.example.com/sse",
-				TransportType: TransportSSE,
+				Name: "remote",
+				URL:  "https://mcp.example.com/sse",
 			},
 		},
 		{
-			input: "remote=http:https://example.com/mcp",
+			input: "remote=http://example.com/mcp",
 			want: ServerConfig{
-				Name:          "remote",
-				URL:           "https://example.com/mcp",
-				TransportType: TransportStreamable,
+				Name: "remote",
+				URL:  "http://example.com/mcp",
 			},
 		},
 		{
@@ -132,15 +130,7 @@ func TestParseServerConfig_HTTP(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			input:   "=sse:url",
-			wantErr: true,
-		},
-		{
-			input:   "name=sse:", // empty URL
-			wantErr: true,
-		},
-		{
-			input:   "name=http:", // empty URL
+			input:   "=http://url",
 			wantErr: true,
 		},
 		{
@@ -148,7 +138,11 @@ func TestParseServerConfig_HTTP(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			input:   "name=ssh:host", // unknown transport
+			input:   "name=ssh:host", // unknown format
+			wantErr: true,
+		},
+		{
+			input:   "name=ftp://host", // unsupported protocol
 			wantErr: true,
 		},
 	}
@@ -166,41 +160,6 @@ func TestParseServerConfig_HTTP(t *testing.T) {
 				}
 				if got.URL != tt.want.URL {
 					t.Errorf("URL = %q, want %q", got.URL, tt.want.URL)
-				}
-				if got.TransportType != tt.want.TransportType {
-					t.Errorf("TransportType = %q, want %q", got.TransportType, tt.want.TransportType)
-				}
-			}
-		})
-	}
-}
-
-func TestParseTransportPrefix(t *testing.T) {
-	tests := []struct {
-		input     string
-		wantTrans string
-		wantValue string
-		wantOK    bool
-	}{
-		{input: "exec:node server.js", wantTrans: "exec", wantValue: "node server.js", wantOK: true},
-		{input: "sse:https://example.com/sse", wantTrans: "sse", wantValue: "https://example.com/sse", wantOK: true},
-		{input: "http:https://example.com/mcp", wantTrans: "http", wantValue: "https://example.com/mcp", wantOK: true},
-		{input: "node server.js", wantOK: false},
-		{input: "unknown:stuff", wantOK: false},
-		{input: "", wantOK: false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			gotTrans, gotValue, gotOK := parseTransportPrefix(tt.input)
-			if gotOK != tt.wantOK {
-				t.Errorf("ok = %v, want %v", gotOK, tt.wantOK)
-			}
-			if gotOK {
-				if gotTrans != tt.wantTrans {
-					t.Errorf("transport = %q, want %q", gotTrans, tt.wantTrans)
-				}
-				if gotValue != tt.wantValue {
-					t.Errorf("value = %q, want %q", gotValue, tt.wantValue)
 				}
 			}
 		})

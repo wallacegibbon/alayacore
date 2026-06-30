@@ -21,10 +21,7 @@ alayacore --mcp-server "db=exec:npx @anthropic/mcp-db-server" \
           --mcp-server "git=exec:uvx mcp-git"
 
 # Connect to a remote MCP server via Streamable HTTP
-alayacore --mcp-server "remote=http:https://example.com/mcp"
-
-# Connect via legacy SSE
-alayacore --mcp-server "remote=sse:https://example.com/sse"
+alayacore --mcp-server "remote=https://example.com/mcp"
 ```
 
 ## CLI Flags
@@ -36,7 +33,7 @@ alayacore --mcp-server "remote=sse:https://example.com/sse"
 
 ## `--mcp-server` Format
 
-Single unified format: `name=transport:value`
+Format: `name=value`
 
 ### exec — Stdio Transport
 
@@ -56,33 +53,19 @@ and passed to the subprocess (in addition to the current process environment):
 --mcp-server "search=exec:python /path/to/server.py --port 8080"
 ```
 
-### sse — Legacy HTTP+SSE Transport (2024-11-05)
+### Streamable HTTP Transport (2025-11-25)
 
 ```
-name=sse:url
+name=https://url
+name=http://url
 ```
 
-Connects to an MCP server over Server-Sent Events. The client connects via
-HTTP GET to the SSE endpoint, receives the POST endpoint URL from the
-server's `endpoint` event, and sends JSON-RPC requests as HTTP POST with
-responses arriving as SSE `message` events.
-
-```bash
---mcp-server "remote=sse:https://example.com/sse"
-```
-
-### http — Streamable HTTP Transport (2025-11-25)
-
-```
-name=http:url
-```
-
-Connects to an MCP server using the new Streamable HTTP transport (spec
+Connects to an MCP server using the Streamable HTTP transport (spec
 2025-11-25). The server provides a single HTTP endpoint for both POST
 and GET. Responses can be immediate JSON or SSE streams.
 
 ```bash
---mcp-server "remote=http:https://example.com/mcp"
+--mcp-server "remote=https://example.com/mcp"
 ```
 
 ## Tool Naming
@@ -131,7 +114,6 @@ Agent Loop
     Manager
       ├── Client "db"  ─── StdioTransport ─── npx @anthropic/mcp-db-server
       ├── Client "git" ─── StdioTransport ─── uvx mcp-git
-      ├── Client "api" ─── SSETransport  ─── https://api.example.com/sse
       └── Client "mcp" ─── StreamableHTTP  ─── https://example.com/mcp
 ```
 
@@ -232,7 +214,6 @@ an MCP Host). The table below covers spec `2025-11-25`.
 | `notifications/tools/list_changed` | Marks server stale, requires restart |
 | Stdio transport | NDJSON, graceful shutdown (stdin→SIGTERM→SIGKILL) |
 | Streamable HTTP transport | JSON + SSE responses, GET stream, `Mcp-Session-Id`, `MCP-Protocol-Version` header |
-| SSE transport (legacy) | Endpoint discovery, relative URL resolution |
 | Cursor pagination | All list methods |
 
 ### ❌ Not Implemented

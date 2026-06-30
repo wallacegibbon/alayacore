@@ -420,18 +420,7 @@ func (c *Client) connectLocked(ctx context.Context) error {
 			return fmt.Errorf("mcp client %q: %w", c.config.Name, err)
 		}
 	case c.config.URL != "":
-		switch c.config.TransportType {
-		case TransportSSE:
-			transport, err = NewSSETransport(c.config.URL, c.config.Debug)
-			if err != nil {
-				return fmt.Errorf("mcp client %q: %w", c.config.Name, err)
-			}
-		case TransportStreamable:
-			transport = NewStreamableHTTPTransport(c.config.URL, c.config.Debug)
-		default:
-			return fmt.Errorf("mcp client %q: unknown transport type %q for URL %s",
-				c.config.Name, c.config.TransportType, c.config.URL)
-		}
+		transport = NewStreamableHTTPTransport(c.config.URL, c.config.Debug)
 	default:
 		return fmt.Errorf("mcp client %q: no command or URL specified", c.config.Name)
 	}
@@ -493,8 +482,6 @@ func (c *Client) setupNotificationHandler(tp Transport) {
 	h := NotificationHandler(c.handleNotification)
 	switch t := tp.(type) {
 	case *StdioTransport:
-		t.SetNotificationHandler(h)
-	case *SSETransport:
 		t.SetNotificationHandler(h)
 	case *StreamableHTTPTransport:
 		t.SetNotificationHandler(h)

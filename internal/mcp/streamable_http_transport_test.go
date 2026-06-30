@@ -487,59 +487,6 @@ func TestStreamableHTTP_ContextCancellation(t *testing.T) {
 	}
 }
 
-func TestStreamableHTTP_Detect(t *testing.T) {
-	server := newStreamableTestServer(t)
-	defer server.Close()
-
-	ctx := context.Background()
-	ok, err := DetectStreamableHTTP(ctx, server.URL())
-	if err != nil {
-		t.Fatalf("DetectStreamableHTTP() error = %v", err)
-	}
-	if !ok {
-		t.Error("DetectStreamableHTTP() = false, want true")
-	}
-}
-
-func TestStreamableHTTP_Detect_LegacySSE(t *testing.T) {
-	// Create a server that returns 405 for POST (like a legacy SSE server).
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("failed to listen: %v", err)
-	}
-
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "POST" {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		http.Error(w, "not found", http.StatusNotFound)
-	})
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		//nolint:errcheck
-		http.Serve(listener, mux)
-	}()
-
-	serverURL := "http://" + listener.Addr().String()
-
-	ctx := context.Background()
-	ok, err := DetectStreamableHTTP(ctx, serverURL)
-	if err != nil {
-		t.Fatalf("DetectStreamableHTTP() error = %v", err)
-	}
-	if ok {
-		t.Error("DetectStreamableHTTP() = true for legacy SSE server, want false")
-	}
-
-	listener.Close()
-	wg.Wait()
-}
-
 func TestStreamableHTTP_GETStream(t *testing.T) {
 	server := newStreamableTestServer(t)
 	defer server.Close()
