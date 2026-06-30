@@ -153,45 +153,54 @@ func (c *Client) doInitialize(ctx context.Context) error {
 	return nil
 }
 
-// ListTools fetches the list of available tools from the server.
-// Supports cursor-based pagination per the MCP spec.
-func (c *Client) ListTools(ctx context.Context) ([]Tool, error) {
+// listAllPages is a generic pagination helper for MCP list methods.
+// It handles cursor-based pagination by repeatedly calling sendRequest
+// and extracting items via the callback until nextCursor is empty.
+func listAllPages[T any, P any](ctx context.Context, c *Client, op string, method string, extract func(*P) ([]T, string)) ([]T, error) {
 	if c.State() != StateReady {
-		return nil, c.stateError("list tools")
+		return nil, c.stateError(op)
 	}
 
-	type listToolsParams struct {
+	type listParams struct {
 		Cursor string `json:"cursor,omitempty"`
 	}
 
-	var allTools []Tool
+	var all []T
 	var cursor string
 
 	for {
 		var params any
 		if cursor != "" {
-			params = listToolsParams{Cursor: cursor}
+			params = listParams{Cursor: cursor}
 		}
 
-		result, err := c.sendRequest(ctx, methodListTools, params)
+		result, err := c.sendRequest(ctx, method, params)
 		if err != nil {
 			return nil, err
 		}
 
-		var page ListToolsResult
+		var page P
 		if err := json.Unmarshal(result, &page); err != nil {
-			return nil, fmt.Errorf("parse page: %w", err)
+			return nil, fmt.Errorf("parse %s: %w", op, err)
 		}
 
-		allTools = append(allTools, page.Tools...)
+		items, nextCursor := extract(&page)
+		all = append(all, items...)
 
-		if page.NextCursor == "" {
+		if nextCursor == "" {
 			break
 		}
-		cursor = page.NextCursor
+		cursor = nextCursor
 	}
 
-	return allTools, nil
+	return all, nil
+}
+
+// ListTools fetches the list of available tools from the server.
+// Supports cursor-based pagination per the MCP spec.
+func (c *Client) ListTools(ctx context.Context) ([]Tool, error) {
+	return listAllPages(ctx, c, "list tools", methodListTools,
+		func(p *ListToolsResult) ([]Tool, string) { return p.Tools, p.NextCursor })
 }
 
 // CallTool invokes a tool on the server and returns the result.
@@ -227,44 +236,9 @@ func (c *Client) HasResources() bool {
 }
 
 // ListResources fetches the list of available resources from the server.
-//
-//nolint:dupl // similar to ListPrompts by spec design
 func (c *Client) ListResources(ctx context.Context) ([]Resource, error) {
-	if c.State() != StateReady {
-		return nil, c.stateError("list resources")
-	}
-
-	type listResourcesParams struct {
-		Cursor string `json:"cursor,omitempty"`
-	}
-
-	var all []Resource
-	var cursor string
-
-	for {
-		var params any
-		if cursor != "" {
-			params = listResourcesParams{Cursor: cursor}
-		}
-
-		result, err := c.sendRequest(ctx, methodListResources, params)
-		if err != nil {
-			return nil, err
-		}
-
-		var page ListResourcesResult
-		if err := json.Unmarshal(result, &page); err != nil {
-			return nil, fmt.Errorf("parse resources page: %w", err)
-		}
-
-		all = append(all, page.Resources...)
-		if page.NextCursor == "" {
-			break
-		}
-		cursor = page.NextCursor
-	}
-
-	return all, nil
+	return listAllPages(ctx, c, "list resources", methodListResources,
+		func(p *ListResourcesResult) ([]Resource, string) { return p.Resources, p.NextCursor })
 }
 
 // ReadResource reads a resource by URI from the server.
@@ -292,44 +266,9 @@ func (c *Client) HasPrompts() bool {
 }
 
 // ListPrompts fetches the list of available prompts from the server.
-//
-//nolint:dupl // similar to ListResources by spec design
 func (c *Client) ListPrompts(ctx context.Context) ([]Prompt, error) {
-	if c.State() != StateReady {
-		return nil, c.stateError("list prompts")
-	}
-
-	type listPromptsParams struct {
-		Cursor string `json:"cursor,omitempty"`
-	}
-
-	var all []Prompt
-	var cursor string
-
-	for {
-		var params any
-		if cursor != "" {
-			params = listPromptsParams{Cursor: cursor}
-		}
-
-		result, err := c.sendRequest(ctx, methodListPrompts, params)
-		if err != nil {
-			return nil, err
-		}
-
-		var page ListPromptsResult
-		if err := json.Unmarshal(result, &page); err != nil {
-			return nil, fmt.Errorf("parse prompts page: %w", err)
-		}
-
-		all = append(all, page.Prompts...)
-		if page.NextCursor == "" {
-			break
-		}
-		cursor = page.NextCursor
-	}
-
-	return all, nil
+	return listAllPages(ctx, c, "list prompts", methodListPrompts,
+		func(p *ListPromptsResult) ([]Prompt, string) { return p.Prompts, p.NextCursor })
 }
 
 // GetPrompt fetches a prompt by name with optional arguments.
