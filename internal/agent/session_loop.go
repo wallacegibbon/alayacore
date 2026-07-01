@@ -127,9 +127,18 @@ func (s *Session) applyMCPUpdate(update MCPUpdateEvent) {
 
 // applyOAuthResult applies a single completed OAuth result.
 // Called from pollOAuthResults in the main loop.
+// If the server was already skipped by the user, the result is discarded.
 func (s *Session) applyOAuthResult(result *mcp.ServerOAuthResult) {
 	if result.Err != nil {
 		s.writeError(fmt.Sprintf("MCP auth failed for %q: %v", result.Name, result.Err))
+		s.advanceMCPAuth()
+		return
+	}
+
+	// If the user skipped this server after OAuth started, discard the result.
+	// The goroutine can't be canceled mid-flight, but its tools shouldn't
+	// be applied.
+	if s.oauthGroup != nil && s.oauthGroup.IsSkipped(result.Name) {
 		s.advanceMCPAuth()
 		return
 	}
@@ -184,6 +193,9 @@ func (s *Session) applyOAuthTools(name string, tools []mcp.Tool) {
 // Called after each user action or OAuth result.
 // With parallel OAuth, confirm prompts are serial (one dialog at a time)
 // but OAuth executions run concurrently in background goroutines.
+// MCP is marked ready as soon as all servers have been confirmed or
+// skipped by the user — tools from still-running OAuths arrive later
+// via pollOAuthResults.
 func (s *Session) advanceMCPAuth() {
 	if s.oauthGroup == nil {
 		return
@@ -191,9 +203,10 @@ func (s *Session) advanceMCPAuth() {
 
 	if next := s.oauthGroup.NextConfirm(); next != nil {
 		s.sendMCPAuthConfirm(next.Name(), next.URL())
-	} else if s.oauthGroup.PendingCount() == 0 && s.oauthGroup.RunningCount() == 0 {
-		// All servers either started or skipped, and no goroutines running.
-		// Collect any remaining results and mark ready.
+	} else if !s.mcpReady.Load() {
+		// All servers have been confirmed or skipped by the user.
+		// Tools from still-running OAuth goroutines will arrive
+		// later via pollOAuthResults — no need to wait.
 		s.pollOAuthResults()
 		s.mcpReady.Store(true)
 		s.sendMCPAuthDone()
@@ -201,7 +214,6 @@ func (s *Session) advanceMCPAuth() {
 		s.writeNotifyf("MCP servers initialized: %d servers, %d tools loaded",
 			s.MCPManager.ActiveServerCount(), s.mcpToolCount)
 	}
-	// else: still waiting for running goroutines to complete.
 }
 
 // handleTaskDone processes a task completion signal from the task goroutine.

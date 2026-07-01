@@ -113,6 +113,11 @@ func (s *OAuthGroup) Skip(name string) {
 	s.skipped[name] = true
 }
 
+// IsSkipped returns true if the server was skipped by the user.
+func (s *OAuthGroup) IsSkipped(name string) bool {
+	return s.skipped[name]
+}
+
 // TryResult returns a completed OAuth result, or nil if none available.
 // Non-blocking.
 func (s *OAuthGroup) TryResult() *ServerOAuthResult {
