@@ -519,7 +519,7 @@ func (s *Session) handleMCPSkip() {
 //
 // Delegates to Init.Confirm() which unblocks the init goroutine so
 // it can proceed to the next server or launch OAuth.
-// Returns a boolean indicating whether the confirm was accepted.
+// Init.Confirm() returns true if the confirm request was accepted.
 func (s *Session) handleMCPAuth(_ context.Context, args string) {
 	name, action, _ := strings.Cut(args, " ")
 	if name == "" || action == "" {
