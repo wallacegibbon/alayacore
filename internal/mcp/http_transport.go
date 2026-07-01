@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/alayacore/alayacore/internal/debug"
 	"github.com/alayacore/alayacore/internal/mcp/auth"
@@ -586,16 +587,22 @@ func (t *StreamableHTTPTransport) readSSEResponse(ctx context.Context, resp *htt
 // handleServerRequest handles a JSON-RPC request from the server (e.g. ping).
 // Responses are sent via HTTP POST to the endpoint (best-effort).
 func (t *StreamableHTTPTransport) handleServerRequest(id requestID, method string) {
+	// Use a short timeout for responding to server requests. If the server
+	// cannot accept our response within 10 seconds, we drop it — there's
+	// nothing more we can do.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	switch method {
 	case methodPing:
-		_ = t.sendResponse(context.Background(), jsonrpcResponse{
+		_ = t.sendResponse(ctx, jsonrpcResponse{
 			JSONRPC: jsonrpcVersion,
 			ID:      id,
 			Result:  json.RawMessage(`{}`),
 		})
 
 	default:
-		_ = t.sendResponse(context.Background(), jsonrpcResponse{
+		_ = t.sendResponse(ctx, jsonrpcResponse{
 			JSONRPC: jsonrpcVersion,
 			ID:      id,
 			Error: &jsonrpcError{
