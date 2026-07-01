@@ -18,22 +18,19 @@ type ServerOAuthResult struct {
 // API for the session to drive the flow:
 //
 //  1. NextConfirm() returns the next server needing user confirmation
-//  2. Start(ctx, name) launches OAuth in a background goroutine
+//  2. Start(name) launches OAuth in a background goroutine
 //  3. TryResult() collects completed results (non-blocking)
-//  4. Done() is true when all servers have been processed
+//  4. AllSettled() is true when all servers are either skipped or completed
 //
 // All methods are safe to call from the session's run() goroutine.
 type OAuthGroup struct {
 	auths   []*ServerAuth
 	results chan ServerOAuthResult
 
-	// started tracks servers the user confirmed (OAuth goroutine launched).
-	// skipped tracks servers the user declined.
-	// Both are map[string]bool guarded by the mutex, but the hot path
-	// for started also uses an atomic counter for RunningCount.
-	started map[string]bool
-	skipped map[string]bool
-	running atomic.Int32 // number of goroutines in flight
+	started   map[string]bool // servers the user confirmed (goroutine launched)
+	skipped   map[string]bool // servers the user declined
+	completed map[string]bool // servers whose result was collected via TryResult
+	running   atomic.Int32    // number of goroutines in flight
 }
 
 // NewOAuthGroup creates an OAuthGroup from clients that need authorization.
@@ -50,10 +47,11 @@ func NewOAuthGroup(clients []*Client) *OAuthGroup {
 		return nil
 	}
 	return &OAuthGroup{
-		auths:   auths,
-		results: make(chan ServerOAuthResult, len(auths)),
-		started: make(map[string]bool),
-		skipped: make(map[string]bool),
+		auths:     auths,
+		results:   make(chan ServerOAuthResult, len(auths)),
+		started:   make(map[string]bool),
+		skipped:   make(map[string]bool),
+		completed: make(map[string]bool),
 	}
 }
 
@@ -119,10 +117,11 @@ func (s *OAuthGroup) IsSkipped(name string) bool {
 }
 
 // TryResult returns a completed OAuth result, or nil if none available.
-// Non-blocking.
+// Non-blocking. Marks the server as completed so AllSettled can check.
 func (s *OAuthGroup) TryResult() *ServerOAuthResult {
 	select {
 	case r := <-s.results:
+		s.completed[r.Name] = true
 		return &r
 	default:
 		return nil
@@ -145,8 +144,24 @@ func (s *OAuthGroup) RunningCount() int {
 	return int(s.running.Load())
 }
 
-// Done returns true when all servers have been either started (and
-// completed) or skipped — no pending, no running goroutines.
-func (s *OAuthGroup) Done() bool {
-	return s.PendingCount() == 0 && s.RunningCount() == 0
+// AllSettled returns true when all servers are either skipped by the user
+// or have completed their OAuth (result collected via TryResult).
+// Unlike Done(), this returns true even if goroutines for skipped servers
+// are still running because their results will be discarded anyway.
+func (s *OAuthGroup) AllSettled() bool {
+	for _, a := range s.auths {
+		name := a.Name()
+		if s.skipped[name] {
+			continue
+		}
+		if !s.completed[name] {
+			return false
+		}
+	}
+	return true
+}
+
+// IsCompleted returns true if the server's result was collected.
+func (s *OAuthGroup) IsCompleted(name string) bool {
+	return s.completed[name]
 }

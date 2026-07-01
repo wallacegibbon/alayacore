@@ -191,11 +191,10 @@ func (s *Session) applyOAuthTools(name string, tools []mcp.Tool) {
 
 // advanceMCPAuth sends the next auth confirm prompt or marks MCP as ready.
 // Called after each user action or OAuth result.
-// With parallel OAuth, confirm prompts are serial (one dialog at a time)
-// but OAuth executions run concurrently in background goroutines.
-// MCP is marked ready as soon as all servers have been confirmed or
-// skipped by the user — tools from still-running OAuths arrive later
-// via pollOAuthResults.
+// Confirm prompts are serial (one dialog at a time); OAuth executions
+// run concurrently in background goroutines.
+// MCP is marked ready when all servers are either skipped or completed,
+// regardless of whether goroutines for skipped servers are still running.
 func (s *Session) advanceMCPAuth() {
 	if s.oauthGroup == nil {
 		return
@@ -203,10 +202,7 @@ func (s *Session) advanceMCPAuth() {
 
 	if next := s.oauthGroup.NextConfirm(); next != nil {
 		s.sendMCPAuthConfirm(next.Name(), next.URL())
-	} else if !s.mcpReady.Load() {
-		// All servers have been confirmed or skipped by the user.
-		// Tools from still-running OAuth goroutines will arrive
-		// later via pollOAuthResults — no need to wait.
+	} else if s.oauthGroup.AllSettled() && !s.mcpReady.Load() {
 		s.pollOAuthResults()
 		s.mcpReady.Store(true)
 		s.sendMCPAuthDone()
