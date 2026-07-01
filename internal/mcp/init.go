@@ -126,7 +126,8 @@ func (init *Init) Confirm(server string, allow bool) bool {
 
 // SkipCurrent aborts the current operation:
 //   - During connect phase: skips the current server being connected
-//   - During OAuth phase: cancels the per-server context, aborting the flow
+//   - During OAuth confirm phase: no-op (user presses 'n' on a dialog to skip)
+//   - During OAuth execution phase: cancels the first running OAuth server's context
 //
 // Safe to call concurrently.
 func (init *Init) SkipCurrent() {
@@ -225,41 +226,52 @@ func (init *Init) connectPhase(ctx context.Context, clients []*Client, total int
 }
 
 // ============================================================================
-// Phase 2: OAuth servers (sequential confirms, parallel auth execution)
+// Phase 2: OAuth servers (parallel confirms, parallel auth execution)
 // ============================================================================
 
 func (init *Init) oauthPhase(ctx context.Context, clients []*Client, connected, skipped, total int) {
+	// Phase 2a: Identify OAuth servers and send all auth_confirm events at once.
+	type pendingServer struct {
+		client *Client
+	}
+	pending := make(map[string]*pendingServer)
 	for _, c := range clients {
 		if !c.needsPersistedAuth() {
 			continue
 		}
+		pending[c.Name()] = &pendingServer{client: c}
 		init.sendEvent(InitEvent{
 			Type: "auth_confirm", Server: c.Name(), URL: c.config.URL,
 			Connected: connected, Skipped: skipped, Total: total,
 		})
-		if !init.waitConfirm(ctx, c.Name()) {
-			skipped++
-			init.sendEvent(InitEvent{
-				Type: "auth_done", Server: c.Name(), Error: "skipped",
-				Connected: connected, Skipped: skipped, Total: total,
-			})
-			continue
-		}
-		init.launchOAuth(ctx, c, connected, skipped, total)
 	}
-}
 
-func (init *Init) waitConfirm(ctx context.Context, server string) bool {
-	for {
+	if len(pending) == 0 {
+		return
+	}
+
+	// Phase 2b: Collect confirm results as they arrive.
+	// Adapter may show dialogs sequentially (TUI) or in parallel (GUI).
+	for len(pending) > 0 {
 		select {
 		case req := <-init.confirmCh:
-			if req.Server == server {
-				return req.Allow
+			ps, ok := pending[req.Server]
+			if !ok {
+				// Stale response for an already-resolved server.
+				continue
 			}
-			// Stale response for a different server — ignore and wait.
-			continue
+			delete(pending, req.Server)
+			if req.Allow {
+				init.launchOAuth(ctx, ps.client, connected, skipped, total)
+			} else {
+				skipped++
+				init.sendEvent(InitEvent{
+					Type: "auth_done", Server: req.Server, Error: "skipped",
+					Connected: connected, Skipped: skipped, Total: total,
+				})
+			}
 		case <-ctx.Done():
-			return false
+			return
 		}
 	}
 }

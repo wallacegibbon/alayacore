@@ -50,11 +50,9 @@ type sessionState struct {
 	mcpSkipped   int    // servers skipped by user
 	mcpTotal     int    // total servers
 
-	// mcpAuthPending is a one-shot flag set when an "auth_confirm" event arrives.
-	// The Terminal tick handler consumes it (via takeMCPAuthPending) to open
-	// the confirm dialog exactly once. Server name and URL are read from
-	// mcpServer/mcpServerURL which are set by updateMCPProgress.
-	mcpAuthPending bool
+	// pendingMCPAuths is a queue of MCP auth confirmations awaiting display.
+	// The Terminal tick handler pops them to open confirm dialogs one at a time.
+	pendingMCPAuths []mcpAuthPending
 
 	// Model fields
 	models          []config.ModelConfig
@@ -79,6 +77,12 @@ type toolConfirmPending struct {
 	ID    string
 	Name  string
 	Input string
+}
+
+// mcpAuthPending holds a single pending MCP auth confirmation.
+type mcpAuthPending struct {
+	server string
+	url    string
 }
 
 // updateTask atomically updates task progress fields.
@@ -183,25 +187,25 @@ func (s *sessionState) updateMCPProgress(status, server, url string, connected, 
 	s.mu.Unlock()
 }
 
-// setMCPAuthPending marks a pending MCP auth confirmation.
-// Server and URL are already stored by the preceding updateMCPProgress call.
+// setMCPAuthPending appends a pending MCP auth confirmation to the queue.
 // Consumed by takeMCPAuthPending in the Terminal tick handler.
-func (s *sessionState) setMCPAuthPending() {
+func (s *sessionState) setMCPAuthPending(server, url string) {
 	s.mu.Lock()
-	s.mcpAuthPending = true
+	s.pendingMCPAuths = append(s.pendingMCPAuths, mcpAuthPending{server: server, url: url})
 	s.mu.Unlock()
 }
 
-// takeMCPAuthPending pops the pending MCP auth confirmation.
-// Returns (server, url, ok). Server/URL read from shared status fields.
+// takeMCPAuthPending pops the next pending MCP auth confirmation.
+// Returns (server, url, ok). If queue is empty, ok is false.
 func (s *sessionState) takeMCPAuthPending() (server, url string, ok bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if !s.mcpAuthPending {
+	if len(s.pendingMCPAuths) == 0 {
 		return "", "", false
 	}
-	s.mcpAuthPending = false
-	return s.mcpServer, s.mcpServerURL, true
+	p := s.pendingMCPAuths[0]
+	s.pendingMCPAuths = s.pendingMCPAuths[1:]
+	return p.server, p.url, true
 }
 
 // takeMCPDone returns true if initialization is complete (mcpStatus is "done")
