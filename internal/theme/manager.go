@@ -47,132 +47,49 @@ func (tm *Manager) initializeThemesFolder() {
 
 // createDefaultThemes creates the default theme-dark.conf and theme-light.conf files.
 func (tm *Manager) createDefaultThemes() {
-	darkTheme := `# AlayaCore Dark Theme
-# Based on Catppuccin Mocha color palette
-
-# Primary - accent color for highlights and focused borders
-primary: #89d4fa
-
-# Dim - for unfocused borders and blurred text
+	darkTheme := `primary: #89d4fa
 dim: #313244
-
-# Muted - for placeholder and secondary text
 muted: #6c7086
-
-# Text - primary text color
 text: #cdd6f4
-
-# Warning - for warnings (yellow/orange)
 warning: #f9e2af
-
-# Error - for errors (red)
 error: #f38ba8
-
-# Success - for success indicators (green)
 success: #a6e3a1
-
-# Selection - for cursor border highlight
 selection: #fab387
-
-# Cursor - text input cursor color
 cursor: #cdd6f4
-
-# Diff colors
-# Added lines (green)
 added: #a6e3a1
-
-# Removed lines (red)
 removed: #f38ba8
-
-# Fold indicator character
 fold_indicator: "⁝"
 `
 	darkPath := filepath.Join(tm.themesFolder, "theme-dark.conf")
 	_ = os.WriteFile(darkPath, []byte(darkTheme), 0600) // best-effort default creation
 
-	lightTheme := `# AlayaCore Light Theme
-# Based on Catppuccin Latte color palette
-# Optimized for white/light terminal backgrounds
-
-# Primary - deep blue for visibility on light backgrounds
-primary: #1e66f5
-
-# Dim - for unfocused borders (darker, closer to background)
+	lightTheme := `primary: #1e66f5
 dim: #d0d0d8
-
-# Muted - for placeholder and secondary text
 muted: #6c6f85
-
-# Text - dark for readability
 text: #4c4f69
-
-# Warning - orange for visibility
 warning: #df8e1d
-
-# Error - deep red for errors
 error: #d20f39
-
-# Success - deep green for success indicators
 success: #40a02b
-
-# Selection - dark maroon for cursor border highlight
 selection: #881337
-
-# Cursor - dark color for visibility
 cursor: #1e1e2e
-
-# Diff colors
-# Added lines (deep green)
 added: #40a02b
-
-# Removed lines (deep red)
 removed: #d20f39
-
-# Fold indicator character
 fold_indicator: "⁝"
 `
 	lightPath := filepath.Join(tm.themesFolder, "theme-light.conf")
 	_ = os.WriteFile(lightPath, []byte(lightTheme), 0600) // best-effort default creation
 
-	redpandaTheme := `# AlayaCore Redpanda Dark Theme
-# Warm reddish-brown palette with red/orange dominant colors,
-# inspired by the Redpanda brand palette.
-
-# Primary - brand red-orange for highlights and focused borders
-primary: #e24328
-
-# Dim - dark warm brown for unfocused borders
+	redpandaTheme := `primary: #e24328
 dim: #2c1c18
-
-# Muted - warm brown for placeholder and secondary text
 muted: #6b4e44
-
-# Text - warm off-white for comfortable reading
 text: #f0e6e0
-
-# Warning - warm orange
 warning: #f77923
-
-# Error - bright red-orange
 error: #ea4a3e
-
-# Success - muted green
 success: #48bb78
-
-# Selection - warm dark red-brown for cursor border highlight
 selection: #943d28
-
-# Cursor - brand red-orange
 cursor: #e24328
-
-# Diff colors
-# Added lines (green)
 added: #68d391
-
-# Removed lines (bright red-orange)
 removed: #f9944f
-
-# Fold indicator character
 fold_indicator: "⁝"
 `
 	redpandaPath := filepath.Join(tm.themesFolder, "theme-redpanda.conf")

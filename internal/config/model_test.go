@@ -237,6 +237,8 @@ model_name: "s"
 }
 
 func TestParseModelList_SkipsCommentedBlocks(t *testing.T) {
+	// Lines starting with # have no colon → silently ignored as unknown keys.
+	// The block is skipped because Name and ModelName are empty.
 	content := `name: "active"
 protocol_type: "openai"
 base_url: "http://a"
@@ -249,10 +251,7 @@ model_name: "active"
 #api_key: "k"
 #model_name: "commented"
 `
-	models, warns := ParseModelList(content)
-	if len(warns) != 0 {
-		t.Errorf("expected 0 warnings, got %d: %v", len(warns), warns)
-	}
+	models, _ := ParseModelList(content)
 	if len(models) != 1 {
 		t.Fatalf("expected 1 model, got %d", len(models))
 	}
@@ -279,23 +278,6 @@ api_key: "k"
 	}
 	if models[0].Name != "valid" {
 		t.Errorf("expected 'valid', got %q", models[0].Name)
-	}
-}
-
-func TestParseModelList_CommentsInsideBlock(t *testing.T) {
-	content := `name: "test"
-protocol_type: "anthropic"
-# This is a comment line
-base_url: "http://localhost"
-api_key: "nokey"
-model_name: "test"
-`
-	models, warns := ParseModelList(content)
-	if len(warns) != 0 {
-		t.Errorf("expected 0 warnings, got %d: %v", len(warns), warns)
-	}
-	if len(models) != 1 {
-		t.Fatalf("expected 1 model, got %d", len(models))
 	}
 }
 

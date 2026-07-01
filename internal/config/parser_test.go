@@ -61,6 +61,7 @@ func TestParseKeyValueSingleQuotes(t *testing.T) {
 }
 
 func TestParseKeyValueComments(t *testing.T) {
+	// Lines starting with # have no colon → silently ignored
 	content := `# This is a comment
 name: test
 # Another comment

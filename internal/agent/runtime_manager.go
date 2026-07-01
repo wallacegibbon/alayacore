@@ -12,7 +12,6 @@ package agent
 import (
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/alayacore/alayacore/internal/config"
 )
@@ -85,12 +84,7 @@ func parseRuntimeConfig(content string) RuntimeConfig {
 
 // formatRuntimeConfig formats the runtime config as key-value text
 func formatRuntimeConfig(cfg RuntimeConfig) string {
-	var sb strings.Builder
-	sb.WriteString("# AlayaCore runtime configuration\n")
-	sb.WriteString("# This file is automatically updated when you switch models or themes\n")
-	sb.WriteString("\n")
-	sb.WriteString(config.FormatKeyValue(cfg))
-	return sb.String()
+	return config.FormatKeyValue(cfg)
 }
 
 func (rm *RuntimeManager) GetActiveModel() string {

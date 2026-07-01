@@ -106,7 +106,7 @@ func parseConfig(content string, target any) []ParseWarning {
 	// Parse lines
 	for line := range strings.SplitSeq(content, "\n") {
 		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
+		if line == "" {
 			continue
 		}
 
