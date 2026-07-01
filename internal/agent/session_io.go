@@ -519,27 +519,34 @@ func (s *Session) handleMCPInitSkip() {
 //
 // Delegates to Init.Confirm() which unblocks the init goroutine so
 // it can proceed to the next server or launch OAuth.
+// Returns a boolean indicating whether the confirm was accepted.
 func (s *Session) handleMCPAuth(_ context.Context, args string) {
 	name, action, _ := strings.Cut(args, " ")
 	if name == "" || action == "" {
 		s.writeError("usage: :mcp_auth <server_name> yes|no")
 		return
 	}
-	switch {
-	case s.mcpInit == nil:
+	if s.mcpInit == nil {
 		s.writeError("No MCP servers configured.")
-	case s.mcpReady.Load():
+		return
+	}
+	if s.mcpReady.Load() {
 		s.writeError("MCP initialization has already completed.")
+		return
+	}
+	var accepted bool
+	switch action {
+	case "yes":
+		accepted = s.mcpInit.Confirm(name, true)
+	case "no":
+		accepted = s.mcpInit.Confirm(name, false)
 	default:
-		switch action {
-		case "yes":
-			s.mcpInit.Confirm(name, true)
-			s.writeNotifyf("Authorizing MCP server %q...", name)
-		case "no":
-			s.mcpInit.Confirm(name, false)
-			s.writeNotifyf("Skipped authorization for MCP server %q.", name)
-		default:
-			s.writeError("usage: :mcp_auth <server_name> yes|no")
-		}
+		s.writeError("usage: :mcp_auth <server_name> yes|no")
+		return
+	}
+	if accepted {
+		s.writeNotifyf("MCP authorization for %q recorded.", name)
+	} else {
+		s.writeError(fmt.Sprintf("No pending authorization for MCP server %q.", name))
 	}
 }

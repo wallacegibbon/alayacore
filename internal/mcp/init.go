@@ -111,12 +111,16 @@ func (init *Init) Start(ctx context.Context) {
 
 // Confirm responds to an "auth_confirm" event.
 // The session calls this when the user decides yes/no for a server.
-// If the server name doesn't match the current pending confirm, the
-// call is silently ignored (prevents race from stale user input).
-func (init *Init) Confirm(server string, allow bool) {
+// Returns true if the response was accepted (init is still running
+// and waiting for this server's confirmation).
+// Returns false if no confirmation is pending (init already done
+// or the buffer is full).
+func (init *Init) Confirm(server string, allow bool) bool {
 	select {
 	case init.confirmCh <- confirmReq{Server: server, Allow: allow}:
+		return true
 	default:
+		return false
 	}
 }
 
