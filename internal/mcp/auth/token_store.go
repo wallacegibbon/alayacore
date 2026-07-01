@@ -37,16 +37,6 @@ func NewFileTokenStore(dir string) *FileTokenStore {
 	return &FileTokenStore{dir: dir}
 }
 
-// DefaultTokenDir returns the default token storage directory
-// under the user's alayacore config directory.
-func DefaultTokenDir() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("home dir: %w", err)
-	}
-	return filepath.Join(home, ".alayacore", "mcp-tokens"), nil
-}
-
 // tokenFileName returns the file path for a given server ID.
 // The server ID is sanitized to prevent directory traversal.
 func (s *FileTokenStore) tokenFileName(serverID string) string {
