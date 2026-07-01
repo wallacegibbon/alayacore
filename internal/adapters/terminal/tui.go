@@ -389,8 +389,10 @@ func (m *Terminal) handleMCPInitOverlay() {
 		if !m.confirmOverlay.IsOpen() && !m.mcpInitOverlayDismissed {
 			m.openConfirmMCPInit()
 		}
-	case "connecting", "succeeded", "skipped", "failed":
+	case "connecting", "succeeded", "skipped", "failed", "auth_required":
 		// Per-server progress — update overlay content.
+		// "auth_required" keeps the overlay open while OAuth runs;
+		// it will be closed by handleConfirmOverlays when done is received.
 		if m.confirmOverlay.Kind() == ConfirmMCPInit {
 			m.confirmOverlay.UpdateMCPInitProgress(st.MCPInitServer, st.MCPInitConnected, st.MCPInitSkipped, st.MCPInitTotal)
 			m.display.updateContent()
@@ -398,7 +400,7 @@ func (m *Terminal) handleMCPInitOverlay() {
 			m.openConfirmMCPInit()
 			m.confirmOverlay.UpdateMCPInitProgress(st.MCPInitServer, st.MCPInitConnected, st.MCPInitSkipped, st.MCPInitTotal)
 		}
-	case "ready", "auth_required":
+	case "ready":
 		// Init complete — close the overlay if it's open and
 		// reset the dismiss flag so future init phases trigger it.
 		m.mcpInitOverlayDismissed = false
@@ -411,26 +413,17 @@ func (m *Terminal) handleMCPInitOverlay() {
 	}
 }
 
-// handleConfirmOverlays processes pending confirmations for tool execution
-// and MCP OAuth authorization, both driven by session TLV messages.
+// handleConfirmOverlays processes pending confirmations and lifecycle signals.
 //
 // Priority order:
-//  1. Tool confirmation (from agent task) — session sends tool_confirm
-//  2. MCP OAuth confirmation — session sends mcp_auth:confirm
+//  1. Tool confirmation (highest priority) — session sends tool_confirm
+//  2. MCP OAuth confirmation — session sends mcp_auth:confirm (temporary)
+//  3. MCP OAuth done — session sends mcp_auth:done (close init overlay)
 //
-// Both use the same pattern: the session writes a TLV message, the output
-// writer stores a pending confirmation, and the tick handler pops it here
-// to open the corresponding overlay.
-// handleConfirmOverlays processes pending confirmations for tool execution
-// and MCP OAuth authorization, both driven by session TLV messages.
-//
-// Priority order:
-//  1. Tool confirmation (highest priority)
-//  2. MCP OAuth confirmation (interrupts init overlay temporarily)
-//
-// Both are temporary — they appear, user responds, they disappear.
-// The init overlay (ConfirmMCPInit) persists across these interruptions
-// and is re-opened by handleMCPInitOverlay on the next tick.
+// The init overlay (ConfirmMCPInit) persists across temporary confirm
+// interruptions and is re-opened by handleMCPInitOverlay on the next tick.
+// When mcp_auth:done arrives, this function closes the init overlay
+// since all MCP servers (including OAuth) are fully initialized.
 func (m *Terminal) handleConfirmOverlays() {
 	// 1. Tool confirmation (highest priority).
 	//    Can interrupt any persistent overlay (including init).
@@ -445,6 +438,14 @@ func (m *Terminal) handleConfirmOverlays() {
 	if server, url, ok := m.out.GetPendingMCPAuth(); ok {
 		m.openConfirmMCPAuth(server, url)
 		return
+	}
+
+	// 3. MCP OAuth done — all servers processed, close init overlay.
+	if m.out.ConsumeMCPAuthDone() {
+		if m.confirmOverlay.IsOpen() && m.confirmOverlay.Kind() == ConfirmMCPInit {
+			m.confirmOverlay.Close()
+			m.restoreFocusAfterConfirm()
+		}
 	}
 }
 
