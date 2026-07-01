@@ -387,10 +387,14 @@ func (to *outputWriter) handleSystemMCPInit(data json.RawMessage) {
 	if json.Unmarshal(data, &msg) != nil {
 		return
 	}
-	// Per-server progress events carry a Server name — fetch all fields.
-	if msg.Server != "" && msg.ServerCount > 0 {
+	// Per-server progress events carry a Server name.
+	// Phase-level events with counts (e.g. "auth_required") use ServerCount directly.
+	switch {
+	case msg.Server != "":
 		to.status.updateMCPInitServerProgress(msg.Status, msg.Server, msg.ConnectedCount, msg.SkippedCount, msg.ServerCount)
-	} else {
+	case msg.ServerCount > 0:
+		to.status.updateMCPInitServerProgress(msg.Status, "", msg.ConnectedCount, msg.SkippedCount, msg.ServerCount)
+	default:
 		to.status.updateMCPInitStatus(msg.Status)
 	}
 }

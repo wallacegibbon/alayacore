@@ -252,11 +252,19 @@ func (s *Session) sendVideoConfigMsg() {
 
 // sendMCPInitMsg sends an MCP initialization status update to the adapter.
 func (s *Session) sendMCPInitMsg(status string, toolCount int, pending []MCPAuthServer) {
-	s.writeSystemMsg(MCPInitMsg{
+	m := MCPInitMsg{
 		Status:      status,
 		ToolCount:   toolCount,
 		PendingAuth: pending,
-	})
+	}
+	// For "auth_required", include server counts so the init overlay
+	// shows accurate progress even when no per-server events were sent
+	// (all servers need OAuth, so AsyncInit skipped them all).
+	if status == "auth_required" && s.MCPManager != nil {
+		m.ServerCount = s.MCPManager.ActiveServerCount() + len(pending)
+		m.ConnectedCount = s.MCPManager.ActiveServerCount()
+	}
+	s.writeSystemMsg(m)
 }
 
 // sendServerMCPInitMsg forwards a per-server progress event to the adapter.
