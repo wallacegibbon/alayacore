@@ -13,7 +13,7 @@ type ServerOAuthResult struct {
 	Err   error
 }
 
-// OAuthSeq manages the OAuth authorization sequence for a set of MCP servers.
+// OAuthGroup manages the OAuth authorization sequence for a set of MCP servers.
 // It owns the per-server state (ServerAuth instances) and provides a simple
 // API for the session to drive the flow:
 //
@@ -23,7 +23,7 @@ type ServerOAuthResult struct {
 //  4. Done() is true when all servers have been processed
 //
 // All methods are safe to call from the session's run() goroutine.
-type OAuthSeq struct {
+type OAuthGroup struct {
 	auths   []*ServerAuth
 	results chan ServerOAuthResult
 
@@ -36,10 +36,10 @@ type OAuthSeq struct {
 	running atomic.Int32 // number of goroutines in flight
 }
 
-// NewOAuthSeq creates an OAuthSeq from clients that need authorization.
+// NewOAuthGroup creates an OAuthGroup from clients that need authorization.
 // Clients that already have a valid token are excluded.
 // Returns nil if no clients need authorization.
-func NewOAuthSeq(clients []*Client) *OAuthSeq {
+func NewOAuthGroup(clients []*Client) *OAuthGroup {
 	var auths []*ServerAuth
 	for _, c := range clients {
 		if c.needsPersistedAuth() {
@@ -49,7 +49,7 @@ func NewOAuthSeq(clients []*Client) *OAuthSeq {
 	if len(auths) == 0 {
 		return nil
 	}
-	return &OAuthSeq{
+	return &OAuthGroup{
 		auths:   auths,
 		results: make(chan ServerOAuthResult, len(auths)),
 		started: make(map[string]bool),
@@ -60,7 +60,7 @@ func NewOAuthSeq(clients []*Client) *OAuthSeq {
 // NextConfirm returns the next server that needs user confirmation,
 // or nil if all servers have been prompted.
 // Servers are returned in config order, one at a time.
-func (s *OAuthSeq) NextConfirm() *ServerAuth {
+func (s *OAuthGroup) NextConfirm() *ServerAuth {
 	for _, a := range s.auths {
 		if !s.started[a.Name()] && !s.skipped[a.Name()] {
 			return a
@@ -73,7 +73,7 @@ func (s *OAuthSeq) NextConfirm() *ServerAuth {
 // Returns false if the server was already started or skipped.
 // Non-blocking: the goroutine sends its result through the results channel.
 // Each goroutine gets a 5-minute timeout context (plenty for interactive OAuth).
-func (s *OAuthSeq) Start(name string) bool {
+func (s *OAuthGroup) Start(name string) bool {
 	if s.started[name] || s.skipped[name] {
 		return false
 	}
@@ -109,13 +109,13 @@ func (s *OAuthSeq) Start(name string) bool {
 
 // Skip marks a server as skipped (user declined authorization).
 // Does not start any goroutine.
-func (s *OAuthSeq) Skip(name string) {
+func (s *OAuthGroup) Skip(name string) {
 	s.skipped[name] = true
 }
 
 // TryResult returns a completed OAuth result, or nil if none available.
 // Non-blocking.
-func (s *OAuthSeq) TryResult() *ServerOAuthResult {
+func (s *OAuthGroup) TryResult() *ServerOAuthResult {
 	select {
 	case r := <-s.results:
 		return &r
@@ -125,7 +125,7 @@ func (s *OAuthSeq) TryResult() *ServerOAuthResult {
 }
 
 // PendingCount returns the number of servers still waiting for user input.
-func (s *OAuthSeq) PendingCount() int {
+func (s *OAuthGroup) PendingCount() int {
 	count := 0
 	for _, a := range s.auths {
 		if !s.started[a.Name()] && !s.skipped[a.Name()] {
@@ -136,12 +136,12 @@ func (s *OAuthSeq) PendingCount() int {
 }
 
 // RunningCount returns the number of servers currently running OAuth.
-func (s *OAuthSeq) RunningCount() int {
+func (s *OAuthGroup) RunningCount() int {
 	return int(s.running.Load())
 }
 
 // Done returns true when all servers have been either started (and
 // completed) or skipped — no pending, no running goroutines.
-func (s *OAuthSeq) Done() bool {
+func (s *OAuthGroup) Done() bool {
 	return s.PendingCount() == 0 && s.RunningCount() == 0
 }

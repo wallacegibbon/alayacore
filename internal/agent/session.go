@@ -95,11 +95,11 @@ type runState struct {
 
 	// OAuth authorization sequence — owned by run() goroutine.
 	// When the initial MCPUpdateEvent has PendingOAuthServers, the run()
-	// goroutine creates an OAuthSeq and drives the flow:
+	// goroutine creates an OAuthGroup and drives the flow:
 	//   - NextConfirm() → adapter confirm dialog
 	//   - Start/Skip → user response
 	//   - TryResult() → collect completed OAuth results
-	oauthSeq *mcp.OAuthSeq
+	oauthGroup *mcp.OAuthGroup
 
 	// mcpToolCount tracks the total number of MCP tools loaded.
 	// Used for display messages; incremented in applyMCPUpdate and

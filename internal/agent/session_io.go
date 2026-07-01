@@ -512,7 +512,7 @@ func (s *Session) handleMCPInitSkip() {
 //
 // Usage: :mcp_auth <server_name> yes|no
 //
-// The OAuthSeq owns the per-server state. "yes" launches OAuth in a
+// The OAuthGroup owns the per-server state. "yes" launches OAuth in a
 // background goroutine (parallel with other confirmed servers); "no"
 // skips the server. Results are collected by pollOAuthResults in the
 // main loop.
@@ -523,21 +523,21 @@ func (s *Session) handleMCPAuth(_ context.Context, args string) {
 		return
 	}
 
-	if s.oauthSeq == nil {
+	if s.oauthGroup == nil {
 		s.writeError("MCP servers are still initializing. Please wait...")
 		return
 	}
 
 	switch action {
 	case "no":
-		s.oauthSeq.Skip(name)
+		s.oauthGroup.Skip(name)
 		s.writeNotifyf("Skipped authorization for MCP server %q.", name)
 		s.advanceMCPAuth()
 	case "yes":
 		s.writeNotifyf("Authorizing MCP server %q...", name)
 		s.writeNotify("A browser window will open for authentication.")
 
-		if ok := s.oauthSeq.Start(name); !ok {
+		if ok := s.oauthGroup.Start(name); !ok {
 			s.writeError(fmt.Sprintf("Server %q not found or already authorized", name))
 			return
 		}

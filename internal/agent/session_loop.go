@@ -84,8 +84,8 @@ func (s *Session) run() {
 // Called after each event in the main loop so OAuth results are
 // processed promptly even while waiting for user input.
 func (s *Session) pollOAuthResults() {
-	for s.oauthSeq != nil {
-		result := s.oauthSeq.TryResult()
+	for s.oauthGroup != nil {
+		result := s.oauthGroup.TryResult()
 		if result == nil {
 			break
 		}
@@ -115,7 +115,7 @@ func (s *Session) applyMCPUpdate(update MCPUpdateEvent) {
 
 	// 5. Start OAuth sequence if there are pending servers.
 	if len(update.PendingOAuthServers) > 0 {
-		s.oauthSeq = mcp.NewOAuthSeq(update.Manager.Clients())
+		s.oauthGroup = mcp.NewOAuthGroup(update.Manager.Clients())
 		s.mcpReady.Store(false)
 		s.advanceMCPAuth()
 	} else {
@@ -185,13 +185,13 @@ func (s *Session) applyOAuthTools(name string, tools []mcp.Tool) {
 // With parallel OAuth, confirm prompts are serial (one dialog at a time)
 // but OAuth executions run concurrently in background goroutines.
 func (s *Session) advanceMCPAuth() {
-	if s.oauthSeq == nil {
+	if s.oauthGroup == nil {
 		return
 	}
 
-	if next := s.oauthSeq.NextConfirm(); next != nil {
+	if next := s.oauthGroup.NextConfirm(); next != nil {
 		s.sendMCPAuthConfirm(next.Name(), next.URL())
-	} else if s.oauthSeq.PendingCount() == 0 && s.oauthSeq.RunningCount() == 0 {
+	} else if s.oauthGroup.PendingCount() == 0 && s.oauthGroup.RunningCount() == 0 {
 		// All servers either started or skipped, and no goroutines running.
 		// Collect any remaining results and mark ready.
 		s.pollOAuthResults()

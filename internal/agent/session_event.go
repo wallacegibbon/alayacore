@@ -52,7 +52,7 @@ func (SetContextTokensEvent) taskEvent() {}
 // MCPUpdateEvent carries MCP initialization results to the session's run()
 // goroutine. It is sent internally by startMCPInitWatcher after AsyncInit
 // completes. The run() goroutine applies the updates (tools + system prompt)
-// and starts the OAuth sequence via OAuthSeq if PendingOAuthServers is non-empty.
+// and starts the OAuth sequence via OAuthGroup if PendingOAuthServers is non-empty.
 type MCPUpdateEvent struct {
 	Tools               []llm.Tool
 	SystemPromptSuffix  string
