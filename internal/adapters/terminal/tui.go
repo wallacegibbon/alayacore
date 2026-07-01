@@ -393,12 +393,20 @@ func (m *Terminal) handleMCPInitOverlay() {
 		// Per-server progress — update overlay content.
 		// "auth_required" keeps the overlay open while OAuth runs;
 		// it will be closed by handleConfirmOverlays when done is received.
-		if m.confirmOverlay.Kind() == ConfirmMCPInit {
+		switch m.confirmOverlay.Kind() {
+		case ConfirmMCPInit:
+			// Init overlay already open — just update progress.
 			m.confirmOverlay.UpdateMCPInitProgress(st.MCPInitServer, st.MCPInitConnected, st.MCPInitSkipped, st.MCPInitTotal)
 			m.display.updateContent()
-		} else if !m.mcpInitOverlayDismissed {
-			m.openConfirmMCPInit()
-			m.confirmOverlay.UpdateMCPInitProgress(st.MCPInitServer, st.MCPInitConnected, st.MCPInitSkipped, st.MCPInitTotal)
+		case ConfirmNone:
+			// No overlay — open init overlay if not dismissed.
+			if !m.mcpInitOverlayDismissed {
+				m.openConfirmMCPInit()
+				m.confirmOverlay.UpdateMCPInitProgress(st.MCPInitServer, st.MCPInitConnected, st.MCPInitSkipped, st.MCPInitTotal)
+			}
+			// Temporary confirms (ConfirmMCPAuth, ConfirmTool) take priority.
+			// Don't override them — handleMCPInitOverlay will re-open init
+			// after the confirm closes.
 		}
 	case "ready":
 		// Init complete — close the overlay if it's open and
