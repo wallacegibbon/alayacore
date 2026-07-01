@@ -343,6 +343,7 @@ func (c *Client) connectLocked(ctx context.Context) error {
 
 	// Set up OAuth auth provider if configured.
 	if err := c.setupStreamableAuth(transport); err != nil {
+		transport.Close()
 		return err
 	}
 
@@ -507,7 +508,13 @@ func (c *Client) Ping(ctx context.Context) error {
 
 // resetState resets the client state to Disconnected, allowing it to be
 // re-connected. This is used after ErrNeedsAuth to retry with a token.
+// It closes any existing transport to prevent resource leaks from
+// partially-established connections.
 func (c *Client) resetState() {
+	if tp := c.loadTransport(); tp != nil {
+		tp.Close()
+		c.storeTransport(nil)
+	}
 	c.state.Store(int32(StateDisconnected))
 }
 
