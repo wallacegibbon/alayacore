@@ -498,13 +498,24 @@ func (s *Session) handlePrompt(contentParts []llm.ContentPart) {
 
 // handleMCPInitSkip handles the :mcp_init_skip command.
 // Called when the user presses Ctrl+G on the init overlay.
-// Tells AsyncInit to skip the currently connecting server
-// and move to the next one. The init overlay is dismissed
-// but init continues in the background.
+// During the connection phase, tells AsyncInit to skip the current server.
+// During the OAuth phase, skips the currently authorizing server (its
+// result will be discarded by applyOAuthResult when it completes).
 func (s *Session) handleMCPInitSkip() {
+	// Still in connection phase — skip via AsyncInit.
 	if ai := s.mcpAsyncInit; ai != nil {
 		ai.SkipCurrent()
 		s.writeNotify("Skipping current MCP server connection...")
+		return
+	}
+
+	// In OAuth phase — skip the currently running server.
+	if s.oauthGroup != nil {
+		if name := s.oauthGroup.CurrentRunning(); name != "" {
+			s.oauthGroup.Skip(name)
+			s.writeNotifyf("Skipped authorization for MCP server %q.", name)
+			s.advanceMCPAuth()
+		}
 	}
 }
 

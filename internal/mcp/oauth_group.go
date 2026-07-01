@@ -150,6 +150,19 @@ func (s *OAuthGroup) RunningCount() int {
 	return int(s.running.Load())
 }
 
+// CurrentRunning returns the name of a server that is currently running
+// OAuth but hasn't been skipped or completed yet, or empty string if none.
+// Used by the session to determine which server to cancel on Ctrl+G.
+func (s *OAuthGroup) CurrentRunning() string {
+	for _, a := range s.auths {
+		name := a.Name()
+		if s.started[name] && !s.skipped[name] && !s.completed[name] {
+			return name
+		}
+	}
+	return ""
+}
+
 // AllSettled returns true when all servers are either skipped by the user
 // or have completed their OAuth (result collected via TryResult).
 // Unlike Done(), this returns true even if goroutines for skipped servers
