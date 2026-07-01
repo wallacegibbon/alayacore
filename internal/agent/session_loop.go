@@ -134,7 +134,6 @@ func (s *Session) handleMCPEvent(evt *mcp.InitEvent) {
 
 		s.mcpReady.Store(true)
 		s.sendMCPMsg("done", "", "", "", 0, 0, 0)
-		s.sendSystemInfo("all")
 		s.writeNotifyf("MCP servers initialized: %d servers, %d tools loaded",
 			evt.Manager.ActiveServerCount(), len(evt.Tools))
 	}
