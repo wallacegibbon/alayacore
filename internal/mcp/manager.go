@@ -211,31 +211,10 @@ type PendingAuthServer struct {
 // PendingAuthServers returns servers configured with authorization_code
 // that have not yet completed the OAuth flow or have no valid persisted
 // token. Servers that have a token loaded from disk do not appear here.
-// needsAuth checks whether a client requires interactive OAuth authorization.
-// It first tries to load a persisted token from disk — if a valid token
-// is found, it sets obtainedToken and returns false.
-func needsAuth(c *Client) bool {
-	if c.config.Auth == nil || c.config.Auth.Type != AuthTypeAuthorizationCode {
-		return false
-	}
-	if c.config.Auth.obtainedToken != nil {
-		return false
-	}
-	// Try loading from disk before declaring that auth is needed.
-	if c.tokenStore != nil {
-		loaded, loadErr := c.tokenStore.LoadToken(c.config.Name)
-		if loadErr == nil && loaded != nil && (loaded.Valid() || loaded.RefreshToken != "") {
-			c.config.Auth.obtainedToken = loaded
-			return false
-		}
-	}
-	return true
-}
-
 func (m *Manager) PendingAuthServers() []PendingAuthServer {
 	var pending []PendingAuthServer
 	for _, c := range m.loadClients() {
-		if needsAuth(c) {
+		if c.needsPersistedAuth() {
 			pending = append(pending, PendingAuthServer{
 				Name:      c.Name(),
 				ServerURL: c.config.URL,
@@ -252,7 +231,7 @@ func (m *Manager) PendingAuthServer(name string) *PendingAuthServer {
 	if c == nil {
 		return nil
 	}
-	if !needsAuth(c) {
+	if !c.needsPersistedAuth() {
 		return nil
 	}
 	return &PendingAuthServer{

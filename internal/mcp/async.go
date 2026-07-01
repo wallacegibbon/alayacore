@@ -129,11 +129,11 @@ func (a *AsyncInit) run(ctx context.Context) {
 	//    (no valid token on disk) — they'll be handled by the adapter's
 	//    :mcp_auth <name> yes|no flow.
 	//    Servers that already have a valid token (loaded from disk by
-	//    needsAuth) are connected normally.
+	//    needsPersistedAuth) are connected normally.
 	connectCtx, connectCancel := context.WithTimeout(ctx, 30*time.Second)
 	var connErrs []error
 	for _, c := range a.manager.Clients() {
-		if needsAuth(c) {
+		if c.needsPersistedAuth() {
 			continue // needs interactive OAuth — skip for now
 		}
 		// Try connecting, but allow user to skip this specific server
