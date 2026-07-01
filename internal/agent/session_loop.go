@@ -48,6 +48,13 @@ func (s *Session) run() {
 		// Check for completed OAuth results before blocking on events.
 		s.pollOAuthResults()
 
+		// Build a reference to the OAuth results channel (nil-safe for select).
+		// oauthGroup is set once in applyMCPUpdate and never replaced.
+		var oauthResultCh <-chan mcp.ServerOAuthResult
+		if s.oauthGroup != nil {
+			oauthResultCh = s.oauthGroup.ResultChan()
+		}
+
 		select {
 		case msg, ok := <-s.inputMsgCh:
 			if !ok {
@@ -70,6 +77,16 @@ func (s *Session) run() {
 
 		case update := <-s.mcpUpdateCh:
 			s.applyMCPUpdate(update)
+
+		case result, ok := <-oauthResultCh:
+			if !ok {
+				break
+			}
+			// Received directly from channel — mark completed and process.
+			s.oauthGroup.MarkCompleted(result.Name)
+			s.applyOAuthResult(&result)
+			// Drain any additional results that may have arrived.
+			s.pollOAuthResults()
 
 		case <-s.sessionCtx.Done():
 			return

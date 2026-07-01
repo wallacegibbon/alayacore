@@ -128,6 +128,12 @@ func (s *OAuthGroup) TryResult() *ServerOAuthResult {
 	}
 }
 
+// ResultChan returns a read-only channel of OAuth results.
+// The session uses this in its main select to wake up when a result arrives.
+func (s *OAuthGroup) ResultChan() <-chan ServerOAuthResult {
+	return s.results
+}
+
 // PendingCount returns the number of servers still waiting for user input.
 func (s *OAuthGroup) PendingCount() int {
 	count := 0
@@ -164,4 +170,10 @@ func (s *OAuthGroup) AllSettled() bool {
 // IsCompleted returns true if the server's result was collected.
 func (s *OAuthGroup) IsCompleted(name string) bool {
 	return s.completed[name]
+}
+
+// MarkCompleted marks a server as completed (used when receiving results
+// directly from ResultChan rather than through TryResult).
+func (s *OAuthGroup) MarkCompleted(name string) {
+	s.completed[name] = true
 }
