@@ -10,9 +10,6 @@ import (
 	"github.com/alayacore/alayacore/internal/theme"
 )
 
-// ThemeInfo represents a theme's metadata for display in the selector.
-type ThemeInfo = theme.Info
-
 // ThemeManager wraps theme.Manager with terminal-specific warnings.
 type ThemeManager struct {
 	inner *theme.Manager
@@ -31,7 +28,7 @@ func (tm *ThemeManager) ReloadThemes() {
 	tm.inner.ReloadThemes()
 }
 
-func (tm *ThemeManager) GetThemes() []ThemeInfo {
+func (tm *ThemeManager) GetThemes() []theme.Info {
 	return tm.inner.GetThemes()
 }
 

@@ -14,13 +14,14 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/llm/factory"
 	"github.com/alayacore/alayacore/internal/llm/providers"
 )
 
 // SwitchModel switches the session to use a new model.
-func (s *Session) SwitchModel(modelConfig *ModelConfig) error {
+func (s *Session) SwitchModel(modelConfig *config.ModelConfig) error {
 	if err := s.initAgentFromConfig(modelConfig); err != nil {
 		return err
 	}
@@ -85,7 +86,7 @@ func (s *Session) activeModelName() string {
 	return ""
 }
 
-func (s *Session) createProviderAndAgent(modelConfig *ModelConfig) (llm.Provider, *llm.Agent, error) {
+func (s *Session) createProviderAndAgent(modelConfig *config.ModelConfig) (llm.Provider, *llm.Agent, error) {
 	provider, err := createProviderFromConfig(modelConfig, s.DebugAPI, s.ProxyURL)
 	if err != nil {
 		return nil, nil, err
@@ -131,7 +132,7 @@ func (s *Session) ensureAgentInitialized() error {
 	return nil
 }
 
-func (s *Session) initAgentFromConfig(modelConfig *ModelConfig) error {
+func (s *Session) initAgentFromConfig(modelConfig *config.ModelConfig) error {
 	provider, agent, err := s.createProviderAndAgent(modelConfig)
 	if err != nil {
 		return err
@@ -146,7 +147,7 @@ func (s *Session) initAgentFromConfig(modelConfig *ModelConfig) error {
 	return nil
 }
 
-func (s *Session) applyModelContextLimit(model *ModelConfig) {
+func (s *Session) applyModelContextLimit(model *config.ModelConfig) {
 	if model == nil || model.ContextLimit <= 0 {
 		return
 	}
@@ -176,7 +177,7 @@ func (s *Session) SetVideoConfig(fps int, resolution int) {
 	s.sendSystemInfo("video_config")
 }
 
-func createProviderFromConfig(config *ModelConfig, debugAPI bool, proxyURL string) (llm.Provider, error) {
+func createProviderFromConfig(modelCfg *config.ModelConfig, debugAPI bool, proxyURL string) (llm.Provider, error) {
 	var client *http.Client
 	var err error
 	if proxyURL != "" {
@@ -193,11 +194,11 @@ func createProviderFromConfig(config *ModelConfig, debugAPI bool, proxyURL strin
 	}
 
 	return factory.NewProvider(factory.ProviderConfig{
-		Type:       config.ProtocolType,
-		APIKey:     config.APIKey,
-		BaseURL:    config.BaseURL,
-		Model:      config.ModelName,
+		Type:       modelCfg.ProtocolType,
+		APIKey:     modelCfg.APIKey,
+		BaseURL:    modelCfg.BaseURL,
+		Model:      modelCfg.ModelName,
 		HTTPClient: client,
-		MaxTokens:  config.MaxTokens,
+		MaxTokens:  modelCfg.MaxTokens,
 	})
 }

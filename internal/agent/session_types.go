@@ -7,6 +7,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/mcp"
 	"github.com/alayacore/alayacore/internal/skills"
@@ -40,7 +41,7 @@ func (ModelMsg) SystemMsgType() string { return "model" }
 // ModelListMsg carries the full model list (type "model_list").
 // Only sent when models change.
 type ModelListMsg struct {
-	Models []ModelConfig `json:"models"`
+	Models []config.ModelConfig `json:"models"`
 }
 
 func (ModelListMsg) SystemMsgType() string { return "model_list" }
@@ -110,9 +111,10 @@ func (MCPInitMsg) SystemMsgType() string { return "mcp_init" }
 // Sent by the session's run() goroutine so the adapter can show overlays.
 //
 // Status values:
-//   "confirm"     — session wants user to confirm authorizing this server
-//   "in_progress" — OAuth flow is running for this server
-//   "done"        — all OAuth servers have been processed
+//
+//	"confirm"     — session wants user to confirm authorizing this server
+//	"in_progress" — OAuth flow is running for this server
+//	"done"        — all OAuth servers have been processed
 //
 // URL is only set for "confirm" status.
 type MCPAuthMsg struct {

@@ -20,6 +20,7 @@ import (
 //   - All other types use their default fmt/strconv formatting.
 //
 // Fields with a `omitempty` config tag option are skipped when zero-valued.
+// Fields tagged with `config:"-"` are always skipped.
 // Tag format: `config:"field_name"` or `config:"field_name,omitempty"`
 func FormatKeyValue(v any) string {
 	rv := reflect.ValueOf(v)
@@ -44,6 +45,12 @@ func FormatKeyValue(v any) string {
 		}
 
 		key, opts, _ := strings.Cut(tag, ",")
+
+		// Skip fields tagged with config:"-"
+		if key == "-" {
+			continue
+		}
+
 		omitempty := opts == "omitempty"
 
 		fv := rv.Field(i)

@@ -11,7 +11,7 @@ package terminal
 import (
 	"sync"
 
-	agentpkg "github.com/alayacore/alayacore/internal/agent"
+	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/theme"
 )
 
@@ -48,12 +48,12 @@ type sessionState struct {
 	//   "confirm" — session wants a y/n confirm dialog for mcpAuthServer
 	//   "in_progress" — OAuth flow is running for mcpAuthServer
 	//   "done"   — all OAuth servers processed, close overlay
-	mcpAuthStatus   string
-	mcpAuthServer   string
+	mcpAuthStatus    string
+	mcpAuthServer    string
 	mcpAuthServerURL string
 
 	// Model fields
-	models          []agentpkg.ModelConfig
+	models          []config.ModelConfig
 	activeModelID   int
 	activeModelName string
 
@@ -109,7 +109,7 @@ func (s *sessionState) updateModel(activeID int, activeName string, contextLimit
 }
 
 // updateModelList atomically replaces the full model list.
-func (s *sessionState) updateModelList(models []agentpkg.ModelConfig) {
+func (s *sessionState) updateModelList(models []config.ModelConfig) {
 	s.mu.Lock()
 	s.models = models
 	// Also sync active name if models list provides it
@@ -210,23 +210,23 @@ func (s *sessionState) snapshotStatus() StatusSnapshot {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return StatusSnapshot{
-		ContextTokens:     s.contextTokens,
-		ContextLimit:      s.contextLimit,
-		InProgress:        s.inProgress,
-		CurrentStep:       s.currentStep,
-		MaxSteps:          s.maxSteps,
-		LastCurrentStep:   s.lastCurrentStep,
-		LastMaxSteps:      s.lastMaxSteps,
-		TaskError:         s.lastTaskError,
-		ReasoningLevel:    s.reasoningLevel,
-		ActiveTheme:       s.activeTheme,
-		ActiveThemeData:   s.activeThemeData,
-		VideoFPS:          s.videoFPS,
-		VideoRes:          s.videoRes,
-		MCPInitStatus:     s.mcpInitStatus,
-		MCPAuthStatus:     s.mcpAuthStatus,
-		MCPAuthServer:     s.mcpAuthServer,
-		MCPAuthServerURL:  s.mcpAuthServerURL,
+		ContextTokens:    s.contextTokens,
+		ContextLimit:     s.contextLimit,
+		InProgress:       s.inProgress,
+		CurrentStep:      s.currentStep,
+		MaxSteps:         s.maxSteps,
+		LastCurrentStep:  s.lastCurrentStep,
+		LastMaxSteps:     s.lastMaxSteps,
+		TaskError:        s.lastTaskError,
+		ReasoningLevel:   s.reasoningLevel,
+		ActiveTheme:      s.activeTheme,
+		ActiveThemeData:  s.activeThemeData,
+		VideoFPS:         s.videoFPS,
+		VideoRes:         s.videoRes,
+		MCPInitStatus:    s.mcpInitStatus,
+		MCPAuthStatus:    s.mcpAuthStatus,
+		MCPAuthServer:    s.mcpAuthServer,
+		MCPAuthServerURL: s.mcpAuthServerURL,
 	}
 }
 

@@ -11,13 +11,13 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	agentpkg "github.com/alayacore/alayacore/internal/agent"
+	"github.com/alayacore/alayacore/internal/config"
 )
 
-// searchableModel wraps agentpkg.ModelConfig with a pre-computed
+// searchableModel wraps config.ModelConfig with a pre-computed
 // lowercase search string for fuzzy matching.
 type searchableModel struct {
-	agentpkg.ModelConfig
+	config.ModelConfig
 	searchStr string // lowercase "id name context provider" — matches what users see in the list
 }
 
@@ -61,7 +61,7 @@ func newFilterInput(placeholder string) *InputField {
 
 // --- Model Management ---
 
-func (ms *ModelSelector) GetActiveModel() *agentpkg.ModelConfig {
+func (ms *ModelSelector) GetActiveModel() *config.ModelConfig {
 	if ms.activeModel == nil {
 		return nil
 	}
@@ -70,8 +70,8 @@ func (ms *ModelSelector) GetActiveModel() *agentpkg.ModelConfig {
 
 func (ms *ModelSelector) SetActiveModel(m *searchableModel) { ms.activeModel = m }
 
-func (ms *ModelSelector) GetModels() []agentpkg.ModelConfig {
-	result := make([]agentpkg.ModelConfig, len(ms.models))
+func (ms *ModelSelector) GetModels() []config.ModelConfig {
+	result := make([]config.ModelConfig, len(ms.models))
 	for i := range ms.models {
 		result[i] = ms.models[i].ModelConfig
 	}
@@ -87,7 +87,7 @@ func (ms *ModelSelector) SetModels(models []searchableModel) {
 	ms.updateFilteredModels()
 }
 
-func (ms *ModelSelector) LoadModels(models []agentpkg.ModelConfig, activeID int) tea.Cmd {
+func (ms *ModelSelector) LoadModels(models []config.ModelConfig, activeID int) tea.Cmd {
 	// Skip update if model list hasn't changed.
 	if ms.modelsUnchangedSinceLastLoad(models) {
 		for i := range ms.models {
@@ -145,7 +145,7 @@ func (ms *ModelSelector) LoadModels(models []agentpkg.ModelConfig, activeID int)
 // identical to the currently cached models. SetModels may have been called
 // independently between LoadModels calls, so we check both ms.models length
 // AND ms.lastModelCount.
-func (ms *ModelSelector) modelsUnchangedSinceLastLoad(models []agentpkg.ModelConfig) bool {
+func (ms *ModelSelector) modelsUnchangedSinceLastLoad(models []config.ModelConfig) bool {
 	if len(models) != len(ms.models) || len(models) != ms.lastModelCount {
 		return false
 	}

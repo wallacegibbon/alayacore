@@ -35,19 +35,22 @@ Files in the adapter packages are named from the **session's perspective**:
 The rawio adapter is an exception — it's a single `adapter.go` since both directions are trivial one-liners (`io.Copy` in, `os.Stdout.Write` out).
 
 ```
-User IO ──▶ input.go ──▶ input channel ──▶ Session ──▶ output.go ──▶ User IO
+User IO ──▶ input.go ──▶ TLV (stdin) ──▶ Session ──▶ TLV (stdout) ──▶ output.go ──▶ User IO
 ```
 
 ## Communication Pattern
 
-All adapters communicate with the session through the TLV stream protocol:
+All adapters communicate with the session **exclusively** through the TLV stream protocol:
 
 ```
-Adapter → Session:  inputWriter (io.WriteCloser)  — user text, commands (TLV)
-Session → Adapter:  output (io.Writer)            — TLV-encoded events
+Adapter ──▶ TLV frames (stdin) ──▶ Session
+Session ──▶ TLV frames (stdout) ──▶ Adapter
 ```
 
-This is the **only** runtime channel. The session never calls adapter methods, and the adapter never calls session methods during normal operation.
+This is the **only** runtime channel. The session must not call adapter functions,
+and the adapter must not call session functions — not even for built-in adapters
+that share the Go module. See [development-principles.md](../development-principles.md)
+for the full isolation rules.
 
 ### Theme Persistence
 

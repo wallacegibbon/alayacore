@@ -11,7 +11,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	agentpkg "github.com/alayacore/alayacore/internal/agent"
+	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/theme"
 )
 
@@ -253,7 +253,7 @@ func (m *Terminal) handleConfirmConfirmed(kind ConfirmKind, toolID string, fromC
 			m.input.SetValue("")
 		}
 		m.restoreFocusAfterConfirm()
-		return m, m.submitCommand(agentpkg.CommandNameCancel, fromCmd)
+		return m, m.submitCommand("cancel", fromCmd)
 
 	case ConfirmTool:
 		m.emitCommand(":confirm " + toolID + " yes")
@@ -520,7 +520,7 @@ func (m *Terminal) handleSaveKey() tea.Cmd {
 		m.display.updateContent()
 		return nil
 	}
-	return m.submitCommand(agentpkg.CommandNameSave, false)
+	return m.submitCommand("save", false)
 }
 
 // handleRedraw handles the Ctrl+R force-redraw shortcut.
@@ -693,13 +693,13 @@ func (m *Terminal) openModelConfigFile() tea.Cmd {
 // serializeModelsForEdit serializes models to the key-value block format
 // (same as model.conf). Terminal users are familiar with this format for
 // $EDITOR editing. Other adapters may use JSON instead.
-func serializeModelsForEdit(models []agentpkg.ModelConfig) string {
+func serializeModelsForEdit(models []config.ModelConfig) string {
 	if len(models) == 0 {
 		return ""
 	}
 	blocks := make([]string, 0, len(models))
 	for _, m := range models {
-		blocks = append(blocks, agentpkg.SerializeModelConfig(m))
+		blocks = append(blocks, strings.TrimSuffix(config.FormatKeyValue(m), "\n"))
 	}
 	return strings.Join(blocks, "\n---\n") + "\n"
 }

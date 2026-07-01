@@ -12,7 +12,7 @@ func TestThemeSelectorCancelRestoresOriginalTheme(t *testing.T) {
 	styles := NewStyles(theme.DefaultTheme())
 	ts := NewThemeSelector(styles)
 
-	themes := []ThemeInfo{
+	themes := []theme.Info{
 		{Name: "theme-dark", Path: "/path/to/theme-dark.conf"},
 		{Name: "theme-light", Path: "/path/to/theme-light.conf"},
 		{Name: "theme-custom", Path: "/path/to/theme-custom.conf"},
@@ -58,7 +58,7 @@ func TestThemeSelectorEnterSavesTheme(t *testing.T) {
 	styles := NewStyles(theme.DefaultTheme())
 	ts := NewThemeSelector(styles)
 
-	themes := []ThemeInfo{
+	themes := []theme.Info{
 		{Name: "theme-dark", Path: "/path/to/theme-dark.conf"},
 		{Name: "theme-light", Path: "/path/to/theme-light.conf"},
 	}

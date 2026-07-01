@@ -36,7 +36,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	agentpkg "github.com/alayacore/alayacore/internal/agent"
+	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/stream"
 	"github.com/alayacore/alayacore/internal/theme"
 )
@@ -316,7 +316,7 @@ func (to *outputWriter) handleSystemModel(data json.RawMessage) {
 
 func (to *outputWriter) handleSystemModelList(data json.RawMessage) {
 	var m struct {
-		Models []agentpkg.ModelConfig `json:"models"`
+		Models []config.ModelConfig `json:"models"`
 	}
 	if json.Unmarshal(data, &m) != nil {
 		return

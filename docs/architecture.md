@@ -1,6 +1,10 @@
 # Architecture
 
-AlayaCore follows a layered architecture with clear separation of concerns. The layers communicate via a lightweight TLV (Tag-Length-Value) binary protocol.
+AlayaCore follows a layered architecture with **strict adapter-agent isolation**.
+The adapter (UI) and agent (session + LLM) communicate **exclusively** via a
+lightweight TLV (Tag-Length-Value) binary protocol — no direct function calls,
+no shared mutable state, no bypass. See [development-principles.md](development-principles.md)
+for the full rules.
 
 ## Components
 
@@ -226,7 +230,7 @@ correct base directory for the current session.
 
 ## Design Decisions
 
-1. **TLV Protocol** — Simple binary protocol for clean separation between adapters and session. The TUI, plain-IO, and raw-IO modes all share the same session/agent logic.
+1. **TLV Protocol** — Simple binary protocol enforces strict separation between adapters and session. The TUI, plain-IO, and raw-IO modes all share the same session/agent logic. No adapter may call agent functions directly — all communication goes through TLV frames.
 2. **Virtual Scrolling** — Only visible windows are rendered. See [virtual-rendering-performance.md](virtual-rendering-performance.md).
 3. **Typed Tools** — `TypedExecute[T]` wrapper for type-safe tool implementations with auto-generated schemas. See [schema-improvements.md](schema-improvements.md).
 4. **Lazy Agent Init** — Agent and provider are created on first use, not at startup.

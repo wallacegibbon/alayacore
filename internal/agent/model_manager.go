@@ -18,23 +18,10 @@ import (
 	"github.com/alayacore/alayacore/internal/config"
 )
 
-// ModelConfig represents a model configuration.
-// JSON tags are used for TLV serialization to adapters.
-type ModelConfig struct {
-	ID           int    `json:"id" config:"-"`                        // Runtime ID (generated, not persisted)
-	Name         string `json:"name" config:"name"`                   // Display name
-	ProtocolType string `json:"protocol_type" config:"protocol_type"` // "openai" or "anthropic"
-	BaseURL      string `json:"base_url" config:"base_url"`           // API server URL
-	APIKey       string `json:"api_key" config:"api_key"`             // API key
-	ModelName    string `json:"model_name" config:"model_name"`       // Model identifier
-	ContextLimit int    `json:"context_limit" config:"context_limit"` // Maximum context length (0 means unlimited)
-	MaxTokens    int    `json:"max_tokens" config:"max_tokens"`       // Maximum output tokens (0 means use provider default)
-}
-
 // ModelManager manages model configurations.
 // It owns both the in-memory model list and the config file on disk.
 type ModelManager struct {
-	models      []ModelConfig
+	models      []config.ModelConfig
 	activeID    int
 	nextID      int
 	filePath    string
@@ -43,14 +30,12 @@ type ModelManager struct {
 }
 
 // DefaultModelConfig is the default model configuration written when config file is empty
-const DefaultModelConfig = `---
-name: "Ollama (127.0.0.1) / GPT OSS 20B"
+const DefaultModelConfig = `name: "Ollama (127.0.0.1) / GPT OSS 20B"
 protocol_type: "anthropic"
 base_url: "http://127.0.0.1:11434"
 api_key: "no-key-by-default"
 model_name: "gpt-oss:20b"
 context_limit: 128000
----
 `
 
 // KnownProtocolTypes are the protocol types accepted by the provider factory.
@@ -164,11 +149,11 @@ func (mm *ModelManager) createDefaultConfig(path string) error {
 
 // parseModelConfig parses the key-value model config format.
 // Returns valid models and a list of validation messages (parse warnings and model errors).
-func parseModelConfig(content string) ([]ModelConfig, []string) {
+func parseModelConfig(content string) ([]config.ModelConfig, []string) {
 	var msgs []string
 
 	blocks := config.ParseKeyValueBlocks(content)
-	models := make([]ModelConfig, 0, len(blocks))
+	models := make([]config.ModelConfig, 0, len(blocks))
 
 	for blockIdx, block := range blocks {
 		block = strings.TrimSpace(block)
@@ -176,7 +161,7 @@ func parseModelConfig(content string) ([]ModelConfig, []string) {
 			continue
 		}
 
-		var model ModelConfig
+		var model config.ModelConfig
 		for _, w := range config.ParseKeyValueWithWarnings(block, &model) {
 			msgs = append(msgs, fmt.Sprintf("model block %d: %s", blockIdx+1, w.String()))
 		}
@@ -196,29 +181,9 @@ func parseModelConfig(content string) ([]ModelConfig, []string) {
 	return models, msgs
 }
 
-// SerializeModelConfig serializes a single ModelConfig to the key-value
-// block format used by model.conf on disk.
-// SerializeModelConfig serializes a single ModelConfig to the key-value
-// block format used by model.conf on disk.
-func SerializeModelConfig(m ModelConfig) string {
-	var b strings.Builder
-	b.WriteString(fmt.Sprintf("name: %q\n", m.Name))
-	b.WriteString(fmt.Sprintf("protocol_type: %q\n", m.ProtocolType))
-	b.WriteString(fmt.Sprintf("base_url: %q\n", m.BaseURL))
-	b.WriteString(fmt.Sprintf("api_key: %q\n", m.APIKey))
-	b.WriteString(fmt.Sprintf("model_name: %q\n", m.ModelName))
-	if m.ContextLimit > 0 {
-		fmt.Fprintf(&b, "context_limit: %d\n", m.ContextLimit)
-	}
-	if m.MaxTokens > 0 {
-		fmt.Fprintf(&b, "max_tokens: %d\n", m.MaxTokens)
-	}
-	return strings.TrimSuffix(b.String(), "\n")
-}
-
 // validateModel checks required fields and returns errors for any issues found.
 // A model with errors is unusable and should not be added to the model list.
-func validateModel(m ModelConfig) []string {
+func validateModel(m config.ModelConfig) []string {
 	var errs []string
 
 	if m.ProtocolType == "" {
@@ -258,7 +223,7 @@ func (mm *ModelManager) HasRejected() bool {
 }
 
 // AddModel adds a new model to the runtime list (does NOT persist to file)
-func (mm *ModelManager) AddModel(m ModelConfig) int {
+func (mm *ModelManager) AddModel(m config.ModelConfig) int {
 	m.ID = mm.nextID
 	mm.nextID++
 	mm.models = append(mm.models, m)
@@ -266,22 +231,22 @@ func (mm *ModelManager) AddModel(m ModelConfig) int {
 }
 
 // GetModels returns all models with full details (including API keys).
-func (mm *ModelManager) GetModels() []ModelConfig {
-	result := make([]ModelConfig, len(mm.models))
+func (mm *ModelManager) GetModels() []config.ModelConfig {
+	result := make([]config.ModelConfig, len(mm.models))
 	copy(result, mm.models)
 	return result
 }
 
 // SyncFromContent replaces all models with parsed JSON content, persists to the
 // config file, and returns validation messages.  The JSON format matches the
-// ModelListMsg wire format ([]ModelConfig).
+// ModelListMsg wire format ([]config.ModelConfig).
 func (mm *ModelManager) SyncFromContent(content string) []string {
-	var models []ModelConfig
+	var models []config.ModelConfig
 	if err := json.Unmarshal([]byte(content), &models); err != nil {
 		return []string{fmt.Sprintf("model_sync: invalid JSON: %v", err)}
 	}
 
-	valid := make([]ModelConfig, 0, len(models))
+	valid := make([]config.ModelConfig, 0, len(models))
 	var msgs []string
 	for i, m := range models {
 		if errs := validateModel(m); len(errs) > 0 {
@@ -323,14 +288,14 @@ func (mm *ModelManager) SyncFromContent(content string) []string {
 func (mm *ModelManager) writeConfigFile() error {
 	blocks := make([]string, 0, len(mm.models))
 	for _, m := range mm.models {
-		blocks = append(blocks, SerializeModelConfig(m))
+		blocks = append(blocks, strings.TrimSuffix(config.FormatKeyValue(m), "\n"))
 	}
 	data := strings.Join(blocks, "\n---\n") + "\n"
 	return os.WriteFile(mm.filePath, []byte(data), 0600)
 }
 
 // GetModel returns a model by ID (includes API key for internal use)
-func (mm *ModelManager) GetModel(id int) *ModelConfig {
+func (mm *ModelManager) GetModel(id int) *config.ModelConfig {
 	for i := range mm.models {
 		if mm.models[i].ID == id {
 			return &mm.models[i]
@@ -361,7 +326,7 @@ func (mm *ModelManager) SetActiveToFirst() bool {
 }
 
 // GetActive returns the active model (includes API key)
-func (mm *ModelManager) GetActive() *ModelConfig {
+func (mm *ModelManager) GetActive() *config.ModelConfig {
 	for _, m := range mm.models {
 		if m.ID == mm.activeID {
 			return &m

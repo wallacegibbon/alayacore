@@ -55,10 +55,10 @@ func (SetContextTokensEvent) taskEvent() {}
 // The run() goroutine applies the updates (tools + system prompt) and
 // starts the OAuth sequence if PendingOAuthServers is non-empty.
 type MCPUpdateEvent struct {
-	Tools                []llm.Tool
-	SystemPromptSuffix   string
-	Manager              *mcp.Manager
-	PendingOAuthServers  []MCPAuthServer // servers needing user OAuth; empty if none
+	Tools               []llm.Tool
+	SystemPromptSuffix  string
+	Manager             *mcp.Manager
+	PendingOAuthServers []MCPAuthServer // servers needing user OAuth; empty if none
 }
 
 // oauthResult carries the result of an OAuth authorization back to the

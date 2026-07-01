@@ -17,7 +17,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	agentpkg "github.com/alayacore/alayacore/internal/agent"
 	"github.com/alayacore/alayacore/internal/app"
 	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/stream"
@@ -29,9 +28,7 @@ import (
 // ============================================================================
 
 // sessionLoadedMsg is sent when the async session loading completes.
-type sessionLoadedMsg struct {
-	session *agentpkg.Session
-}
+type sessionLoadedMsg struct{}
 
 // sessionLoadingErrorMsg is sent when the async session loading fails.
 type sessionLoadingErrorMsg struct {
@@ -244,11 +241,11 @@ func (m *Terminal) loadSessionCmd() tea.Cmd {
 			}
 		}
 
-		session, _, err := app.StartSession(m.appConfig, m.out, input)
+		_, _, err := app.StartSession(m.appConfig, m.out, input)
 		if err != nil {
 			return sessionLoadingErrorMsg{err: err}
 		}
-		return sessionLoadedMsg{session: session}
+		return sessionLoadedMsg{}
 	}
 }
 
@@ -553,13 +550,13 @@ func (m *Terminal) handleEditorFinished(msg EditorFinishedMsg) (tea.Model, tea.C
 // returns JSON array of ModelConfig, suitable for :model_sync transport.
 func convertKVToJSON(kvContent string) string {
 	blocks := config.ParseKeyValueBlocks(kvContent)
-	models := make([]agentpkg.ModelConfig, 0, len(blocks))
+	models := make([]config.ModelConfig, 0, len(blocks))
 	for _, block := range blocks {
 		block = strings.TrimSpace(block)
 		if block == "" {
 			continue
 		}
-		var m agentpkg.ModelConfig
+		var m config.ModelConfig
 		config.ParseKeyValueWithWarnings(block, &m)
 		if m.Name != "" || m.ModelName != "" {
 			models = append(models, m)

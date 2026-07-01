@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/stream"
 )
@@ -398,7 +399,7 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 	}
 
 	// Add a test model to the manager
-	testModel := ModelConfig{
+	testModel := config.ModelConfig{
 		ID:           1,
 		Name:         "Test Model",
 		ProtocolType: "openai",

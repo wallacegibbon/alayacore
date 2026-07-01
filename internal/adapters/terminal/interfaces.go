@@ -3,7 +3,7 @@ package terminal
 import (
 	"io"
 
-	agentpkg "github.com/alayacore/alayacore/internal/agent"
+	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/theme"
 )
 
@@ -44,14 +44,14 @@ type StatusSnapshot struct {
 	//   "confirm" — session wants a y/n confirm dialog for MCPAuthServer
 	//   "in_progress" — OAuth flow is running for MCPAuthServer
 	//   "done"   — all OAuth servers processed, close overlay
-	MCPAuthStatus   string
-	MCPAuthServer   string // server currently being prompted/authorized
+	MCPAuthStatus    string
+	MCPAuthServer    string // server currently being prompted/authorized
 	MCPAuthServerURL string // URL for the confirm dialog
 }
 
 // ModelSnapshot holds a consistent point-in-time view of model state.
 type ModelSnapshot struct {
-	Models     []agentpkg.ModelConfig
+	Models     []config.ModelConfig
 	ActiveID   int
 	ActiveName string
 }

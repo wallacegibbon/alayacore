@@ -14,16 +14,22 @@
 //	  [2-byte tag][4-byte length (big-endian)][value bytes]
 //
 //	Tag values are 2-character strings:
-//	  - TagUserT (UT): User text input
-//	  - TagUserI (UI): User image (data:image/...;base64,... or URL)
-//	  - TagUserV (UV): User video (data:video/...;base64,... or URL)
-//	  - TagUserA (UA): User audio (data:audio/...;base64,... or URL)
-//	  - TagUserD (UD): User document (data:application/...;base64,... or URL)
-//	  - TagAssistantT (AT): Assistant text output
-//	  - TagAssistantR (AR): Reasoning/thinking content
-//	  - TagAssistantF (AF): Function lifecycle (JSON: id, name, input)
-//	  - TagUserF (UF): Function result (JSON: id, output, is_error)
-//	  - TagSystemMsg (SM): System message (JSON: {"type":"...","data":{...}})
+//	  - TagUserT (UT): User text — sent to agent on stdin; echoed by agent on stdout
+//	  - TagUserI (UI): User image — sent to agent on stdin; echoed by agent on stdout
+//	  - TagUserV (UV): User video — sent to agent on stdin; echoed by agent on stdout
+//	  - TagUserA (UA): User audio — sent to agent on stdin; echoed by agent on stdout
+//	  - TagUserD (UD): User document — sent to agent on stdin; echoed by agent on stdout
+//	  - TagUserEnd (UE): User message end — marks the end of a user message on stdin
+//	  - TagAssistantT (AT): Assistant text output (stdout)
+//	  - TagAssistantR (AR): Reasoning/thinking content (stdout)
+//	  - TagAssistantF (AF): Function lifecycle — JSON: id, name, input (stdout)
+//	  - TagUserF (UF): Function result — JSON: id, output, is_error (stdout)
+//	  - TagSystemMsg (SM): System message — JSON: {"type":"...","data":{...}} (stdout)
+//
+// User tags (UT, UI, UV, UA, UD) are bidirectional:
+//   - stdin: adapter sends new user input to the agent
+//   - stdout: agent echoes the user's message back with an assigned history ID
+//   Adapters must handle user tags on both stdin AND stdout.
 //
 // Function Lifecycle:
 //

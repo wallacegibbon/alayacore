@@ -97,9 +97,9 @@ type runState struct {
 	// When the initial MCPUpdateEvent has PendingOAuthServers, the run()
 	// goroutine cycles through them one at a time, sending confirm SM
 	// messages to the adapter and waiting for user responses.
-	pendingOAuthServers []MCPAuthServer // servers needing OAuth, in order
-	pendingOAuthIdx     int             // index of the server currently being prompted
-	oauthResultCh       chan oauthResult // goroutine → run(): AuthorizeServer result
+	pendingOAuthServers []MCPAuthServer    // servers needing OAuth, in order
+	pendingOAuthIdx     int                // index of the server currently being prompted
+	oauthResultCh       chan oauthResult   // goroutine → run(): AuthorizeServer result
 	oauthCancel         context.CancelFunc // cancels the currently running OAuth goroutine
 }
 
@@ -196,10 +196,10 @@ func (s *Session) startMCPInitWatcher(asyncInit *mcp.AsyncInit) {
 		}
 		select {
 		case s.mcpUpdateCh <- MCPUpdateEvent{
-			Tools:                tools,
-			SystemPromptSuffix:   sysFrag,
-			Manager:              mgr,
-			PendingOAuthServers:  authServers,
+			Tools:               tools,
+			SystemPromptSuffix:  sysFrag,
+			Manager:             mgr,
+			PendingOAuthServers: authServers,
 		}:
 		case <-s.sessionCtx.Done():
 			return

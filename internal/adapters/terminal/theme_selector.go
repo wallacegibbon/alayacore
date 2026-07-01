@@ -17,7 +17,7 @@ import (
 // ThemeSelector manages theme selection UI.
 type ThemeSelector struct {
 	ScrollableListCore
-	themes []ThemeInfo
+	themes []theme.Info
 
 	// Preview state
 	previewTheme     *theme.Theme
@@ -31,7 +31,7 @@ type ThemeSelector struct {
 // NewThemeSelector creates a new theme selector.
 func NewThemeSelector(styles *Styles) *ThemeSelector {
 	ts := &ThemeSelector{
-		themes: []ThemeInfo{},
+		themes: []theme.Info{},
 	}
 	ts.Width = 60
 	ts.Height = 20
@@ -42,7 +42,7 @@ func NewThemeSelector(styles *Styles) *ThemeSelector {
 
 // --- State Management ---
 
-func (ts *ThemeSelector) Open(themes []ThemeInfo, activeTheme string) {
+func (ts *ThemeSelector) Open(themes []theme.Info, activeTheme string) {
 	ts.themes = themes
 	ts.State = ScrollableListOpen
 	ts.ScrollIdx = 0
@@ -69,7 +69,7 @@ func (ts *ThemeSelector) Close() {
 
 // --- Theme Management ---
 
-func (ts *ThemeSelector) GetSelectedTheme() *ThemeInfo {
+func (ts *ThemeSelector) GetSelectedTheme() *theme.Info {
 	if len(ts.themes) == 0 || ts.SelectedIdx < 0 || ts.SelectedIdx >= len(ts.themes) {
 		return nil
 	}

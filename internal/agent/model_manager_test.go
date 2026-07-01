@@ -4,13 +4,15 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/alayacore/alayacore/internal/config"
 )
 
 func TestParseModelConfig(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		expected []ModelConfig
+		expected []config.ModelConfig
 	}{
 		{
 			name: "single model",
@@ -20,7 +22,7 @@ base_url: "https://api.openai.com/v1"
 api_key: "test-key"
 model_name: "gpt-4o"
 context_limit: 128000`,
-			expected: []ModelConfig{
+			expected: []config.ModelConfig{
 				{
 					Name:         "OpenAI GPT-4o",
 					ProtocolType: "openai",
@@ -44,7 +46,7 @@ protocol_type: "anthropic"
 base_url: "http://127.0.0.1:11434"
 api_key: "key2"
 model_name: "gpt-oss:20b"`,
-			expected: []ModelConfig{
+			expected: []config.ModelConfig{
 				{
 					Name:         "OpenAI GPT-4o",
 					ProtocolType: "openai",
@@ -70,7 +72,7 @@ protocol_type: "openai"
 base_url: "https://api.example.com"
 api_key: "secret"
 model_name: "test"`,
-			expected: []ModelConfig{
+			expected: []config.ModelConfig{
 				{
 					Name:         "Test Model",
 					ProtocolType: "openai",
@@ -87,7 +89,7 @@ protocol_type: 'anthropic'
 base_url: 'https://api.example.com'
 api_key: 'secret'
 model_name: 'claude'`,
-			expected: []ModelConfig{
+			expected: []config.ModelConfig{
 				{
 					Name:         "Test Model",
 					ProtocolType: "anthropic",
@@ -148,7 +150,7 @@ func TestParseModelBlock(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		expected ModelConfig
+		expected config.ModelConfig
 	}{
 		{
 			name: "complete model block",
@@ -158,7 +160,7 @@ base_url: "https://api.example.com"
 api_key: "secret-key"
 model_name: "gpt-4"
 context_limit: 64000`,
-			expected: ModelConfig{
+			expected: config.ModelConfig{
 				Name:         "Test Model",
 				ProtocolType: "openai",
 				BaseURL:      "https://api.example.com",
@@ -173,7 +175,7 @@ context_limit: 64000`,
 protocol_type: "openai"
 base_url: "https://api.example.com"
 model_name: "mini"`,
-			expected: ModelConfig{
+			expected: config.ModelConfig{
 				Name:         "Minimal Model",
 				ProtocolType: "openai",
 				BaseURL:      "https://api.example.com",
@@ -183,7 +185,7 @@ model_name: "mini"`,
 		{
 			name:     "empty block",
 			input:    "",
-			expected: ModelConfig{},
+			expected: config.ModelConfig{},
 		},
 	}
 
@@ -191,7 +193,7 @@ model_name: "mini"`,
 		t.Run(tt.name, func(t *testing.T) {
 			models, msgs := parseModelConfig(tt.input)
 			_ = msgs
-			var result ModelConfig
+			var result config.ModelConfig
 			if len(models) > 0 {
 				result = models[0]
 			}
@@ -254,7 +256,7 @@ model_name: "model-b"
 	}
 
 	// Add a model to bump the nextID counter
-	newID := mm.AddModel(ModelConfig{
+	newID := mm.AddModel(config.ModelConfig{
 		Name:         "Model C",
 		ProtocolType: "openai",
 		BaseURL:      "https://api.example.com",
