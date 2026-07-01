@@ -42,19 +42,15 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleOverlayConfirm(msg)
 	}
 
-	// 1b. MCP init overlay — separate from confirm overlay.
-	//     Shown during MCP initialization and OAuth. Only Ctrl+G is
-	//     handled (skips the current MCP server). All other keys are
-	//     consumed to prevent interaction with content behind it.
+	// 1b. MCP init overlay — shows MCP init progress (and behind it,
+	//     the auth confirm dialog may appear temporarily).
+	//     Ctrl+G skips the current server without closing the overlay.
+	//     All other keys are consumed while init is in progress.
 	if m.mcpInitOverlay.IsOpen() {
 		if msg.String() == keyCtrlG {
-			m.mcpInitOverlay.Close()
-			m.mcpInitOverlayDismissed = true
-			m.restoreFocusAfterConfirm()
 			m.emitCommand(":mcp_init_skip")
 			return m, scheduleTick()
 		}
-		// All other keys consumed while init overlay is showing.
 		return m, nil
 	}
 

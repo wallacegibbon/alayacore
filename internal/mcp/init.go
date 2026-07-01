@@ -246,23 +246,17 @@ func (init *Init) oauthPhase(ctx context.Context, clients []*Client, connected, 
 }
 
 func (init *Init) waitConfirm(ctx context.Context, server string) bool {
-	select {
-	case req := <-init.confirmCh:
-		if req.Server != server {
-			select {
-			case init.confirmCh <- req:
-			default:
+	for {
+		select {
+		case req := <-init.confirmCh:
+			if req.Server == server {
+				return req.Allow
 			}
-			select {
-			case req2 := <-init.confirmCh:
-				return req2.Server == server && req2.Allow
-			case <-ctx.Done():
-				return false
-			}
+			// Stale response for a different server — ignore and wait.
+			continue
+		case <-ctx.Done():
+			return false
 		}
-		return req.Allow
-	case <-ctx.Done():
-		return false
 	}
 }
 

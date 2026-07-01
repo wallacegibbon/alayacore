@@ -39,23 +39,22 @@ type sessionState struct {
 	videoRes int
 
 	// MCP init status — tracks the initialization phase.
-	// Values: "" (no MCP), "connecting", "auth_confirm", "done".
+	// Values: "" (no MCP), "connecting", "connected", "failed",
+	// "auth_confirm", "auth_running", "auth_done", "done".
 	mcpStatus string
 
 	// Per-server init progress.
 	mcpServer    string // current server being connected/authorized
+	mcpServerURL string // URL for current server (set for auth_confirm)
 	mcpConnected int    // servers connected so far
 	mcpSkipped   int    // servers skipped by user
 	mcpTotal     int    // total servers
 
-	// Pending MCP auth confirm — set when the session sends mcp:auth_confirm,
-	// consumed by the Terminal tick handler to open the confirm dialog.
-	mcpAuthPendingName string
-	mcpAuthPendingURL  string
-
-	// mcpDone is set when the session sends mcp:done.
-	// The Terminal uses it to close all MCP overlays.
-	mcpDone bool
+	// mcpAuthPending is a one-shot flag set when an "auth_confirm" event arrives.
+	// The Terminal tick handler consumes it (via takeMCPAuthPending) to open
+	// the confirm dialog exactly once. Server name and URL are read from
+	// mcpServer/mcpServerURL which are set by updateMCPProgress.
+	mcpAuthPending bool
 
 	// Model fields
 	models          []config.ModelConfig
@@ -171,56 +170,51 @@ func (s *sessionState) updateVideoConfig(fps, res int) {
 
 // updateMCPProgress atomically updates MCP init progress.
 // Called when the session sends an "mcp" system message with
-// status "connecting", "connected", "failed", "auth_running", or "auth_done".
-func (s *sessionState) updateMCPProgress(status, server string, connected, skipped, total int) {
+// status "connecting", "connected", "failed", "auth_confirm",
+// "auth_running", or "auth_done".
+func (s *sessionState) updateMCPProgress(status, server, url string, connected, skipped, total int) {
 	s.mu.Lock()
 	s.mcpStatus = status
 	s.mcpServer = server
+	s.mcpServerURL = url
 	s.mcpConnected = connected
 	s.mcpSkipped = skipped
 	s.mcpTotal = total
 	s.mu.Unlock()
 }
 
-// setMCPAuthPending stores a pending MCP auth confirmation request.
+// setMCPAuthPending marks a pending MCP auth confirmation.
+// Server and URL are already stored by the preceding updateMCPProgress call.
 // Consumed by takeMCPAuthPending in the Terminal tick handler.
-func (s *sessionState) setMCPAuthPending(server, url string) {
+func (s *sessionState) setMCPAuthPending() {
 	s.mu.Lock()
-	s.mcpAuthPendingName = server
-	s.mcpAuthPendingURL = url
+	s.mcpAuthPending = true
 	s.mu.Unlock()
 }
 
 // takeMCPAuthPending pops the pending MCP auth confirmation.
-// Returns (server, url, ok). Only one pending at a time.
+// Returns (server, url, ok). Server/URL read from shared status fields.
 func (s *sessionState) takeMCPAuthPending() (server, url string, ok bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.mcpAuthPendingName == "" {
+	if !s.mcpAuthPending {
 		return "", "", false
 	}
-	server = s.mcpAuthPendingName
-	url = s.mcpAuthPendingURL
-	s.mcpAuthPendingName = ""
-	s.mcpAuthPendingURL = ""
-	return server, url, true
+	s.mcpAuthPending = false
+	return s.mcpServer, s.mcpServerURL, true
 }
 
-// setMCPDone marks MCP initialization as complete.
-// The Terminal uses this to close all MCP overlays.
-func (s *sessionState) setMCPDone() {
-	s.mu.Lock()
-	s.mcpDone = true
-	s.mu.Unlock()
-}
-
-// takeMCPDone returns and resets the done flag.
+// takeMCPDone returns true if initialization is complete (mcpStatus is "done")
+// and resets mcpStatus to "". One-shot — the Terminal uses this to close
+// the init overlay exactly once.
 func (s *sessionState) takeMCPDone() bool {
 	s.mu.Lock()
-	done := s.mcpDone
-	s.mcpDone = false
-	s.mu.Unlock()
-	return done
+	defer s.mu.Unlock()
+	if s.mcpStatus != "done" {
+		return false
+	}
+	s.mcpStatus = ""
+	return true
 }
 
 // setToolConfirmPending appends a pending tool confirmation request.
@@ -265,6 +259,7 @@ func (s *sessionState) snapshotStatus() StatusSnapshot {
 		VideoRes:        s.videoRes,
 		MCPStatus:       s.mcpStatus,
 		MCPServer:       s.mcpServer,
+		MCPServerURL:    s.mcpServerURL,
 		MCPConnected:    s.mcpConnected,
 		MCPSkipped:      s.mcpSkipped,
 		MCPTotal:        s.mcpTotal,

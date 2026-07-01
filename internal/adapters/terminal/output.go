@@ -390,16 +390,18 @@ func (to *outputWriter) handleSystemMCP(data json.RawMessage) {
 
 	switch msg.Status {
 	case "connecting", "connected", "failed":
-		to.status.updateMCPProgress(msg.Status, msg.Server, msg.ConnectedCount, msg.SkippedCount, msg.TotalCount)
+		to.status.updateMCPProgress(msg.Status, msg.Server, msg.URL, msg.ConnectedCount, msg.SkippedCount, msg.TotalCount)
 	case "auth_confirm":
 		if msg.Server != "" {
-			to.status.setMCPAuthPending(msg.Server, msg.URL)
+			to.status.updateMCPProgress("auth_confirm", msg.Server, msg.URL, msg.ConnectedCount, msg.SkippedCount, msg.TotalCount)
+			to.status.setMCPAuthPending()
 		}
 	case "auth_running", "auth_done":
-		to.status.updateMCPProgress(msg.Status, msg.Server, msg.ConnectedCount, msg.SkippedCount, msg.TotalCount)
+		to.status.updateMCPProgress(msg.Status, msg.Server, msg.URL, msg.ConnectedCount, msg.SkippedCount, msg.TotalCount)
 	case "done":
-		to.status.setMCPDone()
-		to.status.updateMCPProgress("done", "", 0, 0, 0)
+		to.status.updateMCPProgress("done", "", "", 0, 0, 0)
+		// Note: takeMCPDone() is consumed by the Terminal tick handler
+		// via outputWriter.ConsumeMCPDone().
 	}
 }
 

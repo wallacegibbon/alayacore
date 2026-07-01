@@ -22,10 +22,10 @@ package agent
 //   Cross-goroutine communication:
 //     inputMsgCh (inputMsg channel)  — inputPump → run()
 //     taskEventCh (taskEvent)        — task → run()
-//     taskCancel (func call)     — run() → task (cancellation via cancelRunningTask)
-//     taskResultCh                 — task → run (full ContentParts list)
-//     taskRefreshCh               — task → run() (best-effort system-info refresh; see session_output.go)
-//     mcpUpdateCh (MCPUpdateEvent) — internal (startMCPInitWatcher + OAuth goroutine) → run()
+//     taskCancel (func call)         — run() → task (cancellation via cancelRunningTask)
+//     taskResultCh                   — task → run (full ContentParts list)
+//     taskRefreshCh                  — task → run() (best-effort system-info refresh; see session_output.go)
+//     mcpInit.Events()               — mcp.Init → run() (MCP init events: connect/OAuth/discover)
 //
 // Related files:
 //   - session_types.go — type definitions (Task, SessionConfig, etc.)

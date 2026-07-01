@@ -138,11 +138,6 @@ type Terminal struct {
 
 	mcpInitOverlay *ConfirmDialog
 
-	// mcpInitOverlayDismissed is set when the user dismisses the init
-	// overlay (Ctrl+G for skip), preventing the tick handler from
-	// immediately reopening it while async init is still running.
-	mcpInitOverlayDismissed bool
-
 	// Async session loading state.
 	// When true, Init() kicks off the loading in a goroutine and View()
 	// renders a loading screen instead of the normal TUI.
@@ -376,21 +371,14 @@ func (m *Terminal) handleTick() (tea.Model, tea.Cmd) {
 }
 
 // handleMCPOverlays manages all MCP overlay state in one place.
-// Called on every tick. Priority:
+// Called on every tick.
 //
-//  1. Done signal   → close init overlay, reset dismiss flag
-//  2. Tool confirm  → open tool confirm dialog (highest overlay)
-//  3. Auth confirm  → open auth confirm dialog (temporary)
-//  4. Status update → show/update init overlay (persistent)
-//
-// The init overlay (mcpInitOverlay) and confirm dialog (confirmOverlay)
-// are separate widget instances. The confirm dialog renders on top of the
-// init overlay (see View()), so the init overlay stays visible when the
-// confirm dialog closes — no close/reopen cycle needed.
+// The init overlay (mcpInitOverlay) persists throughout MCP init.
+// The confirm overlay (confirmOverlay) handles auth confirm and tool
+// confirm as temporary dialogs on top of the init overlay.
 func (m *Terminal) handleMCPOverlays() {
-	// Priority 1: Done signal — close init overlay (one-shot).
+	// 1. Done signal — close init overlay (one-shot).
 	if m.out.ConsumeMCPDone() {
-		m.mcpInitOverlayDismissed = false
 		if m.mcpInitOverlay.IsOpen() {
 			m.mcpInitOverlay.Close()
 			m.restoreFocusAfterConfirm()
@@ -398,28 +386,27 @@ func (m *Terminal) handleMCPOverlays() {
 		return
 	}
 
-	// Priority 2: Tool confirm (always highest-priority overlay).
+	// 2. Tool confirm (separate from MCP init).
 	if id, name, input, ok := m.out.GetPendingToolConfirm(); ok {
 		m.openConfirmTool(id, name, input)
 		return
 	}
 
-	// Priority 3: MCP auth confirm (temporary — appears on top of init overlay).
+	// 3. MCP auth confirm — open confirm dialog on top of init overlay.
 	if server, url, ok := m.out.GetPendingMCPAuth(); ok {
 		m.openConfirmMCPAuth(server, url)
 		return
 	}
 
-	// Priority 4: Init overlay (persistent — stays open behind confirm dialogs).
-	// Open for ANY active MCP status, including "auth_confirm" (covers the
-	// case where all servers need OAuth and no "connecting" event was sent).
+	// 4. Init overlay — show for any active (non-empty, non-done) status.
+	// Stays open throughout init; Ctrl+G skips but does not dismiss it.
 	st := m.out.SnapshotStatus()
 	if st.MCPStatus != "" && st.MCPStatus != "done" {
 		if m.mcpInitOverlay.IsOpen() {
 			m.mcpInitOverlay.UpdateMCPInitProgress(
 				st.MCPServer, st.MCPConnected, st.MCPSkipped, st.MCPTotal)
 			m.display.updateContent()
-		} else if !m.mcpInitOverlayDismissed {
+		} else {
 			m.mcpInitOverlay.OpenMCPInit()
 			m.mcpInitOverlay.UpdateMCPInitProgress(
 				st.MCPServer, st.MCPConnected, st.MCPSkipped, st.MCPTotal)

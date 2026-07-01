@@ -497,9 +497,10 @@ func (s *Session) handlePrompt(contentParts []llm.ContentPart) {
 }
 
 // handleMCPInitSkip handles the :mcp_init_skip command.
-// Called when the user presses Ctrl+G on the init overlay.
-// Delegates to Init.SkipCurrent() which skips either the current
-// connecting server (connect phase) or the first running OAuth server.
+// Called when the user presses Ctrl+G (init overlay or globally) or types
+// the command directly. Delegates to Init.SkipCurrent() which skips
+// either the current connecting server (connect phase) or the first
+// running OAuth server.
 func (s *Session) handleMCPInitSkip() {
 	if s.mcpInit != nil {
 		s.mcpInit.SkipCurrent()
