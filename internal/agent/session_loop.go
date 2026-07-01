@@ -14,8 +14,6 @@ package agent
 //   - session_io.go:          input pump, command dispatch
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -33,7 +31,7 @@ import (
 //   - Task completion signals (via taskResultCh)
 //   - System info refresh requests (via taskRefreshCh)
 //   - MCP initialization results (via mcpUpdateCh)
-//   - MCP OAuth authorization results (via oauthResultCh)
+//   - MCP OAuth authorization results (via pollOAuthResults)
 func (s *Session) run() {
 	defer close(s.runDoneCh)
 	defer s.sessionCancel()
@@ -46,6 +44,9 @@ func (s *Session) run() {
 		if s.sessionCtx.Err() != nil {
 			return
 		}
+
+		// Check for completed OAuth results before blocking on events.
+		s.pollOAuthResults()
 
 		select {
 		case msg, ok := <-s.inputMsgCh:
@@ -70,12 +71,25 @@ func (s *Session) run() {
 		case update := <-s.mcpUpdateCh:
 			s.applyMCPUpdate(update)
 
-		case result := <-s.oauthResultCh:
-			s.handleOAuthResult(result)
-
 		case <-s.sessionCtx.Done():
 			return
 		}
+
+		// Check for completed OAuth results after each event.
+		s.pollOAuthResults()
+	}
+}
+
+// pollOAuthResults drains any completed OAuth results from the seq.
+// Called after each event in the main loop so OAuth results are
+// processed promptly even while waiting for user input.
+func (s *Session) pollOAuthResults() {
+	for s.oauthSeq != nil {
+		result := s.oauthSeq.TryResult()
+		if result == nil {
+			break
+		}
+		s.applyOAuthResult(result)
 	}
 }
 
@@ -101,15 +115,9 @@ func (s *Session) applyMCPUpdate(update MCPUpdateEvent) {
 
 	// 5. Start OAuth sequence if there are pending servers.
 	if len(update.PendingOAuthServers) > 0 {
-		s.pendingOAuthServers = update.PendingOAuthServers
-		s.pendingOAuthIdx = 0
+		s.oauthSeq = mcp.NewOAuthSeq(update.Manager.Clients())
 		s.mcpReady.Store(false)
-
-		// Send the first confirm prompt to the adapter.
-		first := s.pendingOAuthServers[0]
-		s.sendMCPAuthConfirm(first.Name, first.URL)
-		s.writeNotifyf("MCP servers partially initialized. %d server%s need OAuth authorization.",
-			len(s.pendingOAuthServers), pluralize(len(s.pendingOAuthServers)))
+		s.advanceMCPAuth()
 	} else {
 		s.mcpReady.Store(true)
 		s.writeNotifyf("MCP servers initialized: %d servers, %d tools loaded",
@@ -117,33 +125,19 @@ func (s *Session) applyMCPUpdate(update MCPUpdateEvent) {
 	}
 }
 
-// handleOAuthResult processes the result of an OAuth authorization.
-// Called from the run() goroutine when an oauthResult is received from
-// the OAuth goroutine via oauthResultCh.
-func (s *Session) handleOAuthResult(result oauthResult) {
-	// Ignore stale results from servers the user already skipped.
-	if result.idx < s.pendingOAuthIdx {
-		return
-	}
-
-	if result.err != nil {
-		if errors.Is(result.err, context.Canceled) {
-			// User skipped this server — the goroutine was canceled.
-			// skipCurrentMCPAuth already advanced the index; nothing to do.
-			return
-		}
-		s.writeError(fmt.Sprintf("MCP auth failed for %q: %v", result.name, result.err))
-		s.pendingOAuthIdx++
+// applyOAuthResult applies a single completed OAuth result.
+// Called from pollOAuthResults in the main loop.
+func (s *Session) applyOAuthResult(result *mcp.ServerOAuthResult) {
+	if result.Err != nil {
+		s.writeError(fmt.Sprintf("MCP auth failed for %q: %v", result.Name, result.Err))
 		s.advanceMCPAuth()
 		return
 	}
 
 	// Successful authorization — process tools.
-	if result.tools != nil {
-		s.applyOAuthTools(result.name, result.tools)
+	if result.Tools != nil {
+		s.applyOAuthTools(result.Name, result.Tools)
 	}
-
-	s.pendingOAuthIdx++
 	s.advanceMCPAuth()
 }
 
@@ -187,28 +181,27 @@ func (s *Session) applyOAuthTools(name string, tools []mcp.Tool) {
 }
 
 // advanceMCPAuth sends the next auth confirm prompt or marks MCP as ready.
-// Called after user action (yes/no) completes for the current server.
+// Called after each user action or OAuth result.
+// With parallel OAuth, confirm prompts are serial (one dialog at a time)
+// but OAuth executions run concurrently in background goroutines.
 func (s *Session) advanceMCPAuth() {
-	if s.pendingOAuthIdx < len(s.pendingOAuthServers) {
-		next := s.pendingOAuthServers[s.pendingOAuthIdx]
-		s.sendMCPAuthConfirm(next.Name, next.URL)
-	} else {
-		// All servers done.
-		s.oauthCancel = nil
+	if s.oauthSeq == nil {
+		return
+	}
+
+	if next := s.oauthSeq.NextConfirm(); next != nil {
+		s.sendMCPAuthConfirm(next.Name(), next.URL())
+	} else if s.oauthSeq.PendingCount() == 0 && s.oauthSeq.RunningCount() == 0 {
+		// All servers either started or skipped, and no goroutines running.
+		// Collect any remaining results and mark ready.
+		s.pollOAuthResults()
 		s.mcpReady.Store(true)
 		s.sendMCPAuthDone()
 		s.sendSystemInfo("all")
 		s.writeNotifyf("MCP servers initialized: %d servers, %d tools loaded",
 			s.MCPManager.ActiveServerCount(), s.mcpToolCount)
 	}
-}
-
-// pluralize returns "s" for plural count, empty string for singular.
-func pluralize(n int) string {
-	if n == 1 {
-		return ""
-	}
-	return "s"
+	// else: still waiting for running goroutines to complete.
 }
 
 // handleTaskDone processes a task completion signal from the task goroutine.
@@ -257,8 +250,6 @@ func (s *Session) drainUntilTaskDone() {
 			s.sendSystemInfo("task")
 		case update := <-s.mcpUpdateCh:
 			s.applyMCPUpdate(update)
-		case <-s.oauthResultCh:
-			// OAuth results during shutdown are safe to discard.
 		case <-s.sessionCtx.Done():
 			return
 		}

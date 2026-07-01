@@ -95,17 +95,16 @@ type runState struct {
 
 	// OAuth authorization sequence — owned by run() goroutine.
 	// When the initial MCPUpdateEvent has PendingOAuthServers, the run()
-	// goroutine cycles through them one at a time, sending confirm SM
-	// messages to the adapter and waiting for user responses.
-	pendingOAuthServers []MCPAuthServer    // servers needing OAuth, in order
-	pendingOAuthIdx     int                // index of the server currently being prompted
-	oauthResultCh       chan oauthResult   // goroutine → run(): AuthorizeServer result
-	oauthCancel         context.CancelFunc // cancels the currently running OAuth goroutine
+	// goroutine creates an OAuthSeq and drives the flow:
+	//   - NextConfirm() → adapter confirm dialog
+	//   - Start/Skip → user response
+	//   - TryResult() → collect completed OAuth results
+	oauthSeq *mcp.OAuthSeq
 
 	// mcpToolCount tracks the total number of MCP tools loaded.
 	// Used for display messages; incremented in applyMCPUpdate and
-	// handleOAuthResult. This is separate from len(BaseTools) which
-	// includes built-in tools.
+	// when collecting OAuth results. This is separate from len(BaseTools)
+	// which includes built-in tools.
 	mcpToolCount int
 }
 
@@ -282,7 +281,6 @@ func NewSession(cfg SessionConfig) *Session {
 			taskResultCh:  make(chan []llm.ContentPart, 1),
 			taskRefreshCh: make(chan struct{}, 1),
 			mcpUpdateCh:   make(chan MCPUpdateEvent, 10),
-			oauthResultCh: make(chan oauthResult, 10),
 		},
 		sharedState: sharedState{
 			sessionCtx:    ctx,
@@ -330,7 +328,6 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 			taskResultCh:  make(chan []llm.ContentPart, 1),
 			taskRefreshCh: make(chan struct{}, 1),
 			mcpUpdateCh:   make(chan MCPUpdateEvent, 10),
-			oauthResultCh: make(chan oauthResult, 10),
 		},
 		sharedState: sharedState{
 			sessionCtx:    ctx,

@@ -268,15 +268,6 @@ func (s *Session) sendMCPAuthConfirm(serverName, serverURL string) {
 	})
 }
 
-// sendMCPAuthInProgress tells the adapter that the OAuth flow is running
-// for the given server (authorization in progress, waiting for browser).
-func (s *Session) sendMCPAuthInProgress(serverName string) {
-	s.writeSystemMsg(MCPAuthMsg{
-		Server: serverName,
-		Status: "in_progress",
-	})
-}
-
 // sendMCPAuthDone tells the adapter that all OAuth servers have been
 // processed. The adapter closes any remaining MCP overlay.
 func (s *Session) sendMCPAuthDone() {

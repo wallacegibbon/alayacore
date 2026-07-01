@@ -15,7 +15,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/llm"
@@ -513,10 +512,10 @@ func (s *Session) handleMCPInitSkip() {
 //
 // Usage: :mcp_auth <server_name> yes|no
 //
-// The session owns the OAuth sequence (pendingOAuthServers list), so
-// "no" simply advances to the next server and "yes" starts an async
-// AuthorizeServer goroutine. Results arrive via oauthResultCh and are
-// processed by handleOAuthResult in the run() loop.
+// The OAuthSeq owns the per-server state. "yes" launches OAuth in a
+// background goroutine (parallel with other confirmed servers); "no"
+// skips the server. Results are collected by pollOAuthResults in the
+// main loop.
 func (s *Session) handleMCPAuth(_ context.Context, args string) {
 	name, action, _ := strings.Cut(args, " ")
 	if name == "" || action == "" {
@@ -524,97 +523,26 @@ func (s *Session) handleMCPAuth(_ context.Context, args string) {
 		return
 	}
 
-	switch action {
-	case "no":
-		s.skipCurrentMCPAuth(name)
-	case "yes":
-		s.startMCPAuth(name)
-	default:
-		s.writeError("usage: :mcp_auth <server_name> yes|no")
-	}
-}
-
-// skipCurrentMCPAuth handles the "no" response for the current server.
-// Cancels any running OAuth goroutine and advances to the next server.
-func (s *Session) skipCurrentMCPAuth(name string) {
-	// Verify the name matches the current pending server.
-	if s.pendingOAuthIdx >= len(s.pendingOAuthServers) {
-		s.writeError(fmt.Sprintf("Server %q is not in the pending list", name))
-		return
-	}
-	current := s.pendingOAuthServers[s.pendingOAuthIdx]
-	if current.Name != name {
-		s.writeError(fmt.Sprintf("Server %q is not the current authorization prompt", name))
-		return
-	}
-
-	// Cancel any running OAuth so the goroutine exits promptly.
-	if s.oauthCancel != nil {
-		s.oauthCancel()
-		s.oauthCancel = nil
-	}
-
-	s.writeNotifyf("Skipped authorization for MCP server %q.", name)
-	s.pendingOAuthIdx++
-	s.advanceMCPAuth()
-}
-
-// startMCPAuth handles the "yes" response for the current server.
-// Starts an OAuth authorization goroutine and notifies the adapter.
-func (s *Session) startMCPAuth(name string) {
-	mgr := s.MCPManager
-	if mgr == nil {
+	if s.oauthSeq == nil {
 		s.writeError("MCP servers are still initializing. Please wait...")
 		return
 	}
 
-	pending := mgr.PendingAuthServer(name)
-	if pending == nil {
-		s.writeError(fmt.Sprintf("Server %q not found or already authorized", name))
-		return
-	}
+	switch action {
+	case "no":
+		s.oauthSeq.Skip(name)
+		s.writeNotifyf("Skipped authorization for MCP server %q.", name)
+		s.advanceMCPAuth()
+	case "yes":
+		s.writeNotifyf("Authorizing MCP server %q...", name)
+		s.writeNotify("A browser window will open for authentication.")
 
-	// Verify the name matches the current pending server.
-	if s.pendingOAuthIdx >= len(s.pendingOAuthServers) {
-		s.writeError(fmt.Sprintf("Server %q is not in the pending list", name))
-		return
-	}
-	current := s.pendingOAuthServers[s.pendingOAuthIdx]
-	if current.Name != name {
-		s.writeError(fmt.Sprintf("Server %q is not the current authorization prompt", name))
-		return
-	}
-
-	s.writeNotifyf("Authorizing MCP server %q (%s)...", name, pending.ServerURL)
-	s.writeNotify("A browser window will open for authentication.")
-
-	// Notify adapter that OAuth is starting (progress overlay).
-	s.sendMCPAuthInProgress(name)
-
-	// Create cancelable context for the OAuth goroutine.
-	authCtx, authCancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	s.oauthCancel = authCancel
-
-	currentIdx := s.pendingOAuthIdx
-
-	// Run AuthorizeServer in a background goroutine since it blocks
-	// on interactive user input (browser + callback).
-	go func() {
-		defer authCancel()
-
-		tools, err := mgr.AuthorizeServer(authCtx, name)
-		if err != nil {
-			s.oauthResultCh <- oauthResult{name: name, err: err, idx: currentIdx}
+		if ok := s.oauthSeq.Start(name); !ok {
+			s.writeError(fmt.Sprintf("Server %q not found or already authorized", name))
 			return
 		}
-
-		// Guard against TOCTOU: skipMCPAuth may have canceled the context
-		// just as AuthorizeServer succeeded.
-		if authCtx.Err() != nil {
-			s.oauthResultCh <- oauthResult{name: name, err: nil, idx: currentIdx}
-			return
-		}
-
-		s.oauthResultCh <- oauthResult{name: name, tools: tools, err: nil, idx: currentIdx}
-	}()
+		s.advanceMCPAuth()
+	default:
+		s.writeError("usage: :mcp_auth <server_name> yes|no")
+	}
 }

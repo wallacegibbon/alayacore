@@ -42,10 +42,11 @@
 //	read end is in the run() goroutine. The adapter never touches this
 //	channel — all adapter communication goes through TLV frames.
 //
-//	OAuth authorization results flow through oauthResultCh from the
-//	short-lived AuthorizeServer goroutine back to run(), which owns
-//	the entire OAuth sequence state (pendingOAuthServers list + index).
-//	communication with adapters goes through TLV frames.
+//	OAuth authorization is handled by OAuthSeq (internal/mcp/auth_seq.go),
+//	which manages per-server ServerAuth instances. Each confirmed server
+//	runs its OAuth flow in a background goroutine; results are collected
+//	via pollOAuthResults() in the main loop. Adapter communication goes
+//	through TLV frames.
 //
 //	All other session state (agent, provider, ContextTokens, ContextLimit,
 //	reasoningLevel, histCounter) is owned by a single goroutine and

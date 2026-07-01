@@ -51,25 +51,13 @@ func (SetContextTokensEvent) taskEvent() {}
 
 // MCPUpdateEvent carries MCP initialization results to the session's run()
 // goroutine. It is sent internally by startMCPInitWatcher after AsyncInit
-// completes (not from OAuth — OAuth results go through oauthResultCh).
-// The run() goroutine applies the updates (tools + system prompt) and
-// starts the OAuth sequence if PendingOAuthServers is non-empty.
+// completes. The run() goroutine applies the updates (tools + system prompt)
+// and starts the OAuth sequence via OAuthSeq if PendingOAuthServers is non-empty.
 type MCPUpdateEvent struct {
 	Tools               []llm.Tool
 	SystemPromptSuffix  string
 	Manager             *mcp.Manager
 	PendingOAuthServers []MCPAuthServer // servers needing user OAuth; empty if none
-}
-
-// oauthResult carries the result of an OAuth authorization back to the
-// run() goroutine. The idx field identifies the server index this result
-// corresponds to, so stale results from already-skipped servers are
-// silently ignored.
-type oauthResult struct {
-	name  string
-	tools []mcp.Tool
-	err   error
-	idx   int
 }
 
 // sendEvent sends a task event to the run() goroutine.
