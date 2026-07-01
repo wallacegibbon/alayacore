@@ -198,7 +198,8 @@ func (s *Session) advanceMCPAuth() {
 		s.mcpReady.Store(true)
 		s.sendMCPAuthDone()
 		s.sendSystemInfo("all")
-		s.writeNotifyf("MCP servers initialized (%d tools loaded).", s.mcpToolCount)
+		s.writeNotifyf("MCP servers initialized: %d servers, %d tools loaded",
+			s.MCPManager.ActiveServerCount(), s.mcpToolCount)
 	}
 }
 
