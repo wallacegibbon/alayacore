@@ -218,13 +218,11 @@ func (m *Terminal) handleConfirmCanceled(kind ConfirmKind, toolID string, fromCm
 		}
 		return m, scheduleTick()
 
-	case ConfirmMCPAuth, ConfirmMCPAuthProgress:
+	case ConfirmMCPAuth:
 		m.restoreFocusAfterConfirm()
 		if toolID != "" {
 			m.emitCommand(":mcp_auth " + toolID + " no")
 		}
-		// Session owns the OAuth sequence — it will send the next
-		// mcp_auth:confirm (or mcp_auth:done) via SM message.
 		return m, scheduleTick()
 
 	case ConfirmMCPInit:
@@ -264,14 +262,12 @@ func (m *Terminal) handleConfirmConfirmed(kind ConfirmKind, toolID string, fromC
 		return m, scheduleTick()
 
 	case ConfirmMCPAuth:
-		// Immediately switch to progress overlay instead of closing.
-		// This shows "Authorizing MCP server X…" while the OAuth flow
-		// runs in the background. The overlay auto-closes when the
-		// session sends mcp_auth:done (detected in handleTick).
+		// Session runs OAuth in background — just emit yes and close dialog.
+		// The session drives the rest (no progress overlay needed).
 		if toolID != "" {
-			m.confirmOverlay.OpenMCPAuthProgress(toolID)
 			m.emitCommand(":mcp_auth " + toolID + " yes")
 		}
+		m.restoreFocusAfterConfirm()
 		return m, scheduleTick()
 	}
 	return m, nil

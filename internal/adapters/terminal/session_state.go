@@ -42,15 +42,11 @@ type sessionState struct {
 	// Values: "" (no MCP), "starting", "ready", "auth_required".
 	mcpInitStatus string
 
-	// MCP auth status — session-driven OAuth overlay state.
-	// MCPAuthStatus values:
-	//   ""        — no active OAuth overlay
-	//   "confirm" — session wants a y/n confirm dialog for mcpAuthServer
-	//   "in_progress" — OAuth flow is running for mcpAuthServer
-	//   "done"   — all OAuth servers processed, close overlay
-	mcpAuthStatus    string
-	mcpAuthServer    string
-	mcpAuthServerURL string
+	// Pending MCP auth confirm — set when the session sends mcp_auth:confirm,
+	// consumed by the Terminal tick handler to open the confirm dialog.
+	// Only one server is prompted at a time (session serializes the list).
+	mcpAuthPendingName string
+	mcpAuthPendingURL  string
 
 	// Model fields
 	models          []config.ModelConfig
@@ -172,15 +168,28 @@ func (s *sessionState) updateMCPInitStatus(status string) {
 	s.mu.Unlock()
 }
 
-// updateMCPAuth atomically updates the MCP OAuth overlay state.
-// Called when the session sends an mcp_auth system message.
-// Status values: "confirm", "in_progress", "done".
-func (s *sessionState) updateMCPAuth(server, url, status string) {
+// setMCPAuthPending stores a pending MCP auth confirmation request.
+// Consumed by takeMCPAuthPending in the Terminal tick handler.
+func (s *sessionState) setMCPAuthPending(server, url string) {
 	s.mu.Lock()
-	s.mcpAuthStatus = status
-	s.mcpAuthServer = server
-	s.mcpAuthServerURL = url
+	s.mcpAuthPendingName = server
+	s.mcpAuthPendingURL = url
 	s.mu.Unlock()
+}
+
+// takeMCPAuthPending pops the pending MCP auth confirmation.
+// Returns (server, url, ok). Only one pending at a time.
+func (s *sessionState) takeMCPAuthPending() (server, url string, ok bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.mcpAuthPendingName == "" {
+		return "", "", false
+	}
+	server = s.mcpAuthPendingName
+	url = s.mcpAuthPendingURL
+	s.mcpAuthPendingName = ""
+	s.mcpAuthPendingURL = ""
+	return server, url, true
 }
 
 // setToolConfirmPending appends a pending tool confirmation request.
@@ -210,23 +219,20 @@ func (s *sessionState) snapshotStatus() StatusSnapshot {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return StatusSnapshot{
-		ContextTokens:    s.contextTokens,
-		ContextLimit:     s.contextLimit,
-		InProgress:       s.inProgress,
-		CurrentStep:      s.currentStep,
-		MaxSteps:         s.maxSteps,
-		LastCurrentStep:  s.lastCurrentStep,
-		LastMaxSteps:     s.lastMaxSteps,
-		TaskError:        s.lastTaskError,
-		ReasoningLevel:   s.reasoningLevel,
-		ActiveTheme:      s.activeTheme,
-		ActiveThemeData:  s.activeThemeData,
-		VideoFPS:         s.videoFPS,
-		VideoRes:         s.videoRes,
-		MCPInitStatus:    s.mcpInitStatus,
-		MCPAuthStatus:    s.mcpAuthStatus,
-		MCPAuthServer:    s.mcpAuthServer,
-		MCPAuthServerURL: s.mcpAuthServerURL,
+		ContextTokens:   s.contextTokens,
+		ContextLimit:    s.contextLimit,
+		InProgress:      s.inProgress,
+		CurrentStep:     s.currentStep,
+		MaxSteps:        s.maxSteps,
+		LastCurrentStep: s.lastCurrentStep,
+		LastMaxSteps:    s.lastMaxSteps,
+		TaskError:       s.lastTaskError,
+		ReasoningLevel:  s.reasoningLevel,
+		ActiveTheme:     s.activeTheme,
+		ActiveThemeData: s.activeThemeData,
+		VideoFPS:        s.videoFPS,
+		VideoRes:        s.videoRes,
+		MCPInitStatus:   s.mcpInitStatus,
 	}
 }
 
