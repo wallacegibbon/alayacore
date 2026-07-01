@@ -223,6 +223,7 @@ func (s *Session) advanceMCPAuth() {
 		s.pollOAuthResults()
 		s.mcpReady.Store(true)
 		s.sendMCPAuthDone()
+		s.sendMCPInitMsg("ready", s.mcpToolCount, nil)
 		s.sendSystemInfo("all")
 		s.writeNotifyf("MCP servers initialized: %d servers, %d tools loaded",
 			s.MCPManager.ActiveServerCount(), s.mcpToolCount)
