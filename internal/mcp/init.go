@@ -157,8 +157,8 @@ func (init *Init) run(ctx context.Context) {
 	defer func() {
 		init.mu.Lock()
 		init.eventsClosed = true
-		init.mu.Unlock()
 		close(init.events)
+		init.mu.Unlock()
 	}()
 
 	clients := init.manager.Clients()
@@ -385,9 +385,13 @@ func (init *Init) discoverPhase(ctx context.Context, connected, skipped, total i
 
 func (init *Init) sendEvent(evt InitEvent) {
 	init.mu.Lock()
-	closed := init.eventsClosed
-	init.mu.Unlock()
-	if closed {
+	defer init.mu.Unlock()
+
+	// Check and send under the same lock to prevent a TOCTOU race:
+	//   Without the lock, an OAuth goroutine could read eventsClosed=false,
+	//   then the run() deferred cleanup sets eventsClosed=true and closes
+	//   the channel, then the goroutine sends on a closed channel → panic.
+	if init.eventsClosed {
 		return
 	}
 	select {
