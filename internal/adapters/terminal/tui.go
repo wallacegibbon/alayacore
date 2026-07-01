@@ -276,7 +276,11 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Sync theme from the now-loaded session state.
 		snap := m.out.SnapshotStatus()
 		m.syncThemeFromSession(snap.ActiveTheme, snap.ActiveThemeData)
-		return m, nil
+		// Populate model selector from the now-loaded model list.
+		// sendSystemInfo("all") already wrote SM "model_list" to the
+		// output buffer during loading, so SnapshotModels is populated.
+		modelSnap := m.out.SnapshotModels()
+		return m, m.modelSelector.LoadModels(modelSnap.Models, modelSnap.ActiveID)
 
 	case sessionLoadingErrorMsg:
 		m.loading = false
