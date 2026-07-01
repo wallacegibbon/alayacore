@@ -79,7 +79,16 @@ func (s *Session) run() {
 		case evt, ok := <-mcpEvents:
 			if !ok {
 				// Channel closed — disable this case permanently.
+				// If we never saw "done" or "canceled", the init was
+				// aborted without a clean notification (e.g. context
+				// canceled externally). Set mcpReady so the user
+				// can proceed.
 				mcpEvents = nil
+				if !s.mcpReady.Load() {
+					s.mcpReady.Store(true)
+					s.writeError("MCP initialization canceled.")
+					s.sendMCPMsg("done", "", "", "", 0, 0, 0)
+				}
 				break
 			}
 			s.handleMCPEvent(&evt)
@@ -93,6 +102,11 @@ func (s *Session) run() {
 // handleMCPEvent processes a single MCP initialization event.
 // Called from the main loop when an event arrives on mcpInit.Events().
 func (s *Session) handleMCPEvent(evt *mcp.InitEvent) {
+	// Ignore stale events after init was canceled or completed.
+	if s.mcpReady.Load() {
+		return
+	}
+
 	switch evt.Type {
 	case "connecting", "connected", "failed":
 		// Forward to adapter for progress overlay.
@@ -136,6 +150,11 @@ func (s *Session) handleMCPEvent(evt *mcp.InitEvent) {
 		s.sendMCPMsg("done", "", "", "", 0, 0, 0)
 		s.writeNotifyf("MCP servers initialized: %d servers, %d tools loaded",
 			evt.Manager.ActiveServerCount(), len(evt.Tools))
+
+	case "canceled":
+		s.mcpReady.Store(true)
+		s.sendMCPMsg("done", "", "", "", 0, 0, 0)
+		s.writeError("MCP initialization canceled.")
 	}
 }
 

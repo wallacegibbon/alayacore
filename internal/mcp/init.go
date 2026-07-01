@@ -70,6 +70,8 @@ type Init struct {
 
 	mu           sync.Mutex
 	eventsClosed bool // set before closing events channel
+
+	cancel context.CancelFunc // set by Start(), cancels the init context
 }
 
 type confirmReq struct {
@@ -106,7 +108,20 @@ func (init *Init) Manager() *Manager { return init.manager }
 // Start begins initialization in a background goroutine.
 // Idempotent — subsequent calls are no-ops.
 func (init *Init) Start(ctx context.Context) {
-	init.started.Do(func() { go init.run(ctx) })
+	init.started.Do(func() {
+		runCtx, cancel := context.WithCancel(ctx)
+		init.cancel = cancel
+		go init.run(runCtx)
+	})
+}
+
+// Cancel aborts the entire initialization.
+// Safe to call concurrently — cancels the init context, causing run()
+// to exit cleanly. Idempotent.
+func (init *Init) Cancel() {
+	if init.cancel != nil {
+		init.cancel()
+	}
 }
 
 // Confirm responds to an "auth_confirm" event.
@@ -155,6 +170,11 @@ func (init *Init) SkipCurrent() {
 func (init *Init) run(ctx context.Context) {
 	defer close(init.done)
 	defer func() {
+		// Send a terminal event before closing so the session knows
+		// why the channel is being closed.
+		if ctx.Err() != nil {
+			init.sendEvent(InitEvent{Type: "canceled"})
+		}
 		init.mu.Lock()
 		init.eventsClosed = true
 		close(init.events)
@@ -167,18 +187,12 @@ func (init *Init) run(ctx context.Context) {
 	connected, skipped := init.connectPhase(ctx, clients, total)
 	init.oauthPhase(ctx, clients, connected, skipped, total)
 
-	// Wait for all OAuth goroutines (with brief grace period on cancel).
+	// Wait for all OAuth goroutines (best-effort, no grace period on cancel).
 	waitDone := make(chan struct{})
 	go func() { init.oauthWG.Wait(); close(waitDone) }()
 	select {
 	case <-waitDone:
 	case <-ctx.Done():
-		select {
-		case <-waitDone:
-		case <-time.After(2 * time.Second):
-		}
-	}
-	if ctx.Err() != nil {
 		return
 	}
 

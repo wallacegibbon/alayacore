@@ -77,6 +77,7 @@ type OutputWriter interface {
 	// Confirm dialog support
 	GetPendingToolConfirm() (id, toolName, toolInput string, ok bool)
 	GetPendingMCPAuth() (server, url string, ok bool)
+	ClearMCPAuths()
 	ConsumeMCPDone() bool // returns true if MCP init just completed
 
 	// Update signaling

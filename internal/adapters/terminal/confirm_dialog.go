@@ -67,8 +67,9 @@ type ConfirmDialog struct {
 
 	// Result flags — consumed by the Terminal after key handling.
 	// Only one of these is set per interaction.
-	confirmed bool
-	canceled  bool
+	confirmed     bool
+	canceled      bool
+	ctrlGCanceled bool // true when canceled via Ctrl+G (MCP auth → cancel all)
 }
 
 // NewConfirmDialog creates a new confirm dialog.
@@ -98,6 +99,11 @@ func (cd *ConfirmDialog) ToolName() string { return cd.toolName }
 
 // ToolInput returns the tool input for tool confirmations.
 func (cd *ConfirmDialog) ToolInput() string { return cd.toolInput }
+
+// IsCtrlGCanceled returns true if the dialog was closed via Ctrl+G
+// rather than a regular n/N/Esc. Used by MCP auth to distinguish
+// "decline this server" from "cancel all MCP initialization".
+func (cd *ConfirmDialog) IsCtrlGCanceled() bool { return cd.ctrlGCanceled }
 
 // ToolID returns the tool call ID for tool confirmations.
 func (cd *ConfirmDialog) ToolID() string { return cd.toolID }
@@ -156,8 +162,7 @@ func (cd *ConfirmDialog) OpenMCPAuth(serverName, serverURL string) {
 
 // OpenMCPInit opens the dialog to show that MCP servers are initializing.
 // This is a non-interactive overlay — it shows "Initializing MCP servers…"
-// while the async init runs in the background. Press Ctrl+G to skip the
-// current server.
+// while the async init runs in the background. Press Ctrl+G to cancel.
 // All keys are consumed (no-op) while this overlay is shown.
 func (cd *ConfirmDialog) OpenMCPInit() {
 	cd.state = FilteredListOpen
@@ -235,6 +240,7 @@ func (cd *ConfirmDialog) Close() {
 	cd.toolInput = ""
 	cd.confirmed = false
 	cd.canceled = false
+	cd.ctrlGCanceled = false
 }
 
 // ---- Key Handling ----
@@ -266,6 +272,15 @@ func (cd *ConfirmDialog) HandleKeyMsg(msg tea.KeyMsg) bool {
 	case keyN, keyNCapital, keyEsc:
 		cd.canceled = true
 		cd.state = FilteredListClosed
+		return true
+
+	case keyCtrlG:
+		if cd.kind == ConfirmMCPAuth {
+			cd.ctrlGCanceled = true
+			cd.canceled = true
+			cd.state = FilteredListClosed
+			return true
+		}
 		return true
 	}
 
@@ -353,7 +368,7 @@ func (cd *ConfirmDialog) buildContentLines() []string {
 	lines := body
 	switch cd.kind {
 	case ConfirmMCPInit:
-		lines = append(lines, cd.wrapAndCenter("Press Ctrl+G to skip current server.", cd.styles.System, innerWidth)[0])
+		lines = append(lines, cd.wrapAndCenter("Press Ctrl+G to cancel MCP initialization.", cd.styles.System, innerWidth)[0])
 		lines = append(lines, cd.wrapAndCenter("(this window will close automatically)", cd.styles.System, innerWidth)[0])
 	default:
 		lines = append(lines, cd.wrapAndCenter("y / n", cd.styles.System, innerWidth)[0])

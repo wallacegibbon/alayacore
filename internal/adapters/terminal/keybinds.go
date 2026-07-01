@@ -43,11 +43,10 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// 1b. MCP init overlay — shows MCP init progress (and behind it,
 	//     the auth confirm dialog may appear temporarily).
-	//     Ctrl+G skips the current server without closing the overlay.
-	//     All other keys are consumed while init is in progress.
+	//     Ctrl+G cancels the entire MCP initialization.
 	if m.mcpInitOverlay.IsOpen() {
 		if msg.String() == keyCtrlG {
-			m.emitCommand(":mcp_skip")
+			m.emitCommand(":mcp_cancel")
 			return m, scheduleTick()
 		}
 		return m, nil
@@ -190,13 +189,14 @@ func (m *Terminal) handleConfirmResult() (tea.Model, tea.Cmd) {
 
 	kind := m.confirmOverlay.Kind()
 	toolID := m.confirmOverlay.ToolID()
+	ctrlGCanceled := m.confirmOverlay.IsCtrlGCanceled()
 	m.confirmOverlay.Close()
 
 	fromCmd := m.confirmFromCommand
 	m.confirmFromCommand = false
 
 	if canceled {
-		return m.handleConfirmCanceled(kind, toolID, fromCmd)
+		return m.handleConfirmCanceled(kind, toolID, fromCmd, ctrlGCanceled)
 	}
 	return m.handleConfirmConfirmed(kind, toolID, fromCmd)
 }
@@ -215,7 +215,7 @@ func (m *Terminal) restoreFocusAfterConfirm() {
 }
 
 // handleConfirmCanceled handles the cancel path of a confirm dialog result.
-func (m *Terminal) handleConfirmCanceled(kind ConfirmKind, toolID string, fromCmd bool) (tea.Model, tea.Cmd) {
+func (m *Terminal) handleConfirmCanceled(kind ConfirmKind, toolID string, fromCmd bool, ctrlGCanceled bool) (tea.Model, tea.Cmd) {
 	if fromCmd {
 		m.input.SetValue("")
 	}
@@ -230,9 +230,15 @@ func (m *Terminal) handleConfirmCanceled(kind ConfirmKind, toolID string, fromCm
 		return m, scheduleTick()
 
 	case ConfirmMCPAuth:
-		m.restoreFocusAfterConfirm()
 		if toolID != "" {
-			m.emitCommand(":mcp_auth " + toolID + " no")
+			if ctrlGCanceled {
+				// Ctrl+G: cancel entire MCP initialization.
+				m.out.ClearMCPAuths()
+				m.emitCommand(":mcp_cancel")
+			} else {
+				// n/Esc: decline this specific server.
+				m.emitCommand(":mcp_auth " + toolID + " no")
+			}
 		}
 		return m, scheduleTick()
 	}

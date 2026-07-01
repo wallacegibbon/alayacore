@@ -435,10 +435,22 @@ func (to *outputWriter) GetPendingMCPAuth() (server, url string, ok bool) {
 	return to.status.takeMCPAuthPending()
 }
 
+// ClearMCPAuths discards any pending MCP auth confirmations.
+// Used when the user cancels MCP initialization mid-auth.
+func (to *outputWriter) ClearMCPAuths() {
+	to.status.clearMCPAuths()
+}
+
 // ConsumeMCPDone returns true if MCP init just completed,
 // and resets the flag. The Terminal uses this to close the progress overlay.
+// Also clears any stale MCP auth confirmations that may have been queued
+// before the cancellation took effect.
 func (to *outputWriter) ConsumeMCPDone() bool {
-	return to.status.takeMCPDone()
+	done := to.status.takeMCPDone()
+	if done {
+		to.status.clearMCPAuths()
+	}
+	return done
 }
 
 // SnapshotStatus returns a consistent point-in-time view of session status.

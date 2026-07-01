@@ -496,20 +496,17 @@ func (s *Session) handlePrompt(contentParts []llm.ContentPart) {
 	go s.runTask(taskCtx, taskContent, contentParts)
 }
 
-// handleMCPSkip handles the :mcp_skip command.
+// handleMCPCancel handles the :mcp_cancel command.
 // Called when the user presses Ctrl+G (init overlay or globally) or types
-// the command directly. Delegates to Init.SkipCurrent() which skips
-// either the current connecting server (connect phase) or the first
-// running OAuth server.
-func (s *Session) handleMCPSkip() {
+// the command directly. Cancels the entire MCP initialization.
+func (s *Session) handleMCPCancel() {
 	switch {
 	case s.mcpInit == nil:
 		s.writeError("No MCP servers configured.")
 	case s.mcpReady.Load():
 		s.writeError("MCP initialization has already completed.")
 	default:
-		s.mcpInit.SkipCurrent()
-		s.writeNotify("Skipping current MCP server...")
+		s.mcpInit.Cancel()
 	}
 }
 

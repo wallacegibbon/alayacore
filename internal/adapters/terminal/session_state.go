@@ -208,6 +208,15 @@ func (s *sessionState) takeMCPAuthPending() (server, url string, ok bool) {
 	return p.server, p.url, true
 }
 
+// clearMCPAuths discards all pending MCP auth confirmations.
+// Used when MCP init is canceled — stale auth events may have been
+// queued before the cancellation took effect.
+func (s *sessionState) clearMCPAuths() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.pendingMCPAuths = s.pendingMCPAuths[:0]
+}
+
 // takeMCPDone returns true if initialization is complete (mcpStatus is "done")
 // and resets mcpStatus to "". One-shot — the Terminal uses this to close
 // the init overlay exactly once.

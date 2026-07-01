@@ -110,15 +110,15 @@ type Terminal struct {
 	inProgress bool
 
 	// State
-	quitting             bool
-	confirmFromCommand   bool   // tracks if cancel came from :cancel command (vs Ctrl+G)
-	focusedWindow        string // "input" or "display"
-	windowWidth          int
-	windowHeight         int
-	styles               *Styles
-	hasFocus             bool   // tracks whether the terminal has application focus
-	activeTheme          string // cached from system info updates
-	appliedTheme         string // last theme name that was visually applied (for detecting session-driven changes)
+	quitting           bool
+	confirmFromCommand bool   // tracks if cancel came from :cancel command (vs Ctrl+G)
+	focusedWindow      string // "input" or "display"
+	windowWidth        int
+	windowHeight       int
+	styles             *Styles
+	hasFocus           bool   // tracks whether the terminal has application focus
+	activeTheme        string // cached from system info updates
+	appliedTheme       string // last theme name that was visually applied (for detecting session-driven changes)
 
 	// Theme preview debouncing
 	themePreviewID int // ID of the current pending theme preview
