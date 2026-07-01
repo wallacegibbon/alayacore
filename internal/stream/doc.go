@@ -29,7 +29,7 @@
 // User tags (UT, UI, UV, UA, UD) are bidirectional:
 //   - stdin: adapter sends new user input to the agent
 //   - stdout: agent echoes the user's message back with an assigned history ID
-//   Adapters must handle user tags on both stdin AND stdout.
+//     Adapters must handle user tags on both stdin AND stdout.
 //
 // Function Lifecycle:
 //

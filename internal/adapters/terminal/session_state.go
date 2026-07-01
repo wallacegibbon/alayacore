@@ -39,24 +39,23 @@ type sessionState struct {
 	videoRes int
 
 	// MCP init status — tracks the initialization phase.
-	// Values: "" (no MCP), "starting", "ready", "auth_required".
-	mcpInitStatus string
+	// Values: "" (no MCP), "connecting", "auth_confirm", "done".
+	mcpStatus string
 
-	// Per-server init progress (set during "connecting"/"succeeded"/etc. events).
-	mcpInitServer    string // current server being connected
-	mcpInitConnected int    // servers connected so far
-	mcpInitSkipped   int    // servers skipped by user
-	mcpInitTotal     int    // total servers needing connection
+	// Per-server init progress.
+	mcpServer    string // current server being connected/authorized
+	mcpConnected int    // servers connected so far
+	mcpSkipped   int    // servers skipped by user
+	mcpTotal     int    // total servers
 
-	// Pending MCP auth confirm — set when the session sends mcp_auth:confirm,
+	// Pending MCP auth confirm — set when the session sends mcp:auth_confirm,
 	// consumed by the Terminal tick handler to open the confirm dialog.
-	// Only one server is prompted at a time (session serializes the list).
 	mcpAuthPendingName string
 	mcpAuthPendingURL  string
 
-	// mcpAuthDone is set when the session sends mcp_auth:done (all servers
-	// processed). The Terminal uses it to close the progress overlay.
-	mcpAuthDone bool
+	// mcpDone is set when the session sends mcp:done.
+	// The Terminal uses it to close all MCP overlays.
+	mcpDone bool
 
 	// Model fields
 	models          []config.ModelConfig
@@ -170,22 +169,16 @@ func (s *sessionState) updateVideoConfig(fps, res int) {
 	s.mu.Unlock()
 }
 
-// updateMCPInitStatus atomically updates the MCP initialization phase.
-// Called when the session sends an mcp_init system message.
-func (s *sessionState) updateMCPInitStatus(status string) {
+// updateMCPProgress atomically updates MCP init progress.
+// Called when the session sends an "mcp" system message with
+// status "connecting", "connected", "failed", "auth_running", or "auth_done".
+func (s *sessionState) updateMCPProgress(status, server string, connected, skipped, total int) {
 	s.mu.Lock()
-	s.mcpInitStatus = status
-	s.mu.Unlock()
-}
-
-// updateMCPInitServerProgress atomically updates per-server init progress.
-func (s *sessionState) updateMCPInitServerProgress(status, server string, connected, skipped, total int) {
-	s.mu.Lock()
-	s.mcpInitStatus = status
-	s.mcpInitServer = server
-	s.mcpInitConnected = connected
-	s.mcpInitSkipped = skipped
-	s.mcpInitTotal = total
+	s.mcpStatus = status
+	s.mcpServer = server
+	s.mcpConnected = connected
+	s.mcpSkipped = skipped
+	s.mcpTotal = total
 	s.mu.Unlock()
 }
 
@@ -213,19 +206,19 @@ func (s *sessionState) takeMCPAuthPending() (server, url string, ok bool) {
 	return server, url, true
 }
 
-// setMCPAuthDone marks the OAuth sequence as complete.
-// The Terminal uses this to close the progress overlay.
-func (s *sessionState) setMCPAuthDone() {
+// setMCPDone marks MCP initialization as complete.
+// The Terminal uses this to close all MCP overlays.
+func (s *sessionState) setMCPDone() {
 	s.mu.Lock()
-	s.mcpAuthDone = true
+	s.mcpDone = true
 	s.mu.Unlock()
 }
 
-// takeMCPAuthDone returns and resets the done flag.
-func (s *sessionState) takeMCPAuthDone() bool {
+// takeMCPDone returns and resets the done flag.
+func (s *sessionState) takeMCPDone() bool {
 	s.mu.Lock()
-	done := s.mcpAuthDone
-	s.mcpAuthDone = false
+	done := s.mcpDone
+	s.mcpDone = false
 	s.mu.Unlock()
 	return done
 }
@@ -257,24 +250,24 @@ func (s *sessionState) snapshotStatus() StatusSnapshot {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return StatusSnapshot{
-		ContextTokens:    s.contextTokens,
-		ContextLimit:     s.contextLimit,
-		InProgress:       s.inProgress,
-		CurrentStep:      s.currentStep,
-		MaxSteps:         s.maxSteps,
-		LastCurrentStep:  s.lastCurrentStep,
-		LastMaxSteps:     s.lastMaxSteps,
-		TaskError:        s.lastTaskError,
-		ReasoningLevel:   s.reasoningLevel,
-		ActiveTheme:      s.activeTheme,
-		ActiveThemeData:  s.activeThemeData,
-		VideoFPS:         s.videoFPS,
-		VideoRes:         s.videoRes,
-		MCPInitStatus:    s.mcpInitStatus,
-		MCPInitServer:    s.mcpInitServer,
-		MCPInitConnected: s.mcpInitConnected,
-		MCPInitSkipped:   s.mcpInitSkipped,
-		MCPInitTotal:     s.mcpInitTotal,
+		ContextTokens:   s.contextTokens,
+		ContextLimit:    s.contextLimit,
+		InProgress:      s.inProgress,
+		CurrentStep:     s.currentStep,
+		MaxSteps:        s.maxSteps,
+		LastCurrentStep: s.lastCurrentStep,
+		LastMaxSteps:    s.lastMaxSteps,
+		TaskError:       s.lastTaskError,
+		ReasoningLevel:  s.reasoningLevel,
+		ActiveTheme:     s.activeTheme,
+		ActiveThemeData: s.activeThemeData,
+		VideoFPS:        s.videoFPS,
+		VideoRes:        s.videoRes,
+		MCPStatus:       s.mcpStatus,
+		MCPServer:       s.mcpServer,
+		MCPConnected:    s.mcpConnected,
+		MCPSkipped:      s.mcpSkipped,
+		MCPTotal:        s.mcpTotal,
 	}
 }
 

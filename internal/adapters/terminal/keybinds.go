@@ -42,6 +42,22 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleOverlayConfirm(msg)
 	}
 
+	// 1b. MCP init overlay — separate from confirm overlay.
+	//     Shown during MCP initialization and OAuth. Only Ctrl+G is
+	//     handled (skips the current MCP server). All other keys are
+	//     consumed to prevent interaction with content behind it.
+	if m.mcpInitOverlay.IsOpen() {
+		if msg.String() == keyCtrlG {
+			m.mcpInitOverlay.Close()
+			m.mcpInitOverlayDismissed = true
+			m.restoreFocusAfterConfirm()
+			m.emitCommand(":mcp_init_skip")
+			return m, scheduleTick()
+		}
+		// All other keys consumed while init overlay is showing.
+		return m, nil
+	}
+
 	// 2. Theme selector takes precedence when open
 	if m.themeSelector.IsOpen() {
 		return m.handleThemeSelectorKeys(msg)
@@ -224,13 +240,6 @@ func (m *Terminal) handleConfirmCanceled(kind ConfirmKind, toolID string, fromCm
 			m.emitCommand(":mcp_auth " + toolID + " no")
 		}
 		return m, scheduleTick()
-
-	case ConfirmMCPInit:
-		// Ctrl+G on init overlay — skip current server and dismiss overlay.
-		m.mcpInitOverlayDismissed = true
-		m.restoreFocusAfterConfirm()
-		m.emitCommand(":mcp_init_skip")
-		return m, scheduleTick()
 	}
 
 	m.restoreFocusAfterConfirm()
@@ -263,9 +272,8 @@ func (m *Terminal) handleConfirmConfirmed(kind ConfirmKind, toolID string, fromC
 
 	case ConfirmMCPAuth:
 		// User said yes — emit command and close.
-		// The init overlay (ConfirmMCPInit) will be re-opened by
-		// handleMCPInitOverlay on the next tick, showing current
-		// progress including any updated server state.
+		// The init overlay (mcpInitOverlay) is a separate widget that
+		// stays open behind the confirm dialog — it's still visible.
 		if toolID != "" {
 			m.emitCommand(":mcp_auth " + toolID + " yes")
 		}

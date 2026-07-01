@@ -35,18 +35,14 @@
 //	The only mutable state accessed from more than one goroutine are:
 //	  - atomic fields for outputBroken, confirmCh, and mcpReady
 //	  - A few buffered channels for cancellation, completion signaling,
-//	    system-info refresh, and MCP update events (mcpUpdateCh).
+//	    and system-info refresh.
 //
-//	mcpUpdateCh receives MCP initialization results. The write end is
-//	internal to the session (startMCPInitWatcher goroutine), while the
-//	read end is in the run() goroutine. The adapter never touches this
-//	channel — all adapter communication goes through TLV frames.
-//
-//	OAuth authorization is handled by OAuthGroup (internal/mcp/auth_seq.go),
-//	which manages per-server ServerAuth instances. Each confirmed server
-//	runs its OAuth flow in a background goroutine; results are collected
-//	via pollOAuthResults() in the main loop. Adapter communication goes
-//	through TLV frames.
+//	MCP initialization is managed by the Init struct (internal/mcp/init.go),
+//	which handles the entire lifecycle (connect, OAuth, discover) in a
+//	single goroutine. The session reads events from Init.Events() in its
+//	main loop and reacts accordingly — showing confirm dialogs for OAuth,
+//	applying tools on completion. Adapter communication goes through TLV
+//	frames.
 //
 //	All other session state (agent, provider, ContextTokens, ContextLimit,
 //	reasoningLevel, histCounter) is owned by a single goroutine and

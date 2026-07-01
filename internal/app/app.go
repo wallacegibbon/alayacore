@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -74,12 +73,11 @@ type Config struct {
 	MaxSteps          int      // Maximum agent loop steps
 	ToolConfirmTools  []string // Tool names requiring user confirmation
 
-	// AsyncMCP provides asynchronous MCP initialization.
+	// MCPInit provides asynchronous MCP initialization.
 	// If non-nil, MCP servers are configured and initialization is
 	// running in the background. The session manages init results
-	// internally (via startMCPInitWatcher) — the adapter only needs
-	// AsyncMCP for lifecycle checks (e.g. Done() for TUI overlay).
-	AsyncMCP *mcp.AsyncInit
+	// internally — the adapter receives progress via system messages.
+	MCPInit *mcp.Init
 
 	// MCPManager for lifecycle management (cleanup).
 	// May be nil initially; set from AsyncMCP.Manager() after init.
@@ -107,7 +105,7 @@ func Setup(cfg *config.Settings) (*Config, error) {
 	// ========================================================================
 	// MCP (Model Context Protocol) — async initialization
 	// ========================================================================
-	asyncMCP, mcpErrors := initMCPAsync(cfg)
+	mcpInit, mcpErrors := initMCPAsync(cfg)
 
 	// ========================================================================
 	// System Prompt Construction (base — without MCP sections)
@@ -143,16 +141,16 @@ func Setup(cfg *config.Settings) (*Config, error) {
 		ExtraSystemPrompt: cfg.SystemPrompt,
 		MaxSteps:          cfg.MaxSteps,
 		ToolConfirmTools:  cfg.ToolConfirm,
-		AsyncMCP:          asyncMCP,
+		MCPInit:           mcpInit,
 		MCPStartupErrors:  mcpErrors,
 	}, nil
 }
 
 // initMCPAsync starts asynchronous MCP initialization.
-// Returns an AsyncInit (nil if no MCP servers configured) and any config
-// parsing warnings. The AsyncInit is already started in a background
-// goroutine — call AsyncInit.Done() to wait for completion.
-func initMCPAsync(cfg *config.Settings) (*mcp.AsyncInit, []string) {
+// Returns an Init (nil if no MCP servers configured) and any config
+// parsing warnings. The Init is NOT started yet — the session starts
+// it when the main event loop begins.
+func initMCPAsync(cfg *config.Settings) (*mcp.Init, []string) {
 	// Load MCP configurations from mcp.conf
 	mcpConfigs, startupErrors := loadMCPConfigs(cfg)
 	if len(mcpConfigs) == 0 {
@@ -171,9 +169,8 @@ func initMCPAsync(cfg *config.Settings) (*mcp.AsyncInit, []string) {
 		}
 	}
 
-	asyncMCP := mcp.NewAsyncInit(mcpConfigs)
-	asyncMCP.Start(context.Background())
-	return asyncMCP, startupErrors
+	mcpInit := mcp.NewInit(mcpConfigs)
+	return mcpInit, startupErrors
 }
 
 // createTokenStore creates a FileTokenStore for persisting MCP OAuth tokens.

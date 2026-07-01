@@ -201,45 +201,6 @@ func (m *Manager) Clients() []*Client {
 	return result
 }
 
-// PendingAuthServer describes an MCP server waiting for interactive
-// OAuth authorization (authorization_code flow).
-type PendingAuthServer struct {
-	Name      string
-	ServerURL string
-}
-
-// PendingAuthServers returns servers configured with authorization_code
-// that have not yet completed the OAuth flow or have no valid persisted
-// token. Servers that have a token loaded from disk do not appear here.
-func (m *Manager) PendingAuthServers() []PendingAuthServer {
-	var pending []PendingAuthServer
-	for _, c := range m.loadClients() {
-		if c.needsPersistedAuth() {
-			pending = append(pending, PendingAuthServer{
-				Name:      c.Name(),
-				ServerURL: c.config.URL,
-			})
-		}
-	}
-	return pending
-}
-
-// PendingAuthServer returns info about a specific server that needs OAuth,
-// or nil if the server doesn't exist or is already authorized.
-func (m *Manager) PendingAuthServer(name string) *PendingAuthServer {
-	c := m.findClient(name)
-	if c == nil {
-		return nil
-	}
-	if !c.needsPersistedAuth() {
-		return nil
-	}
-	return &PendingAuthServer{
-		Name:      c.Name(),
-		ServerURL: c.config.URL,
-	}
-}
-
 // resolveAuthConfig discovers authorization server metadata and resolves
 // the OAuth client credentials for a server.
 // For authorization_code, client_id always comes from the built-in registry.

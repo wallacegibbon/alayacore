@@ -2,11 +2,6 @@
 
 package agent
 
-import (
-	"github.com/alayacore/alayacore/internal/llm"
-	"github.com/alayacore/alayacore/internal/mcp"
-)
-
 // Session actor model: channel-based state communication between the
 // task goroutine and the run() goroutine.
 //
@@ -48,17 +43,6 @@ type SetContextTokensEvent struct {
 }
 
 func (SetContextTokensEvent) taskEvent() {}
-
-// MCPUpdateEvent carries MCP initialization results to the session's run()
-// goroutine. It is sent internally by startMCPInitWatcher after AsyncInit
-// completes. The run() goroutine applies the updates (tools + system prompt)
-// and starts the OAuth sequence via OAuthGroup if PendingOAuthServers is non-empty.
-type MCPUpdateEvent struct {
-	Tools               []llm.Tool
-	SystemPromptSuffix  string
-	Manager             *mcp.Manager
-	PendingOAuthServers []MCPAuthServer // servers needing user OAuth; empty if none
-}
 
 // sendEvent sends a task event to the run() goroutine.
 // Blocks until the event is received. The buffered channel (capacity 64)

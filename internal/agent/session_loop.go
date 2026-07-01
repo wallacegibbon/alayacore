@@ -15,7 +15,6 @@ package agent
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/mcp"
@@ -30,11 +29,16 @@ import (
 //   - Task state changes (via task goroutine → taskEventCh)
 //   - Task completion signals (via taskResultCh)
 //   - System info refresh requests (via taskRefreshCh)
-//   - MCP initialization results (via mcpUpdateCh)
-//   - MCP OAuth authorization results (via pollOAuthResults)
+//   - MCP initialization events (via mcpInit.Events())
 func (s *Session) run() {
 	defer close(s.runDoneCh)
 	defer s.sessionCancel()
+
+	// Start MCP initialization — the goroutine sends events that
+	// we read from mcpInit.Events() in the main select below.
+	if s.mcpInit != nil {
+		s.mcpInit.Start(s.sessionCtx)
+	}
 
 	// Start the I/O pump goroutine.
 	s.inputMsgCh = make(chan inputMsg, 100)
@@ -45,14 +49,10 @@ func (s *Session) run() {
 			return
 		}
 
-		// Check for completed OAuth results before blocking on events.
-		s.pollOAuthResults()
-
-		// Build a reference to the OAuth results channel (nil-safe for select).
-		// oauthGroup is set once in applyMCPUpdate and never replaced.
-		var oauthResultCh <-chan mcp.ServerOAuthResult
-		if s.oauthGroup != nil {
-			oauthResultCh = s.oauthGroup.ResultChan()
+		// Build a reference to the MCP events channel (nil-safe for select).
+		var mcpEvents <-chan mcp.InitEvent
+		if s.mcpInit != nil {
+			mcpEvents = s.mcpInit.Events()
 		}
 
 		select {
@@ -75,158 +75,66 @@ func (s *Session) run() {
 		case <-s.taskRefreshCh:
 			s.sendSystemInfo("task")
 
-		case update := <-s.mcpUpdateCh:
-			s.applyMCPUpdate(update)
-
-		case result, ok := <-oauthResultCh:
+		case evt, ok := <-mcpEvents:
 			if !ok {
+				mcpEvents = nil // channel closed
 				break
 			}
-			// Received directly from channel — mark completed and process.
-			s.oauthGroup.MarkCompleted(result.Name)
-			s.applyOAuthResult(&result)
-			// Drain any additional results that may have arrived.
-			s.pollOAuthResults()
+			s.handleMCPEvent(&evt)
 
 		case <-s.sessionCtx.Done():
 			return
 		}
-
-		// Check for completed OAuth results after each event.
-		s.pollOAuthResults()
 	}
 }
 
-// pollOAuthResults drains any completed OAuth results from the seq.
-// Called after each event in the main loop so OAuth results are
-// processed promptly even while waiting for user input.
-func (s *Session) pollOAuthResults() {
-	for s.oauthGroup != nil {
-		result := s.oauthGroup.TryResult()
-		if result == nil {
-			break
-		}
-		s.applyOAuthResult(result)
-	}
-}
+// handleMCPEvent processes a single MCP initialization event.
+// Called from the main loop when an event arrives on mcpInit.Events().
+func (s *Session) handleMCPEvent(evt *mcp.InitEvent) {
+	switch evt.Type {
+	case "connecting", "connected", "failed":
+		// Forward to adapter for progress overlay.
+		s.sendMCPMsg(evt.Type, evt.Server, "", evt.Error,
+			evt.Connected, evt.Skipped, evt.Total)
 
-// applyMCPUpdate applies MCP initialization results to the session.
-// Called from the run() goroutine when the initial MCPUpdateEvent is
-// received from startMCPInitWatcher.
-func (s *Session) applyMCPUpdate(update MCPUpdateEvent) {
-	// 1. Append MCP tools to BaseTools.
-	s.BaseTools = append(s.BaseTools, update.Tools...)
-	s.mcpToolCount = len(update.Tools)
+	case "auth_confirm":
+		// Session must show confirm dialog — forward to adapter.
+		s.sendMCPMsg("auth_confirm", evt.Server, evt.URL, "",
+			evt.Connected, evt.Skipped, evt.Total)
 
-	// 2. Append MCP system prompt fragments (instructions + resources + prompts).
-	s.SystemPrompt += update.SystemPromptSuffix
+	case "auth_running", "auth_done":
+		// OAuth progress — forward to adapter.
+		s.sendMCPMsg(evt.Type, evt.Server, "", evt.Error,
+			evt.Connected, evt.Skipped, evt.Total)
 
-	// 3. Store MCP manager for lifecycle management.
-	s.MCPManager = update.Manager
-
-	// 4. If the agent was already created, recreate it to include updated tools.
-	if s.agent != nil {
-		s.agent = nil
-		s.provider = nil
-	}
-
-	// 5. Start OAuth sequence if there are pending servers.
-	if len(update.PendingOAuthServers) > 0 {
-		s.oauthGroup = mcp.NewOAuthGroup(update.Manager.Clients())
-		s.mcpReady.Store(false)
-		s.advanceMCPAuth()
-	} else {
-		s.mcpReady.Store(true)
-		s.writeNotifyf("MCP servers initialized: %d servers, %d tools loaded",
-			update.Manager.ActiveServerCount(), len(update.Tools))
-	}
-}
-
-// applyOAuthResult applies a single completed OAuth result.
-// Called from pollOAuthResults in the main loop.
-// If the server was already skipped by the user, the result is discarded.
-func (s *Session) applyOAuthResult(result *mcp.ServerOAuthResult) {
-	if result.Err != nil {
-		s.writeError(fmt.Sprintf("MCP auth failed for %q: %v", result.Name, result.Err))
-		s.advanceMCPAuth()
-		return
-	}
-
-	// If the user skipped this server after OAuth started, discard the result.
-	// The goroutine can't be canceled mid-flight, but its tools shouldn't
-	// be applied.
-	if s.oauthGroup != nil && s.oauthGroup.IsSkipped(result.Name) {
-		s.advanceMCPAuth()
-		return
-	}
-
-	// Successful authorization — process tools.
-	if result.Tools != nil {
-		s.applyOAuthTools(result.Name, result.Tools)
-	}
-	s.advanceMCPAuth()
-}
-
-// applyOAuthTools processes tools from a completed OAuth authorization
-// and applies them to the session state (same pattern as applyMCPUpdate).
-func (s *Session) applyOAuthTools(name string, tools []mcp.Tool) {
-	mgr := s.MCPManager
-	if mgr == nil {
-		return
-	}
-
-	// Build system prompt fragment (server instructions).
-	var frag strings.Builder
-	for _, c := range mgr.Clients() {
-		if c.Name() == name {
-			if instr := c.Instructions(); instr != "" {
-				frag.WriteString(fmt.Sprintf("\n\nInstructions from MCP server %q:\n%s", name, instr))
+	case "done":
+		// All done — apply final results.
+		if evt.Errors != nil {
+			for _, e := range evt.Errors {
+				s.writeError(fmt.Sprintf("MCP: %v", e))
 			}
-			break
 		}
-	}
+		if evt.Manager != nil {
+			s.MCPManager = evt.Manager
+		}
+		if evt.Tools != nil {
+			s.BaseTools = append(s.BaseTools, evt.Tools...)
+		}
+		if evt.SysFragment != "" {
+			s.SystemPrompt += evt.SysFragment
+		}
 
-	// Convert tools.
-	serverTools := map[string][]mcp.Tool{name: tools}
-	agentTools := mcp.ToolsToAgentTools(serverTools, mgr)
-	agentTools = append(agentTools, mcp.ResourcesToAgentTools(mgr.Clients(), mgr)...)
-	agentTools = append(agentTools, mcp.PromptsToAgentTools(mgr.Clients(), mgr)...)
+		// Recreate agent if it was already initialized.
+		if s.agent != nil {
+			s.agent = nil
+			s.provider = nil
+		}
 
-	// Apply to session state.
-	s.BaseTools = append(s.BaseTools, agentTools...)
-	s.mcpToolCount += len(agentTools)
-	s.SystemPrompt += frag.String()
-
-	// Recreate agent if it was initialized.
-	if s.agent != nil {
-		s.agent = nil
-		s.provider = nil
-	}
-
-	s.writeNotifyf("✓ MCP server %q authorized and connected (%d tools).", name, len(tools))
-}
-
-// advanceMCPAuth sends the next auth confirm prompt or marks MCP as ready.
-// Called after each user action or OAuth result.
-// Confirm prompts are serial (one dialog at a time); OAuth executions
-// run concurrently in background goroutines.
-// MCP is marked ready when all servers are either skipped or completed,
-// regardless of whether goroutines for skipped servers are still running.
-func (s *Session) advanceMCPAuth() {
-	if s.oauthGroup == nil {
-		return
-	}
-
-	if next := s.oauthGroup.NextConfirm(); next != nil {
-		s.sendMCPAuthConfirm(next.Name(), next.URL())
-	} else if s.oauthGroup.AllSettled() && !s.mcpReady.Load() {
-		s.pollOAuthResults()
 		s.mcpReady.Store(true)
-		s.sendMCPAuthDone()
-		s.sendMCPInitMsg("ready", s.mcpToolCount, nil)
+		s.sendMCPMsg("done", "", "", "", 0, 0, 0)
 		s.sendSystemInfo("all")
 		s.writeNotifyf("MCP servers initialized: %d servers, %d tools loaded",
-			s.MCPManager.ActiveServerCount(), s.mcpToolCount)
+			evt.Manager.ActiveServerCount(), len(evt.Tools))
 	}
 }
 
@@ -262,7 +170,7 @@ func (s *Session) flushPendingEvents() {
 }
 
 // drainUntilTaskDone processes task events and completion signals until the
-// currently running task finishes. Also drains any pending MCP updates so
+// currently running task finishes. Also drains any remaining MCP events so
 // they aren't lost during shutdown.
 func (s *Session) drainUntilTaskDone() {
 	for {
@@ -274,8 +182,6 @@ func (s *Session) drainUntilTaskDone() {
 			return
 		case <-s.taskRefreshCh:
 			s.sendSystemInfo("task")
-		case update := <-s.mcpUpdateCh:
-			s.applyMCPUpdate(update)
 		case <-s.sessionCtx.Done():
 			return
 		}

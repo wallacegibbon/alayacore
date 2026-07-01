@@ -84,57 +84,29 @@ type VideoConfigMsg struct {
 
 func (VideoConfigMsg) SystemMsgType() string { return "video_config" }
 
-// MCPAuthServer describes an MCP server that needs OAuth authorization.
-type MCPAuthServer struct {
-	Name string `json:"name"`
-	URL  string `json:"url"`
+// MCPMsg communicates MCP initialization progress (type "mcp").
+// The adapter uses these messages to show/hide init overlays.
+//
+// Status values (from InitEvent.Type):
+//   - "connecting":    connecting to Server
+//   - "connected":     Server connected and initialized
+//   - "failed":        connection failed
+//   - "auth_confirm":  session needs user to authorize this server
+//   - "auth_running":  OAuth flow is running for this server
+//   - "auth_done":     OAuth completed for server
+//   - "done":          all MCP initialization complete
+type MCPMsg struct {
+	Status         string `json:"status"`
+	Server         string `json:"server,omitempty"`
+	URL            string `json:"url,omitempty"`   // set for "auth_confirm"
+	Error          string `json:"error,omitempty"` // set for "failed"
+	ConnectedCount int    `json:"connected_count,omitempty"`
+	SkippedCount   int    `json:"skipped_count,omitempty"`
+	TotalCount     int    `json:"total_count,omitempty"`
+	ToolCount      int    `json:"tool_count,omitempty"`
 }
 
-// MCPInitMsg communicates MCP initialization progress (type "mcp_init").
-// The adapter uses these messages to show/hide init overlays without
-// needing to poll AsyncMCP.Done().
-//
-// Phase status values:
-//   - "starting":      async init goroutine has started
-//   - "connecting":    connecting to Server (per-server event)
-//   - "succeeded":     Server connected and initialized
-//   - "skipped":       user skipped Server via Ctrl+G
-//   - "failed":        Server connection failed
-//   - "ready":         init complete, no OAuth needed
-//   - "auth_required": init complete, OAuth servers pending (in PendingAuth)
-//
-// Server is set for per-server events ("connecting", "succeeded", etc.).
-// ServerCount is total servers; ConnectedCount and SkippedCount track progress.
-type MCPInitMsg struct {
-	Status         string          `json:"status"`
-	Server         string          `json:"server,omitempty"`
-	ToolCount      int             `json:"tool_count,omitempty"`
-	ServerCount    int             `json:"server_count,omitempty"`
-	ConnectedCount int             `json:"connected_count,omitempty"`
-	SkippedCount   int             `json:"skipped_count,omitempty"`
-	PendingAuth    []MCPAuthServer `json:"pending_auth,omitempty"`
-}
-
-func (MCPInitMsg) SystemMsgType() string { return "mcp_init" }
-
-// MCPAuthMsg communicates MCP OAuth authorization progress (type "mcp_auth").
-// Sent by the session's run() goroutine so the adapter can show overlays.
-//
-// Status values:
-//
-//	"confirm"     — session wants user to confirm authorizing this server
-//	"in_progress" — OAuth flow is running for this server
-//	"done"        — all OAuth servers have been processed
-//
-// URL is only set for "confirm" status.
-type MCPAuthMsg struct {
-	Server string `json:"server,omitempty"`
-	URL    string `json:"url,omitempty"`
-	Status string `json:"status"`
-	Error  string `json:"error,omitempty"`
-}
-
-func (MCPAuthMsg) SystemMsgType() string { return "mcp_auth" }
+func (MCPMsg) SystemMsgType() string { return "mcp" }
 
 // MessageVersionMsg carries the TLV message format version (type "version").
 // Sent as the first TagSystemMsg frame so adapters can validate format
@@ -203,11 +175,10 @@ type SessionConfig struct {
 	// Set during async initialization; may be nil initially.
 	MCPManager *mcp.Manager
 
-	// AsyncInit provides asynchronous MCP initialization.
-	// When non-nil, the session starts a goroutine that waits for
-	// AsyncInit.Done() and applies the results (tools, system prompt,
-	// manager) internally — no adapter involvement needed.
-	AsyncInit *mcp.AsyncInit
+	// MCPInit handles MCP initialization lifecycle (connect, OAuth, discover).
+	// When non-nil, the session reads from its Events() channel in the main
+	// loop and applies results (tools, system prompt, manager) internally.
+	MCPInit *mcp.Init
 
 	// Override
 	OverrideActiveModel string // If set, overrides the active model (must exist in model config)

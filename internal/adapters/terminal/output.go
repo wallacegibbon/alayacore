@@ -258,10 +258,8 @@ func (to *outputWriter) handleSystemMsg(value string) {
 		to.handleSystemVideoConfig(env.Data)
 	case "tool_confirm":
 		to.handleSystemToolConfirm(env.Data)
-	case "mcp_init":
-		to.handleSystemMCPInit(env.Data)
-	case "mcp_auth":
-		to.handleSystemMCPAuth(env.Data)
+	case "mcp":
+		to.handleSystemMCP(env.Data)
 	}
 	to.dirty.Store(true)
 }
@@ -374,53 +372,34 @@ func (to *outputWriter) handleSystemVideoConfig(data json.RawMessage) {
 	to.status.updateVideoConfig(m.FPS, m.Res)
 }
 
-// handleSystemMCPInit processes an mcp_init system message.
-// Updates the MCP initialization phase for the init overlay.
-func (to *outputWriter) handleSystemMCPInit(data json.RawMessage) {
+// handleSystemMCP processes a single "mcp" system message.
+// All MCP init progress (connecting, auth confirm, done) comes through here.
+func (to *outputWriter) handleSystemMCP(data json.RawMessage) {
 	var msg struct {
 		Status         string `json:"status"`
 		Server         string `json:"server,omitempty"`
-		ServerCount    int    `json:"server_count,omitempty"`
+		URL            string `json:"url,omitempty"`
+		Error          string `json:"error,omitempty"`
 		ConnectedCount int    `json:"connected_count,omitempty"`
 		SkippedCount   int    `json:"skipped_count,omitempty"`
-	}
-	if json.Unmarshal(data, &msg) != nil {
-		return
-	}
-	// Per-server progress events carry a Server name.
-	// Phase-level events with counts (e.g. "auth_required") use ServerCount directly.
-	switch {
-	case msg.Server != "":
-		to.status.updateMCPInitServerProgress(msg.Status, msg.Server, msg.ConnectedCount, msg.SkippedCount, msg.ServerCount)
-	case msg.ServerCount > 0:
-		to.status.updateMCPInitServerProgress(msg.Status, "", msg.ConnectedCount, msg.SkippedCount, msg.ServerCount)
-	default:
-		to.status.updateMCPInitStatus(msg.Status)
-	}
-}
-
-// handleSystemMCPAuth processes an mcp_auth system message.
-// Stores the server name as a pending confirmation so the Terminal
-// can open a confirm dialog on the next tick.
-// - "confirm": stores pending (triggers confirm dialog)
-// - "done": sets MCPAuthDone flag (Terminal closes progress overlay)
-func (to *outputWriter) handleSystemMCPAuth(data json.RawMessage) {
-	var msg struct {
-		Server string `json:"server,omitempty"`
-		URL    string `json:"url,omitempty"`
-		Status string `json:"status"`
+		TotalCount     int    `json:"total_count,omitempty"`
 	}
 	if json.Unmarshal(data, &msg) != nil {
 		return
 	}
 
 	switch msg.Status {
-	case "confirm":
+	case "connecting", "connected", "failed":
+		to.status.updateMCPProgress(msg.Status, msg.Server, msg.ConnectedCount, msg.SkippedCount, msg.TotalCount)
+	case "auth_confirm":
 		if msg.Server != "" {
 			to.status.setMCPAuthPending(msg.Server, msg.URL)
 		}
+	case "auth_running", "auth_done":
+		to.status.updateMCPProgress(msg.Status, msg.Server, msg.ConnectedCount, msg.SkippedCount, msg.TotalCount)
 	case "done":
-		to.status.setMCPAuthDone()
+		to.status.setMCPDone()
+		to.status.updateMCPProgress("done", "", 0, 0, 0)
 	}
 }
 
@@ -454,10 +433,10 @@ func (to *outputWriter) GetPendingMCPAuth() (server, url string, ok bool) {
 	return to.status.takeMCPAuthPending()
 }
 
-// ConsumeMCPAuthDone returns true if the OAuth sequence just completed,
+// ConsumeMCPDone returns true if MCP init just completed,
 // and resets the flag. The Terminal uses this to close the progress overlay.
-func (to *outputWriter) ConsumeMCPAuthDone() bool {
-	return to.status.takeMCPAuthDone()
+func (to *outputWriter) ConsumeMCPDone() bool {
+	return to.status.takeMCPDone()
 }
 
 // SnapshotStatus returns a consistent point-in-time view of session status.

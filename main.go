@@ -45,9 +45,9 @@ func main() {
 	// MCPManager may have been set by the adapter after async init completed.
 	if appCfg.MCPManager != nil {
 		appCfg.MCPManager.CloseAll()
-	} else if appCfg.AsyncMCP != nil {
-		// Async init may not have completed yet; close what we have.
-		appCfg.AsyncMCP.Manager().CloseAll()
+	} else if appCfg.MCPInit != nil {
+		// Init may still be running; close what we have.
+		appCfg.MCPInit.Manager().CloseAll()
 	}
 
 	os.Exit(exitCode)

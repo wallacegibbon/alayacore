@@ -498,24 +498,14 @@ func (s *Session) handlePrompt(contentParts []llm.ContentPart) {
 
 // handleMCPInitSkip handles the :mcp_init_skip command.
 // Called when the user presses Ctrl+G on the init overlay.
-// During the connection phase, tells AsyncInit to skip the current server.
-// During the OAuth phase, skips the currently authorizing server (its
-// result will be discarded by applyOAuthResult when it completes).
+// Delegates to Init.SkipCurrent() which skips either the current
+// connecting server (connect phase) or the first running OAuth server.
 func (s *Session) handleMCPInitSkip() {
-	// During OAuth phase — skip the currently running server.
-	if s.oauthGroup != nil {
-		if name := s.oauthGroup.CurrentRunning(); name != "" {
-			s.oauthGroup.Skip(name)
-			s.writeNotifyf("Skipping authorization for MCP server %q.", name)
-			s.advanceMCPAuth()
-			return
-		}
-	}
-
-	// During connection phase — skip via AsyncInit.
-	if ai := s.mcpAsyncInit; ai != nil {
-		ai.SkipCurrent()
-		s.writeNotify("Skipping current MCP server connection...")
+	if s.mcpInit != nil {
+		s.mcpInit.SkipCurrent()
+		s.writeNotify("Skipping current MCP server...")
+	} else {
+		s.writeError("MCP initialization is not in progress.")
 	}
 }
 
@@ -523,36 +513,25 @@ func (s *Session) handleMCPInitSkip() {
 //
 // Usage: :mcp_auth <server_name> yes|no
 //
-// The OAuthGroup owns the per-server state. "yes" launches OAuth in a
-// background goroutine (parallel with other confirmed servers); "no"
-// skips the server. Results are collected by pollOAuthResults in the
-// main loop.
+// Delegates to Init.Confirm() which unblocks the init goroutine so
+// it can proceed to the next server or launch OAuth.
 func (s *Session) handleMCPAuth(_ context.Context, args string) {
 	name, action, _ := strings.Cut(args, " ")
 	if name == "" || action == "" {
 		s.writeError("usage: :mcp_auth <server_name> yes|no")
 		return
 	}
-
-	if s.oauthGroup == nil {
+	if s.mcpInit == nil {
 		s.writeError("MCP servers are still initializing. Please wait...")
 		return
 	}
-
 	switch action {
-	case "no":
-		s.oauthGroup.Skip(name)
-		s.writeNotifyf("Skipped authorization for MCP server %q.", name)
-		s.advanceMCPAuth()
 	case "yes":
+		s.mcpInit.Confirm(name, true)
 		s.writeNotifyf("Authorizing MCP server %q...", name)
-		s.writeNotify("A browser window will open for authentication.")
-
-		if ok := s.oauthGroup.Start(name); !ok {
-			s.writeError(fmt.Sprintf("Server %q not found or already authorized", name))
-			return
-		}
-		s.advanceMCPAuth()
+	case "no":
+		s.mcpInit.Confirm(name, false)
+		s.writeNotifyf("Skipped authorization for MCP server %q.", name)
 	default:
 		s.writeError("usage: :mcp_auth <server_name> yes|no")
 	}

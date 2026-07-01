@@ -87,25 +87,11 @@ type runState struct {
 	taskResultCh  chan []llm.ContentPart
 	taskRefreshCh chan struct{}
 
-	mcpUpdateCh chan MCPUpdateEvent // buffered(10), receives MCP init results (internal to session)
-
-	// mcpAsyncInit stores the AsyncInit reference so SkipCurrent() can
-	// be called from handleMCPInitSkip (Ctrl+G on init overlay).
-	mcpAsyncInit *mcp.AsyncInit
-
-	// OAuth authorization sequence — owned by run() goroutine.
-	// When the initial MCPUpdateEvent has PendingOAuthServers, the run()
-	// goroutine creates an OAuthGroup and drives the flow:
-	//   - NextConfirm() → adapter confirm dialog
-	//   - Start/Skip → user response
-	//   - TryResult() → collect completed OAuth results
-	oauthGroup *mcp.OAuthGroup
-
-	// mcpToolCount tracks the total number of MCP tools loaded.
-	// Used for display messages; incremented in applyMCPUpdate and
-	// when collecting OAuth results. This is separate from len(BaseTools)
-	// which includes built-in tools.
-	mcpToolCount int
+	// mcpInit drives the entire MCP initialization lifecycle.
+	// The run() goroutine reads from its Events() channel and reacts:
+	//   "auth_confirm" → shows dialog, calls mcpInit.Confirm()
+	//   "done"         → applies tools, sets mcpReady
+	mcpInit *mcp.Init
 }
 
 // activeTaskStep returns the current step of the active task, or 0 if idle.
@@ -161,81 +147,7 @@ func (s *Session) Done() <-chan struct{} {
 	return s.runDoneCh
 }
 
-// startMCPInitWatcher starts a goroutine that waits for asynchronous MCP
-// initialization and sends system messages to the adapter at each phase.
-// The adapter reacts to these messages without needing to poll AsyncMCP.
-//
-// Communication with the adapter goes through TLV system messages (type
-// "mcp_init" and "mcp_auth"). Internal results (tools, system prompt) are
-// forwarded to the run() goroutine via mcpUpdateCh.
-//
-// Must only be called from NewSession or RestoreFromSession (i.e., before
-// Start()). The goroutine exits when init completes or the session context
-// is canceled.
-func (s *Session) startMCPInitWatcher(asyncInit *mcp.AsyncInit) {
-	go func() {
-		// Phase 1: init starting — adapter can show an overlay.
-		s.sendMCPInitMsg("starting", 0, nil)
-
-		// Listen for per-server progress events while init runs.
-		progressCh := asyncInit.ProgressCh()
-	loop:
-		for {
-			select {
-			case p, ok := <-progressCh:
-				if !ok {
-					break loop // progress channel closed
-				}
-				s.sendServerMCPInitMsg(p)
-			case <-asyncInit.Done():
-				break loop
-			case <-s.sessionCtx.Done():
-				return
-			}
-		}
-
-		// Phase 2: init complete — fetch results.
-		tools, sysFrag, errs := asyncInit.Result()
-
-		// Log non-fatal errors (connection failures, etc.) via TLV.
-		for _, e := range errs {
-			s.writeError(fmt.Sprintf("MCP: %v", e))
-		}
-
-		mgr := asyncInit.Manager()
-		pendingOAuth := mgr.PendingAuthServers()
-
-		// Forward tools + system prompt + manager to the run() goroutine.
-		authServers := make([]MCPAuthServer, len(pendingOAuth))
-		for i, ps := range pendingOAuth {
-			authServers[i] = MCPAuthServer{Name: ps.Name, URL: ps.ServerURL}
-		}
-		select {
-		case s.mcpUpdateCh <- MCPUpdateEvent{
-			Tools:               tools,
-			SystemPromptSuffix:  sysFrag,
-			Manager:             mgr,
-			PendingOAuthServers: authServers,
-		}:
-		case <-s.sessionCtx.Done():
-			return
-		}
-
-		// Phase 3: notify adapter of final status.
-		if len(pendingOAuth) > 0 {
-			s.sendMCPInitMsg("auth_required", len(tools), authServers)
-		} else {
-			s.sendMCPInitMsg("ready", len(tools), nil)
-		}
-	}()
-}
-
-// MCPIsReady reports whether MCP initialization has completed and tools
-// are available. Used by handlePrompt to reject messages before MCP is ready.
-func (s *Session) MCPIsReady() bool {
-	return s.mcpReady.Load()
-}
-
+// HasModels returns true if the model manager has at least one model.
 func (s *Session) HasModels() bool {
 	if s.ModelManager == nil {
 		return false
@@ -291,7 +203,6 @@ func NewSession(cfg SessionConfig) *Session {
 			taskEventCh:   make(chan TaskEvent, 64),
 			taskResultCh:  make(chan []llm.ContentPart, 1),
 			taskRefreshCh: make(chan struct{}, 1),
-			mcpUpdateCh:   make(chan MCPUpdateEvent, 10),
 		},
 		sharedState: sharedState{
 			sessionCtx:    ctx,
@@ -309,10 +220,9 @@ func NewSession(cfg SessionConfig) *Session {
 		s.applyModelContextLimit(model)
 	}
 
-	// Start async MCP init watcher — the session manages init internally.
-	if cfg.AsyncInit != nil {
-		s.mcpAsyncInit = cfg.AsyncInit
-		s.startMCPInitWatcher(cfg.AsyncInit)
+	// Start MCP init — the session manages init internally.
+	if cfg.MCPInit != nil {
+		s.mcpInit = cfg.MCPInit
 	} else {
 		s.mcpReady.Store(true)
 	}
@@ -338,7 +248,6 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 			taskEventCh:   make(chan TaskEvent, 64),
 			taskResultCh:  make(chan []llm.ContentPart, 1),
 			taskRefreshCh: make(chan struct{}, 1),
-			mcpUpdateCh:   make(chan MCPUpdateEvent, 10),
 		},
 		sharedState: sharedState{
 			sessionCtx:    ctx,
@@ -360,9 +269,9 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 	// --model CLI flag takes highest priority: override whatever was resolved above.
 	s.setActiveFromCliFlag()
 
-	// Start async MCP init watcher — the session manages init internally.
-	if cfg.AsyncInit != nil {
-		s.startMCPInitWatcher(cfg.AsyncInit)
+	// Start MCP init — the session manages init internally.
+	if cfg.MCPInit != nil {
+		s.mcpInit = cfg.MCPInit
 	} else {
 		s.mcpReady.Store(true)
 	}

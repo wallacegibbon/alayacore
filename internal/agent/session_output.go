@@ -30,7 +30,6 @@ import (
 	"strings"
 
 	"github.com/alayacore/alayacore/internal/llm"
-	"github.com/alayacore/alayacore/internal/mcp"
 	"github.com/alayacore/alayacore/internal/stream"
 	"github.com/alayacore/alayacore/internal/theme"
 )
@@ -250,48 +249,16 @@ func (s *Session) sendVideoConfigMsg() {
 	s.writeSystemMsg(VideoConfigMsg{FPS: s.videoFPS, Res: s.videoRes})
 }
 
-// sendMCPInitMsg sends an MCP initialization status update to the adapter.
-func (s *Session) sendMCPInitMsg(status string, toolCount int, pending []MCPAuthServer) {
-	m := MCPInitMsg{
-		Status:      status,
-		ToolCount:   toolCount,
-		PendingAuth: pending,
-	}
-	// For "auth_required", include server counts so the init overlay
-	// shows accurate progress even when no per-server events were sent
-	// (all servers need OAuth, so AsyncInit skipped them all).
-	if status == "auth_required" && s.MCPManager != nil {
-		m.ServerCount = s.MCPManager.ActiveServerCount() + len(pending)
-		m.ConnectedCount = s.MCPManager.ActiveServerCount()
-	}
-	s.writeSystemMsg(m)
-}
-
-// sendServerMCPInitMsg forwards a per-server progress event to the adapter.
-func (s *Session) sendServerMCPInitMsg(p mcp.AsyncProgress) {
-	s.writeSystemMsg(MCPInitMsg{
-		Status:         p.Status,
-		Server:         p.Server,
-		ServerCount:    p.TotalCount,
-		ConnectedCount: p.ConnectedCount,
-		SkippedCount:   p.SkippedCount,
-	})
-}
-
-// sendMCPAuthConfirm sends an MCP OAuth confirmation prompt to the adapter.
-// The adapter shows a y/n confirm dialog for the given server.
-func (s *Session) sendMCPAuthConfirm(serverName, serverURL string) {
-	s.writeSystemMsg(MCPAuthMsg{
-		Server: serverName,
-		URL:    serverURL,
-		Status: "confirm",
-	})
-}
-
-// sendMCPAuthDone tells the adapter that all OAuth servers have been
-// processed. The adapter closes any remaining MCP overlay.
-func (s *Session) sendMCPAuthDone() {
-	s.writeSystemMsg(MCPAuthMsg{
-		Status: "done",
+// sendMCPMsg sends an MCP initialization event to the adapter.
+// All MCP progress (connecting, auth, done) goes through this single method.
+func (s *Session) sendMCPMsg(status, server, url, errStr string, connected, skipped, total int) {
+	s.writeSystemMsg(MCPMsg{
+		Status:         status,
+		Server:         server,
+		URL:            url,
+		Error:          errStr,
+		ConnectedCount: connected,
+		SkippedCount:   skipped,
+		TotalCount:     total,
 	})
 }

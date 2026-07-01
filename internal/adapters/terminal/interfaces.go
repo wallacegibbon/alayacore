@@ -35,12 +35,12 @@ type StatusSnapshot struct {
 	VideoRes        int
 
 	// MCP init status — reflects the current phase of MCP initialization.
-	// Values: "" (no MCP or not started), "starting", "ready", "auth_required".
-	MCPInitStatus    string
-	MCPInitServer    string // current server being connected (during init)
-	MCPInitConnected int    // servers connected so far
-	MCPInitSkipped   int    // servers skipped by user
-	MCPInitTotal     int    // total servers needing connection
+	// Values: "" (no MCP), "connecting", "auth_confirm", "done".
+	MCPStatus    string
+	MCPServer    string // current server being connected/authorized
+	MCPConnected int    // servers connected so far
+	MCPSkipped   int    // servers skipped by user
+	MCPTotal     int    // total servers
 }
 
 // ModelSnapshot holds a consistent point-in-time view of model state.
@@ -75,7 +75,7 @@ type OutputWriter interface {
 	// Confirm dialog support
 	GetPendingToolConfirm() (id, toolName, toolInput string, ok bool)
 	GetPendingMCPAuth() (server, url string, ok bool)
-	ConsumeMCPAuthDone() bool // returns true if OAuth sequence just completed
+	ConsumeMCPDone() bool // returns true if MCP init just completed
 
 	// Update signaling
 	DrainDirty() bool // returns true if display was dirty, clears the flag
