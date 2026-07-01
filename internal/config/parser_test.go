@@ -198,3 +198,22 @@ func TestParseKeyValueJSONPlainString(t *testing.T) {
 		t.Errorf("Expected plain string '[\"hello\"]', got %q", cfg.Name)
 	}
 }
+
+func TestParseKeyValueSkipsDashTag(t *testing.T) {
+	// Fields tagged with config:"-" must not be settable via key-value parsing.
+	type Cfg struct {
+		ID   int    `config:"-"`
+		Name string `config:"name"`
+	}
+	content := `name: "hello"
+-: 42
+`
+	var cfg Cfg
+	ParseKeyValue(content, &cfg)
+	if cfg.Name != "hello" {
+		t.Errorf("Name = %q, want %q", cfg.Name, "hello")
+	}
+	if cfg.ID != 0 {
+		t.Errorf("ID should remain 0 (config:\"-\" should be unsettable), got %d", cfg.ID)
+	}
+}
