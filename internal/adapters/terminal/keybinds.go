@@ -218,7 +218,7 @@ func (m *Terminal) handleConfirmCanceled(kind ConfirmKind, toolID string, fromCm
 		}
 		return m, scheduleTick()
 
-	case ConfirmMCPAuth:
+	case ConfirmMCPAuth, ConfirmMCPAuthProgress:
 		m.restoreFocusAfterConfirm()
 		if toolID != "" {
 			m.emitCommand(":mcp_auth " + toolID + " no")
