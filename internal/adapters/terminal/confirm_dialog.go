@@ -242,9 +242,9 @@ func (cd *ConfirmDialog) HandleKeyMsg(msg tea.KeyMsg) bool {
 		return true
 	}
 
-	// For OAuth progress overlay, n/N/Esc/Ctrl+G cancels and skips.
+	// For OAuth progress overlay, only Ctrl+G cancels and skips.
 	if cd.kind == ConfirmMCPAuthProgress {
-		if key == keyN || key == keyNCapital || key == keyEsc || key == keyCtrlG {
+		if key == keyCtrlG {
 			cd.canceled = true
 			cd.state = FilteredListClosed
 		}
@@ -348,7 +348,7 @@ func (cd *ConfirmDialog) buildContentLines() []string {
 	switch cd.kind {
 	case ConfirmMCPAuthProgress:
 		lines = append(lines, cd.wrapAndCenter("Please complete authorization in your browser.", cd.styles.System, innerWidth)[0])
-		lines = append(lines, cd.wrapAndCenter("(n / Esc to skip this server)", cd.styles.System, innerWidth)[0])
+		lines = append(lines, cd.wrapAndCenter("(Ctrl+G to skip this server)", cd.styles.System, innerWidth)[0])
 	case ConfirmMCPInit:
 		lines = append(lines, cd.wrapAndCenter("Please wait...", cd.styles.System, innerWidth)[0])
 		lines = append(lines, cd.wrapAndCenter("(this window will close automatically)", cd.styles.System, innerWidth)[0])
