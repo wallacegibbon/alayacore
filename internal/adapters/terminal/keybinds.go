@@ -694,12 +694,5 @@ func (m *Terminal) openModelConfigFile() tea.Cmd {
 // (same as model.conf). Terminal users are familiar with this format for
 // $EDITOR editing. Other adapters may use JSON instead.
 func serializeModelsForEdit(models []config.ModelConfig) string {
-	if len(models) == 0 {
-		return ""
-	}
-	blocks := make([]string, 0, len(models))
-	for _, m := range models {
-		blocks = append(blocks, strings.TrimSuffix(config.FormatKeyValue(m), "\n"))
-	}
-	return strings.Join(blocks, "\n---\n") + "\n"
+	return config.FormatModelList(models)
 }

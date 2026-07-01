@@ -152,33 +152,19 @@ func (mm *ModelManager) createDefaultConfig(path string) error {
 func parseModelConfig(content string) ([]config.ModelConfig, []string) {
 	var msgs []string
 
-	blocks := config.ParseKeyValueBlocks(content)
-	models := make([]config.ModelConfig, 0, len(blocks))
+	models, warns := config.ParseModelList(content)
+	msgs = append(msgs, warns...)
 
-	for blockIdx, block := range blocks {
-		block = strings.TrimSpace(block)
-		if block == "" {
-			continue
-		}
-
-		var model config.ModelConfig
-		for _, w := range config.ParseKeyValueWithWarnings(block, &model) {
-			msgs = append(msgs, fmt.Sprintf("model block %d: %s", blockIdx+1, w.String()))
-		}
-
-		if model.Name == "" && model.ModelName == "" {
-			continue
-		}
-
+	valid := make([]config.ModelConfig, 0, len(models))
+	for _, model := range models {
 		if errs := validateModel(model); len(errs) > 0 {
 			msgs = append(msgs, errs...)
 			continue // skip broken model
 		}
-
-		models = append(models, model)
+		valid = append(valid, model)
 	}
 
-	return models, msgs
+	return valid, msgs
 }
 
 // validateModel checks required fields and returns errors for any issues found.
@@ -286,11 +272,7 @@ func (mm *ModelManager) SyncFromContent(content string) []string {
 
 // writeConfigFile persists the current models to the config file in key-value format.
 func (mm *ModelManager) writeConfigFile() error {
-	blocks := make([]string, 0, len(mm.models))
-	for _, m := range mm.models {
-		blocks = append(blocks, strings.TrimSuffix(config.FormatKeyValue(m), "\n"))
-	}
-	data := strings.Join(blocks, "\n---\n") + "\n"
+	data := config.FormatModelList(mm.models)
 	return os.WriteFile(mm.filePath, []byte(data), 0600)
 }
 

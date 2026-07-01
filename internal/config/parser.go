@@ -51,6 +51,33 @@ func ParseKeyValueBlocks(content string) []string {
 	return strings.Split(content, "\n---\n")
 }
 
+// ParseModelList parses key-value block format into a slice of ModelConfig.
+// Returns models with a non-empty Name or ModelName, and any parse warnings.
+// Does NOT validate model fields — callers should validate after this.
+func ParseModelList(content string) ([]ModelConfig, []string) {
+	blocks := ParseKeyValueBlocks(content)
+	models := make([]ModelConfig, 0, len(blocks))
+	var warnings []string
+
+	for blockIdx, block := range blocks {
+		block = strings.TrimSpace(block)
+		if block == "" {
+			continue
+		}
+
+		var m ModelConfig
+		for _, w := range ParseKeyValueWithWarnings(block, &m) {
+			warnings = append(warnings, fmt.Sprintf("model block %d: %s", blockIdx+1, w.String()))
+		}
+
+		if m.Name != "" || m.ModelName != "" {
+			models = append(models, m)
+		}
+	}
+
+	return models, warnings
+}
+
 // parseConfig is the unified internal implementation.
 // Always collects warnings for values that fail type conversion.
 func parseConfig(content string, target any) []ParseWarning {
@@ -67,6 +94,9 @@ func parseConfig(content string, target any) []ParseWarning {
 		tag := t.Field(i).Tag.Get("config")
 		if tag != "" {
 			key, _, _ := strings.Cut(tag, ",")
+			if key == "-" {
+				continue // skip internal fields
+			}
 			tagToField[key] = i
 		}
 	}

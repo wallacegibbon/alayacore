@@ -553,19 +553,7 @@ func (m *Terminal) handleEditorFinished(msg EditorFinishedMsg) (tea.Model, tea.C
 // convertKVToJSON parses key-value block format (model.conf style) and
 // returns JSON array of ModelConfig, suitable for :model_sync transport.
 func convertKVToJSON(kvContent string) string {
-	blocks := config.ParseKeyValueBlocks(kvContent)
-	models := make([]config.ModelConfig, 0, len(blocks))
-	for _, block := range blocks {
-		block = strings.TrimSpace(block)
-		if block == "" {
-			continue
-		}
-		var m config.ModelConfig
-		config.ParseKeyValueWithWarnings(block, &m)
-		if m.Name != "" || m.ModelName != "" {
-			models = append(models, m)
-		}
-	}
+	models, _ := config.ParseModelList(kvContent)
 	data, err := json.Marshal(models)
 	if err != nil {
 		return ""
