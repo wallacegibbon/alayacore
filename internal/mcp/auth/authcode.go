@@ -90,7 +90,7 @@ func RunAuthCodeFlow(ctx context.Context, meta *ASMetadata, cfg *AuthCodeConfig)
 			case resultCh <- callbackResult{err: fmt.Errorf("state mismatch: got %q, expected %q", returnedState, state)}:
 			default:
 			}
-			_, _ = w.Write([]byte("State validation failed. You can close this window."))
+			_, _ = w.Write([]byte("Authorization failed. You can close this window."))
 			return
 		}
 		if code == "" {
@@ -98,7 +98,7 @@ func RunAuthCodeFlow(ctx context.Context, meta *ASMetadata, cfg *AuthCodeConfig)
 			case resultCh <- callbackResult{err: fmt.Errorf("no authorization code in callback")}:
 			default:
 			}
-			_, _ = w.Write([]byte("No authorization code received. You can close this window."))
+			_, _ = w.Write([]byte("Authorization failed. You can close this window."))
 			return
 		}
 		select {
@@ -106,7 +106,7 @@ func RunAuthCodeFlow(ctx context.Context, meta *ASMetadata, cfg *AuthCodeConfig)
 		default:
 			// Already received a result, ignore duplicate callback.
 		}
-		_, _ = w.Write([]byte("Authorization successful! You can close this window and return to the terminal."))
+		_, _ = w.Write([]byte("Authorization successful! You can close this window."))
 	})
 
 	server := &http.Server{
