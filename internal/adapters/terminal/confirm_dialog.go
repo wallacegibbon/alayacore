@@ -191,7 +191,27 @@ func (cd *ConfirmDialog) UpdateMCPInitProgress(server string, connected, skipped
 		return
 	}
 	cd.toolName = server
-	cd.Description = fmt.Sprintf("Connecting: %s  (%d/%d connected, %d skipped)", server, connected, skipped, total)
+
+	// Build a concise progress summary.
+	// Examples:
+	//   "Connecting to yardstick... (2 ready, 0 skipped / 4 total)"
+	//   "yardstick connected (3 ready, 0 skipped / 4 total)"
+	//   "yardstick skipped (2 ready, 1 skipped / 4 total)"
+	parts := make([]string, 0, 2)
+	if total > 0 {
+		parts = append(parts, fmt.Sprintf("%d ready", connected))
+	}
+	if skipped > 0 {
+		parts = append(parts, fmt.Sprintf("%d skipped", skipped))
+	}
+	summary := strings.Join(parts, ", ")
+	if total > 0 {
+		summary += fmt.Sprintf(" / %d total", total)
+	}
+	if summary != "" {
+		summary = " (" + summary + ")"
+	}
+	cd.Description = fmt.Sprintf("Server: %s%s", server, summary)
 }
 
 // OpenTool opens the dialog for confirming a tool call.
