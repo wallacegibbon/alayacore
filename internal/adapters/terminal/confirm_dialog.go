@@ -184,6 +184,16 @@ func (cd *ConfirmDialog) OpenMCPInit() {
 	cd.canceled = false
 }
 
+// UpdateMCPInitProgress updates the description with per-server progress.
+// Called when the session reports a new init progress event.
+func (cd *ConfirmDialog) UpdateMCPInitProgress(server string, connected, skipped, total int) {
+	if cd.kind != ConfirmMCPInit {
+		return
+	}
+	cd.toolName = server
+	cd.Description = fmt.Sprintf("Connecting: %s  (%d/%d connected, %d skipped)", server, connected, skipped, total)
+}
+
 // OpenTool opens the dialog for confirming a tool call.
 func (cd *ConfirmDialog) OpenTool(toolID, toolName, toolInput string) {
 	cd.state = FilteredListOpen

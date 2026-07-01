@@ -378,12 +378,21 @@ func (to *outputWriter) handleSystemVideoConfig(data json.RawMessage) {
 // Updates the MCP initialization phase for the init overlay.
 func (to *outputWriter) handleSystemMCPInit(data json.RawMessage) {
 	var msg struct {
-		Status string `json:"status"`
+		Status         string `json:"status"`
+		Server         string `json:"server,omitempty"`
+		ServerCount    int    `json:"server_count,omitempty"`
+		ConnectedCount int    `json:"connected_count,omitempty"`
+		SkippedCount   int    `json:"skipped_count,omitempty"`
 	}
 	if json.Unmarshal(data, &msg) != nil {
 		return
 	}
-	to.status.updateMCPInitStatus(msg.Status)
+	// Per-server progress events carry a Server name — fetch all fields.
+	if msg.Server != "" && msg.ServerCount > 0 {
+		to.status.updateMCPInitServerProgress(msg.Status, msg.Server, msg.ConnectedCount, msg.SkippedCount, msg.ServerCount)
+	} else {
+		to.status.updateMCPInitStatus(msg.Status)
+	}
 }
 
 // handleSystemMCPAuth processes an mcp_auth system message.

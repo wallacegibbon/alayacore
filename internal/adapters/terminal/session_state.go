@@ -42,6 +42,12 @@ type sessionState struct {
 	// Values: "" (no MCP), "starting", "ready", "auth_required".
 	mcpInitStatus string
 
+	// Per-server init progress (set during "connecting"/"succeeded"/etc. events).
+	mcpInitServer    string // current server being connected
+	mcpInitConnected int    // servers connected so far
+	mcpInitSkipped   int    // servers skipped by user
+	mcpInitTotal     int    // total servers needing connection
+
 	// Pending MCP auth confirm — set when the session sends mcp_auth:confirm,
 	// consumed by the Terminal tick handler to open the confirm dialog.
 	// Only one server is prompted at a time (session serializes the list).
@@ -172,6 +178,17 @@ func (s *sessionState) updateMCPInitStatus(status string) {
 	s.mu.Unlock()
 }
 
+// updateMCPInitServerProgress atomically updates per-server init progress.
+func (s *sessionState) updateMCPInitServerProgress(status, server string, connected, skipped, total int) {
+	s.mu.Lock()
+	s.mcpInitStatus = status
+	s.mcpInitServer = server
+	s.mcpInitConnected = connected
+	s.mcpInitSkipped = skipped
+	s.mcpInitTotal = total
+	s.mu.Unlock()
+}
+
 // setMCPAuthPending stores a pending MCP auth confirmation request.
 // Consumed by takeMCPAuthPending in the Terminal tick handler.
 func (s *sessionState) setMCPAuthPending(server, url string) {
@@ -240,20 +257,24 @@ func (s *sessionState) snapshotStatus() StatusSnapshot {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return StatusSnapshot{
-		ContextTokens:   s.contextTokens,
-		ContextLimit:    s.contextLimit,
-		InProgress:      s.inProgress,
-		CurrentStep:     s.currentStep,
-		MaxSteps:        s.maxSteps,
-		LastCurrentStep: s.lastCurrentStep,
-		LastMaxSteps:    s.lastMaxSteps,
-		TaskError:       s.lastTaskError,
-		ReasoningLevel:  s.reasoningLevel,
-		ActiveTheme:     s.activeTheme,
-		ActiveThemeData: s.activeThemeData,
-		VideoFPS:        s.videoFPS,
-		VideoRes:        s.videoRes,
-		MCPInitStatus:   s.mcpInitStatus,
+		ContextTokens:    s.contextTokens,
+		ContextLimit:     s.contextLimit,
+		InProgress:       s.inProgress,
+		CurrentStep:      s.currentStep,
+		MaxSteps:         s.maxSteps,
+		LastCurrentStep:  s.lastCurrentStep,
+		LastMaxSteps:     s.lastMaxSteps,
+		TaskError:        s.lastTaskError,
+		ReasoningLevel:   s.reasoningLevel,
+		ActiveTheme:      s.activeTheme,
+		ActiveThemeData:  s.activeThemeData,
+		VideoFPS:         s.videoFPS,
+		VideoRes:         s.videoRes,
+		MCPInitStatus:    s.mcpInitStatus,
+		MCPInitServer:    s.mcpInitServer,
+		MCPInitConnected: s.mcpInitConnected,
+		MCPInitSkipped:   s.mcpInitSkipped,
+		MCPInitTotal:     s.mcpInitTotal,
 	}
 }
 

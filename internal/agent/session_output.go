@@ -30,6 +30,7 @@ import (
 	"strings"
 
 	"github.com/alayacore/alayacore/internal/llm"
+	"github.com/alayacore/alayacore/internal/mcp"
 	"github.com/alayacore/alayacore/internal/stream"
 	"github.com/alayacore/alayacore/internal/theme"
 )
@@ -255,6 +256,17 @@ func (s *Session) sendMCPInitMsg(status string, toolCount int, pending []MCPAuth
 		Status:      status,
 		ToolCount:   toolCount,
 		PendingAuth: pending,
+	})
+}
+
+// sendServerMCPInitMsg forwards a per-server progress event to the adapter.
+func (s *Session) sendServerMCPInitMsg(p mcp.AsyncProgress) {
+	s.writeSystemMsg(MCPInitMsg{
+		Status:         p.Status,
+		Server:         p.Server,
+		ServerCount:    p.TotalCount,
+		ConnectedCount: p.ConnectedCount,
+		SkippedCount:   p.SkippedCount,
 	})
 }
 

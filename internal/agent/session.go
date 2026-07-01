@@ -177,10 +177,21 @@ func (s *Session) startMCPInitWatcher(asyncInit *mcp.AsyncInit) {
 		// Phase 1: init starting — adapter can show an overlay.
 		s.sendMCPInitMsg("starting", 0, nil)
 
-		select {
-		case <-asyncInit.Done():
-		case <-s.sessionCtx.Done():
-			return
+		// Listen for per-server progress events while init runs.
+		progressCh := asyncInit.ProgressCh()
+	loop:
+		for {
+			select {
+			case p, ok := <-progressCh:
+				if !ok {
+					break loop // progress channel closed
+				}
+				s.sendServerMCPInitMsg(p)
+			case <-asyncInit.Done():
+				break loop
+			case <-s.sessionCtx.Done():
+				return
+			}
 		}
 
 		// Phase 2: init complete — fetch results.

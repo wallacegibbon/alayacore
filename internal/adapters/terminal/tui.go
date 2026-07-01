@@ -380,14 +380,23 @@ func (m *Terminal) handleTick() (tea.Model, tea.Cmd) {
 // Once dismissed, it won't reopen until the status changes to something
 // other than "starting" (init completion resets the flag).
 func (m *Terminal) handleMCPInitOverlay() {
-	status := m.out.SnapshotStatus().MCPInitStatus
+	st := m.out.SnapshotStatus()
 
-	switch status {
+	switch st.MCPInitStatus {
 	case "starting":
 		// Init in progress — show the overlay if not already open
 		// and not dismissed by the user.
 		if !m.confirmOverlay.IsOpen() && !m.mcpInitOverlayDismissed {
 			m.openConfirmMCPInit()
+		}
+	case "connecting", "succeeded", "skipped", "failed":
+		// Per-server progress — update overlay content.
+		if m.confirmOverlay.Kind() == ConfirmMCPInit {
+			m.confirmOverlay.UpdateMCPInitProgress(st.MCPInitServer, st.MCPInitConnected, st.MCPInitSkipped, st.MCPInitTotal)
+			m.display.updateContent()
+		} else if !m.mcpInitOverlayDismissed {
+			m.openConfirmMCPInit()
+			m.confirmOverlay.UpdateMCPInitProgress(st.MCPInitServer, st.MCPInitConnected, st.MCPInitSkipped, st.MCPInitTotal)
 		}
 	case "ready", "auth_required":
 		// Init complete — close the overlay if it's open and

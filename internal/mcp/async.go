@@ -24,6 +24,15 @@ import (
 	"github.com/alayacore/alayacore/internal/llm"
 )
 
+// AsyncProgress reports per-server connection progress during async init.
+type AsyncProgress struct {
+	Status         string // "connecting", "succeeded", "skipped", "failed"
+	Server         string
+	ConnectedCount int
+	SkippedCount   int
+	TotalCount     int
+}
+
 // AsyncInit manages background MCP initialization.
 type AsyncInit struct {
 	manager *Manager
@@ -42,17 +51,19 @@ type AsyncInit struct {
 	// saved configs for reconnecting after OAuth auth
 	configs []ServerConfig
 
-	skipCh chan struct{} // closed to skip the current server during connect phase
+	skipCh     chan struct{}      // closed to skip the current server during connect phase
+	progressCh chan AsyncProgress // per-server progress events (buffered)
 }
 
 // NewAsyncInit creates a new AsyncInit from server configurations.
 // Does not connect to any servers — call Start() to begin.
 func NewAsyncInit(configs []ServerConfig) *AsyncInit {
 	return &AsyncInit{
-		manager: NewManager(configs),
-		done:    make(chan struct{}),
-		configs: configs,
-		skipCh:  make(chan struct{}, 1),
+		manager:    NewManager(configs),
+		done:       make(chan struct{}),
+		configs:    configs,
+		skipCh:     make(chan struct{}, 1),
+		progressCh: make(chan AsyncProgress, len(configs)*2),
 	}
 }
 
@@ -86,6 +97,12 @@ func (a *AsyncInit) Result() (tools []llm.Tool, sysPromptFragment string, errs [
 // Configs returns the server configurations (for reconnecting after auth).
 func (a *AsyncInit) Configs() []ServerConfig {
 	return a.configs
+}
+
+// ProgressCh returns a channel that receives per-server connection progress.
+// The channel is closed when init completes (after Done() is closed).
+func (a *AsyncInit) ProgressCh() <-chan AsyncProgress {
+	return a.progressCh
 }
 
 // SkipCurrent signals the connection loop to skip the current server
@@ -123,6 +140,7 @@ func (a *AsyncInit) connectWithSkip(ctx context.Context, c *Client) error {
 
 func (a *AsyncInit) run(ctx context.Context) {
 	defer close(a.done)
+	defer close(a.progressCh)
 
 	// 1. Connect servers.
 	//    Skip servers that truly need interactive OAuth authorization
@@ -132,18 +150,40 @@ func (a *AsyncInit) run(ctx context.Context) {
 	//    needsPersistedAuth) are connected normally.
 	connectCtx, connectCancel := context.WithTimeout(ctx, 30*time.Second)
 	var connErrs []error
-	for _, c := range a.manager.Clients() {
+	var connectedCount, skippedCount int
+	clients := a.manager.Clients()
+	totalCount := len(clients)
+	for _, c := range clients {
 		if c.needsPersistedAuth() {
 			continue // needs interactive OAuth — skip for now
+		}
+		a.progressCh <- AsyncProgress{
+			Status: "connecting", Server: c.Name(),
+			ConnectedCount: connectedCount, SkippedCount: skippedCount, TotalCount: totalCount,
 		}
 		// Try connecting, but allow user to skip this specific server
 		// via SkipCurrent() (e.g., when it hangs).
 		if err := a.connectWithSkip(connectCtx, c); err != nil {
 			if err == errSkipRequested {
+				skippedCount++
+				a.progressCh <- AsyncProgress{
+					Status: "skipped", Server: c.Name(),
+					ConnectedCount: connectedCount, SkippedCount: skippedCount, TotalCount: totalCount,
+				}
 				connErrs = append(connErrs, fmt.Errorf("skipped server %q", c.Name()))
 				continue
 			}
 			connErrs = append(connErrs, err)
+			a.progressCh <- AsyncProgress{
+				Status: "failed", Server: c.Name(),
+				ConnectedCount: connectedCount, SkippedCount: skippedCount, TotalCount: totalCount,
+			}
+			continue
+		}
+		connectedCount++
+		a.progressCh <- AsyncProgress{
+			Status: "succeeded", Server: c.Name(),
+			ConnectedCount: connectedCount, SkippedCount: skippedCount, TotalCount: totalCount,
 		}
 	}
 	connectCancel()

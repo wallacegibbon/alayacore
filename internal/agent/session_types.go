@@ -94,15 +94,25 @@ type MCPAuthServer struct {
 // The adapter uses these messages to show/hide init overlays without
 // needing to poll AsyncMCP.Done().
 //
-// Status values:
-//   - "starting":     async init goroutine has started
-//   - "ready":        init complete, no OAuth needed
+// Phase status values:
+//   - "starting":      async init goroutine has started
+//   - "connecting":    connecting to Server (per-server event)
+//   - "succeeded":     Server connected and initialized
+//   - "skipped":       user skipped Server via Ctrl+G
+//   - "failed":        Server connection failed
+//   - "ready":         init complete, no OAuth needed
 //   - "auth_required": init complete, OAuth servers pending (in PendingAuth)
+//
+// Server is set for per-server events ("connecting", "succeeded", etc.).
+// ServerCount is total servers; ConnectedCount and SkippedCount track progress.
 type MCPInitMsg struct {
-	Status      string          `json:"status"`
-	ToolCount   int             `json:"tool_count,omitempty"`
-	ServerCount int             `json:"server_count,omitempty"`
-	PendingAuth []MCPAuthServer `json:"pending_auth,omitempty"`
+	Status         string          `json:"status"`
+	Server         string          `json:"server,omitempty"`
+	ToolCount      int             `json:"tool_count,omitempty"`
+	ServerCount    int             `json:"server_count,omitempty"`
+	ConnectedCount int             `json:"connected_count,omitempty"`
+	SkippedCount   int             `json:"skipped_count,omitempty"`
+	PendingAuth    []MCPAuthServer `json:"pending_auth,omitempty"`
 }
 
 func (MCPInitMsg) SystemMsgType() string { return "mcp_init" }
