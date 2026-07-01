@@ -502,11 +502,14 @@ func (s *Session) handlePrompt(contentParts []llm.ContentPart) {
 // either the current connecting server (connect phase) or the first
 // running OAuth server.
 func (s *Session) handleMCPInitSkip() {
-	if s.mcpInit != nil {
+	switch {
+	case s.mcpInit == nil:
+		s.writeError("No MCP servers configured.")
+	case s.mcpReady.Load():
+		s.writeError("MCP initialization has already completed.")
+	default:
 		s.mcpInit.SkipCurrent()
 		s.writeNotify("Skipping current MCP server...")
-	} else {
-		s.writeError("MCP initialization is not in progress.")
 	}
 }
 
@@ -522,18 +525,21 @@ func (s *Session) handleMCPAuth(_ context.Context, args string) {
 		s.writeError("usage: :mcp_auth <server_name> yes|no")
 		return
 	}
-	if s.mcpInit == nil {
-		s.writeError("MCP servers are still initializing. Please wait...")
-		return
-	}
-	switch action {
-	case "yes":
-		s.mcpInit.Confirm(name, true)
-		s.writeNotifyf("Authorizing MCP server %q...", name)
-	case "no":
-		s.mcpInit.Confirm(name, false)
-		s.writeNotifyf("Skipped authorization for MCP server %q.", name)
+	switch {
+	case s.mcpInit == nil:
+		s.writeError("No MCP servers configured.")
+	case s.mcpReady.Load():
+		s.writeError("MCP initialization has already completed.")
 	default:
-		s.writeError("usage: :mcp_auth <server_name> yes|no")
+		switch action {
+		case "yes":
+			s.mcpInit.Confirm(name, true)
+			s.writeNotifyf("Authorizing MCP server %q...", name)
+		case "no":
+			s.mcpInit.Confirm(name, false)
+			s.writeNotifyf("Skipped authorization for MCP server %q.", name)
+		default:
+			s.writeError("usage: :mcp_auth <server_name> yes|no")
+		}
 	}
 }
