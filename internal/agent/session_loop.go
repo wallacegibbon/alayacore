@@ -44,15 +44,16 @@ func (s *Session) run() {
 	s.inputMsgCh = make(chan inputMsg, 100)
 	go s.inputPump()
 
+	// Capture the MCP events channel once. When the channel is closed
+	// (init complete), we set mcpEvents to nil to disable the select case.
+	var mcpEvents <-chan mcp.InitEvent
+	if s.mcpInit != nil {
+		mcpEvents = s.mcpInit.Events()
+	}
+
 	for {
 		if s.sessionCtx.Err() != nil {
 			return
-		}
-
-		// Build a reference to the MCP events channel (nil-safe for select).
-		var mcpEvents <-chan mcp.InitEvent
-		if s.mcpInit != nil {
-			mcpEvents = s.mcpInit.Events()
 		}
 
 		select {
@@ -77,7 +78,8 @@ func (s *Session) run() {
 
 		case evt, ok := <-mcpEvents:
 			if !ok {
-				mcpEvents = nil // channel closed
+				// Channel closed — disable this case permanently.
+				mcpEvents = nil
 				break
 			}
 			s.handleMCPEvent(&evt)
