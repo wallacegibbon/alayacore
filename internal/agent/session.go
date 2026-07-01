@@ -298,6 +298,8 @@ func NewSession(cfg SessionConfig) *Session {
 	if cfg.AsyncInit != nil {
 		s.mcpAsyncInit = cfg.AsyncInit
 		s.startMCPInitWatcher(cfg.AsyncInit)
+	} else {
+		s.mcpReady.Store(true)
 	}
 
 	s.sendSystemInfo("all")
@@ -347,6 +349,8 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 	// Start async MCP init watcher — the session manages init internally.
 	if cfg.AsyncInit != nil {
 		s.startMCPInitWatcher(cfg.AsyncInit)
+	} else {
+		s.mcpReady.Store(true)
 	}
 
 	// Apply context limit from the resolved model so the status bar
