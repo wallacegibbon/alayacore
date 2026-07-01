@@ -421,38 +421,30 @@ func (m *Terminal) handleMCPInitOverlay() {
 // Both use the same pattern: the session writes a TLV message, the output
 // writer stores a pending confirmation, and the tick handler pops it here
 // to open the corresponding overlay.
+// handleConfirmOverlays processes pending confirmations for tool execution
+// and MCP OAuth authorization, both driven by session TLV messages.
+//
+// Priority order:
+//  1. Tool confirmation (highest priority)
+//  2. MCP OAuth confirmation (interrupts init overlay temporarily)
+//
+// Both are temporary — they appear, user responds, they disappear.
+// The init overlay (ConfirmMCPInit) persists across these interruptions
+// and is re-opened by handleMCPInitOverlay on the next tick.
 func (m *Terminal) handleConfirmOverlays() {
-	// Tool confirmation (highest priority).
-	if !m.confirmOverlay.IsOpen() {
-		if id, toolName, toolInput, ok := m.out.GetPendingToolConfirm(); ok {
-			m.openConfirmTool(id, toolName, toolInput)
-			return
-		}
+	// 1. Tool confirmation (highest priority).
+	//    Can interrupt any persistent overlay (including init).
+	if id, toolName, toolInput, ok := m.out.GetPendingToolConfirm(); ok {
+		// Save current overlay kind before switching to confirm.
+		// The restore happens in handleMCPInitOverlay on the next tick.
+		m.openConfirmTool(id, toolName, toolInput)
+		return
 	}
 
-	// MCP OAuth progress overlay is open — check if we should close it.
-	if m.confirmOverlay.Kind() == ConfirmMCPAuthProgress {
-		// Session sent the next confirm (next server in the OAuth sequence).
-		if server, url, ok := m.out.GetPendingMCPAuth(); ok {
-			m.confirmOverlay.Close()
-			m.openConfirmMCPAuth(server, url)
-			return
-		}
-		// Session sent done (all servers processed).
-		if m.out.ConsumeMCPAuthDone() {
-			m.confirmOverlay.Close()
-			m.restoreFocusAfterConfirm()
-			return
-		}
-		return // progress overlay stays
-	}
-
-	// MCP OAuth confirm — only if no overlay is open.
-	if !m.confirmOverlay.IsOpen() {
-		if server, url, ok := m.out.GetPendingMCPAuth(); ok {
-			m.openConfirmMCPAuth(server, url)
-			return
-		}
+	// 2. MCP OAuth confirm — temporary, like tool confirm.
+	if server, url, ok := m.out.GetPendingMCPAuth(); ok {
+		m.openConfirmMCPAuth(server, url)
+		return
 	}
 }
 
