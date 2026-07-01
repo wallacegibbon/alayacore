@@ -149,7 +149,7 @@ func (cd *ConfirmDialog) OpenMCPAuth(serverName, serverURL string) {
 	cd.toolID = serverName
 	cd.toolName = serverName
 	cd.toolInput = serverURL
-	cd.Description = fmt.Sprintf("Server: %s\n%s", serverName, serverURL)
+	cd.Description = fmt.Sprintf("%s\n%s", serverName, serverURL)
 	cd.confirmed = false
 	cd.canceled = false
 }
@@ -180,9 +180,8 @@ func (cd *ConfirmDialog) UpdateMCPInitProgress(server string, connected, skipped
 
 	// Build a concise progress summary.
 	// Examples:
-	//   "Connecting to yardstick... (2 ready, 0 skipped / 4 total)"
-	//   "yardstick connected (3 ready, 0 skipped / 4 total)"
-	//   "yardstick skipped (2 ready, 1 skipped / 4 total)"
+	//   "yardstick (2 ready / 4 total)"
+	//   "yardstick (2 ready, 1 skipped / 4 total)"
 	parts := make([]string, 0, 2)
 	if total > 0 {
 		parts = append(parts, fmt.Sprintf("%d ready", connected))
@@ -197,7 +196,7 @@ func (cd *ConfirmDialog) UpdateMCPInitProgress(server string, connected, skipped
 	if summary != "" {
 		summary = " (" + summary + ")"
 	}
-	cd.Description = fmt.Sprintf("Server: %s%s", server, summary)
+	cd.Description = fmt.Sprintf("%s%s", server, summary)
 }
 
 // OpenTool opens the dialog for confirming a tool call.
@@ -354,7 +353,7 @@ func (cd *ConfirmDialog) buildContentLines() []string {
 	lines := body
 	switch cd.kind {
 	case ConfirmMCPInit:
-		lines = append(lines, cd.wrapAndCenter("Initializing... Press Ctrl+G to skip current server.", cd.styles.System, innerWidth)[0])
+		lines = append(lines, cd.wrapAndCenter("Press Ctrl+G to skip current server.", cd.styles.System, innerWidth)[0])
 		lines = append(lines, cd.wrapAndCenter("(this window will close automatically)", cd.styles.System, innerWidth)[0])
 	default:
 		lines = append(lines, cd.wrapAndCenter("y / n", cd.styles.System, innerWidth)[0])
