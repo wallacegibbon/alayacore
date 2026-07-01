@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -61,11 +62,11 @@ func TestParseKeyValueSingleQuotes(t *testing.T) {
 }
 
 func TestParseKeyValueComments(t *testing.T) {
-	// Lines starting with # have no colon → silently ignored
 	content := `# This is a comment
 name: test
 # Another comment
 port: 80
+# name: commented-out
 `
 	var cfg TestConfig
 	ParseKeyValue(content, &cfg)
@@ -75,6 +76,109 @@ port: 80
 	}
 	if cfg.Port != 80 {
 		t.Errorf("Expected Port 80, got %d", cfg.Port)
+	}
+}
+
+func TestParseKeyValueCommentWithColon(t *testing.T) {
+	// Lines starting with # are explicitly skipped as comments,
+	// even if they contain a colon.
+	content := `# name: "should-be-ignored"
+name: real-value
+`
+	var cfg TestConfig
+	warnings := ParseKeyValueWithWarnings(content, &cfg)
+
+	if cfg.Name != "real-value" {
+		t.Errorf("Expected Name 'real-value', got %q", cfg.Name)
+	}
+	if len(warnings) != 0 {
+		t.Errorf("Expected 0 warnings, got %d: %v", len(warnings), warnings)
+	}
+}
+
+func TestParseKeyValueMissingColon(t *testing.T) {
+	content := `name "test"
+port: 80
+`
+	var cfg TestConfig
+	warnings := ParseKeyValueWithWarnings(content, &cfg)
+
+	if cfg.Port != 80 {
+		t.Errorf("Expected Port 80, got %d", cfg.Port)
+	}
+	// name line has no colon → should produce a warning
+	found := false
+	for _, w := range warnings {
+		if w.Key == `name "test"` && w.Err == "line without ':' separator (missing colon?)" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("Expected warning for missing colon, got %v", warnings)
+	}
+}
+
+func TestParseKeyValueInvalidKeyFormat(t *testing.T) {
+	content := `name: valid
+invalid key: value
+port: 80
+`
+	var cfg TestConfig
+	warnings := ParseKeyValueWithWarnings(content, &cfg)
+
+	if cfg.Name != "valid" {
+		t.Errorf("Expected Name 'valid', got %q", cfg.Name)
+	}
+	if cfg.Port != 80 {
+		t.Errorf("Expected Port 80, got %d", cfg.Port)
+	}
+	// "invalid key" contains a space → should produce a warning
+	found := false
+	for _, w := range warnings {
+		if w.Key == "invalid key" && strings.Contains(w.Err, "invalid key format") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("Expected warning for invalid key format, got %v", warnings)
+	}
+}
+
+func TestParseKeyValueValueWithColons(t *testing.T) {
+	content := `url: http://example.com:8080/path?q=1
+name: test
+`
+	var cfg struct {
+		URL  string `config:"url"`
+		Name string `config:"name"`
+	}
+	ParseKeyValue(content, &cfg)
+
+	if cfg.URL != "http://example.com:8080/path?q=1" {
+		t.Errorf("Expected URL 'http://example.com:8080/path?q=1', got %q", cfg.URL)
+	}
+	if cfg.Name != "test" {
+		t.Errorf("Expected Name 'test', got %q", cfg.Name)
+	}
+}
+
+func TestParseKeyValueDashSeparatorSkipped(t *testing.T) {
+	// "---" lines are block separators and should be silently skipped
+	// in parseConfig (they are handled by ParseKeyValueBlocks).
+	content := `name: first
+---
+name: second
+`
+	var cfg TestConfig
+	warnings := ParseKeyValueWithWarnings(content, &cfg)
+
+	if cfg.Name != "second" {
+		t.Errorf("Expected Name 'second' (last value wins), got %q", cfg.Name)
+	}
+	if len(warnings) != 0 {
+		t.Errorf("Expected 0 warnings, got %d: %v", len(warnings), warnings)
 	}
 }
 

@@ -4,10 +4,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 )
+
+// validKeyPattern defines the allowed format for config keys.
+// Keys must start with a letter or underscore, followed by letters,
+// digits, underscores, or hyphens. This ensures reliable key-value
+// separation and allows values to contain colons without ambiguity.
+var validKeyPattern = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_-]*$`)
 
 // ParseWarning represents a non-fatal issue encountered during config parsing,
 // such as a value that could not be converted to the target field type.
@@ -28,8 +35,14 @@ func (w ParseWarning) String() string {
 //	key: "quoted value"
 //	key: 'quoted value'
 //
-// Lines starting with # are comments. Empty lines are ignored.
-// Multiple configs can be separated by "---" on its own line.
+// Lines starting with # are treated as comments and ignored.
+// Lines starting with --- are block separators and ignored.
+// Empty lines are ignored.
+// Multiple configs can be separated by "---" on its own line (see ParseKeyValueBlocks).
+//
+// Keys must match the pattern `^[a-zA-Z_][a-zA-Z0-9_-]*$` — this ensures reliable
+// key-value separation and allows values to contain colons without ambiguity.
+// Lines that don't match this pattern are treated as comments or malformed input.
 //
 // Unknown keys are silently ignored.
 // Parse errors (e.g. non-numeric value for an int field) are also silently ignored.
@@ -106,16 +119,39 @@ func parseConfig(content string, target any) []ParseWarning {
 	// Parse lines
 	for line := range strings.SplitSeq(content, "\n") {
 		line = strings.TrimSpace(line)
-		if line == "" {
+		if line == "" || line == "---" {
 			continue
 		}
 
-		key, value, found := strings.Cut(line, ":")
-		if !found {
+		// Explicitly skip comment lines
+		if strings.HasPrefix(line, "#") {
 			continue
 		}
 
-		key = strings.TrimSpace(key)
+		// Find the first colon to separate key and value
+		colonIdx := strings.IndexByte(line, ':')
+		if colonIdx == -1 {
+			warnings = append(warnings, ParseWarning{
+				Key:   line,
+				Value: "",
+				Err:   "line without ':' separator (missing colon?)",
+			})
+			continue
+		}
+
+		key := strings.TrimSpace(line[:colonIdx])
+		value := line[colonIdx+1:]
+
+		// Validate key format
+		if !validKeyPattern.MatchString(key) {
+			warnings = append(warnings, ParseWarning{
+				Key:   key,
+				Value: strings.TrimSpace(value),
+				Err:   fmt.Sprintf("invalid key format (must match %s)", validKeyPattern.String()),
+			})
+			continue
+		}
+
 		value = strings.TrimSpace(value)
 		value = unquoteValue(value)
 
