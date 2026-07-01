@@ -363,6 +363,7 @@ func (m *Terminal) handleTick() (tea.Model, tea.Cmd) {
 
 	m.handleMCPInitOverlay()
 	m.handleConfirmOverlays()
+	m.checkMCPAuthDone()
 	cmd := m.handleDisplayRefresh()
 	return m, tea.Batch(
 		tea.Tick(TickInterval, func(_ time.Time) tea.Msg {
@@ -421,12 +422,13 @@ func (m *Terminal) handleMCPInitOverlay() {
 	}
 }
 
-// handleConfirmOverlays processes pending confirmations and lifecycle signals.
+// handleConfirmOverlays processes temporary confirm dialogs.
+// The init overlay lifecycle is managed independently by handleMCPInitOverlay
+// and checkMCPAuthDone.
 //
-// Priority order:
-//  1. Tool confirmation (highest priority) — session sends tool_confirm
-//  2. MCP OAuth confirmation — session sends mcp_auth:confirm (temporary)
-//  3. MCP OAuth done — session sends mcp_auth:done (close init overlay)
+// Priority:
+//  1. Tool confirmation — session sends tool_confirm
+//  2. MCP OAuth confirmation — session sends mcp_auth:confirm
 //
 // The init overlay (ConfirmMCPInit) persists across temporary confirm
 // interruptions and is re-opened by handleMCPInitOverlay on the next tick.
@@ -436,8 +438,6 @@ func (m *Terminal) handleConfirmOverlays() {
 	// 1. Tool confirmation (highest priority).
 	//    Can interrupt any persistent overlay (including init).
 	if id, toolName, toolInput, ok := m.out.GetPendingToolConfirm(); ok {
-		// Save current overlay kind before switching to confirm.
-		// The restore happens in handleMCPInitOverlay on the next tick.
 		m.openConfirmTool(id, toolName, toolInput)
 		return
 	}
@@ -447,8 +447,12 @@ func (m *Terminal) handleConfirmOverlays() {
 		m.openConfirmMCPAuth(server, url)
 		return
 	}
+}
 
-	// 3. MCP OAuth done — all servers processed, close init overlay.
+// checkMCPAuthDone checks for MCP OAuth completion signal and closes
+// the init overlay if it's open. Called unconditionally from handleTick
+// so it's not blocked by temporary confirms.
+func (m *Terminal) checkMCPAuthDone() {
 	if m.out.ConsumeMCPAuthDone() {
 		if m.confirmOverlay.IsOpen() && m.confirmOverlay.Kind() == ConfirmMCPInit {
 			m.confirmOverlay.Close()
