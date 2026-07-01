@@ -85,6 +85,7 @@ func (s *Session) run() {
 func (s *Session) applyMCPUpdate(update MCPUpdateEvent) {
 	// 1. Append MCP tools to BaseTools.
 	s.BaseTools = append(s.BaseTools, update.Tools...)
+	s.mcpToolCount = len(update.Tools)
 
 	// 2. Append MCP system prompt fragments (instructions + resources + prompts).
 	s.SystemPrompt += update.SystemPromptSuffix
@@ -173,6 +174,7 @@ func (s *Session) applyOAuthTools(name string, tools []mcp.Tool) {
 
 	// Apply to session state.
 	s.BaseTools = append(s.BaseTools, agentTools...)
+	s.mcpToolCount += len(agentTools)
 	s.SystemPrompt += frag.String()
 
 	// Recreate agent if it was initialized.
@@ -196,7 +198,7 @@ func (s *Session) advanceMCPAuth() {
 		s.mcpReady.Store(true)
 		s.sendMCPAuthDone()
 		s.sendSystemInfo("all")
-		s.writeNotifyf("MCP servers initialized (%d tools loaded).", len(s.BaseTools))
+		s.writeNotifyf("MCP servers initialized (%d tools loaded).", s.mcpToolCount)
 	}
 }
 

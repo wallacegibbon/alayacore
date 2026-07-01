@@ -101,6 +101,12 @@ type runState struct {
 	pendingOAuthIdx     int                // index of the server currently being prompted
 	oauthResultCh       chan oauthResult   // goroutine → run(): AuthorizeServer result
 	oauthCancel         context.CancelFunc // cancels the currently running OAuth goroutine
+
+	// mcpToolCount tracks the total number of MCP tools loaded.
+	// Used for display messages; incremented in applyMCPUpdate and
+	// handleOAuthResult. This is separate from len(BaseTools) which
+	// includes built-in tools.
+	mcpToolCount int
 }
 
 // activeTaskStep returns the current step of the active task, or 0 if idle.
