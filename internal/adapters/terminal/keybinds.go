@@ -48,7 +48,7 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	//     All other keys are consumed while init is in progress.
 	if m.mcpInitOverlay.IsOpen() {
 		if msg.String() == keyCtrlG {
-			m.emitCommand(":mcp_init_skip")
+			m.emitCommand(":mcp_skip")
 			return m, scheduleTick()
 		}
 		return m, nil

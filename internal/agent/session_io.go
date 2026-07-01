@@ -496,12 +496,12 @@ func (s *Session) handlePrompt(contentParts []llm.ContentPart) {
 	go s.runTask(taskCtx, taskContent, contentParts)
 }
 
-// handleMCPInitSkip handles the :mcp_init_skip command.
+// handleMCPSkip handles the :mcp_skip command.
 // Called when the user presses Ctrl+G (init overlay or globally) or types
 // the command directly. Delegates to Init.SkipCurrent() which skips
 // either the current connecting server (connect phase) or the first
 // running OAuth server.
-func (s *Session) handleMCPInitSkip() {
+func (s *Session) handleMCPSkip() {
 	switch {
 	case s.mcpInit == nil:
 		s.writeError("No MCP servers configured.")

@@ -19,7 +19,7 @@ const (
 	CommandNameFork        = "fork"
 	CommandNameVideoConfig = "video_config"
 	CommandNameMCPAuth     = "mcp_auth"
-	CommandNameMCPInitSkip = "mcp_init_skip"
+	CommandNameMCPSkip = "mcp_skip"
 )
 
 // CmdPolicy specifies how and when a command is dispatched.
@@ -73,8 +73,8 @@ var commandDefs = []Command{
 		func(s *Session, _ context.Context, args string) { s.handleVideoConfig(args) }},
 	{CommandNameMCPAuth, "Authorize (yes) or skip (no) an MCP OAuth server", "<name> yes|no", CmdIdle,
 		func(s *Session, ctx context.Context, args string) { s.handleMCPAuth(ctx, args) }},
-	{CommandNameMCPInitSkip, "Skip current MCP server", "", CmdImmediate,
-		func(s *Session, _ context.Context, _ string) { s.handleMCPInitSkip() }},
+	{CommandNameMCPSkip, "Skip current MCP server", "", CmdImmediate,
+		func(s *Session, _ context.Context, _ string) { s.handleMCPSkip() }},
 }
 
 // LookupCommand returns the command metadata for name, or (nil, false).
