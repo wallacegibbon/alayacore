@@ -156,7 +156,8 @@ func (cd *ConfirmDialog) OpenMCPAuth(serverName, serverURL string) {
 
 // OpenMCPInit opens the dialog to show that MCP servers are initializing.
 // This is a non-interactive overlay — it shows "Initializing MCP servers…"
-// while the async init runs in the background.
+// while the async init runs in the background. Press Ctrl+G to skip the
+// current server.
 // All keys are consumed (no-op) while this overlay is shown.
 func (cd *ConfirmDialog) OpenMCPInit() {
 	cd.state = FilteredListOpen
@@ -353,7 +354,7 @@ func (cd *ConfirmDialog) buildContentLines() []string {
 	lines := body
 	switch cd.kind {
 	case ConfirmMCPInit:
-		lines = append(lines, cd.wrapAndCenter("Please wait...", cd.styles.System, innerWidth)[0])
+		lines = append(lines, cd.wrapAndCenter("Initializing... Press Ctrl+G to skip current server.", cd.styles.System, innerWidth)[0])
 		lines = append(lines, cd.wrapAndCenter("(this window will close automatically)", cd.styles.System, innerWidth)[0])
 	default:
 		lines = append(lines, cd.wrapAndCenter("y / n", cd.styles.System, innerWidth)[0])
