@@ -262,12 +262,16 @@ func (m *Terminal) handleConfirmConfirmed(kind ConfirmKind, toolID string, fromC
 		return m, scheduleTick()
 
 	case ConfirmMCPAuth:
-		// Session runs OAuth in background — just emit yes and close dialog.
-		// The session drives the rest (no progress overlay needed).
+		// Switch to progress overlay immediately — OAuth takes minutes
+		// (browser, callback, token exchange). The overlay shows
+		// "Authorizing server X..." and stays until the session sends
+		// the next mcp_auth:confirm (next server) or mcp_auth:done (all done).
+		// n/N/Esc cancels and skips the current server.
 		if toolID != "" {
+			m.confirmOverlay.OpenMCPAuthProgress(toolID)
 			m.emitCommand(":mcp_auth " + toolID + " yes")
 		}
-		m.restoreFocusAfterConfirm()
+		m.display.updateContent()
 		return m, scheduleTick()
 	}
 	return m, nil

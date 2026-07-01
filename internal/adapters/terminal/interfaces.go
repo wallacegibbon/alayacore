@@ -71,6 +71,7 @@ type OutputWriter interface {
 	// Confirm dialog support
 	GetPendingToolConfirm() (id, toolName, toolInput string, ok bool)
 	GetPendingMCPAuth() (server, url string, ok bool)
+	ConsumeMCPAuthDone() bool // returns true if OAuth sequence just completed
 
 	// Update signaling
 	DrainDirty() bool // returns true if display was dirty, clears the flag

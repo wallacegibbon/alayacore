@@ -30,12 +30,13 @@ const ConfirmContentRows = 8
 type ConfirmKind int
 
 const (
-	ConfirmNone    ConfirmKind = iota // No dialog active
-	ConfirmQuit                       // Confirm exit
-	ConfirmCancel                     // Confirm cancel current request
-	ConfirmTool                       // Confirm tool execution
-	ConfirmMCPAuth                    // Confirm MCP OAuth authorization
-	ConfirmMCPInit                    // MCP servers initializing (informational)
+	ConfirmNone            ConfirmKind = iota // No dialog active
+	ConfirmQuit                               // Confirm exit
+	ConfirmCancel                             // Confirm cancel current request
+	ConfirmTool                               // Confirm tool execution
+	ConfirmMCPAuth                            // Confirm MCP OAuth authorization
+	ConfirmMCPAuthProgress                    // MCP OAuth authorization in progress (informational)
+	ConfirmMCPInit                            // MCP servers initializing (informational)
 )
 
 // ConfirmDialog manages a floating confirmation overlay.
@@ -154,6 +155,20 @@ func (cd *ConfirmDialog) OpenMCPAuth(serverName, serverURL string) {
 	cd.canceled = false
 }
 
+// OpenMCPAuthProgress switches the dialog to show OAuth progress.
+// Non-interactive — shows "Authorizing server X..." while the OAuth flow
+// runs in the background. n/N/Esc/Ctrl+G cancels and skips the server.
+func (cd *ConfirmDialog) OpenMCPAuthProgress(serverName string) {
+	cd.state = FilteredListOpen
+	cd.kind = ConfirmMCPAuthProgress
+	cd.toolID = serverName
+	cd.toolName = serverName
+	cd.toolInput = serverName
+	cd.Description = fmt.Sprintf("Server: %s", serverName)
+	cd.confirmed = false
+	cd.canceled = false
+}
+
 // OpenMCPInit opens the dialog to show that MCP servers are initializing.
 // This is a non-interactive overlay — it shows "Initializing MCP servers…"
 // while the async init runs in the background.
@@ -221,6 +236,15 @@ func (cd *ConfirmDialog) HandleKeyMsg(msg tea.KeyMsg) bool {
 	// For the init overlay, only Ctrl+G cancels (skips MCP initialization).
 	if cd.kind == ConfirmMCPInit {
 		if key == keyCtrlG {
+			cd.canceled = true
+			cd.state = FilteredListClosed
+		}
+		return true
+	}
+
+	// For OAuth progress overlay, n/N/Esc/Ctrl+G cancels and skips.
+	if cd.kind == ConfirmMCPAuthProgress {
+		if key == keyN || key == keyNCapital || key == keyEsc || key == keyCtrlG {
 			cd.canceled = true
 			cd.state = FilteredListClosed
 		}
@@ -322,6 +346,9 @@ func (cd *ConfirmDialog) buildContentLines() []string {
 
 	lines := body
 	switch cd.kind {
+	case ConfirmMCPAuthProgress:
+		lines = append(lines, cd.wrapAndCenter("Please complete authorization in your browser.", cd.styles.System, innerWidth)[0])
+		lines = append(lines, cd.wrapAndCenter("(n / Esc to skip this server)", cd.styles.System, innerWidth)[0])
 	case ConfirmMCPInit:
 		lines = append(lines, cd.wrapAndCenter("Please wait...", cd.styles.System, innerWidth)[0])
 		lines = append(lines, cd.wrapAndCenter("(this window will close automatically)", cd.styles.System, innerWidth)[0])
@@ -356,6 +383,14 @@ func (cd *ConfirmDialog) buildTitleText() string {
 			msg += "?"
 		}
 		return msg + "?"
+	case ConfirmMCPAuthProgress:
+		msg := "Authorizing MCP server "
+		if cd.toolName != "" {
+			msg += fmt.Sprintf("%q", cd.toolName)
+		} else {
+			msg += "?"
+		}
+		return msg + "…"
 	case ConfirmMCPInit:
 		return "Initializing MCP servers…"
 	default:

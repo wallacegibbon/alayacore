@@ -421,7 +421,24 @@ func (m *Terminal) handleConfirmOverlays() {
 		}
 	}
 
-	// MCP OAuth confirm — same pattern as tool confirm, just different command.
+	// MCP OAuth progress overlay is open — check if we should close it.
+	if m.confirmOverlay.Kind() == ConfirmMCPAuthProgress {
+		// Session sent the next confirm (next server in the OAuth sequence).
+		if server, url, ok := m.out.GetPendingMCPAuth(); ok {
+			m.confirmOverlay.Close()
+			m.openConfirmMCPAuth(server, url)
+			return
+		}
+		// Session sent done (all servers processed).
+		if m.out.ConsumeMCPAuthDone() {
+			m.confirmOverlay.Close()
+			m.restoreFocusAfterConfirm()
+			return
+		}
+		return // progress overlay stays
+	}
+
+	// MCP OAuth confirm — only if no overlay is open.
 	if !m.confirmOverlay.IsOpen() {
 		if server, url, ok := m.out.GetPendingMCPAuth(); ok {
 			m.openConfirmMCPAuth(server, url)

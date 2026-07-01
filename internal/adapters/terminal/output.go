@@ -388,24 +388,27 @@ func (to *outputWriter) handleSystemMCPInit(data json.RawMessage) {
 
 // handleSystemMCPAuth processes an mcp_auth system message.
 // Stores the server name as a pending confirmation so the Terminal
-// can open a confirm dialog on the next tick. Only "confirm" status
-// triggers the dialog; "in_progress" and "done" are ignored (the
-// session runs OAuth asynchronously and we don't need progress tracking).
+// can open a confirm dialog on the next tick.
+// - "confirm": stores pending (triggers confirm dialog)
+// - "done": sets MCPAuthDone flag (Terminal closes progress overlay)
 func (to *outputWriter) handleSystemMCPAuth(data json.RawMessage) {
 	var msg struct {
 		Server string `json:"server,omitempty"`
 		URL    string `json:"url,omitempty"`
 		Status string `json:"status"`
 	}
-	if json.Unmarshal(data, &msg) != nil || msg.Server == "" {
+	if json.Unmarshal(data, &msg) != nil {
 		return
 	}
-	// Only "confirm" creates a pending dialog; in_progress/done are
-	// session-internal progress indicators that the adapter doesn't need.
-	if msg.Status != "confirm" {
-		return
+
+	switch msg.Status {
+	case "confirm":
+		if msg.Server != "" {
+			to.status.setMCPAuthPending(msg.Server, msg.URL)
+		}
+	case "done":
+		to.status.setMCPAuthDone()
 	}
-	to.status.setMCPAuthPending(msg.Server, msg.URL)
 }
 
 // handleSystemToolConfirm processes a tool_confirm system message.
@@ -436,6 +439,12 @@ func (to *outputWriter) GetPendingToolConfirm() (id, toolName, toolInput string,
 // GetPendingMCPAuth returns a pending MCP auth confirmation, if any.
 func (to *outputWriter) GetPendingMCPAuth() (server, url string, ok bool) {
 	return to.status.takeMCPAuthPending()
+}
+
+// ConsumeMCPAuthDone returns true if the OAuth sequence just completed,
+// and resets the flag. The Terminal uses this to close the progress overlay.
+func (to *outputWriter) ConsumeMCPAuthDone() bool {
+	return to.status.takeMCPAuthDone()
 }
 
 // SnapshotStatus returns a consistent point-in-time view of session status.

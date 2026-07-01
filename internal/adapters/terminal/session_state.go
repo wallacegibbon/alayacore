@@ -48,6 +48,10 @@ type sessionState struct {
 	mcpAuthPendingName string
 	mcpAuthPendingURL  string
 
+	// mcpAuthDone is set when the session sends mcp_auth:done (all servers
+	// processed). The Terminal uses it to close the progress overlay.
+	mcpAuthDone bool
+
 	// Model fields
 	models          []config.ModelConfig
 	activeModelID   int
@@ -190,6 +194,23 @@ func (s *sessionState) takeMCPAuthPending() (server, url string, ok bool) {
 	s.mcpAuthPendingName = ""
 	s.mcpAuthPendingURL = ""
 	return server, url, true
+}
+
+// setMCPAuthDone marks the OAuth sequence as complete.
+// The Terminal uses this to close the progress overlay.
+func (s *sessionState) setMCPAuthDone() {
+	s.mu.Lock()
+	s.mcpAuthDone = true
+	s.mu.Unlock()
+}
+
+// takeMCPAuthDone returns and resets the done flag.
+func (s *sessionState) takeMCPAuthDone() bool {
+	s.mu.Lock()
+	done := s.mcpAuthDone
+	s.mcpAuthDone = false
+	s.mu.Unlock()
+	return done
 }
 
 // setToolConfirmPending appends a pending tool confirmation request.
