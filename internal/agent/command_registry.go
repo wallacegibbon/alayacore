@@ -19,7 +19,7 @@ const (
 	CommandNameFork        = "fork"
 	CommandNameVideoConfig = "video_config"
 	CommandNameMCPAuth     = "mcp_auth"
-	CommandNameMCPSkip = "mcp_skip"
+	CommandNameMCPSkip     = "mcp_skip"
 )
 
 // CmdPolicy specifies how and when a command is dispatched.

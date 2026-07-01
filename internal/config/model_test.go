@@ -144,7 +144,7 @@ func TestParseModelList_Empty(t *testing.T) {
 		t.Errorf("expected 0 warnings, got %d: %v", len(warns), warns)
 	}
 
-	models, warns = ParseModelList("  \n  \n  ")
+	models, _ = ParseModelList("  \n  \n  ")
 	if len(models) != 0 {
 		t.Errorf("expected 0 models for whitespace, got %d", len(models))
 	}
