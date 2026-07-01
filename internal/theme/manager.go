@@ -45,55 +45,16 @@ func (tm *Manager) initializeThemesFolder() {
 	}
 }
 
-// createDefaultThemes creates the default theme-dark.conf and theme-light.conf files.
+// createDefaultThemes writes the three built-in themes from embedded content.
 func (tm *Manager) createDefaultThemes() {
-	darkTheme := `primary: #89d4fa
-dim: #313244
-muted: #6c7086
-text: #cdd6f4
-warning: #f9e2af
-error: #f38ba8
-success: #a6e3a1
-selection: #fab387
-cursor: #cdd6f4
-added: #a6e3a1
-removed: #f38ba8
-fold_indicator: "⁝"
-`
 	darkPath := filepath.Join(tm.themesFolder, "theme-dark.conf")
-	_ = os.WriteFile(darkPath, []byte(darkTheme), 0600) // best-effort default creation
+	_ = os.WriteFile(darkPath, []byte(darkThemeContent), 0600)
 
-	lightTheme := `primary: #1e66f5
-dim: #d0d0d8
-muted: #6c6f85
-text: #4c4f69
-warning: #df8e1d
-error: #d20f39
-success: #40a02b
-selection: #881337
-cursor: #1e1e2e
-added: #40a02b
-removed: #d20f39
-fold_indicator: "⁝"
-`
 	lightPath := filepath.Join(tm.themesFolder, "theme-light.conf")
-	_ = os.WriteFile(lightPath, []byte(lightTheme), 0600) // best-effort default creation
+	_ = os.WriteFile(lightPath, []byte(lightThemeContent), 0600)
 
-	redpandaTheme := `primary: #e24328
-dim: #2c1c18
-muted: #6b4e44
-text: #f0e6e0
-warning: #f77923
-error: #ea4a3e
-success: #48bb78
-selection: #943d28
-cursor: #e24328
-added: #68d391
-removed: #f9944f
-fold_indicator: "⁝"
-`
 	redpandaPath := filepath.Join(tm.themesFolder, "theme-redpanda.conf")
-	_ = os.WriteFile(redpandaPath, []byte(redpandaTheme), 0600) // best-effort default creation
+	_ = os.WriteFile(redpandaPath, []byte(redpandaThemeContent), 0600)
 }
 
 // ReloadThemes reloads the list of available themes from the themes folder.

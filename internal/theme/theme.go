@@ -4,51 +4,61 @@
 package theme
 
 import (
+	_ "embed"
 	"fmt"
 	"os"
+	"sync"
 
 	"github.com/alayacore/alayacore/internal/config"
 )
+
+//go:embed dark.conf
+var darkThemeContent string
+
+//go:embed light.conf
+var lightThemeContent string
+
+//go:embed redpanda.conf
+var redpandaThemeContent string
 
 // Theme holds all color values for the UI.
 // Each field maps to a key in the .conf theme files.
 type Theme struct {
 	// Core palette
-	Primary   string `config:"primary" json:"primary"`     // Primary/accent color for highlights and focused borders
-	Dim       string `config:"dim" json:"dim"`             // Dimmed color for unfocused borders and blurred text
-	Muted     string `config:"muted" json:"muted"`         // Muted color for placeholder and secondary text
+	Primary   string `config:"primary" json:"primary"`     // Accent color — selected items, focused borders, highlights
+	Dim       string `config:"dim" json:"dim"`             // Dimmed color — unfocused borders, muted text
+	Muted     string `config:"muted" json:"muted"`         // Muted color — placeholders, secondary labels
 	Text      string `config:"text" json:"text"`           // Primary text color
-	Warning   string `config:"warning" json:"warning"`     // Warning color (yellow/orange)
-	Error     string `config:"error" json:"error"`         // Error color (red)
-	Success   string `config:"success" json:"success"`     // Success color (green)
-	Selection string `config:"selection" json:"selection"` // Selection/cursor border highlight color
-	Cursor    string `config:"cursor" json:"cursor"`       // Text input cursor color
+	Warning   string `config:"warning" json:"warning"`     // Warning color — alerts, caution
+	Error     string `config:"error" json:"error"`         // Error color — errors, dangerous operations
+	Success   string `config:"success" json:"success"`     // Success color — success messages, completion status
+	Selection string `config:"selection" json:"selection"` // Selection highlight — selected list item, search match
+	Cursor    string `config:"cursor" json:"cursor"`       // Cursor color — text input cursor
 
 	// Diff colors
-	Added   string `config:"added" json:"added"`     // Added lines in diff (green)
-	Removed string `config:"removed" json:"removed"` // Removed lines in diff (red)
+	Added   string `config:"added" json:"added"`     // Added lines in diff
+	Removed string `config:"removed" json:"removed"` // Removed lines in diff
 
 	// Fold indicator character (repeated to form the fold splitter row)
 	FoldIndicator string `config:"fold_indicator" json:"fold_indicator"`
 }
 
-// DefaultTheme returns the default theme (Catppuccin Mocha)
-func DefaultTheme() *Theme {
-	return &Theme{
-		Primary:   "#89d4fa",
-		Dim:       "#313244",
-		Muted:     "#6c7086",
-		Text:      "#cdd6f4",
-		Warning:   "#f9e2af",
-		Error:     "#f38ba8",
-		Success:   "#a6e3a1",
-		Selection: "#fab387",
-		Cursor:    "#cdd6f4",
-		Added:     "#a6e3a1",
-		Removed:   "#f38ba8",
+var (
+	defaultThemeOnce sync.Once
+	defaultTheme     *Theme
+)
 
-		FoldIndicator: "⁝",
-	}
+// DefaultTheme returns the default theme (Catppuccin Mocha dark).
+// Parsed once from the embedded dark.conf and cached. Returns a copy
+// so callers (e.g. LoadTheme) can safely modify the result.
+func DefaultTheme() *Theme {
+	defaultThemeOnce.Do(func() {
+		var t Theme
+		config.ParseKeyValue(darkThemeContent, &t)
+		defaultTheme = &t
+	})
+	cpy := *defaultTheme
+	return &cpy
 }
 
 // LoadTheme loads a theme from a configuration file.
