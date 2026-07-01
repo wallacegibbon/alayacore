@@ -24,7 +24,6 @@ const (
 	EditorActionNone         EditorAction = iota // e.g. display viewing — no side effects
 	EditorActionSubmit                           // submit content as user input
 	EditorActionReloadConfig                     // reload model/runtime config after edit
-	EditorActionModelSync                        // model config edited via temp file -> sync via protocol
 )
 
 // EditorFinishedMsg is sent when an external editor closes.
@@ -32,7 +31,6 @@ const (
 // - For EditorActionNone: content is empty, no side effects.
 // - For EditorActionSubmit: content contains the editor's text.
 // - For EditorActionReloadConfig: Path + FileType identify the edited file.
-// - For EditorActionModelSync: content contains the edited model config in key-value format.
 type EditorFinishedMsg struct {
 	Content  string
 	Err      error
@@ -97,13 +95,6 @@ func (e *Editor) Open(currentContent string) tea.Cmd {
 // Content is NOT read back — this is a view-only operation.
 func (e *Editor) OpenForDisplay(content string) tea.Cmd {
 	return e.openWithAction(content, EditorActionNone, "", "")
-}
-
-// OpenForModelEdit opens an external editor with model config content.
-// The content is in key-value block format (same as model.conf).
-// After the editor closes, the edited content is returned via EditorActionModelSync.
-func (e *Editor) OpenForModelEdit(content string) tea.Cmd {
-	return e.openWithAction(content, EditorActionModelSync, "", "")
 }
 
 // OpenFile opens an external editor for a specific file path.

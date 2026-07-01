@@ -11,7 +11,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/theme"
 )
 
@@ -286,9 +285,6 @@ func (m *Terminal) handleOverlayModelSelector(msg tea.KeyMsg) (tea.Model, tea.Cm
 
 	if m.modelSelector.ConsumeModelSelected() {
 		m.switchToSelectedModel()
-	}
-	if m.modelSelector.ConsumeOpenModelFile() {
-		return m, tea.Batch(cmd, m.openModelConfigFile())
 	}
 	if m.modelSelector.ConsumeReloadModels() {
 		m.emitCommand(":model_load")
@@ -664,37 +660,4 @@ func (m *Terminal) switchToSelectedModel() {
 	if selectedModel.ID != 0 {
 		m.emitCommand(fmt.Sprintf(":model_set %d", selectedModel.ID))
 	}
-}
-
-// openModelConfigFile opens model config in $EDITOR for editing.
-// Instead of opening the real model.conf, it serializes the current
-// model list to a temp file in key-value block format. After the user
-// saves and closes the editor, the edited content is sent back to the
-// session via :model_sync for validation and persistence.
-func (m *Terminal) openModelConfigFile() tea.Cmd {
-	snap := m.out.SnapshotModels()
-
-	// Serialize current models to key-value format
-	content := serializeModelsForEdit(snap.Models)
-	if content == "" {
-		return func() tea.Msg {
-			return EditorFinishedMsg{
-				Err:      fmt.Errorf("no models to edit"),
-				Action:   EditorActionModelSync,
-				FileType: "model_config",
-			}
-		}
-	}
-
-	// Save original content for no-op detection
-	m.pendingModelSyncOrig = content
-
-	return m.editor.OpenForModelEdit(content)
-}
-
-// serializeModelsForEdit serializes models to the key-value block format
-// (same as model.conf). Terminal users are familiar with this format for
-// $EDITOR editing. Other adapters may use JSON instead.
-func serializeModelsForEdit(models []config.ModelConfig) string {
-	return config.FormatModelList(models)
 }

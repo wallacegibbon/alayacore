@@ -30,7 +30,6 @@ type ModelSelector struct {
 
 	activeModel       *searchableModel
 	modelJustSelected bool
-	openModelFile     bool
 	reloadModels      bool
 	lastModelCount    int
 }
@@ -182,14 +181,6 @@ func (ms *ModelSelector) ConsumeModelSelected() bool {
 	return false
 }
 
-func (ms *ModelSelector) ConsumeOpenModelFile() bool {
-	if ms.openModelFile {
-		ms.openModelFile = false
-		return true
-	}
-	return false
-}
-
 func (ms *ModelSelector) ConsumeReloadModels() bool {
 	if ms.reloadModels {
 		ms.reloadModels = false
@@ -297,8 +288,6 @@ func (ms *ModelSelector) handleListKeys(key string) {
 		if ms.SelectedIdx > 0 {
 			ms.SelectedIdx--
 		}
-	case keyE:
-		ms.openModelFile = true
 	case keyR:
 		ms.reloadModels = true
 	}
@@ -334,7 +323,7 @@ func (ms *ModelSelector) renderList() string {
 	if ms.FilterInputFocused {
 		help = "  tab: list │ enter: select │ esc: close"
 	} else {
-		help = "  tab: search │ j/k: navigate │ e: edit │ r: reload │ enter: select │ q/esc: close"
+		help = "  tab: search │ j/k: navigate │ r: reload │ enter: select │ q/esc: close"
 	}
 	sb.WriteString("\n")
 	sb.WriteString(helpStyle.Render(fmt.Sprintf("%-*s", boxWidth, help)))

@@ -8,7 +8,6 @@ package terminal
 //   - TLV protocol communication with the session
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"math"
@@ -115,7 +114,6 @@ type Terminal struct {
 	confirmFromCommand   bool   // tracks if cancel came from :cancel command (vs Ctrl+G)
 	focusedWindow        string // "input" or "display"
 	windowWidth          int
-	pendingModelSyncOrig string // original KV content before editor opened, for no-op detection
 	windowHeight         int
 	styles               *Styles
 	hasFocus             bool   // tracks whether the terminal has application focus
@@ -468,35 +466,9 @@ func (m *Terminal) handleEditorFinished(msg EditorFinishedMsg) (tea.Model, tea.C
 		}
 		return m, nil
 
-	case EditorActionModelSync:
-		if msg.Content != "" {
-			// Skip no-op: editor didn't change anything
-			if strings.TrimRight(msg.Content, "\n\r") == strings.TrimRight(m.pendingModelSyncOrig, "\n\r") {
-				m.pendingModelSyncOrig = ""
-				return m, nil
-			}
-			m.pendingModelSyncOrig = ""
-
-			// Editor returns key-value block format. Convert to JSON and send.
-			jsonContent := convertKVToJSON(msg.Content)
-			m.emitCommand(fmt.Sprintf(":model_sync %s", jsonContent))
-		}
-		return m, nil
-
 	default:
 		return m, nil
 	}
-}
-
-// convertKVToJSON parses key-value block format (model.conf style) and
-// returns JSON array of ModelConfig, suitable for :model_sync transport.
-func convertKVToJSON(kvContent string) string {
-	models, _ := config.ParseModelList(kvContent)
-	data, err := json.Marshal(models)
-	if err != nil {
-		return ""
-	}
-	return string(data)
 }
 
 // updateDisplayHeight updates the display viewport height based on window size.
