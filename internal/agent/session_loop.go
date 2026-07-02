@@ -120,10 +120,6 @@ func (s *Session) handleMCPEvent(evt *mcp.InitEvent) {
 		// OAuth progress — forward to adapter.
 		s.sendMCPMsg(evt.Type, evt.Server, "", evt.Error)
 
-	case "discovering":
-		// Tool discovery phase — forward to adapter.
-		s.sendMCPMsg("discovering", "", "", "")
-
 	case "done":
 		// All done — apply final results.
 		if evt.Errors != nil {

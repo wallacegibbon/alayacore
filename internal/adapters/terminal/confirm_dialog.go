@@ -175,19 +175,16 @@ func (cd *ConfirmDialog) OpenMCPInit() {
 	cd.canceled = false
 }
 
-// UpdateMCPInitProgress updates the description based on init phase and server list.
+// UpdateMCPInitProgress updates the description with the current server list.
 // Called when the session reports a new init progress event.
-func (cd *ConfirmDialog) UpdateMCPInitProgress(status string, servers []string) {
+func (cd *ConfirmDialog) UpdateMCPInitProgress(servers []string) {
 	if cd.kind != ConfirmMCPInit {
 		return
 	}
-	switch {
-	case status == "discovering":
-		cd.Description = "Discovering tools..."
-	case len(servers) > 0:
+	if len(servers) > 0 {
 		cd.Description = strings.Join(servers, ", ")
-	default:
-		// Keep existing description (set by OpenMCPInit or earlier call).
+	} else {
+		cd.Description = "Discovering tools..."
 	}
 }
 
