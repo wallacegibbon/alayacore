@@ -40,6 +40,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"sync/atomic"
 	"time"
@@ -156,21 +157,34 @@ func (s *Session) HasRejected() bool { return s.modelService.HasRejected() }
 // LoadOrNewSession loads a session from file or creates a new one.
 // Returns an error if the session file exists but has an incompatible version
 // (version must match MessageVersion exactly).
+// If the session file fails to load for other reasons (corrupt data, permissions),
+// a warning is printed to stderr and a new session is created.
 // The returned session is ready to use but NOT yet started —
 // call Start() to begin processing input.
 func LoadOrNewSession(cfg SessionConfig) (*Session, string, error) {
 	cfg.SessionFile = config.ExpandPath(cfg.SessionFile)
-	if cfg.SessionFile != "" {
-		if data, err := LoadSession(cfg.SessionFile); err == nil {
-			s := RestoreFromSession(cfg, data)
-			if replayErr := s.replayContentsToAdapter(); replayErr != nil {
-				s.modelService.SetInitError(replayErr)
-			}
-			return s, cfg.SessionFile, nil
-		} else if errors.Is(err, ErrSessionVersionMismatch) {
-			return nil, "", err
-		}
+	if cfg.SessionFile == "" {
+		return NewSession(cfg), cfg.SessionFile, nil
 	}
+
+	data, loadErr := LoadSession(cfg.SessionFile)
+	if loadErr == nil {
+		s := RestoreFromSession(cfg, data)
+		if replayErr := s.replayContentsToAdapter(); replayErr != nil {
+			s.modelService.SetInitError(replayErr)
+		}
+		return s, cfg.SessionFile, nil
+	}
+
+	if errors.Is(loadErr, ErrSessionVersionMismatch) {
+		return nil, "", loadErr
+	}
+
+	// Session file exists but can't be loaded (corrupt data,
+	// permission error, etc.). Log a warning and start fresh
+	// rather than failing entirely.
+	fmt.Fprintf(os.Stderr, "Warning: could not load session file %q: %v\n", cfg.SessionFile, loadErr)
+	fmt.Fprintf(os.Stderr, "Starting new session.\n")
 	return NewSession(cfg), cfg.SessionFile, nil
 }
 
