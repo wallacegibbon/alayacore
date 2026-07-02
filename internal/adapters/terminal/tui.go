@@ -327,6 +327,7 @@ func (m *Terminal) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 	m.themeSelector.SetSize(msg.Width, msg.Height)
 	m.helpWindow.SetSize(msg.Width, msg.Height)
 	m.confirmOverlay.SetSize(msg.Width, msg.Height)
+	m.mcpInitOverlay.SetSize(msg.Width, msg.Height)
 	m.updateDisplayHeight()
 
 	// Clamp cursor to valid bounds (windows may have been removed) but
