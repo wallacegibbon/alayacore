@@ -17,17 +17,24 @@ func TestStatusBarShowsLastMaxStepsOnError(t *testing.T) {
 
 	// Create terminal with the output writer
 	styles := DefaultStyles()
+	modelSelector := NewModelSelector(styles)
+	themeSelector := NewThemeSelector(styles)
+	helpWindow := NewHelpWindow(styles)
+	confirmOverlay := NewConfirmDialog(styles)
+	mcpInitOverlay := NewConfirmDialog(styles)
+	overlays := NewOverlayManager(modelSelector, themeSelector, helpWindow, confirmOverlay, mcpInitOverlay, styles)
 	terminal := &Terminal{
-		out:           out,
-		display:       NewDisplayModel(out.WindowBuffer(), styles),
-		input:         NewPromptInput(styles),
-		editor:        NewEditor(),
-		windowWidth:   80,
-		windowHeight:  24,
-		styles:        styles,
-		focusedWindow: "input",
-		hasFocus:      true,
+		out:          out,
+		display:      NewDisplayModel(out.WindowBuffer(), styles),
+		input:        NewPromptInput(styles),
+		editor:       NewEditor(),
+		overlays:     overlays,
+		windowWidth:  80,
+		windowHeight: 24,
+		styles:       styles,
+		hasFocus:     true,
 	}
+	terminal.overlays.SetFocusedWindow("input")
 
 	// Update status
 	terminal.updateStatus()
@@ -49,16 +56,22 @@ func TestStatusBarShowsCurrentStepsDuringProgress(t *testing.T) {
 
 	// Create terminal with the output writer
 	styles := DefaultStyles()
+	modelSelector := NewModelSelector(styles)
+	themeSelector := NewThemeSelector(styles)
+	helpWindow := NewHelpWindow(styles)
+	confirmOverlay := NewConfirmDialog(styles)
+	mcpInitOverlay := NewConfirmDialog(styles)
+	overlays := NewOverlayManager(modelSelector, themeSelector, helpWindow, confirmOverlay, mcpInitOverlay, styles)
 	terminal := &Terminal{
-		out:           out,
-		display:       NewDisplayModel(out.WindowBuffer(), styles),
-		input:         NewPromptInput(styles),
-		editor:        NewEditor(),
-		windowWidth:   80,
-		windowHeight:  24,
-		styles:        styles,
-		focusedWindow: "input",
-		hasFocus:      true,
+		out:          out,
+		display:      NewDisplayModel(out.WindowBuffer(), styles),
+		input:        NewPromptInput(styles),
+		editor:       NewEditor(),
+		overlays:     overlays,
+		windowWidth:  80,
+		windowHeight: 24,
+		styles:       styles,
+		hasFocus:     true,
 	}
 
 	// Update status

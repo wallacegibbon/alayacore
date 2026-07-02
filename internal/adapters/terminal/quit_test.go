@@ -28,11 +28,11 @@ func TestQuitCommandRequiresConfirm(t *testing.T) {
 	}
 
 	// Quit confirmation dialog should be shown
-	if !terminal.confirmOverlay.IsOpen() {
+	if !terminal.overlays.ConfirmOverlay().IsOpen() {
 		t.Fatal(":q should open confirm overlay")
 	}
-	if terminal.confirmOverlay.Kind() != ConfirmQuit {
-		t.Errorf(":q should set confirm overlay kind to ConfirmQuit, got %v", terminal.confirmOverlay.Kind())
+	if terminal.overlays.ConfirmOverlay().Kind() != ConfirmQuit {
+		t.Errorf(":q should set confirm overlay kind to ConfirmQuit, got %v", terminal.overlays.ConfirmOverlay().Kind())
 	}
 
 	// confirmFromCommand should be set to true
@@ -51,11 +51,11 @@ func TestQuitCommandCanceledClearsInput(t *testing.T) {
 	terminal.Update(msg)
 
 	// Verify dialog is shown
-	if !terminal.confirmOverlay.IsOpen() {
+	if !terminal.overlays.ConfirmOverlay().IsOpen() {
 		t.Fatalf("Expected confirm overlay to be open")
 	}
-	if terminal.confirmOverlay.Kind() != ConfirmQuit {
-		t.Fatalf("Expected ConfirmQuit dialog, got %v", terminal.confirmOverlay.Kind())
+	if terminal.overlays.ConfirmOverlay().Kind() != ConfirmQuit {
+		t.Fatalf("Expected ConfirmQuit dialog, got %v", terminal.overlays.ConfirmOverlay().Kind())
 	}
 
 	// Press 'n' to cancel
@@ -68,7 +68,7 @@ func TestQuitCommandCanceledClearsInput(t *testing.T) {
 	}
 
 	// Dialog should be closed
-	if terminal.confirmOverlay.IsOpen() {
+	if terminal.overlays.ConfirmOverlay().IsOpen() {
 		t.Errorf("Dialog should be closed after canceling")
 	}
 }
@@ -83,11 +83,11 @@ func TestQuitCommandEscapeCancels(t *testing.T) {
 	terminal.Update(msg)
 
 	// Verify dialog is shown
-	if !terminal.confirmOverlay.IsOpen() {
+	if !terminal.overlays.ConfirmOverlay().IsOpen() {
 		t.Fatalf("Expected confirm overlay to be open")
 	}
-	if terminal.confirmOverlay.Kind() != ConfirmQuit {
-		t.Fatalf("Expected ConfirmQuit dialog, got %v", terminal.confirmOverlay.Kind())
+	if terminal.overlays.ConfirmOverlay().Kind() != ConfirmQuit {
+		t.Fatalf("Expected ConfirmQuit dialog, got %v", terminal.overlays.ConfirmOverlay().Kind())
 	}
 
 	// Press Escape to cancel
@@ -100,7 +100,7 @@ func TestQuitCommandEscapeCancels(t *testing.T) {
 	}
 
 	// Dialog should be closed
-	if terminal.confirmOverlay.IsOpen() {
+	if terminal.overlays.ConfirmOverlay().IsOpen() {
 		t.Errorf("Dialog should be closed after canceling")
 	}
 }
@@ -115,11 +115,11 @@ func TestQuitCommandConfirmed(t *testing.T) {
 	terminal.Update(msg)
 
 	// Verify dialog is shown
-	if !terminal.confirmOverlay.IsOpen() {
+	if !terminal.overlays.ConfirmOverlay().IsOpen() {
 		t.Fatalf("Expected confirm overlay to be open")
 	}
-	if terminal.confirmOverlay.Kind() != ConfirmQuit {
-		t.Fatalf("Expected ConfirmQuit dialog, got %v", terminal.confirmOverlay.Kind())
+	if terminal.overlays.ConfirmOverlay().Kind() != ConfirmQuit {
+		t.Fatalf("Expected ConfirmQuit dialog, got %v", terminal.overlays.ConfirmOverlay().Kind())
 	}
 
 	// Press 'y' to confirm
@@ -161,11 +161,11 @@ func TestFullQuitCommandRequiresConfirm(t *testing.T) {
 	}
 
 	// Quit confirmation dialog should be shown
-	if !terminal.confirmOverlay.IsOpen() {
+	if !terminal.overlays.ConfirmOverlay().IsOpen() {
 		t.Fatal(":quit should open confirm overlay")
 	}
-	if terminal.confirmOverlay.Kind() != ConfirmQuit {
-		t.Errorf(":quit should set confirm overlay kind to ConfirmQuit, got %v", terminal.confirmOverlay.Kind())
+	if terminal.overlays.ConfirmOverlay().Kind() != ConfirmQuit {
+		t.Errorf(":quit should set confirm overlay kind to ConfirmQuit, got %v", terminal.overlays.ConfirmOverlay().Kind())
 	}
 
 	// confirmFromCommand should be set to true

@@ -97,13 +97,10 @@ type Terminal struct {
 	editor      *Editor
 
 	// UI components
-	display        DisplayModel
-	input          PromptInput
-	modelSelector  *ModelSelector
-	themeSelector  *ThemeSelector
-	themeManager   *ThemeManager
-	helpWindow     *HelpWindow
-	confirmOverlay *ConfirmDialog
+	display      DisplayModel
+	input        PromptInput
+	themeManager *ThemeManager
+	overlays     *OverlayManager
 
 	// Status bar state (simplified - no separate struct)
 	statusText string
@@ -111,8 +108,7 @@ type Terminal struct {
 
 	// State
 	quitting           bool
-	confirmFromCommand bool   // tracks if cancel came from :cancel command (vs Ctrl+G)
-	focusedWindow      string // "input" or "display"
+	confirmFromCommand bool // tracks if cancel came from :cancel command (vs Ctrl+G)
 	windowWidth        int
 	windowHeight       int
 	styles             *Styles
@@ -133,8 +129,6 @@ type Terminal struct {
 	// happened in handleRedraw, so resize()'s s.clear=true can take effect
 	// on the same flush.
 	pendingForceRedraw bool
-
-	mcpInitOverlay *ConfirmDialog
 
 	// Async session loading state.
 	// When true, Init() kicks off the loading in a goroutine and View()
@@ -158,36 +152,35 @@ func NewTerminalWithTheme(
 
 	editor := NewEditor()
 
+	modelSelector := NewModelSelector(styles)
+	themeSelector := NewThemeSelector(styles)
+	helpWindow := NewHelpWindow(styles)
+	confirmOverlay := NewConfirmDialog(styles)
+	mcpInitOverlay := NewConfirmDialog(styles)
+	overlays := NewOverlayManager(modelSelector, themeSelector, helpWindow, confirmOverlay, mcpInitOverlay, styles)
+
 	m := &Terminal{
-		out:            out,
-		streamInput:    inputWriter,
-		appConfig:      appCfg,
-		editor:         editor,
-		display:        NewDisplayModel(out.WindowBuffer(), styles),
-		input:          NewPromptInput(styles),
-		modelSelector:  NewModelSelector(styles),
-		themeSelector:  NewThemeSelector(styles),
-		themeManager:   themeManager,
-		helpWindow:     NewHelpWindow(styles),
-		confirmOverlay: NewConfirmDialog(styles),
-		mcpInitOverlay: NewConfirmDialog(styles),
-		windowWidth:    initialWidth,
-		windowHeight:   initialHeight,
-		styles:         styles,
-		focusedWindow:  "input",
-		hasFocus:       true,
-		activeTheme:    themeName,
-		appliedTheme:   themeName,
+		out:          out,
+		streamInput:  inputWriter,
+		appConfig:    appCfg,
+		editor:       editor,
+		display:      NewDisplayModel(out.WindowBuffer(), styles),
+		input:        NewPromptInput(styles),
+		themeManager: themeManager,
+		overlays:     overlays,
+		windowWidth:  initialWidth,
+		windowHeight: initialHeight,
+		styles:       styles,
+		hasFocus:     true,
+		activeTheme:  themeName,
+		appliedTheme: themeName,
 	}
 
 	// Initialize component widths
 	m.display.SetWidth(initialWidth)
 	m.input.SetWidth(initialWidth)
-	m.modelSelector.SetSize(initialWidth, initialHeight)
-	m.themeSelector.SetSize(initialWidth, initialHeight)
-	m.helpWindow.SetSize(initialWidth, initialHeight)
-	m.confirmOverlay.SetSize(initialWidth, initialHeight)
-	m.mcpInitOverlay.SetSize(initialWidth, initialHeight)
+	m.overlays.SetSize(initialWidth, initialHeight)
+	m.overlays.SetFocusedWindow(focusInput)
 	m.updateDisplayHeight()
 
 	return m
@@ -271,7 +264,7 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// sendSystemInfo("all") already wrote SM "model_list" to the
 		// output buffer during loading, so SnapshotModels is populated.
 		modelSnap := m.out.SnapshotModels()
-		return m, m.modelSelector.LoadModels(modelSnap.Models, modelSnap.ActiveID)
+		return m, m.overlays.ModelSelector().LoadModels(modelSnap.Models, modelSnap.ActiveID)
 
 	case sessionLoadingErrorMsg:
 		m.loading = false
@@ -323,11 +316,7 @@ func (m *Terminal) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 	m.out.SetWindowWidth(max(0, msg.Width))
 	m.display.SetWidth(max(0, msg.Width))
 	m.input.SetWidth(max(0, msg.Width))
-	m.modelSelector.SetSize(msg.Width, msg.Height)
-	m.themeSelector.SetSize(msg.Width, msg.Height)
-	m.helpWindow.SetSize(msg.Width, msg.Height)
-	m.confirmOverlay.SetSize(msg.Width, msg.Height)
-	m.mcpInitOverlay.SetSize(msg.Width, msg.Height)
+	m.overlays.SetSize(msg.Width, msg.Height)
 	m.updateDisplayHeight()
 
 	// Clamp cursor to valid bounds (windows may have been removed) but
@@ -376,38 +365,12 @@ func (m *Terminal) handleTick() (tea.Model, tea.Cmd) {
 // The confirm overlay (confirmOverlay) handles auth confirm and tool
 // confirm as temporary dialogs on top of the init overlay.
 func (m *Terminal) handleMCPOverlays() {
-	// 1. Done signal — close init overlay (one-shot).
-	if m.out.ConsumeMCPDone() {
-		if m.mcpInitOverlay.IsOpen() {
-			m.mcpInitOverlay.Close()
-			m.restoreFocusAfterConfirm()
-		}
-		return
+	action := m.overlays.HandleMCPProgress(m.out)
+	if action.CloseInitOverlay {
+		m.restoreFocusAfterConfirm()
 	}
-
-	// 2. Tool confirm (separate from MCP init).
-	if id, name, input, ok := m.out.GetPendingToolConfirm(); ok {
-		m.openConfirmTool(id, name, input)
-		return
-	}
-
-	// 3. MCP auth confirm — open confirm dialog on top of init overlay.
-	if server, url, ok := m.out.GetPendingMCPAuth(); ok {
-		m.openConfirmMCPAuth(server, url)
-		return
-	}
-
-	// 4. Init overlay — show for any active (non-empty, non-done) status.
-	// Stays open throughout init; Ctrl+G skips but does not dismiss it.
-	st := m.out.SnapshotStatus()
-	if st.MCPStatus != "" && st.MCPStatus != "done" {
-		if m.mcpInitOverlay.IsOpen() {
-			m.mcpInitOverlay.UpdateMCPInitProgress(st.MCPServers)
-			m.display.updateContent()
-		} else {
-			m.mcpInitOverlay.OpenMCPInit()
-			m.mcpInitOverlay.UpdateMCPInitProgress(st.MCPServers)
-		}
+	if action.InitOverlayActive || action.OpenedConfirm {
+		m.display.updateContent()
 	}
 }
 
@@ -429,7 +392,7 @@ func (m *Terminal) handleDisplayRefresh() tea.Cmd {
 	}
 
 	modelSnap := m.out.SnapshotModels()
-	return m.modelSelector.LoadModels(modelSnap.Models, modelSnap.ActiveID)
+	return m.overlays.ModelSelector().LoadModels(modelSnap.Models, modelSnap.ActiveID)
 }
 
 // handleEditorFinished handles completion of the external editor.
@@ -590,7 +553,7 @@ func (m *Terminal) View() tea.View {
 	sb.WriteString("\n")
 
 	// Input area (empty border when confirm overlay blocks input)
-	sb.WriteString(m.input.RenderWithBorder(m.confirmOverlay.IsOpen()))
+	sb.WriteString(m.input.RenderWithBorder(m.overlays.IsConfirmOpen()))
 
 	// Status bar (simplified - just render directly)
 	sb.WriteString("\n")
@@ -598,47 +561,16 @@ func (m *Terminal) View() tea.View {
 
 	baseContent := sb.String()
 
-	// Layer 1: Regular overlay windows (model selector, theme selector, help).
-	// These are mutually exclusive — only one can be open at a time.
-	overlayContent := baseContent
+	// Render all overlay layers through the overlay manager.
+	overlayContent, hasConfirm := m.overlays.Render(baseContent, m.windowWidth, m.windowHeight, m.forceRedraw&1 == 1)
 
-	switch {
-	case m.modelSelector.IsOpen():
-		overlayContent = m.modelSelector.RenderOverlay(baseContent, m.windowWidth, m.windowHeight)
-	case m.themeSelector.IsOpen():
-		overlayContent = m.themeSelector.RenderOverlay(baseContent, m.windowWidth, m.windowHeight)
-	case m.helpWindow.IsOpen():
-		overlayContent = m.helpWindow.RenderOverlay(baseContent, m.windowWidth, m.windowHeight)
-	}
-
-	// Layer 2: MCP init overlay — persistent, shows init/OAuth progress.
-	// Rendered behind the confirm dialog so it stays visible when the
-	// confirm dialog closes, eliminating the fragile close/reopen cycle.
-	if m.mcpInitOverlay.IsOpen() {
-		overlayContent = m.mcpInitOverlay.RenderOverlay(overlayContent, m.windowWidth, m.windowHeight)
-	}
-
-	// Layer 3: Confirm dialog — rendered ON TOP of everything, including
-	// the MCP init overlay.
-	// Confirm is a separate layer because it must be visible even when
-	// another overlay (e.g. model selector) is active, for example when
-	// a tool confirmation arrives while the model selector is open.
-	if m.confirmOverlay.IsOpen() {
-		fullContent := m.confirmOverlay.RenderOverlay(overlayContent, m.windowWidth, m.windowHeight)
-		// Toggle invisible suffix on Ctrl-R to force full repaint
-		if m.forceRedraw&1 == 1 {
-			fullContent += "\x1b[0m"
-		}
-		v := tea.NewView(fullContent)
+	if hasConfirm {
+		v := tea.NewView(overlayContent)
 		v.AltScreen = true
 		v.ReportFocus = true
 		return v
 	}
 
-	// Toggle invisible suffix on Ctrl-R to force full repaint
-	if m.forceRedraw&1 == 1 {
-		overlayContent += "\x1b[0m"
-	}
 	v := tea.NewView(overlayContent)
 	v.AltScreen = true
 	v.ReportFocus = true
@@ -717,7 +649,8 @@ var _ tea.Model = (*Terminal)(nil)
 
 // toggleFocus switches between display and input windows.
 func (m *Terminal) toggleFocus() {
-	if m.focusedWindow == focusDisplay {
+	fw := m.overlays.RestoreFocus()
+	if fw == focusDisplay {
 		m.focusInput()
 	} else {
 		m.focusDisplay()
@@ -727,14 +660,14 @@ func (m *Terminal) toggleFocus() {
 
 // focusInput switches focus to the input window.
 func (m *Terminal) focusInput() {
-	m.focusedWindow = focusInput
+	m.overlays.SetFocusedWindow(focusInput)
 	m.display.SetDisplayFocused(false)
 	m.input.Focus()
 }
 
 // focusDisplay switches focus to the display window.
 func (m *Terminal) focusDisplay() {
-	m.focusedWindow = focusDisplay
+	m.overlays.SetFocusedWindow(focusDisplay)
 	m.display.SetDisplayFocused(true)
 	m.input.Blur()
 	if m.display.GetWindowCursor() < 0 {
@@ -744,7 +677,8 @@ func (m *Terminal) focusDisplay() {
 
 // openModelSelector opens the model selector UI.
 func (m *Terminal) openModelSelector() {
-	m.modelSelector.Open()
+	m.overlays.SetFocusedWindow(m.overlays.RestoreFocus())
+	m.overlays.OpenModelSelector()
 	m.input.Blur()
 	m.display.SetDisplayFocused(false)
 	m.display.updateContent()
@@ -752,7 +686,8 @@ func (m *Terminal) openModelSelector() {
 
 // restoreFocus restores focus to the previously focused window after an overlay closes.
 func (m *Terminal) restoreFocus() {
-	if m.focusedWindow == focusDisplay {
+	fw := m.overlays.RestoreFocus()
+	if fw == focusDisplay {
 		m.focusDisplay()
 	} else {
 		m.focusInput()
@@ -765,8 +700,8 @@ func (m *Terminal) openThemeSelector() {
 	if m.themeManager == nil {
 		return
 	}
-
-	m.themeSelector.Open(m.themeManager.GetThemes(), m.activeTheme)
+	m.overlays.SetFocusedWindow(m.overlays.RestoreFocus())
+	m.overlays.OpenThemeSelector(m.themeManager.GetThemes(), m.activeTheme)
 	m.input.Blur()
 	m.display.SetDisplayFocused(false)
 	m.display.updateContent()
@@ -774,7 +709,8 @@ func (m *Terminal) openThemeSelector() {
 
 // openHelpWindow opens the help window UI.
 func (m *Terminal) openHelpWindow() {
-	m.helpWindow.Open()
+	m.overlays.SetFocusedWindow(m.overlays.RestoreFocus())
+	m.overlays.OpenHelpWindow()
 	m.input.Blur()
 	m.display.SetDisplayFocused(false)
 	m.display.updateContent()
@@ -782,7 +718,8 @@ func (m *Terminal) openHelpWindow() {
 
 // openConfirmQuit opens the quit confirmation dialog.
 func (m *Terminal) openConfirmQuit() {
-	m.confirmOverlay.OpenQuit()
+	m.overlays.SetFocusedWindow(m.overlays.RestoreFocus())
+	m.overlays.OpenConfirmQuit()
 	m.input.Blur()
 	m.display.SetDisplayFocused(false)
 	m.display.updateContent()
@@ -790,7 +727,8 @@ func (m *Terminal) openConfirmQuit() {
 
 // openConfirmCancel opens the cancel-task confirmation dialog.
 func (m *Terminal) openConfirmCancel() {
-	m.confirmOverlay.OpenCancel()
+	m.overlays.SetFocusedWindow(m.overlays.RestoreFocus())
+	m.overlays.OpenConfirmCancel()
 	m.input.Blur()
 	m.display.SetDisplayFocused(false)
 	m.display.updateContent()
@@ -798,15 +736,8 @@ func (m *Terminal) openConfirmCancel() {
 
 // openConfirmTool opens the tool-execution confirmation dialog.
 func (m *Terminal) openConfirmTool(id, toolName, toolInput string) {
-	m.confirmOverlay.OpenTool(id, toolName, toolInput)
-	m.input.Blur()
-	m.display.SetDisplayFocused(false)
-	m.display.updateContent()
-}
-
-// openConfirmMCPAuth opens the MCP OAuth authorization confirmation dialog.
-func (m *Terminal) openConfirmMCPAuth(serverName, serverURL string) {
-	m.confirmOverlay.OpenMCPAuth(serverName, serverURL)
+	m.overlays.SetFocusedWindow(m.overlays.RestoreFocus())
+	m.overlays.OpenConfirmTool(id, toolName, toolInput)
 	m.input.Blur()
 	m.display.SetDisplayFocused(false)
 	m.display.updateContent()
@@ -818,10 +749,7 @@ func (m *Terminal) applyTheme(theme *theme.Theme) {
 	m.out.SetStyles(m.styles)
 	m.display.SetStyles(m.styles)
 	m.input.SetStyles(m.styles)
-	m.modelSelector.SetStyles(m.styles)
-	m.themeSelector.SetStyles(m.styles)
-	m.helpWindow.SetStyles(m.styles)
-	m.confirmOverlay.SetStyles(m.styles)
+	m.overlays.SetStyles(m.styles)
 	m.display.updateContent()
 }
 
@@ -830,10 +758,7 @@ func (m *Terminal) handleBlur() (tea.Model, tea.Cmd) {
 	m.hasFocus = false
 	m.display.SetDisplayFocused(false)
 	m.input.Blur()
-	m.modelSelector.SetHasFocus(false)
-	m.themeSelector.SetHasFocus(false)
-	m.helpWindow.SetHasFocus(false)
-	m.confirmOverlay.SetHasFocus(false)
+	m.overlays.SetFocused(false)
 	m.display.updateContent()
 	return m, nil
 }
@@ -841,38 +766,22 @@ func (m *Terminal) handleBlur() (tea.Model, tea.Cmd) {
 // handleFocus handles gain of application focus.
 func (m *Terminal) handleFocus() (tea.Model, tea.Cmd) {
 	m.hasFocus = true
+	m.overlays.SetFocused(true)
 
-	m.modelSelector.SetHasFocus(true)
-	m.themeSelector.SetHasFocus(true)
-	m.helpWindow.SetHasFocus(true)
-	m.confirmOverlay.SetHasFocus(true)
-
-	if m.modelSelector.IsOpen() {
+	if m.overlays.ModelSelector().IsOpen() ||
+		m.overlays.ThemeSelector().IsOpen() ||
+		m.overlays.HelpWindow().IsOpen() ||
+		m.overlays.ConfirmOverlay().IsOpen() {
 		m.display.updateContent()
 		return m, nil
 	}
 
-	if m.themeSelector.IsOpen() {
-		m.display.updateContent()
-		return m, nil
-	}
-
-	if m.helpWindow.IsOpen() {
-		m.display.updateContent()
-		return m, nil
-	}
-
-	if m.confirmOverlay.IsOpen() {
-		m.display.updateContent()
-		return m, nil
-	}
-
-	if m.focusedWindow == focusDisplay {
+	fw := m.overlays.RestoreFocus()
+	if fw == focusDisplay {
 		m.focusDisplay()
 	} else {
 		m.focusInput()
 	}
 	m.display.updateContent()
-
 	return m, nil
 }
