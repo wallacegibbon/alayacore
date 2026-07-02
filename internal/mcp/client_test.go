@@ -198,15 +198,12 @@ func TestManagerEmpty(t *testing.T) {
 		t.Fatal("NewManager(nil) returned nil")
 	}
 
-	ctx := context.Background()
-	errs := m.ConnectAll(ctx)
-	if len(errs) != 0 {
-		t.Errorf("ConnectAll() errors = %v, want none", errs)
+	if n := m.ActiveServerCount(); n != 0 {
+		t.Errorf("ActiveServerCount() = %d, want 0", n)
 	}
 
-	tools := m.DiscoverTools(ctx)
-	if len(tools) != 0 {
-		t.Errorf("DiscoverTools() = %v, want empty", tools)
+	if c := m.Clients(); len(c) != 0 {
+		t.Errorf("Clients() = %d, want 0", len(c))
 	}
 
 	m.CloseAll()

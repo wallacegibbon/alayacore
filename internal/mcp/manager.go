@@ -3,7 +3,6 @@ package mcp
 import (
 	"context"
 	"fmt"
-	"sync"
 	"sync/atomic"
 
 	"github.com/alayacore/alayacore/internal/mcp/auth"
@@ -22,7 +21,6 @@ type Manager struct {
 }
 
 // NewManager creates an MCP manager from server configurations.
-// It does NOT connect to any servers — call ConnectAll to establish connections.
 func NewManager(configs []ServerConfig) *Manager {
 	m := &Manager{}
 	clients := make([]*Client, 0, len(configs))
@@ -44,100 +42,6 @@ func (m *Manager) loadClients() []*Client {
 		return nil
 	}
 	return clients
-}
-
-// ServerInstructions returns a map of server name → initialization
-// instructions for all connected servers that provided them.
-// These instructions can be injected into the system prompt to improve
-// the LLM's understanding of available tools and resources.
-func (m *Manager) ServerInstructions() map[string]string {
-	result := make(map[string]string)
-	for _, c := range m.loadClients() {
-		if c.State() != StateReady {
-			continue
-		}
-		if instr := c.Instructions(); instr != "" {
-			result[c.Name()] = instr
-		}
-	}
-	return result
-}
-
-// ConnectAll connects to all configured MCP servers and performs
-// initialization. Servers that fail to connect do not prevent others
-// from connecting.
-//
-// Returns a list of errors for failed connections so callers can
-// display warnings without aborting. Callers should display progress
-// information themselves.
-func (m *Manager) ConnectAll(ctx context.Context) []error {
-	var errs []error
-	for _, c := range m.loadClients() {
-		if err := c.Connect(ctx); err != nil {
-			errs = append(errs, fmt.Errorf("mcp server %q: %w", c.Name(), err))
-		}
-	}
-	return errs
-}
-
-// DiscoverTools collects all tools from all connected MCP servers.
-// Returns a map keyed by server name for disambiguation.
-// Failing servers are silently skipped; callers should log errors
-// externally if needed.
-func (m *Manager) DiscoverTools(ctx context.Context) map[string][]Tool {
-	return discoverConcurrent(ctx, m.loadClients(),
-		func(c *Client) bool { return c.HasTools() },
-		func(ctx context.Context, c *Client) ([]Tool, error) { return c.ListTools(ctx) },
-	)
-}
-
-// DiscoverResources collects all resources from all connected MCP servers.
-// Returns a map keyed by server name for disambiguation.
-// Failing servers are silently skipped.
-func (m *Manager) DiscoverResources(ctx context.Context) map[string][]Resource {
-	return discoverConcurrent(ctx, m.loadClients(),
-		func(c *Client) bool { return c.HasResources() },
-		func(ctx context.Context, c *Client) ([]Resource, error) { return c.ListResources(ctx) },
-	)
-}
-
-// DiscoverPrompts collects all prompts from all connected MCP servers.
-// Returns a map keyed by server name for disambiguation.
-// Failing servers are silently skipped.
-func (m *Manager) DiscoverPrompts(ctx context.Context) map[string][]Prompt {
-	return discoverConcurrent(ctx, m.loadClients(),
-		func(c *Client) bool { return c.HasPrompts() },
-		func(ctx context.Context, c *Client) ([]Prompt, error) { return c.ListPrompts(ctx) },
-	)
-}
-
-// discoverConcurrent is a generic helper that runs discovery across all
-// clients concurrently. It only considers clients that are StateReady and
-// pass the capability check. Each client is listed independently; failures
-// are silently skipped.
-func discoverConcurrent[T any](ctx context.Context, clients []*Client, hasCapability func(*Client) bool, list func(context.Context, *Client) ([]T, error)) map[string][]T {
-	result := make(map[string][]T)
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-
-	for _, c := range clients {
-		if c.State() != StateReady || !hasCapability(c) {
-			continue
-		}
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			items, err := list(ctx, c)
-			if err != nil || len(items) == 0 {
-				return
-			}
-			mu.Lock()
-			result[c.Name()] = items
-			mu.Unlock()
-		}()
-	}
-	wg.Wait()
-	return result
 }
 
 // CallTool invokes a tool on the specified server.
@@ -174,7 +78,7 @@ func (m *Manager) CloseAll() {
 	}
 
 	for _, c := range m.loadClients() {
-		c.Close() // errors are intentionally discarded — nothing to report at shutdown
+		c.Close()
 	}
 	m.clients.Store([]*Client(nil))
 }
