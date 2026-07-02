@@ -135,6 +135,10 @@ func (init *Init) Cancel() {
 // The session calls this when the user decides yes/no for a server.
 // Returns true if the response was accepted (init is still running
 // and waiting for this server's confirmation).
+//
+// confirmCh is buffered (capacity 1) and the receiver is always waiting
+// on it before the session can call Confirm(), so the send always
+// succeeds immediately. No timeout is needed.
 func (init *Init) Confirm(server string, allow bool) bool {
 	init.mu.Lock()
 	ch, ok := init.confirmChs[server]
@@ -142,12 +146,19 @@ func (init *Init) Confirm(server string, allow bool) bool {
 	if !ok {
 		return false
 	}
-	select {
-	case ch <- allow:
-		return true
-	default:
-		return false
-	}
+	ch <- allow
+	return true
+}
+
+// registerConfirmCh creates a buffered confirm channel for a server
+// and registers it in the map. The channel is created BEFORE sending
+// the "auth_confirm" event to avoid a race with Confirm().
+func (init *Init) registerConfirmCh(server string) chan bool {
+	ch := make(chan bool, 1)
+	init.mu.Lock()
+	init.confirmChs[server] = ch
+	init.mu.Unlock()
+	return ch
 }
 
 // ============================================================================
@@ -226,12 +237,12 @@ func (init *Init) collectOAuthResult(ctx context.Context, c *Client) serverResul
 	r.name = c.Name()
 
 	init.sendEvent(InitEvent{Type: InitConnecting, Server: c.Name()})
-	init.sendEvent(InitEvent{Type: InitAuthConfirm, Server: c.Name(), URL: c.config.URL})
 
-	confirmCh := make(chan bool, 1)
-	init.mu.Lock()
-	init.confirmChs[c.Name()] = confirmCh
-	init.mu.Unlock()
+	// Register the confirm channel BEFORE sending "auth_confirm" to avoid
+	// a race: the session may receive the event and call Confirm() before
+	// the channel is registered, causing Confirm() to return false silently.
+	confirmCh := init.registerConfirmCh(c.Name())
+	init.sendEvent(InitEvent{Type: InitAuthConfirm, Server: c.Name(), URL: c.config.URL})
 
 	var allow bool
 	select {
