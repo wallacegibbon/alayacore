@@ -1,0 +1,126 @@
+package terminal
+
+// Status bar: session state display (steps, tokens, switches).
+//
+// Extracted from tui.go. Owns statusText and inProgress state,
+// and provides rendering helpers.
+
+import (
+	"fmt"
+	"math"
+	"strings"
+
+	"github.com/alayacore/alayacore/internal/config"
+)
+
+// statusStepsSegment returns the steps status string, or "" if no activity.
+func statusStepsSegment(lastMaxSteps int, taskError bool, lastCurrentStep int, inProgress bool, currentStep int, maxSteps int) string {
+	if lastMaxSteps > 0 && taskError {
+		return fmt.Sprintf("%d/%d", lastCurrentStep, lastMaxSteps)
+	}
+	if inProgress && currentStep > 0 {
+		if maxSteps > 0 {
+			return fmt.Sprintf("%d/%d", currentStep, maxSteps)
+		}
+		return fmt.Sprintf("%d/INF", currentStep)
+	}
+	return ""
+}
+
+// renderStatusBar renders the status bar line.
+func (m *Terminal) renderStatusBar() string {
+	var indicator string
+	if m.inProgress {
+		indicator = m.styles.Status.Foreground(m.styles.ColorSuccess).Render("•")
+	} else {
+		indicator = m.styles.Status.Foreground(m.styles.ColorDim).Render("·")
+	}
+
+	if m.statusText != "" {
+		padding := m.styles.Status.Padding(0, 2)
+		return padding.Render(indicator + " " + m.statusText)
+	}
+	return m.styles.Status.Padding(0, 2).Render(indicator)
+}
+
+// formatTokenCount returns a compact human-readable representation of a
+// token count (e.g. 1500 → "1.5K", 1000000 → "1M").
+func formatTokenCount(n int64) string {
+	if n < 1_000 {
+		return fmt.Sprintf("%d", n)
+	}
+	if n < 1_000_000 {
+		v := float64(n) / 1_000
+		if v == math.Floor(v) {
+			return fmt.Sprintf("%.0fK", v)
+		}
+		return fmt.Sprintf("%.1fK", v)
+	}
+	v := float64(n) / 1_000_000
+	if v == math.Floor(v) {
+		return fmt.Sprintf("%.0fM", v)
+	}
+	return fmt.Sprintf("%.1fM", v)
+}
+
+// updateStatus updates the status bar state from the output writer.
+func (m *Terminal) updateStatus() {
+	snap := m.out.SnapshotStatus()
+
+	valStyle := m.styles.Status.Foreground(m.styles.ColorMuted)
+
+	// Build status segments - each rendered separately with appropriate colors
+	var segments []string
+
+	// Switch indicators segment (compact: "R1✦ F↓" in one segment)
+	var switches []string
+	if snap.ReasoningLevel > config.ReasoningLevelOff {
+		reasonStyle := m.styles.Status.Foreground(m.styles.ColorAccent).Bold(true)
+		switches = append(switches, reasonStyle.Render(fmt.Sprintf("R%d✦", snap.ReasoningLevel)))
+	}
+	if m.display.shouldFollow() {
+		switches = append(switches, valStyle.Render("F↓"))
+	}
+	if len(switches) > 0 {
+		segments = append(segments, strings.Join(switches, " "))
+	}
+
+	// Context segment
+	if snap.ContextTokens > 0 {
+		var ctxVal string
+		if snap.ContextLimit > 0 {
+			pct := float64(snap.ContextTokens) * 100.0 / float64(snap.ContextLimit)
+			ctxVal = fmt.Sprintf("%s/%s %.1f%%", formatTokenCount(snap.ContextTokens), formatTokenCount(snap.ContextLimit), pct)
+		} else {
+			ctxVal = formatTokenCount(snap.ContextTokens)
+		}
+		segments = append(segments, valStyle.Render(ctxVal))
+	}
+
+	// Steps segment (rightmost — show only when there's step activity)
+	if stepVal := statusStepsSegment(snap.LastMaxSteps, snap.TaskError, snap.LastCurrentStep,
+		snap.InProgress, snap.CurrentStep, snap.MaxSteps); stepVal != "" {
+		segments = append(segments, valStyle.Render(stepVal))
+	}
+
+	// Video config segment (last)
+	if fps := snap.VideoFPS; fps > 0 {
+		segments = append(segments, valStyle.Render(fmt.Sprintf("V:%d,%d", fps, snap.VideoRes)))
+	}
+
+	// Join segments with dimmed separator
+	var status string
+	if len(segments) > 0 {
+		separator := m.styles.Status.Render("|")
+		status = segments[0]
+		for i := 1; i < len(segments); i++ {
+			status += " " + separator + " " + segments[i]
+		}
+	}
+
+	m.statusText = status
+	m.inProgress = snap.InProgress
+
+	m.syncThemeFromSession(snap.ActiveTheme, snap.ActiveThemeData)
+	m.activeTheme = snap.ActiveTheme
+}
