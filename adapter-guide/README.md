@@ -434,7 +434,7 @@ uf-execute-command-failed.bin  UF \x00 15 \x00 {"id":"t5","output":[{"text":"com
 | `error` | `text` (string) | `sm-error.bin` |
 | `notify` | `text` (string) | `sm-notify.bin` |
 | `tool_confirm` | `id` (string), `allowed` (bool, opt — present only in adapter→agent response) | `sm-tool-confirm.bin` |
-| `mcp` | `status` (string: one of `connecting`, `connected`, `failed`, `auth_confirm`, `auth_running`, `auth_done`, `done`), `server` (string, opt), `url` (string, opt — set for `auth_confirm`), `error` (string, opt — set for `failed`) | `sm-mcp-connecting.bin`, `sm-mcp-connected.bin`, `sm-mcp-failed.bin`, `sm-mcp-auth-confirm.bin`, `sm-mcp-auth-running.bin`, `sm-mcp-auth-done.bin`, `sm-mcp-done.bin` |
+| `mcp` | `status` (string: one of `connecting`, `auth_confirm`, `auth_running`, `connected`, `failed`, `done`), `server` (string, opt), `url` (string, opt — set for `auth_confirm`), `error` (string, opt — set for `failed`) | `sm-mcp-connecting.bin`, `sm-mcp-auth-confirm.bin`, `sm-mcp-auth-running.bin`, `sm-mcp-connected.bin`, `sm-mcp-failed.bin`, `sm-mcp-done.bin` |
 
 Complete wire values:
 
@@ -452,11 +452,10 @@ sm-error.bin                   {"type":"error","data":{"text":"something broke"}
 sm-notify.bin                  {"type":"notify","data":{"text":"all good"}}
 sm-tool-confirm.bin            {"type":"tool_confirm","data":{"id":"t1"}}
 sm-mcp-connecting.bin          {"type":"mcp","data":{"status":"connecting","server":"github"}}
-sm-mcp-connected.bin           {"type":"mcp","data":{"status":"connected","server":"github"}}
-sm-mcp-failed.bin              {"type":"mcp","data":{"status":"failed","server":"github","error":"connection timeout"}}
 sm-mcp-auth-confirm.bin        {"type":"mcp","data":{"status":"auth_confirm","server":"github","url":"https://github.com/login/oauth/authorize"}}
 sm-mcp-auth-running.bin        {"type":"mcp","data":{"status":"auth_running","server":"github"}}
-sm-mcp-auth-done.bin           {"type":"mcp","data":{"status":"auth_done","server":"github"}}
+sm-mcp-connected.bin           {"type":"mcp","data":{"status":"connected","server":"github"}}
+sm-mcp-failed.bin              {"type":"mcp","data":{"status":"failed","server":"github","error":"connection timeout"}}
 sm-mcp-done.bin                {"type":"mcp","data":{"status":"done"}}
 ```
 

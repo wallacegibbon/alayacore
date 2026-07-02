@@ -393,7 +393,7 @@ func (to *outputWriter) handleSystemMCP(data json.RawMessage) {
 			to.status.updateMCPProgress("auth_confirm", msg.Server)
 			to.status.setMCPAuthPending(msg.Server, msg.URL)
 		}
-	case "auth_running", "auth_done":
+	case "auth_running":
 		to.status.updateMCPProgress(msg.Status, msg.Server)
 	case "done":
 		to.status.updateMCPProgress("done", "")

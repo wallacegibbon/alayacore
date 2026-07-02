@@ -116,7 +116,7 @@ func (s *Session) handleMCPEvent(evt *mcp.InitEvent) {
 		// Session must show confirm dialog — forward to adapter.
 		s.sendMCPMsg("auth_confirm", evt.Server, evt.URL, "")
 
-	case "auth_running", "auth_done":
+	case "auth_running":
 		// OAuth progress — forward to adapter.
 		s.sendMCPMsg(evt.Type, evt.Server, "", evt.Error)
 

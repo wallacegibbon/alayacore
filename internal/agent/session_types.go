@@ -88,12 +88,11 @@ func (VideoConfigMsg) SystemMsgType() string { return "video_config" }
 // The adapter uses these messages to show/hide init overlays.
 //
 // Status values (from InitEvent.Type):
-//   - "connecting":    connecting to Server
-//   - "connected":     Server connected and initialized
-//   - "failed":        connection failed
+//   - "connecting":    starting to connect a server (non-OAuth) or begins processing an OAuth server
+//   - "connected":     server connected and initialized (both non-OAuth and OAuth)
+//   - "failed":        connection or OAuth failed
 //   - "auth_confirm":  session needs user to authorize this server
 //   - "auth_running":  OAuth flow is running for this server
-//   - "auth_done":     OAuth completed for server
 //   - "done":          all MCP initialization complete
 type MCPMsg struct {
 	Status string `json:"status"`

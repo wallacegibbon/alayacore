@@ -31,12 +31,12 @@ import (
 // InitEvent covers everything that happens during MCP initialization.
 // The session receives these from Events() and reacts accordingly.
 type InitEvent struct {
-	Type   string // "connecting"|"connected"|"failed"|"auth_confirm"|"auth_running"|"auth_done"|"done"
+	Type   string // "connecting"|"connected"|"failed"|"auth_confirm"|"auth_running"|"done"
 	Server string
 	URL    string // set for "auth_confirm"
 	Error  string // set for "failed"
 
-	// Progress counters (set for "connecting"/"connected"/"failed"/"auth_running"/"auth_done")
+	// Progress counters (set for "connecting"/"connected"/"failed"/"auth_running")
 	Connected int
 	Skipped   int
 	Total     int
@@ -255,6 +255,10 @@ func (init *Init) oauthPhase(ctx context.Context, clients []*Client, connected, 
 		}
 		pending[c.Name()] = &pendingServer{client: c}
 		init.sendEvent(InitEvent{
+			Type: "connecting", Server: c.Name(),
+			Connected: connected, Skipped: skipped, Total: total,
+		})
+		init.sendEvent(InitEvent{
 			Type: "auth_confirm", Server: c.Name(), URL: c.config.URL,
 			Connected: connected, Skipped: skipped, Total: total,
 		})
@@ -280,7 +284,7 @@ func (init *Init) oauthPhase(ctx context.Context, clients []*Client, connected, 
 			} else {
 				skipped++
 				init.sendEvent(InitEvent{
-					Type: "auth_done", Server: req.Server, Error: "skipped",
+					Type: "failed", Server: req.Server, Error: "skipped",
 					Connected: connected, Skipped: skipped, Total: total,
 				})
 			}
@@ -317,21 +321,21 @@ func (init *Init) launchOAuth(_ context.Context, c *Client, connected, skipped, 
 			// User pressed Ctrl+G — clean cancel.
 			init.mu.Unlock()
 			init.sendEvent(InitEvent{
-				Type: "auth_done", Server: sa.Name(), Error: "skipped",
+				Type: "failed", Server: sa.Name(), Error: "skipped",
 				Connected: connected, Skipped: skipped, Total: total,
 			})
 		case err != nil:
 			init.authErrors = append(init.authErrors, fmt.Sprintf("MCP auth for %q: %v", sa.Name(), err))
 			init.mu.Unlock()
 			init.sendEvent(InitEvent{
-				Type: "auth_done", Server: sa.Name(), Error: err.Error(),
+				Type: "failed", Server: sa.Name(), Error: err.Error(),
 				Connected: connected, Skipped: skipped, Total: total,
 			})
 		default:
 			init.authTools[sa.Name()] = tools
 			init.mu.Unlock()
 			init.sendEvent(InitEvent{
-				Type: "auth_done", Server: sa.Name(),
+				Type: "connected", Server: sa.Name(),
 				Connected: connected, Skipped: skipped, Total: total,
 			})
 		}
