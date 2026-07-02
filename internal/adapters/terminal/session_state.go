@@ -44,7 +44,8 @@ type sessionState struct {
 	mcpStatus string
 
 	// Per-server init progress.
-	mcpServer string // current server being connected/authorized
+	mcpServer  string   // current server being connected/authorized
+	mcpServers []string // full list of servers currently being initialized
 
 	// pendingMCPAuths is a queue of MCP auth confirmations awaiting display.
 	// The Terminal tick handler pops them to open confirm dialogs one at a time.
@@ -176,6 +177,32 @@ func (s *sessionState) updateMCPProgress(status, server string) {
 	s.mu.Lock()
 	s.mcpStatus = status
 	s.mcpServer = server
+	switch status {
+	case "connecting":
+		// New init cycle — reset list if coming from idle/done state.
+		if s.mcpStatus == "" || s.mcpStatus == "done" {
+			s.mcpServers = nil
+		}
+		// Add to list if not already present.
+		found := false
+		for _, n := range s.mcpServers {
+			if n == server {
+				found = true
+				break
+			}
+		}
+		if !found {
+			s.mcpServers = append(s.mcpServers, server)
+		}
+	case "connected", "failed":
+		// Remove from list.
+		for i, n := range s.mcpServers {
+			if n == server {
+				s.mcpServers = append(s.mcpServers[:i], s.mcpServers[i+1:]...)
+				break
+			}
+		}
+	}
 	s.mu.Unlock()
 }
 
@@ -262,8 +289,9 @@ func (s *sessionState) snapshotStatus() StatusSnapshot {
 		ActiveThemeData: s.activeThemeData,
 		VideoFPS:        s.videoFPS,
 		VideoRes:        s.videoRes,
-		MCPStatus:       s.mcpStatus,
-		MCPServer:       s.mcpServer,
+		MCPStatus:  s.mcpStatus,
+		MCPServer:  s.mcpServer,
+		MCPServers: append([]string(nil), s.mcpServers...),
 	}
 }
 

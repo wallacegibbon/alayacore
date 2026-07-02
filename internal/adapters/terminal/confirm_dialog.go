@@ -175,14 +175,13 @@ func (cd *ConfirmDialog) OpenMCPInit() {
 	cd.canceled = false
 }
 
-// UpdateMCPInitProgress updates the description with the current server name.
+// UpdateMCPInitProgress updates the description with the current server list.
 // Called when the session reports a new init progress event.
-func (cd *ConfirmDialog) UpdateMCPInitProgress(server string) {
+func (cd *ConfirmDialog) UpdateMCPInitProgress(servers []string) {
 	if cd.kind != ConfirmMCPInit {
 		return
 	}
-	cd.toolName = server
-	cd.Description = server
+	cd.Description = strings.Join(servers, ", ")
 }
 
 // OpenTool opens the dialog for confirming a tool call.

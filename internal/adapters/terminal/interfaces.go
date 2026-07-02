@@ -38,7 +38,8 @@ type StatusSnapshot struct {
 	// Values: "" (no MCP), "connecting", "connected", "failed",
 	// "auth_confirm", "auth_running", "done".
 	MCPStatus string
-	MCPServer string // current server being connected/authorized
+	MCPServer string   // current server being connected/authorized
+	MCPServers []string // full list of servers currently being initialized
 }
 
 // ModelSnapshot holds a consistent point-in-time view of model state.

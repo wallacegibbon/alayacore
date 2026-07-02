@@ -401,11 +401,11 @@ func (m *Terminal) handleMCPOverlays() {
 	st := m.out.SnapshotStatus()
 	if st.MCPStatus != "" && st.MCPStatus != "done" {
 		if m.mcpInitOverlay.IsOpen() {
-			m.mcpInitOverlay.UpdateMCPInitProgress(st.MCPServer)
+			m.mcpInitOverlay.UpdateMCPInitProgress(st.MCPServers)
 			m.display.updateContent()
 		} else {
 			m.mcpInitOverlay.OpenMCPInit()
-			m.mcpInitOverlay.UpdateMCPInitProgress(st.MCPServer)
+			m.mcpInitOverlay.UpdateMCPInitProgress(st.MCPServers)
 		}
 	}
 }
