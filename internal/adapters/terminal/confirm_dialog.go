@@ -396,7 +396,7 @@ func (cd *ConfirmDialog) buildTitleText() string {
 // If it overflows, truncates and appends "...", then centers it.
 func (cd *ConfirmDialog) renderTitleLine(titleText string, innerWidth int) string {
 	styled := cd.styles.Confirm.Render(titleText)
-	wrapped := ansi.Hardwrap(styled, innerWidth, false)
+	wrapped := wrapContent(styled, innerWidth)
 	lines := strings.Split(wrapped, "\n")
 
 	line := lines[0]
@@ -406,13 +406,6 @@ func (cd *ConfirmDialog) renderTitleLine(titleText string, innerWidth int) strin
 			line = ansi.Truncate(line, limit, "")
 		}
 		line += "..."
-	}
-
-	// Ensure the line ends with an ANSI reset to prevent style bleeding
-	// into subsequent content (empty line, description rows, footer).
-	const ansiReset = "\033[0m"
-	if !strings.HasSuffix(line, ansiReset) {
-		line += ansiReset
 	}
 
 	w := lipgloss.Width(line)
