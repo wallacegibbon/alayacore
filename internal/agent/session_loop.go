@@ -164,19 +164,30 @@ func (s *Session) flushPendingEvents() {
 	}
 }
 
-// drainUntilTaskDone processes task events and completion signals until the
-// currently running task finishes. Also drains any remaining MCP events so
-// they aren't lost during shutdown.
+// drainUntilTaskDone processes task completion signals until the currently
+// running task finishes. Used during shutdown (input EOF) to let the active
+// task complete before the session exits.
+//
+// Priority: taskResultCh is checked first to avoid processing redundant
+// events when the task has already finished. taskRefreshCh is ignored
+// during shutdown since the UI is about to close anyway.
 func (s *Session) drainUntilTaskDone() {
 	for {
+		// Check taskResultCh first with priority to avoid unnecessary
+		// event processing when the task has already completed.
+		select {
+		case contents := <-s.taskResultCh:
+			s.handleTaskDone(contents)
+			return
+		default:
+		}
+
 		select {
 		case ev := <-s.taskEventCh:
 			s.handleTaskEvent(ev)
 		case contents := <-s.taskResultCh:
 			s.handleTaskDone(contents)
 			return
-		case <-s.taskRefreshCh:
-			s.sendSystemInfo("task")
 		case <-s.sessionCtx.Done():
 			return
 		}
