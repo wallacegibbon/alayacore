@@ -36,11 +36,6 @@ type InitEvent struct {
 	URL    string // set for "auth_confirm"
 	Error  string // set for "failed"
 
-	// Progress counters (set for "connecting"/"connected"/"failed"/"auth_running")
-	Connected int
-	Skipped   int
-	Total     int
-
 	// Set for "done" — fully converted results
 	Tools       []llm.Tool
 	SysFragment string
@@ -218,7 +213,6 @@ func (init *Init) connectPhase(ctx context.Context, clients []*Client, total int
 		}
 		init.sendEvent(InitEvent{
 			Type: "connecting", Server: c.Name(),
-			Connected: connected, Skipped: skipped, Total: total,
 		})
 		if err := init.connectWithSkip(connectCtx, c); err != nil {
 			if err == errSkipRequested {
@@ -226,14 +220,12 @@ func (init *Init) connectPhase(ctx context.Context, clients []*Client, total int
 			}
 			init.sendEvent(InitEvent{
 				Type: "failed", Server: c.Name(), Error: err.Error(),
-				Connected: connected, Skipped: skipped, Total: total,
 			})
 			continue
 		}
 		connected++
 		init.sendEvent(InitEvent{
 			Type: "connected", Server: c.Name(),
-			Connected: connected, Skipped: skipped, Total: total,
 		})
 	}
 	return connected, skipped
@@ -256,11 +248,9 @@ func (init *Init) oauthPhase(ctx context.Context, clients []*Client, connected, 
 		pending[c.Name()] = &pendingServer{client: c}
 		init.sendEvent(InitEvent{
 			Type: "connecting", Server: c.Name(),
-			Connected: connected, Skipped: skipped, Total: total,
 		})
 		init.sendEvent(InitEvent{
 			Type: "auth_confirm", Server: c.Name(), URL: c.config.URL,
-			Connected: connected, Skipped: skipped, Total: total,
 		})
 	}
 
@@ -285,7 +275,6 @@ func (init *Init) oauthPhase(ctx context.Context, clients []*Client, connected, 
 				skipped++
 				init.sendEvent(InitEvent{
 					Type: "failed", Server: req.Server, Error: "skipped",
-					Connected: connected, Skipped: skipped, Total: total,
 				})
 			}
 		case <-ctx.Done():
@@ -305,7 +294,6 @@ func (init *Init) launchOAuth(_ context.Context, c *Client, connected, skipped, 
 
 	init.sendEvent(InitEvent{
 		Type: "auth_running", Server: c.Name(),
-		Connected: connected, Skipped: skipped, Total: total,
 	})
 
 	go func(sa *ServerAuth, cancel context.CancelFunc) {
@@ -322,21 +310,18 @@ func (init *Init) launchOAuth(_ context.Context, c *Client, connected, skipped, 
 			init.mu.Unlock()
 			init.sendEvent(InitEvent{
 				Type: "failed", Server: sa.Name(), Error: "skipped",
-				Connected: connected, Skipped: skipped, Total: total,
 			})
 		case err != nil:
 			init.authErrors = append(init.authErrors, fmt.Sprintf("MCP auth for %q: %v", sa.Name(), err))
 			init.mu.Unlock()
 			init.sendEvent(InitEvent{
 				Type: "failed", Server: sa.Name(), Error: err.Error(),
-				Connected: connected, Skipped: skipped, Total: total,
 			})
 		default:
 			init.authTools[sa.Name()] = tools
 			init.mu.Unlock()
 			init.sendEvent(InitEvent{
 				Type: "connected", Server: sa.Name(),
-				Connected: connected, Skipped: skipped, Total: total,
 			})
 		}
 	}(sa, authCancel)
@@ -348,8 +333,7 @@ func (init *Init) launchOAuth(_ context.Context, c *Client, connected, skipped, 
 
 func (init *Init) discoverPhase(ctx context.Context, connected, skipped, total int) {
 	init.sendEvent(InitEvent{
-		Type:      "discovering",
-		Connected: connected, Skipped: skipped, Total: total,
+		Type: "discovering",
 	})
 
 	discoverCtx, discoverCancel := context.WithTimeout(ctx, 15*time.Second)
@@ -391,9 +375,6 @@ func (init *Init) discoverPhase(ctx context.Context, connected, skipped, total i
 		SysFragment: frag.String(),
 		Errors:      errs,
 		Manager:     init.manager,
-		Connected:   connected,
-		Skipped:     skipped,
-		Total:       total,
 	})
 }
 
