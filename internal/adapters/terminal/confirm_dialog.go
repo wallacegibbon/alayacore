@@ -408,6 +408,13 @@ func (cd *ConfirmDialog) renderTitleLine(titleText string, innerWidth int) strin
 		line += "..."
 	}
 
+	// Ensure the line ends with an ANSI reset to prevent style bleeding
+	// into subsequent content (empty line, description rows, footer).
+	const ansiReset = "\033[0m"
+	if !strings.HasSuffix(line, ansiReset) {
+		line += ansiReset
+	}
+
 	w := lipgloss.Width(line)
 	pad := max(0, (innerWidth-w)/2)
 	return strings.Repeat(" ", pad) + line + strings.Repeat(" ", innerWidth-w-pad)
