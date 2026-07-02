@@ -107,7 +107,8 @@ func (MCPMsg) SystemMsgType() string { return "mcp" }
 // Sent as the first TagSystemMsg frame so adapters can validate format
 // compatibility before processing subsequent messages.
 type MessageVersionMsg struct {
-	MessageVersion int `json:"message_version"`
+	MessageVersion int    `json:"message_version"`
+	CoreVersion    string `json:"core_version"`
 }
 
 func (MessageVersionMsg) SystemMsgType() string { return "version" }
