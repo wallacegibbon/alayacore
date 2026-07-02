@@ -275,6 +275,11 @@ func (t *StreamableHTTPTransport) SetAuthProvider(ap auth.TokenProvider) {
 	t.authProvider = ap
 }
 
+// DebugWriter returns the debug log writer, or nil if debug is not enabled.
+func (t *StreamableHTTPTransport) DebugWriter() io.Writer {
+	return t.debugWriter
+}
+
 // ============================================================================
 // GET SSE Stream (Server-to-Client Messages)
 // ============================================================================

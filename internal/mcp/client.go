@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -475,7 +473,9 @@ func (c *Client) handleNotification(method string) {
 
 // startGETStream starts a long-lived GET SSE stream for Streamable HTTP transport
 // to receive server-to-client messages (e.g. notifications). This is best-effort;
-// if the server does not support GET streams (405), it's silently ignored.
+// errors are non-fatal — the MCP client still works for tool calls, resource reads,
+// etc. via POST. Unexpected errors are written to the transport's debug log file
+// if --debug-mcp is enabled.
 func (c *Client) startGETStream() {
 	st, ok := c.loadTransport().(*StreamableHTTPTransport)
 	if !ok {
@@ -483,10 +483,8 @@ func (c *Client) startGETStream() {
 	}
 	// Use a background context; the stream is managed by the transport's Close().
 	if err := st.StartGETStream(context.Background(), st.handleServerRequest); err != nil {
-		// 405 Method Not Allowed is expected for servers that don't support GET streams.
-		// Other errors are unexpected but non-fatal — only log with --debug-mcp.
-		if !strings.Contains(err.Error(), "405") && c.config.Debug {
-			log.Printf("MCP: GET SSE stream failed for %q: %v", c.config.Name, err)
+		if c.config.Debug && st.DebugWriter() != nil {
+			fmt.Fprintf(st.DebugWriter(), "MCP: GET SSE stream failed for %q: %v\n", c.config.Name, err)
 		}
 	}
 }
