@@ -33,27 +33,29 @@
 //	     via a message channel.
 //
 //	The only mutable state accessed from more than one goroutine are:
-//	  - atomic fields for outputBroken, confirmCh, and mcpReady
+//	  - atomic fields for outputBroken and confirmCh
 //	  - A few buffered channels for cancellation, completion signaling,
 //	    and system-info refresh.
 //
-//	MCP initialization is managed by the Init struct (internal/mcp/init.go),
-//	which handles the entire lifecycle (connect, OAuth, discover) in a
-//	single goroutine. The session reads events from Init.Events() in its
-//	main loop and reacts accordingly — showing confirm dialogs for OAuth,
-//	applying tools on completion. Adapter communication goes through TLV
-//	frames.
+//	MCP initialization is managed by MCPService (internal/agent/mcp_service.go),
+//	which wraps mcp.Init and owns the ready flag. The session reads events
+//	from MCPService.Events() in its main loop and reacts accordingly —
+//	showing confirm dialogs for OAuth, applying tools on completion.
+//	Adapter communication goes through TLV frames.
 //
-//	All other session state (agent, provider, ContextTokens, ContextLimit,
-//	reasoningLevel, histCounter) is owned by a single goroutine and
-//	accessed without synchronization.
+//	All other session state (Contents, ContextTokens, ContextLimit,
+//	histCounter) is owned by a single goroutine and accessed without
+//	synchronization.
 //
 //	Cross-goroutine
 //	communication is exclusively through channels and atomics.
 //
 // Architecture Overview:
 //
-//	Session wires together the model, tools, IO streams, and managers.
+//	Session wires together the model service, tools, IO streams, and MCP.
+//	Sub-services (ModelService, MCPService, PersistenceService, CommandRegistry)
+//	own distinct concerns and are composed by the Session struct.
+//
 //	The active model is resolved by priority (highest first):
 //
 //	  --model CLI flag
@@ -67,14 +69,14 @@
 //
 //	  --model flag ──────────────────────┐
 //	                                     │
-//	  session file ──▶ SessionMeta ──────┤ override
+//	  session file ──▶ SessionMeta ──────┤ ModelService.ResolveActiveModel()
 //	                                     │
-//	  runtime.conf ──▶ RuntimeManager ───┤ active_model
+//	  runtime.conf ──▶ RuntimeManager ───┤
 //	                                     │
-//	  model.conf ────▶ ModelManager ─────┤ fallback
+//	  model.conf ────▶ ModelManager ─────┤
 //	                                     │
 //	                                     ▼
-//	                               Session.activeModel
+//	                               ModelService.ActiveModel()
 //
 // Communication Protocol:
 //
@@ -109,6 +111,10 @@
 //   - command_registry.go: Declarative command registration
 //   - model_manager.go: Model configuration management
 //   - runtime_manager.go: Runtime persistence
+//   - model_service.go: ModelService (provider/agent lifecycle, model resolution)
+//   - mcp_service.go: MCPService (MCP init lifecycle, event handling)
+//   - persistence.go: PersistenceService (session serialization)
+//   - command_registry.go: CommandRegistry (colon-command dispatch)
 //
 // Usage:
 //

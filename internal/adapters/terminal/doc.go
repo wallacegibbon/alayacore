@@ -23,7 +23,11 @@
 //
 // Key Files:
 //
-//   - tui.go: Main Terminal model, message routing, and status bar
+//   - tui.go: Main Terminal model, message routing, and core state
+//   - tui_focus.go: Focus management (input/display switching, blur/focus)
+//   - tui_status.go: Status bar rendering (tokens, steps, switches)
+//   - overlay_manager.go: OverlayManager (model selector, theme selector, help,
+//     confirm dialogs, MCP init overlay, 3-layer rendering)
 //   - keybinds.go: Declarative key binding configuration
 //   - output.go: TLV parsing and styled rendering
 //   - display.go: DisplayModel, virtual scrolling, and cursor navigation

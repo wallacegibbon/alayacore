@@ -25,7 +25,7 @@ package agent
 //     taskCancel (func call)         — run() → task (cancellation via cancelRunningTask)
 //     taskResultCh                   — task → run (full ContentParts list)
 //     taskRefreshCh                  — task → run() (best-effort system-info refresh; see session_output.go)
-//     mcpInit.Events()               — mcp.Init → run() (MCP init events: connect/OAuth/discover)
+//     mcpService.Events()            — MCPService → run() (MCP init events: connect/OAuth/discover)
 //
 // Related files:
 //   - session_types.go — type definitions (Task, SessionConfig, etc.)
@@ -87,7 +87,7 @@ type runState struct {
 	// mcpService drives the entire MCP initialization lifecycle.
 	// The run() goroutine reads from its Events() channel and reacts:
 	//   "auth_confirm" → shows dialog, calls mcpService.Confirm()
-	//   "done"         → applies tools, sets mcpReady
+	//   "done"         → applies tools, marks MCP ready
 	mcpService *MCPService
 }
 

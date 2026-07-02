@@ -26,9 +26,12 @@ The session layer manages conversation state, task execution, and model interact
 | Component | Description |
 |-----------|-------------|
 | `Session` | Main struct managing conversation state, message history, and task execution |
+| `ModelService` | Owns ModelManager, RuntimeManager, provider/agent creation, reasoning level, and model resolution |
+| `MCPService` | Owns MCP initialization lifecycle (connect, OAuth, discover, ready flag) |
+| `PersistenceService` | Handles session file I/O and markdown/TLV serialization |
+| `CommandRegistry` | Declarative command registration and dispatch for `:save`, `:cancel`, etc. |
 | `ModelManager` | Loads and manages AI model configurations from `model.conf`. Persists edits from `:model_sync` back to the file. |
 | `RuntimeManager` | Persists runtime settings (active model, active theme) to `runtime.conf` |
-| `CommandDefinitions` | Static metadata for session commands (`:save`, `:cancel`, etc.) |
 | `ContextTokens` | Tracks conversation context size across API calls. See [context-tracking.md](context-tracking.md). |
 
 #### Concurrency Model
