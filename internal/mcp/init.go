@@ -191,7 +191,9 @@ func (init *Init) run(ctx context.Context) {
 		return
 	}
 
-	init.buildFinalResults(results)
+	var evt InitEvent
+	init.buildFinalResults(results, &evt)
+	init.sendEvent(evt)
 }
 
 // collectServerResult handles the full lifecycle of a single server and
@@ -297,9 +299,10 @@ func (init *Init) discoverCapabilities(ctx context.Context, c *Client, r *server
 	}
 }
 
-// buildFinalResults builds the tools list and system prompt fragment
-// in config order (deterministic for provider caching), then sends "done".
-func (init *Init) buildFinalResults(results map[string]serverResult) {
+// buildFinalResults builds the tools list, system prompt fragment,
+// and error list in config order (deterministic for provider caching),
+// then writes them into evt.
+func (init *Init) buildFinalResults(results map[string]serverResult, evt *InitEvent) {
 	var allTools []llm.Tool
 	var allErrs []string
 	var frag strings.Builder
@@ -331,13 +334,11 @@ func (init *Init) buildFinalResults(results map[string]serverResult) {
 		}
 	}
 
-	init.sendEvent(InitEvent{
-		Type:        InitDone,
-		Tools:       allTools,
-		SysFragment: frag.String(),
-		Errors:      allErrs,
-		Manager:     init.manager,
-	})
+	evt.Type = InitDone
+	evt.Tools = allTools
+	evt.SysFragment = frag.String()
+	evt.Errors = allErrs
+	evt.Manager = init.manager
 }
 
 func formatResourceContext(frag *strings.Builder, name string, resources []Resource) {

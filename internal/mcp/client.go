@@ -114,7 +114,50 @@ func (c *Client) MarkStale(reason string) {
 // Connect establishes the transport and performs MCP initialization.
 // Returns an error if the connection or handshake fails.
 func (c *Client) Connect(ctx context.Context) error {
-	return c.connectLocked(ctx)
+	if !c.state.CompareAndSwap(int32(StateDisconnected), int32(StateConnecting)) {
+		return fmt.Errorf("mcp client %q: already connecting", c.config.Name)
+	}
+	defer func() {
+		c.state.CompareAndSwap(int32(StateConnecting), int32(StateFailed))
+		c.state.CompareAndSwap(int32(StateInitializing), int32(StateFailed))
+	}()
+
+	transport, err := c.createTransport()
+	if err != nil {
+		return err
+	}
+
+	// For authorization_code, try loading persisted token before skipping.
+	if c.needsPersistedAuth() {
+		transport.Close()
+		return ErrNeedsAuth
+	}
+
+	// Set up OAuth auth provider if configured.
+	if err := c.setupStreamableAuth(transport); err != nil {
+		transport.Close()
+		return err
+	}
+
+	c.storeTransport(transport)
+	c.setupNotificationHandler(transport)
+	c.state.Store(int32(StateInitializing))
+	if err := c.doInitialize(ctx); err != nil {
+		transport.Close()
+		return fmt.Errorf("mcp client %q: initialize: %w", c.config.Name, err)
+	}
+
+	// Set the negotiated protocol version on Streamable HTTP transport
+	// so it can include the MCP-Protocol-Version header on all subsequent
+	// HTTP requests (required by spec 2025-11-25).
+	if st, ok := transport.(*StreamableHTTPTransport); ok {
+		st.SetProtocolVersion(protocolVersion)
+	}
+
+	c.state.Store(int32(StateReady))
+	c.startGETStream()
+	c.startMonitor()
+	return nil
 }
 
 // doInitialize performs the MCP initialize/initialized handshake.
@@ -318,54 +361,6 @@ func (c *Client) Close() error {
 // Done returns a channel that closes when the client is shut down.
 func (c *Client) Done() <-chan struct{} {
 	return c.closedCh
-}
-
-// connectLocked is the inner connect logic.
-func (c *Client) connectLocked(ctx context.Context) error {
-	if !c.state.CompareAndSwap(int32(StateDisconnected), int32(StateConnecting)) {
-		return fmt.Errorf("mcp client %q: already connecting", c.config.Name)
-	}
-	defer func() {
-		c.state.CompareAndSwap(int32(StateConnecting), int32(StateFailed))
-		c.state.CompareAndSwap(int32(StateInitializing), int32(StateFailed))
-	}()
-
-	transport, err := c.createTransport()
-	if err != nil {
-		return err
-	}
-
-	// For authorization_code, try loading persisted token before skipping.
-	if c.needsPersistedAuth() {
-		transport.Close()
-		return ErrNeedsAuth
-	}
-
-	// Set up OAuth auth provider if configured.
-	if err := c.setupStreamableAuth(transport); err != nil {
-		transport.Close()
-		return err
-	}
-
-	c.storeTransport(transport)
-	c.setupNotificationHandler(transport)
-	c.state.Store(int32(StateInitializing))
-	if err := c.doInitialize(ctx); err != nil {
-		transport.Close()
-		return fmt.Errorf("mcp client %q initialize: %w", c.config.Name, err)
-	}
-
-	// Set the negotiated protocol version on Streamable HTTP transport
-	// so it can include the MCP-Protocol-Version header on all subsequent
-	// HTTP requests (required by spec 2025-11-25).
-	if st, ok := transport.(*StreamableHTTPTransport); ok {
-		st.SetProtocolVersion(protocolVersion)
-	}
-
-	c.state.Store(int32(StateReady))
-	c.startGETStream()
-	c.startMonitor()
-	return nil
 }
 
 // createTransport creates a Transport based on the server config.
