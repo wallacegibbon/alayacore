@@ -37,12 +37,8 @@ type StatusSnapshot struct {
 	// MCP init status — reflects the current phase of MCP initialization.
 	// Values: "" (no MCP), "connecting", "connected", "failed",
 	// "auth_confirm", "auth_running", "auth_done", "done".
-	MCPStatus    string
-	MCPServer    string // current server being connected/authorized
-	MCPServerURL string // URL for current server (set for auth_confirm)
-	MCPConnected int    // servers connected so far
-	MCPSkipped   int    // servers skipped by user
-	MCPTotal     int    // total servers
+	MCPStatus string
+	MCPServer string // current server being connected/authorized
 }
 
 // ModelSnapshot holds a consistent point-in-time view of model state.

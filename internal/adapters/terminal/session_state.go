@@ -44,11 +44,7 @@ type sessionState struct {
 	mcpStatus string
 
 	// Per-server init progress.
-	mcpServer    string // current server being connected/authorized
-	mcpServerURL string // URL for current server (set for auth_confirm)
-	mcpConnected int    // servers connected so far
-	mcpSkipped   int    // servers skipped by user
-	mcpTotal     int    // total servers
+	mcpServer string // current server being connected/authorized
 
 	// pendingMCPAuths is a queue of MCP auth confirmations awaiting display.
 	// The Terminal tick handler pops them to open confirm dialogs one at a time.
@@ -176,14 +172,10 @@ func (s *sessionState) updateVideoConfig(fps, res int) {
 // Called when the session sends an "mcp" system message with
 // status "connecting", "connected", "failed", "auth_confirm",
 // "auth_running", or "auth_done".
-func (s *sessionState) updateMCPProgress(status, server, url string, connected, skipped, total int) {
+func (s *sessionState) updateMCPProgress(status, server string) {
 	s.mu.Lock()
 	s.mcpStatus = status
 	s.mcpServer = server
-	s.mcpServerURL = url
-	s.mcpConnected = connected
-	s.mcpSkipped = skipped
-	s.mcpTotal = total
 	s.mu.Unlock()
 }
 
@@ -272,10 +264,6 @@ func (s *sessionState) snapshotStatus() StatusSnapshot {
 		VideoRes:        s.videoRes,
 		MCPStatus:       s.mcpStatus,
 		MCPServer:       s.mcpServer,
-		MCPServerURL:    s.mcpServerURL,
-		MCPConnected:    s.mcpConnected,
-		MCPSkipped:      s.mcpSkipped,
-		MCPTotal:        s.mcpTotal,
 	}
 }
 

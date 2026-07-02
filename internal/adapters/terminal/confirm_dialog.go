@@ -175,33 +175,14 @@ func (cd *ConfirmDialog) OpenMCPInit() {
 	cd.canceled = false
 }
 
-// UpdateMCPInitProgress updates the description with per-server progress.
+// UpdateMCPInitProgress updates the description with the current server name.
 // Called when the session reports a new init progress event.
-func (cd *ConfirmDialog) UpdateMCPInitProgress(server string, connected, skipped, total int) {
+func (cd *ConfirmDialog) UpdateMCPInitProgress(server string) {
 	if cd.kind != ConfirmMCPInit {
 		return
 	}
 	cd.toolName = server
-
-	// Build a concise progress summary.
-	// Examples:
-	//   "yardstick (2 ready / 4 total)"
-	//   "yardstick (2 ready, 1 skipped / 4 total)"
-	parts := make([]string, 0, 2)
-	if total > 0 {
-		parts = append(parts, fmt.Sprintf("%d ready", connected))
-	}
-	if skipped > 0 {
-		parts = append(parts, fmt.Sprintf("%d skipped", skipped))
-	}
-	summary := strings.Join(parts, ", ")
-	if total > 0 {
-		summary += fmt.Sprintf(" / %d total", total)
-	}
-	if summary != "" {
-		summary = " (" + summary + ")"
-	}
-	cd.Description = fmt.Sprintf("%s%s", server, summary)
+	cd.Description = server
 }
 
 // OpenTool opens the dialog for confirming a tool call.

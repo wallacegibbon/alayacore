@@ -376,13 +376,10 @@ func (to *outputWriter) handleSystemVideoConfig(data json.RawMessage) {
 // All MCP init progress (connecting, auth confirm, done) comes through here.
 func (to *outputWriter) handleSystemMCP(data json.RawMessage) {
 	var msg struct {
-		Status         string `json:"status"`
-		Server         string `json:"server,omitempty"`
-		URL            string `json:"url,omitempty"`
-		Error          string `json:"error,omitempty"`
-		ConnectedCount int    `json:"connected_count,omitempty"`
-		SkippedCount   int    `json:"skipped_count,omitempty"`
-		TotalCount     int    `json:"total_count,omitempty"`
+		Status string `json:"status"`
+		Server string `json:"server,omitempty"`
+		URL    string `json:"url,omitempty"`
+		Error  string `json:"error,omitempty"`
 	}
 	if json.Unmarshal(data, &msg) != nil {
 		return
@@ -390,16 +387,16 @@ func (to *outputWriter) handleSystemMCP(data json.RawMessage) {
 
 	switch msg.Status {
 	case "connecting", "connected", "failed":
-		to.status.updateMCPProgress(msg.Status, msg.Server, msg.URL, msg.ConnectedCount, msg.SkippedCount, msg.TotalCount)
+		to.status.updateMCPProgress(msg.Status, msg.Server)
 	case "auth_confirm":
 		if msg.Server != "" {
-			to.status.updateMCPProgress("auth_confirm", msg.Server, msg.URL, msg.ConnectedCount, msg.SkippedCount, msg.TotalCount)
+			to.status.updateMCPProgress("auth_confirm", msg.Server)
 			to.status.setMCPAuthPending(msg.Server, msg.URL)
 		}
 	case "auth_running", "auth_done":
-		to.status.updateMCPProgress(msg.Status, msg.Server, msg.URL, msg.ConnectedCount, msg.SkippedCount, msg.TotalCount)
+		to.status.updateMCPProgress(msg.Status, msg.Server)
 	case "done":
-		to.status.updateMCPProgress("done", "", "", 0, 0, 0)
+		to.status.updateMCPProgress("done", "")
 		// Note: takeMCPDone() is consumed by the Terminal tick handler
 		// via outputWriter.ConsumeMCPDone().
 	}

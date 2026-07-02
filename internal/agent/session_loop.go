@@ -87,7 +87,7 @@ func (s *Session) run() {
 				if !s.mcpReady.Load() {
 					s.mcpReady.Store(true)
 					s.writeError("MCP initialization canceled.")
-					s.sendMCPMsg("done", "", "", "", 0, 0, 0)
+					s.sendMCPMsg("done", "", "", "")
 				}
 				break
 			}
@@ -110,18 +110,15 @@ func (s *Session) handleMCPEvent(evt *mcp.InitEvent) {
 	switch evt.Type {
 	case "connecting", "connected", "failed":
 		// Forward to adapter for progress overlay.
-		s.sendMCPMsg(evt.Type, evt.Server, "", evt.Error,
-			evt.Connected, evt.Skipped, evt.Total)
+		s.sendMCPMsg(evt.Type, evt.Server, "", evt.Error)
 
 	case "auth_confirm":
 		// Session must show confirm dialog — forward to adapter.
-		s.sendMCPMsg("auth_confirm", evt.Server, evt.URL, "",
-			evt.Connected, evt.Skipped, evt.Total)
+		s.sendMCPMsg("auth_confirm", evt.Server, evt.URL, "")
 
 	case "auth_running", "auth_done":
 		// OAuth progress — forward to adapter.
-		s.sendMCPMsg(evt.Type, evt.Server, "", evt.Error,
-			evt.Connected, evt.Skipped, evt.Total)
+		s.sendMCPMsg(evt.Type, evt.Server, "", evt.Error)
 
 	case "done":
 		// All done — apply final results.
@@ -147,13 +144,13 @@ func (s *Session) handleMCPEvent(evt *mcp.InitEvent) {
 		}
 
 		s.mcpReady.Store(true)
-		s.sendMCPMsg("done", "", "", "", 0, 0, 0)
+		s.sendMCPMsg("done", "", "", "")
 		s.writeNotifyf("MCP servers initialized: %d servers, %d tools loaded",
 			evt.Manager.ActiveServerCount(), len(evt.Tools))
 
 	case "canceled":
 		s.mcpReady.Store(true)
-		s.sendMCPMsg("done", "", "", "", 0, 0, 0)
+		s.sendMCPMsg("done", "", "", "")
 		s.writeError("MCP initialization canceled.")
 	}
 }

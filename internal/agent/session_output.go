@@ -251,14 +251,11 @@ func (s *Session) sendVideoConfigMsg() {
 
 // sendMCPMsg sends an MCP initialization event to the adapter.
 // All MCP progress (connecting, auth, done) goes through this single method.
-func (s *Session) sendMCPMsg(status, server, url, errStr string, connected, skipped, total int) {
+func (s *Session) sendMCPMsg(status, server, url, errStr string) {
 	s.writeSystemMsg(MCPMsg{
-		Status:         status,
-		Server:         server,
-		URL:            url,
-		Error:          errStr,
-		ConnectedCount: connected,
-		SkippedCount:   skipped,
-		TotalCount:     total,
+		Status: status,
+		Server: server,
+		URL:    url,
+		Error:  errStr,
 	})
 }

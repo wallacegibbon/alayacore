@@ -96,14 +96,10 @@ func (VideoConfigMsg) SystemMsgType() string { return "video_config" }
 //   - "auth_done":     OAuth completed for server
 //   - "done":          all MCP initialization complete
 type MCPMsg struct {
-	Status         string `json:"status"`
-	Server         string `json:"server,omitempty"`
-	URL            string `json:"url,omitempty"`   // set for "auth_confirm"
-	Error          string `json:"error,omitempty"` // set for "failed"
-	ConnectedCount int    `json:"connected_count,omitempty"`
-	SkippedCount   int    `json:"skipped_count,omitempty"`
-	TotalCount     int    `json:"total_count,omitempty"`
-	ToolCount      int    `json:"tool_count,omitempty"`
+	Status string `json:"status"`
+	Server string `json:"server,omitempty"`
+	URL    string `json:"url,omitempty"`   // set for "auth_confirm"
+	Error  string `json:"error,omitempty"` // set for "failed"
 }
 
 func (MCPMsg) SystemMsgType() string { return "mcp" }
