@@ -191,7 +191,7 @@ func (init *Init) run(ctx context.Context) {
 		return
 	}
 
-	init.buildFinalResults(ctx, results)
+	init.buildFinalResults(results)
 }
 
 // collectServerResult handles the full lifecycle of a single server and
@@ -299,7 +299,7 @@ func (init *Init) discoverCapabilities(ctx context.Context, c *Client, r *server
 
 // buildFinalResults builds the tools list and system prompt fragment
 // in config order (deterministic for provider caching), then sends "done".
-func (init *Init) buildFinalResults(ctx context.Context, results map[string]serverResult) {
+func (init *Init) buildFinalResults(results map[string]serverResult) {
 	var allTools []llm.Tool
 	var allErrs []string
 	var frag strings.Builder
@@ -311,70 +311,72 @@ func (init *Init) buildFinalResults(ctx context.Context, results map[string]serv
 		}
 		allErrs = append(allErrs, r.errs...)
 
-		// Tools.
 		if len(r.tools) > 0 {
 			serverTools := ToolsToAgentTools(map[string][]Tool{cfg.Name: r.tools}, init.manager)
 			allTools = append(allTools, serverTools...)
 		}
 
-		// Resource read tool + system prompt.
 		if len(r.resources) > 0 {
 			allTools = append(allTools, newReadResourceTool(cfg.Name, init.manager))
-
-			frag.WriteString(fmt.Sprintf("\n\nAvailable resources from MCP server %q:", cfg.Name))
-			for _, res := range r.resources {
-				frag.WriteString(fmt.Sprintf("\n  - %s", res.URI))
-				if res.Name != "" {
-					frag.WriteString(fmt.Sprintf(" (name: %q", res.Name))
-					if res.Description != "" {
-						frag.WriteString(fmt.Sprintf(", description: %q", res.Description))
-					}
-					if res.MIMEType != "" {
-						frag.WriteString(fmt.Sprintf(", mimeType: %q", res.MIMEType))
-					}
-					frag.WriteString(")")
-				} else if res.Description != "" {
-					frag.WriteString(fmt.Sprintf(" (description: %q)", res.Description))
-				}
-			}
+			formatResourceContext(&frag, cfg.Name, r.resources)
 		}
 
-		// Prompt get tool + system prompt.
 		if len(r.prompts) > 0 {
 			allTools = append(allTools, newGetPromptTool(cfg.Name, init.manager))
-
-			frag.WriteString(fmt.Sprintf("\n\nAvailable prompts from MCP server %q:", cfg.Name))
-			for _, p := range r.prompts {
-				frag.WriteString(fmt.Sprintf("\n  - %s", p.Name))
-				if p.Description != "" {
-					frag.WriteString(fmt.Sprintf(" (description: %q)", p.Description))
-				}
-				if len(p.Arguments) > 0 {
-					frag.WriteString("\n    Arguments:")
-					for _, a := range p.Arguments {
-						required := ""
-						if a.Required {
-							required = " (required)"
-						}
-						frag.WriteString(fmt.Sprintf("\n      - %s: %s%s", a.Name, a.Description, required))
-					}
-				}
-			}
+			formatPromptContext(&frag, cfg.Name, r.prompts)
 		}
 
-		// Instructions.
 		if r.instrs != "" {
 			frag.WriteString(fmt.Sprintf("\n\nInstructions from MCP server %q:\n%s", cfg.Name, r.instrs))
 		}
 	}
 
 	init.sendEvent(InitEvent{
-		Type:        "done",
+		Type:        InitDone,
 		Tools:       allTools,
 		SysFragment: frag.String(),
 		Errors:      allErrs,
 		Manager:     init.manager,
 	})
+}
+
+func formatResourceContext(frag *strings.Builder, name string, resources []Resource) {
+	frag.WriteString(fmt.Sprintf("\n\nAvailable resources from MCP server %q:", name))
+	for _, r := range resources {
+		frag.WriteString(fmt.Sprintf("\n  - %s", r.URI))
+		if r.Name != "" {
+			frag.WriteString(fmt.Sprintf(" (name: %q", r.Name))
+			if r.Description != "" {
+				frag.WriteString(fmt.Sprintf(", description: %q", r.Description))
+			}
+			if r.MIMEType != "" {
+				frag.WriteString(fmt.Sprintf(", mimeType: %q", r.MIMEType))
+			}
+			frag.WriteString(")")
+		} else if r.Description != "" {
+			frag.WriteString(fmt.Sprintf(" (description: %q)", r.Description))
+		}
+	}
+}
+
+func formatPromptContext(frag *strings.Builder, name string, prompts []Prompt) {
+	frag.WriteString(fmt.Sprintf("\n\nAvailable prompts from MCP server %q:", name))
+	for _, p := range prompts {
+		frag.WriteString(fmt.Sprintf("\n  - %s", p.Name))
+		if p.Description != "" {
+			frag.WriteString(fmt.Sprintf(" (description: %q)", p.Description))
+		}
+		if len(p.Arguments) > 0 {
+			frag.WriteString("\n    Arguments:")
+			for _, a := range p.Arguments {
+				required := ""
+				if a.Required {
+					required = " (required)"
+				}
+				frag.WriteString(fmt.Sprintf("\n      - %s: %s%s", a.Name, a.Description, required))
+			}
+		}
+	}
 }
 
 // ============================================================================

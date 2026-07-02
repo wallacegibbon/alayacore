@@ -289,9 +289,9 @@ func (s *sessionState) snapshotStatus() StatusSnapshot {
 		ActiveThemeData: s.activeThemeData,
 		VideoFPS:        s.videoFPS,
 		VideoRes:        s.videoRes,
-		MCPStatus:  s.mcpStatus,
-		MCPServer:  s.mcpServer,
-		MCPServers: append([]string(nil), s.mcpServers...),
+		MCPStatus:       s.mcpStatus,
+		MCPServer:       s.mcpServer,
+		MCPServers:      append([]string(nil), s.mcpServers...),
 	}
 }
 
