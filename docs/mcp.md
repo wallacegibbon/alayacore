@@ -10,63 +10,91 @@ discovered and merged with AlayaCore's built-in tools (`read_file`,
 `write_file`, `execute_command`, etc.). The agent can use all of them
 transparently in the same tool-calling loop.
 
-## Quick Start
+## Configuration
+
+MCP servers are configured via the `mcp.conf` file in your config directory
+(`~/.alayacore/` by default). This is the only configuration method.
+
+```
+~/.alayacore/
+├── model.conf
+├── runtime.conf
+├── mcp.conf         # MCP server definitions
+└── themes/
+```
+
+### Format
+
+One block per server, separated by `---`:
+
+```
+server: my-db
+command: npx
+args: ["@anthropic/mcp-db-server"]
+---
+server: my-git
+command: uvx
+args: ["mcp-git"]
+---
+server: remote-api
+url: https://example.com/mcp
+---
+server: github
+url: https://api.githubcopilot.com/mcp/
+auth-type: authorization_code
+```
+
+### Fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `server` | Yes | Server name (used for tool naming: `{server}_tool`) |
+| `url` | One of url/command | MCP server HTTP endpoint (Streamable HTTP transport) |
+| `command` | One of url/command | Executable command for stdio transport |
+| `args` | No | JSON array of command-line arguments |
+| `env` | No | JSON object of environment variables (`{"KEY": "val"}`) |
+| `auth-type` | No | OAuth type: `authorization_code` or `static` |
+| `auth-scopes` | No | Comma-separated OAuth scopes (for `authorization_code` only) |
+| `auth-token` | No | Pre-obtained access token (for `static` auth only) |
+
+> **Note:** For `authorization_code` auth, AlayaCore uses **built-in OAuth client
+> credentials** for known services (e.g. GitHub Copilot). You typically only need
+> to set `auth-type: authorization_code`. If your service isn't supported, please
+> file an issue.
+>
+> For `static` auth, only `auth-token` is used (a pre-obtained API key or token).
+
+### Quick Start
+
+Create `~/.alayacore/mcp.conf` with your server definitions:
 
 ```bash
-# Connect to an MCP server via stdio
-alayacore --mcp-server "db=exec:npx @anthropic/mcp-db-server"
+# stdio transport
+cat >> ~/.alayacore/mcp.conf << 'EOF'
+server: my-db
+command: npx
+args: ["@anthropic/mcp-db-server"]
+---
+server: my-git
+command: uvx
+args: ["mcp-git"]
+EOF
 
-# Multiple servers
-alayacore --mcp-server "db=exec:npx @anthropic/mcp-db-server" \
-          --mcp-server "git=exec:uvx mcp-git"
-
-# Connect to a remote MCP server via Streamable HTTP
-alayacore --mcp-server "remote=https://example.com/mcp"
+# Streamable HTTP transport
+cat >> ~/.alayacore/mcp.conf << 'EOF'
+server: remote-api
+url: https://example.com/mcp
+EOF
 ```
+
+Then run `alayacore` normally. The servers are automatically connected
+and their tools are discovered at startup.
 
 ## CLI Flags
 
 | Flag | Description |
 |------|-------------|
-| `--mcp-server` | MCP server config. Can be specified multiple times. |
 | `--debug-mcp` | Log raw JSON-RPC messages to `alayacore-debug-mcp-N.log` |
-
-## `--mcp-server` Format
-
-Format: `name=value`
-
-### exec — Stdio Transport
-
-```
-name=exec:command arg1 arg2 ...
-```
-
-The server is spawned as a subprocess; JSON-RPC messages are sent/received
-over stdin/stdout as newline-delimited JSON (NDJSON).
-
-`KEY=VALUE` tokens before the command are treated as environment variables
-and passed to the subprocess (in addition to the current process environment):
-
-```bash
---mcp-server "db=exec:DB_HOST=localhost DB_PORT=5432 npx @anthropic/mcp-db-server"
---mcp-server "git=exec:GIT_DIR=/repo uvx mcp-git"
---mcp-server "search=exec:python /path/to/server.py --port 8080"
-```
-
-### Streamable HTTP Transport (2025-11-25)
-
-```
-name=https://url
-name=http://url
-```
-
-Connects to an MCP server using the Streamable HTTP transport (spec
-2025-11-25). The server provides a single HTTP endpoint for both POST
-and GET. Responses can be immediate JSON or SSE streams.
-
-```bash
---mcp-server "remote=https://example.com/mcp"
-```
 
 ## Tool Naming
 
@@ -77,7 +105,7 @@ built-in tools and between servers:
 <server>_<tool>
 ```
 
-For example, with `--mcp-server "db=exec:npx @anthropic/mcp-db-server"`:
+For example, with a server named `db` that exposes a `query` tool:
 
 | Original tool name | Prefixed name | Description |
 |--------------------|---------------|-------------|
@@ -117,9 +145,10 @@ Agent Loop
       └── Client "mcp" ─── StreamableHTTP  ─── https://example.com/mcp
 ```
 
-1. **Startup**: AlayaCore creates the appropriate transport for each
-   server (stdio, SSE, or Streamable HTTP), performs the MCP initialize
-   handshake, and calls `tools/list` to discover available tools.
+1. **Startup**: AlayaCore reads `mcp.conf`, creates the appropriate
+   transport for each server (stdio or Streamable HTTP), performs the
+   MCP initialize handshake, and calls `tools/list` to discover
+   available tools.
 
 2. **Tool registration**: Each discovered tool is wrapped as an
    `llm.Tool` with the prefixed name and wired to route calls back
@@ -155,7 +184,7 @@ Agent Loop
 Use `--debug-mcp` to log all JSON-RPC messages:
 
 ```bash
-alayacore --debug-mcp --mcp-server "db=exec:npx @anthropic/mcp-db-server"
+alayacore --debug-mcp
 ```
 
 This creates `alayacore-debug-mcp-N.log` (N = 0, 1, 2, ...) in the current

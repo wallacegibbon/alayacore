@@ -60,7 +60,7 @@ go install github.com/alayacore/alayacore@latest
 - 🖥️ **流式 TUI** — 实时输出，支持虚拟滚动、可折叠窗口和类 Vim 快捷键。
 - 📟 **Plain IO 模式** — `--plainio` 用于脚本和管道。无 TUI，仅 stdin/stdout。
 - 🔌 **Raw IO 模式** — `--rawio` 用于程序化控制。stdin/stdout 上的原始 TLV 帧。
-- 🔗 **MCP 支持** — 通过 `--mcp-server` 连接外部 [Model Context Protocol](https://modelcontextprotocol.io) 服务器，扩展数据库查询、API 访问、代码分析等能力。
+- 🔗 **MCP 支持** — 通过 `mcp.conf` 连接外部 [Model Context Protocol](https://modelcontextprotocol.io) 服务器，扩展数据库查询、API 访问、代码分析等能力。
 - 💾 **会话持久化** — 支持保存和恢复对话，使用 `--session` 时自动保存。
 - 🎯 **技能系统** — 可按照 [Agent Skills](https://agentskills.io) 规范扩展指令包来增强 Agent 能力。
 - 🎨 **主题** — 可自定义配色方案，支持实时切换。

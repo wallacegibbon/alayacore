@@ -116,7 +116,7 @@ func resolveAuthConfig(ctx context.Context, cfg *AuthConfig, serverURL string) (
 	}
 
 	// Resolve client_id from built-in registry only.
-	// Users should never need to configure auth-client-id for
+	// Users should never need to configure client_id for
 	// authorization_code — known services ship with built-in
 	// credentials, and unknown services should file an issue.
 	clientID, defaultSecret, ok := auth.LookupDefaultClient(meta.Issuer)

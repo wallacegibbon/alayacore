@@ -17,7 +17,7 @@ Messages use the standard Tag-Length-Value format:
 [2-byte tag][4-byte length (big-endian)][value bytes]
 ```
 
-See [TLV Protocol](adapter-architecture.md#tlv-protocol) for full details.
+See [TLV Protocol](internal/adapter-architecture.md#tlv-protocol) for full details.
 
 ## Input
 

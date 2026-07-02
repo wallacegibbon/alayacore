@@ -60,7 +60,7 @@ On first run, AlayaCore auto-creates a default model config at `~/.alayacore/mod
 - 🖥️ **Streaming TUI** — Real-time output with virtual scrolling, foldable windows, and vim-like keybindings.
 - 📟 **Plain IO mode** — `--plainio` for scripting and piping. No TUI, just stdin/stdout.
 - 🔌 **Raw IO mode** — `--rawio` for programmatic control. Raw TLV frames on stdin/stdout.
-- 🔗 **MCP support** — Connect to external [Model Context Protocol](https://modelcontextprotocol.io) servers for database queries, API access, code analysis, and more via `--mcp-server`.
+- 🔗 **MCP support** — Connect to external [Model Context Protocol](https://modelcontextprotocol.io) servers for database queries, API access, code analysis, and more via `mcp.conf`.
 - 💾 **Session persistence** — Save and resume conversations automatically when `--session` is specified.
 - 🎯 **Skills system** — Extend the agent with instruction packages following the [Agent Skills](https://agentskills.io) spec.
 - 🎨 **Themes** — Customizable color schemes with live switching.

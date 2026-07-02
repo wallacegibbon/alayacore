@@ -18,8 +18,7 @@ type DefaultClient struct {
 // truly protect a secret, so embedding it provides equivalent security
 // to requiring every user to register their own app and configure it.
 //
-// If your service is not listed here, users can provide their own
-// client_id in mcp.conf (auth-client-id).
+// If your service is not listed here, please file an issue to request support.
 var defaultClients = []DefaultClient{
 	{
 		Issuer:       "https://github.com",
