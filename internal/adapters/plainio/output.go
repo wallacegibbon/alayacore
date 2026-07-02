@@ -180,8 +180,8 @@ func (o *stdoutOutput) handleSystemMsg(value string) {
 	if err != nil {
 		return
 	}
-	switch env.Type {
-	case "error":
+	switch stream.SystemMsgType(env.Type) {
+	case stream.MsgTypeError:
 		var m struct {
 			Text string `json:"text"`
 		}
@@ -194,7 +194,7 @@ func (o *stdoutOutput) handleSystemMsg(value string) {
 				close(o.errorCh)
 			}
 		}
-	case "notify":
+	case stream.MsgTypeNotify:
 		var m struct {
 			Text string `json:"text"`
 		}
@@ -203,7 +203,7 @@ func (o *stdoutOutput) handleSystemMsg(value string) {
 			o.lastTag = ""
 			o.lastHistoryID = ""
 		}
-	case "task":
+	case stream.MsgTypeTask:
 		var m struct {
 			InProgress bool `json:"in_progress"`
 		}
@@ -215,7 +215,7 @@ func (o *stdoutOutput) handleSystemMsg(value string) {
 			}
 			o.inProgress.Store(m.InProgress)
 		}
-	case "tool_confirm":
+	case stream.MsgTypeToolConfirm:
 		var m struct {
 			ID string `json:"id"`
 		}

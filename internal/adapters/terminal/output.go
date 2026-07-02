@@ -237,28 +237,28 @@ func (to *outputWriter) handleSystemMsg(value string) {
 	if err != nil {
 		return
 	}
-	switch env.Type {
-	case "error":
+	switch stream.SystemMsgType(env.Type) {
+	case stream.MsgTypeError:
 		to.handleSystemError(env.Data)
-	case "notify":
+	case stream.MsgTypeNotify:
 		to.handleSystemNotify(env.Data)
-	case "task":
+	case stream.MsgTypeTask:
 		to.handleSystemTask(env.Data)
-	case "model":
+	case stream.MsgTypeModel:
 		to.handleSystemModel(env.Data)
-	case "model_list":
+	case stream.MsgTypeModelList:
 		to.handleSystemModelList(env.Data)
-	case "theme":
+	case stream.MsgTypeTheme:
 		to.handleSystemTheme(env.Data)
-	case "theme_list":
+	case stream.MsgTypeThemeList:
 		to.handleSystemThemeList(env.Data)
-	case "reasoning":
+	case stream.MsgTypeReasoning:
 		to.handleSystemReasoning(env.Data)
-	case "video_config":
+	case stream.MsgTypeVideoConfig:
 		to.handleSystemVideoConfig(env.Data)
-	case "tool_confirm":
+	case stream.MsgTypeToolConfirm:
 		to.handleSystemToolConfirm(env.Data)
-	case "mcp":
+	case stream.MsgTypeMCP:
 		to.handleSystemMCP(env.Data)
 	}
 	to.dirty.Store(true)

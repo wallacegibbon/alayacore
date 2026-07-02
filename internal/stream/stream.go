@@ -203,6 +203,25 @@ type ToolOutputData struct {
 // Wire format: {"type":"...","data":{...}}
 // ============================================================================
 
+// SystemMsgType constants identify the type field of a TagSystemMsg frame.
+// These are used by adapters to dispatch system messages without string literals.
+type SystemMsgType string
+
+const (
+	MsgTypeError       SystemMsgType = "error"
+	MsgTypeNotify      SystemMsgType = "notify"
+	MsgTypeTask        SystemMsgType = "task"
+	MsgTypeModel       SystemMsgType = "model"
+	MsgTypeModelList   SystemMsgType = "model_list"
+	MsgTypeTheme       SystemMsgType = "theme"
+	MsgTypeThemeList   SystemMsgType = "theme_list"
+	MsgTypeReasoning   SystemMsgType = "reasoning"
+	MsgTypeVideoConfig SystemMsgType = "video_config"
+	MsgTypeToolConfirm SystemMsgType = "tool_confirm"
+	MsgTypeMCP         SystemMsgType = "mcp"
+	MsgTypeVersion     SystemMsgType = "version"
+)
+
 // SystemMsg is implemented by all TagSystemMsg payloads.
 type SystemMsg interface {
 	SystemMsgType() string
