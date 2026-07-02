@@ -271,14 +271,6 @@ func (ms *ModelService) SetDebugProxy(debugAPI bool, proxyURL string) {
 	ms.proxyURL = proxyURL
 }
 
-// applyModelContextLimit updates the context limit from a model config.
-func (ms *ModelService) applyModelContextLimit(model *config.ModelConfig) {
-	if model == nil {
-		return
-	}
-	ms.contextLimit = int64(model.ContextLimit)
-}
-
 // ============================================================================
 // Provider/Agent Creation
 // ============================================================================

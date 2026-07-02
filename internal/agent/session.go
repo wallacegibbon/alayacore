@@ -46,7 +46,6 @@ import (
 
 	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/llm"
-	"github.com/alayacore/alayacore/internal/mcp"
 	"github.com/alayacore/alayacore/internal/skills"
 	"github.com/alayacore/alayacore/internal/stream"
 )
@@ -84,11 +83,11 @@ type runState struct {
 	taskResultCh  chan []llm.ContentPart
 	taskRefreshCh chan struct{}
 
-	// mcpInit drives the entire MCP initialization lifecycle.
+	// mcpService drives the entire MCP initialization lifecycle.
 	// The run() goroutine reads from its Events() channel and reacts:
-	//   "auth_confirm" → shows dialog, calls mcpInit.Confirm()
+	//   "auth_confirm" → shows dialog, calls mcpService.Confirm()
 	//   "done"         → applies tools, sets mcpReady
-	mcpInit *mcp.Init
+	mcpService *MCPService
 }
 
 // activeTaskStep returns the current step of the active task, or 0 if idle.
@@ -114,8 +113,6 @@ type sharedState struct {
 	confirmCh atomic.Pointer[chan<- llm.ToolConfirmResponse]
 
 	outputBroken atomic.Bool
-
-	mcpReady atomic.Bool // set to true after MCP init completes and tools are loaded
 }
 
 // Session manages conversation state and task execution.
@@ -212,12 +209,8 @@ func NewSession(cfg SessionConfig) *Session {
 		s.ContextLimit = s.modelService.ContextLimit()
 	}
 
-	// Start MCP init — the session manages init internally.
-	if cfg.MCPInit != nil {
-		s.mcpInit = cfg.MCPInit
-	} else {
-		s.mcpReady.Store(true)
-	}
+	// Set up MCP service (manages init lifecycle).
+	s.mcpService = NewMCPService(cfg.MCPInit, s.Output)
 
 	s.sendSystemInfo("all")
 	return s
@@ -258,12 +251,8 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 	s.initToolConfirmSet(cfg.ToolConfirmTools)
 	s.modelService.ResolveActiveModel()
 
-	// Start MCP init — the session manages init internally.
-	if cfg.MCPInit != nil {
-		s.mcpInit = cfg.MCPInit
-	} else {
-		s.mcpReady.Store(true)
-	}
+	// Set up MCP service (manages init lifecycle).
+	s.mcpService = NewMCPService(cfg.MCPInit, s.Output)
 
 	// Apply context limit from the resolved model so the status bar
 	// can show "tokens/limit (pct%)" immediately, before any API call.

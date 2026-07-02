@@ -475,7 +475,7 @@ func (s *Session) handlePrompt(contentParts []llm.ContentPart) {
 		return
 	}
 	// Wait for MCP initialization to complete before accepting prompts.
-	if !s.mcpReady.Load() {
+	if !s.mcpService.IsReady() {
 		s.writeError("MCP servers are still initializing or OAuth authorization is pending. " +
 			"Please wait for initialization to complete.")
 		return
@@ -496,12 +496,12 @@ func (s *Session) handlePrompt(contentParts []llm.ContentPart) {
 // the command directly. Cancels the entire MCP initialization.
 func (s *Session) handleMCPCancel() {
 	switch {
-	case s.mcpInit == nil:
+	case !s.mcpService.HasInit():
 		s.writeError("No MCP servers configured.")
-	case s.mcpReady.Load():
+	case s.mcpService.IsReady():
 		s.writeError("MCP initialization has already completed.")
 	default:
-		s.mcpInit.Cancel()
+		s.mcpService.Cancel()
 	}
 }
 
@@ -509,29 +509,28 @@ func (s *Session) handleMCPCancel() {
 //
 // Usage: :mcp_auth <server_name> yes|no
 //
-// Delegates to Init.Confirm() which unblocks the init goroutine so
+// Delegates to mcpService.Confirm() which unblocks the init goroutine so
 // it can proceed to the next server or launch OAuth.
-// Init.Confirm() returns true if the confirm request was accepted.
 func (s *Session) handleMCPAuth(_ context.Context, args string) {
 	name, action, _ := strings.Cut(args, " ")
 	if name == "" || action == "" {
 		s.writeError("usage: :mcp_auth <server_name> yes|no")
 		return
 	}
-	if s.mcpInit == nil {
+	if !s.mcpService.HasInit() {
 		s.writeError("No MCP servers configured.")
 		return
 	}
-	if s.mcpReady.Load() {
+	if s.mcpService.IsReady() {
 		s.writeError("MCP initialization has already completed.")
 		return
 	}
 	var accepted bool
 	switch action {
 	case "yes":
-		accepted = s.mcpInit.Confirm(name, true)
+		accepted = s.mcpService.Confirm(name, true)
 	case "no":
-		accepted = s.mcpInit.Confirm(name, false)
+		accepted = s.mcpService.Confirm(name, false)
 	default:
 		s.writeError("usage: :mcp_auth <server_name> yes|no")
 		return

@@ -29,16 +29,14 @@ import (
 //   - Task state changes (via task goroutine → taskEventCh)
 //   - Task completion signals (via taskResultCh)
 //   - System info refresh requests (via taskRefreshCh)
-//   - MCP initialization events (via mcpInit.Events())
+//   - MCP initialization events (via mcpService.Events())
 func (s *Session) run() {
 	defer close(s.runDoneCh)
 	defer s.sessionCancel()
 
 	// Start MCP initialization — the goroutine sends events that
-	// we read from mcpInit.Events() in the main select below.
-	if s.mcpInit != nil {
-		s.mcpInit.Start(s.sessionCtx)
-	}
+	// we read from mcpService.Events() in the main select below.
+	s.mcpService.Start(s.sessionCtx)
 
 	// Start the I/O pump goroutine.
 	s.inputMsgCh = make(chan inputMsg, 100)
@@ -46,10 +44,7 @@ func (s *Session) run() {
 
 	// Capture the MCP events channel once. When the channel is closed
 	// (init complete), we set mcpEvents to nil to disable the select case.
-	var mcpEvents <-chan mcp.InitEvent
-	if s.mcpInit != nil {
-		mcpEvents = s.mcpInit.Events()
-	}
+	mcpEvents := s.mcpService.Events()
 
 	for {
 		if s.sessionCtx.Err() != nil {
@@ -79,15 +74,11 @@ func (s *Session) run() {
 		case evt, ok := <-mcpEvents:
 			if !ok {
 				// Channel closed — disable this case permanently.
-				// If we never saw "done" or "canceled", the init was
-				// aborted without a clean notification (e.g. context
-				// canceled externally). Set mcpReady so the user
-				// can proceed.
 				mcpEvents = nil
-				if !s.mcpReady.Load() {
-					s.mcpReady.Store(true)
+				if !s.mcpService.IsReady() {
+					s.mcpService.MarkAborted()
 					s.writeError("MCP initialization canceled.")
-					s.sendMCPMsg("done", "", "", "")
+					s.mcpService.sendSystemMsg(&MCPMsgData{Status: "done"})
 				}
 				break
 			}
@@ -100,56 +91,44 @@ func (s *Session) run() {
 }
 
 // handleMCPEvent processes a single MCP initialization event.
-// Called from the main loop when an event arrives on mcpInit.Events().
+// Called from the main loop when an event arrives on mcpService.Events().
 func (s *Session) handleMCPEvent(evt *mcp.InitEvent) {
-	// Ignore stale events after init was canceled or completed.
-	if s.mcpReady.Load() {
+	action := s.mcpService.HandleEvent(evt)
+	if action == nil {
 		return
 	}
 
-	switch evt.Type {
-	case mcp.InitConnecting, mcp.InitConnected, mcp.InitFailed:
-		// Forward to adapter for progress overlay.
-		s.sendMCPMsg(string(evt.Type), evt.Server, "", evt.Error)
+	// Send system message to the UI (progress updates, auth prompts, etc.)
+	if action.SystemMsg != nil {
+		s.mcpService.sendSystemMsg(action.SystemMsg)
+	}
 
-	case mcp.InitAuthConfirm:
-		// Session must show confirm dialog — forward to adapter.
-		s.sendMCPMsg("auth_confirm", evt.Server, evt.URL, "")
+	// Log errors.
+	for _, e := range action.Errors {
+		s.writeError(fmt.Sprintf("MCP: %v", e))
+	}
 
-	case mcp.InitAuthRunning:
-		// OAuth progress — forward to adapter.
-		s.sendMCPMsg(string(evt.Type), evt.Server, "", evt.Error)
-
-	case mcp.InitDone:
-		// All done — apply final results.
-		if evt.Errors != nil {
-			for _, e := range evt.Errors {
-				s.writeError(fmt.Sprintf("MCP: %v", e))
-			}
+	// Apply InitDone results.
+	if action.ApplyResult {
+		if action.Manager != nil {
+			s.MCPManager = action.Manager
 		}
-		if evt.Manager != nil {
-			s.MCPManager = evt.Manager
+		if action.Tools != nil {
+			s.BaseTools = append(s.BaseTools, action.Tools...)
 		}
-		if evt.Tools != nil {
-			s.BaseTools = append(s.BaseTools, evt.Tools...)
+		if action.SysFragment != "" {
+			s.SystemPrompt += action.SysFragment
 		}
-		if evt.SysFragment != "" {
-			s.SystemPrompt += evt.SysFragment
-		}
-
 		// Recreate agent if it was already initialized.
 		if s.Agent() != nil {
 			s.modelService.Reset()
 		}
-
-		s.mcpReady.Store(true)
-		s.sendMCPMsg("done", "", "", "")
 		s.writeNotifyf("MCP servers initialized: %d servers, %d tools loaded",
-			evt.Manager.ActiveServerCount(), len(evt.Tools))
+			action.Manager.ActiveServerCount(), len(action.Tools))
+	}
 
-	case "canceled":
-		s.mcpReady.Store(true)
-		s.sendMCPMsg("done", "", "", "")
+	// Log abort messages.
+	if action.Aborted {
 		s.writeError("MCP initialization canceled.")
 	}
 }

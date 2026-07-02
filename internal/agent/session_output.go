@@ -243,14 +243,3 @@ func (s *Session) sendReasoningMsg() {
 func (s *Session) sendVideoConfigMsg() {
 	s.writeSystemMsg(VideoConfigMsg{FPS: s.modelService.VideoFPS(), Res: s.modelService.VideoRes()})
 }
-
-// sendMCPMsg sends an MCP initialization event to the adapter.
-// All MCP progress (connecting, auth, done) goes through this single method.
-func (s *Session) sendMCPMsg(status, server, url, errStr string) {
-	s.writeSystemMsg(MCPMsg{
-		Status: status,
-		Server: server,
-		URL:    url,
-		Error:  errStr,
-	})
-}
