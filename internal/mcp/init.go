@@ -163,7 +163,15 @@ func (init *Init) run(ctx context.Context) {
 			init.runServer(ctx, client)
 		}(c)
 	}
-	wg.Wait()
+
+	// Wait for all goroutines to finish, but don't block on shutdown.
+	doneCh := make(chan struct{})
+	go func() { wg.Wait(); close(doneCh) }()
+	select {
+	case <-doneCh:
+	case <-ctx.Done():
+		return
+	}
 
 	if ctx.Err() != nil {
 		return
