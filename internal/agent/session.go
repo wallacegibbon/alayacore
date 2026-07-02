@@ -54,15 +54,12 @@ import (
 // sessionConfig groups fields that are set once at construction and
 // never modified thereafter.
 type sessionConfig struct {
-	ModelManager   *ModelManager
-	RuntimeManager *RuntimeManager
-	SkillsManager  *skills.Manager
+	modelService  *ModelService
+	SkillsManager *skills.Manager
 
 	SessionConfig
 
-	initError        error  // set during construction if --model refers to a non-existent model
-	sessionMetaModel string // model name from session file frontmatter
-	toolConfirmSet   map[string]struct{}
+	toolConfirmSet map[string]struct{}
 }
 
 // taskHandle encapsulates the mutable state of a currently running task.
@@ -109,17 +106,10 @@ type sharedState struct {
 	ContextTokens int64 // last-known context token count; updated by run() from task events
 	ContextLimit  int64 // maximum context window size (input+output); set from model config
 
-	reasoningLevel int
-	videoFPS       int // default FPS for video attachments; 0 means provider default (2)
-	videoRes       int // default video resolution mode: 0 or 1
-
 	histCounter uint64
 
 	sessionCtx    context.Context
 	sessionCancel context.CancelFunc
-
-	agent    *llm.Agent
-	provider llm.Provider
 
 	confirmCh atomic.Pointer[chan<- llm.ToolConfirmResponse]
 
@@ -149,18 +139,18 @@ func (s *Session) Done() <-chan struct{} {
 
 // HasModels returns true if the model manager has at least one model.
 func (s *Session) HasModels() bool {
-	if s.ModelManager == nil {
-		return false
-	}
-	return s.ModelManager.HasModels()
+	return s.modelService.HasModels()
 }
 
 func (s *Session) ModelConfigPath() string {
-	if s.ModelManager == nil {
-		return ""
-	}
-	return s.ModelManager.GetFilePath()
+	return s.modelService.ModelConfigPath()
 }
+
+// GetLoadErrors returns model config parse/validation warnings.
+func (s *Session) GetLoadErrors() []string { return s.modelService.GetLoadErrors() }
+
+// HasRejected returns true if any model configs were rejected.
+func (s *Session) HasRejected() bool { return s.modelService.HasRejected() }
 
 // ============================================================================
 // Session Lifecycle
@@ -177,7 +167,7 @@ func LoadOrNewSession(cfg SessionConfig) (*Session, string, error) {
 		if data, err := LoadSession(cfg.SessionFile); err == nil {
 			s := RestoreFromSession(cfg, data)
 			if replayErr := s.replayContentsToAdapter(); replayErr != nil {
-				s.initError = replayErr
+				s.modelService.SetInitError(replayErr)
 			}
 			return s, cfg.SessionFile, nil
 		} else if errors.Is(err, ErrSessionVersionMismatch) {
@@ -191,12 +181,16 @@ func LoadOrNewSession(cfg SessionConfig) (*Session, string, error) {
 // call Start() to begin processing input.
 func NewSession(cfg SessionConfig) *Session {
 	ctx, cancel := context.WithCancel(context.Background())
+
+	modelService := NewModelService(NewModelManager(cfg.ModelConfigPath), NewRuntimeManager(cfg.RuntimeConfigPath))
+	modelService.SetOverrideModel(cfg.OverrideActiveModel)
+	modelService.SetDebugProxy(cfg.DebugAPI, cfg.ProxyURL)
+
 	s := &Session{
 		sessionConfig: sessionConfig{
-			ModelManager:   NewModelManager(cfg.ModelConfigPath),
-			RuntimeManager: NewRuntimeManager(cfg.RuntimeConfigPath),
-			SkillsManager:  cfg.SkillsMgr,
-			SessionConfig:  cfg,
+			modelService:  modelService,
+			SkillsManager: cfg.SkillsMgr,
+			SessionConfig: cfg,
 		},
 		runState: runState{
 			Contents:      make([]llm.ContentPart, 0),
@@ -211,13 +205,11 @@ func NewSession(cfg SessionConfig) *Session {
 		runDoneCh: make(chan struct{}),
 		CreatedAt: time.Now(),
 	}
-	s.reasoningLevel = config.DefaultReasoningLevel
 	s.initToolConfirmSet(cfg.ToolConfirmTools)
-	s.setActiveFromRuntimeConfig()
-	s.setActiveFromCliFlag()
+	s.modelService.ResolveActiveModel()
 
-	if model := s.ModelManager.GetActive(); model != nil {
-		s.applyModelContextLimit(model)
+	if model := s.modelService.ActiveModel(); model != nil {
+		s.ContextLimit = s.modelService.ContextLimit()
 	}
 
 	// Start MCP init — the session manages init internally.
@@ -235,13 +227,17 @@ func NewSession(cfg SessionConfig) *Session {
 // Does NOT start goroutines — call Start() to begin processing input.
 func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 	ctx, cancel := context.WithCancel(context.Background())
+
+	modelService := NewModelService(NewModelManager(cfg.ModelConfigPath), NewRuntimeManager(cfg.RuntimeConfigPath))
+	modelService.SetSessionMetaModel(data.ActiveModel)
+	modelService.SetOverrideModel(cfg.OverrideActiveModel)
+	modelService.SetDebugProxy(cfg.DebugAPI, cfg.ProxyURL)
+
 	s := &Session{
 		sessionConfig: sessionConfig{
-			ModelManager:     NewModelManager(cfg.ModelConfigPath),
-			RuntimeManager:   NewRuntimeManager(cfg.RuntimeConfigPath),
-			SkillsManager:    cfg.SkillsMgr,
-			SessionConfig:    cfg,
-			sessionMetaModel: data.ActiveModel,
+			modelService:  modelService,
+			SkillsManager: cfg.SkillsMgr,
+			SessionConfig: cfg,
 		},
 		runState: runState{
 			Contents:      data.Contents,
@@ -256,18 +252,11 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 		runDoneCh: make(chan struct{}),
 		CreatedAt: data.CreatedAt,
 	}
-	s.reasoningLevel = data.ReasoningLevel
-	s.videoFPS = data.VideoFPS
-	s.videoRes = data.VideoRes
 	s.ContextTokens = data.ContextTokens
 	s.histCounter = uint64(len(s.Contents))
 
 	s.initToolConfirmSet(cfg.ToolConfirmTools)
-	s.setActiveFromRuntimeConfig()
-	s.setActiveFromSessionMeta()
-
-	// --model CLI flag takes highest priority: override whatever was resolved above.
-	s.setActiveFromCliFlag()
+	s.modelService.ResolveActiveModel()
 
 	// Start MCP init — the session manages init internally.
 	if cfg.MCPInit != nil {
@@ -278,8 +267,8 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 
 	// Apply context limit from the resolved model so the status bar
 	// can show "tokens/limit (pct%)" immediately, before any API call.
-	if model := s.ModelManager.GetActive(); model != nil {
-		s.applyModelContextLimit(model)
+	if model := s.modelService.ActiveModel(); model != nil {
+		s.ContextLimit = s.modelService.ContextLimit()
 	}
 
 	s.sendSystemInfo("all")

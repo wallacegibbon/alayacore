@@ -177,37 +177,31 @@ func (s *Session) sendTaskMsg() {
 }
 
 func (s *Session) sendModelMsg() {
-	if s.ModelManager == nil {
-		return
-	}
-	activeID := s.ModelManager.GetActiveID()
-	activeName := ""
-	if activeModel := s.ModelManager.GetActive(); activeModel != nil {
-		activeName = activeModel.Name
-	}
+	ms := s.modelService
 	s.writeSystemMsg(ModelMsg{
-		ActiveModelID:   activeID,
-		ActiveModelName: activeName,
-		ContextLimit:    s.ContextLimit,
+		ActiveModelID:   ms.ActiveModelID(),
+		ActiveModelName: ms.ActiveModelName(),
+		ContextLimit:    ms.ContextLimit(),
 	})
 }
 
 // sendModelListMsg sends the full model list.
-// Called once on startup so adapters can populate the model selector.
 func (s *Session) sendModelListMsg() {
-	if s.ModelManager == nil {
+	ms := s.modelService
+	if !ms.HasModels() {
 		return
 	}
 	s.writeSystemMsg(ModelListMsg{
-		Models: s.ModelManager.GetModels(),
+		Models: ms.GetModels(),
 	})
 }
 
 func (s *Session) sendThemeMsg() {
-	if s.RuntimeManager == nil {
+	rm := s.modelService.RuntimeManager()
+	if rm == nil {
 		return
 	}
-	name := s.RuntimeManager.GetActiveTheme()
+	name := rm.GetActiveTheme()
 	s.writeSystemMsg(ThemeMsg{Name: name})
 }
 
@@ -243,11 +237,11 @@ func (s *Session) sendThemeListMsg() {
 }
 
 func (s *Session) sendReasoningMsg() {
-	s.writeSystemMsg(ReasoningMsg{Level: s.reasoningLevel})
+	s.writeSystemMsg(ReasoningMsg{Level: s.modelService.ReasoningLevel()})
 }
 
 func (s *Session) sendVideoConfigMsg() {
-	s.writeSystemMsg(VideoConfigMsg{FPS: s.videoFPS, Res: s.videoRes})
+	s.writeSystemMsg(VideoConfigMsg{FPS: s.modelService.VideoFPS(), Res: s.modelService.VideoRes()})
 }
 
 // sendMCPMsg sends an MCP initialization event to the adapter.

@@ -100,7 +100,7 @@ func TestLoadOrNewSession(t *testing.T) {
 	defer os.Remove(testFile) // Clean up test file
 
 	// Agent is lazily initialized, so it should be nil at startup
-	if session.agent != nil {
+	if session.Agent() != nil {
 		t.Error("Session agent should be nil at startup (lazy initialization)")
 	}
 }
@@ -387,7 +387,7 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 	session := &Session{
 		runState: runState{},
 		sessionConfig: sessionConfig{
-			ModelManager: NewModelManager(""),
+			modelService: NewModelService(NewModelManager(""), NewRuntimeManager("")),
 			SessionConfig: SessionConfig{
 				Input:  &stream.NopInput{},
 				Output: output,
@@ -407,7 +407,7 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 		APIKey:       "test-key",
 		ModelName:    "test-model",
 	}
-	session.ModelManager.models = append(session.ModelManager.models, testModel)
+	session.modelService.ModelManager().models = append(session.modelService.ModelManager().models, testModel)
 
 	// Test 1: model_set should work when no task is running.
 	// Dispatch through handleInputMsg (the real entry point) so the

@@ -65,7 +65,7 @@ func StartSession(cfg *Config, output io.Writer, input *stream.SliceBuffer) (*ag
 	// Display config validation messages (unknown protocol_type, missing fields, etc.)
 	// Must come before HasModels() check so specific errors are shown even when
 	// all models are rejected.
-	if msgs := session.ModelManager.GetLoadErrors(); len(msgs) > 0 {
+	if msgs := session.GetLoadErrors(); len(msgs) > 0 {
 		for _, m := range msgs {
 			fmt.Fprintf(os.Stderr, "%s\n", m)
 		}
@@ -78,7 +78,7 @@ func StartSession(cfg *Config, output io.Writer, input *stream.SliceBuffer) (*ag
 
 	// Check if we have any models available.
 	if !session.HasModels() {
-		return nil, nil, fmt.Errorf("%s", agentpkg.NoModelsErrorMessage(session.ModelConfigPath(), session.ModelManager.HasRejected()))
+		return nil, nil, fmt.Errorf("%s", agentpkg.NoModelsErrorMessage(session.ModelConfigPath(), session.HasRejected()))
 	}
 
 	// Start the session's run() goroutine.

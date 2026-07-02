@@ -54,7 +54,8 @@ func (s *Session) saveSession(args string) {
 }
 
 func (s *Session) handleModelSet(args string) {
-	if s.ModelManager == nil {
+	mm := s.modelService.ModelManager()
+	if mm == nil {
 		s.writeError("model manager not initialized")
 		return
 	}
@@ -69,13 +70,13 @@ func (s *Session) handleModelSet(args string) {
 		s.writeError(fmt.Sprintf("model_set: invalid model ID: %s", args))
 		return
 	}
-	model := s.ModelManager.GetModel(modelID)
+	model := mm.GetModel(modelID)
 	if model == nil {
 		s.writeError(fmt.Sprintf("model_set: model not found: %d", modelID))
 		return
 	}
 
-	if err := s.ModelManager.SetActive(modelID); err != nil {
+	if err := mm.SetActive(modelID); err != nil {
 		s.writeError(err.Error())
 		return
 	}
@@ -84,9 +85,9 @@ func (s *Session) handleModelSet(args string) {
 	// preference in-memory (saved to the session file on :save), while
 	// sessions without one write to the global runtime.conf.
 	if s.SessionFile != "" {
-		s.sessionMetaModel = model.Name
-	} else if s.RuntimeManager != nil {
-		if err := s.RuntimeManager.SetActiveModel(model.Name); err != nil {
+		s.modelService.SetSessionMetaModel(model.Name)
+	} else if rm := s.modelService.RuntimeManager(); rm != nil {
+		if err := rm.SetActiveModel(model.Name); err != nil {
 			s.writeNotifyf("Failed to persist model switch: %v", err)
 		}
 	}
@@ -98,39 +99,35 @@ func (s *Session) handleModelSet(args string) {
 }
 
 func (s *Session) handleModelLoad() {
-	if s.ModelManager == nil {
+	mm := s.modelService.ModelManager()
+	if mm == nil {
 		s.writeError("model manager not initialized")
 		return
 	}
 
-	path := s.ModelManager.GetFilePath()
+	path := mm.GetFilePath()
 	if path == "" {
 		s.writeError("no model file path configured")
 		return
 	}
 
-	if err := s.ModelManager.LoadFromFile(path); err != nil {
+	if err := mm.LoadFromFile(path); err != nil {
 		s.writeError(fmt.Sprintf("model_load: failed to load models: %v", err))
 		return
 	}
 
 	// Report validation messages (unknown protocol_type, missing fields, etc.)
-	if msgs := s.ModelManager.GetLoadErrors(); len(msgs) > 0 {
+	if msgs := mm.GetLoadErrors(); len(msgs) > 0 {
 		for _, m := range msgs {
 			s.writeError(m)
 		}
 	}
 
-	// Re-resolve the active model using the standard priority chain:
-	// runtime.conf → session file frontmatter → --model CLI flag.
-	s.setActiveFromRuntimeConfig()
-	s.setActiveFromSessionMeta()
-	s.setActiveFromCliFlag()
+	// Re-resolve the active model using the standard priority chain.
+	s.modelService.ResolveActiveModel()
 
-	// Re-initialize the provider/agent with the (potentially edited)
-	// model config. This ensures that changes made to the active model's
-	// settings (base_url, api_key, model_name, etc.) take effect immediately.
-	if model := s.ModelManager.GetActive(); model != nil {
+	// Re-initialize the provider/agent with the (potentially edited) model config.
+	if model := mm.GetActive(); model != nil {
 		if err := s.SwitchModel(model); err != nil {
 			s.writeError("Failed to reinitialize model after reload: " + err.Error())
 		}
@@ -143,7 +140,8 @@ func (s *Session) handleModelLoad() {
 // editor session. The JSON is received as a single string (cut on first
 // space), so string values with spaces (e.g. model names) are preserved.
 func (s *Session) handleModelSync(args string) {
-	if s.ModelManager == nil {
+	mm := s.modelService.ModelManager()
+	if mm == nil {
 		s.writeError("model manager not initialized")
 		return
 	}
@@ -153,7 +151,7 @@ func (s *Session) handleModelSync(args string) {
 		return
 	}
 
-	msgs := s.ModelManager.SyncFromContent(args)
+	msgs := mm.SyncFromContent(args)
 
 	// Report validation messages
 	for _, m := range msgs {
@@ -161,13 +159,10 @@ func (s *Session) handleModelSync(args string) {
 	}
 
 	// Re-resolve the active model
-	s.setActiveFromRuntimeConfig()
-	s.setActiveFromSessionMeta()
-	s.setActiveFromCliFlag()
+	s.modelService.ResolveActiveModel()
 
-	// Re-initialize the provider/agent with the (potentially edited)
-	// model config
-	if model := s.ModelManager.GetActive(); model != nil {
+	// Re-initialize the provider/agent with the (potentially edited) model config
+	if model := mm.GetActive(); model != nil {
 		if err := s.SwitchModel(model); err != nil {
 			s.writeError("Failed to reinitialize model after sync: " + err.Error())
 		}
@@ -231,8 +226,8 @@ func (s *Session) handleThemeSet(args string) {
 		}
 	}
 
-	if s.RuntimeManager != nil {
-		if err := s.RuntimeManager.SetActiveTheme(name); err != nil {
+	if s.modelService.RuntimeManager() != nil {
+		if err := s.modelService.RuntimeManager().SetActiveTheme(name); err != nil {
 			s.writeNotifyf("Failed to persist theme switch: %v", err)
 		}
 	}

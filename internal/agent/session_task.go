@@ -178,7 +178,7 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.ContentPart) 
 
 	var fullContents []llm.ContentPart
 
-	_, err := s.agent.Stream(ctx, history, llm.StreamCallbacks{
+	_, err := s.Agent().Stream(ctx, history, llm.StreamCallbacks{
 		OnTextDelta: func(delta string, historyID uint64) error {
 			s.writeTLVWithID(stream.TagAssistantT, historyID, delta)
 			return nil

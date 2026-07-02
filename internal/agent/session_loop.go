@@ -138,9 +138,8 @@ func (s *Session) handleMCPEvent(evt *mcp.InitEvent) {
 		}
 
 		// Recreate agent if it was already initialized.
-		if s.agent != nil {
-			s.agent = nil
-			s.provider = nil
+		if s.Agent() != nil {
+			s.modelService.Reset()
 		}
 
 		s.mcpReady.Store(true)

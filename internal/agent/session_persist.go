@@ -25,15 +25,23 @@ func LoadSession(path string) (*SessionData, error) {
 
 // saveContentToFile saves the current session's contents with its metadata.
 func (s *Session) saveContentToFile(path string, contents []llm.ContentPart) error {
+	reasoningLevel := 0
+	videoFPS := 0
+	videoRes := 0
+	if s.modelService != nil {
+		reasoningLevel = s.modelService.ReasoningLevel()
+		videoFPS = s.modelService.VideoFPS()
+		videoRes = s.modelService.VideoRes()
+	}
 	meta := SessionMeta{
 		CreatedAt:      s.CreatedAt,
 		UpdatedAt:      time.Now(),
 		ActiveModel:    s.activeModelName(),
 		MessageVersion: MessageVersion,
-		ReasoningLevel: s.reasoningLevel,
+		ReasoningLevel: reasoningLevel,
 		ContextTokens:  s.ContextTokens,
-		VideoFPS:       s.videoFPS,
-		VideoRes:       s.videoRes,
+		VideoFPS:       videoFPS,
+		VideoRes:       videoRes,
 	}
 	if err := defaultPersistence.SaveContentToFile(path, meta, contents); err != nil {
 		return fmt.Errorf("save: %w", err)
