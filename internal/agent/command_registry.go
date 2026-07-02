@@ -1,5 +1,11 @@
 package agent
 
+// Command registry: define, register, and dispatch colon-commands.
+//
+// Previously a flat package-level slice + LookupCommand function,
+// now wrapped in a CommandRegistry struct for cleaner encapsulation.
+// The package-level LookupCommand still works via the default registry.
+
 import (
 	"context"
 )
@@ -37,7 +43,6 @@ const (
 
 // CommandHandler is a function that handles a colon-command.
 // args is everything after the first space (empty string if no args).
-// Each handler parses args as appropriate for its command.
 type CommandHandler func(s *Session, ctx context.Context, args string)
 
 // Command describes a user-facing colon-command with its handler and metadata.
@@ -49,8 +54,58 @@ type Command struct {
 	Handler     CommandHandler
 }
 
-// commandDefs is the single source of truth for all colon-commands.
-var commandDefs = []Command{
+// CommandRegistry manages the set of available colon-commands.
+type CommandRegistry struct {
+	commands map[string]Command
+}
+
+// NewCommandRegistry creates a registry pre-populated with all built-in commands.
+func NewCommandRegistry() *CommandRegistry {
+	cr := &CommandRegistry{
+		commands: make(map[string]Command, len(defaultCommandDefs)),
+	}
+	for _, cmd := range defaultCommandDefs {
+		cr.commands[cmd.Name] = cmd
+	}
+	return cr
+}
+
+// Lookup returns the command metadata for name, or (nil, false).
+func (cr *CommandRegistry) Lookup(name string) (*Command, bool) {
+	cmd, ok := cr.commands[name]
+	if !ok {
+		return nil, false
+	}
+	return &cmd, true
+}
+
+// Names returns all registered command names (for help display, etc.).
+func (cr *CommandRegistry) Names() []string {
+	names := make([]string, 0, len(cr.commands))
+	for name := range cr.commands {
+		names = append(names, name)
+	}
+	return names
+}
+
+// Register adds a command to the registry. Panics on duplicate name.
+func (cr *CommandRegistry) Register(cmd Command) {
+	if _, ok := cr.commands[cmd.Name]; ok {
+		panic("command already registered: " + cmd.Name)
+	}
+	cr.commands[cmd.Name] = cmd
+}
+
+// LookupCommand is a package-level shorthand for the default registry.
+func LookupCommand(name string) (*Command, bool) {
+	return defaultCommandRegistry.Lookup(name)
+}
+
+// defaultCommandRegistry is the package-level singleton.
+var defaultCommandRegistry = NewCommandRegistry()
+
+// defaultCommandDefs is the list of all built-in commands.
+var defaultCommandDefs = []Command{
 	{CommandNameCancel, "Cancel the current task", "", CmdImmediate,
 		func(s *Session, _ context.Context, _ string) { s.cancelTask() }},
 	{CommandNameSave, "Save the current session", "[filename]", CmdImmediate,
@@ -75,14 +130,4 @@ var commandDefs = []Command{
 		func(s *Session, ctx context.Context, args string) { s.handleMCPAuth(ctx, args) }},
 	{CommandNameMCPSkip, "Cancel MCP initialization", "", CmdImmediate,
 		func(s *Session, _ context.Context, _ string) { s.handleMCPCancel() }},
-}
-
-// LookupCommand returns the command metadata for name, or (nil, false).
-func LookupCommand(name string) (*Command, bool) {
-	for i := range commandDefs {
-		if commandDefs[i].Name == name {
-			return &commandDefs[i], true
-		}
-	}
-	return nil, false
 }
