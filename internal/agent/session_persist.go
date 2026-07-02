@@ -1,339 +1,42 @@
 package agent
 
 // Session persistence: saving, loading, and displaying sessions.
+//
+// The serialization format (markdown + TLV) and low-level I/O are
+// owned by persistence.go. This file contains Session-specific wrappers
+// that add the session's metadata when saving.
 
 import (
-	"encoding/binary"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
-	"os"
-	"strings"
 	"time"
 
-	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/llm"
-	"github.com/alayacore/alayacore/internal/stream"
 )
 
-// maxTLVContentSize is the safety limit for a single TLV record's content.
-// No legitimate content part should come close to this; it catches corrupted
-// session files attempting to allocate excessive memory.
-const maxTLVContentSize = 10 * 1024 * 1024
-
-// ErrSessionVersionMismatch is returned when a session file has a version
-// that does not match MessageVersion and cannot be loaded.
-var ErrSessionVersionMismatch = errors.New("session file version mismatch")
-
 // ============================================================================
-// Load/Save
+// Load / Save — Session wrappers
 // ============================================================================
 
 // LoadSession loads a session from a file.
+// Delegates to PersistenceService for parsing.
 func LoadSession(path string) (*SessionData, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("load: %w", err)
-	}
-	sd, err := parseSessionData(data)
-	if err != nil {
-		return nil, err
-	}
-	return sd, nil
+	return defaultPersistence.LoadSession(path)
 }
 
+// saveContentToFile saves the current session's contents with its metadata.
 func (s *Session) saveContentToFile(path string, contents []llm.ContentPart) error {
-	data := SessionData{
-		SessionMeta: SessionMeta{
-			CreatedAt:      s.CreatedAt,
-			UpdatedAt:      time.Now(),
-			ActiveModel:    s.activeModelName(),
-			MessageVersion: MessageVersion,
-			ReasoningLevel: s.reasoningLevel,
-			ContextTokens:  s.ContextTokens,
-			VideoFPS:       s.videoFPS,
-			VideoRes:       s.videoRes,
-		},
-		Contents: contents,
+	meta := SessionMeta{
+		CreatedAt:      s.CreatedAt,
+		UpdatedAt:      time.Now(),
+		ActiveModel:    s.activeModelName(),
+		MessageVersion: MessageVersion,
+		ReasoningLevel: s.reasoningLevel,
+		ContextTokens:  s.ContextTokens,
+		VideoFPS:       s.videoFPS,
+		VideoRes:       s.videoRes,
 	}
-
-	raw, err := formatSessionMarkdown(&data)
-	if err != nil {
-		return fmt.Errorf("save: %w", err)
-	}
-	if err := os.WriteFile(path, raw, 0600); err != nil {
+	if err := defaultPersistence.SaveContentToFile(path, meta, contents); err != nil {
 		return fmt.Errorf("save: %w", err)
 	}
 	return nil
-}
-
-// ============================================================================
-// Markdown Format (TLV encoding)
-// ============================================================================
-
-// formatFrontmatter writes the frontmatter using config.FormatKeyValue,
-// which derives field names from `config` struct tags on SessionMeta.
-func formatFrontmatter(meta *SessionMeta) string {
-	return "---\n" + config.FormatKeyValue(meta) + "---\n"
-}
-
-// formatSessionMarkdown serializes Content to TLV (without history IDs).
-// History IDs are ephemeral and rebuilt on load.
-func formatSessionMarkdown(data *SessionData) ([]byte, error) {
-	var buf, tlvBuf strings.Builder
-	buf.WriteString(formatFrontmatter(&data.SessionMeta))
-
-	for _, part := range data.Contents {
-		tag, content, err := contentPartToTLV(part)
-		if err != nil {
-			return nil, fmt.Errorf("save: %w", err)
-		}
-		tlvBuf.WriteString("\n\n")
-		tlvBuf.Write(stream.EncodeTLV(tag, content))
-	}
-
-	buf.WriteString(tlvBuf.String())
-	return []byte(buf.String()), nil
-}
-
-// parseFrontmatter extracts the frontmatter and body from content with "---" delimiters.
-// Returns the frontmatter content (between the delimiters) and the body (after the closing delimiter).
-func parseFrontmatter(content string) (frontmatter, body string, err error) {
-	if !strings.HasPrefix(content, "---\n") {
-		return "", "", fmt.Errorf("load: session file missing frontmatter")
-	}
-
-	endIdx := strings.Index(content[4:], "\n---\n")
-	if endIdx == -1 {
-		return "", "", fmt.Errorf("load: session file missing frontmatter end marker")
-	}
-
-	frontmatter = content[4 : endIdx+4]
-	body = content[endIdx+9:]
-	return frontmatter, body, nil
-}
-
-// parseSessionMeta parses key-value pairs from frontmatter into SessionMeta using struct tags.
-// Returns an error if the session file version does not match MessageVersion.
-func parseSessionMeta(frontmatter string) (SessionMeta, error) {
-	var meta SessionMeta
-	config.ParseKeyValue(frontmatter, &meta)
-
-	// Check message format version — must match exactly.
-	if meta.MessageVersion != MessageVersion {
-		return meta, fmt.Errorf("%w: got %d, expected %d",
-			ErrSessionVersionMismatch, meta.MessageVersion, MessageVersion)
-	}
-
-	// Default reasoning_level to 1 (normal) when the key is absent from the
-	// frontmatter.  config.ParseKeyValue leaves the field at its zero value
-	// (0) when the key is missing, which would incorrectly disable reasoning.
-	if !strings.Contains(frontmatter, "reasoning_level:") {
-		meta.ReasoningLevel = config.DefaultReasoningLevel
-	}
-
-	// Validate reasoning_level range: 0=off, 1=normal, 2=max.
-	// Clamp to default if the stored value is out of range (e.g. corrupted
-	// or hand-edited session file).
-	if meta.ReasoningLevel < config.ReasoningLevelOff || meta.ReasoningLevel > config.ReasoningLevelMax {
-		meta.ReasoningLevel = config.DefaultReasoningLevel
-	}
-
-	return meta, nil
-}
-
-// parseSessionData parses a session file (frontmatter + TLV body) into SessionData.
-func parseSessionData(data []byte) (*SessionData, error) {
-	frontmatter, body, err := parseFrontmatter(string(data))
-	if err != nil {
-		return nil, err
-	}
-
-	meta, err := parseSessionMeta(frontmatter)
-	if err != nil {
-		return nil, err
-	}
-
-	sd := &SessionData{
-		SessionMeta: meta,
-	}
-
-	if len(body) > 0 {
-		content, err := parseMessagesTLV(body)
-		if err != nil {
-			return nil, err
-		}
-		sd.Contents = content
-	}
-
-	return sd, nil
-}
-
-func parseMessagesTLV(body string) ([]llm.ContentPart, error) {
-	est := len(body) / 64
-	if est < 8 {
-		est = 8
-	}
-	contents := make([]llm.ContentPart, 0, est)
-
-	reader := newTLVReader(body)
-	var seqID uint64
-
-	for {
-		tag, raw, err := reader.read()
-		if err == io.EOF {
-			return contents, nil
-		}
-		if err != nil {
-			return contents, fmt.Errorf("read error at chunk %d: %w", len(contents), err)
-		}
-
-		msgPart, err := contentPartFromTLV(tag, raw)
-		if err != nil {
-			return contents, fmt.Errorf("parse error at chunk %d (tag %q): %w", len(contents), tag, err)
-		}
-		if msgPart == nil {
-			continue
-		}
-
-		seqID++
-		msgPart.SetHistoryID(seqID)
-		contents = append(contents, msgPart)
-	}
-}
-
-// contentPartToTLV serializes a ContentPart as a TLV tag and value string (without history ID).
-func contentPartToTLV(part llm.ContentPart) (tag string, content string, err error) {
-	switch p := part.(type) {
-	case *llm.TextPart:
-		if part.GetRole() == llm.RoleAssistant {
-			return stream.TagAssistantT, p.Text, nil
-		}
-		return stream.TagUserT, p.Text, nil
-	case *llm.ImagePart:
-		return stream.TagUserI, p.URI, nil
-	case *llm.VideoPart:
-		return stream.TagUserV, p.URI, nil
-	case *llm.AudioPart:
-		return stream.TagUserA, p.URI, nil
-	case *llm.DocumentPart:
-		return stream.TagUserD, p.URI, nil
-	case *llm.ReasoningPart:
-		return stream.TagAssistantR, p.Text, nil
-	case *llm.ToolInputPart:
-		fd := stream.ToolInputData{ID: p.ID, Name: p.Name, Input: p.Input}
-		jsonData, err := json.Marshal(fd)
-		if err != nil {
-			return "", "", err
-		}
-		return stream.TagAssistantF, string(jsonData), nil
-	case *llm.ToolOutputPart:
-		contentJSON, err := serializeContentParts(p.Output)
-		if err != nil {
-			return "", "", fmt.Errorf("failed to serialize tool result content: %w", err)
-		}
-		tr := stream.ToolOutputData{ID: p.ID, Output: contentJSON, IsError: p.IsError}
-		jsonData, err := json.Marshal(tr)
-		if err != nil {
-			return "", "", err
-		}
-		return stream.TagUserF, string(jsonData), nil
-	default:
-		return "", "", fmt.Errorf("unknown content part type: %T", part)
-	}
-}
-
-// contentPartFromTLV converts a TLV record into a ContentPart with Role set.
-// History IDs in the TLV value are stripped — they are ephemeral and
-// rebuilt when the session is loaded.
-func contentPartFromTLV(tag string, content []byte) (llm.ContentPart, error) {
-	cleanContent := string(content)
-	if _, stripped, ok := stream.UnwrapID(cleanContent); ok {
-		cleanContent = stripped
-	}
-
-	switch tag {
-	case stream.TagUserT:
-		return &llm.TextPart{Text: cleanContent, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}}, nil
-	case stream.TagUserI:
-		return &llm.ImagePart{URI: cleanContent, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}}, nil
-	case stream.TagUserV:
-		return &llm.VideoPart{URI: cleanContent, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}}, nil
-	case stream.TagUserA:
-		return &llm.AudioPart{URI: cleanContent, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}}, nil
-	case stream.TagUserD:
-		return &llm.DocumentPart{URI: cleanContent, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}}, nil
-	case stream.TagAssistantT:
-		return &llm.TextPart{Text: cleanContent, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant}}, nil
-	case stream.TagAssistantR:
-		return &llm.ReasoningPart{Text: cleanContent, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant}}, nil
-	case stream.TagAssistantF:
-		var fd stream.ToolInputData
-		if err := json.Unmarshal([]byte(cleanContent), &fd); err != nil {
-			return nil, fmt.Errorf("failed to parse function data: %w", err)
-		}
-		if fd.Name == "" {
-			return nil, nil
-		}
-		return &llm.ToolInputPart{
-			ID: fd.ID, Name: fd.Name, Input: fd.Input, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant},
-		}, nil
-	case stream.TagUserF:
-		var tr stream.ToolOutputData
-		if err := json.Unmarshal([]byte(cleanContent), &tr); err != nil {
-			return nil, fmt.Errorf("failed to parse tool result: %w", err)
-		}
-		contentParts, err := deserializeContentParts(tr.Output)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse tool result content: %w", err)
-		}
-		return &llm.ToolOutputPart{ID: tr.ID, Output: contentParts, IsError: tr.IsError, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleTool}}, nil
-	default:
-		return nil, fmt.Errorf("unknown tag: %s", tag)
-	}
-}
-
-// tlvReader reads sequential TLV records from a string.
-type tlvReader struct {
-	reader *strings.Reader
-}
-
-func newTLVReader(body string) *tlvReader {
-	return &tlvReader{reader: strings.NewReader(body)}
-}
-
-// read advances to the next TLV record. Returns io.EOF when exhausted.
-func (r *tlvReader) read() (tag string, content []byte, err error) {
-	// Skip whitespace/newlines between records.
-	for {
-		b, err := r.reader.ReadByte()
-		if err != nil {
-			return "", nil, err
-		}
-		if b != '\n' && b != '\r' && b != ' ' && b != '\t' {
-			_ = r.reader.UnreadByte()
-			break
-		}
-	}
-
-	tagBytes := make([]byte, 2)
-	if _, err := io.ReadFull(r.reader, tagBytes); err != nil {
-		return "", nil, err
-	}
-
-	var length int32
-	if err := binary.Read(r.reader, binary.BigEndian, &length); err != nil {
-		return "", nil, fmt.Errorf("failed to read length: %w", err)
-	}
-	if length < 0 || length > maxTLVContentSize {
-		return "", nil, fmt.Errorf("invalid length: %d", length)
-	}
-
-	content = make([]byte, length)
-	if _, err := io.ReadFull(r.reader, content); err != nil {
-		return "", nil, fmt.Errorf("failed to read content: %w", err)
-	}
-
-	return string(tagBytes), content, nil
 }
