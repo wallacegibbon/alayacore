@@ -108,19 +108,19 @@ func (s *Session) handleMCPEvent(evt *mcp.InitEvent) {
 	}
 
 	switch evt.Type {
-	case "connecting", "connected", "failed":
+	case mcp.InitConnecting, mcp.InitConnected, mcp.InitFailed:
 		// Forward to adapter for progress overlay.
-		s.sendMCPMsg(evt.Type, evt.Server, "", evt.Error)
+		s.sendMCPMsg(string(evt.Type), evt.Server, "", evt.Error)
 
-	case "auth_confirm":
+	case mcp.InitAuthConfirm:
 		// Session must show confirm dialog — forward to adapter.
 		s.sendMCPMsg("auth_confirm", evt.Server, evt.URL, "")
 
-	case "auth_running":
+	case mcp.InitAuthRunning:
 		// OAuth progress — forward to adapter.
-		s.sendMCPMsg(evt.Type, evt.Server, "", evt.Error)
+		s.sendMCPMsg(string(evt.Type), evt.Server, "", evt.Error)
 
-	case "done":
+	case mcp.InitDone:
 		// All done — apply final results.
 		if evt.Errors != nil {
 			for _, e := range evt.Errors {

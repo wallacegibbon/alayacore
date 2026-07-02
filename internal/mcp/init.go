@@ -35,8 +35,20 @@ import (
 
 // InitEvent covers everything that happens during MCP initialization.
 // The session receives these from Events() and reacts accordingly.
+type InitEventType string
+
+const (
+	InitConnecting  InitEventType = "connecting"
+	InitConnected   InitEventType = "connected"
+	InitFailed      InitEventType = "failed"
+	InitAuthConfirm InitEventType = "auth_confirm"
+	InitAuthRunning InitEventType = "auth_running"
+	InitDone        InitEventType = "done"
+	InitCanceled    InitEventType = "canceled"
+)
+
 type InitEvent struct {
-	Type   string // "connecting"|"connected"|"failed"|"auth_confirm"|"auth_running"|"done"
+	Type   InitEventType
 	Server string
 	URL    string // set for "auth_confirm"
 	Error  string // set for "failed"
@@ -146,7 +158,7 @@ func (init *Init) run(ctx context.Context) {
 	defer close(init.done)
 	defer func() {
 		if ctx.Err() != nil {
-			init.sendEvent(InitEvent{Type: "canceled"})
+			init.sendEvent(InitEvent{Type: InitCanceled})
 		}
 		init.mu.Lock()
 		init.eventsClosed = true
@@ -195,15 +207,15 @@ func (init *Init) collectStdResult(ctx context.Context, c *Client) serverResult 
 	var r serverResult
 	r.name = c.Name()
 
-	init.sendEvent(InitEvent{Type: "connecting", Server: c.Name()})
+	init.sendEvent(InitEvent{Type: InitConnecting, Server: c.Name()})
 
 	if err := c.Connect(ctx); err != nil {
-		init.sendEvent(InitEvent{Type: "failed", Server: c.Name(), Error: err.Error()})
+		init.sendEvent(InitEvent{Type: InitFailed, Server: c.Name(), Error: err.Error()})
 		return r
 	}
 
 	init.discoverCapabilities(ctx, c, &r)
-	init.sendEvent(InitEvent{Type: "connected", Server: c.Name()})
+	init.sendEvent(InitEvent{Type: InitConnected, Server: c.Name()})
 	return r
 }
 
@@ -211,8 +223,8 @@ func (init *Init) collectOAuthResult(ctx context.Context, c *Client) serverResul
 	var r serverResult
 	r.name = c.Name()
 
-	init.sendEvent(InitEvent{Type: "connecting", Server: c.Name()})
-	init.sendEvent(InitEvent{Type: "auth_confirm", Server: c.Name(), URL: c.config.URL})
+	init.sendEvent(InitEvent{Type: InitConnecting, Server: c.Name()})
+	init.sendEvent(InitEvent{Type: InitAuthConfirm, Server: c.Name(), URL: c.config.URL})
 
 	confirmCh := make(chan bool, 1)
 	init.mu.Lock()
@@ -231,27 +243,27 @@ func (init *Init) collectOAuthResult(ctx context.Context, c *Client) serverResul
 	init.mu.Unlock()
 
 	if !allow {
-		init.sendEvent(InitEvent{Type: "failed", Server: c.Name(), Error: "skipped"})
+		init.sendEvent(InitEvent{Type: InitFailed, Server: c.Name(), Error: "skipped"})
 		return r
 	}
 
-	init.sendEvent(InitEvent{Type: "auth_running", Server: c.Name()})
+	init.sendEvent(InitEvent{Type: InitAuthRunning, Server: c.Name()})
 
 	sa := NewServerAuth(c)
 	tools, err := sa.Run(ctx)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
-			init.sendEvent(InitEvent{Type: "failed", Server: c.Name(), Error: "skipped"})
+			init.sendEvent(InitEvent{Type: InitFailed, Server: c.Name(), Error: "skipped"})
 		} else {
 			r.errs = append(r.errs, fmt.Sprintf("MCP auth for %q: %v", c.Name(), err))
-			init.sendEvent(InitEvent{Type: "failed", Server: c.Name(), Error: err.Error()})
+			init.sendEvent(InitEvent{Type: InitFailed, Server: c.Name(), Error: err.Error()})
 		}
 		return r
 	}
 
 	r.tools = tools
 	init.discoverCapabilities(ctx, c, &r)
-	init.sendEvent(InitEvent{Type: "connected", Server: c.Name()})
+	init.sendEvent(InitEvent{Type: InitConnected, Server: c.Name()})
 	return r
 }
 
