@@ -103,9 +103,11 @@ type MCPMsg struct {
 
 func (MCPMsg) SystemMsgType() string { return "mcp" }
 
-// MessageVersionMsg carries the TLV message format version (type "version").
+// MessageVersionMsg carries the TLV message format version and the
+// alayacore application version (type "version").
 // Sent as the first TagSystemMsg frame so adapters can validate format
-// compatibility before processing subsequent messages.
+// compatibility and identify the core version before processing
+// subsequent messages.
 type MessageVersionMsg struct {
 	MessageVersion int    `json:"message_version"`
 	CoreVersion    string `json:"core_version"`

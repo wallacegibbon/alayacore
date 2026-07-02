@@ -423,7 +423,7 @@ uf-execute-command-failed.bin  UF \x00 15 \x00 {"id":"t5","output":[{"text":"com
 
 | Type | JSON Schema (data fields) | Example `.bin` |
 |------|--------------------------|----------------|
-| `version` | `message_version` (int) | `sm-message-version.bin` |
+| `version` | `message_version` (int), `core_version` (string) | `sm-message-version.bin` |
 | `model` | `active_id` (int), `active_name` (string), `context_limit` (int) | `sm-model.bin` |
 | `model_list` | `models` (array of `{id:int, name:string, protocol_type:string, base_url:string, api_key:string, model_name:string, context_limit:int, max_tokens:int}`) | `sm-model-list.bin` |
 | `theme` | `name` (string), `theme` (object, optional — full palette sent on startup, omitted on theme switch) | `sm-theme.bin` |
@@ -439,7 +439,7 @@ uf-execute-command-failed.bin  UF \x00 15 \x00 {"id":"t5","output":[{"text":"com
 Complete wire values:
 
 ```
-sm-message-version.bin         {"type":"version","data":{"message_version":9}}
+sm-message-version.bin         {"type":"version","data":{"message_version":9,"core_version":"v0.45.0"}}
 sm-model.bin                   {"type":"model","data":{"active_id":4,"active_name":"DeepSeek / DeepSeek-V4 Flash","context_limit":1000000}}
 sm-model-list.bin              {"type":"model_list","data":{"models":[{"id":0,"name":"Anthropic / Claude Haiku 4","protocol_type":"anthropic","base_url":"https://api.anthropic.com","api_key":"sk-ant-...","model_name":"claude-haiku-4-20260515","context_limit":200000,"max_tokens":0},{"id":4,"name":"DeepSeek / DeepSeek-V4 Flash","protocol_type":"openai","base_url":"https://api.deepseek.com/v1","api_key":"sk-ds-...","model_name":"deepseek-v4-flash","context_limit":1000000,"max_tokens":0}]}}
 sm-theme.bin                   {"type":"theme","data":{"name":"theme-dark"}}
