@@ -33,7 +33,7 @@ func NewAdapter(cfg *app.Config) *Adapter {
 // with default signal handling (exit code 130).
 //
 // MCP initialization runs asynchronously — the session manages it
-// internally via AsyncInit. No adapter-side goroutine is needed.
+// internally via MCPInit. No adapter-side goroutine is needed.
 //
 // plainio processes prompts one at a time. If a task produces an error
 // (TagSystemMsg with type "error"), the remaining input is discarded and the process exits

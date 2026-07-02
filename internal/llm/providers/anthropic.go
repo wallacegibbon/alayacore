@@ -260,7 +260,7 @@ func WithMaxTokens(tokens int) AnthropicOption {
 }
 
 // SetReasoningLevel sets the reasoning level for Anthropic.
-// 0=off, 1=high, 2=max.
+// 0=off, 1=normal, 2=max.
 func (p *AnthropicProvider) SetReasoningLevel(level int) {
 	p.reasoningLevel = level
 }

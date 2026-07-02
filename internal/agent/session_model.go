@@ -122,9 +122,7 @@ func (s *Session) ensureAgentInitialized() error {
 
 	s.agent = agent
 	s.provider = provider
-	if activeModel.ContextLimit > 0 {
-		s.ContextLimit = int64(activeModel.ContextLimit)
-	}
+	s.ContextLimit = int64(activeModel.ContextLimit) // 0 means unlimited
 	if s.provider != nil {
 		s.provider.SetReasoningLevel(s.reasoningLevel)
 		s.provider.SetVideoConfig(s.videoFPS, s.videoRes)
@@ -148,10 +146,10 @@ func (s *Session) initAgentFromConfig(modelConfig *config.ModelConfig) error {
 }
 
 func (s *Session) applyModelContextLimit(model *config.ModelConfig) {
-	if model == nil || model.ContextLimit <= 0 {
+	if model == nil {
 		return
 	}
-	s.ContextLimit = int64(model.ContextLimit)
+	s.ContextLimit = int64(model.ContextLimit) // 0 means unlimited
 }
 
 // SetReasoningLevel sets the reasoning level.

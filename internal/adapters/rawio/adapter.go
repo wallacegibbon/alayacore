@@ -31,7 +31,7 @@ func NewAdapter(cfg *app.Config) *Adapter {
 // Ctrl-C (SIGINT) terminates immediately with default signal handling.
 //
 // MCP initialization runs asynchronously — the session manages it
-// internally via AsyncInit. No adapter-side goroutine is needed.
+// internally via MCPInit. No adapter-side goroutine is needed.
 func (a *Adapter) Start() int {
 	session, inputWriter, err := app.StartSession(a.Config, os.Stdout, nil)
 	if err != nil {

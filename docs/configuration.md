@@ -176,5 +176,6 @@ removed: #f38ba8
 | `cursor` | Cursor indicator |
 | `added` | Diff additions |
 | `removed` | Diff removals |
+| `fold_indicator` | Character repeated to form the fold splitter row (e.g. `⁝`) |
 
 Switch themes at runtime with `Ctrl+P`.

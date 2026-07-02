@@ -428,7 +428,7 @@ uf-execute-command-failed.bin  UF \x00 15 \x00 {"id":"t5","output":[{"text":"com
 | `model_list` | `models` (array of `{id:int, name:string, protocol_type:string, base_url:string, api_key:string, model_name:string, context_limit:int, max_tokens:int}`) | `sm-model-list.bin` |
 | `theme` | `name` (string), `theme` (object, optional — full palette sent on startup, omitted on theme switch) | `sm-theme.bin` |
 | `theme_list` | `themes` (array of `{name:string, theme:{primary, dim, muted, text, warning, error, success, selection, cursor, added, removed, fold_indicator: string}}`) | `sm-theme-list.bin` |
-| `reasoning` | `level` (int: 0=off, 1=low, 2=high) | `sm-reasoning.bin` |
+| `reasoning` | `level` (int: 0=off, 1=normal, 2=max) | `sm-reasoning.bin` |
 | `video_config` | `fps` (int), `res` (int) | `sm-video-config.bin` |
 | `task` | `in_progress` (bool), `current_step` (int, opt), `max_steps` (int, opt), `context` (int), `task_error` (bool, opt) | `sm-task-start.bin`, `sm-task-end.bin` |
 | `error` | `text` (string) | `sm-error.bin` |
@@ -439,7 +439,7 @@ uf-execute-command-failed.bin  UF \x00 15 \x00 {"id":"t5","output":[{"text":"com
 Complete wire values:
 
 ```
-sm-message-version.bin         {"type":"version","data":{"message_version":9,"core_version":"v0.45.0"}}
+sm-message-version.bin         {"type":"version","data":{"message_version":9,"core_version":"(set at build time)"}}
 sm-model.bin                   {"type":"model","data":{"active_id":4,"active_name":"DeepSeek / DeepSeek-V4 Flash","context_limit":1000000}}
 sm-model-list.bin              {"type":"model_list","data":{"models":[{"id":0,"name":"Anthropic / Claude Haiku 4","protocol_type":"anthropic","base_url":"https://api.anthropic.com","api_key":"sk-ant-...","model_name":"claude-haiku-4-20260515","context_limit":200000,"max_tokens":0},{"id":4,"name":"DeepSeek / DeepSeek-V4 Flash","protocol_type":"openai","base_url":"https://api.deepseek.com/v1","api_key":"sk-ds-...","model_name":"deepseek-v4-flash","context_limit":1000000,"max_tokens":0}]}}
 sm-theme.bin                   {"type":"theme","data":{"name":"theme-dark"}}
