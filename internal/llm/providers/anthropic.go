@@ -687,22 +687,15 @@ func unmarshalSSE[T any](data string, yield func(llm.StreamEvent, error) bool) (
 //   - llm.ToolInputPart   → anthropicContentBlock{Type: "tool_use"}
 //   - llm.ToolOutputPart → anthropicContentBlock{Type: "tool_result"} (role remapped to "user")
 func anthropicConvertContents(contents []llm.ContentPart, reasoningLevel int) []anthropicMessage {
-	if len(contents) == 0 {
+	chunks := llm.GroupByRole(contents)
+	if len(chunks) == 0 {
 		return nil
 	}
 
-	apiMessages := make([]anthropicMessage, 0)
+	apiMessages := make([]anthropicMessage, 0, len(chunks))
 
-	// Group consecutive same-role parts into API messages
-	i := 0
-	for i < len(contents) {
-		role := contents[i].GetRole()
-		j := i
-		for j < len(contents) && contents[j].GetRole() == role {
-			j++
-		}
-		chunk := contents[i:j]
-		i = j
+	for _, chunk := range chunks {
+		role := chunk[0].GetRole()
 
 		apiMsg := anthropicMessage{
 			Role:    string(role),

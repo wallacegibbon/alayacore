@@ -515,21 +515,15 @@ func (p *OpenAIProvider) handleDelta(delta openAIDelta, yield func(llm.StreamEve
 // openaiConvertContents converts domain ContentParts to OpenAI wire format.
 // It groups consecutive same-role ContentParts into API messages.
 func openaiConvertContents(contents []llm.ContentPart, reasoningLevel int, videoFPS int, videoRes int) []openAIMessage {
-	apiMessages := make([]openAIMessage, 0, len(contents))
-	if len(contents) == 0 {
-		return apiMessages
+	chunks := llm.GroupByRole(contents)
+	if len(chunks) == 0 {
+		return nil
 	}
 
-	// Group consecutive same-role parts into API messages
-	i := 0
-	for i < len(contents) {
-		role := contents[i].GetRole()
-		j := i
-		for j < len(contents) && contents[j].GetRole() == role {
-			j++
-		}
-		chunk := contents[i:j]
-		i = j
+	apiMessages := make([]openAIMessage, 0, len(chunks))
+
+	for _, chunk := range chunks {
+		role := chunk[0].GetRole()
 
 		if role == llm.RoleTool {
 			apiMessages = append(apiMessages, openaiConvertToolOutputs(chunk)...)

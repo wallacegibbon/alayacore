@@ -6,6 +6,28 @@ import (
 	"strings"
 )
 
+// GroupByRole groups consecutive ContentParts with the same role into chunks.
+// Returns a slice of chunks, each chunk having a uniform role.
+// This is a shared helper used by both Anthropic and OpenAI providers
+// to convert the flat ContentPart list into per-role API messages.
+func GroupByRole(contents []ContentPart) [][]ContentPart {
+	if len(contents) == 0 {
+		return nil
+	}
+	var chunks [][]ContentPart
+	i := 0
+	for i < len(contents) {
+		role := contents[i].GetRole()
+		j := i
+		for j < len(contents) && contents[j].GetRole() == role {
+			j++
+		}
+		chunks = append(chunks, contents[i:j])
+		i = j
+	}
+	return chunks
+}
+
 // ParseDataURI parses a data URI into media type and base64 data.
 // Input: "data:image/jpeg;base64,/9j/4AAQ..."
 // Output: "image/jpeg", "/9j/4AAQ...", true
