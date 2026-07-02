@@ -49,8 +49,9 @@ type ModelService struct {
 // NewModelService creates a ModelService with the given managers.
 func NewModelService(manager *ModelManager, runtimeMgr *RuntimeManager) *ModelService {
 	return &ModelService{
-		manager:    manager,
-		runtimeMgr: runtimeMgr,
+		manager:        manager,
+		runtimeMgr:     runtimeMgr,
+		reasoningLevel: config.DefaultReasoningLevel,
 	}
 }
 
