@@ -40,7 +40,7 @@ type sessionState struct {
 
 	// MCP init status — tracks the initialization phase.
 	// Values: "" (no MCP), "connecting", "connected", "failed",
-	// "auth_confirm", "auth_running", "done".
+	// "auth_confirm", "auth_running", "discovering", "done".
 	mcpStatus string
 
 	// Per-server init progress.

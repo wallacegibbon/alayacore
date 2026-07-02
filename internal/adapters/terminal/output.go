@@ -395,6 +395,8 @@ func (to *outputWriter) handleSystemMCP(data json.RawMessage) {
 		}
 	case "auth_running":
 		to.status.updateMCPProgress(msg.Status, msg.Server)
+	case "discovering":
+		to.status.updateMCPProgress("discovering", "")
 	case "done":
 		to.status.updateMCPProgress("done", "")
 		// Note: takeMCPDone() is consumed by the Terminal tick handler

@@ -35,7 +35,7 @@ import (
 // InitEvent covers everything that happens during MCP initialization.
 // The session receives these from Events() and reacts accordingly.
 type InitEvent struct {
-	Type   string // "connecting"|"connected"|"failed"|"auth_confirm"|"auth_running"|"done"
+	Type   string // "connecting"|"connected"|"failed"|"auth_confirm"|"auth_running"|"discovering"|"done"
 	Server string
 	URL    string // set for "auth_confirm"
 	Error  string // set for "failed"

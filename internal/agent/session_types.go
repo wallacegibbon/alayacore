@@ -93,6 +93,7 @@ func (VideoConfigMsg) SystemMsgType() string { return "video_config" }
 //   - "failed":        connection or OAuth failed
 //   - "auth_confirm":  session needs user to authorize this server
 //   - "auth_running":  OAuth flow is running for this server
+//   - "discovering":   all servers handled, now discovering tools/resources/prompts
 //   - "done":          all MCP initialization complete
 type MCPMsg struct {
 	Status string `json:"status"`
