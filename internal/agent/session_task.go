@@ -276,8 +276,16 @@ func (s *Session) handleStepStart(step int) error {
 }
 
 func (s *Session) processPrompt(ctx context.Context, history []llm.ContentPart) ([]llm.ContentPart, int64, error) {
-	var outputTokens int64
 	var fullContents []llm.ContentPart
+	var outputTokens int64
+
+	onStepFinish := func(contents []llm.ContentPart, usage llm.Usage) error {
+		fullContents = cleanIncompleteToolInputs(contents)
+		s.sendEvent(usageToStepFinishEvent(usage))
+		outputTokens += usage.OutputTokens
+		s.requestSystemInfo()
+		return nil
+	}
 
 	_, err := s.Agent().Stream(ctx, history, llm.StreamCallbacks{
 		OnTextDelta:         s.handleTextDelta,
@@ -288,14 +296,8 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.ContentPart) 
 		OnToolConfirm:       s.handleToolConfirm,
 		ToolNeedsConfirm:    s.needsToolConfirm,
 		OnStepStart:         s.handleStepStart,
-		OnStepFinish: func(contents []llm.ContentPart, usage llm.Usage) error {
-			fullContents = cleanIncompleteToolInputs(contents)
-			s.sendEvent(usageToStepFinishEvent(usage))
-			outputTokens += usage.OutputTokens
-			s.requestSystemInfo()
-			return nil
-		},
-		IDGen: s.histIncAndGet,
+		OnStepFinish:        onStepFinish,
+		IDGen:               s.histIncAndGet,
 	})
 
 	if err != nil {

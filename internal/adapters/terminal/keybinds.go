@@ -378,6 +378,85 @@ func gotoTop(m *Terminal) {
 // DisplayKeyHandler handles a display key event and returns an optional tea.Cmd.
 type DisplayKeyHandler func(*Terminal) tea.Cmd
 
+// ---------- display key handler implementations ----------
+
+func handleDisplayKeyH(m *Terminal) tea.Cmd {
+	if m.display.MoveWindowCursorToTop() {
+		m.display.EnsureCursorVisible()
+		m.display.updateContent()
+	}
+	return nil
+}
+
+func handleDisplayKeyL(m *Terminal) tea.Cmd {
+	if m.display.MoveWindowCursorToBottom() {
+		m.display.EnsureCursorVisible()
+		m.display.updateContent()
+	}
+	return nil
+}
+
+func handleDisplayKeyM(m *Terminal) tea.Cmd {
+	if m.display.MoveWindowCursorToCenter() {
+		m.display.EnsureCursorVisible()
+		m.display.updateContent()
+	}
+	return nil
+}
+
+func handleDisplayKeyColon(m *Terminal) tea.Cmd {
+	m.focusInput()
+	m.input.SetValue(keyColon)
+	m.input.CursorEnd()
+	m.display.updateContent()
+	return nil
+}
+
+func handleDisplayKeySpace(m *Terminal) tea.Cmd {
+	if m.display.ToggleWindowFold() {
+		m.display.EnsureCursorVisible()
+		m.display.updateContent()
+	}
+	return nil
+}
+
+func handleDisplayKeyF(m *Terminal) tea.Cmd {
+	if m.display.MoveWindowCursorToNextUserPrompt() {
+		m.display.ScrollCursorToTop()
+		m.display.updateContent()
+	}
+	return nil
+}
+
+func handleDisplayKeyB(m *Terminal) tea.Cmd {
+	if m.display.MoveWindowCursorToPrevUserPrompt() {
+		m.display.ScrollCursorToTop()
+		m.display.updateContent()
+	}
+	return nil
+}
+
+func handleDisplayKeyE(m *Terminal) tea.Cmd {
+	content := m.display.GetCursorWindowContent()
+	if content != "" {
+		m.display.MarkUserScrolled()
+		return m.editor.OpenForDisplay(content)
+	}
+	return nil
+}
+
+func handleDisplayKeyCtrlF(m *Terminal) tea.Cmd {
+	if historyID := m.display.GetCursorWindowHistoryID(); historyID > 0 {
+		m.focusInput()
+		m.input.SetValue(fmt.Sprintf(":fork %d ", historyID))
+		m.input.CursorEnd()
+		m.display.updateContent()
+	}
+	return nil
+}
+
+// ---------- display key handler map ----------
+
 // displayKeyHandlers maps display key strings to their handler functions.
 // All display keys are listed in a single map; handlers that don't need
 // to return a command simply return nil.
@@ -394,76 +473,19 @@ var displayKeyHandlers = map[string]DisplayKeyHandler{
 	keyShiftDown: func(m *Terminal) tea.Cmd { scrollDownLine(m); return nil },
 	keyKCapital:  func(m *Terminal) tea.Cmd { scrollUpLine(m); return nil },
 	keyShiftUp:   func(m *Terminal) tea.Cmd { scrollUpLine(m); return nil },
-	keyH: func(m *Terminal) tea.Cmd {
-		if m.display.MoveWindowCursorToTop() {
-			m.display.EnsureCursorVisible()
-			m.display.updateContent()
-		}
-		return nil
-	},
-	keyL: func(m *Terminal) tea.Cmd {
-		if m.display.MoveWindowCursorToBottom() {
-			m.display.EnsureCursorVisible()
-			m.display.updateContent()
-		}
-		return nil
-	},
-	keyM: func(m *Terminal) tea.Cmd {
-		if m.display.MoveWindowCursorToCenter() {
-			m.display.EnsureCursorVisible()
-			m.display.updateContent()
-		}
-		return nil
-	},
-	keyG:      func(m *Terminal) tea.Cmd { gotoBottom(m); return nil },
-	keyEnd:    func(m *Terminal) tea.Cmd { gotoBottom(m); return nil },
-	keyGSmall: func(m *Terminal) tea.Cmd { gotoTop(m); return nil },
-	keyHome:   func(m *Terminal) tea.Cmd { gotoTop(m); return nil },
-	keyColon: func(m *Terminal) tea.Cmd {
-		m.focusInput()
-		m.input.SetValue(keyColon)
-		m.input.CursorEnd()
-		m.display.updateContent()
-		return nil
-	},
-	keySpace: func(m *Terminal) tea.Cmd {
-		if m.display.ToggleWindowFold() {
-			m.display.EnsureCursorVisible()
-			m.display.updateContent()
-		}
-		return nil
-	},
-	keyF: func(m *Terminal) tea.Cmd {
-		if m.display.MoveWindowCursorToNextUserPrompt() {
-			m.display.ScrollCursorToTop()
-			m.display.updateContent()
-		}
-		return nil
-	},
-	keyB: func(m *Terminal) tea.Cmd {
-		if m.display.MoveWindowCursorToPrevUserPrompt() {
-			m.display.ScrollCursorToTop()
-			m.display.updateContent()
-		}
-		return nil
-	},
-	keyE: func(m *Terminal) tea.Cmd {
-		content := m.display.GetCursorWindowContent()
-		if content != "" {
-			m.display.MarkUserScrolled()
-			return m.editor.OpenForDisplay(content)
-		}
-		return nil
-	},
-	keyCtrlF: func(m *Terminal) tea.Cmd {
-		if historyID := m.display.GetCursorWindowHistoryID(); historyID > 0 {
-			m.focusInput()
-			m.input.SetValue(fmt.Sprintf(":fork %d ", historyID))
-			m.input.CursorEnd()
-			m.display.updateContent()
-		}
-		return nil
-	},
+	keyH:         handleDisplayKeyH,
+	keyL:         handleDisplayKeyL,
+	keyM:         handleDisplayKeyM,
+	keyG:         func(m *Terminal) tea.Cmd { gotoBottom(m); return nil },
+	keyEnd:       func(m *Terminal) tea.Cmd { gotoBottom(m); return nil },
+	keyGSmall:    func(m *Terminal) tea.Cmd { gotoTop(m); return nil },
+	keyHome:      func(m *Terminal) tea.Cmd { gotoTop(m); return nil },
+	keyColon:     handleDisplayKeyColon,
+	keySpace:     handleDisplayKeySpace,
+	keyF:         handleDisplayKeyF,
+	keyB:         handleDisplayKeyB,
+	keyE:         handleDisplayKeyE,
+	keyCtrlF:     handleDisplayKeyCtrlF,
 }
 
 // handleDisplayKeys handles key events when display window is focused.
