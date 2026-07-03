@@ -66,22 +66,22 @@ func DefaultTheme() *Theme {
 }
 
 // LoadTheme loads a theme from a configuration file.
-// Returns the loaded theme or an error if the file cannot be read or parsed.
-func LoadTheme(path string) (*Theme, error) {
+// Returns the loaded theme, any non-fatal parse warnings, or an error
+// if the file cannot be read or parsed. Warnings are for unknown fields
+// or type mismatches in the theme file — the theme is still usable.
+func LoadTheme(path string) (*Theme, []string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open theme file: %w", err)
+		return nil, nil, fmt.Errorf("failed to open theme file: %w", err)
 	}
 
 	// Start with defaults, then override with config values
+	var warnings []string
 	theme := DefaultTheme()
 	if warns := config.ParseKeyValue(string(data), theme); len(warns) > 0 {
-		// Surface parse warnings for user-managed theme files, but do not
-		// treat them as fatal — unknown fields (e.g. from older versions)
-		// should not prevent loading the valid parts of the theme.
 		for _, w := range warns {
-			fmt.Fprintf(os.Stderr, "Warning: %s\n", w.String())
+			warnings = append(warnings, w.String())
 		}
 	}
-	return theme, nil
+	return theme, warnings, nil
 }

@@ -42,7 +42,7 @@ func TestFormatRuntimeConfig_RoundTrip(t *testing.T) {
 	}
 
 	formatted := formatRuntimeConfig(cfg)
-	parsed := parseRuntimeConfig(formatted)
+	parsed, _ := parseRuntimeConfig(formatted)
 
 	if parsed.ActiveModel != cfg.ActiveModel {
 		t.Errorf("ActiveModel round-trip failed: got %q, want %q", parsed.ActiveModel, cfg.ActiveModel)

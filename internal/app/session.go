@@ -77,8 +77,15 @@ func StartSession(cfg *Config, output io.Writer, input io.Reader) (*agentpkg.Ses
 		}
 	}
 
-	// Display MCP startup errors through the adapter as system error messages.
-	for _, e := range cfg.MCPStartupErrors {
+	// Collect runtime config parse warnings (typos in runtime.conf).
+	if rm := session.RuntimeManager(); rm != nil {
+		for _, w := range rm.GetLoadErrors() {
+			_ = protocol.WriteSystemMsg(output, protocol.ErrorMsg{Text: w})
+		}
+	}
+
+	// Display startup errors (theme, runtime config, MCP config) as system messages.
+	for _, e := range cfg.StartupErrors {
 		_ = protocol.WriteSystemMsg(output, protocol.ErrorMsg{Text: e})
 	}
 

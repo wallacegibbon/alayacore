@@ -25,8 +25,9 @@ type RuntimeConfig struct {
 
 // RuntimeManager manages runtime configuration
 type RuntimeManager struct {
-	config RuntimeConfig
-	path   string
+	config   RuntimeConfig
+	path     string
+	loadErrs []string // parse warnings from last Load()
 }
 
 func NewRuntimeManager(runtimePath string) *RuntimeManager {
@@ -56,7 +57,7 @@ func (rm *RuntimeManager) Load() error {
 		return err
 	}
 
-	rm.config = parseRuntimeConfig(string(data))
+	rm.config, rm.loadErrs = parseRuntimeConfig(string(data))
 	return nil
 }
 
@@ -77,21 +78,26 @@ func (rm *RuntimeManager) save() error {
 }
 
 // parseRuntimeConfig parses the key-value runtime config format
-func parseRuntimeConfig(content string) RuntimeConfig {
+func parseRuntimeConfig(content string) (RuntimeConfig, []string) {
 	var cfg RuntimeConfig
 	if warns := config.ParseKeyValue(content, &cfg); len(warns) > 0 {
-		// Runtime config is user-managed; surface parse warnings via stderr
-		// so typos like "active_model: foo" are not silently ignored.
-		for _, w := range warns {
-			fmt.Fprintf(os.Stderr, "Warning: runtime.conf: %s\n", w.String())
+		errs := make([]string, len(warns))
+		for i, w := range warns {
+			errs[i] = fmt.Sprintf("runtime.conf: %s", w.String())
 		}
+		return cfg, errs
 	}
-	return cfg
+	return cfg, nil
 }
 
 // formatRuntimeConfig formats the runtime config as key-value text
 func formatRuntimeConfig(cfg RuntimeConfig) string {
 	return config.FormatKeyValue(cfg)
+}
+
+// GetLoadErrors returns any parse warnings from the last Load() call.
+func (rm *RuntimeManager) GetLoadErrors() []string {
+	return rm.loadErrs
 }
 
 func (rm *RuntimeManager) GetActiveModel() string {

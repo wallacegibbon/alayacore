@@ -203,10 +203,11 @@ func (s *Session) sendThemeMsg() {
 // Returns zero ThemeInfo and false if the file cannot be loaded.
 func loadThemeFromFile(path string) (ThemeInfo, bool) {
 	name := strings.TrimSuffix(filepath.Base(path), ".conf")
-	t, err := theme.LoadTheme(path)
+	t, warns, err := theme.LoadTheme(path)
 	if err != nil {
 		return ThemeInfo{}, false
 	}
+	_ = warns // warnings are collected by the caller if needed
 	return ThemeInfo{Name: name, Theme: t}, true
 }
 

@@ -24,7 +24,7 @@ error: #ff0000
 		t.Fatalf("Failed to create test theme file: %v", err)
 	}
 
-	th, err := LoadTheme(themePath)
+	th, _, err := LoadTheme(themePath)
 	if err != nil {
 		t.Fatalf("LoadTheme failed: %v", err)
 	}
@@ -53,9 +53,12 @@ primary: #333333
 		t.Fatalf("Failed to create test theme file: %v", err)
 	}
 
-	th, err := LoadTheme(themePath)
+	th, warns, err := LoadTheme(themePath)
 	if err != nil {
 		t.Fatalf("LoadTheme failed: %v", err)
+	}
+	if len(warns) == 0 {
+		t.Error("expected parse warnings for unknown fields, got none")
 	}
 
 	if th.Primary != "#333333" {
@@ -67,7 +70,7 @@ primary: #333333
 }
 
 func TestLoadThemeInvalidPath(t *testing.T) {
-	_, err := LoadTheme("/nonexistent/path/theme.conf")
+	_, _, err := LoadTheme("/nonexistent/path/theme.conf")
 	if err == nil {
 		t.Error("Expected error for nonexistent file, got nil")
 	}
@@ -87,7 +90,7 @@ removed: #cccccc
 			t.Fatalf("Failed to create theme file: %v", err)
 		}
 
-		th, err := LoadTheme(themePath)
+		th, _, err := LoadTheme(themePath)
 		if err != nil {
 			t.Fatalf("Failed to load theme: %v", err)
 		}
@@ -117,7 +120,7 @@ dim: #000000
 			t.Fatalf("Failed to create theme file: %v", err)
 		}
 
-		th, err := LoadTheme(themePath)
+		th, _, err := LoadTheme(themePath)
 		if err != nil {
 			t.Fatalf("Failed to load theme: %v", err)
 		}

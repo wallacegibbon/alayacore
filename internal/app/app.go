@@ -11,6 +11,7 @@ import (
 	"github.com/alayacore/alayacore/internal/mcp"
 	"github.com/alayacore/alayacore/internal/mcp/auth"
 	"github.com/alayacore/alayacore/internal/skills"
+	"github.com/alayacore/alayacore/internal/theme"
 	"github.com/alayacore/alayacore/internal/tools"
 )
 
@@ -92,8 +93,11 @@ type Config struct {
 	// internally — the adapter receives progress via system messages.
 	MCPInit *mcp.Init
 
-	// MCPStartupErrors contains non-fatal errors from MCP config parsing.
-	MCPStartupErrors []string
+	// StartupErrors contains non-fatal warnings from theme loading,
+	// runtime config parsing, and MCP config parsing. These are
+	// emitted as TLV system messages during session startup so the
+	// user sees them even in TUI mode.
+	StartupErrors []string
 }
 
 // Setup initializes the common app components.
@@ -113,10 +117,24 @@ func Setup(cfg *config.Settings) (*Config, error) {
 		return nil, fmt.Errorf("invalid --builtin-tools: %w", err)
 	}
 
+	// Collect non-fatal startup warnings from all sources.
+	var startupErrors []string
+
 	// ========================================================================
 	// MCP (Model Context Protocol) — async initialization
 	// ========================================================================
 	mcpInit, mcpErrors := initMCPAsync(cfg)
+	startupErrors = append(startupErrors, mcpErrors...)
+
+	// ========================================================================
+	// Theme loading — warm up theme manager and collect parse warnings.
+	// ========================================================================
+	themeMgr := theme.NewManager(cfg.ThemesFolder)
+	// Load each known theme to collect parse warnings.
+	for _, info := range themeMgr.GetThemes() {
+		themeMgr.LoadTheme(info.Name)
+	}
+	startupErrors = append(startupErrors, themeMgr.GetWarnings()...)
 
 	// ========================================================================
 	// System Prompt Construction (base — without MCP sections)
@@ -153,7 +171,7 @@ func Setup(cfg *config.Settings) (*Config, error) {
 		MaxSteps:          cfg.MaxSteps,
 		ToolConfirmTools:  cfg.ToolConfirm,
 		MCPInit:           mcpInit,
-		MCPStartupErrors:  mcpErrors,
+		StartupErrors:     startupErrors,
 	}, nil
 }
 

@@ -40,6 +40,14 @@ func (s *Session) activeModelName() string {
 	return s.modelService.ActiveModelName()
 }
 
+// RuntimeManager returns the runtime manager, or nil.
+func (s *Session) RuntimeManager() *RuntimeManager {
+	if s.modelService == nil {
+		return nil
+	}
+	return s.modelService.RuntimeManager()
+}
+
 func (s *Session) ensureAgentInitialized() error {
 	return s.modelService.EnsureInitialized(s.BaseTools, s.SystemPrompt, s.ExtraSystemPrompt, s.MaxSteps)
 }
