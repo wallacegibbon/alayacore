@@ -284,12 +284,23 @@ The **semantics** of the history ID differ by tag type:
    are available. The adapter should display them so the user can fix their
    `model.conf`.
 
-3. **Output stream broken**: On the first write error to stdout, the agent
+3. **MCP config errors**: At startup, MCP configuration errors (empty server
+   name, duplicate server names, etc.) are sent to the adapter as system error
+   messages:
+   ```
+   SM {"type":"error","data":{"text":"mcp.conf: skipping block with empty server name"}}
+   SM {"type":"error","data":{"text":"mcp.conf: duplicate server name \"my-db\" — skipped"}}
+   ```
+   These are informational — the session continues with whatever valid MCP
+   servers are available. The adapter should display them so the user can fix
+   their `mcp.conf`.
+
+4. **Output stream broken**: On the first write error to stdout, the agent
    cancels the session context and stops processing. No further frames are
    sent. The adapter will see EOF on stdout and should handle it gracefully
    (e.g. close the connection, show a notification).
 
-4. **Missing UF**: A tool call (AF) without a matching UF is still in progress.
+5. **Missing UF**: A tool call (AF) without a matching UF is still in progress.
    If the session ends before all tool calls complete, pending tool calls are
    abandoned — no UF will arrive for them.
 

@@ -3,6 +3,7 @@ package app
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/alayacore/alayacore/internal/config"
@@ -162,5 +163,54 @@ url: "https://valid.example.com"
 	}
 	if len(warnings) != 1 {
 		t.Errorf("expected 1 warning for empty server name, got %d", len(warnings))
+	}
+}
+
+func TestLoadMCPConfigs_DuplicateServerName(t *testing.T) {
+	content := `---
+server: my-db
+command: npx
+args: ["@anthropic/mcp-db-server"]
+---
+server: my-db
+url: "https://example.com/mcp"
+---
+server: other
+url: "https://other.example.com/mcp"
+---
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "mcp.conf")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &config.Settings{MCPConfigPath: path}
+	configs, warnings := loadMCPConfigs(cfg)
+	if len(configs) != 2 {
+		t.Fatalf("expected 2 configs (first occurrence of my-db + other), got %d", len(configs))
+	}
+	if configs[0].Name != "my-db" {
+		t.Errorf("expected first config name 'my-db', got %q", configs[0].Name)
+	}
+	if configs[1].Name != "other" {
+		t.Errorf("expected second config name 'other', got %q", configs[1].Name)
+	}
+
+	// Verify the first my-db is the stdio one (first occurrence preserved)
+	if configs[0].Command != "npx" {
+		t.Errorf("expected first my-db to be stdio (npx), got command=%q url=%q", configs[0].Command, configs[0].URL)
+	}
+
+	// Check duplicate warning
+	found := false
+	for _, w := range warnings {
+		if strings.Contains(w, "duplicate server name") && strings.Contains(w, "my-db") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected warning about duplicate server name 'my-db', got: %v", warnings)
 	}
 }

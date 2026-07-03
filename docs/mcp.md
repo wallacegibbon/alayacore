@@ -64,6 +64,15 @@ auth-type: authorization_code
 >
 > For `static` auth, only `auth-token` is used (a pre-obtained API key or token).
 
+### Validation
+
+Server configurations are validated at load time. A server block is **rejected** if:
+
+- `server` name is empty
+- `server` name duplicates another block — the first occurrence is kept, subsequent duplicates are skipped
+
+Rejected servers are skipped and an error is reported to the adapter. Other valid servers in the same file are unaffected.
+
 ### Quick Start
 
 Create `~/.alayacore/mcp.conf` with your server definitions:

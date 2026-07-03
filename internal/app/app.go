@@ -49,7 +49,20 @@ func loadMCPConfigs(cfg *config.Settings) ([]mcp.ServerConfig, []string) {
 		configs = append(configs, fileCfg.ToServerConfig())
 	}
 
-	return configs, warnings
+	// Check for duplicate server names.
+	// First occurrence is kept; subsequent duplicates are reported as errors.
+	seenNames := make(map[string]bool)
+	deduped := make([]mcp.ServerConfig, 0, len(configs))
+	for _, cfg := range configs {
+		if seenNames[cfg.Name] {
+			warnings = append(warnings, fmt.Sprintf("mcp.conf: duplicate server name %q — skipped", cfg.Name))
+			continue
+		}
+		seenNames[cfg.Name] = true
+		deduped = append(deduped, cfg)
+	}
+
+	return deduped, warnings
 }
 
 // This package provides shared initialization for all adapters.
