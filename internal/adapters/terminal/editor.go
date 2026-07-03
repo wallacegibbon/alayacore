@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"runtime"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -60,18 +59,6 @@ func errEditorNotFound() error {
 // ============================================================================
 // Editor
 // ============================================================================
-
-// defaultEditors is the list of editor binaries to try when $EDITOR is not set.
-// Ordered by preference per OS.
-var defaultEditors []string
-
-func init() { //nolint:gochecknoinits // platform-specific list requires init-time setup
-	if runtime.GOOS == "windows" {
-		defaultEditors = []string{"vim", "notepad"}
-	} else {
-		defaultEditors = []string{"vim", "vi"}
-	}
-}
 
 // Editor handles external editor operations
 type Editor struct {
