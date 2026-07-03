@@ -294,13 +294,18 @@ func (a *Agent) handleStreamedToolInput(ctx context.Context, tc *ToolInputPart, 
 	if callbacks.ToolNeedsConfirm != nil && callbacks.ToolNeedsConfirm(tc.Name) {
 		// Start goroutine that waits for confirmation before executing.
 		historyID := genHistoryID(callbacks)
-		go func(tc *ToolInputPart, historyID uint64) {
-			if !<-callbacks.OnToolConfirm(tc.ToConfirmRequest()) {
-				resultCh <- newToolOutput(callbacks, tc.ID, nil, fmt.Errorf("Tool execution denied by user"), historyID)
-				return
+		go func(ctx context.Context, tc *ToolInputPart, historyID uint64) {
+			select {
+			case allowed := <-callbacks.OnToolConfirm(tc.ToConfirmRequest()):
+				if !allowed {
+					resultCh <- newToolOutput(callbacks, tc.ID, nil, fmt.Errorf("Tool execution denied by user"), historyID)
+					return
+				}
+				resultCh <- a.executeTool(ctx, tc, callbacks, historyID)
+			case <-ctx.Done():
+				resultCh <- newToolOutput(callbacks, tc.ID, nil, ctx.Err(), historyID)
 			}
-			resultCh <- a.executeTool(ctx, tc, callbacks, historyID)
-		}(tc, historyID)
+		}(ctx, tc, historyID)
 		return
 	}
 

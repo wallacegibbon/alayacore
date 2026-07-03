@@ -222,16 +222,24 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.ContentPart) 
 		OnToolConfirm: func(req llm.ToolConfirmRequest) <-chan bool {
 			ch := make(chan bool, 1)
 
-			s.confirmMu.Lock()
-			s.confirmChs[req.ID] = ch
-			s.confirmMu.Unlock()
-
+			// outputBroken: don't store in map, send false inline.
+			// The goroutine receives false immediately and treats it as denied.
 			if s.outputBroken.Load() {
 				ch <- false
 				return ch
 			}
+
+			s.confirmMu.Lock()
+			s.confirmChs[req.ID] = ch
+			s.confirmMu.Unlock()
+
 			if err := stream.WriteSystemMsg(s.Output, stream.ToolConfirmMsg{ID: req.ID}); err != nil {
 				s.markOutputBroken()
+				// SM write failed — remove the entry so handleConfirmCommand
+				// won't find a stale channel later.
+				s.confirmMu.Lock()
+				delete(s.confirmChs, req.ID)
+				s.confirmMu.Unlock()
 				ch <- false
 			}
 
