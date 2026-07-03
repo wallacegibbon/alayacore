@@ -430,21 +430,25 @@ func (c *Client) startMonitor() {
 		return
 	}
 
-	go func() {
-		<-tp.Done()
+	go c.monitorTransport(tp)
+}
 
-		// Only transition from Ready — Close() may have set Disconnected.
-		if !c.state.CompareAndSwap(int32(StateReady), int32(StateFailed)) {
-			return
-		}
+// monitorTransport waits for the transport to finish and transitions the
+// client to StateFailed if it dies unexpectedly (i.e. not via Close()).
+func (c *Client) monitorTransport(tp Transport) {
+	<-tp.Done()
 
-		// Claim the right to close closedCh.
-		// If Close() ran first (closeDone already true), skip.
-		if !c.closeDone.Swap(true) {
-			ch := c.closedCh
-			close(ch)
-		}
-	}()
+	// Only transition from Ready — Close() may have set Disconnected.
+	if !c.state.CompareAndSwap(int32(StateReady), int32(StateFailed)) {
+		return
+	}
+
+	// Claim the right to close closedCh.
+	// If Close() ran first (closeDone already true), skip.
+	if !c.closeDone.Swap(true) {
+		ch := c.closedCh
+		close(ch)
+	}
 }
 
 // setupNotificationHandler registers a notification handler on the transport
