@@ -356,20 +356,25 @@ func (t *StreamableHTTPTransport) StartGETStream(ctx context.Context, handler Se
 	// Start reading in background.
 	sr := newSSEReadCloser(resp.Body)
 	t.readerWg.Add(1)
-	go func() {
-		defer t.readerWg.Done()
-		defer sr.Close()
-		defer func() {
-			t.getSSEMu.Lock()
-			t.getSSECancel = nil
-			t.getSSEMu.Unlock()
-			close(t.getSSEClosed)
-		}()
-
-		t.readSSELoop(sr, handler, t.notificationHandler)
-	}()
+	go t.readSSEStream(sr, handler)
 
 	return nil
+}
+
+// readSSEStream reads SSE events from a stream in a background goroutine.
+// It ensures cleanup of the stream, reader goroutine tracking, and GET
+// stream state (cancel func, closed channel) on exit.
+func (t *StreamableHTTPTransport) readSSEStream(sr *sseReadCloser, handler ServerRequestHandler) {
+	defer t.readerWg.Done()
+	defer sr.Close()
+	defer func() {
+		t.getSSEMu.Lock()
+		t.getSSECancel = nil
+		t.getSSEMu.Unlock()
+		close(t.getSSEClosed)
+	}()
+
+	t.readSSELoop(sr, handler, t.notificationHandler)
 }
 
 // readSSELoop reads SSE events from a stream and dispatches them.
