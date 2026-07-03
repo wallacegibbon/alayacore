@@ -155,16 +155,34 @@ func parseModelConfig(content string) ([]config.ModelConfig, []string) {
 	models, warns := config.ParseModelList(content)
 	msgs = append(msgs, warns...)
 
-	valid := make([]config.ModelConfig, 0, len(models))
-	for _, model := range models {
+	// First pass: validate all models and collect names.
+	type candidate struct {
+		model config.ModelConfig
+		index int // original block index (1-based for reporting)
+	}
+	var validCands []candidate
+	for i, model := range models {
 		if errs := validateModel(model); len(errs) > 0 {
 			msgs = append(msgs, errs...)
 			continue // skip broken model
 		}
-		valid = append(valid, model)
+		validCands = append(validCands, candidate{model: model, index: i + 1})
 	}
 
-	return valid, msgs
+	// Second pass: check for duplicate names among valid models.
+	// Keep the first occurrence; report and skip subsequent duplicates.
+	seenNames := make(map[string]bool)
+	result := make([]config.ModelConfig, 0, len(validCands))
+	for _, c := range validCands {
+		if c.model.Name != "" && seenNames[c.model.Name] {
+			msgs = append(msgs, fmt.Sprintf("model block %d: duplicate name %q — skipped", c.index, c.model.Name))
+			continue
+		}
+		seenNames[c.model.Name] = true
+		result = append(result, c.model)
+	}
+
+	return result, msgs
 }
 
 // validateModel checks required fields and returns errors for any issues found.

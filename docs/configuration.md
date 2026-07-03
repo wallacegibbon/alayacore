@@ -100,6 +100,8 @@ Models are validated at load time (startup and after `:model_load`). A model is 
 
 Rejected models are skipped — they won't appear in the model selector. Errors are printed at startup and shown as errors after `:model_load`. Other valid models in the same file are unaffected.
 
+If two or more models share the same `name`, the first occurrence is kept and subsequent duplicates are **rejected** with an error message. This prevents ambiguity in model selection.
+
 If a field value has the wrong type (e.g. `context_limit: abc`), a warning is printed but the model is still loaded with the zero value for that field.
 
 ### Switching Models at Runtime

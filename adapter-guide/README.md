@@ -273,16 +273,27 @@ The **semantics** of the history ID differ by tag type:
    The adapter should display the error and stop sending new prompts — no
    further frames will be processed.
 
-2. **Output stream broken**: On the first write error to stdout, the agent
+2. **Model config errors**: At startup and after `:model_load`, model
+   configuration errors (invalid fields, duplicate names, etc.) are sent to the
+   adapter as system error messages:
+   ```
+   SM {"type":"error","data":{"text":"model \"Bad Model\": unknown protocol_type \"foobar\" — skipped"}}
+   SM {"type":"error","data":{"text":"model block 3: duplicate name \"Model A\" — skipped"}}
+   ```
+   These are informational — the session continues with whatever valid models
+   are available. The adapter should display them so the user can fix their
+   `model.conf`.
+
+3. **Output stream broken**: On the first write error to stdout, the agent
    cancels the session context and stops processing. No further frames are
    sent. The adapter will see EOF on stdout and should handle it gracefully
    (e.g. close the connection, show a notification).
 
-3. **Missing UF**: A tool call (AF) without a matching UF is still in progress.
+4. **Missing UF**: A tool call (AF) without a matching UF is still in progress.
    If the session ends before all tool calls complete, pending tool calls are
    abandoned — no UF will arrive for them.
 
-4. **History ID collision**: History IDs are assigned monotonically. During
+5. **History ID collision**: History IDs are assigned monotonically. During
    live streaming they come from a single counter; during replay they are
    rebuilt from `seqID++`. Collisions cannot occur under normal operation.
    If a corrupt session causes duplicate IDs, the adapter should treat each

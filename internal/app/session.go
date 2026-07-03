@@ -62,12 +62,14 @@ func StartSession(cfg *Config, output io.Writer, input *stream.SliceBuffer) (*ag
 		return nil, nil, err
 	}
 
-	// Display config validation messages (unknown protocol_type, missing fields, etc.)
+	// Display config validation messages (unknown protocol_type, missing fields, duplicate names, etc.)
 	// Must come before HasModels() check so specific errors are shown even when
 	// all models are rejected.
 	if msgs := session.GetLoadErrors(); len(msgs) > 0 {
 		for _, m := range msgs {
 			fmt.Fprintf(os.Stderr, "%s\n", m)
+			// Send to adapter as system error messages for TUI/plainio display
+			_ = stream.WriteSystemMsg(output, stream.ErrorMsg{Text: m})
 		}
 	}
 
