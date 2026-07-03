@@ -45,18 +45,17 @@ const maxMessageSize = 1<<31 - 1 // Max int32 to fit in uint32
 // EncodeTLV creates a TLV-encoded byte slice.
 // Format: [2-byte tag][4-byte length][value]
 func EncodeTLV(tag string, value string) []byte {
-	data := []byte(value)
-	length := len(data)
+	length := len(value)
 	if length > maxMessageSize {
 		length = maxMessageSize
-		data = data[:maxMessageSize]
+		value = value[:maxMessageSize]
 	}
 
 	msg := make([]byte, 6+length)
 	msg[0] = tag[0]
 	msg[1] = tag[1]
 	binary.BigEndian.PutUint32(msg[2:], uint32(length)) //nolint:gosec // G115: length is bounded by maxMessageSize
-	copy(msg[6:], data)
+	copy(msg[6:], value)
 
 	return msg
 }
