@@ -54,7 +54,7 @@ The session uses three goroutines for concurrent operation:
 | `taskEventCh` (buffered, cap 64) | task worker | run() | Step progress, token counts |
 | `taskRefreshCh` (buffered, cap 1) | task worker | run() | Request system-info broadcast |
 | `outputBroken` (atomic.Bool) | both | — | Output stream failure flag (any goroutine can set) |
-| `confirmCh` (atomic.Pointer) | both | — | Tool-confirmation channel handoff |
+| `confirmChs` (map + mutex) | both | — | Per-tool confirmation channel map (MCP-style) |
 
 **Lifecycle — drain on EOF:**
 
@@ -120,7 +120,7 @@ Agent.Stream(ctx, messages, llm.StreamCallbacks{
 	OnToolInputStart:    func(toolCallID, name string, historyID uint64) error { ... },
 	OnToolInputComplete: func(toolCallID string, input json.RawMessage, historyID uint64) error { ... },
 	OnToolOutput:        func(toolCallID string, contents []ContentPart, err error, historyID uint64) error { ... },
-	OnToolConfirm:       func(requests []llm.ToolConfirmRequest) <-chan llm.ToolConfirmResponse { ... },
+	OnToolConfirm:       func(req llm.ToolConfirmRequest) <-chan bool { ... },
 	ToolNeedsConfirm:    func(name string) bool { ... },
 	OnStepStart:         func(step int) error { ... },
 	OnStepFinish:        func(contents []ContentPart, usage Usage) error { ... },
@@ -237,7 +237,7 @@ correct base directory for the current session.
 2. **Virtual Scrolling** — Only visible windows are rendered. See [virtual-rendering-performance.md](virtual-rendering-performance.md).
 3. **Typed Tools** — `TypedExecute[T]` wrapper for type-safe tool implementations with auto-generated schemas. See [schema-improvements.md](schema-improvements.md).
 4. **Lazy Agent Init** — Agent and provider are created on first use, not at startup.
-5. **Tool Execution** — Tools execute concurrently during streaming (no-confirm) or as confirmations arrive (deferred). See [tool-execution.md](tool-execution.md).
+5. **Tool Execution** — Tools execute concurrently during streaming. Tools needing confirmation block on per-tool channels until the user responds (MCP-style). See [tool-execution.md](tool-execution.md).
 6. **Context Efficiency** — Large outputs (>64KB) saved to `os.TempDir()/alayacore-<suffix>/` instead of inline. See [truncation.md](truncation.md).
 7. **Reasoning Mode** — Provider-specific thinking fields added to API requests. Three levels: 0=off, 1=normal, 2=max. Toggled via `:reason [0|1|2]`.
 8. **Concurrent Task Execution** — Each task runs in its own goroutine so the main loop stays responsive during LLM streaming. Communication via typed channels and atomic fields.

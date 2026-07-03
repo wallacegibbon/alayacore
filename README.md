@@ -113,7 +113,8 @@ See [providers.md](docs/providers.md) for provider-specific details.
 | [Providers](docs/providers.md) | Provider-specific gotchas (tool call chunking, null args, reasoning mode) |
 | [Context Tracking](docs/context-tracking.md) | How context tokens are tracked and displayed |
 | [Error Handling](docs/error-handling.md) | Error detection and propagation from LLM APIs |
-| [Tool Execution](docs/tool-execution.md) | Concurrent + deferred tool execution strategy |
+| [Tool Execution](docs/tool-execution.md) | Concurrent tool execution with per-tool MCP-style confirmation |
+
 | [Output Truncation](docs/truncation.md) | How large tool outputs are handled within context budgets |
 
 **Internal design docs**: [docs/internal/](docs/internal/)

@@ -199,15 +199,23 @@ func (om *OverlayManager) HandleMCPProgress(out OutputWriter) OverlayAction {
 	}
 
 	// 2. Tool confirm (separate from MCP init).
-	if id, name, input, ok := out.GetPendingToolConfirm(); ok {
-		om.OpenConfirmTool(id, name, input)
-		return OverlayAction{OpenedConfirm: true}
+	// Only pop when no confirm dialog is already showing — the tick
+	// runs every 250ms and would otherwise overwrite the current dialog
+	// with the next queued item before the user can respond.
+	if !om.confirmOverlay.IsOpen() {
+		if id, name, input, ok := out.GetPendingToolConfirm(); ok {
+			om.OpenConfirmTool(id, name, input)
+			return OverlayAction{OpenedConfirm: true}
+		}
 	}
 
 	// 3. MCP auth confirm — open confirm dialog on top of init overlay.
-	if server, url, ok := out.GetPendingMCPAuth(); ok {
-		om.OpenConfirmMCPAuth(server, url)
-		return OverlayAction{OpenedConfirm: true}
+	// Same guard: don't overwrite an already-open confirm dialog.
+	if !om.confirmOverlay.IsOpen() {
+		if server, url, ok := out.GetPendingMCPAuth(); ok {
+			om.OpenConfirmMCPAuth(server, url)
+			return OverlayAction{OpenedConfirm: true}
+		}
 	}
 
 	// 4. Init overlay — show for any active (non-empty, non-done) status.

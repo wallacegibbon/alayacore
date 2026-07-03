@@ -42,6 +42,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -111,7 +112,8 @@ type sharedState struct {
 	sessionCtx    context.Context
 	sessionCancel context.CancelFunc
 
-	confirmCh atomic.Pointer[chan<- llm.ToolConfirmResponse]
+	confirmChs map[string]chan bool
+	confirmMu  sync.Mutex
 
 	outputBroken atomic.Bool
 }
@@ -212,6 +214,7 @@ func NewSession(cfg SessionConfig) *Session {
 		sharedState: sharedState{
 			sessionCtx:    ctx,
 			sessionCancel: cancel,
+			confirmChs:    make(map[string]chan bool),
 		},
 		runDoneCh: make(chan struct{}),
 		CreatedAt: time.Now(),
@@ -255,6 +258,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 		sharedState: sharedState{
 			sessionCtx:    ctx,
 			sessionCancel: cancel,
+			confirmChs:    make(map[string]chan bool),
 		},
 		runDoneCh: make(chan struct{}),
 		CreatedAt: data.CreatedAt,

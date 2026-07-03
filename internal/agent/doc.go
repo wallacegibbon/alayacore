@@ -33,7 +33,8 @@
 //	     via a message channel.
 //
 //	The only mutable state accessed from more than one goroutine are:
-//	  - atomic fields for outputBroken and confirmCh
+//	  - atomic fields for outputBroken
+//	  - confirmChs map + confirmMu mutex for tool confirmation channels
 //	  - A few buffered channels for cancellation, completion signaling,
 //	    and system-info refresh.
 //

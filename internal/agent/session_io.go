@@ -358,8 +358,8 @@ func (s *Session) handleFork(args string) {
 }
 
 // handleConfirmCommand processes a `:confirm <id> yes|no` command.
-// It writes the response to the task goroutine's pending confirmation
-// channel.  Called from the run() goroutine via the command registry.
+// It looks up the per-tool confirmation channel and writes the
+// user's decision. Called from the run() goroutine via the command registry.
 func (s *Session) handleConfirmCommand(args string) {
 	fields := strings.Fields(args)
 	if len(fields) != 2 {
@@ -368,11 +368,6 @@ func (s *Session) handleConfirmCommand(args string) {
 	}
 
 	id := fields[0]
-	p := s.confirmCh.Load()
-	if p == nil {
-		s.writeError("No pending tool confirmation")
-		return
-	}
 
 	var allowed bool
 	switch fields[1] {
@@ -385,7 +380,17 @@ func (s *Session) handleConfirmCommand(args string) {
 		return
 	}
 
-	*p <- llm.ToolConfirmResponse{ID: id, Allowed: allowed}
+	s.confirmMu.Lock()
+	ch, ok := s.confirmChs[id]
+	delete(s.confirmChs, id)
+	s.confirmMu.Unlock()
+
+	if !ok {
+		s.writeError("No pending tool confirmation for " + id)
+		return
+	}
+
+	ch <- allowed
 }
 
 // startTaskContinue starts a task goroutine for :continue.

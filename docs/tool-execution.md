@@ -1,35 +1,37 @@
-# Tool Execution: Concurrent + Deferred
+# Tool Execution: Concurrent with Per-Tool Confirmation
 
-AlayaCore executes tool calls using a **two-phase strategy**: tools that don't need confirmation run **concurrently during streaming**, while tools needing confirmation are **deferred and executed as confirmations arrive**.
+AlayaCore executes tool calls using a **unified concurrent strategy**: all tools run in goroutines during streaming. Tools that need confirmation block on a per-tool channel until the user responds, while tools that don't need confirmation execute immediately.
 
 ## How It Works
 
 When a `ToolInputPart` event arrives during streaming, the agent calls `ToolNeedsConfirm(toolName)`:
 
 1. **No confirmation needed** — The tool executes immediately in a goroutine. Results flow back through a channel and are appended in receive order.
-2. **Confirmation needed** — The tool is deferred. After streaming completes, `OnToolConfirm` is called with only the deferred tools. As each confirm response arrives, the confirmed tool executes in a goroutine.
+2. **Confirmation needed** — A goroutine is started that obtains a per-tool confirm channel and blocks until the user responds. Once confirmed, the tool executes in the same goroutine.
 
 All results are collected and then re-ordered by tool call ID to match the original `stepMessage.Contents` order.
 
-See `internal/llm/agent.go` → `Stream()`, `streamEvents()`, and `executeDeferredTools()`.
+See `internal/llm/agent.go` → `Stream()`, `streamEvents()`, and `handleStreamedToolInput()`.
 
 ## Execution Strategy
 
 | Phase | Tools | Execution |
 |-------|-------|-----------|
 | **During streaming** | No confirmation needed (`ToolNeedsConfirm` returns false) | Concurrent goroutines, results appended and re-ordered by ID |
-| **After streaming** | Confirmation needed (deferred) | Concurrent goroutines per confirm response, results appended and re-ordered by ID |
+| **During streaming** | Confirmation needed (`ToolNeedsConfirm` returns true) | Goroutine blocks on per-tool confirm channel, then executes |
 | **Final** | All results | Re-ordered by tool call ID to match LLM response order |
 
 ## Confirmation
 
-`ToolNeedsConfirm` filters which tools need user approval. Only those tools are deferred; all others execute immediately during streaming. `OnToolConfirm` receives only confirm-required tools and returns a channel. The agent reads confirm responses one at a time. As each tool is confirmed, it executes immediately in a goroutine — overlapping with other confirms and executions.
+`ToolNeedsConfirm` filters which tools need user approval. When a tool needs confirmation, `OnToolConfirm` is called **per tool** and returns a per-tool channel. The tool's goroutine blocks on this channel. The session stores the channel in a map keyed by tool call ID. When the user responds via `:confirm <id> yes|no`, the session looks up the channel in the map and writes the response, unblocking the goroutine which then executes the tool.
 
-The TUI adapter processes confirmations sequentially (one dialog at a time). Other adapters can process the batch in parallel.
+Each tool has its own confirm channel (buffered, capacity 1), following the same pattern used by MCP OAuth confirmation. This keeps the tool lifecycle continuous — no artificial segmentation between streaming, confirmation collection, and execution.
+
+The TUI adapter processes confirmations sequentially (one dialog at a time). Other adapters can process them in parallel.
 
 ## Implementation
 
-Results from both phases are merged and re-ordered by ID:
+All results (from both confirmed and unconfirmed tools) flow through a single shared channel and are re-ordered by ID:
 
 ```go
 toolInputs := extractToolInputs(stepMessage.Contents) // original order from LLM

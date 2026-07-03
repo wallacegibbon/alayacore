@@ -160,7 +160,7 @@ func parseModelConfig(content string) ([]config.ModelConfig, []string) {
 		model config.ModelConfig
 		index int // original block index (1-based for reporting)
 	}
-	var validCands []candidate
+	var validCands = make([]candidate, 0, len(models))
 	for i, model := range models {
 		if errs := validateModel(model); len(errs) > 0 {
 			msgs = append(msgs, errs...)

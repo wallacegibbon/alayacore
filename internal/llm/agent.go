@@ -62,12 +62,15 @@ type StreamCallbacks struct {
 	OnToolInputComplete func(toolCallID string, input json.RawMessage, historyID uint64) error
 	OnToolOutput        func(toolCallID string, contents []ContentPart, err error, historyID uint64) error
 
-	// OnToolConfirm is called with tools that require user confirmation.
-	// Only tools for which ToolNeedsConfirm returned true are included.
-	OnToolConfirm func(requests []ToolConfirmRequest) <-chan ToolConfirmResponse
+	// OnToolConfirm is called for each tool that requires user confirmation.
+	// It returns a channel that receives the user's decision (true = allowed).
+	// Only tools for which ToolNeedsConfirm returned true trigger this callback.
+	// The callback is called from a per-tool goroutine that blocks on the
+	// returned channel until the user responds.
+	OnToolConfirm func(request ToolConfirmRequest) <-chan bool
 
 	// ToolNeedsConfirm reports whether a tool requires user confirmation.
-	// If nil, no tools are deferred — they all execute immediately.
+	// If nil, no tools trigger confirmation — they all execute immediately.
 	ToolNeedsConfirm func(name string) bool
 
 	OnStepStart  func(step int) error
@@ -93,15 +96,6 @@ func (tc *ToolInputPart) ToConfirmRequest() ToolConfirmRequest {
 		Name:  tc.Name,
 		Input: tc.Input,
 	}
-}
-
-// ToolConfirmResponse represents the user's decision for a specific tool call.
-// If Error is non-empty, the tool result is recorded as failed with that reason.
-// If Allowed is false (and Error is empty), the tool is recorded as denied by user.
-type ToolConfirmResponse struct {
-	ID      string
-	Allowed bool
-	Error   string
 }
 
 // StreamResult is the final result of streaming.
@@ -187,16 +181,12 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 		stepContents []ContentPart
 		stepUsage    Usage
 		truncated    bool
-		deferred     []*ToolInputPart
 		results      []ContentPart
 	)
 
 	// Channel for collecting all tool execution results.
 	// Buffered so sender goroutines exit immediately after execution.
-	// Capacity 16 covers all no-confirm + deferred results in practice.
-	// Errors/denials are sent synchronously before the collection loop,
-	// so the buffer must be large enough for all of them.
-	// Unbuffered would also work (execution already done by time of send).
+	// Capacity 16 covers all tool results in practice.
 	resultCh := make(chan ContentPart, 16)
 	execCount := 0
 
@@ -243,7 +233,7 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 			}
 			execCount++
 			tc := e.ToPart(id, nameByIndex[e.Index])
-			deferred = a.handleStreamedToolInput(ctx, tc, callbacks, deferred, resultCh)
+			a.handleStreamedToolInput(ctx, tc, callbacks, resultCh)
 
 		case StepCompleteEvent:
 			stepContents = e.Contents
@@ -263,7 +253,8 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 		}
 	}
 
-	a.executeDeferredTools(ctx, deferred, callbacks, resultCh)
+	// All tools (confirm and no-confirm) execute in goroutines started
+	// during streaming. Collect all results.
 
 	for i := 0; i < execCount; i++ {
 		results = append(results, <-resultCh)
@@ -295,63 +286,28 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 }
 
 // handleStreamedToolInput processes a completed tool use during streaming.
-// If the tool requires confirmation (per ToolNeedsConfirm), it is deferred.
-// Otherwise it executes immediately in a goroutine.
-func (a *Agent) handleStreamedToolInput(ctx context.Context, tc *ToolInputPart, callbacks StreamCallbacks, deferred []*ToolInputPart, resultCh chan<- ContentPart) []*ToolInputPart {
+// If the tool requires confirmation (per ToolNeedsConfirm), it starts a
+// goroutine that obtains a per-tool confirm channel and blocks until the
+// user responds. Otherwise it executes immediately in a goroutine.
+// All tools send exactly one result through resultCh.
+func (a *Agent) handleStreamedToolInput(ctx context.Context, tc *ToolInputPart, callbacks StreamCallbacks, resultCh chan<- ContentPart) {
 	if callbacks.ToolNeedsConfirm != nil && callbacks.ToolNeedsConfirm(tc.Name) {
-		deferred = append(deferred, tc)
-		return deferred
+		// Start goroutine that waits for confirmation before executing.
+		historyID := genHistoryID(callbacks)
+		go func(tc *ToolInputPart, historyID uint64) {
+			if !<-callbacks.OnToolConfirm(tc.ToConfirmRequest()) {
+				resultCh <- newToolOutput(callbacks, tc.ID, nil, fmt.Errorf("Tool execution denied by user"), historyID)
+				return
+			}
+			resultCh <- a.executeTool(ctx, tc, callbacks, historyID)
+		}(tc, historyID)
+		return
 	}
 
 	historyID := genHistoryID(callbacks)
 	go func(tc *ToolInputPart, historyID uint64) {
 		resultCh <- a.executeTool(ctx, tc, callbacks, historyID)
 	}(tc, historyID)
-	return deferred
-}
-
-// executeDeferredTools sends deferred tools for confirmation and executes
-// confirmed tools concurrently as confirm responses arrive.
-// Results (errors, denials, and successful executions) are all sent through resultCh.
-// Exactly len(deferred) items are sent to the channel.
-func (a *Agent) executeDeferredTools(ctx context.Context, deferred []*ToolInputPart, callbacks StreamCallbacks, resultCh chan<- ContentPart) {
-	if len(deferred) == 0 {
-		return
-	}
-
-	requests := make([]ToolConfirmRequest, len(deferred))
-	idToIdx := make(map[string]int, len(deferred))
-	for i, tc := range deferred {
-		requests[i] = tc.ToConfirmRequest()
-		idToIdx[tc.ID] = i
-	}
-
-	confirmCh := callbacks.OnToolConfirm(requests)
-
-	// Process confirm results as they arrive. Each response produces
-	// exactly one item sent to resultCh (error, denial, or execution result).
-	pendingConfirm := len(deferred)
-
-	for pendingConfirm > 0 {
-		resp := <-confirmCh
-		pendingConfirm--
-
-		if resp.Error != "" {
-			resultCh <- newToolOutput(callbacks, resp.ID, nil, fmt.Errorf("denied: %s", resp.Error), genHistoryID(callbacks))
-			continue
-		}
-		if !resp.Allowed {
-			resultCh <- newToolOutput(callbacks, resp.ID, nil, fmt.Errorf("Tool execution denied by user"), genHistoryID(callbacks))
-			continue
-		}
-
-		// Confirmed — execute concurrently.
-		tc := deferred[idToIdx[resp.ID]]
-		historyID := genHistoryID(callbacks)
-		go func(tc *ToolInputPart, historyID uint64) {
-			resultCh <- a.executeTool(ctx, tc, callbacks, historyID)
-		}(tc, historyID)
-	}
 }
 
 func (a *Agent) toolDefinitions() []ToolDefinition {

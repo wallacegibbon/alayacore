@@ -219,18 +219,20 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.ContentPart) 
 			s.writeTLVWithID(stream.TagUserF, historyID, string(data))
 			return nil
 		},
-		OnToolConfirm: func(requests []llm.ToolConfirmRequest) <-chan llm.ToolConfirmResponse {
-			ch := make(chan llm.ToolConfirmResponse, len(requests))
-			sc := chan<- llm.ToolConfirmResponse(ch)
-			s.confirmCh.Store(&sc)
+		OnToolConfirm: func(req llm.ToolConfirmRequest) <-chan bool {
+			ch := make(chan bool, 1)
 
-			for _, req := range requests {
-				if s.outputBroken.Load() {
-					ch <- llm.ToolConfirmResponse{ID: req.ID, Error: "output broken"}
-				} else if err := stream.WriteSystemMsg(s.Output, stream.ToolConfirmMsg{ID: req.ID}); err != nil {
-					s.markOutputBroken()
-					ch <- llm.ToolConfirmResponse{ID: req.ID, Error: fmt.Errorf("tool: %w", err).Error()}
-				}
+			s.confirmMu.Lock()
+			s.confirmChs[req.ID] = ch
+			s.confirmMu.Unlock()
+
+			if s.outputBroken.Load() {
+				ch <- false
+				return ch
+			}
+			if err := stream.WriteSystemMsg(s.Output, stream.ToolConfirmMsg{ID: req.ID}); err != nil {
+				s.markOutputBroken()
+				ch <- false
 			}
 
 			return ch
