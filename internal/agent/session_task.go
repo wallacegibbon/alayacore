@@ -172,91 +172,120 @@ func (s *Session) writeTLVWithID(tag string, historyID uint64, data string) {
 	s.writeTLV(tag, stream.WrapID(id, data))
 }
 
-//nolint:gocyclo // callback-heavy; extracting harms readability.
+// handleToolConfirm handles a tool confirmation request.
+// It creates a buffered channel and either:
+//   - Sends false immediately if output is broken (no map entry needed)
+//   - Registers the channel in confirmChs map and sends the SM notification
+//   - On SM write failure: removes the map entry and sends false
+//
+// The caller (agent goroutine) blocks on the returned channel until the
+// user responds via :confirm command, which writes to the channel via
+// handleConfirmCommand.
+func (s *Session) handleToolConfirm(req llm.ToolConfirmRequest) <-chan bool {
+	ch := make(chan bool, 1)
+
+	// outputBroken: don't store in map, send false inline.
+	if s.outputBroken.Load() {
+		ch <- false
+		return ch
+	}
+
+	s.confirmMu.Lock()
+	s.confirmChs[req.ID] = ch
+	s.confirmMu.Unlock()
+
+	if err := stream.WriteSystemMsg(s.Output, stream.ToolConfirmMsg{ID: req.ID}); err != nil {
+		s.markOutputBroken()
+		// SM write failed — remove the entry so handleConfirmCommand
+		// won't find a stale channel later.
+		s.confirmMu.Lock()
+		delete(s.confirmChs, req.ID)
+		s.confirmMu.Unlock()
+		ch <- false
+	}
+
+	return ch
+}
+
+// handleToolOutput serializes tool results and writes them to the output stream.
+func (s *Session) handleToolOutput(toolCallID string, contents []llm.ContentPart, err error, historyID uint64) error {
+	contentJSON, serErr := serializeContentParts(contents)
+	if serErr != nil {
+		contentJSON = []byte(`[{"type":"text","text":"(serialization error)"}]`)
+	}
+	data, marshalErr := json.Marshal(stream.ToolOutputData{
+		ID:      toolCallID,
+		Output:  contentJSON,
+		IsError: err != nil,
+	})
+	if marshalErr != nil {
+		return fmt.Errorf("failed to marshal tool output: %w", marshalErr)
+	}
+	s.writeTLVWithID(stream.TagUserF, historyID, string(data))
+	return nil
+}
+
+// handleTextDelta streams assistant text deltas to the output.
+func (s *Session) handleTextDelta(delta string, historyID uint64) error {
+	s.writeTLVWithID(stream.TagAssistantT, historyID, delta)
+	return nil
+}
+
+// handleReasoningDelta streams assistant reasoning deltas to the output.
+func (s *Session) handleReasoningDelta(delta string, historyID uint64) error {
+	s.writeTLVWithID(stream.TagAssistantR, historyID, delta)
+	return nil
+}
+
+// handleToolInputStart marshals and writes a tool call start frame.
+func (s *Session) handleToolInputStart(toolCallID, name string, historyID uint64) error {
+	data, err := json.Marshal(stream.ToolInputData{ID: toolCallID, Name: name})
+	if err != nil {
+		return fmt.Errorf("failed to marshal tool input start: %w", err)
+	}
+	s.writeTLVWithID(stream.TagAssistantF, historyID, string(data))
+	return nil
+}
+
+// handleToolInputComplete marshals and writes a tool call input frame.
+func (s *Session) handleToolInputComplete(toolCallID string, input json.RawMessage, historyID uint64) error {
+	data, err := json.Marshal(stream.ToolInputData{ID: toolCallID, Input: input})
+	if err != nil {
+		return fmt.Errorf("failed to marshal tool input complete: %w", err)
+	}
+	s.writeTLVWithID(stream.TagAssistantF, historyID, string(data))
+	return nil
+}
+
+// needsToolConfirm reports whether a tool requires user confirmation.
+func (s *Session) needsToolConfirm(name string) bool {
+	if s.toolConfirmSet == nil {
+		return false
+	}
+	_, ok := s.toolConfirmSet[name]
+	return ok
+}
+
+// handleStepStart handles the start of a new agent step.
+func (s *Session) handleStepStart(step int) error {
+	s.sendEvent(StepStartEvent{Step: step})
+	s.requestSystemInfo()
+	return nil
+}
+
 func (s *Session) processPrompt(ctx context.Context, history []llm.ContentPart) ([]llm.ContentPart, int64, error) {
 	var outputTokens int64
-
 	var fullContents []llm.ContentPart
 
 	_, err := s.Agent().Stream(ctx, history, llm.StreamCallbacks{
-		OnTextDelta: func(delta string, historyID uint64) error {
-			s.writeTLVWithID(stream.TagAssistantT, historyID, delta)
-			return nil
-		},
-		OnReasoningDelta: func(delta string, historyID uint64) error {
-			s.writeTLVWithID(stream.TagAssistantR, historyID, delta)
-			return nil
-		},
-		OnToolInputStart: func(toolCallID, name string, historyID uint64) error {
-			data, err := json.Marshal(stream.ToolInputData{ID: toolCallID, Name: name})
-			if err != nil {
-				return fmt.Errorf("failed to marshal tool input start: %w", err)
-			}
-			s.writeTLVWithID(stream.TagAssistantF, historyID, string(data))
-			return nil
-		},
-		OnToolInputComplete: func(toolCallID string, input json.RawMessage, historyID uint64) error {
-			data, err := json.Marshal(stream.ToolInputData{ID: toolCallID, Input: input})
-			if err != nil {
-				return fmt.Errorf("failed to marshal tool input complete: %w", err)
-			}
-			s.writeTLVWithID(stream.TagAssistantF, historyID, string(data))
-			return nil
-		},
-		OnToolOutput: func(toolCallID string, contents []llm.ContentPart, err error, historyID uint64) error {
-			contentJSON, serErr := serializeContentParts(contents)
-			if serErr != nil {
-				contentJSON = []byte(`[{"type":"text","text":"(serialization error)"}]`)
-			}
-			data, marshalErr := json.Marshal(stream.ToolOutputData{
-				ID:      toolCallID,
-				Output:  contentJSON,
-				IsError: err != nil,
-			})
-			if marshalErr != nil {
-				return fmt.Errorf("failed to marshal tool output: %w", marshalErr)
-			}
-			s.writeTLVWithID(stream.TagUserF, historyID, string(data))
-			return nil
-		},
-		OnToolConfirm: func(req llm.ToolConfirmRequest) <-chan bool {
-			ch := make(chan bool, 1)
-
-			// outputBroken: don't store in map, send false inline.
-			// The goroutine receives false immediately and treats it as denied.
-			if s.outputBroken.Load() {
-				ch <- false
-				return ch
-			}
-
-			s.confirmMu.Lock()
-			s.confirmChs[req.ID] = ch
-			s.confirmMu.Unlock()
-
-			if err := stream.WriteSystemMsg(s.Output, stream.ToolConfirmMsg{ID: req.ID}); err != nil {
-				s.markOutputBroken()
-				// SM write failed — remove the entry so handleConfirmCommand
-				// won't find a stale channel later.
-				s.confirmMu.Lock()
-				delete(s.confirmChs, req.ID)
-				s.confirmMu.Unlock()
-				ch <- false
-			}
-
-			return ch
-		},
-		ToolNeedsConfirm: func(name string) bool {
-			if s.toolConfirmSet == nil {
-				return false
-			}
-			_, ok := s.toolConfirmSet[name]
-			return ok
-		},
-		OnStepStart: func(step int) error {
-			s.sendEvent(StepStartEvent{Step: step})
-			s.requestSystemInfo()
-			return nil
-		},
+		OnTextDelta:         s.handleTextDelta,
+		OnReasoningDelta:    s.handleReasoningDelta,
+		OnToolInputStart:    s.handleToolInputStart,
+		OnToolInputComplete: s.handleToolInputComplete,
+		OnToolOutput:        s.handleToolOutput,
+		OnToolConfirm:       s.handleToolConfirm,
+		ToolNeedsConfirm:    s.needsToolConfirm,
+		OnStepStart:         s.handleStepStart,
 		OnStepFinish: func(contents []llm.ContentPart, usage llm.Usage) error {
 			fullContents = cleanIncompleteToolInputs(contents)
 			s.sendEvent(usageToStepFinishEvent(usage))
