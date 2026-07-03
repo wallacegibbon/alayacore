@@ -37,8 +37,9 @@ import (
 	"sync/atomic"
 
 	"github.com/alayacore/alayacore/internal/config"
-	"github.com/alayacore/alayacore/internal/stream"
+	"github.com/alayacore/alayacore/internal/protocol"
 	"github.com/alayacore/alayacore/internal/theme"
+	"github.com/alayacore/alayacore/internal/tlv"
 )
 
 // outputWriter parses TLV from the session and writes styled content to the WindowBuffer.
@@ -136,8 +137,8 @@ func (to *outputWriter) writeColored(tag string, value string) {
 	switch tag {
 	// Text content tags — may carry NUL-delimited history ID for live deltas,
 	// or plain text when replayed from a saved session file.
-	case stream.TagAssistantT, stream.TagAssistantR:
-		id, content, ok := stream.UnwrapID(value)
+	case tlv.TagAssistantT, tlv.TagAssistantR:
+		id, content, ok := tlv.UnwrapID(value)
 		if !ok {
 			// No history ID (e.g. replayed from session file) — each message
 			// gets its own window.
@@ -149,16 +150,16 @@ func (to *outputWriter) writeColored(tag string, value string) {
 
 	// User text tag — may carry NUL-delimited historyID
 	// User content tags — accumulated until next non-user tag triggers flush.
-	case stream.TagUserT:
-		id, content, ok := stream.UnwrapID(value)
+	case tlv.TagUserT:
+		id, content, ok := tlv.UnwrapID(value)
 		if !ok {
 			id = to.generateWindowID()
 			content = value
 		}
-		to.bufferUserContent(id, content, stream.TagUserT)
+		to.bufferUserContent(id, content, tlv.TagUserT)
 
-	case stream.TagUserI, stream.TagUserV, stream.TagUserA, stream.TagUserD:
-		id, _, ok := stream.UnwrapID(value)
+	case tlv.TagUserI, tlv.TagUserV, tlv.TagUserA, tlv.TagUserD:
+		id, _, ok := tlv.UnwrapID(value)
 		if !ok {
 			id = to.generateWindowID()
 		}
@@ -166,12 +167,12 @@ func (to *outputWriter) writeColored(tag string, value string) {
 
 	// Function lifecycle (JSON: id, type, name, input, status)
 	// May carry NUL-delimited historyID prefix
-	case stream.TagAssistantF:
-		id, payload, ok := stream.UnwrapID(value)
+	case tlv.TagAssistantF:
+		id, payload, ok := tlv.UnwrapID(value)
 		if !ok {
 			payload = value
 		}
-		var fd stream.ToolInputData
+		var fd protocol.ToolInputData
 		if err := json.Unmarshal([]byte(payload), &fd); err != nil {
 			return
 		}
@@ -195,12 +196,12 @@ func (to *outputWriter) writeColored(tag string, value string) {
 
 	// Function result (JSON: id, content, is_error)
 	// May carry NUL-delimited historyID prefix
-	case stream.TagUserF:
-		id, payload, ok := stream.UnwrapID(value)
+	case tlv.TagUserF:
+		id, payload, ok := tlv.UnwrapID(value)
 		if !ok {
 			payload = value
 		}
-		var tr stream.ToolOutputData
+		var tr protocol.ToolOutputData
 		if err := json.Unmarshal([]byte(payload), &tr); err != nil {
 			return
 		}
@@ -209,7 +210,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 		to.windowBuffer.HandleToolOutput(tr.ID, displayText, tr.IsError, parseHistoryID(id))
 
 	// System tags
-	case stream.TagSystemMsg:
+	case tlv.TagSystemMsg:
 		to.handleSystemMsg(value)
 		return
 
@@ -225,7 +226,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 // after processing, so it doesn't need the early dirty flag from this function.
 func (to *outputWriter) triggerUpdateForTag(tag string) {
 	switch tag {
-	case stream.TagAssistantT, stream.TagAssistantR, stream.TagAssistantF, stream.TagUserT, stream.TagUserF, stream.TagUserI, stream.TagUserV, stream.TagUserA, stream.TagUserD:
+	case tlv.TagAssistantT, tlv.TagAssistantR, tlv.TagAssistantF, tlv.TagUserT, tlv.TagUserF, tlv.TagUserI, tlv.TagUserV, tlv.TagUserA, tlv.TagUserD:
 		to.dirty.Store(true)
 	}
 }
@@ -233,32 +234,32 @@ func (to *outputWriter) triggerUpdateForTag(tag string) {
 // handleSystemMsg processes a TagSystemMsg frame.
 // Called from processBuffer which holds outputWriter.mu.
 func (to *outputWriter) handleSystemMsg(value string) {
-	env, err := stream.ParseSystemMsg(value)
+	env, err := protocol.ParseSystemMsg(value)
 	if err != nil {
 		return
 	}
-	switch stream.SystemMsgType(env.Type) {
-	case stream.MsgTypeError:
+	switch protocol.SystemMsgType(env.Type) {
+	case protocol.MsgTypeError:
 		to.handleSystemError(env.Data)
-	case stream.MsgTypeNotify:
+	case protocol.MsgTypeNotify:
 		to.handleSystemNotify(env.Data)
-	case stream.MsgTypeTask:
+	case protocol.MsgTypeTask:
 		to.handleSystemTask(env.Data)
-	case stream.MsgTypeModel:
+	case protocol.MsgTypeModel:
 		to.handleSystemModel(env.Data)
-	case stream.MsgTypeModelList:
+	case protocol.MsgTypeModelList:
 		to.handleSystemModelList(env.Data)
-	case stream.MsgTypeTheme:
+	case protocol.MsgTypeTheme:
 		to.handleSystemTheme(env.Data)
-	case stream.MsgTypeThemeList:
+	case protocol.MsgTypeThemeList:
 		to.handleSystemThemeList(env.Data)
-	case stream.MsgTypeReasoning:
+	case protocol.MsgTypeReasoning:
 		to.handleSystemReasoning(env.Data)
-	case stream.MsgTypeVideoConfig:
+	case protocol.MsgTypeVideoConfig:
 		to.handleSystemVideoConfig(env.Data)
-	case stream.MsgTypeToolConfirm:
+	case protocol.MsgTypeToolConfirm:
 		to.handleSystemToolConfirm(env.Data)
-	case stream.MsgTypeMCP:
+	case protocol.MsgTypeMCP:
 		to.handleSystemMCP(env.Data)
 	}
 	to.dirty.Store(true)
@@ -467,20 +468,20 @@ func (to *outputWriter) generateWindowID() string {
 
 // userTag returns true if tag is a user content tag.
 func userTag(tag string) bool {
-	return tag == stream.TagUserT || tag == stream.TagUserI ||
-		tag == stream.TagUserV || tag == stream.TagUserA || tag == stream.TagUserD
+	return tag == tlv.TagUserT || tag == tlv.TagUserI ||
+		tag == tlv.TagUserV || tag == tlv.TagUserA || tag == tlv.TagUserD
 }
 
 // mediaLabel returns a display label for media tags.
 func mediaLabel(tag string) string {
 	switch tag {
-	case stream.TagUserI:
+	case tlv.TagUserI:
 		return "📎 Image"
-	case stream.TagUserV:
+	case tlv.TagUserV:
 		return "🎬 Video"
-	case stream.TagUserA:
+	case tlv.TagUserA:
 		return "🎵 Audio"
-	case stream.TagUserD:
+	case tlv.TagUserD:
 		return "📄 Document"
 	}
 	return ""
@@ -494,7 +495,7 @@ func (to *outputWriter) bufferUserContent(id, content string, tag string) {
 	if to.activeUserWindowIdx < 0 {
 		// First frame — create the window
 		to.activeUserWindowID = id
-		to.activeUserWindowIdx = to.windowBuffer.AppendOrUpdate(stream.TagUserT, id, "")
+		to.activeUserWindowIdx = to.windowBuffer.AppendOrUpdate(tlv.TagUserT, id, "")
 		to.windowBuffer.SetWindowVisible(id)
 	}
 

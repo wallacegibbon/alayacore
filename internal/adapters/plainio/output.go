@@ -9,7 +9,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/alayacore/alayacore/internal/stream"
+	"github.com/alayacore/alayacore/internal/protocol"
+	"github.com/alayacore/alayacore/internal/tlv"
 )
 
 // stdoutOutput implements io.Writer.
@@ -77,22 +78,22 @@ func (o *stdoutOutput) printMessage(tag string, value string) {
 
 func (o *stdoutOutput) handleTag(tag, value string) {
 	switch tag {
-	case stream.TagAssistantT, stream.TagAssistantR:
+	case tlv.TagAssistantT, tlv.TagAssistantR:
 		o.handleTextDelta(tag, value)
 
-	case stream.TagUserT:
-		_, content, ok := stream.UnwrapID(value)
+	case tlv.TagUserT:
+		_, content, ok := tlv.UnwrapID(value)
 		if !ok {
 			content = value
 		}
 		o.emitSeparator(tag)
 		fmt.Fprintf(o.writer, "> %s\n", content)
 
-	case stream.TagSystemMsg:
+	case tlv.TagSystemMsg:
 		o.handleSystemMsg(value)
 
-	case stream.TagAssistantF:
-		_, payload, ok := stream.UnwrapID(value)
+	case tlv.TagAssistantF:
+		_, payload, ok := tlv.UnwrapID(value)
 		if !ok {
 			payload = value
 		}
@@ -104,8 +105,8 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 		// Show complete tool call JSON.
 		fmt.Fprintf(o.writer, "%s\n", payload)
 
-	case stream.TagUserF:
-		_, payload, ok := stream.UnwrapID(value)
+	case tlv.TagUserF:
+		_, payload, ok := tlv.UnwrapID(value)
 		if !ok {
 			payload = value
 		}
@@ -117,7 +118,7 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 		o.lastHistoryID = ""
 		fmt.Fprintf(o.writer, "%s\n", payload)
 
-	case stream.TagUserI, stream.TagUserV, stream.TagUserA, stream.TagUserD:
+	case tlv.TagUserI, tlv.TagUserV, tlv.TagUserA, tlv.TagUserD:
 		o.handleMediaTag(tag, value)
 
 	default:
@@ -130,7 +131,7 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 // It prints a separator when transitioning between different tags or
 // history IDs, then prints the content delta.
 func (o *stdoutOutput) handleTextDelta(tag, value string) {
-	id, content, _ := stream.UnwrapID(value)
+	id, content, _ := tlv.UnwrapID(value)
 	// When id is "" (replayed from session file, no NUL prefix),
 	// we just track it as-is — no history transition to detect.
 	if o.lastHistoryID != "" && o.lastTag != tag {
@@ -153,13 +154,13 @@ func (o *stdoutOutput) handleTextDelta(tag, value string) {
 // It updates lastTag to the new tag.
 // handleMediaTag prints a media label (image/video/audio/document).
 func (o *stdoutOutput) handleMediaTag(tag, value string) {
-	stream.UnwrapID(value)
+	tlv.UnwrapID(value)
 	o.emitSeparator(tag)
 	label := map[string]string{
-		stream.TagUserI: "image",
-		stream.TagUserV: "video",
-		stream.TagUserA: "audio",
-		stream.TagUserD: "document",
+		tlv.TagUserI: "image",
+		tlv.TagUserV: "video",
+		tlv.TagUserA: "audio",
+		tlv.TagUserD: "document",
 	}[tag]
 	fmt.Fprintf(o.writer, "[%s]\n", label)
 }
@@ -176,12 +177,12 @@ func (o *stdoutOutput) emitSeparator(tag string) {
 // Handles error, notify, task, and tool_confirm system messages.
 // Task completion transitions print a trailing blank line between tasks.
 func (o *stdoutOutput) handleSystemMsg(value string) {
-	env, err := stream.ParseSystemMsg(value)
+	env, err := protocol.ParseSystemMsg(value)
 	if err != nil {
 		return
 	}
-	switch stream.SystemMsgType(env.Type) {
-	case stream.MsgTypeError:
+	switch protocol.SystemMsgType(env.Type) {
+	case protocol.MsgTypeError:
 		var m struct {
 			Text string `json:"text"`
 		}
@@ -194,7 +195,7 @@ func (o *stdoutOutput) handleSystemMsg(value string) {
 				close(o.errorCh)
 			}
 		}
-	case stream.MsgTypeNotify:
+	case protocol.MsgTypeNotify:
 		var m struct {
 			Text string `json:"text"`
 		}
@@ -203,7 +204,7 @@ func (o *stdoutOutput) handleSystemMsg(value string) {
 			o.lastTag = ""
 			o.lastHistoryID = ""
 		}
-	case stream.MsgTypeTask:
+	case protocol.MsgTypeTask:
 		var m struct {
 			InProgress bool `json:"in_progress"`
 		}
@@ -215,7 +216,7 @@ func (o *stdoutOutput) handleSystemMsg(value string) {
 			}
 			o.inProgress.Store(m.InProgress)
 		}
-	case stream.MsgTypeToolConfirm:
+	case protocol.MsgTypeToolConfirm:
 		var m struct {
 			ID string `json:"id"`
 		}

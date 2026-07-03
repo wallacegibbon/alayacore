@@ -9,7 +9,7 @@ package terminal
 import (
 	"strings"
 
-	"github.com/alayacore/alayacore/internal/stream"
+	"github.com/alayacore/alayacore/internal/tlv"
 )
 
 // ============================================================================
@@ -146,23 +146,23 @@ type userRenderer struct {
 	contentLen int
 }
 
-func (r *userRenderer) Tag() string { return stream.TagUserT }
+func (r *userRenderer) Tag() string { return tlv.TagUserT }
 
 func (r *userRenderer) ToolInfo() *ToolInfo { return nil }
 
 func (r *userRenderer) AppendFromTLV(tag string, value string) {
 	switch tag {
-	case stream.TagUserT:
+	case tlv.TagUserT:
 		if value != "" {
 			r.textParts = append(r.textParts, value)
 		}
-	case stream.TagUserI:
+	case tlv.TagUserI:
 		r.mediaParts = append(r.mediaParts, "📎 Image")
-	case stream.TagUserV:
+	case tlv.TagUserV:
 		r.mediaParts = append(r.mediaParts, "🎬 Video")
-	case stream.TagUserA:
+	case tlv.TagUserA:
 		r.mediaParts = append(r.mediaParts, "🎵 Audio")
-	case stream.TagUserD:
+	case tlv.TagUserD:
 		r.mediaParts = append(r.mediaParts, "📄 Document")
 	}
 	r.contentLen += len(value)
@@ -238,7 +238,7 @@ type toolRenderer struct {
 	status ToolStatus
 }
 
-func (r *toolRenderer) Tag() string { return stream.TagAssistantF }
+func (r *toolRenderer) Tag() string { return tlv.TagAssistantF }
 
 // showSeparator returns true if the tool should display a separator
 // between the call input and its result. Only diff-style tools (edit_file,
@@ -345,17 +345,17 @@ func styleByTag(tag, content string, styles *Styles, _ string) string {
 	}
 
 	switch tag {
-	case stream.TagAssistantF:
+	case tlv.TagAssistantF:
 		return ColorizeTool(content, styles)
-	case stream.TagUserF:
+	case tlv.TagUserF:
 		return styleMultiline(content, styles.Text)
-	case stream.TagAssistantT:
+	case tlv.TagAssistantT:
 		return styleMultiline(content, styles.Text)
-	case stream.TagAssistantR:
+	case tlv.TagAssistantR:
 		return styleMultiline(content, styles.Reasoning)
-	case stream.TagUserI, stream.TagUserV, stream.TagUserA, stream.TagUserD:
+	case tlv.TagUserI, tlv.TagUserV, tlv.TagUserA, tlv.TagUserD:
 		return styleMultiline(content, styles.Attachment)
-	case stream.TagUserT:
+	case tlv.TagUserT:
 		// User text without media is styled by userRenderer directly
 		// This path is for fallback only (e.g. replayed content)
 		result := styles.Prompt.Render("> ")

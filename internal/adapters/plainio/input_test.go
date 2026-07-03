@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alayacore/alayacore/internal/stream"
+	"github.com/alayacore/alayacore/internal/tlv"
 )
 
 func TestReadPrompts_SingleLine(t *testing.T) {
@@ -19,22 +19,22 @@ func TestReadPrompts_SingleLine(t *testing.T) {
 	}
 
 	// Should emit TLV(UT, "hello") followed by UE
-	tag, value, err := stream.ReadTLV(&buf)
+	tag, value, err := tlv.ReadTLV(&buf)
 	if err != nil {
 		t.Fatalf("failed to read TLV: %v", err)
 	}
-	if tag != stream.TagUserT {
+	if tag != tlv.TagUserT {
 		t.Errorf("expected tag UT, got %s", tag)
 	}
 	if value != "hello" {
 		t.Errorf("expected value 'hello', got %q", value)
 	}
 	// UE
-	tag, _, err = stream.ReadTLV(&buf)
+	tag, _, err = tlv.ReadTLV(&buf)
 	if err != nil {
 		t.Fatalf("failed to read UE TLV: %v", err)
 	}
-	if tag != stream.TagUserEnd {
+	if tag != tlv.TagUserEnd {
 		t.Errorf("expected UE tag, got %s", tag)
 	}
 }
@@ -49,22 +49,22 @@ func TestReadPrompts_MultiLineBackslash(t *testing.T) {
 	}
 
 	// Should emit TLV(UT, "first line\nsecond line\nthird line") followed by UE
-	tag, value, err := stream.ReadTLV(&buf)
+	tag, value, err := tlv.ReadTLV(&buf)
 	if err != nil {
 		t.Fatalf("failed to read TLV: %v", err)
 	}
-	if tag != stream.TagUserT {
+	if tag != tlv.TagUserT {
 		t.Errorf("expected tag UT, got %s", tag)
 	}
 	if value != "first line\nsecond line\nthird line" {
 		t.Errorf("expected multi-line value, got %q", value)
 	}
 	// UE
-	tag, _, err = stream.ReadTLV(&buf)
+	tag, _, err = tlv.ReadTLV(&buf)
 	if err != nil {
 		t.Fatalf("failed to read UE TLV: %v", err)
 	}
-	if tag != stream.TagUserEnd {
+	if tag != tlv.TagUserEnd {
 		t.Errorf("expected UE tag, got %s", tag)
 	}
 }
@@ -81,22 +81,22 @@ func TestReadPrompts_TrailingBackslash(t *testing.T) {
 	}
 
 	// Should emit TLV(UT, "hello") followed by UE
-	tag, value, err := stream.ReadTLV(&buf)
+	tag, value, err := tlv.ReadTLV(&buf)
 	if err != nil {
 		t.Fatalf("failed to read TLV: %v", err)
 	}
-	if tag != stream.TagUserT {
+	if tag != tlv.TagUserT {
 		t.Errorf("expected tag UT, got %s", tag)
 	}
 	if value != "hello" {
 		t.Errorf("expected 'hello', got %q", value)
 	}
 	// UE
-	tag, _, err = stream.ReadTLV(&buf)
+	tag, _, err = tlv.ReadTLV(&buf)
 	if err != nil {
 		t.Fatalf("failed to read UE TLV: %v", err)
 	}
-	if tag != stream.TagUserEnd {
+	if tag != tlv.TagUserEnd {
 		t.Errorf("expected UE tag, got %s", tag)
 	}
 }
@@ -112,22 +112,22 @@ func TestReadPrompts_MultipleLines(t *testing.T) {
 
 	// Each prompt is followed by UE.
 	for i, expected := range []string{"first", "second", "third"} {
-		tag, value, err := stream.ReadTLV(&buf)
+		tag, value, err := tlv.ReadTLV(&buf)
 		if err != nil {
 			t.Fatalf("prompt %d: failed to read TLV: %v", i, err)
 		}
-		if tag != stream.TagUserT {
+		if tag != tlv.TagUserT {
 			t.Errorf("prompt %d: expected tag UT, got %s", i, tag)
 		}
 		if value != expected {
 			t.Errorf("prompt %d: expected %q, got %q", i, expected, value)
 		}
 		// UE
-		tag, _, err = stream.ReadTLV(&buf)
+		tag, _, err = tlv.ReadTLV(&buf)
 		if err != nil {
 			t.Fatalf("prompt %d: failed to read UE TLV: %v", i, err)
 		}
-		if tag != stream.TagUserEnd {
+		if tag != tlv.TagUserEnd {
 			t.Errorf("prompt %d: expected UE tag, got %s", i, tag)
 		}
 	}
@@ -144,22 +144,22 @@ func TestReadPrompts_EmptyLines(t *testing.T) {
 
 	// Each prompt is followed by UE.
 	for i, expected := range []string{"hello", "world"} {
-		tag, value, err := stream.ReadTLV(&buf)
+		tag, value, err := tlv.ReadTLV(&buf)
 		if err != nil {
 			t.Fatalf("prompt %d: failed to read TLV: %v", i, err)
 		}
-		if tag != stream.TagUserT {
+		if tag != tlv.TagUserT {
 			t.Errorf("prompt %d: expected tag UT, got %s", i, tag)
 		}
 		if value != expected {
 			t.Errorf("prompt %d: expected %q, got %q", i, expected, value)
 		}
 		// UE
-		tag, _, err = stream.ReadTLV(&buf)
+		tag, _, err = tlv.ReadTLV(&buf)
 		if err != nil {
 			t.Fatalf("prompt %d: failed to read UE TLV: %v", i, err)
 		}
-		if tag != stream.TagUserEnd {
+		if tag != tlv.TagUserEnd {
 			t.Errorf("prompt %d: expected UE tag, got %s", i, tag)
 		}
 	}
@@ -180,22 +180,22 @@ func TestReadPrompts_EOFPartialLine(t *testing.T) {
 	}
 
 	// Partial prompt on EOF should also flush with UE.
-	tag, value, err := stream.ReadTLV(&buf)
+	tag, value, err := tlv.ReadTLV(&buf)
 	if err != nil {
 		t.Fatalf("failed to read TLV: %v", err)
 	}
-	if tag != stream.TagUserT {
+	if tag != tlv.TagUserT {
 		t.Errorf("expected tag UT, got %s", tag)
 	}
 	if value != "partial prompt" {
 		t.Errorf("expected 'partial prompt', got %q", value)
 	}
 	// UE
-	tag, _, err = stream.ReadTLV(&buf)
+	tag, _, err = tlv.ReadTLV(&buf)
 	if err != nil {
 		t.Fatalf("failed to read UE TLV: %v", err)
 	}
-	if tag != stream.TagUserEnd {
+	if tag != tlv.TagUserEnd {
 		t.Errorf("expected UE tag, got %s", tag)
 	}
 }
@@ -210,11 +210,11 @@ func TestReadPrompts_Command(t *testing.T) {
 	}
 
 	// Commands should emit UT without UE.
-	tag, value, err := stream.ReadTLV(&buf)
+	tag, value, err := tlv.ReadTLV(&buf)
 	if err != nil {
 		t.Fatalf("failed to read TLV: %v", err)
 	}
-	if tag != stream.TagUserT {
+	if tag != tlv.TagUserT {
 		t.Errorf("expected tag UT, got %s", tag)
 	}
 	if value != ":cancel" {
@@ -222,7 +222,7 @@ func TestReadPrompts_Command(t *testing.T) {
 	}
 
 	// Should be no UE after command
-	tag, _, err = stream.ReadTLV(&buf)
+	tag, _, err = tlv.ReadTLV(&buf)
 	if err == nil {
 		t.Errorf("expected EOF after command, got tag %s", tag)
 	}
@@ -239,11 +239,11 @@ func TestReadPrompts_QuitCommand(t *testing.T) {
 	}
 
 	// Only "some text" should be emitted
-	tag, value, err := stream.ReadTLV(&buf)
+	tag, value, err := tlv.ReadTLV(&buf)
 	if err != nil {
 		t.Fatalf("failed to read TLV: %v", err)
 	}
-	if tag != stream.TagUserT {
+	if tag != tlv.TagUserT {
 		t.Errorf("expected tag UT, got %s", tag)
 	}
 	if value != "some text" {
@@ -251,11 +251,11 @@ func TestReadPrompts_QuitCommand(t *testing.T) {
 	}
 
 	// UE after first prompt
-	tag, _, err = stream.ReadTLV(&buf)
+	tag, _, err = tlv.ReadTLV(&buf)
 	if err != nil {
 		t.Fatalf("failed to read UE TLV: %v", err)
 	}
-	if tag != stream.TagUserEnd {
+	if tag != tlv.TagUserEnd {
 		t.Errorf("expected UE tag, got %s", tag)
 	}
 
@@ -275,22 +275,22 @@ func TestReadPrompts_BackslashThenEOF(t *testing.T) {
 	}
 
 	// The backslash consumed the newline, "hello" is the accumulated text.
-	tag, value, err := stream.ReadTLV(&buf)
+	tag, value, err := tlv.ReadTLV(&buf)
 	if err != nil {
 		t.Fatalf("failed to read TLV: %v", err)
 	}
-	if tag != stream.TagUserT {
+	if tag != tlv.TagUserT {
 		t.Errorf("expected tag UT, got %s", tag)
 	}
 	if value != "hello" {
 		t.Errorf("expected 'hello', got %q", value)
 	}
 	// UE
-	tag, _, err = stream.ReadTLV(&buf)
+	tag, _, err = tlv.ReadTLV(&buf)
 	if err != nil {
 		t.Fatalf("failed to read UE TLV: %v", err)
 	}
-	if tag != stream.TagUserEnd {
+	if tag != tlv.TagUserEnd {
 		t.Errorf("expected UE tag, got %s", tag)
 	}
 }

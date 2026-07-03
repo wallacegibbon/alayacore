@@ -6,7 +6,7 @@ package terminal
 import (
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/alayacore/alayacore/internal/stream"
+	"github.com/alayacore/alayacore/internal/tlv"
 )
 
 // DisplayModel holds the viewport over WindowBuffer content.
@@ -515,7 +515,7 @@ func (m *DisplayModel) MoveWindowCursorToNextUserPrompt() bool {
 
 	found := false
 	m.windowBuffer.ForEachVisible(m.windowCursor+1, func(i int, w *Window) bool {
-		if w.Tag() == stream.TagUserT {
+		if w.Tag() == tlv.TagUserT {
 			m.setCursor(i)
 			found = true
 			return false
@@ -536,7 +536,7 @@ func (m *DisplayModel) MoveWindowCursorToPrevUserPrompt() bool {
 
 	found := false
 	m.windowBuffer.ForEachVisibleBackward(m.windowCursor-1, func(i int, w *Window) bool {
-		if w.Tag() == stream.TagUserT {
+		if w.Tag() == tlv.TagUserT {
 			m.setCursor(i)
 			found = true
 			return false

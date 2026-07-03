@@ -7,12 +7,12 @@ import (
 	"io"
 	"os"
 
-	"github.com/alayacore/alayacore/internal/stream"
+	"github.com/alayacore/alayacore/internal/tlv"
 )
 
 func main() {
 	for {
-		tag, value, err := stream.ReadTLV(os.Stdin)
+		tag, value, err := tlv.ReadTLV(os.Stdin)
 		if err != nil {
 			if err == io.EOF {
 				return

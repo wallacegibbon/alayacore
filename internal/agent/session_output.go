@@ -30,8 +30,9 @@ import (
 	"strings"
 
 	"github.com/alayacore/alayacore/internal/llm"
-	"github.com/alayacore/alayacore/internal/stream"
+	"github.com/alayacore/alayacore/internal/protocol"
 	"github.com/alayacore/alayacore/internal/theme"
+	"github.com/alayacore/alayacore/internal/tlv"
 	"github.com/alayacore/alayacore/internal/version"
 )
 
@@ -56,27 +57,27 @@ func (s *Session) writeTLV(tag string, value string) {
 	if s.outputBroken.Load() || s.Output == nil {
 		return
 	}
-	if err := stream.WriteTLV(s.Output, tag, value); err != nil {
+	if err := tlv.WriteTLV(s.Output, tag, value); err != nil {
 		s.markOutputBroken()
 	}
 }
 
 // writeSystemMsg writes a TagSystemMsg frame. On error, marks output as broken.
-func (s *Session) writeSystemMsg(msg stream.SystemMsg) {
+func (s *Session) writeSystemMsg(msg protocol.SystemMsg) {
 	if s.outputBroken.Load() || s.Output == nil {
 		return
 	}
-	if err := stream.WriteSystemMsg(s.Output, msg); err != nil {
+	if err := protocol.WriteSystemMsg(s.Output, msg); err != nil {
 		s.markOutputBroken()
 	}
 }
 
 func (s *Session) writeError(msg string) {
-	s.writeSystemMsg(stream.ErrorMsg{Text: msg})
+	s.writeSystemMsg(protocol.ErrorMsg{Text: msg})
 }
 
 func (s *Session) writeNotify(msg string) {
-	s.writeSystemMsg(stream.NotifyMsg{Text: msg})
+	s.writeSystemMsg(protocol.NotifyMsg{Text: msg})
 }
 
 func (s *Session) writeNotifyf(format string, args ...any) {
@@ -88,7 +89,7 @@ func (s *Session) writeToolInput(input json.RawMessage, id string) {
 	if err != nil {
 		return
 	}
-	s.writeTLV(stream.TagAssistantF, string(data))
+	s.writeTLV(tlv.TagAssistantF, string(data))
 }
 
 func (s *Session) writeToolOutput(id string, contents []llm.ContentPart, isError bool) {
@@ -96,7 +97,7 @@ func (s *Session) writeToolOutput(id string, contents []llm.ContentPart, isError
 	if err != nil {
 		return
 	}
-	s.writeTLV(stream.TagUserF, string(data))
+	s.writeTLV(tlv.TagUserF, string(data))
 }
 
 // ============================================================================

@@ -11,7 +11,8 @@ import (
 
 	"charm.land/lipgloss/v2"
 
-	"github.com/alayacore/alayacore/internal/stream"
+	"github.com/alayacore/alayacore/internal/protocol"
+	"github.com/alayacore/alayacore/internal/tlv"
 )
 
 // ============================================================================
@@ -116,7 +117,7 @@ func (wb *WindowBuffer) AppendOrUpdate(tag string, id string, content string) in
 	}
 
 	// Create new window
-	folded := tag != stream.TagUserT && tag != stream.TagAssistantT
+	folded := tag != tlv.TagUserT && tag != tlv.TagAssistantT
 	historyID := parseHistoryID(id)
 	w := NewWindow(id, tag, wb.styles)
 	w.HistoryID = historyID
@@ -136,7 +137,7 @@ func (wb *WindowBuffer) AppendOrUpdate(tag string, id string, content string) in
 // the tool name. All other frames carry actual tool arguments.
 // Status defaults to "pending" when a tool window is created —
 // the final status arrives via HandleToolOutput (UF).
-func (wb *WindowBuffer) HandleToolInputEvent(data stream.ToolInputData, historyID uint64) {
+func (wb *WindowBuffer) HandleToolInputEvent(data protocol.ToolInputData, historyID uint64) {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 
@@ -148,7 +149,7 @@ func (wb *WindowBuffer) HandleToolInputEvent(data stream.ToolInputData, historyI
 	}
 
 	// Create new window with tool renderer
-	w := NewWindow(data.ID, stream.TagAssistantF, wb.styles)
+	w := NewWindow(data.ID, tlv.TagAssistantF, wb.styles)
 	w.HistoryID = historyID
 	w.Folded = true
 	w.Visible = true
@@ -182,7 +183,7 @@ func (wb *WindowBuffer) HandleToolOutput(id, output string, isError bool, histor
 	if isError {
 		status = ToolStatusError
 	}
-	w := NewWindow(id, stream.TagUserF, wb.styles)
+	w := NewWindow(id, tlv.TagUserF, wb.styles)
 	w.HistoryID = historyID
 	w.Folded = true
 	w.Visible = true

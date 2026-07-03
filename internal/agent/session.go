@@ -49,7 +49,7 @@ import (
 	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/skills"
-	"github.com/alayacore/alayacore/internal/stream"
+	"github.com/alayacore/alayacore/internal/tlv"
 )
 
 // sessionConfig groups fields that are set once at construction and
@@ -293,7 +293,7 @@ func (s *Session) replayContentsToAdapter() error {
 			return fmt.Errorf("corrupt session file: failed to serialize content part (HistoryID=%d): %w", part.GetHistoryID(), err)
 		}
 
-		s.writeTLV(tag, stream.WrapID(strconv.FormatUint(part.GetHistoryID(), 10), content))
+		s.writeTLV(tag, tlv.WrapID(strconv.FormatUint(part.GetHistoryID(), 10), content))
 	}
 
 	return nil

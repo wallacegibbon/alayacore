@@ -7,7 +7,8 @@ import (
 	"testing"
 
 	"github.com/alayacore/alayacore/internal/llm"
-	"github.com/alayacore/alayacore/internal/stream"
+	"github.com/alayacore/alayacore/internal/protocol"
+	"github.com/alayacore/alayacore/internal/tlv"
 )
 
 func TestWriteToolOutput(t *testing.T) {
@@ -21,11 +22,11 @@ func TestWriteToolOutput(t *testing.T) {
 	session.writeToolOutput("tool123", []llm.ContentPart{&llm.TextPart{Text: "output text"}}, false)
 
 	tag, value := parseTLVFromBytes(output.data)
-	if tag != stream.TagUserF {
-		t.Errorf("Expected tag %s, got %s", stream.TagUserF, tag)
+	if tag != tlv.TagUserF {
+		t.Errorf("Expected tag %s, got %s", tlv.TagUserF, tag)
 	}
 
-	var got stream.ToolOutputData
+	var got protocol.ToolOutputData
 	if err := json.Unmarshal([]byte(value), &got); err != nil {
 		t.Fatalf("Failed to parse UF JSON: %v", err)
 	}
@@ -39,8 +40,8 @@ func TestWriteToolOutput(t *testing.T) {
 	session.writeToolOutput("tool456", []llm.ContentPart{&llm.TextPart{Text: "error message"}}, true)
 
 	tag, value = parseTLVFromBytes(output.data)
-	if tag != stream.TagUserF {
-		t.Errorf("Expected tag %s, got %s", stream.TagUserF, tag)
+	if tag != tlv.TagUserF {
+		t.Errorf("Expected tag %s, got %s", tlv.TagUserF, tag)
 	}
 
 	if err := json.Unmarshal([]byte(value), &got); err != nil {
@@ -82,11 +83,11 @@ func TestOnToolOutputCallback(t *testing.T) {
 	}
 
 	tag, value := parseTLVFromBytes(output.data)
-	if tag != stream.TagUserF {
-		t.Errorf("Expected tag %s, got %s", stream.TagUserF, tag)
+	if tag != tlv.TagUserF {
+		t.Errorf("Expected tag %s, got %s", tlv.TagUserF, tag)
 	}
 
-	var got stream.ToolOutputData
+	var got protocol.ToolOutputData
 	if err := json.Unmarshal([]byte(value), &got); err != nil {
 		t.Fatalf("Failed to parse UF JSON: %v", err)
 	}
@@ -98,8 +99,8 @@ func TestOnToolOutputCallback(t *testing.T) {
 	callback("call2", []llm.ContentPart{&llm.TextPart{Text: "something failed"}}, errors.New("something failed"))
 
 	tag, value = parseTLVFromBytes(output.data)
-	if tag != stream.TagUserF {
-		t.Errorf("Expected tag %s, got %s", stream.TagUserF, tag)
+	if tag != tlv.TagUserF {
+		t.Errorf("Expected tag %s, got %s", tlv.TagUserF, tag)
 	}
 
 	if err := json.Unmarshal([]byte(value), &got); err != nil {
@@ -121,11 +122,11 @@ func TestWriteToolCallWithPending(t *testing.T) {
 	session.writeToolInput(json.RawMessage(`{"command":"ls"}`), "tool123")
 
 	tag1, value1 := parseTLVFromBytes(output.data)
-	if tag1 != stream.TagAssistantF {
-		t.Errorf("Expected tag %s, got %s", stream.TagAssistantF, tag1)
+	if tag1 != tlv.TagAssistantF {
+		t.Errorf("Expected tag %s, got %s", tlv.TagAssistantF, tag1)
 	}
 
-	var fd1 stream.ToolInputData
+	var fd1 protocol.ToolInputData
 	if err := json.Unmarshal([]byte(value1), &fd1); err != nil {
 		t.Fatalf("Failed to parse AF JSON: %v", err)
 	}

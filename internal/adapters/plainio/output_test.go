@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/alayacore/alayacore/internal/stream"
+	"github.com/alayacore/alayacore/internal/tlv"
 )
 
 func TestNewlineBetweenDifferentStreamGroups(t *testing.T) {
@@ -14,10 +14,10 @@ func TestNewlineBetweenDifferentStreamGroups(t *testing.T) {
 	}
 
 	// Simulate: assistant text delta with NUL-delimited history IDs
-	msg1 := stream.EncodeTLV(stream.TagAssistantT, stream.WrapID("1", "hello "))
-	msg2 := stream.EncodeTLV(stream.TagAssistantT, stream.WrapID("1", "world"))
+	msg1 := tlv.EncodeTLV(tlv.TagAssistantT, tlv.WrapID("1", "hello "))
+	msg2 := tlv.EncodeTLV(tlv.TagAssistantT, tlv.WrapID("1", "world"))
 	// New step: different history ID
-	msg3 := stream.EncodeTLV(stream.TagAssistantT, stream.WrapID("2", "new step"))
+	msg3 := tlv.EncodeTLV(tlv.TagAssistantT, tlv.WrapID("2", "new step"))
 
 	o.Write(msg1)
 	o.Write(msg2)
@@ -36,8 +36,8 @@ func TestNoNewlineWithinSameStreamGroup(t *testing.T) {
 		writer: &buf,
 	}
 
-	msg1 := stream.EncodeTLV(stream.TagAssistantT, stream.WrapID("1", "hello "))
-	msg2 := stream.EncodeTLV(stream.TagAssistantT, stream.WrapID("1", "world"))
+	msg1 := tlv.EncodeTLV(tlv.TagAssistantT, tlv.WrapID("1", "hello "))
+	msg2 := tlv.EncodeTLV(tlv.TagAssistantT, tlv.WrapID("1", "world"))
 
 	o.Write(msg1)
 	o.Write(msg2)
@@ -55,8 +55,8 @@ func TestNewlineBetweenTextAndReasoning(t *testing.T) {
 		writer: &buf,
 	}
 
-	msg1 := stream.EncodeTLV(stream.TagAssistantT, stream.WrapID("1", "some text"))
-	msg2 := stream.EncodeTLV(stream.TagAssistantR, stream.WrapID("2", "some reasoning"))
+	msg1 := tlv.EncodeTLV(tlv.TagAssistantT, tlv.WrapID("1", "some text"))
+	msg2 := tlv.EncodeTLV(tlv.TagAssistantR, tlv.WrapID("2", "some reasoning"))
 
 	o.Write(msg1)
 	o.Write(msg2)
@@ -74,8 +74,8 @@ func TestNewlineBetweenReasoningAndText(t *testing.T) {
 		writer: &buf,
 	}
 
-	msg1 := stream.EncodeTLV(stream.TagAssistantR, stream.WrapID("1", "thinking..."))
-	msg2 := stream.EncodeTLV(stream.TagAssistantT, stream.WrapID("2", "answer"))
+	msg1 := tlv.EncodeTLV(tlv.TagAssistantR, tlv.WrapID("1", "thinking..."))
+	msg2 := tlv.EncodeTLV(tlv.TagAssistantT, tlv.WrapID("2", "answer"))
 
 	o.Write(msg1)
 	o.Write(msg2)
@@ -95,8 +95,8 @@ func TestNoPrefixNoNewline(t *testing.T) {
 
 	// Messages without stream prefixes are treated as complete text parts
 	// (session load style) and each ends with a newline.
-	msg1 := stream.EncodeTLV(stream.TagAssistantT, "hello ")
-	msg2 := stream.EncodeTLV(stream.TagAssistantT, "world")
+	msg1 := tlv.EncodeTLV(tlv.TagAssistantT, "hello ")
+	msg2 := tlv.EncodeTLV(tlv.TagAssistantT, "world")
 
 	o.Write(msg1)
 	o.Write(msg2)
@@ -115,11 +115,11 @@ func TestToolCallResetsStreamPrefix(t *testing.T) {
 	}
 
 	// Stream some text
-	msg1 := stream.EncodeTLV(stream.TagAssistantT, stream.WrapID("1", "hello"))
+	msg1 := tlv.EncodeTLV(tlv.TagAssistantT, tlv.WrapID("1", "hello"))
 	// Then a tool call (resets prefix)
-	msg2 := stream.EncodeTLV(stream.TagAssistantF, `{"id":"1","type":"call","name":"read_file","input":"{}"}`)
+	msg2 := tlv.EncodeTLV(tlv.TagAssistantF, `{"id":"1","type":"call","name":"read_file","input":"{}"}`)
 	// Then more text with different prefix — should NOT get extra newline since tool call reset it
-	msg3 := stream.EncodeTLV(stream.TagAssistantT, stream.WrapID("2", "result"))
+	msg3 := tlv.EncodeTLV(tlv.TagAssistantT, tlv.WrapID("2", "result"))
 
 	o.Write(msg1)
 	o.Write(msg2)
@@ -138,9 +138,9 @@ func TestUserPromptResetsStreamPrefix(t *testing.T) {
 		writer: &buf,
 	}
 
-	msg1 := stream.EncodeTLV(stream.TagAssistantT, stream.WrapID("1", "response"))
-	msg2 := stream.EncodeTLV(stream.TagUserT, "next prompt")
-	msg3 := stream.EncodeTLV(stream.TagAssistantT, stream.WrapID("2", "new response"))
+	msg1 := tlv.EncodeTLV(tlv.TagAssistantT, tlv.WrapID("1", "response"))
+	msg2 := tlv.EncodeTLV(tlv.TagUserT, "next prompt")
+	msg3 := tlv.EncodeTLV(tlv.TagAssistantT, tlv.WrapID("2", "new response"))
 
 	o.Write(msg1)
 	o.Write(msg2)

@@ -16,7 +16,8 @@ import (
 	"time"
 
 	"github.com/alayacore/alayacore/internal/llm"
-	"github.com/alayacore/alayacore/internal/stream"
+	"github.com/alayacore/alayacore/internal/protocol"
+	"github.com/alayacore/alayacore/internal/tlv"
 )
 
 // Auto-summarization threshold constants.
@@ -50,7 +51,7 @@ func (s *Session) handleUserPrompt(ctx context.Context, contents []llm.ContentPa
 		part.SetRole(llm.RoleUser)
 		contents = append(contents, part)
 		if tag, val, err := contentPartToTLV(part); err == nil && tag != "" {
-			s.writeTLV(tag, stream.WrapID(strconv.FormatUint(id, 10), val))
+			s.writeTLV(tag, tlv.WrapID(strconv.FormatUint(id, 10), val))
 		}
 	}
 
@@ -107,7 +108,7 @@ func (s *Session) doAutoSummarize(ctx context.Context, contents []llm.ContentPar
 	promptPart.SetRole(llm.RoleUser)
 	contents = append(contents, promptPart)
 	if tag, val, err := contentPartToTLV(promptPart); err == nil && tag != "" {
-		s.writeTLV(tag, stream.WrapID(strconv.FormatUint(id, 10), val))
+		s.writeTLV(tag, tlv.WrapID(strconv.FormatUint(id, 10), val))
 	}
 
 	beforeLen := len(contents)
@@ -169,7 +170,7 @@ func (s *Session) buildSummary(fullContents []llm.ContentPart, beforeLen int, ou
 // writeTLVWithID formats the historyID and writes a TLV entry to the output stream.
 func (s *Session) writeTLVWithID(tag string, historyID uint64, data string) {
 	id := strconv.FormatUint(historyID, 10)
-	s.writeTLV(tag, stream.WrapID(id, data))
+	s.writeTLV(tag, tlv.WrapID(id, data))
 }
 
 // handleToolConfirm handles a tool confirmation request.
@@ -198,7 +199,7 @@ func (s *Session) handleToolConfirm(req llm.ToolConfirmRequest) <-chan bool {
 	s.confirmChs[req.ID] = ch
 	s.confirmMu.Unlock()
 
-	if err := stream.WriteSystemMsg(s.Output, stream.ToolConfirmMsg{ID: req.ID}); err != nil {
+	if err := protocol.WriteSystemMsg(s.Output, protocol.ToolConfirmMsg{ID: req.ID}); err != nil {
 		s.markOutputBroken()
 		s.confirmMu.Lock()
 		delete(s.confirmChs, req.ID)
@@ -215,19 +216,19 @@ func (s *Session) handleToolOutput(toolCallID string, contents []llm.ContentPart
 	if marshalErr != nil {
 		return fmt.Errorf("failed to marshal tool output: %w", marshalErr)
 	}
-	s.writeTLVWithID(stream.TagUserF, historyID, string(data))
+	s.writeTLVWithID(tlv.TagUserF, historyID, string(data))
 	return nil
 }
 
 // handleTextDelta streams assistant text deltas to the output.
 func (s *Session) handleTextDelta(delta string, historyID uint64) error {
-	s.writeTLVWithID(stream.TagAssistantT, historyID, delta)
+	s.writeTLVWithID(tlv.TagAssistantT, historyID, delta)
 	return nil
 }
 
 // handleReasoningDelta streams assistant reasoning deltas to the output.
 func (s *Session) handleReasoningDelta(delta string, historyID uint64) error {
-	s.writeTLVWithID(stream.TagAssistantR, historyID, delta)
+	s.writeTLVWithID(tlv.TagAssistantR, historyID, delta)
 	return nil
 }
 
@@ -237,7 +238,7 @@ func (s *Session) handleToolInputStart(toolCallID, name string, historyID uint64
 	if err != nil {
 		return fmt.Errorf("failed to marshal tool input start: %w", err)
 	}
-	s.writeTLVWithID(stream.TagAssistantF, historyID, string(data))
+	s.writeTLVWithID(tlv.TagAssistantF, historyID, string(data))
 	return nil
 }
 
@@ -247,7 +248,7 @@ func (s *Session) handleToolInputComplete(toolCallID string, input json.RawMessa
 	if err != nil {
 		return fmt.Errorf("failed to marshal tool input complete: %w", err)
 	}
-	s.writeTLVWithID(stream.TagAssistantF, historyID, string(data))
+	s.writeTLVWithID(tlv.TagAssistantF, historyID, string(data))
 	return nil
 }
 
@@ -459,6 +460,6 @@ func (s *Session) appendCancelMessage(contents []llm.ContentPart) []llm.ContentP
 			Role:      llm.RoleAssistant,
 		},
 	})
-	s.writeTLV(stream.TagAssistantT, stream.WrapID(strconv.FormatUint(id, 10), cancelMessage))
+	s.writeTLV(tlv.TagAssistantT, tlv.WrapID(strconv.FormatUint(id, 10), cancelMessage))
 	return contents
 }

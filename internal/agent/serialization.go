@@ -12,7 +12,8 @@ import (
 	"fmt"
 
 	"github.com/alayacore/alayacore/internal/llm"
-	"github.com/alayacore/alayacore/internal/stream"
+	"github.com/alayacore/alayacore/internal/protocol"
+	"github.com/alayacore/alayacore/internal/tlv"
 )
 
 // ============================================================================
@@ -26,7 +27,7 @@ import (
 //   - Complete frame: id + input (name is empty)
 //   - Full (persistence): id + name + input
 func marshalToolInputData(id, name string, input json.RawMessage) ([]byte, error) {
-	data, err := json.Marshal(stream.ToolInputData{
+	data, err := json.Marshal(protocol.ToolInputData{
 		ID:    id,
 		Name:  name,
 		Input: input,
@@ -46,7 +47,7 @@ func marshalToolOutputData(id string, contents []llm.ContentPart, isError bool) 
 	if serErr != nil {
 		contentJSON = []byte(`[{"type":"text","text":"(serialization error)"}]`)
 	}
-	data, err := json.Marshal(stream.ToolOutputData{
+	data, err := json.Marshal(protocol.ToolOutputData{
 		ID:      id,
 		Output:  contentJSON,
 		IsError: isError,
@@ -66,31 +67,31 @@ func contentPartToTLV(part llm.ContentPart) (tag string, content string, err err
 	switch p := part.(type) {
 	case *llm.TextPart:
 		if part.GetRole() == llm.RoleAssistant {
-			return stream.TagAssistantT, p.Text, nil
+			return tlv.TagAssistantT, p.Text, nil
 		}
-		return stream.TagUserT, p.Text, nil
+		return tlv.TagUserT, p.Text, nil
 	case *llm.ImagePart:
-		return stream.TagUserI, p.URI, nil
+		return tlv.TagUserI, p.URI, nil
 	case *llm.VideoPart:
-		return stream.TagUserV, p.URI, nil
+		return tlv.TagUserV, p.URI, nil
 	case *llm.AudioPart:
-		return stream.TagUserA, p.URI, nil
+		return tlv.TagUserA, p.URI, nil
 	case *llm.DocumentPart:
-		return stream.TagUserD, p.URI, nil
+		return tlv.TagUserD, p.URI, nil
 	case *llm.ReasoningPart:
-		return stream.TagAssistantR, p.Text, nil
+		return tlv.TagAssistantR, p.Text, nil
 	case *llm.ToolInputPart:
 		jsonData, err := marshalToolInputData(p.ID, p.Name, p.Input)
 		if err != nil {
 			return "", "", err
 		}
-		return stream.TagAssistantF, string(jsonData), nil
+		return tlv.TagAssistantF, string(jsonData), nil
 	case *llm.ToolOutputPart:
 		jsonData, err := marshalToolOutputData(p.ID, p.Output, p.IsError)
 		if err != nil {
 			return "", "", err
 		}
-		return stream.TagUserF, string(jsonData), nil
+		return tlv.TagUserF, string(jsonData), nil
 	default:
 		return "", "", fmt.Errorf("unknown content part type: %T", part)
 	}
@@ -99,27 +100,27 @@ func contentPartToTLV(part llm.ContentPart) (tag string, content string, err err
 // contentPartFromTLV converts a TLV record into a ContentPart with Role set.
 func contentPartFromTLV(tag string, content []byte) (llm.ContentPart, error) {
 	cleanContent := string(content)
-	if _, stripped, ok := stream.UnwrapID(cleanContent); ok {
+	if _, stripped, ok := tlv.UnwrapID(cleanContent); ok {
 		cleanContent = stripped
 	}
 
 	switch tag {
-	case stream.TagUserT:
+	case tlv.TagUserT:
 		return &llm.TextPart{Text: cleanContent, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}}, nil
-	case stream.TagUserI:
+	case tlv.TagUserI:
 		return &llm.ImagePart{URI: cleanContent, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}}, nil
-	case stream.TagUserV:
+	case tlv.TagUserV:
 		return &llm.VideoPart{URI: cleanContent, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}}, nil
-	case stream.TagUserA:
+	case tlv.TagUserA:
 		return &llm.AudioPart{URI: cleanContent, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}}, nil
-	case stream.TagUserD:
+	case tlv.TagUserD:
 		return &llm.DocumentPart{URI: cleanContent, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}}, nil
-	case stream.TagAssistantT:
+	case tlv.TagAssistantT:
 		return &llm.TextPart{Text: cleanContent, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant}}, nil
-	case stream.TagAssistantR:
+	case tlv.TagAssistantR:
 		return &llm.ReasoningPart{Text: cleanContent, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant}}, nil
-	case stream.TagAssistantF:
-		var fd stream.ToolInputData
+	case tlv.TagAssistantF:
+		var fd protocol.ToolInputData
 		if err := json.Unmarshal([]byte(cleanContent), &fd); err != nil {
 			return nil, fmt.Errorf("failed to parse function data: %w", err)
 		}
@@ -129,8 +130,8 @@ func contentPartFromTLV(tag string, content []byte) (llm.ContentPart, error) {
 		return &llm.ToolInputPart{
 			ID: fd.ID, Name: fd.Name, Input: fd.Input, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant},
 		}, nil
-	case stream.TagUserF:
-		var tr stream.ToolOutputData
+	case tlv.TagUserF:
+		var tr protocol.ToolOutputData
 		if err := json.Unmarshal([]byte(cleanContent), &tr); err != nil {
 			return nil, fmt.Errorf("failed to parse tool result: %w", err)
 		}

@@ -25,7 +25,8 @@ import (
 
 	"charm.land/lipgloss/v2"
 
-	"github.com/alayacore/alayacore/internal/stream"
+	"github.com/alayacore/alayacore/internal/protocol"
+	"github.com/alayacore/alayacore/internal/tlv"
 )
 
 // ToolInfo holds the identifying details of a tool call window.
@@ -99,10 +100,10 @@ func NewWindow(id string, tag string, styles *Styles) *Window {
 // setRenderer sets the renderer based on the TLV tag.
 func (w *Window) setRenderer(tag string) {
 	switch tag {
-	case stream.TagUserT:
+	case tlv.TagUserT:
 		w.renderer = &userRenderer{}
-	case stream.TagAssistantF, stream.TagUserF:
-		w.renderer = &toolRenderer{isUF: tag == stream.TagUserF}
+	case tlv.TagAssistantF, tlv.TagUserF:
+		w.renderer = &toolRenderer{isUF: tag == tlv.TagUserF}
 	default:
 		w.renderer = &textRenderer{tag: tag}
 	}
@@ -170,8 +171,8 @@ func (w *Window) SetRendererForTool(name, input string) {
 
 // HandleToolInput updates the tool call data on an existing tool window
 // or creates a tool renderer if none exists.
-func (w *Window) HandleToolInput(data stream.ToolInputData, historyID uint64) {
-	if w.renderer == nil || w.renderer.Tag() != stream.TagAssistantF {
+func (w *Window) HandleToolInput(data protocol.ToolInputData, historyID uint64) {
+	if w.renderer == nil || w.renderer.Tag() != tlv.TagAssistantF {
 		w.renderer = &toolRenderer{}
 	}
 	if tr, ok := w.renderer.(*toolRenderer); ok {

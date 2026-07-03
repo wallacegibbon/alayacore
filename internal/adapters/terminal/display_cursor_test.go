@@ -3,7 +3,7 @@ package terminal
 import (
 	"testing"
 
-	"github.com/alayacore/alayacore/internal/stream"
+	"github.com/alayacore/alayacore/internal/tlv"
 )
 
 func TestValidateCursor_ClampsOutOfRangeCursor(t *testing.T) {
@@ -12,9 +12,9 @@ func TestValidateCursor_ClampsOutOfRangeCursor(t *testing.T) {
 	display := NewDisplayModel(wb, DefaultStyles())
 
 	// Add some windows
-	wb.AppendOrUpdate(stream.TagAssistantT, "window-1", "Content 1")
-	wb.AppendOrUpdate(stream.TagAssistantT, "window-2", "Content 2")
-	wb.AppendOrUpdate(stream.TagAssistantT, "window-3", "Content 3")
+	wb.AppendOrUpdate(tlv.TagAssistantT, "window-1", "Content 1")
+	wb.AppendOrUpdate(tlv.TagAssistantT, "window-2", "Content 2")
+	wb.AppendOrUpdate(tlv.TagAssistantT, "window-3", "Content 3")
 
 	// Set cursor to the middle window
 	display.SetWindowCursor(1)
@@ -38,8 +38,8 @@ func TestValidateCursor_HandlesNegativeCursor(t *testing.T) {
 	display := NewDisplayModel(wb, DefaultStyles())
 
 	// Add some windows
-	wb.AppendOrUpdate(stream.TagAssistantT, "window-1", "Content 1")
-	wb.AppendOrUpdate(stream.TagAssistantT, "window-2", "Content 2")
+	wb.AppendOrUpdate(tlv.TagAssistantT, "window-1", "Content 1")
+	wb.AppendOrUpdate(tlv.TagAssistantT, "window-2", "Content 2")
 
 	// Set cursor to invalid negative value
 	display.windowCursor = -5
@@ -72,9 +72,9 @@ func TestValidateCursor_KeepsValidCursor(t *testing.T) {
 	display := NewDisplayModel(wb, DefaultStyles())
 
 	// Add windows
-	wb.AppendOrUpdate(stream.TagAssistantT, "window-1", "Content 1")
-	wb.AppendOrUpdate(stream.TagAssistantT, "window-2", "Content 2")
-	wb.AppendOrUpdate(stream.TagAssistantT, "window-3", "Content 3")
+	wb.AppendOrUpdate(tlv.TagAssistantT, "window-1", "Content 1")
+	wb.AppendOrUpdate(tlv.TagAssistantT, "window-2", "Content 2")
+	wb.AppendOrUpdate(tlv.TagAssistantT, "window-3", "Content 3")
 
 	// Set cursor to valid position
 	display.SetWindowCursor(1)

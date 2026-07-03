@@ -11,6 +11,7 @@ import (
 	"os"
 
 	agentpkg "github.com/alayacore/alayacore/internal/agent"
+	"github.com/alayacore/alayacore/internal/protocol"
 	"github.com/alayacore/alayacore/internal/stream"
 )
 
@@ -69,13 +70,13 @@ func StartSession(cfg *Config, output io.Writer, input *stream.SliceBuffer) (*ag
 		for _, m := range msgs {
 			fmt.Fprintf(os.Stderr, "%s\n", m)
 			// Send to adapter as system error messages for TUI/plainio display
-			_ = stream.WriteSystemMsg(output, stream.ErrorMsg{Text: m})
+			_ = protocol.WriteSystemMsg(output, protocol.ErrorMsg{Text: m})
 		}
 	}
 
 	// Display MCP startup errors through the adapter as system error messages.
 	for _, e := range cfg.MCPStartupErrors {
-		_ = stream.WriteSystemMsg(output, stream.ErrorMsg{Text: e})
+		_ = protocol.WriteSystemMsg(output, protocol.ErrorMsg{Text: e})
 	}
 
 	// Check if we have any models available.

@@ -4,15 +4,16 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/alayacore/alayacore/internal/stream"
+	"github.com/alayacore/alayacore/internal/protocol"
 	"github.com/alayacore/alayacore/internal/theme"
+	"github.com/alayacore/alayacore/internal/tlv"
 )
 
 func TestHandleToolInputEvent(t *testing.T) {
 	wb := NewWindowBuffer(80, DefaultStyles())
 
 	// Send a "call" type event (creates the window with Name set = start frame)
-	wb.HandleToolInputEvent(stream.ToolInputData{
+	wb.HandleToolInputEvent(protocol.ToolInputData{
 		ID:    "tool123",
 		Name:  "execute_command",
 		Input: json.RawMessage("execute_command: git status"),
@@ -52,7 +53,7 @@ func TestRenderWindowContentWithStatus(t *testing.T) {
 	wb := NewWindowBuffer(80, DefaultStyles())
 
 	// Create a tool window (Name set = start frame)
-	wb.HandleToolInputEvent(stream.ToolInputData{
+	wb.HandleToolInputEvent(protocol.ToolInputData{
 		ID:    "tool123",
 		Name:  "execute_command",
 		Input: json.RawMessage("execute_command: git status"),
@@ -113,19 +114,19 @@ func TestOutputWriterToolCallStartThenFull(t *testing.T) {
 	out.SetWindowWidth(80)
 
 	makeStartFD := func(id, name string) []byte {
-		fd, _ := json.Marshal(stream.ToolInputData{
+		fd, _ := json.Marshal(protocol.ToolInputData{
 			ID:   id,
 			Name: name,
 		})
-		return stream.EncodeTLV(stream.TagAssistantF, string(fd))
+		return tlv.EncodeTLV(tlv.TagAssistantF, string(fd))
 	}
 
 	makeInputFD := func(id, input string) []byte {
-		fd, _ := json.Marshal(stream.ToolInputData{
+		fd, _ := json.Marshal(protocol.ToolInputData{
 			ID:    id,
 			Input: json.RawMessage(input),
 		})
-		return stream.EncodeTLV(stream.TagAssistantF, string(fd))
+		return tlv.EncodeTLV(tlv.TagAssistantF, string(fd))
 	}
 
 	// 1. Simulate ToolCallStart: Name set, no input yet

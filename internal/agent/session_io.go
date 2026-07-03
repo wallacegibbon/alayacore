@@ -18,7 +18,7 @@ import (
 
 	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/llm"
-	"github.com/alayacore/alayacore/internal/stream"
+	"github.com/alayacore/alayacore/internal/tlv"
 )
 
 // ============================================================================
@@ -269,7 +269,7 @@ func (s *Session) inputPump() {
 	var staged []llm.ContentPart
 
 	for {
-		tag, value, err := stream.ReadTLV(s.Input)
+		tag, value, err := tlv.ReadTLV(s.Input)
 		if err != nil {
 			if len(staged) > 0 {
 				s.inputMsgCh <- inputMsg{contentParts: staged}
@@ -288,15 +288,15 @@ func (s *Session) inputPump() {
 // Command text (UT starting with ':') is sent immediately without staging.
 func (s *Session) handleInputFrame(tag, value string, staged []llm.ContentPart) []llm.ContentPart {
 	switch tag {
-	case stream.TagUserI:
+	case tlv.TagUserI:
 		return append(staged, &llm.ImagePart{URI: value})
-	case stream.TagUserV:
+	case tlv.TagUserV:
 		return append(staged, &llm.VideoPart{URI: value})
-	case stream.TagUserA:
+	case tlv.TagUserA:
 		return append(staged, &llm.AudioPart{URI: value})
-	case stream.TagUserD:
+	case tlv.TagUserD:
 		return append(staged, &llm.DocumentPart{URI: value})
-	case stream.TagUserT:
+	case tlv.TagUserT:
 		if len(value) > 0 && value[0] == ':' {
 			if len(staged) > 0 {
 				s.inputMsgCh <- inputMsg{err: fmt.Errorf("command can not be sent with staged content")}
@@ -309,7 +309,7 @@ func (s *Session) handleInputFrame(tag, value string, staged []llm.ContentPart) 
 			return append(staged, &llm.TextPart{Text: value})
 		}
 		return staged
-	case stream.TagUserEnd:
+	case tlv.TagUserEnd:
 		if len(staged) > 0 {
 			s.inputMsgCh <- inputMsg{contentParts: staged}
 		}

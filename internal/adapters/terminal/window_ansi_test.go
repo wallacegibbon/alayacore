@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alayacore/alayacore/internal/stream"
+	"github.com/alayacore/alayacore/internal/tlv"
 )
 
 // TestWindow_WithANSIContent verifies that windows properly handle content
@@ -20,37 +20,37 @@ func TestWindow_WithANSIContent(t *testing.T) {
 	}{
 		{
 			name:     "read_file result with ANSI",
-			tag:      stream.TagUserF,
+			tag:      tlv.TagUserF,
 			content:  "File content with \x1b[31mred text\x1b[0m",
 			expected: "File content with red text",
 		},
 		{
 			name:     "execute_command result with colors",
-			tag:      stream.TagUserF,
+			tag:      tlv.TagUserF,
 			content:  "Command output:\n\x1b[32mSuccess\x1b[0m\nDone",
 			expected: "Command output:\nSuccess\nDone",
 		},
 		{
 			name:     "write_file result with cursor codes",
-			tag:      stream.TagUserF,
+			tag:      tlv.TagUserF,
 			content:  "Writing\x1b[2K\rComplete",
 			expected: "Writing\nComplete",
 		},
 		{
 			name:     "tool call with ANSI in command",
-			tag:      stream.TagAssistantF,
+			tag:      tlv.TagAssistantF,
 			content:  "execute_command: echo \x1b[31mtest\x1b[0m",
 			expected: "· execute_command: echo test", // Note: includes status indicator
 		},
 		{
 			name:     "text with embedded ANSI",
-			tag:      stream.TagAssistantT,
+			tag:      tlv.TagAssistantT,
 			content:  "Here is \x1b[1mbold\x1b[0m text",
 			expected: "Here is bold text",
 		},
 		{
 			name:     "reasoning with OSC sequence",
-			tag:      stream.TagAssistantR,
+			tag:      tlv.TagAssistantR,
 			content:  "Thinking\x1b]0;Title\x07...",
 			expected: "Thinking...",
 		},
@@ -88,25 +88,25 @@ func TestWindow_PreservesLipglossColors(t *testing.T) {
 	}{
 		{
 			name:            "tool call gets styled",
-			tag:             stream.TagAssistantF,
+			tag:             tlv.TagAssistantF,
 			content:         "execute_command: echo test",
 			shouldHaveColor: true,
 		},
 		{
 			name:            "tool result gets styled",
-			tag:             stream.TagUserF,
+			tag:             tlv.TagUserF,
 			content:         "output text",
 			shouldHaveColor: true,
 		},
 		{
 			name:            "text assistant gets styled",
-			tag:             stream.TagAssistantT,
+			tag:             tlv.TagAssistantT,
 			content:         "Hello world",
 			shouldHaveColor: true,
 		},
 		{
 			name:            "reasoning gets styled",
-			tag:             stream.TagAssistantR,
+			tag:             tlv.TagAssistantR,
 			content:         "Thinking...",
 			shouldHaveColor: true,
 		},

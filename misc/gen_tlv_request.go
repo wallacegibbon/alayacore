@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/alayacore/alayacore/internal/stream"
+	"github.com/alayacore/alayacore/internal/tlv"
 )
 
 func main() {
@@ -32,19 +32,19 @@ func main() {
 		dataURI := fmt.Sprintf("data:%s;base64,%s", mime, b64)
 		tag := tagForMIME(mime)
 
-		if _, err := os.Stdout.Write(stream.EncodeTLV(tag, dataURI)); err != nil {
+		if _, err := os.Stdout.Write(tlv.EncodeTLV(tag, dataURI)); err != nil {
 			fmt.Fprintf(os.Stderr, "write: %v\n", err)
 			os.Exit(1)
 		}
 	}
 
-	if _, err := os.Stdout.Write(stream.EncodeTLV(stream.TagUserT, prompt)); err != nil {
+	if _, err := os.Stdout.Write(tlv.EncodeTLV(tlv.TagUserT, prompt)); err != nil {
 		fmt.Fprintf(os.Stderr, "write: %v\n", err)
 		os.Exit(1)
 	}
 
 	// Flush with TagUserEnd to commit the user message.
-	if _, err := os.Stdout.Write(stream.EncodeTLV(stream.TagUserEnd, "")); err != nil {
+	if _, err := os.Stdout.Write(tlv.EncodeTLV(tlv.TagUserEnd, "")); err != nil {
 		fmt.Fprintf(os.Stderr, "write: %v\n", err)
 		os.Exit(1)
 	}
@@ -54,15 +54,15 @@ func main() {
 func tagForMIME(mime string) string {
 	switch {
 	case strings.HasPrefix(mime, "image/"):
-		return stream.TagUserI
+		return tlv.TagUserI
 	case strings.HasPrefix(mime, "video/"):
-		return stream.TagUserV
+		return tlv.TagUserV
 	case strings.HasPrefix(mime, "audio/"):
-		return stream.TagUserA
+		return tlv.TagUserA
 	case strings.HasPrefix(mime, "application/"), strings.HasPrefix(mime, "text/"):
-		return stream.TagUserD
+		return tlv.TagUserD
 	default:
-		return stream.TagUserI // fallback
+		return tlv.TagUserI // fallback
 	}
 }
 

@@ -5,7 +5,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/alayacore/alayacore/internal/stream"
+	"github.com/alayacore/alayacore/internal/tlv"
 )
 
 // readPrompts reads lines from stdin and emits them as TLV messages.
@@ -65,11 +65,11 @@ func readPrompts(input io.Writer, reader io.Reader) error {
 // Commands (starting with ':') are sent without UE. Returns the first
 // write error, if any.
 func sendPrompt(input io.Writer, text string) error {
-	if err := stream.WriteTLV(input, stream.TagUserT, text); err != nil {
+	if err := tlv.WriteTLV(input, tlv.TagUserT, text); err != nil {
 		return err
 	}
 	if !strings.HasPrefix(text, ":") {
-		if err := stream.WriteTLV(input, stream.TagUserEnd, ""); err != nil {
+		if err := tlv.WriteTLV(input, tlv.TagUserEnd, ""); err != nil {
 			return err
 		}
 	}

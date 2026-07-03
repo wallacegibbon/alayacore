@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"io"
 	"testing"
+
+	"github.com/alayacore/alayacore/internal/tlv"
 )
 
 func TestEncodeTLV(t *testing.T) {
@@ -17,47 +19,47 @@ func TestEncodeTLV(t *testing.T) {
 	}{
 		{
 			name:    "simple message",
-			tag:     TagUserT,
+			tag:     tlv.TagUserT,
 			value:   "Hello, World!",
 			wantLen: 6 + 13, // 6 header + 13 value
-			wantTag: TagUserT,
+			wantTag: tlv.TagUserT,
 			wantVal: "Hello, World!",
 		},
 		{
 			name:    "empty value",
-			tag:     TagAssistantT,
+			tag:     tlv.TagAssistantT,
 			value:   "",
 			wantLen: 6, // just header
-			wantTag: TagAssistantT,
+			wantTag: tlv.TagAssistantT,
 			wantVal: "",
 		},
 		{
 			name:    "unicode value",
-			tag:     TagUserT,
+			tag:     tlv.TagUserT,
 			value:   "你好世界 🌍",
 			wantLen: 6 + len("你好世界 🌍"), // 6 header + actual byte length
-			wantTag: TagUserT,
+			wantTag: tlv.TagUserT,
 			wantVal: "你好世界 🌍",
 		},
 		{
 			name:    "long message",
-			tag:     TagAssistantR,
+			tag:     tlv.TagAssistantR,
 			value:   string(make([]byte, 1000)),
 			wantLen: 6 + 1000,
-			wantTag: TagAssistantR,
+			wantTag: tlv.TagAssistantR,
 			wantVal: string(make([]byte, 1000)),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			encoded := EncodeTLV(tt.tag, tt.value)
+			encoded := tlv.EncodeTLV(tt.tag, tt.value)
 			if len(encoded) != tt.wantLen {
 				t.Errorf("EncodeTLV() length = %d, want %d", len(encoded), tt.wantLen)
 			}
 
 			// Decode and verify
-			tag, value, err := ReadTLV(&byteReader{data: encoded})
+			tag, value, err := tlv.ReadTLV(&byteReader{data: encoded})
 			if err != nil {
 				t.Fatalf("ReadTLV() error = %v", err)
 			}
@@ -99,18 +101,18 @@ func TestSliceBuffer(t *testing.T) {
 		input := NewSliceBuffer(10)
 
 		// Emit TLV message
-		err := WriteTLV(input, TagUserT, "Hello")
+		err := tlv.WriteTLV(input, tlv.TagUserT, "Hello")
 		if err != nil {
 			t.Fatalf("EmitTLV() error = %v", err)
 		}
 
 		// Read and decode
-		tag, value, err := ReadTLV(input)
+		tag, value, err := tlv.ReadTLV(input)
 		if err != nil {
 			t.Fatalf("ReadTLV() error = %v", err)
 		}
-		if tag != TagUserT {
-			t.Errorf("ReadTLV() tag = %q, want %q", tag, TagUserT)
+		if tag != tlv.TagUserT {
+			t.Errorf("ReadTLV() tag = %q, want %q", tag, tlv.TagUserT)
 		}
 		if value != "Hello" {
 			t.Errorf("ReadTLV() value = %q, want %q", value, "Hello")
@@ -141,14 +143,14 @@ func TestSliceBuffer(t *testing.T) {
 			tag   string
 			value string
 		}{
-			{TagUserT, "first"},
-			{TagAssistantT, "second"},
-			{TagAssistantR, "third"},
+			{tlv.TagUserT, "first"},
+			{tlv.TagAssistantT, "second"},
+			{tlv.TagAssistantR, "third"},
 		}
 
 		// Emit all messages
 		for _, msg := range messages {
-			err := WriteTLV(input, msg.tag, msg.value)
+			err := tlv.WriteTLV(input, msg.tag, msg.value)
 			if err != nil {
 				t.Fatalf("EmitTLV() error = %v", err)
 			}
@@ -156,7 +158,7 @@ func TestSliceBuffer(t *testing.T) {
 
 		// Read and verify all messages
 		for _, want := range messages {
-			tag, value, err := ReadTLV(input)
+			tag, value, err := tlv.ReadTLV(input)
 			if err != nil {
 				t.Fatalf("ReadTLV() error = %v", err)
 			}
@@ -173,18 +175,18 @@ func TestWriteTLV(t *testing.T) {
 		buf := &bytes.Buffer{}
 		output := &bufferOutput{buf}
 
-		err := WriteTLV(output, TagUserT, "test message")
+		err := tlv.WriteTLV(output, tlv.TagUserT, "test message")
 		if err != nil {
 			t.Fatalf("error = %v", err)
 		}
 
 		// Verify the written data
-		tag, value, err := ReadTLV(&byteReader{data: buf.Bytes()})
+		tag, value, err := tlv.ReadTLV(&byteReader{data: buf.Bytes()})
 		if err != nil {
 			t.Fatalf("ReadTLV() error = %v", err)
 		}
-		if tag != TagUserT {
-			t.Errorf("tag = %q, want %q", tag, TagUserT)
+		if tag != tlv.TagUserT {
+			t.Errorf("tag = %q, want %q", tag, tlv.TagUserT)
 		}
 		if value != "test message" {
 			t.Errorf("value = %q, want %q", value, "test message")
@@ -229,8 +231,8 @@ func TestWrapUnwrapID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			wrapped := WrapID(tt.id, tt.content)
-			gotID, gotContent, ok := UnwrapID(wrapped)
+			wrapped := tlv.WrapID(tt.id, tt.content)
+			gotID, gotContent, ok := tlv.UnwrapID(wrapped)
 
 			if tt.id == "" {
 				if ok {
@@ -266,7 +268,7 @@ func TestUnwrapID_InvalidInput(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, ok := UnwrapID(tt.value)
+			_, _, ok := tlv.UnwrapID(tt.value)
 			if ok {
 				t.Errorf("expected ok=false for %q", tt.value)
 			}
@@ -277,9 +279,9 @@ func TestUnwrapID_InvalidInput(t *testing.T) {
 func TestWrapUnwrapRoundTrip(t *testing.T) {
 	id := "42"
 	delta := "some thinking content"
-	wrapped := WrapID(id, delta)
+	wrapped := tlv.WrapID(id, delta)
 
-	gotID, gotContent, ok := UnwrapID(wrapped)
+	gotID, gotContent, ok := tlv.UnwrapID(wrapped)
 	if !ok {
 		t.Fatal("UnwrapID failed")
 	}

@@ -18,6 +18,7 @@ import (
 	"github.com/alayacore/alayacore/internal/app"
 	"github.com/alayacore/alayacore/internal/stream"
 	"github.com/alayacore/alayacore/internal/theme"
+	"github.com/alayacore/alayacore/internal/tlv"
 )
 
 // ============================================================================
@@ -36,13 +37,13 @@ type sessionLoadingErrorMsg struct {
 // Errors are silently ignored — commands are best-effort and the
 // session may close the input stream at any time.
 func (m *Terminal) emitCommand(cmd string) {
-	_ = stream.WriteTLV(m.streamInput, stream.TagUserT, cmd)
+	_ = tlv.WriteTLV(m.streamInput, tlv.TagUserT, cmd)
 }
 
 // emitUE sends a TagUserEnd frame, flushing any staged content
 // as a complete user message.
 func (m *Terminal) emitUE() {
-	_ = stream.WriteTLV(m.streamInput, stream.TagUserEnd, "")
+	_ = tlv.WriteTLV(m.streamInput, tlv.TagUserEnd, "")
 }
 
 // ============================================================================

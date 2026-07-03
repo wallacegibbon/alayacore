@@ -13,7 +13,7 @@ import (
 
 	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/mcp"
-	"github.com/alayacore/alayacore/internal/stream"
+	"github.com/alayacore/alayacore/internal/protocol"
 )
 
 // MCPService manages MCP server initialization lifecycle.
@@ -183,7 +183,7 @@ func (m *MCPService) sendSystemMsg(data *MCPMsgData) {
 	if m.output == nil {
 		return
 	}
-	_ = stream.WriteSystemMsg(m.output, MCPMsg{
+	_ = protocol.WriteSystemMsg(m.output, MCPMsg{
 		Status: data.Status,
 		Server: data.Server,
 		URL:    data.URL,

@@ -17,7 +17,7 @@ import (
 
 	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/llm"
-	"github.com/alayacore/alayacore/internal/stream"
+	"github.com/alayacore/alayacore/internal/tlv"
 )
 
 // maxTLVContentSize is the safety limit for a single TLV record's content.
@@ -87,7 +87,7 @@ func formatSessionMarkdown(data *SessionData) ([]byte, error) {
 			return nil, fmt.Errorf("save: %w", err)
 		}
 		tlvBuf.WriteString("\n\n")
-		tlvBuf.Write(stream.EncodeTLV(tag, content))
+		tlvBuf.Write(tlv.EncodeTLV(tag, content))
 	}
 
 	buf.WriteString(tlvBuf.String())
