@@ -6,17 +6,17 @@ package agent
 // Broadcasting overview:
 //
 //   Guaranteed broadcasts (critical state transitions):
-//     handleTaskEvent(StepStartEvent)  → sendSystemInfo("task")  — step counter
-//     handleTaskDone()                 → sendSystemInfo("task")  — task completion
-//     handleModelSet/ModelLoad         → sendSystemInfo("model") — model switch
-//     SetReasoningLevel()              → sendSystemInfo("reasoning")
-//     SetVideoConfig()                 → sendSystemInfo("video_config")
-//     handleThemeSet()                 → sendSystemInfo("theme")
+//     handleTaskEvent(StepStartEvent)  → sendSystemInfo(SystemInfoTask)  — step counter
+//     handleTaskDone()                 → sendSystemInfo(SystemInfoTask)  — task completion
+//     handleModelSet/ModelLoad         → sendSystemInfo(SystemInfoModel) — model switch
+//     SetReasoningLevel()              → sendSystemInfo(SystemInfoReasoning)
+//     SetVideoConfig()                 → sendSystemInfo(SystemInfoVideoConfig)
+//     handleThemeSet()                 → sendSystemInfo(SystemInfoTheme)
 //
 //   Best-effort broadcasts (UI responsiveness optimization):
 //     The task goroutine calls requestSystemInfo() which sends on
 //     taskRefreshCh (non-blocking). The run() goroutine picks it up
-//     and calls sendSystemInfo("task"). If the send is dropped
+//     and calls sendSystemInfo(SystemInfoTask). If the send is dropped
 //     (buffer full), the TUI misses a transient update but catches
 //     up at the next guaranteed broadcast above.
 //
@@ -34,6 +34,19 @@ import (
 	"github.com/alayacore/alayacore/internal/theme"
 	"github.com/alayacore/alayacore/internal/tlv"
 	"github.com/alayacore/alayacore/internal/version"
+)
+
+// SystemInfoKind selects which state to broadcast to the adapter.
+// Used instead of string literals to avoid silent typos.
+type SystemInfoKind int
+
+const (
+	SystemInfoAll         SystemInfoKind = iota // all state
+	SystemInfoTask                              // task progress (step, in_progress)
+	SystemInfoModel                             // active model
+	SystemInfoTheme                             // active theme
+	SystemInfoReasoning                         // reasoning level
+	SystemInfoVideoConfig                       // video FPS/resolution
 )
 
 // ============================================================================
@@ -119,12 +132,10 @@ func (s *Session) requestSystemInfo() {
 }
 
 // sendSystemInfo sends one or more TagSystemMsg frames to the adapter.
-// kind selects which messages to send: "task", "model", "theme",
-// "reasoning", "video_config", or "all".
 // Must only be called from the run() goroutine.
-func (s *Session) sendSystemInfo(kind string) {
+func (s *Session) sendSystemInfo(kind SystemInfoKind) {
 	switch kind {
-	case "all":
+	case SystemInfoAll:
 		s.sendMessageVersionMsg()
 		s.sendTaskMsg()
 		s.sendModelListMsg()
@@ -133,15 +144,15 @@ func (s *Session) sendSystemInfo(kind string) {
 		s.sendThemeMsg()
 		s.sendReasoningMsg()
 		s.sendVideoConfigMsg()
-	case "task":
+	case SystemInfoTask:
 		s.sendTaskMsg()
-	case "model":
+	case SystemInfoModel:
 		s.sendModelMsg()
-	case "theme":
+	case SystemInfoTheme:
 		s.sendThemeMsg()
-	case "reasoning":
+	case SystemInfoReasoning:
 		s.sendReasoningMsg()
-	case "video_config":
+	case SystemInfoVideoConfig:
 		s.sendVideoConfigMsg()
 	}
 }

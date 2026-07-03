@@ -69,7 +69,7 @@ func (s *Session) run() {
 			s.handleTaskDone(contents)
 
 		case <-s.taskRefreshCh:
-			s.sendSystemInfo("task")
+			s.sendSystemInfo(SystemInfoTask)
 
 		case evt, ok := <-mcpEvents:
 			if !ok {
@@ -148,7 +148,7 @@ func (s *Session) handleTaskDone(contents []llm.ContentPart) {
 		}
 	}
 
-	s.sendSystemInfo("task")
+	s.sendSystemInfo(SystemInfoTask)
 }
 
 // flushPendingEvents drains remaining taskEventCh events from the
@@ -201,7 +201,7 @@ func (s *Session) handleTaskEvent(ev TaskEvent) {
 		if s.activeTask != nil {
 			s.activeTask.step = e.Step
 		}
-		s.sendSystemInfo("task")
+		s.sendSystemInfo(SystemInfoTask)
 
 	case StepFinishEvent:
 		newContext := e.InputTokens + e.OutputTokens + e.CacheReadTokens + e.CacheCreationTokens

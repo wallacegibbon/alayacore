@@ -229,7 +229,7 @@ func NewSession(cfg SessionConfig) *Session {
 	// Set up MCP service (manages init lifecycle).
 	s.mcpService = NewMCPService(cfg.MCPInit, s.Output)
 
-	s.sendSystemInfo("all")
+	s.sendSystemInfo(SystemInfoAll)
 	return s
 }
 
@@ -278,7 +278,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 		s.ContextLimit = s.modelService.ContextLimit()
 	}
 
-	s.sendSystemInfo("all")
+	s.sendSystemInfo(SystemInfoAll)
 	return s
 }
 

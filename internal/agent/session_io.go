@@ -231,7 +231,7 @@ func (s *Session) handleThemeSet(args string) {
 			s.writeNotifyf("Failed to persist theme switch: %v", err)
 		}
 	}
-	s.sendSystemInfo("theme")
+	s.sendSystemInfo(SystemInfoTheme)
 }
 
 // resendPrompt resends the conversation history to the LLM.

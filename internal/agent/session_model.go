@@ -23,7 +23,7 @@ func (s *Session) SwitchModel(modelConfig *config.ModelConfig) error {
 	}
 	// Sync back context limit from the service.
 	s.ContextLimit = s.modelService.ContextLimit()
-	s.sendSystemInfo("model")
+	s.sendSystemInfo(SystemInfoModel)
 	return nil
 }
 
@@ -51,13 +51,13 @@ func (s *Session) ensureAgentInitialized() error {
 // SetReasoningLevel sets the reasoning level.
 func (s *Session) SetReasoningLevel(level int) {
 	s.modelService.SetReasoningLevel(level)
-	s.sendSystemInfo("reasoning")
+	s.sendSystemInfo(SystemInfoReasoning)
 }
 
 // SetVideoConfig sets the default video FPS and resolution.
 func (s *Session) SetVideoConfig(fps int, resolution int) {
 	s.modelService.SetVideoConfig(fps, resolution)
-	s.sendSystemInfo("video_config")
+	s.sendSystemInfo(SystemInfoVideoConfig)
 }
 
 // ============================================================================
