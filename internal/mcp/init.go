@@ -268,7 +268,7 @@ func (init *Init) collectOAuthResult(ctx context.Context, c *Client) serverResul
 		if errors.Is(err, context.Canceled) {
 			init.sendEvent(InitEvent{Type: InitFailed, Server: c.Name(), Error: "skipped"})
 		} else {
-			r.errs = append(r.errs, fmt.Sprintf("MCP auth for %q: %v", c.Name(), err))
+			r.errs = append(r.errs, err.Error())
 			init.sendEvent(InitEvent{Type: InitFailed, Server: c.Name(), Error: err.Error()})
 		}
 		return r
@@ -286,21 +286,21 @@ func (init *Init) collectOAuthResult(ctx context.Context, c *Client) serverResul
 func (init *Init) discoverCapabilities(ctx context.Context, c *Client, r *serverResult) {
 	if c.HasTools() && len(r.tools) == 0 {
 		if tools, err := c.ListTools(ctx); err != nil {
-			r.errs = append(r.errs, fmt.Sprintf("MCP tools for %q: %v", c.Name(), err))
+			r.errs = append(r.errs, fmt.Sprintf("list tools for %q: %v", c.Name(), err))
 		} else {
 			r.tools = tools
 		}
 	}
 	if c.HasResources() {
 		if resources, err := c.ListResources(ctx); err != nil {
-			r.errs = append(r.errs, fmt.Sprintf("MCP resources for %q: %v", c.Name(), err))
+			r.errs = append(r.errs, fmt.Sprintf("list resources for %q: %v", c.Name(), err))
 		} else {
 			r.resources = resources
 		}
 	}
 	if c.HasPrompts() {
 		if prompts, err := c.ListPrompts(ctx); err != nil {
-			r.errs = append(r.errs, fmt.Sprintf("MCP prompts for %q: %v", c.Name(), err))
+			r.errs = append(r.errs, fmt.Sprintf("list prompts for %q: %v", c.Name(), err))
 		} else {
 			r.prompts = prompts
 		}

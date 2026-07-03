@@ -172,7 +172,7 @@ func (c *Client) doInitialize(ctx context.Context) error {
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("initialize request failed: %w", err)
+		return err
 	}
 
 	var result InitializeResult

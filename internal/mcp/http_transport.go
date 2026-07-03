@@ -462,7 +462,7 @@ func (t *StreamableHTTPTransport) doPOSTOnce(ctx context.Context, req jsonrpcReq
 
 	resp, err := t.httpClient.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("POST: %w", err)
+		return nil, err
 	}
 
 	// Check for session ID in response.
