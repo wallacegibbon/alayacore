@@ -120,13 +120,22 @@ func (m *MCPService) HandleEvent(evt *mcp.InitEvent) *MCPEventResult {
 	}
 
 	switch evt.Type {
-	case mcp.InitConnecting, mcp.InitConnected, mcp.InitFailed:
+	case mcp.InitConnecting, mcp.InitConnected:
+		return &MCPEventResult{
+			SystemMsg: &MCPMsgData{
+				Status: string(evt.Type),
+				Server: evt.Server,
+			},
+		}
+
+	case mcp.InitFailed:
 		return &MCPEventResult{
 			SystemMsg: &MCPMsgData{
 				Status: string(evt.Type),
 				Server: evt.Server,
 				Error:  evt.Error,
 			},
+			Errors: []string{evt.Error},
 		}
 
 	case mcp.InitAuthConfirm:
