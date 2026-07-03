@@ -34,9 +34,7 @@ The TUI adapter processes confirmations sequentially (one dialog at a time). Oth
 All results (from both confirmed and unconfirmed tools) flow through a single shared channel and are re-ordered by ID:
 
 ```go
-toolInputs := extractToolInputs(stepMessage.Contents) // original order from LLM
-idToTool := map ID → index
-for _, r := range results {
-    finalResults[idToTool[r.ID]] = r
-}
+stepContents = reorderToolResults(stepContents, results)
 ```
+
+`reorderToolResults` matches each `ToolOutputPart` to its `ToolInputPart` by ID and places results in the original SSE index order so they match the assistant message's content order.

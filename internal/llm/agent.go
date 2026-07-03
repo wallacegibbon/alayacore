@@ -175,7 +175,7 @@ func (a *Agent) Stream(ctx context.Context, contents []ContentPart, callbacks St
 // Assigns unique history IDs via IDGen on first touch of each content block,
 // passes them to callbacks, and stores them on ContentParts.
 //
-//nolint:gocyclo // extracting further would harm readability
+//nolint:gocyclo // switch dispatch over 5 event types with callback guards
 func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, error], callbacks StreamCallbacks) ([]ContentPart, Usage, bool, error) {
 	var (
 		stepContents []ContentPart
@@ -262,9 +262,18 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 
 	// Re-order results by tool call ID to match the LLM's intended order.
 	// toolInputs are extracted from stepContents, which preserves the
-	// SSE index order (0, 1, 2...) from the streaming response. Each result
-	// carries its tool call ID, so we place them at the correct position
-	// regardless of execution or collection order.
+	// SSE index order (0, 1, 2...) from the streaming response.
+	stepContents = reorderToolResults(stepContents, results)
+
+	return stepContents, stepUsage, truncated, nil
+}
+
+// reorderToolResults re-orders tool results by their tool call ID to match
+// the original order of tool calls in stepContents (which preserves the
+// SSE index order from the streaming response). Each result carries its
+// tool call ID, so we place them at the correct position regardless of
+// execution or collection order.
+func reorderToolResults(stepContents, results []ContentPart) []ContentPart {
 	toolInputs := extractToolInputs(stepContents)
 	finalResults := make([]ContentPart, len(toolInputs))
 	idToTool := make(map[string]int, len(toolInputs))
@@ -278,11 +287,7 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 			}
 		}
 	}
-
-	// Append assistant contents + tool results as flat list
-	stepContents = append(stepContents, finalResults...)
-
-	return stepContents, stepUsage, truncated, nil
+	return append(stepContents, finalResults...)
 }
 
 // handleStreamedToolInput processes a completed tool use during streaming.
