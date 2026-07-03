@@ -60,7 +60,8 @@ Types used by both adapter and agent (e.g. `ModelConfig`) must live in a shared 
 
 ```
 internal/config/    ← ModelConfig, key-value parsing/formatting
-internal/stream/    ← TLV tag constants, wire format, SliceBuffer
+internal/tlv/       ← TLV tag constants, frame encoding/decoding
+internal/protocol/  ← System message types, tool data structures
 internal/theme/     ← Theme data structures
 ```
 
@@ -87,4 +88,4 @@ When reviewing a change, ask:
 1. **Does this call an agent function from an adapter?** → Move the function to a neutral package or find a TLV-based approach.
 2. **Can a rawio client do this?** → If not, the TLV protocol needs a new message type.
 3. **Does this create a reverse dependency (agent → adapter)?** → Restructure immediately; this is never acceptable.
-4. **Is this type used by both sides?** → Put it in `internal/config`, `internal/stream`, or another shared package.
+4. **Is this type used by both sides?** → Put it in `internal/config`, `internal/tlv`, `internal/protocol`, or another shared package.
