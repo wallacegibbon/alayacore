@@ -83,37 +83,20 @@ func (s *Session) writeNotifyf(format string, args ...any) {
 	s.writeNotify(fmt.Sprintf(format, args...))
 }
 
-// writeTLVJSON marshals a value to JSON and writes it as a TLV frame.
-// On marshal failure, marks output as broken (same as writeTLV on write failure).
-func (s *Session) writeTLVJSON(tag string, v any) {
-	if s.outputBroken.Load() || s.Output == nil {
-		return
-	}
-	data, err := json.Marshal(v)
-	if err != nil {
-		s.markOutputBroken()
-		return
-	}
-	s.writeTLV(tag, string(data))
-}
-
 func (s *Session) writeToolInput(input json.RawMessage, id string) {
-	s.writeTLVJSON(stream.TagAssistantF, stream.ToolInputData{
-		ID:    id,
-		Input: input,
-	})
+	data, err := marshalToolInputData(id, "", input)
+	if err != nil {
+		return
+	}
+	s.writeTLV(stream.TagAssistantF, string(data))
 }
 
 func (s *Session) writeToolOutput(id string, contents []llm.ContentPart, isError bool) {
-	contentJSON, err := serializeContentParts(contents)
+	data, err := marshalToolOutputData(id, contents, isError)
 	if err != nil {
-		contentJSON = []byte(`[{"type":"text","text":"(serialization error)"}]`)
+		return
 	}
-	s.writeTLVJSON(stream.TagUserF, stream.ToolOutputData{
-		ID:      id,
-		Output:  contentJSON,
-		IsError: isError,
-	})
+	s.writeTLV(stream.TagUserF, string(data))
 }
 
 // ============================================================================

@@ -8,7 +8,6 @@ package agent
 
 import (
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -197,95 +196,6 @@ func parseMessagesTLV(body string) ([]llm.ContentPart, error) {
 		seqID++
 		msgPart.SetHistoryID(seqID)
 		contents = append(contents, msgPart)
-	}
-}
-
-// contentPartToTLV serializes a ContentPart as a TLV tag and value string (without history ID).
-func contentPartToTLV(part llm.ContentPart) (tag string, content string, err error) {
-	switch p := part.(type) {
-	case *llm.TextPart:
-		if part.GetRole() == llm.RoleAssistant {
-			return stream.TagAssistantT, p.Text, nil
-		}
-		return stream.TagUserT, p.Text, nil
-	case *llm.ImagePart:
-		return stream.TagUserI, p.URI, nil
-	case *llm.VideoPart:
-		return stream.TagUserV, p.URI, nil
-	case *llm.AudioPart:
-		return stream.TagUserA, p.URI, nil
-	case *llm.DocumentPart:
-		return stream.TagUserD, p.URI, nil
-	case *llm.ReasoningPart:
-		return stream.TagAssistantR, p.Text, nil
-	case *llm.ToolInputPart:
-		fd := stream.ToolInputData{ID: p.ID, Name: p.Name, Input: p.Input}
-		jsonData, err := json.Marshal(fd)
-		if err != nil {
-			return "", "", err
-		}
-		return stream.TagAssistantF, string(jsonData), nil
-	case *llm.ToolOutputPart:
-		contentJSON, err := serializeContentParts(p.Output)
-		if err != nil {
-			return "", "", fmt.Errorf("failed to serialize tool result content: %w", err)
-		}
-		tr := stream.ToolOutputData{ID: p.ID, Output: contentJSON, IsError: p.IsError}
-		jsonData, err := json.Marshal(tr)
-		if err != nil {
-			return "", "", err
-		}
-		return stream.TagUserF, string(jsonData), nil
-	default:
-		return "", "", fmt.Errorf("unknown content part type: %T", part)
-	}
-}
-
-// contentPartFromTLV converts a TLV record into a ContentPart with Role set.
-func contentPartFromTLV(tag string, content []byte) (llm.ContentPart, error) {
-	cleanContent := string(content)
-	if _, stripped, ok := stream.UnwrapID(cleanContent); ok {
-		cleanContent = stripped
-	}
-
-	switch tag {
-	case stream.TagUserT:
-		return &llm.TextPart{Text: cleanContent, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}}, nil
-	case stream.TagUserI:
-		return &llm.ImagePart{URI: cleanContent, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}}, nil
-	case stream.TagUserV:
-		return &llm.VideoPart{URI: cleanContent, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}}, nil
-	case stream.TagUserA:
-		return &llm.AudioPart{URI: cleanContent, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}}, nil
-	case stream.TagUserD:
-		return &llm.DocumentPart{URI: cleanContent, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}}, nil
-	case stream.TagAssistantT:
-		return &llm.TextPart{Text: cleanContent, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant}}, nil
-	case stream.TagAssistantR:
-		return &llm.ReasoningPart{Text: cleanContent, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant}}, nil
-	case stream.TagAssistantF:
-		var fd stream.ToolInputData
-		if err := json.Unmarshal([]byte(cleanContent), &fd); err != nil {
-			return nil, fmt.Errorf("failed to parse function data: %w", err)
-		}
-		if fd.Name == "" {
-			return nil, nil
-		}
-		return &llm.ToolInputPart{
-			ID: fd.ID, Name: fd.Name, Input: fd.Input, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant},
-		}, nil
-	case stream.TagUserF:
-		var tr stream.ToolOutputData
-		if err := json.Unmarshal([]byte(cleanContent), &tr); err != nil {
-			return nil, fmt.Errorf("failed to parse tool result: %w", err)
-		}
-		contentParts, err := deserializeContentParts(tr.Output)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse tool result content: %w", err)
-		}
-		return &llm.ToolOutputPart{ID: tr.ID, Output: contentParts, IsError: tr.IsError, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleTool}}, nil
-	default:
-		return nil, fmt.Errorf("unknown tag: %s", tag)
 	}
 }
 

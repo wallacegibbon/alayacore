@@ -211,15 +211,7 @@ func (s *Session) handleToolConfirm(req llm.ToolConfirmRequest) <-chan bool {
 
 // handleToolOutput serializes tool results and writes them to the output stream.
 func (s *Session) handleToolOutput(toolCallID string, contents []llm.ContentPart, err error, historyID uint64) error {
-	contentJSON, serErr := serializeContentParts(contents)
-	if serErr != nil {
-		contentJSON = []byte(`[{"type":"text","text":"(serialization error)"}]`)
-	}
-	data, marshalErr := json.Marshal(stream.ToolOutputData{
-		ID:      toolCallID,
-		Output:  contentJSON,
-		IsError: err != nil,
-	})
+	data, marshalErr := marshalToolOutputData(toolCallID, contents, err != nil)
 	if marshalErr != nil {
 		return fmt.Errorf("failed to marshal tool output: %w", marshalErr)
 	}
@@ -241,7 +233,7 @@ func (s *Session) handleReasoningDelta(delta string, historyID uint64) error {
 
 // handleToolInputStart marshals and writes a tool call start frame.
 func (s *Session) handleToolInputStart(toolCallID, name string, historyID uint64) error {
-	data, err := json.Marshal(stream.ToolInputData{ID: toolCallID, Name: name})
+	data, err := marshalToolInputData(toolCallID, name, nil)
 	if err != nil {
 		return fmt.Errorf("failed to marshal tool input start: %w", err)
 	}
@@ -251,7 +243,7 @@ func (s *Session) handleToolInputStart(toolCallID, name string, historyID uint64
 
 // handleToolInputComplete marshals and writes a tool call input frame.
 func (s *Session) handleToolInputComplete(toolCallID string, input json.RawMessage, historyID uint64) error {
-	data, err := json.Marshal(stream.ToolInputData{ID: toolCallID, Input: input})
+	data, err := marshalToolInputData(toolCallID, "", input)
 	if err != nil {
 		return fmt.Errorf("failed to marshal tool input complete: %w", err)
 	}
