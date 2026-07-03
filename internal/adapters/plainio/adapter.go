@@ -50,9 +50,9 @@ func (a *Adapter) Start() int {
 
 	exitCh := make(chan int, 1)
 
-	// Read stdin and emit TLV messages. On read error, close inputWriter
-	// to signal EOF. Only the stdin goroutine touches inputWriter.
-	go func() {
+	// readStdin reads prompts from stdin and emits TLV messages.
+	// Only this goroutine touches inputWriter.
+	readStdin := func() {
 		err := readPrompts(inputWriter, os.Stdin)
 		// Close signals EOF regardless, unblocking the session.
 		inputWriter.Close()
@@ -67,7 +67,8 @@ func (a *Adapter) Start() int {
 		case exitCh <- 0:
 		default:
 		}
-	}()
+	}
+	go readStdin()
 
 	// Wait for EOF (Ctrl-D), error, or session completion.
 	code := 0
