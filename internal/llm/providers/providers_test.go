@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,6 +12,29 @@ import (
 	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/llm/providers"
 )
+
+// newMockSSEServer creates an httptest.Server that responds with SSE events.
+// The writeFn callback receives the response writer after common headers are
+// set; it is responsible for writing the event data.  The server is
+// automatically closed when the test finishes via t.Cleanup.
+//
+// Tests that need to verify request headers should use httptest.NewServer
+// directly instead.
+func newMockSSEServer(t *testing.T, writeFn func(w io.Writer)) *httptest.Server {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			t.Fatal("response writer does not support flushing")
+		}
+		writeFn(w)
+		flusher.Flush()
+	}))
+	t.Cleanup(server.Close)
+	return server
+}
 
 func TestAnthropicProvider(t *testing.T) {
 	// Create mock server
@@ -150,12 +174,7 @@ func TestOpenAIProvider(t *testing.T) {
 
 func TestToolCallStreaming(t *testing.T) {
 	// Test that tool calls are properly streamed
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.WriteHeader(http.StatusOK)
-
-		flusher, _ := w.(http.Flusher)
-
+	server := newMockSSEServer(t, func(w io.Writer) {
 		// Send tool call
 		toolCall := map[string]any{
 			"choices": []any{
@@ -182,10 +201,7 @@ func TestToolCallStreaming(t *testing.T) {
 		}
 		fmt.Fprintf(w, "data: %s\n\n", string(data))
 		fmt.Fprint(w, "data: [DONE]\n\n")
-
-		flusher.Flush()
-	}))
-	defer server.Close()
+	})
 
 	provider, err := providers.NewOpenAI(
 		providers.WithOpenAIAPIKey("test"),
@@ -241,22 +257,14 @@ func TestToolCallStreamingChunked(t *testing.T) {
 	// Test that tool calls with chunked arguments are properly accumulated
 	// This simulates Qwen and other providers that split arguments across multiple deltas
 	// Important: subsequent chunks have empty "id" but correct "index"
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.WriteHeader(http.StatusOK)
-
-		flusher, _ := w.(http.Flusher)
-
+	server := newMockSSEServer(t, func(w io.Writer) {
 		// First chunk: name + id + index (arguments empty)
 		fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call-456\",\"type\":\"function\",\"function\":{\"name\":\"execute_command\",\"arguments\":\"\"}}]}}]}\n\n")
 		// Subsequent chunks: arguments are raw JSON fragments (not quoted strings)
 		// The API sends the JSON object being built up piece by piece
 		fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"\",\"function\":{\"arguments\":\"{\\\"command\\\": \\\"uname -a\\\"}\"}}]}}]}\n\n")
 		fmt.Fprint(w, "data: [DONE]\n\n")
-
-		flusher.Flush()
-	}))
-	defer server.Close()
+	})
 
 	provider, err := providers.NewOpenAI(
 		providers.WithOpenAIAPIKey("test"),
@@ -369,12 +377,7 @@ func TestToolCallStreamingWithNullArguments(t *testing.T) {
 
 func TestAnthropicToolCallStreaming(t *testing.T) {
 	// Test that tool calls are properly streamed from Anthropic
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.WriteHeader(http.StatusOK)
-
-		flusher, _ := w.(http.Flusher)
-
+	server := newMockSSEServer(t, func(w io.Writer) {
 		// Send tool call start
 		fmt.Fprint(w, "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_123\",\"name\":\"get_weather\"}}\n\n")
 		// Send tool input delta
@@ -385,10 +388,7 @@ func TestAnthropicToolCallStreaming(t *testing.T) {
 		// Send message stop
 		fmt.Fprint(w, "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"tool_use\"},\"usage\":{\"input_tokens\":50,\"output_tokens\":20}}\n\n")
 		fmt.Fprint(w, "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
-
-		flusher.Flush()
-	}))
-	defer server.Close()
+	})
 
 	provider, err := providers.NewAnthropic(
 		providers.WithAPIKey("test"),
@@ -567,12 +567,7 @@ func TestToolInputStartEventAnthropic(t *testing.T) {
 
 func TestAnthropicReasoningStreaming(t *testing.T) {
 	// Test that reasoning/thinking content is properly streamed
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.WriteHeader(http.StatusOK)
-
-		flusher, _ := w.(http.Flusher)
-
+	server := newMockSSEServer(t, func(w io.Writer) {
 		// Send thinking block
 		fmt.Fprint(w, "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\"}}\n\n")
 		fmt.Fprint(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"Let me think...\"}}\n\n")
@@ -583,10 +578,7 @@ func TestAnthropicReasoningStreaming(t *testing.T) {
 		fmt.Fprint(w, "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":1}\n\n")
 		fmt.Fprint(w, "event: message_delta\ndata: {\"type\":\"message_delta\",\"usage\":{\"input_tokens\":10,\"output_tokens\":30}}\n\n")
 		fmt.Fprint(w, "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
-
-		flusher.Flush()
-	}))
-	defer server.Close()
+	})
 
 	provider, err := providers.NewAnthropic(
 		providers.WithAPIKey("test"),
@@ -655,11 +647,7 @@ func TestAnthropicThinkingOmittedMode(t *testing.T) {
 	// thinking_delta events — just a signature_delta then immediately stop.
 	// Text streaming begins right after the thinking block closes.
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.WriteHeader(http.StatusOK)
-		flusher, _ := w.(http.Flusher)
-
+	server := newMockSSEServer(t, func(w io.Writer) {
 		// Thinking block: no thinking_delta, just stop
 		fmt.Fprint(w, "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\"}}\n\n")
 		fmt.Fprint(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"signature_delta\",\"signature\":\"abc123\"}}\n\n")
@@ -672,9 +660,7 @@ func TestAnthropicThinkingOmittedMode(t *testing.T) {
 
 		fmt.Fprint(w, "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":10}}\n\n")
 		fmt.Fprint(w, "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
-		flusher.Flush()
-	}))
-	defer server.Close()
+	})
 
 	provider, err := providers.NewAnthropic(
 		providers.WithAPIKey("test"),
@@ -741,11 +727,7 @@ func TestAnthropicAPIError(t *testing.T) {
 
 func TestAnthropicRefusalStopReason(t *testing.T) {
 	// Test Anthropic refusal stop reason handling
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.WriteHeader(http.StatusOK)
-
-		flusher, _ := w.(http.Flusher)
+	server := newMockSSEServer(t, func(w io.Writer) {
 		// Send message_start
 		fmt.Fprint(w, "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_123\",\"role\":\"assistant\",\"content\":[]}}\n\n")
 		// Send text content
@@ -753,9 +735,7 @@ func TestAnthropicRefusalStopReason(t *testing.T) {
 		fmt.Fprint(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"I cannot\"}}\n\n")
 		// Send refusal stop reason
 		fmt.Fprint(w, "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"refusal\"}}\n\n")
-		flusher.Flush()
-	}))
-	defer server.Close()
+	})
 
 	provider, err := providers.NewAnthropic(
 		providers.WithAPIKey("test-key"),
@@ -787,11 +767,7 @@ func TestAnthropicRefusalStopReason(t *testing.T) {
 
 func TestAnthropicUnknownStopReason(t *testing.T) {
 	// Test Anthropic unknown stop reason handling
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.WriteHeader(http.StatusOK)
-
-		flusher, _ := w.(http.Flusher)
+	server := newMockSSEServer(t, func(w io.Writer) {
 		// Send message_start
 		fmt.Fprint(w, "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_123\",\"role\":\"assistant\",\"content\":[]}}\n\n")
 		// Send text content
@@ -799,9 +775,7 @@ func TestAnthropicUnknownStopReason(t *testing.T) {
 		fmt.Fprint(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Some text\"}}\n\n")
 		// Send unknown stop reason
 		fmt.Fprint(w, "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"unknown_reason\"}}\n\n")
-		flusher.Flush()
-	}))
-	defer server.Close()
+	})
 
 	provider, err := providers.NewAnthropic(
 		providers.WithAPIKey("test-key"),
@@ -837,11 +811,7 @@ func TestAnthropicValidStopReasons(t *testing.T) {
 
 	for _, reason := range validReasons {
 		t.Run(reason, func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.Header().Set("Content-Type", "text/event-stream")
-				w.WriteHeader(http.StatusOK)
-
-				flusher, _ := w.(http.Flusher)
+			server := newMockSSEServer(t, func(w io.Writer) {
 				// Send message_start
 				fmt.Fprint(w, "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_123\",\"role\":\"assistant\",\"content\":[]}}\n\n")
 				// Send text content
@@ -851,9 +821,7 @@ func TestAnthropicValidStopReasons(t *testing.T) {
 				// Send valid stop reason
 				fmt.Fprintf(w, "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"%s\"},\"usage\":{\"output_tokens\":10}}\n\n", reason)
 				fmt.Fprint(w, "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
-				flusher.Flush()
-			}))
-			defer server.Close()
+			})
 
 			provider, err := providers.NewAnthropic(
 				providers.WithAPIKey("test-key"),
@@ -899,18 +867,12 @@ func TestAnthropicValidStopReasons(t *testing.T) {
 
 func TestOpenAIContentFilter(t *testing.T) {
 	// Test OpenAI content_filter finish reason handling
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.WriteHeader(http.StatusOK)
-
-		flusher, _ := w.(http.Flusher)
+	server := newMockSSEServer(t, func(w io.Writer) {
 		// Send partial content
 		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"Some content\"}}]}\n\n")
 		// Then content_filter
 		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"\"},\"finish_reason\":\"content_filter\"}]}\n\n")
-		flusher.Flush()
-	}))
-	defer server.Close()
+	})
 
 	provider, err := providers.NewOpenAI(
 		providers.WithOpenAIAPIKey("test-key"),
@@ -942,16 +904,10 @@ func TestOpenAIContentFilter(t *testing.T) {
 
 func TestOpenAILengthFinishReason(t *testing.T) {
 	// Test OpenAI length finish reason (should NOT error - it's valid)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.WriteHeader(http.StatusOK)
-
-		flusher, _ := w.(http.Flusher)
+	server := newMockSSEServer(t, func(w io.Writer) {
 		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"Truncated\"},\"finish_reason\":\"length\"}]}\n\n")
 		fmt.Fprint(w, "data: [DONE]\n\n")
-		flusher.Flush()
-	}))
-	defer server.Close()
+	})
 
 	provider, err := providers.NewOpenAI(
 		providers.WithOpenAIAPIKey("test-key"),
@@ -1019,18 +975,12 @@ func TestOpenAIAPIError(t *testing.T) {
 
 func TestOpenAINetworkError(t *testing.T) {
 	// Test OpenAI network_error finish reason handling
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.WriteHeader(http.StatusOK)
-
-		flusher, _ := w.(http.Flusher)
+	server := newMockSSEServer(t, func(w io.Writer) {
 		// Send some content first
 		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"Partial\"}}]}\n\n")
 		// Then send network_error
 		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"\"},\"finish_reason\":\"network_error\"}]}\n\n")
-		flusher.Flush()
-	}))
-	defer server.Close()
+	})
 
 	provider, err := providers.NewOpenAI(
 		providers.WithOpenAIAPIKey("test-key"),
@@ -1430,12 +1380,7 @@ func TestAnthropicToolResultMessageFormat(t *testing.T) {
 
 func TestAnthropicMultiToolCall(t *testing.T) {
 	// Test multiple tool calls in a single response
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.WriteHeader(http.StatusOK)
-
-		flusher, _ := w.(http.Flusher)
-
+	server := newMockSSEServer(t, func(w io.Writer) {
 		// First tool call
 		fmt.Fprint(w, "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"tool-1\",\"name\":\"get_weather\"}}\n\n")
 		fmt.Fprint(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"city\\\":\\\"NYC\\\"}\"}}\n\n")
@@ -1448,10 +1393,7 @@ func TestAnthropicMultiToolCall(t *testing.T) {
 
 		fmt.Fprint(w, "event: message_delta\ndata: {\"type\":\"message_delta\",\"usage\":{\"input_tokens\":10,\"output_tokens\":20}}\n\n")
 		fmt.Fprint(w, "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
-
-		flusher.Flush()
-	}))
-	defer server.Close()
+	})
 
 	provider, err := providers.NewAnthropic(
 		providers.WithAPIKey("test-key"),
