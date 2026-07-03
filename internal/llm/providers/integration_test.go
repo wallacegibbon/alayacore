@@ -27,6 +27,24 @@ func testMsg(role llm.MessageRole, parts ...llm.ContentPart) []llm.ContentPart {
 	return parts
 }
 
+// collectTextCallback returns an OnTextDelta callback that appends all text
+// deltas to the given strings.Builder.
+func collectTextCallback(dest *strings.Builder) func(string, uint64) error {
+	return func(delta string, _ uint64) error {
+		dest.WriteString(delta)
+		return nil
+	}
+}
+
+// collectToolCallsCallback returns an OnToolInputComplete callback that records
+// each tool call input as "tool(<json>)" strings.
+func collectToolCallsCallback(dest *[]string) func(string, json.RawMessage, uint64) error {
+	return func(_ string, input json.RawMessage, _ uint64) error {
+		*dest = append(*dest, fmt.Sprintf("tool(%s)", string(input)))
+		return nil
+	}
+}
+
 var runIntegration = flag.Bool("integration", false, "run integration tests with real APIs")
 
 func skipIfNoIntegration(t *testing.T) {
@@ -339,14 +357,8 @@ func TestAgentToolLoopRealAPI(t *testing.T) {
 	var toolCalls []string
 
 	result, err := agent.Stream(ctx, messages, llm.StreamCallbacks{
-		OnTextDelta: func(delta string, _ uint64) error {
-			textReceived.WriteString(delta)
-			return nil
-		},
-		OnToolInputComplete: func(_ string, input json.RawMessage, _ uint64) error {
-			toolCalls = append(toolCalls, fmt.Sprintf("tool(%s)", string(input)))
-			return nil
-		},
+		OnTextDelta:         collectTextCallback(&textReceived),
+		OnToolInputComplete: collectToolCallsCallback(&toolCalls),
 	})
 	if err != nil {
 		t.Fatalf("Agent stream failed: %v", err)
@@ -440,14 +452,8 @@ func TestAgentMultiToolLoopRealAPI(t *testing.T) {
 	var toolCalls []string
 
 	result, err := agent.Stream(ctx, messages, llm.StreamCallbacks{
-		OnTextDelta: func(delta string, _ uint64) error {
-			textReceived.WriteString(delta)
-			return nil
-		},
-		OnToolInputComplete: func(_ string, input json.RawMessage, _ uint64) error {
-			toolCalls = append(toolCalls, fmt.Sprintf("tool(%s)", string(input)))
-			return nil
-		},
+		OnTextDelta:         collectTextCallback(&textReceived),
+		OnToolInputComplete: collectToolCallsCallback(&toolCalls),
 	})
 	if err != nil {
 		t.Fatalf("Agent stream failed: %v", err)
@@ -535,10 +541,7 @@ func TestAgentSequentialQueriesWithTools(t *testing.T) {
 
 	var toolCalls []string
 	result, err := agent.Stream(ctx, allContents, llm.StreamCallbacks{
-		OnToolInputComplete: func(_ string, input json.RawMessage, _ uint64) error {
-			toolCalls = append(toolCalls, fmt.Sprintf("tool(%s)", string(input)))
-			return nil
-		},
+		OnToolInputComplete: collectToolCallsCallback(&toolCalls),
 	})
 	if err != nil {
 		t.Fatalf("First query failed: %v", err)
@@ -559,10 +562,7 @@ func TestAgentSequentialQueriesWithTools(t *testing.T) {
 
 	toolCalls = nil
 	result, err = agent.Stream(ctx, allContents, llm.StreamCallbacks{
-		OnToolInputComplete: func(_ string, input json.RawMessage, _ uint64) error {
-			toolCalls = append(toolCalls, fmt.Sprintf("tool(%s)", string(input)))
-			return nil
-		},
+		OnToolInputComplete: collectToolCallsCallback(&toolCalls),
 	})
 	if err != nil {
 		t.Fatalf("Second query failed: %v", err)
@@ -577,10 +577,7 @@ func TestAgentSequentialQueriesWithTools(t *testing.T) {
 
 	var textReceived strings.Builder
 	_, err = agent.Stream(ctx, allContents, llm.StreamCallbacks{
-		OnTextDelta: func(delta string, _ uint64) error {
-			textReceived.WriteString(delta)
-			return nil
-		},
+		OnTextDelta: collectTextCallback(&textReceived),
 	})
 	if err != nil {
 		t.Fatalf("Third query failed: %v", err)
@@ -652,10 +649,7 @@ func TestOpenAICompatSequentialQueriesWithTools(t *testing.T) {
 
 	var toolCalls []string
 	result, err := agent.Stream(ctx, allContents, llm.StreamCallbacks{
-		OnToolInputComplete: func(_ string, input json.RawMessage, _ uint64) error {
-			toolCalls = append(toolCalls, fmt.Sprintf("tool(%s)", string(input)))
-			return nil
-		},
+		OnToolInputComplete: collectToolCallsCallback(&toolCalls),
 	})
 	if err != nil {
 		t.Fatalf("First query failed: %v", err)
@@ -676,10 +670,7 @@ func TestOpenAICompatSequentialQueriesWithTools(t *testing.T) {
 
 	toolCalls = nil
 	result, err = agent.Stream(ctx, allContents, llm.StreamCallbacks{
-		OnToolInputComplete: func(_ string, input json.RawMessage, _ uint64) error {
-			toolCalls = append(toolCalls, fmt.Sprintf("tool(%s)", string(input)))
-			return nil
-		},
+		OnToolInputComplete: collectToolCallsCallback(&toolCalls),
 	})
 	if err != nil {
 		t.Fatalf("Second query failed: %v", err)
@@ -694,10 +685,7 @@ func TestOpenAICompatSequentialQueriesWithTools(t *testing.T) {
 
 	var textReceived strings.Builder
 	_, err = agent.Stream(ctx, allContents, llm.StreamCallbacks{
-		OnTextDelta: func(delta string, _ uint64) error {
-			textReceived.WriteString(delta)
-			return nil
-		},
+		OnTextDelta: collectTextCallback(&textReceived),
 	})
 	if err != nil {
 		t.Fatalf("Third query failed: %v", err)
