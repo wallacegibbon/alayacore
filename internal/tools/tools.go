@@ -34,16 +34,24 @@ var BuiltinTools = []ToolRegistration{
 	{New: NewSearchContentTool, Name: "search_content"},
 }
 
+// ToolFilter specifies which built-in tools to enable.
+// The three states are mutually exclusive:
+//   - AllBuiltins = true:  enable all built-in tools
+//   - AllBuiltins = false, Selected = non-empty:  enable only the named tools
+//   - AllBuiltins = false, Selected = nil/empty:  no built-in tools (MCP only)
+type ToolFilter struct {
+	AllBuiltins bool
+	Selected    []string
+}
+
 // DefaultTools returns llm.Tool instances for built-in tools based on the
-// provided filter:
-//   - filter is nil → all built-in tools are returned.
-//   - filter is empty → no built-in tools are returned (user relies on MCP).
-//   - filter has items → only tools whose names appear in filter are returned.
+// provided filter.
 //
-// Returns an error if any name in filter does not match a registered built-in tool.
-func DefaultTools(filter []string) ([]llm.Tool, error) {
-	// nil means "not specified" → enable all tools.
-	if filter == nil {
+// Returns an error if any name in filter.Selected does not match a
+// registered built-in tool.
+func DefaultTools(filter ToolFilter) ([]llm.Tool, error) {
+	// AllBuiltins = true → enable all tools.
+	if filter.AllBuiltins {
 		var result = make([]llm.Tool, 0, len(BuiltinTools))
 		for _, reg := range BuiltinTools {
 			result = append(result, reg.New())
@@ -51,8 +59,8 @@ func DefaultTools(filter []string) ([]llm.Tool, error) {
 		return result, nil
 	}
 
-	// Empty slice means explicitly disabled → no built-in tools.
-	if len(filter) == 0 {
+	// AllBuiltins = false, Selected is empty → no built-in tools.
+	if len(filter.Selected) == 0 {
 		return nil, nil
 	}
 
@@ -64,7 +72,7 @@ func DefaultTools(filter []string) ([]llm.Tool, error) {
 
 	// Check for unknown tool names.
 	var unknown []string
-	for _, name := range filter {
+	for _, name := range filter.Selected {
 		if !valid[name] {
 			unknown = append(unknown, name)
 		}
@@ -79,8 +87,8 @@ func DefaultTools(filter []string) ([]llm.Tool, error) {
 	}
 
 	// Build the enabled set.
-	enabled := make(map[string]bool, len(filter))
-	for _, name := range filter {
+	enabled := make(map[string]bool, len(filter.Selected))
+	for _, name := range filter.Selected {
 		enabled[name] = true
 	}
 

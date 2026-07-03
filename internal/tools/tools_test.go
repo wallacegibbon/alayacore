@@ -16,8 +16,8 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func TestDefaultToolsNil(t *testing.T) {
-	tools, err := DefaultTools(nil)
+func TestDefaultToolsAll(t *testing.T) {
+	tools, err := DefaultTools(ToolFilter{AllBuiltins: true})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -26,8 +26,8 @@ func TestDefaultToolsNil(t *testing.T) {
 	}
 }
 
-func TestDefaultToolsEmpty(t *testing.T) {
-	tools, err := DefaultTools([]string{})
+func TestDefaultToolsNone(t *testing.T) {
+	tools, err := DefaultTools(ToolFilter{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -37,7 +37,7 @@ func TestDefaultToolsEmpty(t *testing.T) {
 }
 
 func TestDefaultToolsFilter(t *testing.T) {
-	tools, err := DefaultTools([]string{"read_file", "write_file"})
+	tools, err := DefaultTools(ToolFilter{Selected: []string{"read_file", "write_file"}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -47,7 +47,7 @@ func TestDefaultToolsFilter(t *testing.T) {
 }
 
 func TestDefaultToolsUnknown(t *testing.T) {
-	_, err := DefaultTools([]string{"read_file", "blah"})
+	_, err := DefaultTools(ToolFilter{Selected: []string{"read_file", "blah"}})
 	if err == nil {
 		t.Fatal("expected error for unknown tool name")
 	}

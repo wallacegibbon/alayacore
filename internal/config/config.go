@@ -8,6 +8,8 @@ import (
 	"os/user"
 	"path/filepath"
 	"strings"
+
+	"github.com/alayacore/alayacore/internal/tools"
 )
 
 // Reasoning level constants.
@@ -112,8 +114,8 @@ type Settings struct {
 	SystemPrompt  string
 	MaxSteps      int
 	AutoSummarize bool
-	ToolConfirm   []string // tool names requiring user confirmation
-	BuiltinTools  []string // built-in tools to enable (nil = all enabled, empty = none)
+	ToolConfirm   []string         // tool names requiring user confirmation
+	BuiltinTools  tools.ToolFilter // built-in tools to enable
 }
 
 // Parse parses CLI flags and returns settings
@@ -156,18 +158,23 @@ func Parse() *Settings {
 	cp := *configPath
 
 	// Detect if --builtin-tools was explicitly provided (even if empty).
-	var builtinToolsVal []string // nil = not provided (all tools enabled)
+	var builtinToolsFilter tools.ToolFilter
 	flag.Visit(func(f *flag.Flag) {
 		if f.Name == "builtin-tools" {
 			raw := f.Value.String()
-			if raw == "" {
-				// --builtin-tools= (empty) → no builtin tools, use MCP
-				builtinToolsVal = []string{}
-			} else {
-				builtinToolsVal = parseToolConfirm(raw)
+			if raw != "" {
+				builtinToolsFilter = tools.ToolFilter{
+					AllBuiltins: false,
+					Selected:    parseToolConfirm(raw),
+				}
 			}
+			// --builtin-tools= (empty) keeps the zero value: no tools.
 		}
 	})
+	// If --builtin-tools was never visited, AllBuiltins remains true.
+	if !flagHasBeenVisited("builtin-tools") {
+		builtinToolsFilter = tools.ToolFilter{AllBuiltins: true}
+	}
 
 	s := &Settings{
 		ShowVersion:   *showVersion,
@@ -187,7 +194,7 @@ func Parse() *Settings {
 		MaxSteps:      *maxSteps,
 		AutoSummarize: *autoSummarize,
 		ToolConfirm:   parseToolConfirm(*toolConfirm),
-		BuiltinTools:  builtinToolsVal,
+		BuiltinTools:  builtinToolsFilter,
 	}
 
 	return s
@@ -215,4 +222,16 @@ func parseToolConfirm(raw string) []string {
 		}
 	}
 	return names
+}
+
+// flagHasBeenVisited returns true if the named flag was explicitly set
+// on the command line (including with an empty value).
+func flagHasBeenVisited(name string) bool {
+	var found bool
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			found = true
+		}
+	})
+	return found
 }
