@@ -12,7 +12,6 @@ import (
 
 	agentpkg "github.com/alayacore/alayacore/internal/agent"
 	"github.com/alayacore/alayacore/internal/protocol"
-	"github.com/alayacore/alayacore/internal/stream"
 )
 
 // StartSession loads (or creates) a session, validates it, and starts the
@@ -25,14 +24,18 @@ import (
 //   - HasModels check (no usable models → fatal)
 //   - session.Start()
 //
-// input is an optional pre-created input buffer. If nil, a new one is created.
-// On success the write end is returned so the adapter can feed TLV messages
-// to the session.
+// input is an optional pre-created input reader. If nil, an io.Pipe is
+// created internally and the PipeWriter is returned so the adapter can
+// feed TLV messages to the session. When input is non-nil, the returned
+// WriteCloser is nil — the caller manages the pipe writer itself.
 //
 // Returns nil, nil, and an error if the session cannot be used.
-func StartSession(cfg *Config, output io.Writer, input *stream.SliceBuffer) (*agentpkg.Session, io.WriteCloser, error) {
+func StartSession(cfg *Config, output io.Writer, input io.Reader) (*agentpkg.Session, io.WriteCloser, error) {
+	var pipeWriter io.WriteCloser
 	if input == nil {
-		input = stream.NewSliceBuffer(100)
+		var r *io.PipeReader
+		r, pipeWriter = io.Pipe()
+		input = r
 	}
 
 	session, _, err := agentpkg.LoadOrNewSession(agentpkg.SessionConfig{
@@ -87,5 +90,5 @@ func StartSession(cfg *Config, output io.Writer, input *stream.SliceBuffer) (*ag
 	// Start the session's run() goroutine.
 	session.Start()
 
-	return session, input, nil
+	return session, pipeWriter, nil
 }

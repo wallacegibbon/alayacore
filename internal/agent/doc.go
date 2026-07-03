@@ -119,9 +119,8 @@
 //
 // Usage:
 //
-//	input := stream.NewSliceBuffer(10)
-//	output := &bufferOutput{}
-//	cfg := agent.SessionConfig{Input: input, Output: output, ...}
+//	pr, pw := io.Pipe()
+//	cfg := agent.SessionConfig{Input: pr, Output: output, ...}
 //	session := agent.NewSession(cfg)
 //	session.Start()
 package agent

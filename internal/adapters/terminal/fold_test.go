@@ -4,13 +4,12 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/alayacore/alayacore/internal/stream"
 	"github.com/alayacore/alayacore/internal/theme"
 	"github.com/alayacore/alayacore/internal/tlv"
 )
 
 func TestSpaceKeyTogglesFold(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
+	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
 	terminal.focusDisplay()
 
 	// Add a window with content that can be folded
@@ -58,7 +57,7 @@ func TestSpaceKeyTogglesFold(t *testing.T) {
 }
 
 func TestSpaceKeyDoesNothingInInputWindow(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
+	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
 	terminal.focusInput()
 
 	// Add a window with content
@@ -83,7 +82,7 @@ func TestSpaceKeyDoesNothingInInputWindow(t *testing.T) {
 }
 
 func TestSpaceKeyDoesNothingWithNoWindow(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
+	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
 	terminal.focusDisplay()
 
 	// No windows in buffer

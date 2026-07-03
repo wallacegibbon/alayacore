@@ -13,7 +13,6 @@ import (
 
 	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/llm"
-	"github.com/alayacore/alayacore/internal/stream"
 	"github.com/alayacore/alayacore/internal/tlv"
 )
 
@@ -36,8 +35,8 @@ func TestSaveAndLoadSession(t *testing.T) {
 		runState: runState{},
 		sessionConfig: sessionConfig{
 			SessionConfig: SessionConfig{
-				Input:  &stream.NopInput{},
-				Output: &stream.NopOutput{},
+				Input:  &nopInput{},
+				Output: &nopOutput{},
 			},
 		},
 	}
@@ -73,8 +72,8 @@ func TestLoadOrNewSession(t *testing.T) {
 	session, sessionFile, err := LoadOrNewSession(SessionConfig{
 		BaseTools:    baseTools,
 		SystemPrompt: systemPrompt,
-		Input:        &stream.NopInput{},
-		Output:       &stream.NopOutput{},
+		Input:        &nopInput{},
+		Output:       &nopOutput{},
 	})
 	if err != nil {
 		t.Fatalf("LoadOrNewSession returned error: %v", err)
@@ -149,8 +148,8 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 		},
 		sessionConfig: sessionConfig{
 			SessionConfig: SessionConfig{
-				Input:  &stream.NopInput{},
-				Output: &stream.NopOutput{},
+				Input:  &nopInput{},
+				Output: &nopOutput{},
 			},
 		},
 	}
@@ -229,8 +228,8 @@ func TestMarkdownFormat_HumanReadable(t *testing.T) {
 		},
 		sessionConfig: sessionConfig{
 			SessionConfig: SessionConfig{
-				Input:  &stream.NopInput{},
-				Output: &stream.NopOutput{},
+				Input:  &nopInput{},
+				Output: &nopOutput{},
 			},
 		},
 	}
@@ -277,8 +276,8 @@ func TestReasoningOnlyMessage(t *testing.T) {
 		},
 		sessionConfig: sessionConfig{
 			SessionConfig: SessionConfig{
-				Input:  &stream.NopInput{},
-				Output: &stream.NopOutput{},
+				Input:  &nopInput{},
+				Output: &nopOutput{},
 			},
 		},
 	}
@@ -331,8 +330,8 @@ func TestTextAndReasoningInSameMessage(t *testing.T) {
 		},
 		sessionConfig: sessionConfig{
 			SessionConfig: SessionConfig{
-				Input:  &stream.NopInput{},
-				Output: &stream.NopOutput{},
+				Input:  &nopInput{},
+				Output: &nopOutput{},
 			},
 		},
 	}
@@ -390,7 +389,7 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 		sessionConfig: sessionConfig{
 			modelService: NewModelService(NewModelManager(""), NewRuntimeManager("")),
 			SessionConfig: SessionConfig{
-				Input:  &stream.NopInput{},
+				Input:  &nopInput{},
 				Output: output,
 			},
 		},
@@ -660,8 +659,8 @@ func TestTLVFormatRecursionProtection(t *testing.T) {
 		},
 		sessionConfig: sessionConfig{
 			SessionConfig: SessionConfig{
-				Input:  &stream.NopInput{},
-				Output: &stream.NopOutput{},
+				Input:  &nopInput{},
+				Output: &nopOutput{},
 			},
 		},
 	}
@@ -832,8 +831,8 @@ func TestLoadOrNewSessionVersionMismatch(t *testing.T) {
 
 	_, _, err := LoadOrNewSession(SessionConfig{
 		SessionFile: sessionPath,
-		Input:       &stream.NopInput{},
-		Output:      &stream.NopOutput{},
+		Input:       &nopInput{},
+		Output:      &nopOutput{},
 	})
 	if err == nil {
 		t.Fatal("expected error for old session file, got nil")

@@ -9,7 +9,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/alayacore/alayacore/internal/protocol"
-	"github.com/alayacore/alayacore/internal/stream"
 	"github.com/alayacore/alayacore/internal/theme"
 	"github.com/alayacore/alayacore/internal/tlv"
 )
@@ -19,7 +18,7 @@ func visibleLength(s string) int {
 }
 
 func TestCtrlOOpensEditor(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
+	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
 
 	msg := tea.KeyPressMsg(tea.Key{
 		Code: 'o',
@@ -38,7 +37,7 @@ func TestCtrlOOpensEditor(t *testing.T) {
 }
 
 func TestCtrlOWithExistingContent(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
+	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
 	terminal.input.SetValue("existing input text")
 
 	msg := tea.KeyPressMsg(tea.Key{
@@ -62,7 +61,7 @@ func TestCtrlOWithExistingContent(t *testing.T) {
 }
 
 func TestEditorFinishedMsg(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
+	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
 
 	msg := EditorFinishedMsg{
 		Action:  EditorActionSubmit,
@@ -83,7 +82,7 @@ func TestEditorFinishedMsg(t *testing.T) {
 }
 
 func TestEditorFinishedMsgWithWhitespace(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
+	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
 
 	msg := EditorFinishedMsg{
 		Action:  EditorActionSubmit,
@@ -104,7 +103,7 @@ func TestEditorFinishedMsgWithWhitespace(t *testing.T) {
 }
 
 func TestEditorFinishedMsgWithMultipleTrailingNewlines(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
+	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
 
 	msg := EditorFinishedMsg{
 		Action:  EditorActionSubmit,
@@ -125,7 +124,7 @@ func TestEditorFinishedMsgWithMultipleTrailingNewlines(t *testing.T) {
 }
 
 func TestEditorFinishedMsgMultiline(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
+	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
 
 	msg := EditorFinishedMsg{
 		Action:  EditorActionSubmit,
@@ -146,7 +145,7 @@ func TestEditorFinishedMsgMultiline(t *testing.T) {
 }
 
 func TestEditorFinishedMsgWithError(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
+	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
 	terminal.input.SetValue("original content")
 
 	msg := EditorFinishedMsg{
@@ -275,7 +274,7 @@ func TestWrapContentPreservesANSI(t *testing.T) {
 }
 
 func TestCtrlCClearsInput(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
+	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
 	terminal.input.SetValue("test input text")
 
 	// Press Ctrl+C while in input window
@@ -301,7 +300,7 @@ func TestCtrlCClearsInput(t *testing.T) {
 }
 
 func TestCtrlCInDisplayWindow(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
+	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
 	terminal.input.SetValue("test input text")
 
 	// Press Ctrl+C while in display window
@@ -327,7 +326,7 @@ func TestCtrlCInDisplayWindow(t *testing.T) {
 }
 
 func TestCtrlGTriggersCancel(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
+	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
 	terminal.input.SetValue("test input text")
 
 	// Press Ctrl+G (should work regardless of focus)
@@ -374,7 +373,7 @@ func TestCtrlGTriggersCancel(t *testing.T) {
 }
 
 func TestCtrlUClearsInput(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
+	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
 	terminal.input.SetValue("test input text")
 
 	// Press Ctrl+U while in input window
@@ -617,7 +616,7 @@ func TestWindowBufferWidthMatchesInput(t *testing.T) {
 }
 
 func TestEKeyOpensDisplayWindowInEditor(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
+	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
 	terminal.focusDisplay()
 
 	// Add a window with content
@@ -642,7 +641,7 @@ func TestEKeyOpensDisplayWindowInEditor(t *testing.T) {
 }
 
 func TestEKeyDoesNothingWithNoWindow(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
+	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
 	terminal.focusDisplay()
 
 	// No windows in buffer
@@ -664,7 +663,7 @@ func TestEKeyDoesNothingWithNoWindow(t *testing.T) {
 }
 
 func TestEKeyDoesNothingInInputWindow(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
+	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
 	terminal.focusInput()
 
 	// Add a window with content
@@ -689,7 +688,7 @@ func TestEKeyDoesNothingInInputWindow(t *testing.T) {
 }
 
 func TestDisplayEditorFinishedDoesNotPopulateInput(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
+	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
 	terminal.input.SetValue("original input")
 
 	// Simulate display editor finishing (user viewed content, then quit)
@@ -708,7 +707,7 @@ func TestDisplayEditorFinishedDoesNotPopulateInput(t *testing.T) {
 }
 
 func TestDisplayEditorFinishedWithError(t *testing.T) {
-	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), stream.NewSliceBuffer(10), nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
+	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
 	terminal.input.SetValue("original input")
 
 	// Simulate display editor finishing with error

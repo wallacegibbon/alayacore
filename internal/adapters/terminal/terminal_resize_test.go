@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/alayacore/alayacore/internal/stream"
 	"github.com/alayacore/alayacore/internal/theme"
 	"github.com/alayacore/alayacore/internal/tlv"
 )
@@ -15,7 +14,7 @@ import (
 func TestTerminalResizeCursorValidation(t *testing.T) {
 	// Create a terminal with initial size
 	output := NewTerminalOutput(DefaultStyles())
-	input := stream.NewSliceBuffer(10)
+	input := nopWriteCloser{}
 	terminal := NewTerminalWithTheme(output, input, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
 
 	// Add some windows to the buffer
@@ -52,7 +51,7 @@ func TestTerminalResizeCursorValidation(t *testing.T) {
 // change height during resize.
 func TestTerminalResizeClampsCursor(t *testing.T) {
 	output := NewTerminalOutput(DefaultStyles())
-	input := stream.NewSliceBuffer(10)
+	input := nopWriteCloser{}
 	terminal := NewTerminalWithTheme(output, input, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
 
 	// Add windows
@@ -91,7 +90,7 @@ func TestTerminalResizeClampsCursor(t *testing.T) {
 func TestTerminalResizeUpdatesDisplayContent(t *testing.T) {
 	// Create a terminal with initial size
 	output := NewTerminalOutput(DefaultStyles())
-	input := stream.NewSliceBuffer(10)
+	input := nopWriteCloser{}
 	terminal := NewTerminalWithTheme(output, input, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
 
 	// Add content that will wrap differently at different widths

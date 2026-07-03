@@ -6,13 +6,13 @@ package terminal
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	tea "charm.land/bubbletea/v2"
 	"golang.org/x/term"
 
 	"github.com/alayacore/alayacore/internal/app"
-	"github.com/alayacore/alayacore/internal/stream"
 	"github.com/alayacore/alayacore/internal/theme"
 )
 
@@ -49,10 +49,10 @@ func (a *Adapter) Start() int {
 	initialWidth, initialHeight := getTerminalSize()
 	terminalOutput.SetWindowWidth(initialWidth)
 
-	// Create the input buffer BEFORE starting the TUI. The TUI gets the
-	// write end (streamInput) immediately; the session will read from
-	// the same buffer once loading completes.
-	inputBuffer := stream.NewSliceBuffer(100)
+	// Create the input pipe BEFORE starting the TUI. The TUI gets the
+	// write end (pipeWriter) immediately; the session will read from
+	// the read end (pipeReader) once loading completes.
+	pipeReader, pipeWriter := io.Pipe()
 
 	// Create Terminal model in loading mode. The theme/styles here are for
 	// the loading screen only — the session's actual theme is applied
@@ -63,11 +63,12 @@ func (a *Adapter) Start() int {
 	terminalOutput.SetStyles(styles)
 
 	t := NewTerminalWithTheme(
-		terminalOutput, inputBuffer, a.Config,
+		terminalOutput, pipeWriter, a.Config,
 		initialWidth, initialHeight,
 		theme, themeManager, activeThemeName,
 	)
 	t.loading = true // enter async loading mode
+	t.pipeReader = pipeReader
 
 	// Create and run the program.
 	// Bubbletea automatically opens the real TTY when stdin is piped

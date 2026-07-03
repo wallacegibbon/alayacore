@@ -16,7 +16,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/alayacore/alayacore/internal/app"
-	"github.com/alayacore/alayacore/internal/stream"
 	"github.com/alayacore/alayacore/internal/theme"
 	"github.com/alayacore/alayacore/internal/tlv"
 )
@@ -92,6 +91,7 @@ type Terminal struct {
 	// Core components
 	out         OutputWriter
 	streamInput io.WriteCloser
+	pipeReader  *io.PipeReader // read end of the input pipe; set before async loading
 	appConfig   *app.Config
 	editor      *Editor
 
@@ -213,18 +213,9 @@ func (m *Terminal) Init() tea.Cmd {
 
 // loadSessionCmd returns a tea.Cmd that runs app.StartSession in a goroutine.
 // It is only used when the TUI starts in loading mode (m.loading == true).
-// The session is nil, the input buffer already exists as m.streamInput.
 func (m *Terminal) loadSessionCmd() tea.Cmd {
 	return func() tea.Msg {
-		// streamInput is always a *stream.SliceBuffer in production.
-		input, ok := m.streamInput.(*stream.SliceBuffer)
-		if !ok {
-			return sessionLoadingErrorMsg{
-				err: fmt.Errorf("internal: streamInput is not a SliceBuffer"),
-			}
-		}
-
-		_, _, err := app.StartSession(m.appConfig, m.out, input)
+		_, _, err := app.StartSession(m.appConfig, m.out, m.pipeReader)
 		if err != nil {
 			return sessionLoadingErrorMsg{err: err}
 		}
