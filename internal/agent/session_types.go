@@ -169,10 +169,6 @@ type SessionConfig struct {
 	// External dependencies
 	SkillsMgr *skills.Manager
 
-	// MCP manager for tool execution and lifecycle management.
-	// Set during async initialization; may be nil initially.
-	MCPManager *mcp.Manager
-
 	// MCPInit handles MCP initialization lifecycle (connect, OAuth, discover).
 	// When non-nil, the session reads from its Events() channel in the main
 	// loop and applies results (tools, system prompt, manager) internally.

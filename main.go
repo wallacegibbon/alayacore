@@ -43,11 +43,9 @@ func main() {
 	tools.Cleanup()
 
 	// Clean up MCP server connections (before os.Exit, which skips defers).
-	// MCPManager may have been set by the adapter after async init completed.
-	if appCfg.MCPManager != nil {
-		appCfg.MCPManager.CloseAll()
-	} else if appCfg.MCPInit != nil {
-		// Init may still be running; close what we have.
+	// MCPInit.Manager() is always safe to call — it returns the manager even
+	// before init completes, so we can close whatever connections exist.
+	if appCfg.MCPInit != nil {
 		appCfg.MCPInit.Manager().CloseAll()
 	}
 

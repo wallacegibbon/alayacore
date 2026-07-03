@@ -92,10 +92,8 @@ type Config struct {
 	// internally — the adapter receives progress via system messages.
 	MCPInit *mcp.Init
 
-	// MCPManager for lifecycle management (cleanup).
-	// May be nil initially; set from AsyncMCP.Manager() after init.
-	MCPManager       *mcp.Manager
-	MCPStartupErrors []string // Non-fatal errors from MCP startup (config parsing)
+	// MCPStartupErrors contains non-fatal errors from MCP config parsing.
+	MCPStartupErrors []string
 }
 
 // Setup initializes the common app components.

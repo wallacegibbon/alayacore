@@ -110,9 +110,6 @@ func (s *Session) handleMCPEvent(evt *mcp.InitEvent) {
 
 	// Apply InitDone results.
 	if action.ApplyResult {
-		if action.Manager != nil {
-			s.MCPManager = action.Manager
-		}
 		if action.Tools != nil {
 			s.BaseTools = append(s.BaseTools, action.Tools...)
 		}
@@ -123,8 +120,12 @@ func (s *Session) handleMCPEvent(evt *mcp.InitEvent) {
 		if s.Agent() != nil {
 			s.modelService.Reset()
 		}
+		serverCount := 0
+		if action.Manager != nil {
+			serverCount = action.Manager.ActiveServerCount()
+		}
 		s.writeNotifyf("MCP servers initialized: %d servers, %d tools loaded",
-			action.Manager.ActiveServerCount(), len(action.Tools))
+			serverCount, len(action.Tools))
 	}
 
 	// Log abort messages.
