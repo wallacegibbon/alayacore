@@ -28,36 +28,6 @@ func (w ParseWarning) String() string {
 	return fmt.Sprintf("key %q: cannot parse value %q: %s", w.Key, w.Value, w.Err)
 }
 
-// ParseKeyValue parses key-value config content into a struct using `config` tags.
-// The content format is:
-//
-//	key: value
-//	key: "quoted value"
-//	key: 'quoted value'
-//
-// Lines starting with # are treated as comments and ignored.
-// Lines starting with --- are block separators and ignored.
-// Empty lines are ignored.
-// Multiple configs can be separated by "---" on its own line (see ParseKeyValueBlocks).
-//
-// Keys must match the pattern `^[a-zA-Z_][a-zA-Z0-9_-]*$` — this ensures reliable
-// key-value separation and allows values to contain colons without ambiguity.
-// Lines that don't match this pattern are treated as comments or malformed input.
-//
-// Unknown keys are silently ignored.
-// Parse errors (e.g. non-numeric value for an int field) are also silently ignored.
-// Use ParseKeyValueWithWarnings to collect them.
-func ParseKeyValue(content string, target any) {
-	parseConfig(content, target)
-}
-
-// ParseKeyValueWithWarnings is like ParseKeyValue but also returns warnings for
-// values that could not be converted to the target field type. This helps surface
-// typos like context_limit: abc (which would otherwise silently default to 0).
-func ParseKeyValueWithWarnings(content string, target any) []ParseWarning {
-	return parseConfig(content, target)
-}
-
 // ParseKeyValueBlocks parses multiple config blocks separated by "---"
 func ParseKeyValueBlocks(content string) []string {
 	// Split by "\n---\n" to get individual blocks
@@ -79,7 +49,7 @@ func ParseModelList(content string) ([]ModelConfig, []string) {
 		}
 
 		var m ModelConfig
-		for _, w := range ParseKeyValueWithWarnings(block, &m) {
+		for _, w := range ParseKeyValue(block, &m) {
 			warnings = append(warnings, fmt.Sprintf("model block %d: %s", blockIdx+1, w.String()))
 		}
 
@@ -91,9 +61,25 @@ func ParseModelList(content string) ([]ModelConfig, []string) {
 	return models, warnings
 }
 
-// parseConfig is the unified internal implementation.
-// Always collects warnings for values that fail type conversion.
-func parseConfig(content string, target any) []ParseWarning {
+// ParseKeyValue parses key-value config content into a struct using `config` tags.
+// The content format is:
+//
+//	key: value
+//	key: "quoted value"
+//	key: 'quoted value'
+//
+// Lines starting with # are treated as comments and ignored.
+// Lines starting with --- are block separators and ignored.
+// Empty lines are ignored.
+// Multiple configs can be separated by "---" on its own line (see ParseKeyValueBlocks).
+//
+// Keys must match the pattern `^[a-zA-Z_][a-zA-Z0-9_-]*$` — this ensures reliable
+// key-value separation and allows values to contain colons without ambiguity.
+// Lines that don't match this pattern are treated as comments or malformed input.
+//
+// Parse errors (e.g. non-numeric value for an int field) and unknown keys
+// are reported as warnings in the return value.
+func ParseKeyValue(content string, target any) []ParseWarning {
 	v := reflect.ValueOf(target)
 	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Struct {
 		return nil
@@ -268,6 +254,15 @@ func unquoteValue(value string) string {
 	return value
 }
 
+// escapeTable maps escape sequence characters to their actual values.
+// Zero value means "not a known escape" — the raw characters are kept as-is.
+var escapeTable = [256]byte{
+	'\\': '\\',
+	'"':  '"',
+	'n':  '\n',
+	'r':  '\r',
+}
+
 // unescapeQuoted processes escape sequences in a double-quoted config value.
 // Recognized sequences: \\, \", \n, \r.
 // Unknown sequences (e.g. \U) are kept as-is for backward compatibility.
@@ -277,16 +272,9 @@ func unescapeQuoted(s string) string {
 	i := 0
 	for i < len(s) {
 		if s[i] == '\\' && i+1 < len(s) {
-			switch s[i+1] {
-			case '\\':
-				b.WriteByte('\\')
-			case '"':
-				b.WriteByte('"')
-			case 'n':
-				b.WriteByte('\n')
-			case 'r':
-				b.WriteByte('\r')
-			default:
+			if c := escapeTable[s[i+1]]; c != 0 {
+				b.WriteByte(c)
+			} else {
 				// Unknown escape: keep both characters as-is
 				b.WriteByte('\\')
 				b.WriteByte(s[i+1])

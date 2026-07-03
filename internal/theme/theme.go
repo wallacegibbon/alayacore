@@ -54,7 +54,11 @@ var (
 func DefaultTheme() *Theme {
 	defaultThemeOnce.Do(func() {
 		var t Theme
-		config.ParseKeyValue(darkThemeContent, &t)
+		if warns := config.ParseKeyValue(darkThemeContent, &t); len(warns) > 0 {
+			// Embedded default theme should always be valid. If it fails,
+			// the binary is corrupted — surface warnings to stderr.
+			fmt.Fprintf(os.Stderr, "Warning: default theme parse warnings: %v\n", warns)
+		}
 		defaultTheme = &t
 	})
 	cpy := *defaultTheme
@@ -71,6 +75,13 @@ func LoadTheme(path string) (*Theme, error) {
 
 	// Start with defaults, then override with config values
 	theme := DefaultTheme()
-	config.ParseKeyValue(string(data), theme)
+	if warns := config.ParseKeyValue(string(data), theme); len(warns) > 0 {
+		// Surface parse warnings for user-managed theme files, but do not
+		// treat them as fatal — unknown fields (e.g. from older versions)
+		// should not prevent loading the valid parts of the theme.
+		for _, w := range warns {
+			fmt.Fprintf(os.Stderr, "Warning: %s\n", w.String())
+		}
+	}
 	return theme, nil
 }

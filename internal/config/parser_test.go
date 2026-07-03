@@ -86,7 +86,7 @@ func TestParseKeyValueCommentWithColon(t *testing.T) {
 name: real-value
 `
 	var cfg TestConfig
-	warnings := ParseKeyValueWithWarnings(content, &cfg)
+	warnings := ParseKeyValue(content, &cfg)
 
 	if cfg.Name != "real-value" {
 		t.Errorf("Expected Name 'real-value', got %q", cfg.Name)
@@ -101,7 +101,7 @@ func TestParseKeyValueMissingColon(t *testing.T) {
 port: 80
 `
 	var cfg TestConfig
-	warnings := ParseKeyValueWithWarnings(content, &cfg)
+	warnings := ParseKeyValue(content, &cfg)
 
 	if cfg.Port != 80 {
 		t.Errorf("Expected Port 80, got %d", cfg.Port)
@@ -125,7 +125,7 @@ invalid key: value
 port: 80
 `
 	var cfg TestConfig
-	warnings := ParseKeyValueWithWarnings(content, &cfg)
+	warnings := ParseKeyValue(content, &cfg)
 
 	if cfg.Name != "valid" {
 		t.Errorf("Expected Name 'valid', got %q", cfg.Name)
@@ -172,7 +172,7 @@ func TestParseKeyValueDashSeparatorSkipped(t *testing.T) {
 name: second
 `
 	var cfg TestConfig
-	warnings := ParseKeyValueWithWarnings(content, &cfg)
+	warnings := ParseKeyValue(content, &cfg)
 
 	if cfg.Name != "second" {
 		t.Errorf("Expected Name 'second' (last value wins), got %q", cfg.Name)

@@ -22,7 +22,7 @@ func TestParseKeyValueWithWarnings_IntField(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var cfg C
-			warnings := ParseKeyValueWithWarnings(tt.input, &cfg)
+			warnings := ParseKeyValue(tt.input, &cfg)
 			if cfg.Port != tt.wantPort {
 				t.Errorf("Port = %d, want %d", cfg.Port, tt.wantPort)
 			}
@@ -51,7 +51,7 @@ func TestParseKeyValueWithWarnings_UintField(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var cfg C
-			warnings := ParseKeyValueWithWarnings(tt.input, &cfg)
+			warnings := ParseKeyValue(tt.input, &cfg)
 			if cfg.Count != tt.wantCount {
 				t.Errorf("Count = %d, want %d", cfg.Count, tt.wantCount)
 			}
@@ -82,7 +82,7 @@ func TestParseKeyValueWithWarnings_BoolField(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var cfg C
-			warnings := ParseKeyValueWithWarnings(tt.input, &cfg)
+			warnings := ParseKeyValue(tt.input, &cfg)
 			if cfg.Enabled != tt.want {
 				t.Errorf("Enabled = %v, want %v", cfg.Enabled, tt.want)
 			}
@@ -110,7 +110,7 @@ func TestParseKeyValueWithWarnings_FloatField(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var cfg C
-			warnings := ParseKeyValueWithWarnings(tt.input, &cfg)
+			warnings := ParseKeyValue(tt.input, &cfg)
 			if cfg.Rate != tt.want {
 				t.Errorf("Rate = %v, want %v", cfg.Rate, tt.want)
 			}
@@ -137,7 +137,7 @@ func TestParseKeyValueWithWarnings_TimeField(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var cfg C
-			warnings := ParseKeyValueWithWarnings(tt.input, &cfg)
+			warnings := ParseKeyValue(tt.input, &cfg)
 			gotWarning := len(warnings) > 0
 			if gotWarning != tt.wantWarning {
 				t.Errorf("got warning = %v, want %v (warnings: %v)", gotWarning, tt.wantWarning, warnings)
@@ -161,7 +161,7 @@ func TestParseKeyValueWithWarnings_DurationField(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var cfg C
-			warnings := ParseKeyValueWithWarnings(tt.input, &cfg)
+			warnings := ParseKeyValue(tt.input, &cfg)
 			gotWarning := len(warnings) > 0
 			if gotWarning != tt.wantWarning {
 				t.Errorf("got warning = %v, want %v (warnings: %v)", gotWarning, tt.wantWarning, warnings)
@@ -180,7 +180,7 @@ func TestParseKeyValueWithWarnings_MultipleWarnings(t *testing.T) {
 rate: xyz
 enabled: maybe`
 	var cfg C
-	warnings := ParseKeyValueWithWarnings(input, &cfg)
+	warnings := ParseKeyValue(input, &cfg)
 	if len(warnings) != 3 {
 		t.Fatalf("expected 3 warnings, got %d: %v", len(warnings), warnings)
 	}
@@ -196,7 +196,7 @@ func TestParseKeyValueWithWarnings_NoWarningOnValidInput(t *testing.T) {
 port: 8080
 enabled: true`
 	var cfg C
-	warnings := ParseKeyValueWithWarnings(input, &cfg)
+	warnings := ParseKeyValue(input, &cfg)
 	if len(warnings) != 0 {
 		t.Fatalf("expected 0 warnings, got %d: %v", len(warnings), warnings)
 	}

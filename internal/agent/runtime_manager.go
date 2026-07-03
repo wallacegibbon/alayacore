@@ -10,6 +10,7 @@ package agent
 // synchronization is needed.
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -78,7 +79,13 @@ func (rm *RuntimeManager) save() error {
 // parseRuntimeConfig parses the key-value runtime config format
 func parseRuntimeConfig(content string) RuntimeConfig {
 	var cfg RuntimeConfig
-	config.ParseKeyValue(content, &cfg)
+	if warns := config.ParseKeyValue(content, &cfg); len(warns) > 0 {
+		// Runtime config is user-managed; surface parse warnings via stderr
+		// so typos like "active_model: foo" are not silently ignored.
+		for _, w := range warns {
+			fmt.Fprintf(os.Stderr, "Warning: runtime.conf: %s\n", w.String())
+		}
+	}
 	return cfg
 }
 

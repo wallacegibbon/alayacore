@@ -36,7 +36,7 @@ func loadMCPConfigs(cfg *config.Settings) ([]mcp.ServerConfig, []string) {
 		}
 
 		var fileCfg mcp.ServerConfigFile
-		parseWarns := config.ParseKeyValueWithWarnings(block, &fileCfg)
+		parseWarns := config.ParseKeyValue(block, &fileCfg)
 		for _, w := range parseWarns {
 			warnings = append(warnings, fmt.Sprintf("mcp.conf: %s", w.String()))
 		}

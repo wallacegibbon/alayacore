@@ -8,8 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/mcp/auth"
+	"github.com/alayacore/alayacore/internal/version"
 )
 
 // ClientState represents the state of an MCP client connection.
@@ -168,7 +168,7 @@ func (c *Client) doInitialize(ctx context.Context) error {
 		},
 		ClientInfo: ImplementationInfo{
 			Name:    "alayacore",
-			Version: config.Version,
+			Version: version.Version,
 		},
 	})
 	if err != nil {

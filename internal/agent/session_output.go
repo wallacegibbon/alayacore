@@ -29,10 +29,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/stream"
 	"github.com/alayacore/alayacore/internal/theme"
+	"github.com/alayacore/alayacore/internal/version"
 )
 
 // ============================================================================
@@ -163,7 +163,7 @@ func (s *Session) sendSystemInfo(kind string) {
 }
 
 func (s *Session) sendMessageVersionMsg() {
-	s.writeSystemMsg(MessageVersionMsg{MessageVersion: MessageVersion, CoreVersion: config.Version})
+	s.writeSystemMsg(MessageVersionMsg{MessageVersion: MessageVersion, CoreVersion: version.Version})
 }
 
 func (s *Session) sendTaskMsg() {

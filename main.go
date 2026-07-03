@@ -10,13 +10,14 @@ import (
 	"github.com/alayacore/alayacore/internal/app"
 	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/tools"
+	"github.com/alayacore/alayacore/internal/version"
 )
 
 func main() {
 	cfg := config.Parse()
 
 	if cfg.ShowVersion {
-		fmt.Printf("alayacore version %s\n", config.Version)
+		fmt.Printf("alayacore version %s\n", version.Version)
 		os.Exit(0)
 	}
 
