@@ -182,22 +182,24 @@ func (s *Session) writeTLVWithID(tag string, historyID uint64, data string) {
 // user responds via :confirm command, which writes to the channel via
 // handleConfirmCommand.
 func (s *Session) handleToolConfirm(req llm.ToolConfirmRequest) <-chan bool {
-	ch := make(chan bool, 1)
+	// Cap 2: normal flow uses one slot (handleConfirmCommand). The second
+	// slot prevents deadlock when the error path (ch <- false) races with
+	// a concurrent handleConfirmCommand write.
+	ch := make(chan bool, 2)
 
-	// outputBroken: don't store in map, send false inline.
 	if s.outputBroken.Load() {
 		ch <- false
 		return ch
 	}
 
+	// Store in map first so the channel is findable the instant the
+	// user sees the SM notification and responds.
 	s.confirmMu.Lock()
 	s.confirmChs[req.ID] = ch
 	s.confirmMu.Unlock()
 
 	if err := stream.WriteSystemMsg(s.Output, stream.ToolConfirmMsg{ID: req.ID}); err != nil {
 		s.markOutputBroken()
-		// SM write failed — remove the entry so handleConfirmCommand
-		// won't find a stale channel later.
 		s.confirmMu.Lock()
 		delete(s.confirmChs, req.ID)
 		s.confirmMu.Unlock()
