@@ -180,7 +180,7 @@ Agent Loop
    monitor goroutine detects the death via the transport's Done channel,
    transitions the client to a failed state, and signals via the client's
    Done channel. Subsequent tool calls to that server return a clear
-   error: `mcp client "name": server connection lost`. The agent
+   error: `"name": server connection lost`. The agent
    handles this like any other tool failure.
 
 6. **Stale detection**: If a server notifies that its tool list has
@@ -230,7 +230,7 @@ JSON is pretty-printed for readability.
 
 - **Stale server**: If the server's tool list changes at runtime
   (`notifications/tools/list_changed`), the server is marked stale
-  and tool calls return: `mcp client "name": server tool list changed,
+  and tool calls return: `"name": server tool list changed,
   restart required`.
 
 ## Protocol Support

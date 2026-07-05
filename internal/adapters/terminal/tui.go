@@ -138,8 +138,8 @@ type Terminal struct {
 
 	// postLoading is true after the session finishes loading but before the
 	// first tick has a chance to check whether MCP init is needed.  During
-	// this brief window the input is kept blurred so it doesn't appear
-	// focused while the MCP init overlay may appear.
+	// this brief window the input border is blocked (rendered as an empty
+	// box) so it doesn't appear focused while the MCP init overlay may open.
 	postLoading bool
 }
 
