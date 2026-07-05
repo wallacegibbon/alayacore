@@ -1,9 +1,10 @@
 // Package providers implements LLM provider clients.
 //
-// This file contains the shared HTTP streaming infrastructure used by
+// This file contains the shared provider infrastructure used by
 // both Anthropic and OpenAI providers. It handles:
-//   - HTTP request construction and dispatch
-//   - Response body management and error handling
+//   - Common configuration (BaseConfig)
+//   - Shared provider fields (baseProvider)
+//   - HTTP request construction and response handling
 //
 // Provider-specific wire formats (message conversion, event parsing,
 // tool formatting, and SSE scanning) live in anthropic.go and openai.go
