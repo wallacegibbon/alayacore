@@ -207,7 +207,7 @@ func (m *Terminal) handleConfirmResult() (tea.Model, tea.Cmd) {
 // keys in handleKeyMsg.
 func (m *Terminal) restoreFocusAfterConfirm() {
 	if m.overlays.ModelSelector().IsOpen() || m.overlays.ThemeSelector().IsOpen() ||
-		m.overlays.HelpWindow().IsOpen() {
+		m.overlays.HelpWindow().IsOpen() || m.overlays.IsMCPInitOpen() {
 		m.display.updateContent()
 		return
 	}

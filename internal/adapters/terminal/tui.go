@@ -134,6 +134,12 @@ type Terminal struct {
 	// renders a loading screen instead of the normal TUI.
 	loading      bool
 	loadingError error
+
+	// postLoading is true after the session finishes loading but before the
+	// first tick has a chance to check whether MCP init is needed.  During
+	// this brief window the input is kept blurred so it doesn't appear
+	// focused while the MCP init overlay may appear.
+	postLoading bool
 }
 
 // NewTerminalWithTheme creates a new Terminal model with a custom theme.
@@ -236,6 +242,7 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case sessionLoadedMsg:
 		m.loading = false
+		m.postLoading = true
 		// The session's sendSystemInfo("all") was already written to the
 		// WindowBuffer during loading. Update the display to reflect it.
 		m.out.DrainDirty()
@@ -254,6 +261,11 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// sendSystemInfo("all") already wrote SM "model_list" to the
 		// output buffer during loading, so SnapshotModels is populated.
 		modelSnap := m.out.SnapshotModels()
+		// Blur the input and try to open MCP init overlay immediately.
+		// The input stays blurred (rendered as empty box) until the first
+		// tick determines whether MCP init is needed.
+		m.input.Blur()
+		m.handleMCPOverlays()
 		return m, m.overlays.ModelSelector().LoadModels(modelSnap.Models, modelSnap.ActiveID)
 
 	case sessionLoadingErrorMsg:
@@ -339,6 +351,17 @@ func (m *Terminal) handleTick() (tea.Model, tea.Cmd) {
 	}
 
 	m.handleMCPOverlays()
+
+	// First tick after loading: initialization is done — restore input
+	// focus if no overlay is blocking it.
+	if m.postLoading {
+		m.postLoading = false
+		if !m.overlays.IsMCPInitOpen() && !m.overlays.IsConfirmOpen() &&
+			!m.overlays.IsOverlayActive() {
+			m.restoreFocus()
+		}
+	}
+
 	cmd := m.handleDisplayRefresh()
 	return m, tea.Batch(
 		tea.Tick(TickInterval, func(_ time.Time) tea.Msg {
@@ -355,11 +378,17 @@ func (m *Terminal) handleTick() (tea.Model, tea.Cmd) {
 // The confirm overlay (confirmOverlay) handles auth confirm and tool
 // confirm as temporary dialogs on top of the init overlay.
 func (m *Terminal) handleMCPOverlays() {
+	wasOpen := m.overlays.IsMCPInitOpen()
 	action := m.overlays.HandleMCPProgress(m.out)
 	if action.CloseInitOverlay {
 		m.restoreFocusAfterConfirm()
 	}
 	if action.InitOverlayActive || action.OpenedConfirm {
+		// MCP init overlay just opened — blur input so its border renders
+		// as blurred (empty box) rather than focused but unreachable.
+		if action.InitOverlayActive && !wasOpen {
+			m.input.Blur()
+		}
 		m.display.updateContent()
 	}
 }
@@ -462,11 +491,13 @@ func (m *Terminal) View() tea.View {
 	sb.WriteString(m.display.View().Content)
 	sb.WriteString("\n")
 
-	// Input area (empty border when confirm overlay blocks input)
-	sb.WriteString(m.input.RenderWithBorder(m.overlays.IsConfirmOpen()))
+	// Input area — empty bordered box (blurred) while MCP init or
+	// post-loading is in progress, same as confirm overlay behavior.
+	sb.WriteString(m.input.RenderWithBorder(
+		m.overlays.IsConfirmOpen() || m.overlays.IsMCPInitOpen() || m.postLoading))
+	sb.WriteString("\n")
 
 	// Status bar (simplified - just render directly)
-	sb.WriteString("\n")
 	sb.WriteString(m.renderStatusBar())
 
 	baseContent := sb.String()

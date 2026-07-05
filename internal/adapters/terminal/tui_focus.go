@@ -120,7 +120,8 @@ func (m *Terminal) handleFocus() (tea.Model, tea.Cmd) {
 	if m.overlays.ModelSelector().IsOpen() ||
 		m.overlays.ThemeSelector().IsOpen() ||
 		m.overlays.HelpWindow().IsOpen() ||
-		m.overlays.ConfirmOverlay().IsOpen() {
+		m.overlays.ConfirmOverlay().IsOpen() ||
+		m.overlays.IsMCPInitOpen() {
 		m.display.updateContent()
 		return m, nil
 	}
