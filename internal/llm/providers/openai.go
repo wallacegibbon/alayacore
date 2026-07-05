@@ -34,6 +34,7 @@ package providers
 //    dynamic index computation and works regardless of streaming order.
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -260,6 +261,55 @@ func (p *OpenAIProvider) StreamMessages(
 // SSE Stream Parsing (OpenAI data-only format)
 // ============================================================================
 
+// openaiScanner reads data-only SSE (OpenAI format).
+//
+// Each line with "data:" prefix is a complete event. Lines without this
+// prefix are ignored. The caller receives the trimmed data string via Data().
+type openaiScanner struct {
+	scanner     *bufio.Scanner
+	currentData string
+	err         error
+}
+
+func newOpenAIScanner(reader io.Reader) *openaiScanner {
+	scanner := bufio.NewScanner(reader)
+	buf := make([]byte, 0, 64*1024)
+	scanner.Buffer(buf, 1024*1024)
+	return &openaiScanner{scanner: scanner}
+}
+
+// Next advances to the next data event.
+// Returns false when the stream is exhausted or an error occurs.
+func (s *openaiScanner) Next() bool {
+	for s.scanner.Scan() {
+		line := s.scanner.Text()
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "data:") {
+			if len(trimmed) > 5 && trimmed[5] == ' ' {
+				s.currentData = trimmed[6:] // "data: hello" → "hello"
+			} else {
+				s.currentData = trimmed[5:] // "data:hello" → "hello", "data:" → ""
+			}
+			return true
+		}
+		// Ignore event: lines, comments, blank lines, etc.
+	}
+	if err := s.scanner.Err(); err != nil {
+		s.err = err
+	}
+	return false
+}
+
+// Data returns the current event's data payload.
+func (s *openaiScanner) Data() string {
+	return s.currentData
+}
+
+// Err returns any error encountered during scanning.
+func (s *openaiScanner) Err() error {
+	return s.err
+}
+
 // parseStream returns an iterator that yields SSE events from the OpenAI response.
 func (p *OpenAIProvider) parseStream(reader io.Reader) iter.Seq2[llm.StreamEvent, error] {
 	return func(yield func(llm.StreamEvent, error) bool) {
@@ -270,10 +320,10 @@ func (p *OpenAIProvider) parseStream(reader io.Reader) iter.Seq2[llm.StreamEvent
 		}()
 
 		state := &openAIStreamState{}
-		scanner := newSSEScanner(reader)
+		scanner := newOpenAIScanner(reader)
 
 		for scanner.Next() {
-			_, data := scanner.Event()
+			data := scanner.Data()
 			if data == "[DONE]" {
 				break
 			}
@@ -314,10 +364,27 @@ type openAIToolAccumulator struct {
 }
 
 type openAIStreamState struct {
-	streamUsage
+	usage            llm.Usage
+	stopReason       string
 	textBuilder      strings.Builder
 	reasoningBuilder strings.Builder
 	toolAccumulators map[int]*openAIToolAccumulator // tool call index -> accumulator
+}
+
+func (s *openAIStreamState) setUsage(usage llm.Usage) {
+	s.usage = usage
+}
+
+func (s *openAIStreamState) getUsage() llm.Usage {
+	return s.usage
+}
+
+func (s *openAIStreamState) setStopReason(reason string) {
+	s.stopReason = reason
+}
+
+func (s *openAIStreamState) getStopReason() string {
+	return s.stopReason
 }
 
 func (s *openAIStreamState) addTextDelta(delta string) {

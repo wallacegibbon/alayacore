@@ -16,8 +16,10 @@ package providers
 //    See docs/architecture.md → "Empty thinking block padding".
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"iter"
@@ -350,6 +352,103 @@ func computeAnthropicOutputConfig(level int) *anthropicOutputConfig {
 // SSE Stream Parsing (Anthropic named-event format)
 // ============================================================================
 
+// anthropicScanner reads named-event SSE (Anthropic format).
+//
+//   - Lines with "event:" set the event type.
+//   - Lines with "data:" append to the data payload.
+//   - Lines with ":" are comments.
+//   - A blank line ("") terminates the current event.
+//   - Unknown fields are silently ignored.
+//
+// The field name may optionally be followed by a space (per the SSE spec).
+//
+// This follows the same logic as MCP's processSSELine.
+type anthropicScanner struct {
+	scanner   *bufio.Scanner
+	eventType string
+	eventData strings.Builder
+	hasData   bool // true if we've accumulated any data for the current event
+}
+
+func newAnthropicScanner(reader io.Reader) *anthropicScanner {
+	scanner := bufio.NewScanner(reader)
+	buf := make([]byte, 0, 64*1024)
+	scanner.Buffer(buf, 1024*1024)
+	return &anthropicScanner{scanner: scanner}
+}
+
+// Next advances to the next complete SSE event.
+// Returns false when the stream is exhausted or an error occurs.
+func (s *anthropicScanner) Next() bool {
+	for s.scanner.Scan() {
+		line := s.scanner.Text()
+
+		// Empty line — terminate the current event if we have one.
+		if line == "" {
+			if s.hasData {
+				s.hasData = false
+				return true
+			}
+			// Consecutive blank lines: skip.
+			continue
+		}
+
+		// Parse SSE field line (same logic as MCP's processSSELine).
+		switch {
+		case strings.HasPrefix(line, "event:"):
+			// Reset both fields — this is the start of a new event.
+			s.eventType = ""
+			s.eventData.Reset()
+			s.hasData = false
+			if len(line) > 6 && line[6] == ' ' {
+				s.eventType = line[7:]
+			} else {
+				s.eventType = line[6:]
+			}
+
+		case strings.HasPrefix(line, "data:"):
+			if s.eventData.Len() > 0 {
+				s.eventData.WriteString("\n")
+			}
+			if len(line) > 5 && line[5] == ' ' {
+				s.eventData.WriteString(line[6:])
+			} else {
+				s.eventData.WriteString(line[5:])
+			}
+			s.hasData = true
+
+		case len(line) > 0 && line[0] == ':':
+			// Comment — ignore.
+
+		default:
+			// Unknown field — ignore per SSE spec.
+		}
+	}
+
+	// EOF reached. Drain any pending event that wasn't terminated by
+	// a blank line (handles truncated streams gracefully).
+	if s.hasData {
+		s.hasData = false
+		return true
+	}
+
+	return false
+}
+
+// Err returns any error encountered during scanning.
+func (s *anthropicScanner) Err() error {
+	err := s.scanner.Err()
+	if errors.Is(err, bufio.ErrTooLong) {
+		return fmt.Errorf("SSE line exceeded 1MB limit — the model may have generated an oversized tool call")
+	}
+	return err
+}
+
+// Event returns the current event's type and data payload.
+func (s *anthropicScanner) Event() (eventType string, data string) {
+	return s.eventType, s.eventData.String()
+}
+
 // parseStream returns an iterator that yields SSE events from the Anthropic response.
 func (p *AnthropicProvider) parseStream(reader io.Reader) iter.Seq2[llm.StreamEvent, error] {
 	return func(yield func(llm.StreamEvent, error) bool) {
@@ -362,7 +461,7 @@ func (p *AnthropicProvider) parseStream(reader io.Reader) iter.Seq2[llm.StreamEv
 		state := &anthropicStreamState{
 			contentParts: make(map[int]llm.ContentPart),
 		}
-		scanner := newSSEScanner(reader)
+		scanner := newAnthropicScanner(reader)
 
 		for scanner.Next() {
 			eventType, data := scanner.Event()
@@ -392,7 +491,9 @@ type blockAccumulator struct {
 
 // anthropicStreamState tracks accumulation state during streaming
 type anthropicStreamState struct {
-	streamUsage
+	usage      llm.Usage
+	stopReason string
+
 	contentParts map[int]llm.ContentPart   // completed blocks by index
 	blocks       map[int]*blockAccumulator // index → block being accumulated
 }
@@ -437,12 +538,20 @@ func (s *anthropicStreamState) finishBlock(index int) {
 }
 
 func (s *anthropicStreamState) setUsage(inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens int64) {
-	s.streamUsage.setUsage(llm.Usage{
+	s.usage = llm.Usage{
 		CacheCreationTokens: cacheCreationTokens,
 		CacheReadTokens:     cacheReadTokens,
 		InputTokens:         inputTokens,
 		OutputTokens:        outputTokens,
-	})
+	}
+}
+
+func (s *anthropicStreamState) getUsage() llm.Usage {
+	return s.usage
+}
+
+func (s *anthropicStreamState) setStopReason(reason string) {
+	s.stopReason = reason
 }
 
 // getContents returns the accumulated ContentParts sorted by index.

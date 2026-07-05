@@ -4,18 +4,16 @@
 // both Anthropic and OpenAI providers. It handles:
 //   - HTTP request construction and dispatch
 //   - Response body management and error handling
-//   - SSE line scanning (both event-named and data-only formats)
 //
 // Provider-specific wire formats (message conversion, event parsing,
-// tool formatting) live in anthropic.go and openai.go respectively.
+// tool formatting, and SSE scanning) live in anthropic.go and openai.go
+// respectively.
 package providers
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -103,110 +101,3 @@ func (b *baseProvider) doRequest(req *http.Request) (io.ReadCloser, error) {
 
 	return resp.Body, nil
 }
-
-// ============================================================================
-// SSE Line Scanning
-// ============================================================================
-
-// sseScanner reads SSE-formatted lines from an io.Reader.
-// It supports two modes:
-//   - Named-event SSE: lines with "event: <type>" followed by "data: <payload>"
-//     terminated by a blank line (Anthropic format).
-//   - Data-only SSE: lines with "data: <payload>", one per event (OpenAI format).
-//
-// The scanner emits one sseLine per complete event.
-
-// SSE scanner buffer size constants.
-const (
-	// sseScannerInitBuf is the initial buffer size for the SSE scanner.
-	sseScannerInitBuf = 64 * 1024 // 64KB
-
-	// sseScannerMaxBuf is the maximum SSE line size.  Lines exceeding this
-	// (e.g. a provider sending an unusually large tool call atomically)
-	// will terminate the stream with a descriptive error.
-	sseScannerMaxBuf = 1024 * 1024 // 1MB
-)
-
-type sseScanner struct {
-	scanner *bufio.Scanner
-
-	// Accumulation state for named-event SSE
-	eventType strings.Builder
-	eventData strings.Builder
-	hasEvent  bool // true if we've seen an "event:" line without its blank line terminator
-}
-
-// newSSEScanner creates an SSE scanner over the given reader.
-func newSSEScanner(reader io.Reader) *sseScanner {
-	scanner := bufio.NewScanner(reader)
-	buf := make([]byte, 0, sseScannerInitBuf)
-	scanner.Buffer(buf, sseScannerMaxBuf)
-	return &sseScanner{scanner: scanner}
-}
-
-// Next advances to the next complete SSE event.
-// Returns false when the stream is exhausted or an error occurs.
-func (s *sseScanner) Next() bool {
-	for s.scanner.Scan() {
-		line := s.scanner.Text()
-
-		if strings.HasPrefix(line, "event: ") {
-			// Named-event SSE (Anthropic format)
-			s.eventType.Reset()
-			s.eventType.WriteString(strings.TrimPrefix(line, "event: "))
-			s.eventData.Reset()
-			s.hasEvent = true
-			continue
-		}
-
-		if strings.HasPrefix(line, "data: ") {
-			data := strings.TrimPrefix(line, "data: ")
-			if s.hasEvent {
-				s.eventData.WriteString(data)
-			} else {
-				// Data-only SSE (OpenAI format): emit immediately.
-				// This is a complete event — there is no blank line terminator.
-				s.eventType.Reset()
-				s.eventData.Reset()
-				s.eventData.WriteString(data)
-				return true
-			}
-			continue
-		}
-
-		// Blank line terminates a named event (Anthropic format).
-		// Reset hasEvent so the EOF-drain path doesn't re-emit this event.
-		if line == "" && s.hasEvent {
-			s.hasEvent = false
-			return true
-		}
-	}
-
-	// EOF reached. Drain any pending event that wasn't terminated by a blank line.
-	// This handles truncated streams (e.g. server closes mid-event).
-	if s.hasEvent {
-		s.hasEvent = false
-		return true
-	}
-
-	return false
-}
-
-// Err returns any error encountered during scanning.
-// Wraps bufio.ErrTooLong with a descriptive message.
-func (s *sseScanner) Err() error {
-	err := s.scanner.Err()
-	if errors.Is(err, bufio.ErrTooLong) {
-		return fmt.Errorf("SSE line exceeded %dMB limit — the model may have generated an oversized tool call", sseScannerMaxBuf/(1024*1024))
-	}
-	return err
-}
-
-// Event returns the current event's type and data payload.
-// For data-only SSE (OpenAI format), eventType is empty.
-func (s *sseScanner) Event() (eventType string, data string) {
-	return s.eventType.String(), s.eventData.String()
-}
-
-// Common Types
-// ============================================================================
