@@ -44,7 +44,7 @@ func (s *ServerAuth) Run(ctx context.Context) ([]Tool, error) {
 	// 1. Discover authorization server metadata and resolve client credentials.
 	meta, clientID, err := resolveAuthConfig(ctx, cfg, s.client.config.URL)
 	if err != nil {
-		return nil, fmt.Errorf("mcp server %q: %w", s.client.config.Name, err)
+		return nil, fmt.Errorf("%q: %w", s.client.config.Name, err)
 	}
 
 	cfg.TokenEndpoint = meta.TokenEndpoint
@@ -58,11 +58,11 @@ func (s *ServerAuth) Run(ctx context.Context) ([]Tool, error) {
 		Resource:     s.client.config.URL,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("mcp server %q: auth code flow: %w", s.client.config.Name, err)
+		return nil, fmt.Errorf("%q: auth code flow: %w", s.client.config.Name, err)
 	}
 
 	if oauthToken.AccessToken == "" {
-		return nil, fmt.Errorf("mcp server %q: OAuth returned empty access token", s.client.config.Name)
+		return nil, fmt.Errorf("%q: OAuth returned empty access token", s.client.config.Name)
 	}
 
 	// 3. Store the obtained token.
@@ -88,7 +88,7 @@ func (s *ServerAuth) Run(ctx context.Context) ([]Tool, error) {
 	s.client.resetState()
 	if err := s.client.Connect(ctx); err != nil {
 		cfg.obtainedToken = nil
-		return nil, fmt.Errorf("mcp server %q: connect after auth: %w", s.client.config.Name, err)
+		return nil, fmt.Errorf("%q: connect after auth: %w", s.client.config.Name, err)
 	}
 
 	// 5. Discover tools.
