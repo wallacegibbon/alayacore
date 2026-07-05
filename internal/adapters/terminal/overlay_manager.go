@@ -112,6 +112,13 @@ func (om *OverlayManager) IsAnyModalOpen() bool {
 		om.helpWindow.IsOpen() || om.confirmOverlay.IsOpen()
 }
 
+// IsBlocked returns true when the user's view is covered by any overlay
+// that prevents interaction with the prompt input: a selector window, a
+// confirm dialog, or the MCP init progress overlay.
+func (om *OverlayManager) IsBlocked() bool {
+	return om.IsOverlayActive() || om.confirmOverlay.IsOpen() || om.mcpInitOverlay.IsOpen()
+}
+
 // IsConfirmOpen returns true if the confirm dialog is open.
 func (om *OverlayManager) IsConfirmOpen() bool {
 	return om.confirmOverlay.IsOpen()

@@ -104,7 +104,7 @@ type Terminal struct {
 	// Status bar state (simplified - no separate struct)
 	statusText    string
 	statusTextDim string // dimmed version of statusText for inactive focus
-	inProgress bool
+	inProgress    bool
 
 	// State
 	quitting           bool
@@ -329,8 +329,7 @@ func (m *Terminal) handleTick() (tea.Model, tea.Cmd) {
 	// focus if no overlay is blocking it.
 	if m.postLoading {
 		m.postLoading = false
-		if !m.overlays.IsMCPInitOpen() && !m.overlays.IsConfirmOpen() &&
-			!m.overlays.IsOverlayActive() {
+		if !m.overlays.IsBlocked() {
 			m.restoreFocus()
 		}
 	}
