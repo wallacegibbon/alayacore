@@ -113,7 +113,7 @@ func (c *Client) MarkStale(reason string) {
 // Returns an error if the connection or handshake fails.
 func (c *Client) Connect(ctx context.Context) error {
 	if !c.state.CompareAndSwap(int32(StateDisconnected), int32(StateConnecting)) {
-		return fmt.Errorf("mcp client %q: already connecting", c.config.Name)
+		return fmt.Errorf("%q: already connecting", c.config.Name)
 	}
 	defer func() {
 		c.state.CompareAndSwap(int32(StateConnecting), int32(StateFailed))
@@ -142,7 +142,7 @@ func (c *Client) Connect(ctx context.Context) error {
 	c.state.Store(int32(StateInitializing))
 	if err := c.doInitialize(ctx); err != nil {
 		transport.Close()
-		return fmt.Errorf("mcp client %q: initialize: %w", c.config.Name, err)
+		return fmt.Errorf("%q: initialize: %w", c.config.Name, err)
 	}
 
 	// Set the negotiated protocol version on Streamable HTTP transport
@@ -367,13 +367,13 @@ func (c *Client) createTransport() (Transport, error) {
 	case c.config.Command != "":
 		t, err := NewStdioTransport(c.config.Command, c.config.Args, c.config.Env, c.config.Debug)
 		if err != nil {
-			return nil, fmt.Errorf("mcp client %q: %w", c.config.Name, err)
+			return nil, fmt.Errorf("%q: %w", c.config.Name, err)
 		}
 		return t, nil
 	case c.config.URL != "":
 		return NewStreamableHTTPTransport(c.config.URL, c.config.Debug), nil
 	default:
-		return nil, fmt.Errorf("mcp client %q: no command or URL specified", c.config.Name)
+		return nil, fmt.Errorf("%q: no command or URL specified", c.config.Name)
 	}
 }
 
@@ -406,7 +406,7 @@ func (c *Client) setupStreamableAuth(transport Transport) error {
 	}
 	provider, err := newAuthProvider(c.config.Auth, c.tokenStore, c.config.Name)
 	if err != nil {
-		return fmt.Errorf("mcp client %q auth: %w", c.config.Name, err)
+		return fmt.Errorf("%q auth: %w", c.config.Name, err)
 	}
 	if provider != nil {
 		ht.SetAuthProvider(provider)
@@ -546,11 +546,11 @@ func (c *Client) stateError(string) error {
 	st := c.State()
 	switch st {
 	case StateFailed:
-		return fmt.Errorf("mcp client %q: server connection lost", c.config.Name)
+		return fmt.Errorf("%q: server connection lost", c.config.Name)
 	case StateStale:
-		return fmt.Errorf("mcp client %q: %s", c.config.Name, c.staleReason)
+		return fmt.Errorf("%q: %s", c.config.Name, c.staleReason)
 	default:
-		return fmt.Errorf("mcp client %q: not ready (state=%d)", c.config.Name, st)
+		return fmt.Errorf("%q: not ready (state=%d)", c.config.Name, st)
 	}
 }
 
@@ -567,7 +567,7 @@ func (c *Client) stateError(string) error {
 func (c *Client) sendRequest(ctx context.Context, method string, params any) (json.RawMessage, error) {
 	tp := c.loadTransport()
 	if tp == nil {
-		return nil, fmt.Errorf("mcp client %q: no transport", c.config.Name)
+		return nil, fmt.Errorf("%q: no transport", c.config.Name)
 	}
 
 	// Check context before doing any work.
@@ -632,7 +632,7 @@ func (c *Client) sendCanceledNotification(id requestID, cause error) {
 func (c *Client) sendNotification(ctx context.Context, method string, params any) error {
 	tp := c.loadTransport()
 	if tp == nil {
-		return fmt.Errorf("mcp client %q: no transport", c.config.Name)
+		return fmt.Errorf("%q: no transport", c.config.Name)
 	}
 
 	var paramsData json.RawMessage
