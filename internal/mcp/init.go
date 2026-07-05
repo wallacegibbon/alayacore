@@ -256,7 +256,7 @@ func (init *Init) collectOAuthResult(ctx context.Context, c *Client) serverResul
 	init.mu.Unlock()
 
 	if !allow {
-		init.sendEvent(InitEvent{Type: InitFailed, Server: c.Name(), Error: "skipped"})
+		init.sendEvent(InitEvent{Type: InitFailed, Server: c.Name(), Error: fmt.Sprintf("%q: skipped", c.Name())})
 		return r
 	}
 
@@ -266,7 +266,7 @@ func (init *Init) collectOAuthResult(ctx context.Context, c *Client) serverResul
 	tools, err := sa.Run(ctx)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
-			init.sendEvent(InitEvent{Type: InitFailed, Server: c.Name(), Error: "skipped"})
+			init.sendEvent(InitEvent{Type: InitFailed, Server: c.Name(), Error: fmt.Sprintf("%q: skipped", c.Name())})
 		} else {
 			r.errs = append(r.errs, err.Error())
 			init.sendEvent(InitEvent{Type: InitFailed, Server: c.Name(), Error: err.Error()})
