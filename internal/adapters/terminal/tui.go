@@ -102,7 +102,8 @@ type Terminal struct {
 	overlays     *OverlayManager
 
 	// Status bar state (simplified - no separate struct)
-	statusText string
+	statusText    string
+	statusTextDim string // dimmed version of statusText for inactive focus
 	inProgress bool
 
 	// State

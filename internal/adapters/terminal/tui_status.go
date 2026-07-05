@@ -28,17 +28,33 @@ func statusStepsSegment(lastMaxSteps int, taskError bool, lastCurrentStep int, i
 }
 
 // renderStatusBar renders the status bar line.
+// Highlights reflect input focus: dimmed when display is focused
+// or an overlay is active (the status bar is treated as an
+// attachment to the prompt input).
 func (m *Terminal) renderStatusBar() string {
+	active := m.overlays.RestoreFocus() == focusInput &&
+		!m.overlays.IsMCPInitOpen() &&
+		!m.overlays.IsConfirmOpen() &&
+		!m.overlays.IsOverlayActive()
+
 	var indicator string
 	if m.inProgress {
-		indicator = m.styles.Status.Foreground(m.styles.ColorSuccess).Render("•")
+		if active {
+			indicator = m.styles.Status.Foreground(m.styles.ColorSuccess).Render("•")
+		} else {
+			indicator = m.styles.Status.Foreground(m.styles.ColorDim).Render("•")
+		}
 	} else {
 		indicator = m.styles.Status.Foreground(m.styles.ColorDim).Render("·")
 	}
 
 	if m.statusText != "" {
 		padding := m.styles.Status.Padding(0, 2)
-		return padding.Render(indicator + " " + m.statusText)
+		text := m.statusText
+		if !active {
+			text = m.statusTextDim
+		}
+		return padding.Render(indicator + " " + text)
 	}
 	return m.styles.Status.Padding(0, 2).Render(indicator)
 }
@@ -68,21 +84,27 @@ func (m *Terminal) updateStatus() {
 	snap := m.out.SnapshotStatus()
 
 	valStyle := m.styles.Status.Foreground(m.styles.ColorMuted)
+	dimValStyle := m.styles.Status.Foreground(m.styles.ColorDim)
 
 	// Build status segments - each rendered separately with appropriate colors
 	var segments []string
+	var dimSegments []string
 
 	// Switch indicators segment (compact: "R1✦ F↓" in one segment)
 	var switches []string
+	var dimSwitches []string
 	if snap.ReasoningLevel > config.ReasoningLevelOff {
 		reasonStyle := m.styles.Status.Foreground(m.styles.ColorAccent).Bold(true)
 		switches = append(switches, reasonStyle.Render(fmt.Sprintf("R%d✦", snap.ReasoningLevel)))
+		dimSwitches = append(dimSwitches, dimValStyle.Render(fmt.Sprintf("R%d✦", snap.ReasoningLevel)))
 	}
 	if m.display.shouldFollow() {
 		switches = append(switches, valStyle.Render("F↓"))
+		dimSwitches = append(dimSwitches, dimValStyle.Render("F↓"))
 	}
 	if len(switches) > 0 {
 		segments = append(segments, strings.Join(switches, " "))
+		dimSegments = append(dimSegments, strings.Join(dimSwitches, " "))
 	}
 
 	// Context segment
@@ -95,17 +117,20 @@ func (m *Terminal) updateStatus() {
 			ctxVal = formatTokenCount(snap.ContextTokens)
 		}
 		segments = append(segments, valStyle.Render(ctxVal))
+		dimSegments = append(dimSegments, dimValStyle.Render(ctxVal))
 	}
 
 	// Steps segment (rightmost — show only when there's step activity)
 	if stepVal := statusStepsSegment(snap.LastMaxSteps, snap.TaskError, snap.LastCurrentStep,
 		snap.InProgress, snap.CurrentStep, snap.MaxSteps); stepVal != "" {
 		segments = append(segments, valStyle.Render(stepVal))
+		dimSegments = append(dimSegments, dimValStyle.Render(stepVal))
 	}
 
 	// Video config segment (last)
 	if fps := snap.VideoFPS; fps > 0 {
 		segments = append(segments, valStyle.Render(fmt.Sprintf("V:%d,%d", fps, snap.VideoRes)))
+		dimSegments = append(dimSegments, dimValStyle.Render(fmt.Sprintf("V:%d,%d", fps, snap.VideoRes)))
 	}
 
 	// Join segments with dimmed separator
@@ -118,7 +143,17 @@ func (m *Terminal) updateStatus() {
 		}
 	}
 
+	var dimStatus string
+	if len(dimSegments) > 0 {
+		dimSeparator := m.styles.Status.Foreground(m.styles.ColorDim).Render("|")
+		dimStatus = dimSegments[0]
+		for i := 1; i < len(dimSegments); i++ {
+			dimStatus += " " + dimSeparator + " " + dimSegments[i]
+		}
+	}
+
 	m.statusText = status
+	m.statusTextDim = dimStatus
 	m.inProgress = snap.InProgress
 
 	m.syncThemeFromSession(snap.ActiveTheme, snap.ActiveThemeData)
