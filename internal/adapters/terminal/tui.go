@@ -241,38 +241,10 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Loading message handling — these take priority during startup.
 	switch msg := msg.(type) {
 	case sessionLoadedMsg:
-		m.loading = false
-		m.postLoading = true
-		// The session's sendSystemInfo("all") was already written to the
-		// WindowBuffer during loading. Update the display to reflect it.
-		m.out.DrainDirty()
-		if m.out.WindowBuffer().WindowCount() > 0 {
-			m.updateStatus()
-			m.updateDisplayHeight()
-			if m.display.shouldFollow() {
-				m.display.SetCursorToLastWindow()
-			}
-			m.display.updateContent()
-		}
-		// Sync theme from the now-loaded session state.
-		snap := m.out.SnapshotStatus()
-		m.syncThemeFromSession(snap.ActiveTheme, snap.ActiveThemeData)
-		// Populate model selector from the now-loaded model list.
-		// sendSystemInfo("all") already wrote SM "model_list" to the
-		// output buffer during loading, so SnapshotModels is populated.
-		modelSnap := m.out.SnapshotModels()
-		// Blur the input and try to open MCP init overlay immediately.
-		// The input stays blurred (rendered as empty box) until the first
-		// tick determines whether MCP init is needed.
-		m.input.Blur()
-		m.handleMCPOverlays()
-		return m, m.overlays.ModelSelector().LoadModels(modelSnap.Models, modelSnap.ActiveID)
+		return m.handleSessionLoadedMsg()
 
 	case sessionLoadingErrorMsg:
-		m.loading = false
-		m.loadingError = msg.err
-		m.quitting = true
-		return m, tea.Quit
+		return m.handleSessionLoadingError(msg.err)
 	}
 
 	switch msg := msg.(type) {
@@ -391,6 +363,50 @@ func (m *Terminal) handleMCPOverlays() {
 		}
 		m.display.updateContent()
 	}
+}
+
+// handleSessionLoadedMsg is called when the async session loading completes.
+// It transitions the UI from the loading spinner to the normal TUI view,
+// applying the loaded theme, populating the model selector, and preparing
+// for MCP initialization if needed.
+func (m *Terminal) handleSessionLoadedMsg() (tea.Model, tea.Cmd) {
+	m.loading = false
+	m.postLoading = true
+
+	// Drain any buffered output written during loading.
+	m.out.DrainDirty()
+	if m.out.WindowBuffer().WindowCount() > 0 {
+		m.updateStatus()
+		m.updateDisplayHeight()
+		if m.display.shouldFollow() {
+			m.display.SetCursorToLastWindow()
+		}
+		m.display.updateContent()
+	}
+
+	// Sync theme from the now-loaded session state.
+	snap := m.out.SnapshotStatus()
+	m.syncThemeFromSession(snap.ActiveTheme, snap.ActiveThemeData)
+
+	// Populate model selector from the now-loaded model list.
+	modelSnap := m.out.SnapshotModels()
+
+	// Blur the input and try to open MCP init overlay immediately.
+	// The input stays blurred (rendered as empty box) until the first
+	// tick determines whether MCP init is needed.
+	m.input.Blur()
+	m.handleMCPOverlays()
+
+	return m, m.overlays.ModelSelector().LoadModels(modelSnap.Models, modelSnap.ActiveID)
+}
+
+// handleSessionLoadingError is called when the async session loading fails.
+// It transitions the UI to a quitting state with the error recorded.
+func (m *Terminal) handleSessionLoadingError(err error) (tea.Model, tea.Cmd) {
+	m.loading = false
+	m.loadingError = err
+	m.quitting = true
+	return m, tea.Quit
 }
 
 // handleDisplayRefresh checks if the display needs updating and returns
