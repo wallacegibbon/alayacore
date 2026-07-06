@@ -11,7 +11,6 @@ import (
 	"github.com/alayacore/alayacore/internal/mcp"
 	"github.com/alayacore/alayacore/internal/mcp/auth"
 	"github.com/alayacore/alayacore/internal/skills"
-	"github.com/alayacore/alayacore/internal/theme"
 	"github.com/alayacore/alayacore/internal/tools"
 )
 
@@ -125,16 +124,6 @@ func Setup(cfg *config.Settings) (*Config, error) {
 	// ========================================================================
 	mcpInit, mcpErrors := initMCPAsync(cfg)
 	startupErrors = append(startupErrors, mcpErrors...)
-
-	// ========================================================================
-	// Theme loading — warm up theme manager and collect parse warnings.
-	// ========================================================================
-	themeMgr := theme.NewManager(cfg.ThemesFolder)
-	// Load each known theme to collect parse warnings.
-	for _, info := range themeMgr.GetThemes() {
-		themeMgr.LoadTheme(info.Name)
-	}
-	startupErrors = append(startupErrors, themeMgr.GetWarnings()...)
 
 	// ========================================================================
 	// System Prompt Construction (base — without MCP sections)
