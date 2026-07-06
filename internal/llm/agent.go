@@ -226,6 +226,10 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 
 		case ToolInputCompleteEvent:
 			id := getOrAssignID(callbacks, idByIndex, e.Index)
+
+			// Repair tool input before processing (Patterns 1-4).
+			repairToolInput(&e.Input, nameByIndex[e.Index], a.config.Tools)
+
 			if callbacks.OnToolInputComplete != nil {
 				if err := callbacks.OnToolInputComplete(e.ID, e.Input, id); err != nil {
 					return nil, Usage{}, false, err
@@ -247,6 +251,8 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 			// Strip empty placeholders that providers may have inserted
 			// to keep delta indices aligned with content positions.
 			stepContents = stripEmptyPlaceholders(stepContents)
+			// Repair tool inputs in step contents for history consistency.
+			repairToolInputsInContents(stepContents, a.config.Tools)
 			if e.StopReason == "max_tokens" || e.StopReason == "length" {
 				truncated = true
 			}
@@ -440,4 +446,38 @@ func hasToolInputs(contents []ContentPart) bool {
 		}
 	}
 	return false
+}
+
+// repairToolInput repairs a tool input in-place using the tool's schema.
+// If the tool is not found or has no schema, the input is left unchanged.
+func repairToolInput(input *json.RawMessage, toolName string, tools []Tool) {
+	if schema := findToolSchema(toolName, tools); schema != nil {
+		if fixed := RepairToolInput(*input, schema); string(fixed) != string(*input) {
+			*input = fixed
+		}
+	}
+}
+
+// repairToolInputsInContents applies repairToolInput to all ToolInputParts
+// in the content slice. This ensures the history stored via OnStepFinish
+// contains repaired JSON, so subsequent API requests send clean input.
+func repairToolInputsInContents(contents []ContentPart, tools []Tool) {
+	for _, part := range contents {
+		tp, ok := part.(*ToolInputPart)
+		if !ok {
+			continue
+		}
+		repairToolInput(&tp.Input, tp.Name, tools)
+	}
+}
+
+// findToolSchema looks up a tool by name and returns its JSON Schema.
+// Returns nil if the tool is not found or has no schema defined.
+func findToolSchema(toolName string, tools []Tool) json.RawMessage {
+	for _, t := range tools {
+		if t.Definition.Name == toolName && len(t.Definition.Schema) > 0 {
+			return t.Definition.Schema
+		}
+	}
+	return nil
 }
