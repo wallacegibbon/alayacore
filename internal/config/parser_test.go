@@ -86,13 +86,13 @@ func TestParseKeyValueCommentWithColon(t *testing.T) {
 name: real-value
 `
 	var cfg TestConfig
-	warnings := ParseKeyValue(content, &cfg)
+	errors := ParseKeyValue(content, &cfg)
 
 	if cfg.Name != "real-value" {
 		t.Errorf("Expected Name 'real-value', got %q", cfg.Name)
 	}
-	if len(warnings) != 0 {
-		t.Errorf("Expected 0 warnings, got %d: %v", len(warnings), warnings)
+	if len(errors) != 0 {
+		t.Errorf("Expected 0 errors, got %d: %v", len(errors), errors)
 	}
 }
 
@@ -101,21 +101,21 @@ func TestParseKeyValueMissingColon(t *testing.T) {
 port: 80
 `
 	var cfg TestConfig
-	warnings := ParseKeyValue(content, &cfg)
+	errors := ParseKeyValue(content, &cfg)
 
 	if cfg.Port != 80 {
 		t.Errorf("Expected Port 80, got %d", cfg.Port)
 	}
-	// name line has no colon → should produce a warning
+	// name line has no colon → should produce an error
 	found := false
-	for _, w := range warnings {
-		if w.Key == `name "test"` && w.Err == "line without ':' separator (missing colon?)" {
+	for _, e := range errors {
+		if e.Key == `name "test"` && e.Err == "line without ':' separator (missing colon?)" {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Errorf("Expected warning for missing colon, got %v", warnings)
+		t.Errorf("Expected error for missing colon, got %v", errors)
 	}
 }
 
@@ -125,7 +125,7 @@ invalid key: value
 port: 80
 `
 	var cfg TestConfig
-	warnings := ParseKeyValue(content, &cfg)
+	errors := ParseKeyValue(content, &cfg)
 
 	if cfg.Name != "valid" {
 		t.Errorf("Expected Name 'valid', got %q", cfg.Name)
@@ -133,16 +133,16 @@ port: 80
 	if cfg.Port != 80 {
 		t.Errorf("Expected Port 80, got %d", cfg.Port)
 	}
-	// "invalid key" contains a space → should produce a warning
+	// "invalid key" contains a space → should produce an error
 	found := false
-	for _, w := range warnings {
-		if w.Key == "invalid key" && strings.Contains(w.Err, "invalid key format") {
+	for _, e := range errors {
+		if e.Key == "invalid key" && strings.Contains(e.Err, "invalid key format") {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Errorf("Expected warning for invalid key format, got %v", warnings)
+		t.Errorf("Expected error for invalid key format, got %v", errors)
 	}
 }
 
@@ -172,13 +172,13 @@ func TestParseKeyValueDashSeparatorSkipped(t *testing.T) {
 name: second
 `
 	var cfg TestConfig
-	warnings := ParseKeyValue(content, &cfg)
+	errors := ParseKeyValue(content, &cfg)
 
 	if cfg.Name != "second" {
 		t.Errorf("Expected Name 'second' (last value wins), got %q", cfg.Name)
 	}
-	if len(warnings) != 0 {
-		t.Errorf("Expected 0 warnings, got %d: %v", len(warnings), warnings)
+	if len(errors) != 0 {
+		t.Errorf("Expected 0 errors, got %d: %v", len(errors), errors)
 	}
 }
 

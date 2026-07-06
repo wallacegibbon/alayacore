@@ -19,7 +19,7 @@ type Info struct {
 type Manager struct {
 	themesFolder string
 	themes       []Info
-	warnings     []string // non-fatal parse warnings collected during LoadTheme
+	loadErrors   []string // parse errors collected during LoadTheme
 }
 
 // NewManager creates a new theme manager.
@@ -111,12 +111,12 @@ func (tm *Manager) LoadTheme(name string) *Theme {
 	}
 	for _, t := range tm.themes {
 		if t.Name == name {
-			loaded, warns, err := LoadTheme(t.Path)
+			loaded, errs, err := LoadTheme(t.Path)
 			if err != nil {
 				return DefaultTheme()
 			}
-			if len(warns) > 0 {
-				tm.warnings = append(tm.warnings, warns...)
+			if len(errs) > 0 {
+				tm.loadErrors = append(tm.loadErrors, errs...)
 			}
 			return loaded
 		}
@@ -134,10 +134,10 @@ func (tm *Manager) ThemeExists(name string) bool {
 	return false
 }
 
-// GetWarnings returns any non-fatal parse warnings collected during
+// GetLoadErrors returns any parse errors collected during
 // LoadTheme calls, and clears the internal buffer.
-func (tm *Manager) GetWarnings() []string {
-	w := tm.warnings
-	tm.warnings = nil
+func (tm *Manager) GetLoadErrors() []string {
+	w := tm.loadErrors
+	tm.loadErrors = nil
 	return w
 }

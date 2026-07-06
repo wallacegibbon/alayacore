@@ -8,8 +8,8 @@ import (
 	"strings"
 )
 
-// warnWriter is where warnings are written. Can be set to io.Discard in tests.
-var warnWriter io.Writer = os.Stderr
+// errWriter is where errors are written. Can be set to io.Discard in tests.
+var errWriter io.Writer = os.Stderr
 
 // Manager handles skill discovery and loading
 type Manager struct {
@@ -64,15 +64,15 @@ func (m *Manager) discoverSkills() error {
 			// Load only metadata at startup
 			skill, err := m.loadSkillMetadata(skillFile, entry.Name())
 			if err != nil {
-				// Skip invalid skills but log warning
-				fmt.Fprintf(warnWriter, "Warning: failed to load skill %s from %s: %v\n", entry.Name(), skillDir, err)
+				// Skip invalid skills but log error
+				fmt.Fprintf(errWriter, "Error: failed to load skill %s from %s: %v\n", entry.Name(), skillDir, err)
 				continue
 			}
 
 			// Check for duplicate skill names
 			for _, existing := range m.skills {
 				if existing.Name == skill.Name {
-					fmt.Fprintf(warnWriter, "Warning: duplicate skill name '%s' found in %s\n", skill.Name, skillDir)
+					fmt.Fprintf(errWriter, "Error: duplicate skill name '%s' found in %s\n", skill.Name, skillDir)
 				}
 			}
 

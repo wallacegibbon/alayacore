@@ -25,7 +25,7 @@ type ModelManager struct {
 	activeID    int
 	nextID      int
 	filePath    string
-	warnings    []string // config validation messages from last load (parse warnings + model errors)
+	loadErrors  []string // config parse/validation errors from last load
 	hasRejected bool     // true if any model blocks were rejected during last load
 }
 
@@ -72,10 +72,10 @@ func NewModelManager(configPath string) *ModelManager {
 }
 
 // GetLoadErrors returns validation messages from the last LoadFromFile call.
-// These include both parse warnings (e.g. non-numeric value for an int field)
+// These include both parse errors (e.g. non-numeric value for an int field)
 // and model errors (e.g. unknown protocol_type, missing required fields).
 func (mm *ModelManager) GetLoadErrors() []string {
-	return mm.warnings
+	return mm.loadErrors
 }
 
 // LoadFromFile loads models from a config file in key-value format
@@ -127,7 +127,7 @@ func (mm *ModelManager) LoadFromFile(path string) error {
 	mm.hasRejected = totalBlocks > 0 && len(models) == 0 && len(msgs) > 0
 
 	mm.models = models
-	mm.warnings = msgs
+	mm.loadErrors = msgs
 
 	if mm.filePath == "" {
 		mm.filePath = path
@@ -148,12 +148,12 @@ func (mm *ModelManager) createDefaultConfig(path string) error {
 }
 
 // parseModelConfig parses the key-value model config format.
-// Returns valid models and a list of validation messages (parse warnings and model errors).
+// Returns valid models and a list of validation messages (parse errors and model errors).
 func parseModelConfig(content string) ([]config.ModelConfig, []string) {
 	var msgs []string
 
-	models, warns := config.ParseModelList(content)
-	msgs = append(msgs, warns...)
+	models, errs := config.ParseModelList(content)
+	msgs = append(msgs, errs...)
 
 	// First pass: validate all models and collect names.
 	type candidate struct {
@@ -275,13 +275,13 @@ func (mm *ModelManager) SyncFromContent(content string) []string {
 	}
 
 	mm.models = valid
-	mm.warnings = msgs
+	mm.loadErrors = msgs
 	mm.hasRejected = false
 
 	// Persist to config file in key-value format
 	if mm.filePath != "" {
 		if err := mm.writeConfigFile(); err != nil {
-			msgs = append(msgs, fmt.Sprintf("warning: failed to persist model config: %v", err))
+			msgs = append(msgs, fmt.Sprintf("error: failed to persist model config: %v", err))
 		}
 	}
 

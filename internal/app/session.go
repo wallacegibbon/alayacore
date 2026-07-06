@@ -2,7 +2,7 @@ package app
 
 // Shared session loading for adapters.
 // Both terminal and plainio adapters follow the same bootstrap sequence:
-// load session, validate init errors, print config warnings, check models,
+// load session, validate init errors, print config errors, check models,
 // then start the session goroutine.
 
 import (
@@ -78,7 +78,7 @@ func StartSession(cfg *Config, output io.Writer, input io.Reader) (*agentpkg.Ses
 		}
 	}
 
-	// Collect runtime config parse warnings (typos in runtime.conf).
+	// Collect runtime config parse errors (typos in runtime.conf).
 	if rm := session.RuntimeManager(); rm != nil {
 		for _, w := range rm.GetLoadErrors() {
 			_ = protocol.WriteSystemMsg(output, protocol.ErrorMsg{Text: w})

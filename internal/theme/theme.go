@@ -54,10 +54,10 @@ var (
 func DefaultTheme() *Theme {
 	defaultThemeOnce.Do(func() {
 		var t Theme
-		if warns := config.ParseKeyValue(darkThemeContent, &t); len(warns) > 0 {
+		if errs := config.ParseKeyValue(darkThemeContent, &t); len(errs) > 0 {
 			// Embedded default theme should always be valid. If it fails,
-			// the binary is corrupted — surface warnings to stderr.
-			fmt.Fprintf(os.Stderr, "Warning: default theme parse warnings: %v\n", warns)
+			// the binary is corrupted — surface errors to stderr.
+			fmt.Fprintf(os.Stderr, "Error: default theme parse errors: %v\n", errs)
 		}
 		defaultTheme = &t
 	})
@@ -66,9 +66,10 @@ func DefaultTheme() *Theme {
 }
 
 // LoadTheme loads a theme from a configuration file.
-// Returns the loaded theme, any non-fatal parse warnings, or an error
-// if the file cannot be read or parsed. Warnings are for unknown fields
-// or type mismatches in the theme file — the theme is still usable.
+// Returns the loaded theme, any parse errors, or an error
+// if the file cannot be read. Parse errors are for unknown fields
+// or type mismatches in the theme file — the theme is still usable
+// with default values for the unrecognized fields.
 func LoadTheme(path string) (*Theme, []string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -76,12 +77,12 @@ func LoadTheme(path string) (*Theme, []string, error) {
 	}
 
 	// Start with defaults, then override with config values
-	var warnings []string
+	var errs []string
 	theme := DefaultTheme()
-	if warns := config.ParseKeyValue(string(data), theme); len(warns) > 0 {
-		for _, w := range warns {
-			warnings = append(warnings, w.String())
+	if parseErrs := config.ParseKeyValue(string(data), theme); len(parseErrs) > 0 {
+		for _, e := range parseErrs {
+			errs = append(errs, e.String())
 		}
 	}
-	return theme, warnings, nil
+	return theme, errs, nil
 }

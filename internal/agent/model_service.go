@@ -120,7 +120,7 @@ func (ms *ModelService) ModelManager() *ModelManager { return ms.manager }
 // RuntimeManager returns the underlying RuntimeManager.
 func (ms *ModelService) RuntimeManager() *RuntimeManager { return ms.runtimeMgr }
 
-// GetLoadErrors returns model config parse/validation warnings.
+// GetLoadErrors returns model config parse/validation errors.
 func (ms *ModelService) GetLoadErrors() []string {
 	if ms.manager == nil {
 		return nil

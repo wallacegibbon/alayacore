@@ -37,9 +37,9 @@
 //   - styles.go: Lipgloss style derivation from theme.Theme
 //   - prompt_input.go: Input handling and external editor support
 //   - model_selector.go: Model switching UI with fuzzy search
-//   - theme_manager.go: Wrapper around theme.Manager with startup warnings
+//   - theme_manager.go: Wrapper around theme.Manager with startup init errors
 //   - theme_selector.go: Theme selection UI with live preview
-//   - warnings.go: Warning collection for non-fatal initialization errors
+//   - init_errors.go: Init error collection for initialization errors
 //   - overlay.go: Overlay rendering for selectors
 //   - help_window.go: Keybinding and command help overlay
 //   - confirm_dialog.go: Confirmation dialogs (quit, cancel, tool, MCP auth, MCP init)

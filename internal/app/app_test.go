@@ -11,12 +11,12 @@ import (
 
 func TestLoadMCPConfigs_FileNotFound(t *testing.T) {
 	cfg := &config.Settings{MCPConfigPath: "/nonexistent/mcp.conf"}
-	configs, warnings := loadMCPConfigs(cfg)
+	configs, errs := loadMCPConfigs(cfg)
 	if configs != nil {
 		t.Errorf("expected nil configs, got %v", configs)
 	}
-	if warnings != nil {
-		t.Errorf("expected no warnings, got %v", warnings)
+	if errs != nil {
+		t.Errorf("expected no errors, got %v", errs)
 	}
 }
 
@@ -45,9 +45,9 @@ url: "https://public.example.com/mcp"
 	}
 
 	cfg := &config.Settings{MCPConfigPath: path}
-	configs, warnings := loadMCPConfigs(cfg)
-	if len(warnings) > 0 {
-		t.Errorf("unexpected warnings: %v", warnings)
+	configs, errs := loadMCPConfigs(cfg)
+	if len(errs) > 0 {
+		t.Errorf("unexpected errors: %v", errs)
 	}
 	if len(configs) != 3 {
 		t.Fatalf("expected 3 configs, got %d", len(configs))
@@ -113,12 +113,12 @@ func TestLoadMCPConfigs_EmptyFile(t *testing.T) {
 	}
 
 	cfg := &config.Settings{MCPConfigPath: path}
-	configs, warnings := loadMCPConfigs(cfg)
+	configs, errs := loadMCPConfigs(cfg)
 	if len(configs) != 0 {
 		t.Errorf("expected 0 configs, got %d", len(configs))
 	}
-	if len(warnings) > 0 {
-		t.Errorf("unexpected warnings: %v", warnings)
+	if len(errs) > 0 {
+		t.Errorf("unexpected errors: %v", errs)
 	}
 }
 
@@ -133,12 +133,12 @@ func TestLoadMCPConfigs_CommentsOnly(t *testing.T) {
 	}
 
 	cfg := &config.Settings{MCPConfigPath: path}
-	configs, warnings := loadMCPConfigs(cfg)
+	configs, errs := loadMCPConfigs(cfg)
 	if len(configs) != 0 {
 		t.Errorf("expected 0 configs, got %d", len(configs))
 	}
-	if len(warnings) > 0 {
-		t.Errorf("unexpected warnings: %v", warnings)
+	if len(errs) > 0 {
+		t.Errorf("unexpected errors: %v", errs)
 	}
 }
 
@@ -157,12 +157,12 @@ url: "https://valid.example.com"
 	}
 
 	cfg := &config.Settings{MCPConfigPath: path}
-	configs, warnings := loadMCPConfigs(cfg)
+	configs, errs := loadMCPConfigs(cfg)
 	if len(configs) != 1 {
 		t.Errorf("expected 1 config, got %d", len(configs))
 	}
-	if len(warnings) != 1 {
-		t.Errorf("expected 1 warning for empty server name, got %d", len(warnings))
+	if len(errs) != 1 {
+		t.Errorf("expected 1 error for empty server name, got %d", len(errs))
 	}
 }
 
@@ -186,7 +186,7 @@ url: "https://other.example.com/mcp"
 	}
 
 	cfg := &config.Settings{MCPConfigPath: path}
-	configs, warnings := loadMCPConfigs(cfg)
+	configs, errs := loadMCPConfigs(cfg)
 	if len(configs) != 2 {
 		t.Fatalf("expected 2 configs (first occurrence of my-db + other), got %d", len(configs))
 	}
@@ -202,15 +202,15 @@ url: "https://other.example.com/mcp"
 		t.Errorf("expected first my-db to be stdio (npx), got command=%q url=%q", configs[0].Command, configs[0].URL)
 	}
 
-	// Check duplicate warning
+	// Check duplicate error
 	found := false
-	for _, w := range warnings {
+	for _, w := range errs {
 		if strings.Contains(w, "duplicate server name") && strings.Contains(w, "my-db") {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Errorf("expected warning about duplicate server name 'my-db', got: %v", warnings)
+		t.Errorf("expected error about duplicate server name 'my-db', got: %v", errs)
 	}
 }

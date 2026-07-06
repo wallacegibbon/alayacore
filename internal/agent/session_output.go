@@ -205,20 +205,20 @@ func (s *Session) sendThemeMsg() {
 }
 
 // loadThemeFromFile loads a theme from a file path and returns its info.
-// Returns warnings from theme parsing (non-fatal, e.g. unknown fields).
+// Returns parse errors from theme loading (unknown fields, type mismatches).
 func loadThemeFromFile(path string) (ThemeInfo, []string, bool) {
 	name := strings.TrimSuffix(filepath.Base(path), ".conf")
-	t, warns, err := theme.LoadTheme(path)
+	t, errs, err := theme.LoadTheme(path)
 	if err != nil {
 		return ThemeInfo{}, nil, false
 	}
-	return ThemeInfo{Name: name, Theme: t}, warns, true
+	return ThemeInfo{Name: name, Theme: t}, errs, true
 }
 
 // sendThemeListMsg sends the full list of available themes with content.
 // Called once on startup so adapters can cache theme data.
-// Parse warnings from theme files are sent as TLV error messages so all
-// adapters see them, eliminating the need for a separate pre-validation pass.
+// Parse errors from theme files are sent as TLV error messages so all
+// adapters see them.
 func (s *Session) sendThemeListMsg() {
 	if s.ThemesFolder == "" {
 		return
@@ -229,10 +229,10 @@ func (s *Session) sendThemeListMsg() {
 	}
 	infos := make([]ThemeInfo, 0, len(confs))
 	for _, path := range confs {
-		if info, warns, ok := loadThemeFromFile(path); ok {
+		if info, errs, ok := loadThemeFromFile(path); ok {
 			infos = append(infos, info)
-			for _, w := range warns {
-				s.writeError(w)
+			for _, e := range errs {
+				s.writeError(e)
 			}
 		}
 	}

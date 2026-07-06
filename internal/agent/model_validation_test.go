@@ -123,7 +123,7 @@ model_name: "model"`
 	}
 }
 
-func TestParseModelConfig_ParseWarnings(t *testing.T) {
+func TestParseModelConfig_ParseErrors(t *testing.T) {
 	input := `name: "Bad Int"
 protocol_type: "openai"
 base_url: "https://api.example.com"
@@ -138,7 +138,7 @@ context_limit: abc`
 		}
 	}
 	if !found {
-		t.Errorf("expected parse warning about invalid integer for context_limit, got: %v", msgs)
+		t.Errorf("expected parse error about invalid integer for context_limit, got: %v", msgs)
 	}
 }
 

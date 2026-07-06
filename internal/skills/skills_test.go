@@ -297,10 +297,10 @@ description: Second skill from directory 2
 }
 
 func TestMultipleSkillPathsFirstMissing(t *testing.T) {
-	// Suppress warnings during this test
-	original := warnWriter
-	warnWriter = io.Discard
-	defer func() { warnWriter = original }()
+	// Suppress errors during this test
+	original := errWriter
+	errWriter = io.Discard
+	defer func() { errWriter = original }()
 
 	missingDir := filepath.Join(t.TempDir(), "nonexistent")
 
@@ -338,10 +338,10 @@ description: Skill from second directory
 }
 
 func TestDuplicateSkillNames(t *testing.T) {
-	// Suppress warnings during this test
-	original := warnWriter
-	warnWriter = io.Discard
-	defer func() { warnWriter = original }()
+	// Suppress errors during this test
+	original := errWriter
+	errWriter = io.Discard
+	defer func() { errWriter = original }()
 
 	// Create first temp skill directory
 	tmpDir1 := t.TempDir()
@@ -381,7 +381,7 @@ description: Second occurrence
 		t.Fatalf("Failed to write skill file: %v", err)
 	}
 
-	// Test manager - both skills should be loaded (with warning)
+	// Test manager - both skills should be loaded (with error)
 	m, err := NewManager([]string{tmpDir1, tmpDir2})
 	if err != nil {
 		t.Fatalf("NewManager failed: %v", err)

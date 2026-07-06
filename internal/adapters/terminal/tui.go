@@ -195,11 +195,11 @@ func NewTerminalWithTheme(
 // Init starts the periodic tick loop for processing session updates.
 // When loading is true, it also kicks off async session loading.
 func (m *Terminal) Init() tea.Cmd {
-	// Display any buffered warnings from initialization
+	// Display any buffered init errors from initialization
 	if m.themeManager != nil {
-		if warnings := m.themeManager.GetWarnings(); len(warnings) > 0 {
-			for _, w := range warnings {
-				m.out.WriteError("%s", w.Message)
+		if errs := m.themeManager.GetInitErrors(); len(errs) > 0 {
+			for _, e := range errs {
+				m.out.WriteError("%s", e.Message)
 			}
 		}
 	}

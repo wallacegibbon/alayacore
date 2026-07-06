@@ -136,12 +136,12 @@ func TestFormatModelList_OmitsID(t *testing.T) {
 }
 
 func TestParseModelList_Empty(t *testing.T) {
-	models, warns := ParseModelList("")
+	models, errs := ParseModelList("")
 	if len(models) != 0 {
 		t.Errorf("expected 0 models, got %d", len(models))
 	}
-	if len(warns) != 0 {
-		t.Errorf("expected 0 warnings, got %d: %v", len(warns), warns)
+	if len(errs) != 0 {
+		t.Errorf("expected 0 errors, got %d: %v", len(errs), errs)
 	}
 
 	models, _ = ParseModelList("  \n  \n  ")
@@ -158,9 +158,9 @@ api_key: "nokey"
 model_name: "test"
 context_limit: 64000
 `
-	models, warns := ParseModelList(content)
-	if len(warns) != 0 {
-		t.Errorf("expected 0 warnings, got %d: %v", len(warns), warns)
+	models, errs := ParseModelList(content)
+	if len(errs) != 0 {
+		t.Errorf("expected 0 errors, got %d: %v", len(errs), errs)
 	}
 	if len(models) != 1 {
 		t.Fatalf("expected 1 model, got %d", len(models))
@@ -196,9 +196,9 @@ base_url: "http://b"
 api_key: "k"
 model_name: "m-b"
 `
-	models, warns := ParseModelList(content)
-	if len(warns) != 0 {
-		t.Errorf("expected 0 warnings, got %d: %v", len(warns), warns)
+	models, errs := ParseModelList(content)
+	if len(errs) != 0 {
+		t.Errorf("expected 0 errors, got %d: %v", len(errs), errs)
 	}
 	if len(models) != 2 {
 		t.Fatalf("expected 2 models, got %d", len(models))
@@ -227,9 +227,9 @@ base_url: "http://b"
 api_key: "k"
 model_name: "s"
 `
-	models, warns := ParseModelList(content)
-	if len(warns) != 0 {
-		t.Errorf("expected 0 warnings, got %d: %v", len(warns), warns)
+	models, errs := ParseModelList(content)
+	if len(errs) != 0 {
+		t.Errorf("expected 0 errors, got %d: %v", len(errs), errs)
 	}
 	if len(models) != 2 {
 		t.Fatalf("expected 2 models, got %d", len(models))
@@ -287,9 +287,9 @@ func TestParseModelList_RoundTrip(t *testing.T) {
 		{Name: "m2", ProtocolType: "anthropic", BaseURL: "http://b", APIKey: "k2", ModelName: "m2", MaxTokens: 500},
 	}
 	formatted := FormatModelList(original)
-	parsed, warns := ParseModelList(formatted)
-	if len(warns) != 0 {
-		t.Errorf("expected 0 warnings, got %d: %v", len(warns), warns)
+	parsed, errs := ParseModelList(formatted)
+	if len(errs) != 0 {
+		t.Errorf("expected 0 errors, got %d: %v", len(errs), errs)
 	}
 	if len(parsed) != len(original) {
 		t.Fatalf("expected %d models, got %d", len(original), len(parsed))

@@ -53,12 +53,12 @@ primary: #333333
 		t.Fatalf("Failed to create test theme file: %v", err)
 	}
 
-	th, warns, err := LoadTheme(themePath)
+	th, errs, err := LoadTheme(themePath)
 	if err != nil {
 		t.Fatalf("LoadTheme failed: %v", err)
 	}
-	if len(warns) == 0 {
-		t.Error("expected parse warnings for unknown fields, got none")
+	if len(errs) == 0 {
+		t.Error("expected parse errors for unknown fields, got none")
 	}
 
 	if th.Primary != "#333333" {

@@ -146,7 +146,7 @@ func (s *Session) ModelConfigPath() string {
 	return s.modelService.ModelConfigPath()
 }
 
-// GetLoadErrors returns model config parse/validation warnings.
+// GetLoadErrors returns model config parse/validation errors.
 func (s *Session) GetLoadErrors() []string { return s.modelService.GetLoadErrors() }
 
 // HasRejected returns true if any model configs were rejected.
@@ -160,7 +160,7 @@ func (s *Session) HasRejected() bool { return s.modelService.HasRejected() }
 // Returns an error if the session file exists but has an incompatible version
 // (version must match MessageVersion exactly).
 // If the session file fails to load for other reasons (corrupt data, permissions),
-// a warning is printed to stderr and a new session is created.
+// an error is printed to stderr and a new session is created.
 // The returned session is ready to use but NOT yet started —
 // call Start() to begin processing input.
 func LoadOrNewSession(cfg SessionConfig) (*Session, string, error) {
@@ -183,9 +183,9 @@ func LoadOrNewSession(cfg SessionConfig) (*Session, string, error) {
 	}
 
 	// Session file exists but can't be loaded (corrupt data,
-	// permission error, etc.). Log a warning and start fresh
+	// permission error, etc.). Log an error and start fresh
 	// rather than failing entirely.
-	fmt.Fprintf(os.Stderr, "Warning: could not load session file %q: %v\n", cfg.SessionFile, loadErr)
+	fmt.Fprintf(os.Stderr, "Error: could not load session file %q: %v\n", cfg.SessionFile, loadErr)
 	fmt.Fprintf(os.Stderr, "Starting new session.\n")
 	return NewSession(cfg), cfg.SessionFile, nil
 }

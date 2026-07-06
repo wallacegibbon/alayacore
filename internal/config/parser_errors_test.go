@@ -5,15 +5,15 @@ import (
 	"time"
 )
 
-func TestParseKeyValueWithWarnings_IntField(t *testing.T) {
+func TestParseKeyValueWithErrors_IntField(t *testing.T) {
 	type C struct {
 		Port int `config:"port"`
 	}
 	tests := []struct {
-		name        string
-		input       string
-		wantPort    int
-		wantWarning bool
+		name     string
+		input    string
+		wantPort int
+		wantErr  bool
 	}{
 		{"valid int", "port: 8080", 8080, false},
 		{"invalid int", "port: abc", 0, true},
@@ -22,27 +22,27 @@ func TestParseKeyValueWithWarnings_IntField(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var cfg C
-			warnings := ParseKeyValue(tt.input, &cfg)
+			errs := ParseKeyValue(tt.input, &cfg)
 			if cfg.Port != tt.wantPort {
 				t.Errorf("Port = %d, want %d", cfg.Port, tt.wantPort)
 			}
-			gotWarning := len(warnings) > 0
-			if gotWarning != tt.wantWarning {
-				t.Errorf("got warning = %v, want %v (warnings: %v)", gotWarning, tt.wantWarning, warnings)
+			gotErr := len(errs) > 0
+			if gotErr != tt.wantErr {
+				t.Errorf("got error = %v, want %v (errors: %v)", gotErr, tt.wantErr, errs)
 			}
 		})
 	}
 }
 
-func TestParseKeyValueWithWarnings_UintField(t *testing.T) {
+func TestParseKeyValueWithErrors_UintField(t *testing.T) {
 	type C struct {
 		Count uint `config:"count"`
 	}
 	tests := []struct {
-		name        string
-		input       string
-		wantCount   uint
-		wantWarning bool
+		name      string
+		input     string
+		wantCount uint
+		wantErr   bool
 	}{
 		{"valid uint", "count: 42", 42, false},
 		{"negative", "count: -1", 0, true},
@@ -51,27 +51,27 @@ func TestParseKeyValueWithWarnings_UintField(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var cfg C
-			warnings := ParseKeyValue(tt.input, &cfg)
+			errs := ParseKeyValue(tt.input, &cfg)
 			if cfg.Count != tt.wantCount {
 				t.Errorf("Count = %d, want %d", cfg.Count, tt.wantCount)
 			}
-			gotWarning := len(warnings) > 0
-			if gotWarning != tt.wantWarning {
-				t.Errorf("got warning = %v, want %v (warnings: %v)", gotWarning, tt.wantWarning, warnings)
+			gotErr := len(errs) > 0
+			if gotErr != tt.wantErr {
+				t.Errorf("got error = %v, want %v (errors: %v)", gotErr, tt.wantErr, errs)
 			}
 		})
 	}
 }
 
-func TestParseKeyValueWithWarnings_BoolField(t *testing.T) {
+func TestParseKeyValueWithErrors_BoolField(t *testing.T) {
 	type C struct {
 		Enabled bool `config:"enabled"`
 	}
 	tests := []struct {
-		name        string
-		input       string
-		want        bool
-		wantWarning bool
+		name    string
+		input   string
+		want    bool
+		wantErr bool
 	}{
 		{"true", "enabled: true", true, false},
 		{"false", "enabled: false", false, false},
@@ -82,27 +82,27 @@ func TestParseKeyValueWithWarnings_BoolField(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var cfg C
-			warnings := ParseKeyValue(tt.input, &cfg)
+			errs := ParseKeyValue(tt.input, &cfg)
 			if cfg.Enabled != tt.want {
 				t.Errorf("Enabled = %v, want %v", cfg.Enabled, tt.want)
 			}
-			gotWarning := len(warnings) > 0
-			if gotWarning != tt.wantWarning {
-				t.Errorf("got warning = %v, want %v (warnings: %v)", gotWarning, tt.wantWarning, warnings)
+			gotErr := len(errs) > 0
+			if gotErr != tt.wantErr {
+				t.Errorf("got error = %v, want %v (errors: %v)", gotErr, tt.wantErr, errs)
 			}
 		})
 	}
 }
 
-func TestParseKeyValueWithWarnings_FloatField(t *testing.T) {
+func TestParseKeyValueWithErrors_FloatField(t *testing.T) {
 	type C struct {
 		Rate float64 `config:"rate"`
 	}
 	tests := []struct {
-		name        string
-		input       string
-		want        float64
-		wantWarning bool
+		name    string
+		input   string
+		want    float64
+		wantErr bool
 	}{
 		{"valid float", "rate: 3.14", 3.14, false},
 		{"invalid float", "rate: xyz", 0, true},
@@ -110,26 +110,26 @@ func TestParseKeyValueWithWarnings_FloatField(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var cfg C
-			warnings := ParseKeyValue(tt.input, &cfg)
+			errs := ParseKeyValue(tt.input, &cfg)
 			if cfg.Rate != tt.want {
 				t.Errorf("Rate = %v, want %v", cfg.Rate, tt.want)
 			}
-			gotWarning := len(warnings) > 0
-			if gotWarning != tt.wantWarning {
-				t.Errorf("got warning = %v, want %v (warnings: %v)", gotWarning, tt.wantWarning, warnings)
+			gotErr := len(errs) > 0
+			if gotErr != tt.wantErr {
+				t.Errorf("got error = %v, want %v (errors: %v)", gotErr, tt.wantErr, errs)
 			}
 		})
 	}
 }
 
-func TestParseKeyValueWithWarnings_TimeField(t *testing.T) {
+func TestParseKeyValueWithErrors_TimeField(t *testing.T) {
 	type C struct {
 		CreatedAt time.Time `config:"created_at"`
 	}
 	tests := []struct {
-		name        string
-		input       string
-		wantWarning bool
+		name    string
+		input   string
+		wantErr bool
 	}{
 		{"valid time", "created_at: 2024-01-15T10:30:00Z", false},
 		{"invalid time", "created_at: not-a-time", true},
@@ -137,23 +137,23 @@ func TestParseKeyValueWithWarnings_TimeField(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var cfg C
-			warnings := ParseKeyValue(tt.input, &cfg)
-			gotWarning := len(warnings) > 0
-			if gotWarning != tt.wantWarning {
-				t.Errorf("got warning = %v, want %v (warnings: %v)", gotWarning, tt.wantWarning, warnings)
+			errs := ParseKeyValue(tt.input, &cfg)
+			gotErr := len(errs) > 0
+			if gotErr != tt.wantErr {
+				t.Errorf("got error = %v, want %v (errors: %v)", gotErr, tt.wantErr, errs)
 			}
 		})
 	}
 }
 
-func TestParseKeyValueWithWarnings_DurationField(t *testing.T) {
+func TestParseKeyValueWithErrors_DurationField(t *testing.T) {
 	type C struct {
 		Timeout time.Duration `config:"timeout"`
 	}
 	tests := []struct {
-		name        string
-		input       string
-		wantWarning bool
+		name    string
+		input   string
+		wantErr bool
 	}{
 		{"valid duration", "timeout: 5s", false},
 		{"invalid duration", "timeout: forever", true},
@@ -161,16 +161,16 @@ func TestParseKeyValueWithWarnings_DurationField(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var cfg C
-			warnings := ParseKeyValue(tt.input, &cfg)
-			gotWarning := len(warnings) > 0
-			if gotWarning != tt.wantWarning {
-				t.Errorf("got warning = %v, want %v (warnings: %v)", gotWarning, tt.wantWarning, warnings)
+			errs := ParseKeyValue(tt.input, &cfg)
+			gotErr := len(errs) > 0
+			if gotErr != tt.wantErr {
+				t.Errorf("got error = %v, want %v (errors: %v)", gotErr, tt.wantErr, errs)
 			}
 		})
 	}
 }
 
-func TestParseKeyValueWithWarnings_MultipleWarnings(t *testing.T) {
+func TestParseKeyValueWithErrors_MultipleErrors(t *testing.T) {
 	type C struct {
 		Port    int     `config:"port"`
 		Rate    float64 `config:"rate"`
@@ -180,13 +180,13 @@ func TestParseKeyValueWithWarnings_MultipleWarnings(t *testing.T) {
 rate: xyz
 enabled: maybe`
 	var cfg C
-	warnings := ParseKeyValue(input, &cfg)
-	if len(warnings) != 3 {
-		t.Fatalf("expected 3 warnings, got %d: %v", len(warnings), warnings)
+	errs := ParseKeyValue(input, &cfg)
+	if len(errs) != 3 {
+		t.Fatalf("expected 3 errors, got %d: %v", len(errs), errs)
 	}
 }
 
-func TestParseKeyValueWithWarnings_NoWarningOnValidInput(t *testing.T) {
+func TestParseKeyValueWithErrors_NoErrorOnValidInput(t *testing.T) {
 	type C struct {
 		Name    string `config:"name"`
 		Port    int    `config:"port"`
@@ -196,18 +196,18 @@ func TestParseKeyValueWithWarnings_NoWarningOnValidInput(t *testing.T) {
 port: 8080
 enabled: true`
 	var cfg C
-	warnings := ParseKeyValue(input, &cfg)
-	if len(warnings) != 0 {
-		t.Fatalf("expected 0 warnings, got %d: %v", len(warnings), warnings)
+	errs := ParseKeyValue(input, &cfg)
+	if len(errs) != 0 {
+		t.Fatalf("expected 0 errors, got %d: %v", len(errs), errs)
 	}
 	if cfg.Name != "test" || cfg.Port != 8080 || !cfg.Enabled {
 		t.Errorf("unexpected values: %+v", cfg)
 	}
 }
 
-func TestParseWarningString(t *testing.T) {
-	w := ParseWarning{Key: "port", Value: "abc", Err: "invalid integer"}
-	s := w.String()
+func TestParseErrorString(t *testing.T) {
+	e := ParseError{Key: "port", Value: "abc", Err: "invalid integer"}
+	s := e.String()
 	if s != `key "port": cannot parse value "abc": invalid integer` {
 		t.Errorf("unexpected string: %s", s)
 	}

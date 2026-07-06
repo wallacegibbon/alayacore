@@ -27,7 +27,7 @@ type RuntimeConfig struct {
 type RuntimeManager struct {
 	config   RuntimeConfig
 	path     string
-	loadErrs []string // parse warnings from last Load()
+	loadErrs []string // parse errors from last Load()
 }
 
 func NewRuntimeManager(runtimePath string) *RuntimeManager {
@@ -80,12 +80,12 @@ func (rm *RuntimeManager) save() error {
 // parseRuntimeConfig parses the key-value runtime config format
 func parseRuntimeConfig(content string) (RuntimeConfig, []string) {
 	var cfg RuntimeConfig
-	if warns := config.ParseKeyValue(content, &cfg); len(warns) > 0 {
-		errs := make([]string, len(warns))
-		for i, w := range warns {
-			errs[i] = fmt.Sprintf("runtime.conf: %s", w.String())
+	if errs := config.ParseKeyValue(content, &cfg); len(errs) > 0 {
+		msgs := make([]string, len(errs))
+		for i, e := range errs {
+			msgs[i] = fmt.Sprintf("runtime.conf: %s", e.String())
 		}
-		return cfg, errs
+		return cfg, msgs
 	}
 	return cfg, nil
 }
@@ -95,7 +95,7 @@ func formatRuntimeConfig(cfg RuntimeConfig) string {
 	return config.FormatKeyValue(cfg)
 }
 
-// GetLoadErrors returns any parse warnings from the last Load() call.
+// GetLoadErrors returns any parse errors from the last Load() call.
 func (rm *RuntimeManager) GetLoadErrors() []string {
 	return rm.loadErrs
 }

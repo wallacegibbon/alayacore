@@ -16,16 +16,16 @@ import (
 // separation and allows values to contain colons without ambiguity.
 var validKeyPattern = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_-]*$`)
 
-// ParseWarning represents a non-fatal issue encountered during config parsing,
-// such as a value that could not be converted to the target field type.
-type ParseWarning struct {
+// ParseError represents an issue encountered during config parsing,
+// such as an unknown key or a value that could not be converted to the target field type.
+type ParseError struct {
 	Key   string // config key
 	Value string // raw value string
 	Err   string // description of the problem
 }
 
-func (w ParseWarning) String() string {
-	return fmt.Sprintf("key %q: cannot parse value %q: %s", w.Key, w.Value, w.Err)
+func (e ParseError) String() string {
+	return fmt.Sprintf("key %q: cannot parse value %q: %s", e.Key, e.Value, e.Err)
 }
 
 // ParseKeyValueBlocks parses multiple config blocks separated by "---"
@@ -35,12 +35,12 @@ func ParseKeyValueBlocks(content string) []string {
 }
 
 // ParseModelList parses key-value block format into a slice of ModelConfig.
-// Returns models with a non-empty Name or ModelName, and any parse warnings.
+// Returns models with a non-empty Name or ModelName, and any parse errors.
 // Does NOT validate model fields — callers should validate after this.
 func ParseModelList(content string) ([]ModelConfig, []string) {
 	blocks := ParseKeyValueBlocks(content)
 	models := make([]ModelConfig, 0, len(blocks))
-	var warnings []string
+	var errs []string
 
 	for blockIdx, block := range blocks {
 		block = strings.TrimSpace(block)
@@ -49,8 +49,8 @@ func ParseModelList(content string) ([]ModelConfig, []string) {
 		}
 
 		var m ModelConfig
-		for _, w := range ParseKeyValue(block, &m) {
-			warnings = append(warnings, fmt.Sprintf("model block %d: %s", blockIdx+1, w.String()))
+		for _, e := range ParseKeyValue(block, &m) {
+			errs = append(errs, fmt.Sprintf("model block %d: %s", blockIdx+1, e.String()))
 		}
 
 		if m.Name != "" || m.ModelName != "" {
@@ -58,7 +58,7 @@ func ParseModelList(content string) ([]ModelConfig, []string) {
 		}
 	}
 
-	return models, warnings
+	return models, errs
 }
 
 // ParseKeyValue parses key-value config content into a struct using `config` tags.
@@ -78,8 +78,9 @@ func ParseModelList(content string) ([]ModelConfig, []string) {
 // Lines that don't match this pattern are treated as comments or malformed input.
 //
 // Parse errors (e.g. non-numeric value for an int field) and unknown keys
-// are reported as warnings in the return value.
-func ParseKeyValue(content string, target any) []ParseWarning {
+// are collected and returned. Parsing continues after each error so all
+// problems are reported at once.
+func ParseKeyValue(content string, target any) []ParseError {
 	v := reflect.ValueOf(target)
 	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Struct {
 		return nil
@@ -100,7 +101,7 @@ func ParseKeyValue(content string, target any) []ParseWarning {
 		}
 	}
 
-	var warnings []ParseWarning
+	var errs []ParseError
 
 	// Parse lines
 	for line := range strings.SplitSeq(content, "\n") {
@@ -117,7 +118,7 @@ func ParseKeyValue(content string, target any) []ParseWarning {
 		// Find the first colon to separate key and value
 		colonIdx := strings.IndexByte(line, ':')
 		if colonIdx == -1 {
-			warnings = append(warnings, ParseWarning{
+			errs = append(errs, ParseError{
 				Key:   line,
 				Value: "",
 				Err:   "line without ':' separator (missing colon?)",
@@ -130,7 +131,7 @@ func ParseKeyValue(content string, target any) []ParseWarning {
 
 		// Validate key format
 		if !validKeyPattern.MatchString(key) {
-			warnings = append(warnings, ParseWarning{
+			errs = append(errs, ParseError{
 				Key:   key,
 				Value: strings.TrimSpace(value),
 				Err:   fmt.Sprintf("invalid key format (must match %s)", validKeyPattern.String()),
@@ -144,24 +145,24 @@ func ParseKeyValue(content string, target any) []ParseWarning {
 		// Look up field by tag
 		fieldIdx, ok := tagToField[key]
 		if !ok {
-			warnings = append(warnings, ParseWarning{Key: key, Value: value, Err: "unknown config key"})
+			errs = append(errs, ParseError{Key: key, Value: value, Err: "unknown config key"})
 			continue
 		}
 
-		if w := setField(fieldIdx, v, value, key); w != nil {
-			warnings = append(warnings, *w)
+		if e := setField(fieldIdx, v, value, key); e != nil {
+			errs = append(errs, *e)
 		}
 	}
 
-	return warnings
+	return errs
 }
 
 // setField sets a struct field from a string value.
-// Returns a ParseWarning if the value cannot be converted.
+// Returns a ParseError if the value cannot be converted.
 // Empty values are silently treated as "unset".
 //
 //nolint:gocyclo // Type switch over all supported field kinds requires many cases
-func setField(fieldIdx int, v reflect.Value, value, key string) *ParseWarning {
+func setField(fieldIdx int, v reflect.Value, value, key string) *ParseError {
 	if value == "" {
 		return nil
 	}
@@ -184,7 +185,7 @@ func setField(fieldIdx int, v reflect.Value, value, key string) *ParseWarning {
 	if field.Type() == reflect.TypeOf(time.Time{}) {
 		t, err := time.Parse(time.RFC3339, value)
 		if err != nil {
-			return &ParseWarning{Key: key, Value: value, Err: "expected RFC3339 timestamp"}
+			return &ParseError{Key: key, Value: value, Err: "expected RFC3339 timestamp"}
 		}
 		field.Set(reflect.ValueOf(t))
 		return nil
@@ -194,7 +195,7 @@ func setField(fieldIdx int, v reflect.Value, value, key string) *ParseWarning {
 	if field.Type() == reflect.TypeOf(time.Duration(0)) {
 		d, err := time.ParseDuration(value)
 		if err != nil {
-			return &ParseWarning{Key: key, Value: value, Err: "invalid duration"}
+			return &ParseError{Key: key, Value: value, Err: "invalid duration"}
 		}
 		field.SetInt(int64(d))
 		return nil
@@ -207,27 +208,27 @@ func setField(fieldIdx int, v reflect.Value, value, key string) *ParseWarning {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		i, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
-			return &ParseWarning{Key: key, Value: value, Err: "invalid integer"}
+			return &ParseError{Key: key, Value: value, Err: "invalid integer"}
 		}
 		field.SetInt(i)
 
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		u, err := strconv.ParseUint(value, 10, 64)
 		if err != nil {
-			return &ParseWarning{Key: key, Value: value, Err: "invalid unsigned integer"}
+			return &ParseError{Key: key, Value: value, Err: "invalid unsigned integer"}
 		}
 		field.SetUint(u)
 
 	case reflect.Bool:
 		field.SetBool(parseBool(value))
 		if !isValidBool(value) {
-			return &ParseWarning{Key: key, Value: value, Err: "invalid boolean (expected true/false/yes/no/on/off/1/0)"}
+			return &ParseError{Key: key, Value: value, Err: "invalid boolean (expected true/false/yes/no/on/off/1/0)"}
 		}
 
 	case reflect.Float32, reflect.Float64:
 		f, err := strconv.ParseFloat(value, 64)
 		if err != nil {
-			return &ParseWarning{Key: key, Value: value, Err: "invalid float"}
+			return &ParseError{Key: key, Value: value, Err: "invalid float"}
 		}
 		field.SetFloat(f)
 

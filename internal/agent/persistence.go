@@ -113,10 +113,10 @@ func parseFrontmatter(content string) (frontmatter, body string, err error) {
 // parseSessionMeta parses key-value pairs from frontmatter into SessionMeta using struct tags.
 func parseSessionMeta(frontmatter string) (SessionMeta, error) {
 	var meta SessionMeta
-	if warns := config.ParseKeyValue(frontmatter, &meta); len(warns) > 0 {
-		// Surface parse warnings (unknown keys, type conversion failures) so they
+	if errs := config.ParseKeyValue(frontmatter, &meta); len(errs) > 0 {
+		// Surface parse errors (unknown keys, type conversion failures) so they
 		// are not silently lost when loading session files.
-		return meta, fmt.Errorf("load: session frontmatter has parse warnings: %v", warns)
+		return meta, fmt.Errorf("load: session frontmatter has parse errors: %v", errs)
 	}
 
 	// Check message format version — must match exactly.

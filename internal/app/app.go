@@ -15,7 +15,7 @@ import (
 )
 
 // loadMCPConfigs reads mcp.conf from the config directory and parses it
-// into a slice of ServerConfig. Returns any parse/load errors as warnings.
+// into a slice of ServerConfig. Returns any parse errors.
 func loadMCPConfigs(cfg *config.Settings) ([]mcp.ServerConfig, []string) {
 	data, err := os.ReadFile(cfg.MCPConfigPath)
 	if err != nil {
@@ -27,7 +27,7 @@ func loadMCPConfigs(cfg *config.Settings) ([]mcp.ServerConfig, []string) {
 
 	blocks := config.ParseKeyValueBlocks(string(data))
 	configs := make([]mcp.ServerConfig, 0, len(blocks))
-	var warnings []string
+	var errs []string
 
 	for _, block := range blocks {
 		block = strings.TrimSpace(block)
@@ -36,13 +36,13 @@ func loadMCPConfigs(cfg *config.Settings) ([]mcp.ServerConfig, []string) {
 		}
 
 		var fileCfg mcp.ServerConfigFile
-		parseWarns := config.ParseKeyValue(block, &fileCfg)
-		for _, w := range parseWarns {
-			warnings = append(warnings, fmt.Sprintf("mcp.conf: %s", w.String()))
+		parseErrors := config.ParseKeyValue(block, &fileCfg)
+		for _, e := range parseErrors {
+			errs = append(errs, fmt.Sprintf("mcp.conf: %s", e.String()))
 		}
 
 		if fileCfg.Server == "" {
-			warnings = append(warnings, "mcp.conf: skipping block with empty server name")
+			errs = append(errs, "mcp.conf: skipping block with empty server name")
 			continue
 		}
 
@@ -55,14 +55,14 @@ func loadMCPConfigs(cfg *config.Settings) ([]mcp.ServerConfig, []string) {
 	deduped := make([]mcp.ServerConfig, 0, len(configs))
 	for _, cfg := range configs {
 		if seenNames[cfg.Name] {
-			warnings = append(warnings, fmt.Sprintf("mcp.conf: duplicate server name %q — skipped", cfg.Name))
+			errs = append(errs, fmt.Sprintf("mcp.conf: duplicate server name %q — skipped", cfg.Name))
 			continue
 		}
 		seenNames[cfg.Name] = true
 		deduped = append(deduped, cfg)
 	}
 
-	return deduped, warnings
+	return deduped, errs
 }
 
 // This package provides shared initialization for all adapters.
@@ -92,7 +92,7 @@ type Config struct {
 	// internally — the adapter receives progress via system messages.
 	MCPInit *mcp.Init
 
-	// StartupErrors contains non-fatal warnings from theme loading,
+	// StartupErrors contains errors from theme loading,
 	// runtime config parsing, and MCP config parsing. These are
 	// emitted as TLV system messages during session startup so the
 	// user sees them even in TUI mode.
@@ -116,7 +116,7 @@ func Setup(cfg *config.Settings) (*Config, error) {
 		return nil, fmt.Errorf("invalid --builtin-tools: %w", err)
 	}
 
-	// Collect non-fatal startup warnings from all sources.
+	// Collect startup errors from all sources.
 	var startupErrors []string
 
 	// ========================================================================
@@ -166,7 +166,7 @@ func Setup(cfg *config.Settings) (*Config, error) {
 
 // initMCPAsync starts asynchronous MCP initialization.
 // Returns an Init (nil if no MCP servers configured) and any config
-// parsing warnings. The Init is NOT started yet — the session starts
+// parsing errors. The Init is NOT started yet — the session starts
 // it when the main event loop begins.
 func initMCPAsync(cfg *config.Settings) (*mcp.Init, []string) {
 	// Load MCP configurations from mcp.conf
