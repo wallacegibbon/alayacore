@@ -211,6 +211,10 @@ func (s *Session) handleVideoConfig(args string) {
 // handleThemeSet sets the active theme, persists it to runtime config,
 // and sends updated system info so adapters receive the full theme data.
 func (s *Session) handleThemeSet(args string) {
+	if s.NoTheme {
+		s.writeError("theme management is not available in this mode")
+		return
+	}
 	if args == "" {
 		s.writeError("usage: :theme_set <name>")
 		return

@@ -165,6 +165,7 @@ type SessionConfig struct {
 	DebugAPI      bool
 	AutoSummarize bool
 	ProxyURL      string
+	NoTheme       bool // If true, skip all theme loading, detection, and broadcasting
 
 	// External dependencies
 	SkillsMgr *skills.Manager

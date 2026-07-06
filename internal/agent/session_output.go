@@ -140,8 +140,10 @@ func (s *Session) sendSystemInfo(kind SystemInfoKind) {
 		s.sendTaskMsg()
 		s.sendModelListMsg()
 		s.sendModelMsg()
-		s.sendThemeListMsg()
-		s.sendThemeMsg()
+		if !s.NoTheme {
+			s.sendThemeListMsg()
+			s.sendThemeMsg()
+		}
 		s.sendReasoningMsg()
 		s.sendVideoConfigMsg()
 	case SystemInfoTask:
@@ -149,7 +151,9 @@ func (s *Session) sendSystemInfo(kind SystemInfoKind) {
 	case SystemInfoModel:
 		s.sendModelMsg()
 	case SystemInfoTheme:
-		s.sendThemeMsg()
+		if !s.NoTheme {
+			s.sendThemeMsg()
+		}
 	case SystemInfoReasoning:
 		s.sendReasoningMsg()
 	case SystemInfoVideoConfig:
