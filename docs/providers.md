@@ -2,7 +2,9 @@
 
 Non-obvious patterns when working with LLM provider implementations.
 
-> **See also: [data-mapping.md](internal/data-mapping.md)** for how OpenAI/Anthropic wire formats map to the domain types in `llm/types.go`, with traced examples of `reasoning_content`, `tool_calls`, mixed messages, and multimodal content.
+> **See also:**
+> - [data-mapping.md](internal/data-mapping.md) — how OpenAI/Anthropic wire formats map to domain types
+> - [tool-input-repair.md](tool-input-repair.md) — how common JSON output errors are repaired at the agent level
 
 ## OpenAI multimodal content format
 
