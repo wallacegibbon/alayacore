@@ -15,6 +15,50 @@ Rather than patching each provider or each tool individually, a centralized
 repair function (`RepairToolInput`) intercepts tool inputs at the agent level
 and corrects them against the tool's declared schema.
 
+## Why These Errors Occur
+
+These 4 patterns share a common root cause: **structural amnesia around
+JSON's type system**. The model serializes content correctly at the value
+level (the right data is there), but defaults to the simplest possible JSON
+construct at the container level — string over array, null over omission,
+scalar over collection.
+
+They are **generation-order artifacts**, not knowledge gaps:
+
+```
+Token generation for {"files": ["a", "b"]}:
+
+Position 1:  {"files":
+Position 2:  {"files":           ← model must decide: string token or array token?
+Position 3:  {"files": [         ← if it chose array, great
+             {"files": "         ← if it chose string, already wrong
+```
+
+At position 2 the model has just finished the key `"files"`. Its first
+instinct is to produce a string (the most common JSON value type). By the
+time it realizes the schema demands an array, it has already committed to
+a `"` token. The semantic content is correct; the structural wrapper is
+an afterthought.
+
+### Relationship with model size
+
+The relationship is **non-monotonic** — bigger does not simply mean fewer
+errors. Models can be classified by a three-level error hierarchy:
+
+| Level | Description | Typical model size | These 4 patterns |
+|-------|-------------|-------------------|-----------------|
+| **3** | Invalid JSON (broken brackets, unquoted strings) | < 3B parameters | Overshadowed by syntax failures |
+| **2** | Valid JSON but schema-violating in basic ways | 3B–14B | **Peak frequency** — model is good enough for valid JSON but not for correct nesting |
+| **1** | Valid JSON, schema violations at the container/type level | 14B–70B | Most visible — syntax is clean but these 4 patterns persist |
+| **0** | Schema-compliant JSON | 70B+ (frontier) | Decrease significantly, appear under streaming pressure or with complex nested schemas |
+
+These 4 errors are **most characteristic of the 14B–70B band**: the model
+has learned to produce syntactically flawless JSON, but hasn't fully
+internalized the schema's structural requirements. They persist even in
+frontier models under time pressure (early streaming tokens), when
+distracted by reasoning, or when the schema involves deeply nested arrays
+(e.g. MCP-style tools).
+
 ## The Four Error Patterns
 
 ### 1. null for optional fields
