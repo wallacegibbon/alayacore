@@ -375,6 +375,13 @@ func (m *Terminal) handleSessionLoadedMsg() (tea.Model, tea.Cmd) {
 
 	// Drain any buffered output written during loading.
 	m.out.DrainDirty()
+
+	// Reset appliedTheme so the session's theme data (from sendThemeListMsg)
+	// is always applied on initial load, even if the theme name matches the
+	// loading screen theme. This ensures that if the user modified a theme
+	// file (e.g. theme-dark.conf), the changes take effect immediately.
+	m.appliedTheme = ""
+
 	if m.out.WindowBuffer().WindowCount() > 0 {
 		m.updateStatus()
 		m.updateDisplayHeight()
@@ -385,6 +392,8 @@ func (m *Terminal) handleSessionLoadedMsg() (tea.Model, tea.Cmd) {
 	}
 
 	// Sync theme from the now-loaded session state.
+	// (Fallback when there are no windows yet — updateStatus above already
+	// handles the normal case via syncThemeFromSession.)
 	snap := m.out.SnapshotStatus()
 	m.syncThemeFromSession(snap.ActiveTheme, snap.ActiveThemeData)
 

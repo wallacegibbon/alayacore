@@ -54,18 +54,15 @@ func (a *Adapter) Start() int {
 	// the read end (pipeReader) once loading completes.
 	pipeReader, pipeWriter := io.Pipe()
 
-	// Create Terminal model in loading mode. The theme/styles here are for
-	// the loading screen only — the session's actual theme is applied
-	// after async loading completes.
-	activeThemeName := defaultThemeName
-	theme := themeManager.LoadTheme(activeThemeName)
-	styles := NewStyles(theme)
-	terminalOutput.SetStyles(styles)
-
+	// Create Terminal model in loading mode. The loading screen uses the
+	// embedded default theme (theme.DefaultTheme()) — no file I/O needed
+	// for the brief startup phase. The session will load all theme files
+	// exactly once via sendThemeListMsg() and broadcast the full data,
+	// which the adapter caches and applies when loading completes.
 	t := NewTerminalWithTheme(
 		terminalOutput, pipeWriter, a.Config,
 		initialWidth, initialHeight,
-		theme, themeManager, activeThemeName,
+		theme.DefaultTheme(), themeManager, defaultThemeName,
 	)
 	t.loading = true // enter async loading mode
 	t.pipeReader = pipeReader
