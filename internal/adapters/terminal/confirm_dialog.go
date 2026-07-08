@@ -155,7 +155,7 @@ func (cd *ConfirmDialog) OpenMCPAuth(serverName, serverURL string) {
 	cd.toolID = serverName
 	cd.toolName = serverName
 	cd.toolInput = serverURL
-	cd.Description = fmt.Sprintf("%s\n%s", serverName, serverURL)
+	cd.Description = serverURL
 	cd.confirmed = false
 	cd.canceled = false
 }
@@ -272,14 +272,46 @@ func (cd *ConfirmDialog) HandleKeyMsg(msg tea.KeyMsg) bool {
 	return true
 }
 
-// ConsumeResult returns the result flags and resets them.
-// Returns (confirmed, canceled).
-func (cd *ConfirmDialog) ConsumeResult() (bool, bool) {
-	confirmed := cd.confirmed
-	canceled := cd.canceled
+// ConfirmResult captures the complete result of a confirm dialog interaction.
+// The Terminal uses this to dispatch actions without needing separate
+// confirmed/canceled handler functions.
+type ConfirmResult struct {
+	Kind          ConfirmKind
+	Confirmed     bool
+	Canceled      bool
+	ToolID        string // server name (MCPAuth) or tool call ID (Tool)
+	ToolInput     string // authorization URL (MCPAuth) or tool input (Tool)
+	CtrlGCanceled bool   // true if canceled via Ctrl+G (MCPAuth → cancel all)
+}
+
+// ConsumeResult returns the result of the dialog interaction and resets
+// the dialog to its closed state. Returns nil if no result is pending.
+func (cd *ConfirmDialog) ConsumeResult() *ConfirmResult {
+	if !cd.confirmed && !cd.canceled {
+		return nil
+	}
+
+	r := &ConfirmResult{
+		Kind:          cd.kind,
+		Confirmed:     cd.confirmed,
+		Canceled:      cd.canceled,
+		ToolID:        cd.toolID,
+		ToolInput:     cd.toolInput,
+		CtrlGCanceled: cd.ctrlGCanceled,
+	}
+
+	// Reset to closed state.
+	cd.state = FilteredListClosed
+	cd.kind = ConfirmNone
+	cd.Description = ""
+	cd.toolID = ""
+	cd.toolName = ""
+	cd.toolInput = ""
 	cd.confirmed = false
 	cd.canceled = false
-	return confirmed, canceled
+	cd.ctrlGCanceled = false
+
+	return r
 }
 
 // ---- Rendering ----

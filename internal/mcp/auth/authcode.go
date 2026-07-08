@@ -24,92 +24,42 @@ type AuthCodeConfig struct {
 	Resource     string // RFC 8707 resource indicator (MCP server URL)
 }
 
-// callbackResult holds the result of the OAuth callback HTTP request.
-type callbackResult struct {
-	code string
-	err  error
+// CallbackResult holds the result of the OAuth callback HTTP request.
+type CallbackResult struct {
+	Code string
+	Err  error
 }
 
-// RunAuthCodeFlow performs the complete OAuth 2.1 Authorization Code + PKCE flow.
-// It:
-//  1. Generates PKCE parameters
-//  2. Starts a local HTTP server on 127.0.0.1 at a random port
-//  3. Constructs the authorization URL and opens it in the browser
-//  4. Waits for the authorization code callback
-//  5. Exchanges the code for tokens at the token endpoint
-//  6. Returns the obtained Token
+// StartCallbackServer starts a local HTTP server on 127.0.0.1 at a random port
+// to receive the OAuth authorization code callback. It validates the state
+// parameter to prevent CSRF attacks.
 //
-// The ctx parameter controls the overall timeout (e.g., 5 minutes).
-//
-//nolint:gocyclo // OAuth code flow has many sequential steps by spec
-func RunAuthCodeFlow(ctx context.Context, meta *ASMetadata, cfg *AuthCodeConfig) (*Token, error) {
-	// 1. Generate PKCE params.
-	pkce, err := NewPKCE()
-	if err != nil {
-		return nil, fmt.Errorf("pkce: %w", err)
-	}
-
-	// 2. Generate random state for CSRF protection.
-	state := randomState()
-
-	// 3. Start local callback server on a random port.
+// Returns a channel that receives the callback result, a redirect URI for the
+// authorization request, and a cleanup function that shuts down the server.
+func StartCallbackServer(state string) (<-chan CallbackResult, string, func()) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		return nil, fmt.Errorf("callback listener: %w", err)
+		ch := make(chan CallbackResult, 1)
+		ch <- CallbackResult{Err: fmt.Errorf("callback listener: %w", err)}
+		close(ch)
+		return ch, "", func() {}
 	}
+
 	addr, ok := listener.Addr().(*net.TCPAddr)
 	if !ok {
-		return nil, fmt.Errorf("callback listener: unexpected addr type %T", listener.Addr())
+		listener.Close()
+		ch := make(chan CallbackResult, 1)
+		ch <- CallbackResult{Err: fmt.Errorf("callback listener: unexpected addr type %T", listener.Addr())}
+		close(ch)
+		return ch, "", func() {}
 	}
 	port := addr.Port
 	redirectURI := fmt.Sprintf("http://127.0.0.1:%d/callback", port)
 
-	resultCh := make(chan callbackResult, 1)
+	resultCh := make(chan CallbackResult, 1)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/callback", makeAuthCallbackHandler(resultCh, state))
-
-	server := &http.Server{
-		Addr:              fmt.Sprintf("127.0.0.1:%d", port),
-		Handler:           mux,
-		ReadHeaderTimeout: 10 * time.Second,
-	}
-
-	go server.Serve(listener) //nolint:errcheck // server is closed via defer
-	defer server.Close()
-
-	// 4. Construct authorization URL.
-	authURL, err := buildAuthURL(meta, cfg, pkce, redirectURI, state)
-	if err != nil {
-		return nil, fmt.Errorf("build auth URL: %w", err)
-	}
-
-	// 5. Open browser.
-	if err := OpenURL(authURL); err != nil {
-		return nil, fmt.Errorf("open browser: %w", err)
-	}
-
-	// 6. Wait for callback.
-	select {
-	case res := <-resultCh:
-		if res.err != nil {
-			return nil, res.err
-		}
-		// Proceed to token exchange.
-		return exchangeCode(ctx, meta, cfg, pkce, redirectURI, res.code)
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
-}
-
-// makeAuthCallbackHandler creates the HTTP handler for the OAuth callback endpoint.
-//
-// All sends to resultCh use non-blocking select so that the handler never blocks
-// on a full channel (edge case: browser sends a second callback while the first
-// is still being exchanged). If the channel is full, the duplicate callback is
-// silently dropped — the first result wins, which is the correct behavior for OAuth.
-func makeAuthCallbackHandler(resultCh chan callbackResult, state string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
 		code := r.URL.Query().Get("code")
 		returnedState := r.URL.Query().Get("state")
 		errStr := r.URL.Query().Get("error")
@@ -117,7 +67,7 @@ func makeAuthCallbackHandler(resultCh chan callbackResult, state string) http.Ha
 
 		if errStr != "" {
 			select {
-			case resultCh <- callbackResult{err: fmt.Errorf("authorization error: %s: %s", errStr, errDesc)}:
+			case resultCh <- CallbackResult{Err: fmt.Errorf("authorization error: %s: %s", errStr, errDesc)}:
 			default:
 			}
 			_, _ = w.Write([]byte("Authorization failed. You can close this window."))
@@ -125,7 +75,7 @@ func makeAuthCallbackHandler(resultCh chan callbackResult, state string) http.Ha
 		}
 		if returnedState != state {
 			select {
-			case resultCh <- callbackResult{err: fmt.Errorf("state mismatch: got %q, expected %q", returnedState, state)}:
+			case resultCh <- CallbackResult{Err: fmt.Errorf("state mismatch: got %q, expected %q", returnedState, state)}:
 			default:
 			}
 			_, _ = w.Write([]byte("Authorization failed. You can close this window."))
@@ -133,23 +83,32 @@ func makeAuthCallbackHandler(resultCh chan callbackResult, state string) http.Ha
 		}
 		if code == "" {
 			select {
-			case resultCh <- callbackResult{err: fmt.Errorf("no authorization code in callback")}:
+			case resultCh <- CallbackResult{Err: fmt.Errorf("no authorization code in callback")}:
 			default:
 			}
 			_, _ = w.Write([]byte("Authorization failed. You can close this window."))
 			return
 		}
 		select {
-		case resultCh <- callbackResult{code: code}:
+		case resultCh <- CallbackResult{Code: code}:
 		default:
-			// Already received a result, ignore duplicate callback.
 		}
 		_, _ = w.Write([]byte("Authorization successful! You can close this window."))
+	})
+
+	server := &http.Server{
+		Addr:              fmt.Sprintf("127.0.0.1:%d", port),
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
 	}
+
+	go server.Serve(listener) //nolint:errcheck // server is closed via cleanup
+
+	return resultCh, redirectURI, func() { server.Close() }
 }
 
-// buildAuthURL constructs the authorization URL with all required parameters.
-func buildAuthURL(meta *ASMetadata, cfg *AuthCodeConfig, pkce *PKCEParams, redirectURI, state string) (string, error) {
+// BuildAuthorizationURL constructs the authorization URL with all required parameters.
+func BuildAuthorizationURL(meta *ASMetadata, cfg *AuthCodeConfig, pkce *PKCEParams, redirectURI, state string) (string, error) {
 	params := url.Values{}
 	params.Set("response_type", "code")
 	params.Set("client_id", cfg.ClientID)
@@ -173,8 +132,8 @@ func buildAuthURL(meta *ASMetadata, cfg *AuthCodeConfig, pkce *PKCEParams, redir
 	return u.String(), nil
 }
 
-// exchangeCode exchanges the authorization code for tokens.
-func exchangeCode(ctx context.Context, meta *ASMetadata, cfg *AuthCodeConfig, pkce *PKCEParams, redirectURI, code string) (*Token, error) {
+// ExchangeCode exchanges the authorization code for tokens at the token endpoint.
+func ExchangeCode(ctx context.Context, meta *ASMetadata, cfg *AuthCodeConfig, pkce *PKCEParams, redirectURI, code string) (*Token, error) {
 	data := url.Values{}
 	data.Set("grant_type", "authorization_code")
 	data.Set("code", code)
@@ -250,9 +209,9 @@ func exchangeCode(ctx context.Context, meta *ASMetadata, cfg *AuthCodeConfig, pk
 	return token, nil
 }
 
-// randomState generates a random state string for CSRF protection.
-func randomState() string {
+// RandomState generates a random hex string for OAuth state (CSRF protection).
+func RandomState() string {
 	buf := make([]byte, 16)
-	_, _ = rand.Read(buf) // always succeeds per docs
+	_, _ = rand.Read(buf)
 	return hex.EncodeToString(buf)
 }

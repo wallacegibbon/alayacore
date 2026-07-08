@@ -87,18 +87,13 @@ func (m *MCPService) Confirm(server string, allow bool) bool {
 
 // MCPEventResult describes what the Session should do after processing an event.
 type MCPEventResult struct {
-	// SystemMsg is non-nil if a system message should be sent to the UI.
 	SystemMsg *MCPMsgData
 
-	// ApplyResult is true when InitDone was processed and the Session should
-	// apply the tools, system fragment, and manager.
 	ApplyResult bool
 	Tools       []llm.Tool
 	SysFragment string
-	Errors      []string
 	Manager     *mcp.Manager
 
-	// Aborted is true when init was canceled or the channel was closed unexpectedly.
 	Aborted bool
 }
 
@@ -135,7 +130,6 @@ func (m *MCPService) HandleEvent(evt *mcp.InitEvent) *MCPEventResult {
 				Server: evt.Server,
 				Error:  evt.Error,
 			},
-			Errors: []string{evt.Error},
 		}
 
 	case mcp.InitAuthConfirm:
@@ -163,7 +157,6 @@ func (m *MCPService) HandleEvent(evt *mcp.InitEvent) *MCPEventResult {
 			ApplyResult: true,
 			Tools:       evt.Tools,
 			SysFragment: evt.SysFragment,
-			Errors:      evt.Errors,
 			Manager:     evt.Manager,
 		}
 

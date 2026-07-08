@@ -1,4 +1,6 @@
-package auth
+// Package platform provides OS-level utilities that are needed by both
+// the core and adapter layers (e.g., opening a URL in the default browser).
+package platform
 
 import (
 	"fmt"

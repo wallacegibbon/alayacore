@@ -11,6 +11,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/alayacore/alayacore/internal/platform"
 	"github.com/alayacore/alayacore/internal/theme"
 )
 
@@ -182,23 +183,88 @@ func (m *Terminal) handleThemePreview(msg themePreviewMsg) (tea.Model, tea.Cmd) 
 }
 
 func (m *Terminal) handleConfirmResult() (tea.Model, tea.Cmd) {
-	confirmed, canceled := m.overlays.ConfirmOverlay().ConsumeResult()
-	if !confirmed && !canceled {
+	r := m.overlays.ConfirmOverlay().ConsumeResult()
+	if r == nil {
 		return m, nil
 	}
-
-	kind := m.overlays.ConfirmOverlay().Kind()
-	toolID := m.overlays.ConfirmOverlay().ToolID()
-	ctrlGCanceled := m.overlays.ConfirmOverlay().IsCtrlGCanceled()
-	m.overlays.ConfirmOverlay().Close()
 
 	fromCmd := m.confirmFromCommand
 	m.confirmFromCommand = false
 
-	if canceled {
-		return m.handleConfirmCanceled(kind, toolID, fromCmd, ctrlGCanceled)
+	switch r.Kind {
+	case ConfirmQuit:
+		return m.handleConfirmQuit(r, fromCmd)
+	case ConfirmCancel:
+		return m.handleConfirmCancel(r, fromCmd)
+	case ConfirmTool:
+		return m.handleConfirmTool(r, fromCmd)
+	case ConfirmMCPAuth:
+		return m.handleConfirmMCPAuth(r, fromCmd)
 	}
-	return m.handleConfirmConfirmed(kind, toolID, fromCmd)
+	return m, nil
+}
+
+func (m *Terminal) handleConfirmQuit(r *ConfirmResult, fromCmd bool) (tea.Model, tea.Cmd) {
+	if r.Confirmed {
+		m.quitting = true
+		m.streamInput.Close()
+		m.out.Close()
+		return m, tea.Quit
+	}
+	if fromCmd {
+		m.input.SetValue("")
+	}
+	m.restoreFocusAfterConfirm()
+	return m, nil
+}
+
+func (m *Terminal) handleConfirmCancel(r *ConfirmResult, fromCmd bool) (tea.Model, tea.Cmd) {
+	if fromCmd {
+		m.input.SetValue("")
+	}
+	m.restoreFocusAfterConfirm()
+	if r.Confirmed {
+		return m, m.submitCommand("cancel", fromCmd)
+	}
+	return m, nil
+}
+
+func (m *Terminal) handleConfirmTool(r *ConfirmResult, fromCmd bool) (tea.Model, tea.Cmd) {
+	action := "no"
+	if r.Confirmed {
+		action = "yes"
+	}
+	if fromCmd {
+		m.input.SetValue("")
+	}
+	m.emitCommand(":confirm " + r.ToolID + " " + action)
+	m.restoreFocusAfterConfirm()
+	if nextID, nextName, nextInput, ok := m.out.GetPendingToolConfirm(); ok {
+		m.openConfirmTool(nextID, nextName, nextInput)
+	}
+	return m, scheduleTick()
+}
+
+func (m *Terminal) handleConfirmMCPAuth(r *ConfirmResult, fromCmd bool) (tea.Model, tea.Cmd) {
+	switch {
+	case r.Confirmed:
+		if r.ToolInput != "" {
+			if err := platform.OpenURL(r.ToolInput); err != nil {
+				m.out.WriteError("Failed to open browser: %v", err)
+			}
+		}
+		m.emitCommand(":mcp_auth " + r.ToolID + " yes")
+	case r.CtrlGCanceled:
+		m.out.ClearMCPAuths()
+		m.emitCommand(":mcp_cancel")
+	default:
+		if fromCmd {
+			m.input.SetValue("")
+		}
+		m.emitCommand(":mcp_auth " + r.ToolID + " no")
+	}
+	m.restoreFocusAfterConfirm()
+	return m, scheduleTick()
 }
 
 // restoreFocusAfterConfirm restores input/display focus only if no overlay
@@ -212,76 +278,6 @@ func (m *Terminal) restoreFocusAfterConfirm() {
 		return
 	}
 	m.restoreFocus()
-}
-
-// handleConfirmCanceled handles the cancel path of a confirm dialog result.
-func (m *Terminal) handleConfirmCanceled(kind ConfirmKind, toolID string, fromCmd bool, ctrlGCanceled bool) (tea.Model, tea.Cmd) {
-	if fromCmd {
-		m.input.SetValue("")
-	}
-
-	switch kind {
-	case ConfirmTool:
-		m.emitCommand(":confirm " + toolID + " no")
-		m.restoreFocusAfterConfirm()
-		if id, toolName, toolInput, ok := m.out.GetPendingToolConfirm(); ok {
-			m.openConfirmTool(id, toolName, toolInput)
-		}
-		return m, scheduleTick()
-
-	case ConfirmMCPAuth:
-		if toolID != "" {
-			if ctrlGCanceled {
-				// Ctrl+G: cancel entire MCP initialization.
-				m.out.ClearMCPAuths()
-				m.emitCommand(":mcp_cancel")
-			} else {
-				// n/Esc: decline this specific server.
-				m.emitCommand(":mcp_auth " + toolID + " no")
-			}
-		}
-		return m, scheduleTick()
-	}
-
-	m.restoreFocusAfterConfirm()
-	return m, nil
-}
-
-// handleConfirmConfirmed handles the confirm (yes) path of a confirm dialog result.
-func (m *Terminal) handleConfirmConfirmed(kind ConfirmKind, toolID string, fromCmd bool) (tea.Model, tea.Cmd) {
-	switch kind {
-	case ConfirmQuit:
-		m.quitting = true
-		m.streamInput.Close()
-		m.out.Close()
-		return m, tea.Quit
-
-	case ConfirmCancel:
-		if fromCmd {
-			m.input.SetValue("")
-		}
-		m.restoreFocusAfterConfirm()
-		return m, m.submitCommand("cancel", fromCmd)
-
-	case ConfirmTool:
-		m.emitCommand(":confirm " + toolID + " yes")
-		m.restoreFocusAfterConfirm()
-		if nextID, nextName, nextInput, ok := m.out.GetPendingToolConfirm(); ok {
-			m.openConfirmTool(nextID, nextName, nextInput)
-		}
-		return m, scheduleTick()
-
-	case ConfirmMCPAuth:
-		// User said yes — emit command and close.
-		// The init overlay (mcpInitOverlay) is a separate widget that
-		// stays open behind the confirm dialog — it's still visible.
-		if toolID != "" {
-			m.emitCommand(":mcp_auth " + toolID + " yes")
-		}
-		m.restoreFocusAfterConfirm()
-		return m, scheduleTick()
-	}
-	return m, nil
 }
 
 // handleOverlayModelSelector handles keyboard input when the model selector is open.

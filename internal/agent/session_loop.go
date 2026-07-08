@@ -103,9 +103,9 @@ func (s *Session) handleMCPEvent(evt *mcp.InitEvent) {
 		s.mcpService.sendSystemMsg(action.SystemMsg)
 	}
 
-	// Log errors.
-	for _, e := range action.Errors {
-		s.writeError(fmt.Sprintf("MCP: %v", e))
+	// Display InitFailed errors in the chat window.
+	if evt.Type == mcp.InitFailed && evt.Error != "" {
+		s.writeError(fmt.Sprintf("MCP: %v", evt.Error))
 	}
 
 	// Apply InitDone results.

@@ -31,7 +31,10 @@ import (
 	"sync"
 
 	"github.com/alayacore/alayacore/internal/llm"
+	"github.com/alayacore/alayacore/internal/mcp/auth"
 )
+
+var errSkipped = errors.New("skipped")
 
 // InitEvent covers everything that happens during MCP initialization.
 // The session receives these from Events() and reacts accordingly.
@@ -56,7 +59,6 @@ type InitEvent struct {
 	// Set for "done" — fully converted results
 	Tools       []llm.Tool
 	SysFragment string
-	Errors      []string
 	Manager     *Manager
 }
 
@@ -67,7 +69,6 @@ type serverResult struct {
 	resources []Resource
 	prompts   []Prompt
 	instrs    string
-	errs      []string
 }
 
 // Init orchestrates MCP initialization from start to finish.
@@ -238,39 +239,29 @@ func (init *Init) collectOAuthResult(ctx context.Context, c *Client) serverResul
 
 	init.sendEvent(InitEvent{Type: InitConnecting, Server: c.Name()})
 
-	// Register the confirm channel BEFORE sending "auth_confirm" to avoid
-	// a race: the session may receive the event and call Confirm() before
-	// the channel is registered, causing Confirm() to return false silently.
-	confirmCh := init.registerConfirmCh(c.Name())
-	init.sendEvent(InitEvent{Type: InitAuthConfirm, Server: c.Name(), URL: c.config.URL})
+	cfg := c.config.Auth
 
-	var allow bool
-	select {
-	case allow = <-confirmCh:
-	case <-ctx.Done():
-		return r
-	}
-
-	init.mu.Lock()
-	delete(init.confirmChs, c.Name())
-	init.mu.Unlock()
-
-	if !allow {
-		init.sendEvent(InitEvent{Type: InitFailed, Server: c.Name(), Error: fmt.Sprintf("%q: skipped", c.Name())})
-		return r
-	}
-
-	init.sendEvent(InitEvent{Type: InitAuthRunning, Server: c.Name()})
-
-	sa := NewServerAuth(c)
-	tools, err := sa.Run(ctx)
+	// 1. Discover authorization server metadata.
+	meta, clientID, err := resolveAuthConfig(ctx, cfg, c.config.URL)
 	if err != nil {
-		if errors.Is(err, context.Canceled) {
-			init.sendEvent(InitEvent{Type: InitFailed, Server: c.Name(), Error: fmt.Sprintf("%q: skipped", c.Name())})
-		} else {
-			r.errs = append(r.errs, err.Error())
-			init.sendEvent(InitEvent{Type: InitFailed, Server: c.Name(), Error: err.Error()})
+		init.sendEvent(InitEvent{Type: InitFailed, Server: c.Name(), Error: fmt.Errorf("%q: %w", c.Name(), err).Error()})
+		return r
+	}
+
+	cfg.TokenEndpoint = meta.TokenEndpoint
+	cfg.ClientID = clientID
+
+	// 2. Register confirm channel, then run OAuth flow.
+	//    onAuthURL sends auth_confirm to the adapter and blocks until
+	//    the user confirms or denies.
+	confirmCh := init.registerConfirmCh(c.Name())
+	tools, err := init.runOAuthForServer(ctx, c, meta, clientID, confirmCh)
+	if err != nil {
+		msg := err.Error()
+		if errors.Is(err, errSkipped) {
+			msg = fmt.Sprintf("%q: skipped", c.Name())
 		}
+		init.sendEvent(InitEvent{Type: InitFailed, Server: c.Name(), Error: msg})
 		return r
 	}
 
@@ -280,27 +271,124 @@ func (init *Init) collectOAuthResult(ctx context.Context, c *Client) serverResul
 	return r
 }
 
+// runOAuthForServer runs the OAuth flow for a single server.
+func (init *Init) runOAuthForServer(ctx context.Context, c *Client, meta *auth.ASMetadata, clientID string, confirmCh chan bool) ([]Tool, error) {
+	cfg := c.config.Auth
+
+	pkce, err := auth.NewPKCE()
+	if err != nil {
+		return nil, fmt.Errorf("%q: pkce: %w", c.Name(), err)
+	}
+
+	state := auth.RandomState()
+	resultCh, redirectURI, cleanup := auth.StartCallbackServer(state)
+	defer cleanup()
+
+	authURL, err := auth.BuildAuthorizationURL(meta, &auth.AuthCodeConfig{
+		ClientID:     clientID,
+		ClientSecret: cfg.ClientSecret,
+		Scopes:       cfg.Scopes,
+		Resource:     c.config.URL,
+	}, pkce, redirectURI, state)
+	if err != nil {
+		return nil, fmt.Errorf("%q: build auth URL: %w", c.Name(), err)
+	}
+
+	// Send URL to adapter and wait for user confirmation.
+	init.sendEvent(InitEvent{Type: InitAuthConfirm, Server: c.Name(), URL: authURL})
+
+	var allow bool
+	select {
+	case allow = <-confirmCh:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+
+	init.mu.Lock()
+	delete(init.confirmChs, c.Name())
+	init.mu.Unlock()
+
+	if !allow {
+		return nil, errSkipped
+	}
+
+	init.sendEvent(InitEvent{Type: InitAuthRunning, Server: c.Name()})
+
+	// Wait for OAuth callback.
+	var code string
+	select {
+	case res := <-resultCh:
+		if res.Err != nil {
+			return nil, fmt.Errorf("%q: callback: %w", c.Name(), res.Err)
+		}
+		code = res.Code
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+
+	oauthToken, err := auth.ExchangeCode(ctx, meta, &auth.AuthCodeConfig{
+		ClientID:     clientID,
+		ClientSecret: cfg.ClientSecret,
+		Scopes:       cfg.Scopes,
+		Resource:     c.config.URL,
+	}, pkce, redirectURI, code)
+	if err != nil {
+		return nil, fmt.Errorf("%q: exchange code: %w", c.Name(), err)
+	}
+
+	if oauthToken.AccessToken == "" {
+		return nil, fmt.Errorf("%q: OAuth returned empty access token", c.Name())
+	}
+
+	// Persist token.
+	token := &auth.Token{
+		AccessToken:   oauthToken.AccessToken,
+		TokenType:     oauthToken.TokenType,
+		RefreshToken:  oauthToken.RefreshToken,
+		ExpiresAt:     oauthToken.ExpiresAt,
+		Scopes:        oauthToken.Scopes,
+		TokenEndpoint: meta.TokenEndpoint,
+		ClientID:      clientID,
+	}
+	if c.tokenStore != nil {
+		_ = c.tokenStore.SaveToken(c.Name(), token) // non-fatal
+	}
+	cfg.obtainedToken = token
+
+	// Reconnect with the obtained token.
+	c.resetState()
+	if err := c.Connect(ctx); err != nil {
+		cfg.obtainedToken = nil
+		return nil, fmt.Errorf("%q: connect after auth: %w", c.Name(), err)
+	}
+
+	// Discover tools.
+	if !c.HasTools() {
+		return nil, nil
+	}
+	return c.ListTools(ctx)
+}
+
 // discoverCapabilities discovers tools (if not already done), resources,
-// and prompts for a connected server. Results are stored in the result
-// struct directly — no shared state needed since each goroutine has its own.
+// and prompts for a connected server.
 func (init *Init) discoverCapabilities(ctx context.Context, c *Client, r *serverResult) {
 	if c.HasTools() && len(r.tools) == 0 {
 		if tools, err := c.ListTools(ctx); err != nil {
-			r.errs = append(r.errs, fmt.Sprintf("list tools for %q: %v", c.Name(), err))
+			init.sendEvent(InitEvent{Type: InitFailed, Server: c.Name(), Error: fmt.Sprintf("list tools: %v", err)})
 		} else {
 			r.tools = tools
 		}
 	}
 	if c.HasResources() {
 		if resources, err := c.ListResources(ctx); err != nil {
-			r.errs = append(r.errs, fmt.Sprintf("list resources for %q: %v", c.Name(), err))
+			init.sendEvent(InitEvent{Type: InitFailed, Server: c.Name(), Error: fmt.Sprintf("list resources: %v", err)})
 		} else {
 			r.resources = resources
 		}
 	}
 	if c.HasPrompts() {
 		if prompts, err := c.ListPrompts(ctx); err != nil {
-			r.errs = append(r.errs, fmt.Sprintf("list prompts for %q: %v", c.Name(), err))
+			init.sendEvent(InitEvent{Type: InitFailed, Server: c.Name(), Error: fmt.Sprintf("list prompts: %v", err)})
 		} else {
 			r.prompts = prompts
 		}
@@ -315,7 +403,6 @@ func (init *Init) discoverCapabilities(ctx context.Context, c *Client, r *server
 // then writes them into evt.
 func (init *Init) buildFinalResults(results map[string]serverResult, evt *InitEvent) {
 	var allTools []llm.Tool
-	var allErrs []string
 	var frag strings.Builder
 
 	for _, cfg := range init.configs {
@@ -323,7 +410,6 @@ func (init *Init) buildFinalResults(results map[string]serverResult, evt *InitEv
 		if !ok {
 			continue
 		}
-		allErrs = append(allErrs, r.errs...)
 
 		if len(r.tools) > 0 {
 			serverTools := ToolsToAgentTools(map[string][]Tool{cfg.Name: r.tools}, init.manager)
@@ -348,7 +434,6 @@ func (init *Init) buildFinalResults(results map[string]serverResult, evt *InitEv
 	evt.Type = InitDone
 	evt.Tools = allTools
 	evt.SysFragment = frag.String()
-	evt.Errors = allErrs
 	evt.Manager = init.manager
 }
 
