@@ -24,8 +24,11 @@ UV  → stdin   User video (data:video/...;base64,... or URL)
 UA  → stdin   User audio (data:audio/...;base64,... or URL)
 UD  → stdin   User document (data:application/...;base64,... or URL)
 UE  → stdin   User message end — flushes staged content as a single message
-AT  ← stdout  Assistant text (delta: \x00<id>\x00<content>)
-AR  ← stdout  Assistant reasoning (delta: \x00<id>\x00<content>)
+At  ← stdout  Assistant text (streaming delta: \x00<id>\x00<content>)
+Ar  ← stdout  Assistant reasoning (streaming delta: \x00<id>\x00<content>)
+Af  ← stdout  Function/tool argument (streaming delta: \x00<id>\x00<JSON>)
+AT  ← stdout  Assistant text (complete/authoritative: \x00<id>\x00<content>)
+AR  ← stdout  Assistant reasoning (complete/authoritative: \x00<id>\x00<content>)
 AF  ← stdout  Function/tool lifecycle (\x00<id>\x00<JSON>)
 UF  ← stdout  Function/tool result (\x00<id>\x00<JSON>)
 SM  ← stdout  System message, no history ID (JSON: {"type":"...","data":{...}})
@@ -48,15 +51,22 @@ Each tag is two characters: **role** + **type**.
 
 | Second letter | Type | Examples |
 |---|---|---|
-| `T` | **T**ext | UT, AT |
+| `T` | **T**ext | UT, AT, At |
 | `I` | **I**mage | UI |
 | `V` | **V**ideo | UV |
 | `A` | **A**udio | UA |
 | `D` | **D**ocument | UD |
-| `R` | **R**easoning | AR |
-| `F` | **F**unction/tool | AF, UF |
+| `R` | **R**easoning | AR, Ar |
+| `F` | **F**unction/tool | AF, UF, Af |
 | `E` | **E**nd (flush) | UE |
 | `M` | **M**essage | SM |
+
+**Case convention:** Uppercase tags carry complete/authoritative content.
+Lowercase tags carry streaming delta (incremental) content:
+- `At`/`Ar` — text/reasoning deltas, appended to the window per chunk
+- `AT`/`AR` — complete text/reasoning, replaces the accumulated delta content (useful for replay)
+- `Af` — tool argument delta, partial JSON chunk during streaming
+- `AF` — complete tool call (start + input frames)
 
 The role indicates who the content belongs to in the conversation, **not** the
 direction of the message. For example, UF is a function result (user-role
@@ -81,9 +91,9 @@ The adapter must be prepared to **receive** user tags on stdout in these scenari
 > Both the terminal adapter (`internal/adapters/terminal/output.go`) and the plainio
 > adapter (`internal/adapters/plainio/output.go`) handle user tags from stdout.
 
-## Delta Messages (AT, AR)
+## Delta Messages (At, Ar)
 
-AT and AR use NUL-delimited history IDs for **incremental streaming**:
+Streaming content uses **lowercase** tags (`At`, `Ar`) with NUL-delimited history IDs:
 
 ```
 \x00<history-id>\x00<content>
@@ -92,12 +102,18 @@ AT and AR use NUL-delimited history IDs for **incremental streaming**:
 The same history ID can appear multiple times — each subsequent frame is a
 continuation (delta) of that content block. The adapter concatenates them.
 
+**Complete/authoritative frames** use **uppercase** tags (`AT`, `AR`). These are
+sent after all deltas for a content block have been received. During live
+streaming the adapter already has the content from the deltas and may skip the
+complete frame. During replay (session load) only the uppercase frames are sent;
+no deltas precede them.
+
 **History ID format:** a flat monotonic history counter (e.g. `1`, `2`, `3`).
 Each content block (text, reasoning, tool call, user content part) receives a
 unique ID from this counter.
 
 **History ID:**
-- Same history ID → content is a continuation of that stream (AT/AR only)
+- Same history ID → content is a continuation of that stream (At/Ar only)
 - Different history ID → different content block
 - No NUL prefix → plain text, no history ID
 
@@ -114,7 +130,8 @@ into a single user message. Other tag types use different grouping mechanisms:
 | Tags | Grouping mechanism |
 |------|-------------------|
 | UT, UI, UV, UA, UD (stdout) | **Position** — consecutive frames belong to one message; a non-user tag starts the next |
-| AT, AR | **History ID** — same ID = same stream (delta concatenation) |
+| At, Ar | **History ID** — same ID = same stream (delta concatenation) |
+| Af | **JSON `"id"`** — partial JSON chunk for the named tool call |
 | AF | **History ID** (start+input share same ID) + **JSON `"id"`** — start announces name, input carries arguments |
 | UF | **JSON `"id"`** — matches the corresponding AF (history ID is present but not used for matching) |
 | SM | **None** — each frame is standalone |
@@ -138,13 +155,14 @@ All stdout content frames carry a NUL-delimited history ID (`\x00<id>\x00`). For
 AF/UF the history ID identifies the content block; tool matching uses the JSON
 `"id"` field.
 
-**AF** — function lifecycle (two frames live, one frame on replay):
+**AF** — function lifecycle (two or three frames live, one frame on replay):
 - `\x00<id>\x00{"id":"t1","name":"read_file"}` — tool name announced (start frame, no input yet)
+- `\x00<id>\x00{"id":"t1","delta":"{\\"path\\":"}"` — partial JSON argument (delta frame, zero or more during streaming)
 - `\x00<id>\x00{"id":"t1","input":{...}}` — full tool arguments (input frame, name already known, same history ID as start)
 
-During live streaming `OnToolInputStart` and `OnToolInputComplete` share the same
-history ID (they belong to the same tool call). During session replay the tool
-call is a single AF frame with both `name` and `input`.
+During live streaming `OnToolInputStart` → `AF` start, `OnToolInputDelta` → `Af` (zero or more),
+and `OnToolInputComplete` → `AF` input share the same history ID (they belong to the same tool call).
+During session replay the tool call is a single AF frame with both `name` and `input`.
 
 **UF** — function result:
 - `\x00<id>\x00{"id":"t1","output":[...]}` — succeeded (`is_error` omitted when `false`)
@@ -152,14 +170,27 @@ call is a single AF frame with both `name` and `input`.
 
 A tool call (AF) without a matching UF is still in progress. Each `.bin` sample below shows one frame in this lifecycle.
 
-## Example: Text Prompt Flow
+## Example: Text Prompt Flow (with streaming deltas)
 
 ```
 Adapter writes → stdin:        UT "Read the file main.go"
                                UE
 Session writes → stdout:       UT \x00 1 \x00 Read the file main.go        ← echo with history ID
                                AF \x00 2 \x00 {"id":"t1","name":"read_file"} ← non-user tag flushes user msg
-                               AF \x00 2 \x00 {"id":"t1","input":{"path":"main.go"}}  ← same ID as start
+                               Af \x00 2 \x00 {"id":"t1","delta":"{\\"path\\":"} ← partial arg delta
+                               Af \x00 2 \x00 {"id":"t1","delta":"\\"main.go\\"}"}  ← more args
+                               AF \x00 2 \x00 {"id":"t1","input":{"path":"main.go"}}  ← complete args
+                               UF \x00 3 \x00 {"id":"t1","output":[{"text":"package main...","type":"text"}]}
+                               At \x00 4 \x00 Here's what main.go does...    ← streaming text delta
+                               AT \x00 4 \x00 Here's what main.go does...    ← authoritative complete
+                               SM {"type":"task","data":{"in_progress":false,"context":1500}}
+```
+
+## Example: Text Prompt Flow (replay, no deltas)
+
+```
+Session writes → stdout:       UT \x00 1 \x00 Read the file main.go
+                               AF \x00 2 \x00 {"id":"t1","name":"read_file","input":{"path":"main.go"}}
                                UF \x00 3 \x00 {"id":"t1","output":[{"text":"package main...","type":"text"}]}
                                AT \x00 4 \x00 Here's what main.go does...
                                SM {"type":"task","data":{"in_progress":false,"context":1500}}
@@ -175,7 +206,7 @@ Adapter writes → stdin:        UI data:image/jpeg;base64,...
 Session writes → stdout:       UI \x00 1 \x00 data:image/jpeg;base64,...
                                UI \x00 2 \x00 data:image/png;base64,...
                                UT \x00 3 \x00 What's in these images?
-                               AT \x00 4 \x00 These images contain...
+                               AT \x00 4 \x00 These images contain...         ← complete (live or replay)
 ```
 
 The three user frames (IDs 1, 2, 3) are accumulated into one user message.
