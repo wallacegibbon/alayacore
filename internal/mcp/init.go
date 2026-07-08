@@ -74,8 +74,9 @@ type serverResult struct {
 // Init orchestrates MCP initialization from start to finish.
 // Thread-safe: all public methods are safe to call from any goroutine.
 type Init struct {
-	manager *Manager
-	configs []ServerConfig
+	manager      *Manager
+	configs      []ServerConfig
+	callbackAddr string
 
 	events  chan InitEvent // session reads from this
 	done    chan struct{}
@@ -93,12 +94,20 @@ type Init struct {
 // NewInit creates an Init from server configurations.
 // Call Start() to begin initialization.
 func NewInit(configs []ServerConfig) *Init {
+	addr := "127.0.0.1:0"
+	for _, cfg := range configs {
+		if cfg.CallbackAddr != "" {
+			addr = cfg.CallbackAddr
+			break
+		}
+	}
 	return &Init{
-		manager:    NewManager(configs),
-		configs:    configs,
-		events:     make(chan InitEvent, 64),
-		done:       make(chan struct{}),
-		confirmChs: make(map[string]chan bool),
+		manager:      NewManager(configs),
+		configs:      configs,
+		callbackAddr: addr,
+		events:       make(chan InitEvent, 64),
+		done:         make(chan struct{}),
+		confirmChs:   make(map[string]chan bool),
 	}
 }
 
@@ -255,7 +264,7 @@ func (init *Init) collectOAuthResult(ctx context.Context, c *Client) serverResul
 	//    onAuthURL sends auth_confirm to the adapter and blocks until
 	//    the user confirms or denies.
 	confirmCh := init.registerConfirmCh(c.Name())
-	tools, err := init.runOAuthForServer(ctx, c, meta, clientID, confirmCh)
+	tools, err := init.runOAuthForServer(ctx, c, meta, clientID, confirmCh, init.callbackAddr)
 	if err != nil {
 		msg := err.Error()
 		if errors.Is(err, errSkipped) {
@@ -272,7 +281,7 @@ func (init *Init) collectOAuthResult(ctx context.Context, c *Client) serverResul
 }
 
 // runOAuthForServer runs the OAuth flow for a single server.
-func (init *Init) runOAuthForServer(ctx context.Context, c *Client, meta *auth.ASMetadata, clientID string, confirmCh chan bool) ([]Tool, error) {
+func (init *Init) runOAuthForServer(ctx context.Context, c *Client, meta *auth.ASMetadata, clientID string, confirmCh chan bool, listenAddr string) ([]Tool, error) {
 	cfg := c.config.Auth
 
 	pkce, err := auth.NewPKCE()
@@ -281,7 +290,7 @@ func (init *Init) runOAuthForServer(ctx context.Context, c *Client, meta *auth.A
 	}
 
 	state := auth.RandomState()
-	resultCh, redirectURI, cleanup := auth.StartCallbackServer(state)
+	resultCh, redirectURI, cleanup := auth.StartCallbackServer(listenAddr, state)
 	defer cleanup()
 
 	authURL, err := auth.BuildAuthorizationURL(meta, &auth.AuthCodeConfig{

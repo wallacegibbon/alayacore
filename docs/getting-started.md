@@ -63,6 +63,7 @@ export ALAYACORE_SHELL=zsh
 | `--plainio` | `false` | Plain stdin/stdout mode — no TUI, for scripting and piping |
 | `--debug-api` | `false` | Write raw API requests and responses to a log file |
 | `--debug-mcp` | `false` | Write raw MCP JSON-RPC messages to a log file |
+| `--oauth-callback-addr` | `127.0.0.1:0` | Listen `address` for OAuth callback server. Use the core's external IP if the browser runs on a different machine |
 | `--version` | — | Print version and exit |
 | `--help` | — | Print help and exit |
 

@@ -92,17 +92,18 @@ func (s *stringSlice) Get() []string {
 // Settings holds all CLI configuration
 type Settings struct {
 	// Core
-	ShowVersion   bool
-	PlainIO       bool
-	RawIO         bool
-	DebugAPI      bool
-	DebugMCP      bool
-	ModelConfig   string // derived from config-path + "model.conf"
-	RuntimeConfig string // derived from config-path + "runtime.conf"
-	MCPConfigPath string // derived from config-path + "mcp.conf"
-	ThemesFolder  string // derived from config-path + "themes"
-	Skills        []string
-	Session       string
+	ShowVersion       bool
+	PlainIO           bool
+	RawIO             bool
+	DebugAPI          bool
+	DebugMCP          bool
+	OAuthCallbackAddr string
+	ModelConfig       string // derived from config-path + "model.conf"
+	RuntimeConfig     string // derived from config-path + "runtime.conf"
+	MCPConfigPath     string // derived from config-path + "mcp.conf"
+	ThemesFolder      string // derived from config-path + "themes"
+	Skills            []string
+	Session           string
 
 	// Model selection
 	ModelName string
@@ -135,6 +136,7 @@ func Parse() *Settings {
 	rawIO := flag.Bool("rawio", false, "Use raw TLV stdin/stdout mode instead of terminal UI (pipe TLV frames directly)")
 	debugAPI := flag.Bool("debug-api", false, "Write raw API requests and responses to log file")
 	debugMCP := flag.Bool("debug-mcp", false, "Write raw MCP JSON-RPC messages to log file")
+	oauthCallbackAddr := flag.String("oauth-callback-addr", "", "Listen `address` for OAuth callback server. If the browser runs on a different machine, use the core's external IP (e.g., \"192.168.1.5:0\")")
 	configPath := flag.String("config-path", defaultConfigPath, "Config directory `path` (contains model.conf, runtime.conf, themes/)")
 	modelName := flag.String("model", "", "Model `name` to activate (must exist in model config; overrides runtime config)")
 	skill := &stringSlice{}
@@ -177,24 +179,25 @@ func Parse() *Settings {
 	}
 
 	s := &Settings{
-		ShowVersion:   *showVersion,
-		PlainIO:       *plainIO,
-		RawIO:         *rawIO,
-		DebugAPI:      *debugAPI,
-		DebugMCP:      *debugMCP,
-		ModelConfig:   filepath.Join(cp, "model.conf"),
-		RuntimeConfig: filepath.Join(cp, "runtime.conf"),
-		MCPConfigPath: filepath.Join(cp, "mcp.conf"),
-		ThemesFolder:  filepath.Join(cp, "themes"),
-		Skills:        skill.Get(),
-		Session:       *session,
-		ModelName:     *modelName,
-		Proxy:         *proxy,
-		SystemPrompt:  mergedSystemPrompt(systemPrompt),
-		MaxSteps:      *maxSteps,
-		AutoSummarize: *autoSummarize,
-		ToolConfirm:   parseToolConfirm(*toolConfirm),
-		BuiltinTools:  builtinToolsFilter,
+		ShowVersion:       *showVersion,
+		PlainIO:           *plainIO,
+		RawIO:             *rawIO,
+		DebugAPI:          *debugAPI,
+		DebugMCP:          *debugMCP,
+		OAuthCallbackAddr: *oauthCallbackAddr,
+		ModelConfig:       filepath.Join(cp, "model.conf"),
+		RuntimeConfig:     filepath.Join(cp, "runtime.conf"),
+		MCPConfigPath:     filepath.Join(cp, "mcp.conf"),
+		ThemesFolder:      filepath.Join(cp, "themes"),
+		Skills:            skill.Get(),
+		Session:           *session,
+		ModelName:         *modelName,
+		Proxy:             *proxy,
+		SystemPrompt:      mergedSystemPrompt(systemPrompt),
+		MaxSteps:          *maxSteps,
+		AutoSummarize:     *autoSummarize,
+		ToolConfirm:       parseToolConfirm(*toolConfirm),
+		BuiltinTools:      builtinToolsFilter,
 	}
 
 	return s

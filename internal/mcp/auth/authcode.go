@@ -30,14 +30,14 @@ type CallbackResult struct {
 	Err  error
 }
 
-// StartCallbackServer starts a local HTTP server on 127.0.0.1 at a random port
-// to receive the OAuth authorization code callback. It validates the state
-// parameter to prevent CSRF attacks.
+// StartCallbackServer starts a local HTTP server to receive the OAuth
+// authorization code callback. It validates the state parameter to prevent
+// CSRF attacks.
 //
-// Returns a channel that receives the callback result, a redirect URI for the
-// authorization request, and a cleanup function that shuts down the server.
-func StartCallbackServer(state string) (<-chan CallbackResult, string, func()) {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+// listenAddr is the TCP address to bind to (e.g., "127.0.0.1:0" for
+// loopback with random port, "0.0.0.0:0" for all interfaces).
+func StartCallbackServer(listenAddr, state string) (<-chan CallbackResult, string, func()) {
+	listener, err := net.Listen("tcp", listenAddr)
 	if err != nil {
 		ch := make(chan CallbackResult, 1)
 		ch <- CallbackResult{Err: fmt.Errorf("callback listener: %w", err)}
@@ -54,7 +54,14 @@ func StartCallbackServer(state string) (<-chan CallbackResult, string, func()) {
 		return ch, "", func() {}
 	}
 	port := addr.Port
-	redirectURI := fmt.Sprintf("http://127.0.0.1:%d/callback", port)
+
+	// Use the listen host for the redirect URI, but fall back to
+	// loopback if bound to all interfaces (0.0.0.0 or empty host).
+	redirectHost := addr.IP.String()
+	if redirectHost == "" || addr.IP.IsUnspecified() {
+		redirectHost = "127.0.0.1"
+	}
+	redirectURI := fmt.Sprintf("http://%s:%d/callback", redirectHost, port)
 
 	resultCh := make(chan CallbackResult, 1)
 

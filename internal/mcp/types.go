@@ -460,6 +460,11 @@ type ServerConfig struct {
 
 	// Debug enables logging of raw JSON-RPC messages to a file.
 	Debug bool
+
+	// CallbackAddr is the listen address for the OAuth callback server.
+	// Default "127.0.0.1:0" (loopback, random port). Use "0.0.0.0:0" if the
+	// browser runs on a different machine than the core.
+	CallbackAddr string
 }
 
 // AuthType enumerates the supported OAuth authentication modes.

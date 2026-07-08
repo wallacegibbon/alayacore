@@ -178,6 +178,9 @@ func initMCPAsync(cfg *config.Settings) (*mcp.Init, []string) {
 	// Set debug mode from global config.
 	for i := range mcpConfigs {
 		mcpConfigs[i].Debug = cfg.DebugMCP
+		if cfg.OAuthCallbackAddr != "" {
+			mcpConfigs[i].CallbackAddr = cfg.OAuthCallbackAddr
+		}
 	}
 
 	// Set up token persistence for all MCP servers.
