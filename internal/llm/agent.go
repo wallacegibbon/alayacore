@@ -51,6 +51,9 @@ type Agent struct {
 
 // NewAgent creates a new agent
 func NewAgent(config AgentConfig) *Agent {
+	if config.MaxSteps == 0 {
+		config.MaxSteps = math.MaxInt
+	}
 	return &Agent{config: config}
 }
 
@@ -119,13 +122,7 @@ func (a *Agent) Stream(ctx context.Context, contents []ContentPart, callbacks St
 
 	var totalUsage Usage
 
-	// 0 means unlimited, map to MaxInt so the loop runs as long as needed.
-	maxSteps := a.config.MaxSteps
-	if maxSteps == 0 {
-		maxSteps = math.MaxInt
-	}
-
-	for step := 1; step <= maxSteps; step++ {
+	for step := 1; step <= a.config.MaxSteps; step++ {
 		if callbacks.OnStepStart != nil {
 			if err := callbacks.OnStepStart(step); err != nil {
 				return nil, err
@@ -153,16 +150,11 @@ func (a *Agent) Stream(ctx context.Context, contents []ContentPart, callbacks St
 		totalUsage.InputTokens += stepUsage.InputTokens
 		totalUsage.OutputTokens += stepUsage.OutputTokens
 
-		// stepContents has no tool calls → no more tooluse.
-		// Check: if stepContents has no ToolInputParts and has ToolOutputParts,
-		// that's the final step with results. If no tool-related parts at all,
-		// it's a text-only response.
-		if truncated || !hasToolInputs(stepContents) {
-			result := &StreamResult{Contents: allContents, Usage: totalUsage}
-			if truncated {
-				return result, ErrResponseTruncated
-			}
-			return result, nil
+		if truncated {
+			return &StreamResult{Contents: allContents, Usage: totalUsage}, ErrResponseTruncated
+		}
+		if !hasToolInputs(stepContents) {
+			return &StreamResult{Contents: allContents, Usage: totalUsage}, nil
 		}
 	}
 
@@ -226,7 +218,6 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 
 		case ToolInputCompleteEvent:
 			id := getOrAssignID(callbacks, idByIndex, e.Index)
-
 			// Repair tool input before processing (Patterns 1-4).
 			repairToolInput(&e.Input, nameByIndex[e.Index], a.config.Tools)
 
