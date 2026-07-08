@@ -10,11 +10,16 @@
 //   - UA: User audio
 //   - UD: User document
 //   - UE: User message end
-//   - AT: Assistant text
-//   - AR: Assistant reasoning
-//   - AF: Assistant function (tool call)
-//   - UF: User function (tool result)
+//   - AT: Assistant text (complete/authoritative)
+//   - AR: Assistant reasoning (complete/authoritative)
+//   - AF: Assistant function / tool call (complete/authoritative)
+//   - UF: User function / tool result
 //   - SM: System message
+//
+// Lowercase tags carry streaming delta / incremental content:
+//   - At: Assistant text delta (streaming fragment)
+//   - Ar: Assistant reasoning delta (streaming fragment)
+//   - Af: Assistant function / tool call delta (partial JSON argument)
 package tlv
 
 import (
@@ -25,9 +30,9 @@ import (
 
 // TLV tag constants - these are sent over the wire.
 const (
-	TagAssistantR = "AR" // Reasoning/thinking content
-	TagAssistantT = "AT" // Assistant text output
-	TagAssistantF = "AF" // JSON: id, type, name, input, status (function arguments)
+	TagAssistantR = "AR" // Reasoning/thinking content (complete)
+	TagAssistantT = "AT" // Assistant text output (complete)
+	TagAssistantF = "AF" // JSON: id, type, name, input, status (function arguments, complete)
 	TagUserT      = "UT" // User text input
 	TagUserF      = "UF" // JSON: id, output, status (function result)
 	TagUserI      = "UI" // User image — data:image/...;base64,... or URL
@@ -38,6 +43,11 @@ const (
 	TagUserEnd = "UE" // User message end — flushes staged content as one window
 
 	TagSystemMsg = "SM" // System message JSON: {"type":"...","data":{...}}
+
+	// Lowercase tags for streaming delta / incremental content.
+	TagAssistantTDelta = "At" // Assistant text delta (streaming fragment)
+	TagAssistantRDelta = "Ar" // Assistant reasoning delta (streaming fragment)
+	TagAssistantFDelta = "Af" // Assistant function / tool call delta (partial JSON argument)
 )
 
 const maxMessageSize = 1<<31 - 1 // Max int32 to fit in uint32

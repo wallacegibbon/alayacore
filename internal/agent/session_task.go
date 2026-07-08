@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -224,15 +225,15 @@ func (s *Session) handleToolOutput(toolCallID string, contents []llm.ContentPart
 	return nil
 }
 
-// handleTextDelta streams assistant text deltas to the output.
-func (s *Session) handleTextDelta(delta string, historyID uint64) error {
-	s.writeTLVWithID(tlv.TagAssistantT, historyID, delta)
+// handleTextComplete writes the complete authoritative text to the output.
+func (s *Session) handleTextComplete(text string, historyID uint64) error {
+	s.writeTLVWithID(tlv.TagAssistantT, historyID, text)
 	return nil
 }
 
-// handleReasoningDelta streams assistant reasoning deltas to the output.
-func (s *Session) handleReasoningDelta(delta string, historyID uint64) error {
-	s.writeTLVWithID(tlv.TagAssistantR, historyID, delta)
+// handleReasoningComplete writes the complete authoritative reasoning to the output.
+func (s *Session) handleReasoningComplete(text string, historyID uint64) error {
+	s.writeTLVWithID(tlv.TagAssistantR, historyID, text)
 	return nil
 }
 
@@ -272,6 +273,58 @@ func (s *Session) handleStepStart(step int) error {
 	return nil
 }
 
+// deltaWriter writes streaming delta frames directly to the TLV output,
+// bypassing the session layer. Delta frames are ephemeral and not persisted.
+// It also tracks tool calls that receive Af deltas so it can send error
+// UF frames on cancellation.
+type deltaWriter struct {
+	output       io.Writer
+	pendingTools map[string]uint64 // toolCallID → historyID for tools with Af but no AF complete
+}
+
+func (dw *deltaWriter) handleTextDelta(delta string, historyID uint64) error {
+	return tlv.WriteTLV(dw.output, tlv.TagAssistantTDelta, tlv.WrapID(strconv.FormatUint(historyID, 10), delta))
+}
+
+func (dw *deltaWriter) handleReasoningDelta(delta string, historyID uint64) error {
+	return tlv.WriteTLV(dw.output, tlv.TagAssistantRDelta, tlv.WrapID(strconv.FormatUint(historyID, 10), delta))
+}
+
+func (dw *deltaWriter) handleToolInputDelta(toolCallID, delta string, historyID uint64) error {
+	if dw.pendingTools == nil {
+		dw.pendingTools = make(map[string]uint64)
+	}
+	dw.pendingTools[toolCallID] = historyID
+	data, err := json.Marshal(protocol.ToolInputDeltaData{ID: toolCallID, Delta: delta})
+	if err != nil {
+		return fmt.Errorf("failed to marshal tool input delta: %w", err)
+	}
+	return tlv.WriteTLV(dw.output, tlv.TagAssistantFDelta, tlv.WrapID(strconv.FormatUint(historyID, 10), string(data)))
+}
+
+// completeTool marks a tool call as completed (received AF complete), so
+// it won't get an error UF on cleanup.
+func (dw *deltaWriter) completeTool(toolCallID string) {
+	delete(dw.pendingTools, toolCallID)
+}
+
+// flushErrors sends error ToolOutput frames for all pending tool calls
+// that never completed. Called when the stream ends with an error.
+func (dw *deltaWriter) flushErrors() {
+	for id, historyID := range dw.pendingTools {
+		data, err := json.Marshal(protocol.ToolOutputData{
+			ID:      id,
+			Output:  json.RawMessage(`[{"type":"text","text":"(canceled)"}]`),
+			IsError: true,
+		})
+		if err != nil {
+			continue
+		}
+		_ = tlv.WriteTLV(dw.output, tlv.TagUserF, tlv.WrapID(strconv.FormatUint(historyID, 10), string(data)))
+	}
+	dw.pendingTools = nil
+}
+
 func (s *Session) processPrompt(ctx context.Context, history []llm.ContentPart) ([]llm.ContentPart, int64, error) {
 	var fullContents []llm.ContentPart
 	var outputTokens int64
@@ -284,11 +337,22 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.ContentPart) 
 		return nil
 	}
 
+	dw := &deltaWriter{output: s.Output}
+
+	// Wrap OnToolInputComplete to track completed tools.
+	onToolInputComplete := func(toolCallID string, input json.RawMessage, historyID uint64) error {
+		dw.completeTool(toolCallID)
+		return s.handleToolInputComplete(toolCallID, input, historyID)
+	}
+
 	_, err := s.Agent().Stream(ctx, history, llm.StreamCallbacks{
-		OnTextDelta:         s.handleTextDelta,
-		OnReasoningDelta:    s.handleReasoningDelta,
+		OnTextDelta:         dw.handleTextDelta,
+		OnTextComplete:      s.handleTextComplete,
+		OnReasoningDelta:    dw.handleReasoningDelta,
+		OnReasoningComplete: s.handleReasoningComplete,
 		OnToolInputStart:    s.handleToolInputStart,
-		OnToolInputComplete: s.handleToolInputComplete,
+		OnToolInputDelta:    dw.handleToolInputDelta,
+		OnToolInputComplete: onToolInputComplete,
 		OnToolOutput:        s.handleToolOutput,
 		OnToolConfirm:       s.handleToolConfirm,
 		ToolNeedsConfirm:    s.needsToolConfirm,
@@ -296,6 +360,11 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.ContentPart) 
 		OnStepFinish:        onStepFinish,
 		IDGen:               s.histIncAndGet,
 	})
+
+	// Clean up any tools that received deltas but never completed
+	// (e.g. canceled mid-streaming). This sends error UF frames
+	// so the UI turns their status from pending to error.
+	dw.flushErrors()
 
 	if err != nil {
 		return fullContents, 0, err

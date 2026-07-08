@@ -9,6 +9,8 @@ package terminal
 import (
 	"strings"
 
+	"charm.land/lipgloss/v2"
+
 	"github.com/alayacore/alayacore/internal/tlv"
 )
 
@@ -233,9 +235,14 @@ func (r *userRenderer) BuildInner(width int, _ bool, styles *Styles) (string, in
 type toolRenderer struct {
 	isUF   bool   // true for UF-only windows (no prior AF frame)
 	name   string // tool name (e.g. "read_file")
-	input  string // formatted tool call input
+	input  string // formatted tool call input (complete, from AF)
 	output string // tool execution output
 	status ToolStatus
+
+	// deltaBuffer accumulates partial JSON from Af frames during streaming.
+	// Not appended to window content — rendered as a one-line preview
+	// alongside the tool name in the pending state.
+	deltaBuffer string
 }
 
 func (r *toolRenderer) Tag() string { return tlv.TagAssistantF }
@@ -266,6 +273,13 @@ func (r *toolRenderer) AppendFromTLV(_ string, value string) {
 
 func (r *toolRenderer) Invalidate() {}
 
+// AppendDelta sets the latest partial JSON chunk for one-line preview.
+// Each call replaces the previous delta — the window shows only the
+// most recently received chunk alongside the tool name.
+func (r *toolRenderer) AppendDelta(delta string) {
+	r.deltaBuffer = delta
+}
+
 func (r *toolRenderer) BuildInner(width int, _ bool, styles *Styles) (string, int) {
 	innerWidth := max(0, width-BorderInnerPadding)
 
@@ -276,6 +290,25 @@ func (r *toolRenderer) BuildInner(width int, _ bool, styles *Styles) (string, in
 			styled = wrapContent(styled, innerWidth)
 		}
 		return styled, strings.Count(styled, "\n") + 1 + 2
+	}
+
+	// Input still streaming via Af deltas — show truncated one-line preview
+	// of accumulated arguments alongside the tool name.
+	if r.deltaBuffer != "" {
+		// Status dot uses its normal color, tool name uses Tool style (golden),
+		// colon and delta content use ToolContent style (muted), truncated to one line.
+		deltaContent := r.deltaBuffer
+		// Flatten delta to single line.
+		deltaContent = strings.ReplaceAll(deltaContent, "\n", " ")
+		deltaContent = strings.ReplaceAll(deltaContent, "\r", "")
+		// Truncate to fit available width (indicator + name + ": " + delta).
+		// Reserve ~5 chars for "• " and ": " and "…".
+		maxDelta := max(0, innerWidth-lipgloss.Width(r.name)-5)
+		if len(deltaContent) > maxDelta {
+			deltaContent = deltaContent[:maxDelta] + "…"
+		}
+		display := r.status.Indicator(styles) + styles.Tool.Render(r.name) + styles.ToolContent.Render(": "+deltaContent)
+		return display, strings.Count(display, "\n") + 1 + 2
 	}
 
 	// Full tool rendering: input (with indicator) + optional output

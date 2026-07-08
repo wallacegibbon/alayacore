@@ -135,18 +135,33 @@ func (to *outputWriter) writeColored(tag string, value string) {
 	}
 
 	switch tag {
-	// Text content tags — may carry NUL-delimited history ID for live deltas,
-	// or plain text when replayed from a saved session file.
-	case tlv.TagAssistantT, tlv.TagAssistantR:
+	// Streaming delta frames — incremental content appended to existing window.
+	// Use uppercase tag for styling (lowercase/uppercase share same display).
+	case tlv.TagAssistantTDelta, tlv.TagAssistantRDelta:
 		id, content, ok := tlv.UnwrapID(value)
 		if !ok {
-			// No history ID (e.g. replayed from session file) — each message
-			// gets its own window.
 			id = to.generateWindowID()
 			content = value
 		}
-		// Pass raw content - styling is applied during render
-		to.windowBuffer.AppendOrUpdate(tag, id, content)
+		// Map lowercase delta tag to uppercase for display styling.
+		displayTag := tlv.TagAssistantT
+		if tag == tlv.TagAssistantRDelta {
+			displayTag = tlv.TagAssistantR
+		}
+		to.windowBuffer.AppendOrUpdate(displayTag, id, content)
+
+	// Complete authoritative frames — content already delivered via deltas
+	// during live streaming, but carries the authoritative content during
+	// replay. Only display if no window exists yet (replay case).
+	case tlv.TagAssistantT, tlv.TagAssistantR:
+		id, content, ok := tlv.UnwrapID(value)
+		if !ok {
+			id = to.generateWindowID()
+			content = value
+		}
+		if !to.windowBuffer.HasWindow(id) {
+			to.windowBuffer.AppendOrUpdate(tag, id, content)
+		}
 
 	// User text tag — may carry NUL-delimited historyID
 	// User content tags — accumulated until next non-user tag triggers flush.
@@ -194,6 +209,23 @@ func (to *outputWriter) writeColored(tag string, value string) {
 
 		to.windowBuffer.HandleToolInputEvent(fd, parseHistoryID(id))
 
+	// Tool input delta — partial JSON arguments during streaming.
+	case tlv.TagAssistantFDelta:
+		id, payload, ok := tlv.UnwrapID(value)
+		if !ok {
+			payload = value
+		}
+		var fd protocol.ToolInputDeltaData
+		if err := json.Unmarshal([]byte(payload), &fd); err != nil {
+			return
+		}
+		// Resolve tool name from existing window if known.
+		name := ""
+		if info := to.windowBuffer.GetFunctionInfo(fd.ID); info != nil {
+			name = info.Name
+		}
+		to.windowBuffer.HandleToolInputDelta(fd.ID, name, fd.Delta, parseHistoryID(id))
+
 	// Function result (JSON: id, content, is_error)
 	// May carry NUL-delimited historyID prefix
 	case tlv.TagUserF:
@@ -226,7 +258,9 @@ func (to *outputWriter) writeColored(tag string, value string) {
 // after processing, so it doesn't need the early dirty flag from this function.
 func (to *outputWriter) triggerUpdateForTag(tag string) {
 	switch tag {
-	case tlv.TagAssistantT, tlv.TagAssistantR, tlv.TagAssistantF, tlv.TagUserT, tlv.TagUserF, tlv.TagUserI, tlv.TagUserV, tlv.TagUserA, tlv.TagUserD:
+	case tlv.TagAssistantT, tlv.TagAssistantR, tlv.TagAssistantF,
+		tlv.TagAssistantTDelta, tlv.TagAssistantRDelta, tlv.TagAssistantFDelta,
+		tlv.TagUserT, tlv.TagUserF, tlv.TagUserI, tlv.TagUserV, tlv.TagUserA, tlv.TagUserD:
 		to.dirty.Store(true)
 	}
 }

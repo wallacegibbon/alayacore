@@ -86,6 +86,13 @@ type ToolInputData struct {
 	Input json.RawMessage `json:"input,omitempty"`
 }
 
+// ToolInputDeltaData is the JSON payload for TagAssistantFDelta (Af).
+// Carries a partial JSON chunk of tool arguments during streaming.
+type ToolInputDeltaData struct {
+	ID    string `json:"id"`
+	Delta string `json:"delta"`
+}
+
 // ToolOutputData is the JSON payload for TagUserF (UF).
 // Output is a JSON array of content blocks (text, image, etc.).
 // IsError indicates whether the tool completed with an error.

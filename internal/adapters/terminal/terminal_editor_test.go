@@ -401,17 +401,17 @@ func TestCtrlUClearsInput(t *testing.T) {
 func TestWindowBufferDeltaRouting(t *testing.T) {
 	out := NewTerminalOutput(DefaultStyles())
 	// Write assistant text delta with history ID
-	err := tlv.WriteTLV(out, tlv.TagAssistantT, tlv.WrapID("1", "Hello"))
+	err := tlv.WriteTLV(out, tlv.TagAssistantTDelta, tlv.WrapID("1", "Hello"))
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
 	// Write another delta with same history ID
-	err = tlv.WriteTLV(out, tlv.TagAssistantT, tlv.WrapID("1", " world"))
+	err = tlv.WriteTLV(out, tlv.TagAssistantTDelta, tlv.WrapID("1", " world"))
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
 	// Write different history ID
-	err = tlv.WriteTLV(out, tlv.TagAssistantT, tlv.WrapID("2", "Another"))
+	err = tlv.WriteTLV(out, tlv.TagAssistantTDelta, tlv.WrapID("2", "Another"))
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
@@ -515,7 +515,7 @@ func TestWindowBufferNonDeltaMessages(t *testing.T) {
 func TestWindowBufferEdgeCases(t *testing.T) {
 	out := NewTerminalOutput(DefaultStyles())
 	// Delta message without valid NUL-delimited history ID (plain text)
-	err := tlv.WriteTLV(out, tlv.TagAssistantT, "plain text without history ID")
+	err := tlv.WriteTLV(out, tlv.TagAssistantTDelta, "plain text without history ID")
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
@@ -529,7 +529,7 @@ func TestWindowBufferEdgeCases(t *testing.T) {
 		t.Errorf("Expected generated window ID, got %s", windows[0].ID)
 	}
 	// Mixed delta and non-delta messages
-	err = tlv.WriteTLV(out, tlv.TagAssistantT, tlv.WrapID("3", "Delta"))
+	err = tlv.WriteTLV(out, tlv.TagAssistantTDelta, tlv.WrapID("3", "Delta"))
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
@@ -544,10 +544,10 @@ func TestWindowBufferEdgeCases(t *testing.T) {
 	}
 	// Check ordering: first malformed, second delta, third error
 	if windows[0].RawTag() != tlv.TagAssistantT {
-		t.Errorf("First window tag mismatch")
+		t.Errorf("First window tag mismatch, got %s", windows[0].RawTag())
 	}
 	if windows[1].RawTag() != tlv.TagAssistantT {
-		t.Errorf("Second window tag mismatch")
+		t.Errorf("Second window tag mismatch, got %s", windows[1].RawTag())
 	}
 	if windows[2].RawTag() != TagWindowSE {
 		t.Errorf("Third window tag mismatch, got %s", windows[2].RawTag())

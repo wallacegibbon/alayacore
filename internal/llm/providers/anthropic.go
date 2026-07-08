@@ -683,21 +683,40 @@ func (p *AnthropicProvider) handleContentDelta(index int, delta anthropicSSEDelt
 		}
 	case anthropicDeltaTypeInputJSON:
 		block.buffer.WriteString(delta.PartialJSON)
+		if !yield(llm.ToolInputDeltaEvent{ID: block.id, Delta: delta.PartialJSON, Index: index}, nil) {
+			return false
+		}
 	}
 	return true
 }
 
 // handleContentBlockStop handles content_block_stop events
 func (p *AnthropicProvider) handleContentBlockStop(index int, yield func(llm.StreamEvent, error) bool, state *anthropicStreamState) bool {
+	// Capture block info before finishing (finishBlock deletes from map).
+	block, blockExists := state.blocks[index]
+
+	// Tool input completion.
 	tc := state.toolInputPart(index)
 	state.finishBlock(index)
 	if tc != nil {
-		if !yield(llm.ToolInputCompleteEvent{
+		return yield(llm.ToolInputCompleteEvent{
 			ID:    tc.ID,
 			Input: tc.Input,
 			Index: index,
-		}, nil) {
-			return false
+		}, nil)
+	}
+
+	// Text and reasoning complete events.
+	if blockExists {
+		switch block.blockType {
+		case anthropicBlockTypeText:
+			if !yield(llm.TextCompleteEvent{Text: block.buffer.String(), Index: index}, nil) {
+				return false
+			}
+		case anthropicBlockTypeThinking:
+			if !yield(llm.ReasoningCompleteEvent{Text: block.buffer.String(), Index: index}, nil) {
+				return false
+			}
 		}
 	}
 	return true

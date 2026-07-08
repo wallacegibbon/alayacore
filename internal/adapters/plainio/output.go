@@ -21,7 +21,7 @@ import (
 // guard for errorCh. See stream/doc.go for the full contract.
 type stdoutOutput struct {
 	writer        io.Writer
-	mu            sync.Mutex // protects buf, lastTag, lastHistoryID, errorClosed
+	mu            sync.Mutex // protects buf, lastTag, lastHistoryID, errorClosed, seenDelta
 	buf           []byte
 	inProgress    atomic.Bool
 	hasError      atomic.Bool
@@ -29,12 +29,14 @@ type stdoutOutput struct {
 	errorCh       chan struct{}
 	lastTag       string
 	lastHistoryID string
+	seenDelta     map[string]bool // history IDs already printed via At/Ar deltas
 }
 
 func newStdoutOutput() *stdoutOutput {
 	return &stdoutOutput{
-		writer:  os.Stdout,
-		errorCh: make(chan struct{}),
+		writer:    os.Stdout,
+		errorCh:   make(chan struct{}),
+		seenDelta: make(map[string]bool),
 	}
 }
 
@@ -76,9 +78,20 @@ func (o *stdoutOutput) printMessage(tag string, value string) {
 	o.handleTag(tag, value)
 }
 
+//nolint:gocyclo // dispatch over many tag types; each case is simple
 func (o *stdoutOutput) handleTag(tag, value string) {
 	switch tag {
+	case tlv.TagAssistantTDelta, tlv.TagAssistantRDelta:
+		if id, _, ok := tlv.UnwrapID(value); ok {
+			o.seenDelta[id] = true
+		}
+		o.handleTextDelta(tag, value)
+
 	case tlv.TagAssistantT, tlv.TagAssistantR:
+		// Skip complete frames if content already shown via deltas.
+		if id, _, ok := tlv.UnwrapID(value); ok && o.seenDelta[id] {
+			return
+		}
 		o.handleTextDelta(tag, value)
 
 	case tlv.TagUserT:
@@ -105,6 +118,10 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 		// Show complete tool call JSON.
 		fmt.Fprintf(o.writer, "%s\n", payload)
 
+	// Tool argument deltas are ephemeral — printed via AF complete frame.
+	case tlv.TagAssistantFDelta:
+		// Ignore.
+
 	case tlv.TagUserF:
 		_, payload, ok := tlv.UnwrapID(value)
 		if !ok {
@@ -127,7 +144,7 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 	}
 }
 
-// handleTextDelta handles AT (assistant text) and AR (reasoning text) tags.
+// handleTextDelta handles assistant text/reasoning tags (AT/AR/At/Ar).
 // It prints a separator when transitioning between different tags or
 // history IDs, then prints the content delta.
 func (o *stdoutOutput) handleTextDelta(tag, value string) {

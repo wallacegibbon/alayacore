@@ -164,6 +164,15 @@ type TextDeltaEvent struct {
 
 func (TextDeltaEvent) isStreamEvent() {}
 
+// TextCompleteEvent signals that a text content block is fully received.
+// Carries the complete authoritative text.
+type TextCompleteEvent struct {
+	Text  string
+	Index int
+}
+
+func (TextCompleteEvent) isStreamEvent() {}
+
 // ReasoningDeltaEvent represents reasoning content streaming
 type ReasoningDeltaEvent struct {
 	Delta string
@@ -171,6 +180,15 @@ type ReasoningDeltaEvent struct {
 }
 
 func (ReasoningDeltaEvent) isStreamEvent() {}
+
+// ReasoningCompleteEvent signals that a reasoning content block is fully received.
+// Carries the complete authoritative reasoning text.
+type ReasoningCompleteEvent struct {
+	Text  string
+	Index int
+}
+
+func (ReasoningCompleteEvent) isStreamEvent() {}
 
 // ToolInputStartEvent signals that a tool use has started
 type ToolInputStartEvent struct {
@@ -180,6 +198,15 @@ type ToolInputStartEvent struct {
 }
 
 func (ToolInputStartEvent) isStreamEvent() {}
+
+// ToolInputDeltaEvent signals a partial JSON chunk of tool arguments.
+type ToolInputDeltaEvent struct {
+	ID    string
+	Delta string
+	Index int
+}
+
+func (ToolInputDeltaEvent) isStreamEvent() {}
 
 // ToolInputCompleteEvent signals that a tool use's arguments have finished streaming
 type ToolInputCompleteEvent struct {

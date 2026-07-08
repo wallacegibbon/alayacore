@@ -344,6 +344,18 @@ func (p *OpenAIProvider) parseStream(reader io.Reader) iter.Seq2[llm.StreamEvent
 			}
 		}
 
+		// Emit complete events for text and reasoning blocks.
+		if text := state.textBuilder.String(); text != "" {
+			if !yield(llm.TextCompleteEvent{Text: text, Index: 1}, nil) {
+				return
+			}
+		}
+		if reasoning := state.reasoningBuilder.String(); reasoning != "" {
+			if !yield(llm.ReasoningCompleteEvent{Text: reasoning, Index: 0}, nil) {
+				return
+			}
+		}
+
 		yield(llm.StepCompleteEvent{
 			Contents:   state.getContents(),
 			Usage:      state.getUsage(),
@@ -407,18 +419,21 @@ func (s *openAIStreamState) toolAccumulator(index int) *openAIToolAccumulator {
 	return acc
 }
 
+// unquoteToolArg unquotes a JSON string literal tool argument.
+// OpenAI sends arguments as a JSON-string-encoded value (with surrounding
+// quotes and escaped inner quotes). This extracts the inner string.
+// Returns empty string for null/no-op arguments.
+func unquoteToolArg(args json.RawMessage) string {
+	var s string
+	if err := json.Unmarshal(args, &s); err == nil {
+		return s
+	}
+	return ""
+}
+
 func (s *openAIStreamState) appendToolCallArgs(index int, args json.RawMessage) {
 	acc := s.toolAccumulator(index)
-	if len(args) > 0 && args[0] == '"' {
-		var unquoted string
-		if err := json.Unmarshal(args, &unquoted); err == nil {
-			acc.args.WriteString(unquoted)
-			return
-		}
-	}
-	if string(args) != "null" {
-		acc.args.WriteString(string(args))
-	}
+	acc.args.WriteString(unquoteToolArg(args))
 }
 
 func (s *openAIStreamState) setToolCallName(index int, id, name string) {
@@ -557,14 +572,23 @@ func (p *OpenAIProvider) handleDelta(delta openAIDelta, yield func(llm.StreamEve
 	}
 
 	for _, tc := range delta.ToolCalls {
-		if len(tc.Function.Arguments) > 0 {
-			state.appendToolCallArgs(tc.Index, tc.Function.Arguments)
-		}
+		// Process name first so acc.id is set before any argument delta.
 		if tc.Function.Name != "" {
 			state.setToolCallName(tc.Index, tc.ID, tc.Function.Name)
 			if !yield(llm.ToolInputStartEvent{
 				ID:    tc.ID,
 				Name:  tc.Function.Name,
+				Index: 2 + tc.Index, // content block: 0=reasoning, 1=text, 2+=tools
+			}, nil) {
+				return false
+			}
+		}
+		if len(tc.Function.Arguments) > 0 {
+			state.appendToolCallArgs(tc.Index, tc.Function.Arguments)
+			acc := state.toolAccumulator(tc.Index)
+			if !yield(llm.ToolInputDeltaEvent{
+				ID:    acc.id,
+				Delta: unquoteToolArg(tc.Function.Arguments),
 				Index: 2 + tc.Index, // content block: 0=reasoning, 1=text, 2+=tools
 			}, nil) {
 				return false

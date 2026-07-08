@@ -60,8 +60,11 @@ func NewAgent(config AgentConfig) *Agent {
 // StreamCallbacks receives streaming events
 type StreamCallbacks struct {
 	OnTextDelta         func(delta string, historyID uint64) error
+	OnTextComplete      func(text string, historyID uint64) error
 	OnReasoningDelta    func(delta string, historyID uint64) error
+	OnReasoningComplete func(text string, historyID uint64) error
 	OnToolInputStart    func(toolCallID, name string, historyID uint64) error
+	OnToolInputDelta    func(toolCallID, delta string, historyID uint64) error
 	OnToolInputComplete func(toolCallID string, input json.RawMessage, historyID uint64) error
 	OnToolOutput        func(toolCallID string, contents []ContentPart, err error, historyID uint64) error
 
@@ -167,7 +170,7 @@ func (a *Agent) Stream(ctx context.Context, contents []ContentPart, callbacks St
 // Assigns unique history IDs via IDGen on first touch of each content block,
 // passes them to callbacks, and stores them on ContentParts.
 //
-//nolint:gocyclo // switch dispatch over 5 event types with callback guards
+//nolint:gocyclo // switch dispatch over 8 event types with callback guards
 func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, error], callbacks StreamCallbacks) ([]ContentPart, Usage, bool, error) {
 	var (
 		stepContents []ContentPart
@@ -201,9 +204,23 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 				}
 			}
 
+		case TextCompleteEvent:
+			if callbacks.OnTextComplete != nil {
+				if err := callbacks.OnTextComplete(e.Text, getOrAssignID(callbacks, idByIndex, e.Index)); err != nil {
+					return nil, Usage{}, false, err
+				}
+			}
+
 		case ReasoningDeltaEvent:
 			if callbacks.OnReasoningDelta != nil {
 				if err := callbacks.OnReasoningDelta(e.Delta, getOrAssignID(callbacks, idByIndex, e.Index)); err != nil {
+					return nil, Usage{}, false, err
+				}
+			}
+
+		case ReasoningCompleteEvent:
+			if callbacks.OnReasoningComplete != nil {
+				if err := callbacks.OnReasoningComplete(e.Text, getOrAssignID(callbacks, idByIndex, e.Index)); err != nil {
 					return nil, Usage{}, false, err
 				}
 			}
@@ -215,6 +232,13 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 				}
 			}
 			nameByIndex[e.Index] = e.Name
+
+		case ToolInputDeltaEvent:
+			if callbacks.OnToolInputDelta != nil {
+				if err := callbacks.OnToolInputDelta(e.ID, e.Delta, getOrAssignID(callbacks, idByIndex, e.Index)); err != nil {
+					return nil, Usage{}, false, err
+				}
+			}
 
 		case ToolInputCompleteEvent:
 			id := getOrAssignID(callbacks, idByIndex, e.Index)

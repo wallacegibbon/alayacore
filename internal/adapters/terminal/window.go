@@ -11,9 +11,9 @@ package terminal
 // its own rendering and content management.
 //
 // Renderers (window_renderer.go):
-//   - textRenderer:  assistant text (AT), reasoning (AR), sys msg (SN), sys err (SE)
+//   - textRenderer:  assistant text (AT, At), reasoning (AR, Ar), sys msg (SN), sys err (SE)
 //   - userRenderer:  user messages with optional media attachments (UT)
-//   - toolRenderer:  tool calls and results (AF, UF)
+//   - toolRenderer:  tool calls and results (AF, Af, UF)
 //
 // Related files:
 //   - window_renderer.go — WindowRendering interface and implementations
@@ -187,6 +187,8 @@ func (w *Window) HandleToolInput(data protocol.ToolInputData, historyID uint64) 
 				tr.name = data.Name
 			}
 			tr.input = string(data.Input)
+			// Complete input arrived, clear delta preview.
+			tr.deltaBuffer = ""
 		}
 		if tr.status == ToolStatusNone {
 			tr.status = ToolStatusPending

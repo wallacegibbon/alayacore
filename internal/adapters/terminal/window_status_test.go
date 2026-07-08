@@ -2,6 +2,7 @@ package terminal
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/alayacore/alayacore/internal/protocol"
@@ -156,5 +157,63 @@ func TestOutputWriterToolCallStartThenFull(t *testing.T) {
 	w = wb.WindowAt(0)
 	if ti := w.ToolInfo(); ti == nil || ti.Input != "write_file: /tmp/f.txt\nhello world" {
 		t.Errorf("Expected full input, got %v", w.ToolInfo())
+	}
+}
+
+func TestToolRendererDeltaTruncation(t *testing.T) {
+	styles := DefaultStyles()
+
+	tests := []struct {
+		name      string
+		innerW    int
+		toolName  string
+		delta     string
+		wantLines int
+		wantTrim  bool // expect "…" truncation
+	}{
+		{
+			name:      "short delta fits",
+			innerW:    80,
+			toolName:  "write_file",
+			delta:     `{"path":"/tmp/foo"}`,
+			wantLines: 3, // top border + content + bottom border
+			wantTrim:  false,
+		},
+		{
+			name:      "long delta truncated",
+			innerW:    30,
+			toolName:  "write_file",
+			delta:     `{"path":"/home/user/very/long/path/that/exceeds/width/for/preview"}`,
+			wantLines: 3, // still single content line
+			wantTrim:  true,
+		},
+		{
+			name:      "narrow window",
+			innerW:    10,
+			toolName:  "cat",
+			delta:     `{"path":"/tmp/foo"}`,
+			wantLines: 3,
+			wantTrim:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tr := &toolRenderer{
+				name:        tt.toolName,
+				deltaBuffer: tt.delta,
+				status:      ToolStatusPending,
+			}
+			result, lineCount := tr.BuildInner(tt.innerW, false, styles)
+
+			if lineCount != tt.wantLines {
+				t.Errorf("Expected %d lines, got %d", tt.wantLines, lineCount)
+			}
+
+			hasTrim := strings.Contains(result, "…")
+			if hasTrim != tt.wantTrim {
+				t.Errorf("Truncation mismatch: wantTrim=%v, got contains-ellipsis=%v\nResult: %q", tt.wantTrim, hasTrim, result)
+			}
+		})
 	}
 }

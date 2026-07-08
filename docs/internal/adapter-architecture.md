@@ -101,7 +101,9 @@ User types prompt
           → handleUserPrompt()
             → processPrompt()
               → Agent.Stream()
-                → Callbacks emit TLV(AT), TLV(AR), TLV(AF), TLV(UF), etc.
+                → Delta callbacks emit TLV(At), TLV(Ar), TLV(Af) (streaming deltas)
+                → Complete callbacks emit TLV(AT), TLV(AR), TLV(AF) (authoritative)
+                → Tool output callbacks emit TLV(UF)
                   → OutputWriter parses TLV
                     → WindowBuffer.AppendOrUpdate()
                       → DisplayModel.View()
@@ -113,7 +115,8 @@ User types prompt
 ```
 Agent.Stream() receives tool_call event
   → OnToolInputStart callback → TLV(AF, {"id":"<id>","name":"<tool>"}) → UI shows tool name immediately
-    → OnToolInputComplete callback → TLV(AF, {"id":"<id>","input":{...}}) → UI fills in arguments
+    → OnToolInputDelta callback → TLV(Af, {"id":"<id>","delta":"..."}) → UI shows truncated one-line preview
+    → OnToolInputComplete callback → TLV(AF, {"id":"<id>","input":{...}}) → UI fills in full arguments
       → Agent executes tool: tool.Execute(ctx, input)
         → OnToolOutput callback → TLV(UF, {"id":"<id>","output":[{"type":"text","text":"..."}]}) → UI shows output and indicator
           → Tool result added to messages

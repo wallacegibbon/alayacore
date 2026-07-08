@@ -165,8 +165,45 @@ func (wb *WindowBuffer) HandleToolInputEvent(data protocol.ToolInputData, histor
 	wb.markDirty(len(wb.windows) - 1)
 }
 
+// HandleToolInputDelta processes a TagAssistantFDelta (Af) frame.
+// Carries a partial JSON chunk of tool arguments during streaming.
+// For display, we show a truncated one-line preview alongside the tool name.
+// If no window exists yet for this ID, we create a placeholder.
+func (wb *WindowBuffer) HandleToolInputDelta(id, name, delta string, historyID uint64) {
+	wb.mu.Lock()
+	defer wb.mu.Unlock()
+
+	idx, ok := wb.idIndex[id]
+	if !ok {
+		// No window yet — create placeholder with just the tool name.
+		w := NewWindow(id, tlv.TagAssistantF, wb.styles)
+		w.HistoryID = historyID
+		w.Folded = true
+		w.Visible = true
+		if name != "" {
+			w.SetRendererForTool(name, "")
+			if tr, ok := w.renderer.(*toolRenderer); ok && tr.status == ToolStatusNone {
+				tr.status = ToolStatusPending
+			}
+		}
+		wb.windows = append(wb.windows, w)
+		wb.idIndex[id] = len(wb.windows) - 1
+		idx = len(wb.windows) - 1
+	}
+
+	w := wb.windows[idx]
+	// Apply the delta to the tool renderer.
+	if tr, ok := w.renderer.(*toolRenderer); ok {
+		tr.AppendDelta(delta)
+	}
+	if historyID > w.HistoryID {
+		w.HistoryID = historyID
+	}
+	w.Invalidate()
+	wb.markDirty(idx)
+}
+
 // HandleToolOutput processes a TagUserF (UF) frame.
-// Sets ToolOutput and updates Status from the result.
 func (wb *WindowBuffer) HandleToolOutput(id, output string, isError bool, historyID uint64) {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
@@ -331,6 +368,15 @@ type FunctionInfo struct {
 }
 
 // Returns nil if no window with that ID exists or if it's not a tool window.
+
+// HasWindow returns true if a window with the given ID exists.
+func (wb *WindowBuffer) HasWindow(id string) bool {
+	wb.mu.Lock()
+	defer wb.mu.Unlock()
+	_, ok := wb.idIndex[id]
+	return ok
+}
+
 func (wb *WindowBuffer) GetFunctionInfo(id string) *FunctionInfo {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
