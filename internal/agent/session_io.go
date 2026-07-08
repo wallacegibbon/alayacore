@@ -516,14 +516,14 @@ func (s *Session) handleMCPCancel() {
 
 // handleMCPAuth handles the :mcp_auth command.
 //
-// Usage: :mcp_auth <server_name> yes|no
+// Usage: :mcp_auth <server> yes|no
 //
 // Delegates to mcpService.Confirm() which unblocks the init goroutine so
 // it can proceed to the next server or launch OAuth.
 func (s *Session) handleMCPAuth(_ context.Context, args string) {
 	name, action, _ := strings.Cut(args, " ")
 	if name == "" || action == "" {
-		s.writeError("usage: :mcp_auth <server_name> yes|no")
+		s.writeError("usage: :mcp_auth <server> yes|no")
 		return
 	}
 	if !s.mcpService.HasInit() {
@@ -541,7 +541,7 @@ func (s *Session) handleMCPAuth(_ context.Context, args string) {
 	case "no":
 		accepted = s.mcpService.Confirm(name, false)
 	default:
-		s.writeError("usage: :mcp_auth <server_name> yes|no")
+		s.writeError("usage: :mcp_auth <server> yes|no")
 		return
 	}
 	if accepted {
