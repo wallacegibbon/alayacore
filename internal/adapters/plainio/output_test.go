@@ -93,8 +93,8 @@ func TestNoPrefixNoNewline(t *testing.T) {
 		writer: &buf,
 	}
 
-	// Messages without stream prefixes are treated as complete text parts
-	// (session load style) and each ends with a newline.
+	// Messages without stream prefixes are malformed for stdout AT frames
+	// (history ID is always required). They should be silently ignored.
 	msg1 := tlv.EncodeTLV(tlv.TagAssistantT, "hello ")
 	msg2 := tlv.EncodeTLV(tlv.TagAssistantT, "world")
 
@@ -102,7 +102,7 @@ func TestNoPrefixNoNewline(t *testing.T) {
 	o.Write(msg2)
 
 	got := buf.String()
-	want := "hello \nworld\n"
+	want := ""
 	if got != want {
 		t.Errorf("output = %q, want %q", got, want)
 	}

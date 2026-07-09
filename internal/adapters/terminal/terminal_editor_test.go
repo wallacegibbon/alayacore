@@ -515,18 +515,15 @@ func TestWindowBufferNonDeltaMessages(t *testing.T) {
 func TestWindowBufferEdgeCases(t *testing.T) {
 	out := NewTerminalOutput(DefaultStyles())
 	// Delta message without valid NUL-delimited history ID (plain text)
+	// is malformed — should be silently ignored.
 	err := tlv.WriteTLV(out, tlv.TagAssistantTDelta, "plain text without history ID")
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
-	// Should create a new window with generated ID
+	// Should NOT create a window (frame rejected)
 	windows := out.windowBuffer.AllWindows()
-	if len(windows) != 1 {
-		t.Errorf("Expected 1 window, got %d", len(windows))
-	}
-	// Window ID should be generated (starts with 'win')
-	if !strings.HasPrefix(windows[0].ID, "win") {
-		t.Errorf("Expected generated window ID, got %s", windows[0].ID)
+	if len(windows) != 0 {
+		t.Errorf("Expected 0 windows (malformed frame), got %d", len(windows))
 	}
 	// Mixed delta and non-delta messages
 	err = tlv.WriteTLV(out, tlv.TagAssistantTDelta, tlv.WrapID("3", "Delta"))
@@ -537,20 +534,17 @@ func TestWindowBufferEdgeCases(t *testing.T) {
 	if err != nil {
 		t.Fatalf("WriteSystemMsg failed: %v", err)
 	}
-	// Should have three windows total
+	// Should have two windows total (malformed frame rejected)
 	windows = out.windowBuffer.AllWindows()
-	if len(windows) != 3 {
-		t.Errorf("Expected 3 windows, got %d", len(windows))
+	if len(windows) != 2 {
+		t.Errorf("Expected 2 windows, got %d", len(windows))
 	}
-	// Check ordering: first malformed, second delta, third error
+	// Check ordering: first delta, second error
 	if windows[0].RawTag() != tlv.TagAssistantT {
 		t.Errorf("First window tag mismatch, got %s", windows[0].RawTag())
 	}
-	if windows[1].RawTag() != tlv.TagAssistantT {
+	if windows[1].RawTag() != TagWindowSE {
 		t.Errorf("Second window tag mismatch, got %s", windows[1].RawTag())
-	}
-	if windows[2].RawTag() != TagWindowSE {
-		t.Errorf("Third window tag mismatch, got %s", windows[2].RawTag())
 	}
 }
 
