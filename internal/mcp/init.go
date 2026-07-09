@@ -253,8 +253,7 @@ func (init *Init) collectOAuthResult(ctx context.Context, c *Client) serverResul
 	cfg.TokenEndpoint = meta.TokenEndpoint
 	cfg.ClientID = clientID
 
-	tools, err := init.runOAuthForServer(ctx, c, meta, clientID)
-	if err != nil {
+	if err := init.runOAuthForServer(ctx, c, meta, clientID); err != nil {
 		msg := err.Error()
 		if errors.Is(err, errSkipped) {
 			msg = fmt.Sprintf("%q: skipped", c.Name())
@@ -263,7 +262,6 @@ func (init *Init) collectOAuthResult(ctx context.Context, c *Client) serverResul
 		return r
 	}
 
-	r.tools = tools
 	init.discoverCapabilities(ctx, c, &r)
 	init.sendEvent(InitEvent{Type: InitConnected, Server: c.Name()})
 	return r
@@ -275,12 +273,12 @@ func (init *Init) collectOAuthResult(ctx context.Context, c *Client) serverResul
 // and sends it to the adapter. The adapter starts a local callback server,
 // fills in the placeholders, opens the browser, and sends the authorization
 // code back via SendAuthCodeResult().
-func (init *Init) runOAuthForServer(ctx context.Context, c *Client, meta *auth.ASMetadata, clientID string) ([]Tool, error) {
+func (init *Init) runOAuthForServer(ctx context.Context, c *Client, meta *auth.ASMetadata, clientID string) error {
 	cfg := c.config.Auth
 
 	pkce, err := auth.NewPKCE()
 	if err != nil {
-		return nil, fmt.Errorf("%q: pkce: %w", c.Name(), err)
+		return fmt.Errorf("%q: pkce: %w", c.Name(), err)
 	}
 
 	placeholderURI := "{{redirect_uri}}"
@@ -292,7 +290,7 @@ func (init *Init) runOAuthForServer(ctx context.Context, c *Client, meta *auth.A
 		Scopes:       cfg.Scopes,
 	}, pkce, placeholderURI, placeholderState)
 	if err != nil {
-		return nil, fmt.Errorf("%q: build auth URL: %w", c.Name(), err)
+		return fmt.Errorf("%q: build auth URL: %w", c.Name(), err)
 	}
 
 	// Send URL template to adapter and wait for result.
@@ -307,7 +305,7 @@ func (init *Init) runOAuthForServer(ctx context.Context, c *Client, meta *auth.A
 	select {
 	case acr = <-authCodeCh:
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		return ctx.Err()
 	}
 
 	init.mu.Lock()
@@ -315,7 +313,7 @@ func (init *Init) runOAuthForServer(ctx context.Context, c *Client, meta *auth.A
 	init.mu.Unlock()
 
 	if acr.code == "" {
-		return nil, errSkipped
+		return errSkipped
 	}
 
 	init.sendEvent(InitEvent{Type: InitAuthRunning, Server: c.Name()})
@@ -326,11 +324,11 @@ func (init *Init) runOAuthForServer(ctx context.Context, c *Client, meta *auth.A
 		Scopes:       cfg.Scopes,
 	}, pkce, acr.redirectURI, acr.code)
 	if err != nil {
-		return nil, fmt.Errorf("%q: exchange code: %w", c.Name(), err)
+		return fmt.Errorf("%q: exchange code: %w", c.Name(), err)
 	}
 
 	if oauthToken.AccessToken == "" {
-		return nil, fmt.Errorf("%q: OAuth returned empty access token", c.Name())
+		return fmt.Errorf("%q: OAuth returned empty access token", c.Name())
 	}
 
 	// Persist token.
@@ -356,20 +354,16 @@ func (init *Init) runOAuthForServer(ctx context.Context, c *Client, meta *auth.A
 	c.resetState()
 	if err := c.Connect(ctx); err != nil {
 		cfg.obtainedToken = nil
-		return nil, fmt.Errorf("%q: connect after auth: %w", c.Name(), err)
+		return fmt.Errorf("%q: connect after auth: %w", c.Name(), err)
 	}
 
-	// Discover tools.
-	if !c.HasTools() {
-		return nil, nil
-	}
-	return c.ListTools(ctx)
+	return nil
 }
 
-// discoverCapabilities discovers tools (if not already done), resources,
+// discoverCapabilities discovers tools, resources,
 // and prompts for a connected server.
 func (init *Init) discoverCapabilities(ctx context.Context, c *Client, r *serverResult) {
-	if c.HasTools() && len(r.tools) == 0 {
+	if c.HasTools() {
 		if tools, err := c.ListTools(ctx); err != nil {
 			init.sendEvent(InitEvent{Type: InitFailed, Server: c.Name(), Error: fmt.Sprintf("list tools: %v", err)})
 		} else {
