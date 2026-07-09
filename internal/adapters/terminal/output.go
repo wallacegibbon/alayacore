@@ -140,8 +140,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 	case tlv.TagAssistantTDelta, tlv.TagAssistantRDelta:
 		id, content, ok := tlv.UnwrapID(value)
 		if !ok {
-			id = to.generateWindowID()
-			content = value
+			return
 		}
 		// Map lowercase delta tag to uppercase for display styling.
 		displayTag := tlv.TagAssistantT
@@ -162,29 +161,28 @@ func (to *outputWriter) writeColored(tag string, value string) {
 			to.windowBuffer.AppendOrUpdate(tag, id, content)
 		}
 
-	// User text tag — may carry NUL-delimited historyID
+	// User text tag — carries NUL-delimited historyID
 	// User content tags — accumulated until next non-user tag triggers flush.
 	case tlv.TagUserT:
 		id, content, ok := tlv.UnwrapID(value)
 		if !ok {
-			id = to.generateWindowID()
-			content = value
+			return
 		}
 		to.bufferUserContent(id, content, tlv.TagUserT)
 
 	case tlv.TagUserI, tlv.TagUserV, tlv.TagUserA, tlv.TagUserD:
 		id, _, ok := tlv.UnwrapID(value)
 		if !ok {
-			id = to.generateWindowID()
+			return
 		}
 		to.bufferUserContent(id, mediaLabel(tag), tag)
 
 	// Function lifecycle (JSON: id, type, name, input, status)
-	// May carry NUL-delimited historyID prefix
+	// Carries NUL-delimited historyID prefix
 	case tlv.TagAssistantF:
 		id, payload, ok := tlv.UnwrapID(value)
 		if !ok {
-			payload = value
+			return
 		}
 		var fd protocol.ToolInputData
 		if err := json.Unmarshal([]byte(payload), &fd); err != nil {
@@ -212,7 +210,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 	case tlv.TagAssistantFDelta:
 		id, payload, ok := tlv.UnwrapID(value)
 		if !ok {
-			payload = value
+			return
 		}
 		var fd protocol.ToolInputDeltaData
 		if err := json.Unmarshal([]byte(payload), &fd); err != nil {
@@ -230,7 +228,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 	case tlv.TagUserF:
 		id, payload, ok := tlv.UnwrapID(value)
 		if !ok {
-			payload = value
+			return
 		}
 		var tr protocol.ToolOutputData
 		if err := json.Unmarshal([]byte(payload), &tr); err != nil {

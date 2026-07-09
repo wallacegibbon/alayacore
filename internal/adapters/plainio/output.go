@@ -82,9 +82,11 @@ func (o *stdoutOutput) printMessage(tag string, value string) {
 func (o *stdoutOutput) handleTag(tag, value string) {
 	switch tag {
 	case tlv.TagAssistantTDelta, tlv.TagAssistantRDelta:
-		if id, _, ok := tlv.UnwrapID(value); ok {
-			o.seenDelta[id] = true
+		id, _, ok := tlv.UnwrapID(value)
+		if !ok {
+			return
 		}
+		o.seenDelta[id] = true
 		o.handleTextDelta(tag, value)
 
 	case tlv.TagAssistantT, tlv.TagAssistantR:
@@ -100,7 +102,7 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 	case tlv.TagUserT:
 		_, content, ok := tlv.UnwrapID(value)
 		if !ok {
-			content = value
+			return
 		}
 		o.emitSeparator(tag)
 		fmt.Fprintf(o.writer, "> %s\n", content)
@@ -111,7 +113,7 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 	case tlv.TagAssistantF:
 		_, payload, ok := tlv.UnwrapID(value)
 		if !ok {
-			payload = value
+			return
 		}
 		if o.lastTag != "" {
 			fmt.Fprintln(o.writer)
@@ -128,7 +130,7 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 	case tlv.TagUserF:
 		_, payload, ok := tlv.UnwrapID(value)
 		if !ok {
-			payload = value
+			return
 		}
 		// Show complete tool result JSON.
 		if o.lastTag != "" && o.lastTag != tag {
