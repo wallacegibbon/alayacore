@@ -9,22 +9,46 @@ authorization_code`, AlayaCore handles the entire flow:
 3. **Token exchange** — Swap the authorization code for tokens
 4. **Token refresh** — Automatically renew expired tokens
 
+## Prerequisites
+
+Before using `authorization_code` auth, you must **register an OAuth app**
+with the service. For example, for GitHub Copilot:
+
+1. Go to **GitHub Settings → Developer settings → OAuth Apps → New OAuth App**
+2. Set the **Authorization callback URL** to `http://127.0.0.1` (AlayaCore
+   will append the actual port and path at runtime)
+3. After registration, note your **Client ID** and **Client Secret**
+
+Then configure them in `mcp.conf`:
+
+```ini
+server: github
+url: https://api.githubcopilot.com/mcp/
+auth-type: authorization_code
+auth-client-id: <your-client-id>
+auth-client-secret: <your-client-secret>
+```
+
+> **Tip:** Some services (e.g. GitHub) support public OAuth clients that
+> do not require a `client_secret` when used with PKCE. For those services,
+> you can omit `auth-client-secret`.
+
 ## Configuration
 
 ```ini
 server: github
 url: https://api.githubcopilot.com/mcp/
 auth-type: authorization_code
+auth-client-id: Iv1.xxxxxxxxxxxxxxxx
+auth-client-secret: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `auth-type` | No | `authorization_code` or `static` |
+| `auth-type` | Yes for OAuth | `authorization_code` or `static` |
+| `auth-client-id` | Yes for `authorization_code` | Your OAuth app's client ID |
+| `auth-client-secret` | No | OAuth client secret (required by most services) |
 | `auth-scopes` | No | Comma-separated OAuth scopes to request |
-
-For `authorization_code`, you typically don't need to configure a
-`client_id` or `client_secret` — AlayaCore ships with built-in
-credentials for known services (see [Built-in Client Registry](#built-in-client-registry)).
 
 For `static` auth, provide a pre-obtained token:
 
@@ -147,7 +171,7 @@ it in the user's default browser:
 ```
 https://github.com/login/oauth/authorize
   ?response_type=code
-  &client_id=Ov23lipCk4st2cXDZixb
+  &client_id=<your-client-id>
   &code_challenge=<SHA256 hash of code_verifier>
   &code_challenge_method=S256
   &redirect_uri=http://127.0.0.1:PORT/callback
@@ -184,7 +208,8 @@ grant_type=authorization_code
 &code=<authorization_code>
 &redirect_uri=http://127.0.0.1:PORT/callback
 &code_verifier=<original code_verifier>
-&client_id=Ov23lipCk4st2cXDZixb
+&client_id=<your-client-id>
+&client_secret=<your-client-secret>
 
 → 200 OK
 → {
@@ -220,7 +245,7 @@ Content-Type: application/x-www-form-urlencoded
 
 grant_type=refresh_token
 &refresh_token=<stored refresh_token>
-&client_id=Ov23lipCk4st2cXDZixb
+&client_id=<your-client-id>
 
 → 200 OK
 → {
@@ -234,19 +259,6 @@ grant_type=refresh_token
 If the refresh token is also expired or revoked, the entire flow
 restarts from the authorization step.
 
-## Built-in Client Registry
-
-AlayaCore ships with pre-registered OAuth client credentials for
-known services. These are **public identifiers** — they appear in
-the browser URL during OAuth flows and are safe to distribute.
-
-| Issuer | Client ID | Type |
-|--------|-----------|------|
-| `https://github.com` | `Ov23lipCk4st2cXDZixb` | Public (PKCE) |
-
-If your service is not listed, please
-[file an issue](https://github.com/alayacore/alayacore/issues).
-
 ## Token Storage
 
 Tokens are persisted to disk at `~/.alayacore/mcp-tokens/{server}.json`:
@@ -259,7 +271,7 @@ Tokens are persisted to disk at `~/.alayacore/mcp-tokens/{server}.json`:
   "expires_at": "2026-07-10T12:00:00+08:00",
   "scopes": [],
   "token_endpoint": "https://github.com/login/oauth/access_token",
-  "client_id": "Ov23lipCk4st2cXDZixb"
+  "client_id": "<your-client-id>"
 }
 ```
 
@@ -312,9 +324,8 @@ Only two of these are user-facing interactive services:
   `authorization_code` flow, preventing authorization code
   interception attacks
 - **State parameter** provides CSRF protection for the callback
-- **Client secrets** for desktop apps are embedded in the binary —
-  this is equivalent security to requiring every user to register
-  their own app, since desktop applications cannot protect a
-  secret anyway
+- **Your own credentials** — you register and control your own OAuth
+  app credentials, reducing the risk of shared credential revocation
+  or rate-limiting
 - **Tokens are stored on disk** with the same permissions as other
   config files (`~/.alayacore/mcp-tokens/`)

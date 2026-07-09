@@ -39,9 +39,16 @@ args: ["mcp-git"]
 server: remote-api
 url: https://example.com/mcp
 ---
+server: my-service
+url: https://example.com/mcp
+auth-type: static
+auth-token: <your-token>
+---
 server: github
 url: https://api.githubcopilot.com/mcp/
 auth-type: authorization_code
+auth-client-id: <your-client-id>
+auth-client-secret: <your-client-secret>
 ```
 
 ### Fields
@@ -55,14 +62,16 @@ auth-type: authorization_code
 | `env` | No | JSON object of environment variables (`{"KEY": "val"}`) |
 | `auth-type` | No | OAuth type: `authorization_code` or `static` |
 | `auth-scopes` | No | Comma-separated OAuth scopes (for `authorization_code` only) |
+| `auth-client-id` | No* | OAuth client ID (required for `authorization_code`) |
+| `auth-client-secret` | No | OAuth client secret (required by some services for `authorization_code`) |
 | `auth-token` | No | Pre-obtained access token (for `static` auth only) |
 
-> **Note:** For `authorization_code` auth, AlayaCore uses **built-in OAuth client
-> credentials** for known services (e.g. GitHub Copilot). You typically only need
-> to set `auth-type: authorization_code`. If your service isn't supported, please
-> file an issue.
+> **Note:** For `authorization_code` auth, you **must** register an OAuth app
+> with the service and provide `auth-client-id` (and `auth-client-secret` if
+> required) in your `mcp.conf`. AlayaCore does not ship with built-in
+> credentials.
 >
-> See [OAuth Flow](oauth.md) for the full authorization flow details.
+> See [OAuth Flow](oauth.md) for the full authorization flow.
 > For `static` auth, only `auth-token` is used (a pre-obtained API key or token).
 
 ### Validation

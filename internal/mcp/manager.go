@@ -107,7 +107,8 @@ func (m *Manager) Clients() []*Client {
 
 // resolveAuthConfig discovers authorization server metadata and resolves
 // the OAuth client credentials for a server.
-// For authorization_code, client_id always comes from the built-in registry.
+// client_id and client_secret must be configured by the user in mcp.conf
+// via auth-client-id and auth-client-secret.
 func resolveAuthConfig(ctx context.Context, cfg *AuthConfig, serverURL string) (*auth.ASMetadata, string, error) {
 	// Discover authorization server metadata.
 	meta, err := discoverASMetadata(ctx, cfg, serverURL)
@@ -115,26 +116,14 @@ func resolveAuthConfig(ctx context.Context, cfg *AuthConfig, serverURL string) (
 		return nil, "", fmt.Errorf("discover AS: %w", err)
 	}
 
-	// Resolve client_id from built-in registry only.
-	// Users should never need to configure client_id for
-	// authorization_code — known services ship with built-in
-	// credentials, and unknown services should file an issue.
-	clientID, defaultSecret, ok := auth.LookupDefaultClient(meta.Issuer)
-	if !ok {
-		return nil, "", fmt.Errorf("alayacore does not yet support OAuth for %s. "+
-			"Please file an issue at https://github.com/alayacore/alayacore to request support", meta.Issuer)
-	}
-	if clientID == "" {
-		return nil, "", fmt.Errorf("%s requires a different authentication method "+
-			"(try auth-type: static with an API key)", meta.Issuer)
+	// Require user-provided client_id for authorization_code flow.
+	if cfg.ClientID == "" {
+		return nil, "", fmt.Errorf("%s requires auth-client-id in mcp.conf. "+
+			"Register an OAuth app with the service and set auth-client-id and "+
+			"auth-client-secret (if needed). See docs/oauth.md for details", meta.Issuer)
 	}
 
-	// Use default client_secret if user didn't provide one.
-	if cfg.ClientSecret == "" && defaultSecret != "" {
-		cfg.ClientSecret = defaultSecret
-	}
-
-	return meta, clientID, nil
+	return meta, cfg.ClientID, nil
 }
 
 // discoverASMetadata discovers the authorization server metadata for an

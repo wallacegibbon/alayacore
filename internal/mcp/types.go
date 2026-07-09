@@ -507,9 +507,11 @@ type ServerConfigFile struct {
 	Args    []string          `config:"args"`
 	Env     map[string]string `config:"env"`
 
-	AuthType   string   `config:"auth-type"`
-	AuthScopes []string `config:"auth-scopes"`
-	AuthToken  string   `config:"auth-token"`
+	AuthType         string   `config:"auth-type"`
+	AuthScopes       []string `config:"auth-scopes"`
+	AuthToken        string   `config:"auth-token"`
+	AuthClientID     string   `config:"auth-client-id"`
+	AuthClientSecret string   `config:"auth-client-secret"`
 }
 
 // RPCError represents a JSON-RPC error response.
@@ -535,9 +537,11 @@ func (f *ServerConfigFile) ToServerConfig() ServerConfig {
 
 	if f.AuthType != "" {
 		cfg.Auth = &AuthConfig{
-			Type:   AuthType(f.AuthType),
-			Scopes: f.AuthScopes,
-			Token:  f.AuthToken,
+			Type:         AuthType(f.AuthType),
+			ClientID:     f.AuthClientID,
+			ClientSecret: f.AuthClientSecret,
+			Scopes:       f.AuthScopes,
+			Token:        f.AuthToken,
 		}
 	}
 
