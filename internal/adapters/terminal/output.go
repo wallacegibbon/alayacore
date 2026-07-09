@@ -156,8 +156,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 	case tlv.TagAssistantT, tlv.TagAssistantR:
 		id, content, ok := tlv.UnwrapID(value)
 		if !ok {
-			id = to.generateWindowID()
-			content = value
+			return
 		}
 		if !to.windowBuffer.HasWindow(id) {
 			to.windowBuffer.AppendOrUpdate(tag, id, content)

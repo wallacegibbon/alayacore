@@ -88,8 +88,11 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 		o.handleTextDelta(tag, value)
 
 	case tlv.TagAssistantT, tlv.TagAssistantR:
-		// Skip complete frames if content already shown via deltas.
-		if id, _, ok := tlv.UnwrapID(value); ok && o.seenDelta[id] {
+		id, _, ok := tlv.UnwrapID(value)
+		if !ok {
+			return
+		}
+		if o.seenDelta[id] {
 			return
 		}
 		o.handleTextDelta(tag, value)
