@@ -62,6 +62,7 @@ auth-type: authorization_code
 > to set `auth-type: authorization_code`. If your service isn't supported, please
 > file an issue.
 >
+> See [OAuth Flow](oauth.md) for the full authorization flow details.
 > For `static` auth, only `auth-token` is used (a pre-obtained API key or token).
 
 ### Validation
