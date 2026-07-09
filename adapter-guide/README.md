@@ -356,63 +356,63 @@ user's prompt echo with its assigned history ID.
 ### read_file
 
 ```
-stdin:  ut-read-file.bin               UT "Read the file main.go"
+stdin:  UT-read-file.bin               UT "Read the file main.go"
                                        UE
-stdout: ut-echo-read-file.bin          UT \x00 5 \x00 Read the file main.go
-        af-read-file-start.bin         AF \x00 6 \x00 {"id":"t1","name":"read_file"}
-        af-read-file-input.bin         AF \x00 6 \x00 {"id":"t1","input":{"path":"main.go"}}   ← or af-read-file-input-range.bin
-        uf-read-file-success.bin       UF \x00 7 \x00 {"id":"t1","output":[{"text":"package main...","type":"text"}]}
-        uf-read-file-failed.bin        UF \x00 7 \x00 {"id":"t1","output":[{"text":"file not found","type":"text"}],"is_error":true}
+stdout: UT-echo-read-file.bin          UT \x00 5 \x00 Read the file main.go
+        AF-read-file-start.bin         AF \x00 6 \x00 {"id":"t1","name":"read_file"}
+        AF-read-file-input.bin         AF \x00 6 \x00 {"id":"t1","input":{"path":"main.go"}}   ← or AF-read-file-input-range.bin
+        UF-read-file-success.bin       UF \x00 7 \x00 {"id":"t1","output":[{"text":"package main...","type":"text"}]}
+        UF-read-file-failed.bin        UF \x00 7 \x00 {"id":"t1","output":[{"text":"file not found","type":"text"}],"is_error":true}
 ```
 
-The `af-read-file-input-range.bin` sample is an **alternative** to `af-read-file-input.bin` — it demonstrates the `start_line` and `num_lines` optional parameters. Only one input frame is sent per tool invocation.
+The `AF-read-file-input-range.bin` sample is an **alternative** to `AF-read-file-input.bin` — it demonstrates the `start_line` and `num_lines` optional parameters. Only one input frame is sent per tool invocation.
 
 ### write_file
 
 ```
-stdin:  ut-write-file.bin              UT "Write a hello world Go program to hello.go"
+stdin:  UT-write-file.bin              UT "Write a hello world Go program to hello.go"
                                        UE
 stdout: (echo)                         UT \x00 9 \x00 Write a hello world Go program to hello.go
-        af-write-file-start.bin        AF \x00 10 \x00 {"id":"t3","name":"write_file"}
-        af-write-file-input.bin        AF \x00 10 \x00 {"id":"t3","input":{"content":"package main","path":"main.go"}}
-        uf-write-file-success.bin      UF \x00 11 \x00 {"id":"t3","output":[{"text":"File written successfully","type":"text"}]}
-        uf-write-file-failed.bin       UF \x00 11 \x00 {"id":"t3","output":[{"text":"permission denied","type":"text"}],"is_error":true}
+        AF-write-file-start.bin        AF \x00 10 \x00 {"id":"t3","name":"write_file"}
+        AF-write-file-input.bin        AF \x00 10 \x00 {"id":"t3","input":{"content":"package main","path":"main.go"}}
+        UF-write-file-success.bin      UF \x00 11 \x00 {"id":"t3","output":[{"text":"File written successfully","type":"text"}]}
+        UF-write-file-failed.bin       UF \x00 11 \x00 {"id":"t3","output":[{"text":"permission denied","type":"text"}],"is_error":true}
 ```
 
 ### edit_file
 
 ```
-stdin:  ut-edit-file.bin               UT "Edit main.go to fix the greeting"
+stdin:  UT-edit-file.bin               UT "Edit main.go to fix the greeting"
                                        UE
 stdout: (echo)                         UT \x00 7 \x00 Edit main.go to fix the greeting
-        af-edit-file-start.bin         AF \x00 8 \x00 {"id":"t2","name":"edit_file"}
-        af-edit-file-input.bin         AF \x00 8 \x00 {"id":"t2","input":{"new_string":"fmt.Printf","old_string":"fmt.Println","path":"main.go"}}
-        uf-edit-file-success.bin       UF \x00 9 \x00 {"id":"t2","output":[{"text":"File edited successfully","type":"text"}]}
-        uf-edit-file-failed.bin        UF \x00 9 \x00 {"id":"t2","output":[{"text":"old_string not found","type":"text"}],"is_error":true}
+        AF-edit-file-start.bin         AF \x00 8 \x00 {"id":"t2","name":"edit_file"}
+        AF-edit-file-input.bin         AF \x00 8 \x00 {"id":"t2","input":{"new_string":"fmt.Printf","old_string":"fmt.Println","path":"main.go"}}
+        UF-edit-file-success.bin       UF \x00 9 \x00 {"id":"t2","output":[{"text":"File edited successfully","type":"text"}]}
+        UF-edit-file-failed.bin        UF \x00 9 \x00 {"id":"t2","output":[{"text":"old_string not found","type":"text"}],"is_error":true}
 ```
 
 ### search_content
 
 ```
-stdin:  ut-search-content.bin          UT "Search for TODO in Go files"
+stdin:  UT-search-content.bin          UT "Search for TODO in Go files"
                                        UE
 stdout: (echo)                         UT \x00 11 \x00 Search for TODO in Go files
-        af-search-content-start.bin    AF \x00 12 \x00 {"id":"t4","name":"search_content"}
-        af-search-content-input.bin    AF \x00 12 \x00 {"id":"t4","input":{"pattern":"TODO"}}
-        uf-search-content-success.bin  UF \x00 13 \x00 {"id":"t4","output":[{"text":"main.go:1:package main","type":"text"}]}
-        uf-search-content-failed.bin   UF \x00 13 \x00 {"id":"t4","output":[{"text":"invalid regex","type":"text"}],"is_error":true}
+        AF-search-content-start.bin    AF \x00 12 \x00 {"id":"t4","name":"search_content"}
+        AF-search-content-input.bin    AF \x00 12 \x00 {"id":"t4","input":{"pattern":"TODO"}}
+        UF-search-content-success.bin  UF \x00 13 \x00 {"id":"t4","output":[{"text":"main.go:1:package main","type":"text"}]}
+        UF-search-content-failed.bin   UF \x00 13 \x00 {"id":"t4","output":[{"text":"invalid regex","type":"text"}],"is_error":true}
 ```
 
 ### execute_command
 
 ```
-stdin:  ut-execute-command.bin         UT "Run: ls -la"
+stdin:  UT-execute-command.bin         UT "Run: ls -la"
                                        UE
 stdout: (echo)                         UT \x00 13 \x00 Run: ls -la
-        af-execute-command-start.bin   AF \x00 14 \x00 {"id":"t5","name":"execute_command"}
-        af-execute-command-input.bin   AF \x00 14 \x00 {"id":"t5","input":{"command":"ls -la"}}
-        uf-execute-command-success.bin UF \x00 15 \x00 {"id":"t5","output":[{"text":"total 42...","type":"text"}]}
-        uf-execute-command-failed.bin  UF \x00 15 \x00 {"id":"t5","output":[{"text":"command not found","type":"text"}],"is_error":true}
+        AF-execute-command-start.bin   AF \x00 14 \x00 {"id":"t5","name":"execute_command"}
+        AF-execute-command-input.bin   AF \x00 14 \x00 {"id":"t5","input":{"command":"ls -la"}}
+        UF-execute-command-success.bin UF \x00 15 \x00 {"id":"t5","output":[{"text":"total 42...","type":"text"}]}
+        UF-execute-command-failed.bin  UF \x00 15 \x00 {"id":"t5","output":[{"text":"command not found","type":"text"}],"is_error":true}
 ```
 
 ### Text / Reasoning / System / Tool
@@ -423,115 +423,115 @@ Samples are grouped by direction below.
 **stdin (adapter → agent, no history ID):**
 
 ```
-ut-hello.bin                   UT "hello"
-ut-empty.bin                   UT "" (length 0)
-ui-image.bin                   UI data:image/jpeg;base64,...
-ui-image-url.bin               UI https://...
-ua-audio.bin                   UA data:audio/mpeg;base64,...
-ua-audio-url.bin               UA https://...
-uv-video.bin                   UV data:video/mp4;base64,...
-uv-video-url.bin               UV https://...
-ud-document.bin                UD data:application/pdf;base64,...
-ue.bin                         UE "" (length 0)
-ut-model-sync.bin              UT ":model_sync [{id,name,protocol_type,base_url,api_key,model_name,context_limit,max_tokens},...]"
+UT-hello.bin                   UT "hello"
+UT-empty.bin                   UT "" (length 0)
+UI-image.bin                   UI data:image/jpeg;base64,...
+UI-image-url.bin               UI https://...
+UA-audio.bin                   UA data:audio/mpeg;base64,...
+UA-audio-url.bin               UA https://...
+UV-video.bin                   UV data:video/mp4;base64,...
+UV-video-url.bin               UV https://...
+UD-document.bin                UD data:application/pdf;base64,...
+UE.bin                         UE "" (length 0)
+UT-model-sync.bin              UT ":model_sync [{id,name,protocol_type,base_url,api_key,model_name,context_limit,max_tokens},...]"
 ```
 
 **stdout — delta/echo (with history ID `\x00<id>\x00`):**
 
 ```
-ut-echo-hello.bin              UT \x00 1 \x00 Hello
-ut-echo-read-file.bin          UT \x00 5 \x00 Read the file main.go
-ui-echo-image.bin              UI \x00 2 \x00 data:image/jpeg;...
-ua-echo-audio-url.bin          UA \x00 3 \x00 https://...
-uv-echo-video-url.bin          UV \x00 4 \x00 https://...
-at-delta-hello.bin             At \x00 1 \x00 Hello
-at-delta-world.bin             At \x00 1 \x00 world (same stream)
-at-delta-new-step.bin          At \x00 2 \x00 Next step (new stream)
+UT-echo-hello.bin              UT \x00 1 \x00 Hello
+UT-echo-read-file.bin          UT \x00 5 \x00 Read the file main.go
+UI-echo-image.bin              UI \x00 2 \x00 data:image/jpeg;...
+UA-echo-audio-url.bin          UA \x00 3 \x00 https://...
+UV-echo-video-url.bin          UV \x00 4 \x00 https://...
+At-delta-hello.bin             At \x00 1 \x00 Hello
+At-delta-world.bin             At \x00 1 \x00 world (same stream)
+At-delta-new-step.bin          At \x00 2 \x00 Next step (new stream)
 AT-plain.bin                   AT "plain text without history id"   ← special case: no NUL prefix, no delta
-ar-delta.bin                   Ar \x00 3 \x00 thinking...
+Ar-delta.bin                   Ar \x00 3 \x00 thinking...
 AR-plain.bin                   AR "thinking about the solution..."   ← special case: no NUL prefix, no delta
 ```
 
 **stdout — tool frames (with history ID `\x00<id>\x00`, JSON `"id"` for matching):**
 
 ```
-af-read-file-start.bin         AF \x00 6 \x00 {"id":"t1","name":"read_file"}
-af-read-file-input.bin         AF \x00 6 \x00 {"id":"t1","input":{"path":"main.go"}}
-af-read-file-input-range.bin   AF \x00 6 \x00 {"id":"t1","input":{"path":"main.go","start_line":10,"num_lines":20}}
-uf-read-file-success.bin       UF \x00 7 \x00 {"id":"t1","output":[{"text":"package main...","type":"text"}]}
-uf-read-file-failed.bin        UF \x00 7 \x00 {"id":"t1","output":[{"text":"file not found","type":"text"}],"is_error":true}
-af-edit-file-start.bin         AF \x00 8 \x00 {"id":"t2","name":"edit_file"}
-af-edit-file-input.bin         AF \x00 8 \x00 {"id":"t2","input":{"new_string":"fmt.Printf","old_string":"fmt.Println","path":"main.go"}}
-uf-edit-file-success.bin       UF \x00 9 \x00 {"id":"t2","output":[{"text":"File edited successfully","type":"text"}]}
-uf-edit-file-failed.bin        UF \x00 9 \x00 {"id":"t2","output":[{"text":"old_string not found","type":"text"}],"is_error":true}
-af-write-file-start.bin        AF \x00 10 \x00 {"id":"t3","name":"write_file"}
-af-write-file-input.bin        AF \x00 10 \x00 {"id":"t3","input":{"content":"package main","path":"main.go"}}
-uf-write-file-success.bin      UF \x00 11 \x00 {"id":"t3","output":[{"text":"File written successfully","type":"text"}]}
-uf-write-file-failed.bin       UF \x00 11 \x00 {"id":"t3","output":[{"text":"permission denied","type":"text"}],"is_error":true}
-af-search-content-start.bin    AF \x00 12 \x00 {"id":"t4","name":"search_content"}
-af-search-content-input.bin    AF \x00 12 \x00 {"id":"t4","input":{"pattern":"TODO"}}
-uf-search-content-success.bin  UF \x00 13 \x00 {"id":"t4","output":[{"text":"main.go:1:package main","type":"text"}]}
-uf-search-content-failed.bin   UF \x00 13 \x00 {"id":"t4","output":[{"text":"invalid regex","type":"text"}],"is_error":true}
-af-execute-command-start.bin   AF \x00 14 \x00 {"id":"t5","name":"execute_command"}
-af-execute-command-input.bin   AF \x00 14 \x00 {"id":"t5","input":{"command":"ls -la"}}
-uf-execute-command-success.bin UF \x00 15 \x00 {"id":"t5","output":[{"text":"total 42...","type":"text"}]}
-uf-execute-command-failed.bin  UF \x00 15 \x00 {"id":"t5","output":[{"text":"command not found","type":"text"}],"is_error":true}
+AF-read-file-start.bin         AF \x00 6 \x00 {"id":"t1","name":"read_file"}
+AF-read-file-input.bin         AF \x00 6 \x00 {"id":"t1","input":{"path":"main.go"}}
+AF-read-file-input-range.bin   AF \x00 6 \x00 {"id":"t1","input":{"path":"main.go","start_line":10,"num_lines":20}}
+UF-read-file-success.bin       UF \x00 7 \x00 {"id":"t1","output":[{"text":"package main...","type":"text"}]}
+UF-read-file-failed.bin        UF \x00 7 \x00 {"id":"t1","output":[{"text":"file not found","type":"text"}],"is_error":true}
+AF-edit-file-start.bin         AF \x00 8 \x00 {"id":"t2","name":"edit_file"}
+AF-edit-file-input.bin         AF \x00 8 \x00 {"id":"t2","input":{"new_string":"fmt.Printf","old_string":"fmt.Println","path":"main.go"}}
+UF-edit-file-success.bin       UF \x00 9 \x00 {"id":"t2","output":[{"text":"File edited successfully","type":"text"}]}
+UF-edit-file-failed.bin        UF \x00 9 \x00 {"id":"t2","output":[{"text":"old_string not found","type":"text"}],"is_error":true}
+AF-write-file-start.bin        AF \x00 10 \x00 {"id":"t3","name":"write_file"}
+AF-write-file-input.bin        AF \x00 10 \x00 {"id":"t3","input":{"content":"package main","path":"main.go"}}
+UF-write-file-success.bin      UF \x00 11 \x00 {"id":"t3","output":[{"text":"File written successfully","type":"text"}]}
+UF-write-file-failed.bin       UF \x00 11 \x00 {"id":"t3","output":[{"text":"permission denied","type":"text"}],"is_error":true}
+AF-search-content-start.bin    AF \x00 12 \x00 {"id":"t4","name":"search_content"}
+AF-search-content-input.bin    AF \x00 12 \x00 {"id":"t4","input":{"pattern":"TODO"}}
+UF-search-content-success.bin  UF \x00 13 \x00 {"id":"t4","output":[{"text":"main.go:1:package main","type":"text"}]}
+UF-search-content-failed.bin   UF \x00 13 \x00 {"id":"t4","output":[{"text":"invalid regex","type":"text"}],"is_error":true}
+AF-execute-command-start.bin   AF \x00 14 \x00 {"id":"t5","name":"execute_command"}
+AF-execute-command-input.bin   AF \x00 14 \x00 {"id":"t5","input":{"command":"ls -la"}}
+UF-execute-command-success.bin UF \x00 15 \x00 {"id":"t5","output":[{"text":"total 42...","type":"text"}]}
+UF-execute-command-failed.bin  UF \x00 15 \x00 {"id":"t5","output":[{"text":"command not found","type":"text"}],"is_error":true}
 ```
 
 **stdout — system messages (no history ID, JSON `{"type":"...","data":{...}}`):**
 
 | Type | JSON Schema (data fields) | Example `.bin` |
 |------|--------------------------|----------------|
-| `version` | `message_version` (int), `core_version` (string) | `sm-message-version.bin` |
-| `model` | `active_id` (int), `active_name` (string), `context_limit` (int) | `sm-model.bin` |
-| `model_list` | `models` (array of `{id:int, name:string, protocol_type:string, base_url:string, api_key:string, model_name:string, context_limit:int, max_tokens:int}`) | `sm-model-list.bin` |
-| `theme` | `name` (string), `theme` (object, optional — full palette sent on startup, omitted on theme switch) | `sm-theme.bin` |
-| `theme_list` | `themes` (array of `{name:string, theme:{primary, dim, muted, text, warning, error, success, selection, cursor, added, removed, fold_indicator: string}}`) | `sm-theme-list.bin` |
-| `reasoning` | `level` (int: 0=off, 1=normal, 2=max) | `sm-reasoning.bin` |
-| `video_config` | `fps` (int), `res` (int) | `sm-video-config.bin` |
-| `task` | `in_progress` (bool), `current_step` (int, opt), `max_steps` (int, opt), `context` (int), `task_error` (bool, opt) | `sm-task-start.bin`, `sm-task-end.bin` |
-| `error` | `text` (string) | `sm-error.bin` |
-| `notify` | `text` (string) | `sm-notify.bin` |
-| `tool_confirm` | `id` (string), `allowed` (bool, opt — present only in adapter→agent response) | `sm-tool-confirm.bin` |
-| `mcp` | `status` (string: one of `connecting`, `auth_confirm`, `auth_running`, `connected`, `failed`, `done`), `server` (string, opt), `url` (string, opt — set for `auth_confirm`; may contain `{{redirect_uri}}` and `{{state}}` placeholders), `error` (string, opt — set for `failed`) | `sm-mcp-connecting.bin`, `sm-mcp-auth-confirm.bin`, `sm-mcp-auth-running.bin`, `sm-mcp-connected.bin`, `sm-mcp-failed.bin`, `sm-mcp-done.bin` |
+| `version` | `message_version` (int), `core_version` (string) | `SM-message-version.bin` |
+| `model` | `active_id` (int), `active_name` (string), `context_limit` (int) | `SM-model.bin` |
+| `model_list` | `models` (array of `{id:int, name:string, protocol_type:string, base_url:string, api_key:string, model_name:string, context_limit:int, max_tokens:int}`) | `SM-model-list.bin` |
+| `theme` | `name` (string), `theme` (object, optional — full palette sent on startup, omitted on theme switch) | `SM-theme.bin` |
+| `theme_list` | `themes` (array of `{name:string, theme:{primary, dim, muted, text, warning, error, success, selection, cursor, added, removed, fold_indicator: string}}`) | `SM-theme-list.bin` |
+| `reasoning` | `level` (int: 0=off, 1=normal, 2=max) | `SM-reasoning.bin` |
+| `video_config` | `fps` (int), `res` (int) | `SM-video-config.bin` |
+| `task` | `in_progress` (bool), `current_step` (int, opt), `max_steps` (int, opt), `context` (int), `task_error` (bool, opt) | `SM-task-start.bin`, `SM-task-end.bin` |
+| `error` | `text` (string) | `SM-error.bin` |
+| `notify` | `text` (string) | `SM-notify.bin` |
+| `tool_confirm` | `id` (string), `allowed` (bool, opt — present only in adapter→agent response) | `SM-tool-confirm.bin` |
+| `mcp` | `status` (string: one of `connecting`, `auth_confirm`, `auth_running`, `connected`, `failed`, `done`), `server` (string, opt), `url` (string, opt — set for `auth_confirm`; may contain `{{redirect_uri}}` and `{{state}}` placeholders), `error` (string, opt — set for `failed`) | `SM-mcp-connecting.bin`, `SM-mcp-auth-confirm.bin`, `SM-mcp-auth-running.bin`, `SM-mcp-connected.bin`, `SM-mcp-failed.bin`, `SM-mcp-done.bin` |
 
 Complete wire values:
 
 ```
-sm-message-version.bin         {"type":"version","data":{"message_version":9,"core_version":"(set at build time)"}}
-sm-model.bin                   {"type":"model","data":{"active_id":4,"active_name":"DeepSeek / DeepSeek-V4 Flash","context_limit":1000000}}
-sm-model-list.bin              {"type":"model_list","data":{"models":[{"id":0,"name":"Anthropic / Claude Haiku 4","protocol_type":"anthropic","base_url":"https://api.anthropic.com","api_key":"sk-ant-...","model_name":"claude-haiku-4-20260515","context_limit":200000,"max_tokens":0},{"id":4,"name":"DeepSeek / DeepSeek-V4 Flash","protocol_type":"openai","base_url":"https://api.deepseek.com/v1","api_key":"sk-ds-...","model_name":"deepseek-v4-flash","context_limit":1000000,"max_tokens":0}]}}
-sm-theme.bin                   {"type":"theme","data":{"name":"theme-dark"}}
-sm-theme-list.bin              {"type":"theme_list","data":{"themes":[{"name":"theme-dark","theme":{"primary":"#89d4fa","dim":"#313244","muted":"#6c7086","text":"#cdd6f4","warning":"#f9e2af","error":"#f38ba8","success":"#a6e3a1","selection":"#fab387","cursor":"#cdd6f4","added":"#a6e3a1","removed":"#f38ba8","fold_indicator":"⁝"}},{"name":"theme-light","theme":{"primary":"#1e66f5","dim":"#ccd0da","muted":"#9ca0b0","text":"#4c4f69","warning":"#df8e1d","error":"#d20f39","success":"#40a02b","selection":"#fe640b","cursor":"#dc8a78","added":"#40a02b","removed":"#d20f39","fold_indicator":"⁝"}}]}}
-sm-reasoning.bin               {"type":"reasoning","data":{"level":2}}
-sm-video-config.bin            {"type":"video_config","data":{"fps":5,"res":1}}
-sm-task-start.bin              {"type":"task","data":{"in_progress":true,"current_step":1,"max_steps":10,"context":0}}
-sm-task-end.bin                {"type":"task","data":{"in_progress":false,"context":1500}}
-sm-error.bin                   {"type":"error","data":{"text":"something broke"}}
-sm-notify.bin                  {"type":"notify","data":{"text":"all good"}}
-sm-tool-confirm.bin            {"type":"tool_confirm","data":{"id":"t1"}}
-sm-mcp-connecting.bin          {"type":"mcp","data":{"status":"connecting","server":"github"}}
-sm-mcp-auth-confirm.bin        {"type":"mcp","data":{"status":"auth_confirm","server":"github","url":"https://github.com/login/oauth/authorize?...redirect_uri={{redirect_uri}}&state={{state}}"}}
-sm-mcp-auth-running.bin        {"type":"mcp","data":{"status":"auth_running","server":"github"}}
-sm-mcp-connected.bin           {"type":"mcp","data":{"status":"connected","server":"github"}}
-sm-mcp-failed.bin              {"type":"mcp","data":{"status":"failed","server":"github","error":"connection timeout"}}
-sm-mcp-done.bin                {"type":"mcp","data":{"status":"done"}}
+SM-message-version.bin         {"type":"version","data":{"message_version":9,"core_version":"(set at build time)"}}
+SM-model.bin                   {"type":"model","data":{"active_id":4,"active_name":"DeepSeek / DeepSeek-V4 Flash","context_limit":1000000}}
+SM-model-list.bin              {"type":"model_list","data":{"models":[{"id":0,"name":"Anthropic / Claude Haiku 4","protocol_type":"anthropic","base_url":"https://api.anthropic.com","api_key":"sk-ant-...","model_name":"claude-haiku-4-20260515","context_limit":200000,"max_tokens":0},{"id":4,"name":"DeepSeek / DeepSeek-V4 Flash","protocol_type":"openai","base_url":"https://api.deepseek.com/v1","api_key":"sk-ds-...","model_name":"deepseek-v4-flash","context_limit":1000000,"max_tokens":0}]}}
+SM-theme.bin                   {"type":"theme","data":{"name":"theme-dark"}}
+SM-theme-list.bin              {"type":"theme_list","data":{"themes":[{"name":"theme-dark","theme":{"primary":"#89d4fa","dim":"#313244","muted":"#6c7086","text":"#cdd6f4","warning":"#f9e2af","error":"#f38ba8","success":"#a6e3a1","selection":"#fab387","cursor":"#cdd6f4","added":"#a6e3a1","removed":"#f38ba8","fold_indicator":"⁝"}},{"name":"theme-light","theme":{"primary":"#1e66f5","dim":"#ccd0da","muted":"#9ca0b0","text":"#4c4f69","warning":"#df8e1d","error":"#d20f39","success":"#40a02b","selection":"#fe640b","cursor":"#dc8a78","added":"#40a02b","removed":"#d20f39","fold_indicator":"⁝"}}]}}
+SM-reasoning.bin               {"type":"reasoning","data":{"level":2}}
+SM-video-config.bin            {"type":"video_config","data":{"fps":5,"res":1}}
+SM-task-start.bin              {"type":"task","data":{"in_progress":true,"current_step":1,"max_steps":10,"context":0}}
+SM-task-end.bin                {"type":"task","data":{"in_progress":false,"context":1500}}
+SM-error.bin                   {"type":"error","data":{"text":"something broke"}}
+SM-notify.bin                  {"type":"notify","data":{"text":"all good"}}
+SM-tool-confirm.bin            {"type":"tool_confirm","data":{"id":"t1"}}
+SM-mcp-connecting.bin          {"type":"mcp","data":{"status":"connecting","server":"github"}}
+SM-mcp-auth-confirm.bin        {"type":"mcp","data":{"status":"auth_confirm","server":"github","url":"https://github.com/login/oauth/authorize?...redirect_uri={{redirect_uri}}&state={{state}}"}}
+SM-mcp-auth-running.bin        {"type":"mcp","data":{"status":"auth_running","server":"github"}}
+SM-mcp-connected.bin           {"type":"mcp","data":{"status":"connected","server":"github"}}
+SM-mcp-failed.bin              {"type":"mcp","data":{"status":"failed","server":"github","error":"connection timeout"}}
+SM-mcp-done.bin                {"type":"mcp","data":{"status":"done"}}
 ```
 
 ## Use
 
 ```sh
 # Pipe a user prompt to the agent
-cat tlv-samples/ut-read-file.bin | alayacore --rawio
+cat tlv-samples/UT-read-file.bin | alayacore --rawio
 
 # Pipe a user prompt and decode the response frames
-cat tlv-samples/ut-read-file.bin | alayacore --rawio | go run ./misc/tlvcat.go
+cat tlv-samples/UT-read-file.bin | alayacore --rawio | go run ./misc/tlvcat.go
 
 # Decode a single frame (stdin or stdout direction)
-cat tlv-samples/af-read-file-start.bin | go run ./misc/tlvcat.go
+cat tlv-samples/AF-read-file-start.bin | go run ./misc/tlvcat.go
 
 # Decode a user echo frame (agent → adapter, with history ID)
-cat tlv-samples/ut-echo-hello.bin | go run ./misc/tlvcat.go
+cat tlv-samples/UT-echo-hello.bin | go run ./misc/tlvcat.go
 ```
 
 ## Generate Media Requests (Go)
