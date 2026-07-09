@@ -64,7 +64,7 @@ Each tag is two characters: **role** + **type**.
 **Case convention:** Uppercase tags carry complete/authoritative content.
 Lowercase tags carry streaming delta (incremental) content:
 - `At`/`Ar` — text/reasoning deltas, appended to the window per chunk
-- `AT`/`AR` — complete text/reasoning, replaces the accumulated delta content (useful for replay)
+- `AT`/`AR` — complete text/reasoning, sent after all deltas for that block (adapter may use this instead of or after accumulating deltas; useful for replay where no deltas precede it)
 - `Af` — tool argument delta, partial JSON chunk during streaming
 - `AF` — complete tool call (start + input frames)
 
@@ -103,10 +103,15 @@ The same history ID can appear multiple times — each subsequent frame is a
 continuation (delta) of that content block. The adapter concatenates them.
 
 **Complete/authoritative frames** use **uppercase** tags (`AT`, `AR`). These are
-sent after all deltas for a content block have been received. During live
-streaming the adapter already has the content from the deltas and may skip the
-complete frame. During replay (session load) only the uppercase frames are sent;
-no deltas precede them.
+sent after all deltas for a content block have been received. The adapter may
+choose either approach:
+- If it has accumulated deltas (`At`/`Ar`), it can **ignore** the uppercase frame
+  (deltas already represent the complete content).
+- Alternatively, it can **use** the uppercase frame as the authoritative source,
+  replacing any delta-accumulated content.
+
+During replay (session load) only the uppercase frames are sent; no deltas
+precede them — the adapter must use the uppercase frame to display the content.
 
 **History ID format:** a flat monotonic history counter (e.g. `1`, `2`, `3`).
 Each content block (text, reasoning, tool call, user content part) receives a
@@ -288,7 +293,7 @@ The **semantics** of the history ID differ by tag type:
 
 **Key rules:**
 - Different history ID → different content block (all tags)
-- No NUL prefix → plain text, no history ID (stdout: `at-plain.bin`, SM; stdin: all frames)
+- No NUL prefix → plain text, no history ID (stdout: `AT-plain.bin`, SM; stdin: all frames)
 - History IDs are ephemeral: rebuilt from `seqID++` on session load, not persisted
 - On session replay, ALL content parts (AT, AR, AF, UF, UT/UI/UA/UV/UD) carry a history ID,
   matching the format they had during live streaming
@@ -439,11 +444,12 @@ ut-echo-read-file.bin          UT \x00 5 \x00 Read the file main.go
 ui-echo-image.bin              UI \x00 2 \x00 data:image/jpeg;...
 ua-echo-audio-url.bin          UA \x00 3 \x00 https://...
 uv-echo-video-url.bin          UV \x00 4 \x00 https://...
-at-delta-hello.bin             AT \x00 1 \x00 Hello
-at-delta-world.bin             AT \x00 1 \x00 world (same stream)
-at-delta-new-step.bin          AT \x00 2 \x00 Next step (new stream)
-at-plain.bin                   AT "plain text without history id"   ← special case: no NUL prefix, no delta
-ar-delta.bin                   AR \x00 3 \x00 thinking...
+at-delta-hello.bin             At \x00 1 \x00 Hello
+at-delta-world.bin             At \x00 1 \x00 world (same stream)
+at-delta-new-step.bin          At \x00 2 \x00 Next step (new stream)
+AT-plain.bin                   AT "plain text without history id"   ← special case: no NUL prefix, no delta
+ar-delta.bin                   Ar \x00 3 \x00 thinking...
+AR-plain.bin                   AR "thinking about the solution..."   ← special case: no NUL prefix, no delta
 ```
 
 **stdout — tool frames (with history ID `\x00<id>\x00`, JSON `"id"` for matching):**
