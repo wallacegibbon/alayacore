@@ -517,7 +517,8 @@ func (s *Session) handleMCPCancel() {
 // handleMCPAuth handles the :mcp_auth command.
 //
 // Usage: :mcp_auth <server>                       → decline
-//        :mcp_auth <server> <code> <redirect_uri> → confirm + auth code
+//
+//	:mcp_auth <server> <code> <redirect_uri> → confirm + auth code
 func (s *Session) handleMCPAuth(_ context.Context, args string) {
 	fields := strings.Fields(args)
 	if len(fields) < 1 {

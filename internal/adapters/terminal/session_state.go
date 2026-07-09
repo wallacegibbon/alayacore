@@ -80,7 +80,6 @@ type toolConfirmPending struct {
 type mcpAuthPending struct {
 	server string
 	url    string
-	state  string
 }
 
 // updateTask atomically updates task progress fields.
@@ -209,23 +208,23 @@ func (s *sessionState) updateMCPProgress(status, server string) {
 
 // setMCPAuthPending appends a pending MCP auth confirmation to the queue.
 // Consumed by takeMCPAuthPending in the Terminal tick handler.
-func (s *sessionState) setMCPAuthPending(server, url, state string) {
+func (s *sessionState) setMCPAuthPending(server, url string) {
 	s.mu.Lock()
-	s.pendingMCPAuths = append(s.pendingMCPAuths, mcpAuthPending{server: server, url: url, state: state})
+	s.pendingMCPAuths = append(s.pendingMCPAuths, mcpAuthPending{server: server, url: url})
 	s.mu.Unlock()
 }
 
 // takeMCPAuthPending pops the next pending MCP auth confirmation.
 // Returns (server, url, ok). If queue is empty, ok is false.
-func (s *sessionState) takeMCPAuthPending() (server, url, state string, ok bool) {
+func (s *sessionState) takeMCPAuthPending() (server, url string, ok bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if len(s.pendingMCPAuths) == 0 {
-		return "", "", "", false
+		return "", "", false
 	}
 	p := s.pendingMCPAuths[0]
 	s.pendingMCPAuths = s.pendingMCPAuths[1:]
-	return p.server, p.url, p.state, true
+	return p.server, p.url, true
 }
 
 // clearMCPAuths discards all pending MCP auth confirmations.

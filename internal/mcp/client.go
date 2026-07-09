@@ -410,9 +410,6 @@ func (c *Client) setupStreamableAuth(transport Transport) error {
 	}
 	if provider != nil {
 		ht.SetAuthProvider(provider)
-		if pp, ok := provider.(*auth.PersistentTokenProvider); ok && c.config.URL != "" {
-			pp.SetResource(c.config.URL)
-		}
 	}
 	return nil
 }
@@ -693,7 +690,6 @@ func newAuthProvider(cfg *AuthConfig, tokenStore auth.TokenStore, serverName str
 				TokenEndpoint: cfg.TokenEndpoint,
 				ClientID:      cfg.ClientID,
 				ClientSecret:  cfg.ClientSecret,
-				Resource:      "", // will be set from server URL by caller
 			}
 			return auth.NewPersistentTokenProvider(base, tokenStore, serverName, refreshCfg), nil
 		}

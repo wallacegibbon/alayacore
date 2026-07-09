@@ -22,9 +22,6 @@ type RefreshConfig struct {
 
 	// ClientSecret is the OAuth client secret (optional for public clients).
 	ClientSecret string
-
-	// Resource is the RFC 8707 resource indicator (MCP server URL).
-	Resource string
 }
 
 // PersistentTokenProvider wraps a TokenProvider with on-disk persistence
@@ -201,9 +198,6 @@ func (p *PersistentTokenProvider) refreshToken(ctx context.Context, refreshToken
 	if p.refresh.ClientSecret != "" {
 		data.Set("client_secret", p.refresh.ClientSecret)
 	}
-	if p.refresh.Resource != "" {
-		data.Set("resource", p.refresh.Resource)
-	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", p.refresh.TokenEndpoint,
 		strings.NewReader(data.Encode()))
@@ -279,16 +273,6 @@ func (p *PersistentTokenProvider) InvalidateToken(_ context.Context) error {
 		}
 	}
 	return nil
-}
-
-// SetResource sets the RFC 8707 resource indicator for token refresh requests.
-// This is called by the MCP client to bind refresh tokens to the correct server.
-func (p *PersistentTokenProvider) SetResource(resource string) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if p.refresh != nil {
-		p.refresh.Resource = resource
-	}
 }
 
 // persistToken saves the token to disk via the store.

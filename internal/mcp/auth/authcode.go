@@ -2,8 +2,6 @@ package auth
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -20,7 +18,6 @@ type AuthCodeConfig struct {
 	ClientID     string
 	ClientSecret string // optional, for confidential clients
 	Scopes       []string
-	Resource     string // RFC 8707 resource indicator (MCP server URL)
 }
 
 // BuildAuthorizationURL constructs the authorization URL with all required parameters.
@@ -28,14 +25,9 @@ func BuildAuthorizationURL(meta *ASMetadata, cfg *AuthCodeConfig, pkce *PKCEPara
 	params := url.Values{}
 	params.Set("response_type", "code")
 	params.Set("client_id", cfg.ClientID)
-	params.Set("redirect_uri", redirectURI)
 	params.Set("code_challenge", pkce.CodeChallenge)
 	params.Set("code_challenge_method", pkce.Method)
-	params.Set("state", state)
 
-	if cfg.Resource != "" {
-		params.Set("resource", cfg.Resource)
-	}
 	if len(cfg.Scopes) > 0 {
 		params.Set("scope", strings.Join(cfg.Scopes, " "))
 	}
@@ -44,7 +36,11 @@ func BuildAuthorizationURL(meta *ASMetadata, cfg *AuthCodeConfig, pkce *PKCEPara
 	if err != nil {
 		return "", fmt.Errorf("parse authorization_endpoint: %w", err)
 	}
-	u.RawQuery = params.Encode()
+	// Build query string from safe params, then manually append
+	// placeholders so they remain raw ({{...}}) in the URL.
+	q := params.Encode()
+	q += "&redirect_uri=" + redirectURI + "&state=" + state
+	u.RawQuery = q
 	return u.String(), nil
 }
 
@@ -56,9 +52,6 @@ func ExchangeCode(ctx context.Context, meta *ASMetadata, cfg *AuthCodeConfig, pk
 	data.Set("redirect_uri", redirectURI)
 	data.Set("code_verifier", pkce.CodeVerifier)
 	data.Set("client_id", cfg.ClientID)
-	if cfg.Resource != "" {
-		data.Set("resource", cfg.Resource)
-	}
 	if cfg.ClientSecret != "" {
 		data.Set("client_secret", cfg.ClientSecret)
 	}
@@ -123,11 +116,4 @@ func ExchangeCode(ctx context.Context, meta *ASMetadata, cfg *AuthCodeConfig, pk
 	}
 
 	return token, nil
-}
-
-// RandomState generates a random hex string for OAuth state (CSRF protection).
-func RandomState() string {
-	buf := make([]byte, 16)
-	_, _ = rand.Read(buf)
-	return hex.EncodeToString(buf)
 }

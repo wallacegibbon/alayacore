@@ -55,7 +55,6 @@ type InitEvent struct {
 	Server string
 	URL    string // set for "auth_confirm"
 	Error  string // set for "failed"
-	State  string // set for "auth_confirm" — OAuth state for CSRF protection
 
 	// Set for "done" — fully converted results
 	Tools       []llm.Tool
@@ -85,8 +84,8 @@ type Init struct {
 	manager *Manager
 	configs []ServerConfig
 
-	events chan InitEvent // session reads from this
-	done   chan struct{}
+	events  chan InitEvent // session reads from this
+	done    chan struct{}
 	started sync.Once
 
 	// Per-server channel for OAuth auth code results.
@@ -272,9 +271,9 @@ func (init *Init) collectOAuthResult(ctx context.Context, c *Client) serverResul
 
 // runOAuthForServer runs the OAuth flow for a single server.
 //
-// It builds the authorization URL with a REDIRECT_URI_HERE placeholder
+// It builds the authorization URL with {{redirect_uri}} and {{state}} placeholders
 // and sends it to the adapter. The adapter starts a local callback server,
-// fills in the placeholder, opens the browser, and sends the authorization
+// fills in the placeholders, opens the browser, and sends the authorization
 // code back via SendAuthCodeResult().
 func (init *Init) runOAuthForServer(ctx context.Context, c *Client, meta *auth.ASMetadata, clientID string) ([]Tool, error) {
 	cfg := c.config.Auth
@@ -284,15 +283,14 @@ func (init *Init) runOAuthForServer(ctx context.Context, c *Client, meta *auth.A
 		return nil, fmt.Errorf("%q: pkce: %w", c.Name(), err)
 	}
 
-	state := auth.RandomState()
-	placeholderURI := "REDIRECT_URI_HERE"
+	placeholderURI := "{{redirect_uri}}"
+	placeholderState := "{{state}}"
 
 	authURL, err := auth.BuildAuthorizationURL(meta, &auth.AuthCodeConfig{
 		ClientID:     clientID,
 		ClientSecret: cfg.ClientSecret,
 		Scopes:       cfg.Scopes,
-		Resource:     c.config.URL,
-	}, pkce, placeholderURI, state)
+	}, pkce, placeholderURI, placeholderState)
 	if err != nil {
 		return nil, fmt.Errorf("%q: build auth URL: %w", c.Name(), err)
 	}
@@ -302,7 +300,6 @@ func (init *Init) runOAuthForServer(ctx context.Context, c *Client, meta *auth.A
 		Type:   InitAuthConfirm,
 		Server: c.Name(),
 		URL:    authURL,
-		State:  state,
 	})
 	authCodeCh := init.registerAuthCodeCh(c.Name())
 
@@ -327,7 +324,6 @@ func (init *Init) runOAuthForServer(ctx context.Context, c *Client, meta *auth.A
 		ClientID:     clientID,
 		ClientSecret: cfg.ClientSecret,
 		Scopes:       cfg.Scopes,
-		Resource:     c.config.URL,
 	}, pkce, acr.redirectURI, acr.code)
 	if err != nil {
 		return nil, fmt.Errorf("%q: exchange code: %w", c.Name(), err)

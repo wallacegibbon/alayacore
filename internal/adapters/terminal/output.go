@@ -415,7 +415,6 @@ func (to *outputWriter) handleSystemMCP(data json.RawMessage) {
 		Server string `json:"server,omitempty"`
 		URL    string `json:"url,omitempty"`
 		Error  string `json:"error,omitempty"`
-		State  string `json:"state,omitempty"`
 	}
 	if json.Unmarshal(data, &msg) != nil {
 		return
@@ -427,7 +426,7 @@ func (to *outputWriter) handleSystemMCP(data json.RawMessage) {
 	case "auth_confirm":
 		if msg.Server != "" {
 			to.status.updateMCPProgress("auth_confirm", msg.Server)
-			to.status.setMCPAuthPending(msg.Server, msg.URL, msg.State)
+			to.status.setMCPAuthPending(msg.Server, msg.URL)
 		}
 	case "auth_running":
 		to.status.updateMCPProgress(msg.Status, msg.Server)
@@ -464,7 +463,7 @@ func (to *outputWriter) GetPendingToolConfirm() (id, toolName, toolInput string,
 }
 
 // GetPendingMCPAuth returns a pending MCP auth confirmation, if any.
-func (to *outputWriter) GetPendingMCPAuth() (server, url, state string, ok bool) {
+func (to *outputWriter) GetPendingMCPAuth() (server, url string, ok bool) {
 	return to.status.takeMCPAuthPending()
 }
 

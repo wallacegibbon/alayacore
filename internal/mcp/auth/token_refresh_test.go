@@ -49,7 +49,6 @@ func TestPersistentTokenProvider_Refresh(t *testing.T) {
 		TokenEndpoint: ts.URL + "/token",
 		ClientID:      "test-client",
 		ClientSecret:  "test-secret",
-		Resource:      "https://mcp.example.com",
 	})
 
 	// Token() should trigger refresh because cached token is expired.
@@ -205,24 +204,6 @@ func TestPersistentTokenProvider_Invalidate(t *testing.T) {
 	}
 	if tok.AccessToken != "test-token" {
 		t.Errorf("got %q, want %q", tok.AccessToken, "test-token")
-	}
-}
-
-// Test that SetResource sets the resource on the refresh config.
-func TestPersistentTokenProvider_SetResource(t *testing.T) {
-	pp := NewPersistentTokenProvider(nil, nil, "test", nil)
-
-	// No refresh config — SetResource is a no-op.
-	pp.SetResource("https://example.com/mcp")
-
-	// With refresh config.
-	pp = NewPersistentTokenProvider(nil, nil, "test", &RefreshConfig{
-		TokenEndpoint: "https://auth.example.com/token",
-		ClientID:      "client",
-	})
-	pp.SetResource("https://mcp.example.com")
-	if pp.refresh.Resource != "https://mcp.example.com" {
-		t.Errorf("Resource = %q, want %q", pp.refresh.Resource, "https://mcp.example.com")
 	}
 }
 

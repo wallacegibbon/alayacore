@@ -4,6 +4,8 @@
 package platform
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"net/http"
@@ -14,6 +16,14 @@ import (
 type CallbackResult struct {
 	Code string
 	Err  error
+}
+
+// RandomState generates a random hex string suitable for OAuth state
+// (CSRF protection). Returns a 32-character hex string (128 bits).
+func RandomState() string {
+	buf := make([]byte, 16)
+	_, _ = rand.Read(buf)
+	return hex.EncodeToString(buf)
 }
 
 // StartCallbackServer starts a local HTTP server to receive the OAuth
