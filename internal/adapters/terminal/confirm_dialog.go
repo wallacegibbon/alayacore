@@ -70,6 +70,9 @@ type ConfirmDialog struct {
 	confirmed     bool
 	canceled      bool
 	ctrlGCanceled bool // true when canceled via Ctrl+G (MCP auth → cancel all)
+
+	// OAuth state for CSRF protection (set for ConfirmMCPAuth kind).
+	stateStr string
 }
 
 // NewConfirmDialog creates a new confirm dialog.
@@ -149,7 +152,7 @@ func (cd *ConfirmDialog) OpenCancel() {
 }
 
 // OpenMCPAuth opens the dialog for confirming MCP OAuth authorization.
-func (cd *ConfirmDialog) OpenMCPAuth(serverName, serverURL string) {
+func (cd *ConfirmDialog) OpenMCPAuth(serverName, serverURL, state string) {
 	cd.state = FilteredListOpen
 	cd.kind = ConfirmMCPAuth
 	cd.toolID = serverName
@@ -158,6 +161,7 @@ func (cd *ConfirmDialog) OpenMCPAuth(serverName, serverURL string) {
 	cd.Description = serverURL
 	cd.confirmed = false
 	cd.canceled = false
+	cd.stateStr = state
 }
 
 // OpenMCPInit opens the dialog to show that MCP servers are initializing.
@@ -222,6 +226,7 @@ func (cd *ConfirmDialog) Close() {
 	cd.toolID = ""
 	cd.toolName = ""
 	cd.toolInput = ""
+	cd.stateStr = ""
 	cd.confirmed = false
 	cd.canceled = false
 	cd.ctrlGCanceled = false
@@ -282,6 +287,7 @@ type ConfirmResult struct {
 	ToolID        string // server name (MCPAuth) or tool call ID (Tool)
 	ToolInput     string // authorization URL (MCPAuth) or tool input (Tool)
 	CtrlGCanceled bool   // true if canceled via Ctrl+G (MCPAuth → cancel all)
+	State         string // OAuth state for CSRF protection (MCPAuth only)
 }
 
 // ConsumeResult returns the result of the dialog interaction and resets
@@ -298,6 +304,7 @@ func (cd *ConfirmDialog) ConsumeResult() *ConfirmResult {
 		ToolID:        cd.toolID,
 		ToolInput:     cd.toolInput,
 		CtrlGCanceled: cd.ctrlGCanceled,
+		State:         cd.stateStr,
 	}
 
 	// Reset to closed state.

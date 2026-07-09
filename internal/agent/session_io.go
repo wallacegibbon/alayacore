@@ -516,14 +516,12 @@ func (s *Session) handleMCPCancel() {
 
 // handleMCPAuth handles the :mcp_auth command.
 //
-// Usage: :mcp_auth <server> yes|no
-//
-// Delegates to mcpService.Confirm() which unblocks the init goroutine so
-// it can proceed to the next server or launch OAuth.
+// Usage: :mcp_auth <server>                       → decline
+//        :mcp_auth <server> <code> <redirect_uri> → confirm + auth code
 func (s *Session) handleMCPAuth(_ context.Context, args string) {
-	name, action, _ := strings.Cut(args, " ")
-	if name == "" || action == "" {
-		s.writeError("usage: :mcp_auth <server> yes|no")
+	fields := strings.Fields(args)
+	if len(fields) < 1 {
+		s.writeError("usage: :mcp_auth <server> [<code> <redirect_uri>]")
 		return
 	}
 	if !s.mcpService.HasInit() {
@@ -534,19 +532,27 @@ func (s *Session) handleMCPAuth(_ context.Context, args string) {
 		s.writeError("MCP initialization has already completed.")
 		return
 	}
-	var accepted bool
-	switch action {
-	case "yes":
-		accepted = s.mcpService.Confirm(name, true)
-	case "no":
-		accepted = s.mcpService.Confirm(name, false)
-	default:
-		s.writeError("usage: :mcp_auth <server> yes|no")
+
+	server := fields[0]
+	if len(fields) == 1 {
+		// Just server name → decline
+		if s.mcpService.SendAuthCodeResult(server, "", "") {
+			s.writeNotifyf("MCP authorization for %q declined.", server)
+		} else {
+			s.writeError(fmt.Sprintf("No pending authorization for MCP server %q.", server))
+		}
 		return
 	}
-	if accepted {
-		s.writeNotifyf("MCP authorization for %q recorded.", name)
+
+	if len(fields) < 3 {
+		s.writeError("usage: :mcp_auth <server> [<code> <redirect_uri>]")
+		return
+	}
+	code := fields[1]
+	redirectURI := fields[2]
+	if s.mcpService.SendAuthCodeResult(server, code, redirectURI) {
+		s.writeNotifyf("MCP auth code received for %q.", server)
 	} else {
-		s.writeError(fmt.Sprintf("No pending authorization for MCP server %q.", name))
+		s.writeError(fmt.Sprintf("No pending auth for MCP server %q.", server))
 	}
 }

@@ -11,7 +11,7 @@ package mcp
 //
 // The session drives the flow by:
 //  1. Reading events from Events() channel
-//  2. For "auth_confirm" events: showing a dialog, calling init.Confirm(name, bool)
+//  2. For "auth_confirm" events: showing a dialog, sending result via mcp_auth
 //  3. For Ctrl+G: calling init.Cancel()
 //  4. For "done"/"canceled" event: applying final results or cleaning up
 //
@@ -55,6 +55,7 @@ type InitEvent struct {
 	Server string
 	URL    string // set for "auth_confirm"
 	Error  string // set for "failed"
+	State  string // set for "auth_confirm" — OAuth state for CSRF protection
 
 	// Set for "done" — fully converted results
 	Tools       []llm.Tool
@@ -71,21 +72,27 @@ type serverResult struct {
 	instrs    string
 }
 
+// authCodeResult carries the authorization code and redirect URI
+// from the adapter's callback server back to the init goroutine.
+type authCodeResult struct {
+	code        string
+	redirectURI string
+}
+
 // Init orchestrates MCP initialization from start to finish.
 // Thread-safe: all public methods are safe to call from any goroutine.
 type Init struct {
-	manager      *Manager
-	configs      []ServerConfig
-	callbackAddr string
+	manager *Manager
+	configs []ServerConfig
 
-	events  chan InitEvent // session reads from this
-	done    chan struct{}
+	events chan InitEvent // session reads from this
+	done   chan struct{}
 	started sync.Once
 
-	// Per-server confirmation channels for OAuth.
-	confirmChs map[string]chan bool
+	// Per-server channel for OAuth auth code results.
+	authCodeChs map[string]chan authCodeResult
 
-	mu           sync.Mutex // guards confirmChs and eventsClosed
+	mu           sync.Mutex // guards authCodeChs and eventsClosed
 	eventsClosed bool
 
 	cancel context.CancelFunc // set by Start(), cancels the init context
@@ -94,20 +101,12 @@ type Init struct {
 // NewInit creates an Init from server configurations.
 // Call Start() to begin initialization.
 func NewInit(configs []ServerConfig) *Init {
-	addr := "127.0.0.1:0"
-	for _, cfg := range configs {
-		if cfg.CallbackAddr != "" {
-			addr = cfg.CallbackAddr
-			break
-		}
-	}
 	return &Init{
-		manager:      NewManager(configs),
-		configs:      configs,
-		callbackAddr: addr,
-		events:       make(chan InitEvent, 64),
-		done:         make(chan struct{}),
-		confirmChs:   make(map[string]chan bool),
+		manager:     NewManager(configs),
+		configs:     configs,
+		events:      make(chan InitEvent, 64),
+		done:        make(chan struct{}),
+		authCodeChs: make(map[string]chan authCodeResult),
 	}
 }
 
@@ -141,34 +140,29 @@ func (init *Init) Cancel() {
 	}
 }
 
-// Confirm responds to an "auth_confirm" event.
-// The session calls this when the user decides yes/no for a server.
-// Returns true if the response was accepted (init is still running
-// and waiting for this server's confirmation).
-//
-// confirmCh is buffered (capacity 1) and the receiver is always waiting
-// on it before the session can call Confirm(), so the send always
-// succeeds immediately. No timeout is needed.
-func (init *Init) Confirm(server string, allow bool) bool {
+// registerAuthCodeCh creates a buffered auth code channel for a server
+// and registers it in the map. The channel is created BEFORE sending
+// the "auth_confirm" event to avoid races with SendAuthCodeResult().
+func (init *Init) registerAuthCodeCh(server string) chan authCodeResult {
+	ch := make(chan authCodeResult, 1)
 	init.mu.Lock()
-	ch, ok := init.confirmChs[server]
+	init.authCodeChs[server] = ch
+	init.mu.Unlock()
+	return ch
+}
+
+// SendAuthCodeResult delivers the authorization code from the adapter's
+// callback server to the init goroutine waiting in runOAuthForServer.
+// Returns false if no init goroutine is waiting for this server.
+func (init *Init) SendAuthCodeResult(server string, code string, redirectURI string) bool {
+	init.mu.Lock()
+	ch, ok := init.authCodeChs[server]
 	init.mu.Unlock()
 	if !ok {
 		return false
 	}
-	ch <- allow
+	ch <- authCodeResult{code: code, redirectURI: redirectURI}
 	return true
-}
-
-// registerConfirmCh creates a buffered confirm channel for a server
-// and registers it in the map. The channel is created BEFORE sending
-// the "auth_confirm" event to avoid a race with Confirm().
-func (init *Init) registerConfirmCh(server string) chan bool {
-	ch := make(chan bool, 1)
-	init.mu.Lock()
-	init.confirmChs[server] = ch
-	init.mu.Unlock()
-	return ch
 }
 
 // ============================================================================
@@ -260,11 +254,7 @@ func (init *Init) collectOAuthResult(ctx context.Context, c *Client) serverResul
 	cfg.TokenEndpoint = meta.TokenEndpoint
 	cfg.ClientID = clientID
 
-	// 2. Register confirm channel, then run OAuth flow.
-	//    onAuthURL sends auth_confirm to the adapter and blocks until
-	//    the user confirms or denies.
-	confirmCh := init.registerConfirmCh(c.Name())
-	tools, err := init.runOAuthForServer(ctx, c, meta, clientID, confirmCh, init.callbackAddr)
+	tools, err := init.runOAuthForServer(ctx, c, meta, clientID)
 	if err != nil {
 		msg := err.Error()
 		if errors.Is(err, errSkipped) {
@@ -281,7 +271,12 @@ func (init *Init) collectOAuthResult(ctx context.Context, c *Client) serverResul
 }
 
 // runOAuthForServer runs the OAuth flow for a single server.
-func (init *Init) runOAuthForServer(ctx context.Context, c *Client, meta *auth.ASMetadata, clientID string, confirmCh chan bool, listenAddr string) ([]Tool, error) {
+//
+// It builds the authorization URL with a REDIRECT_URI_HERE placeholder
+// and sends it to the adapter. The adapter starts a local callback server,
+// fills in the placeholder, opens the browser, and sends the authorization
+// code back via SendAuthCodeResult().
+func (init *Init) runOAuthForServer(ctx context.Context, c *Client, meta *auth.ASMetadata, clientID string) ([]Tool, error) {
 	cfg := c.config.Auth
 
 	pkce, err := auth.NewPKCE()
@@ -290,57 +285,50 @@ func (init *Init) runOAuthForServer(ctx context.Context, c *Client, meta *auth.A
 	}
 
 	state := auth.RandomState()
-	resultCh, redirectURI, cleanup := auth.StartCallbackServer(listenAddr, state)
-	defer cleanup()
+	placeholderURI := "REDIRECT_URI_HERE"
 
 	authURL, err := auth.BuildAuthorizationURL(meta, &auth.AuthCodeConfig{
 		ClientID:     clientID,
 		ClientSecret: cfg.ClientSecret,
 		Scopes:       cfg.Scopes,
 		Resource:     c.config.URL,
-	}, pkce, redirectURI, state)
+	}, pkce, placeholderURI, state)
 	if err != nil {
 		return nil, fmt.Errorf("%q: build auth URL: %w", c.Name(), err)
 	}
 
-	// Send URL to adapter and wait for user confirmation.
-	init.sendEvent(InitEvent{Type: InitAuthConfirm, Server: c.Name(), URL: authURL})
+	// Send URL template to adapter and wait for result.
+	init.sendEvent(InitEvent{
+		Type:   InitAuthConfirm,
+		Server: c.Name(),
+		URL:    authURL,
+		State:  state,
+	})
+	authCodeCh := init.registerAuthCodeCh(c.Name())
 
-	var allow bool
+	var acr authCodeResult
 	select {
-	case allow = <-confirmCh:
+	case acr = <-authCodeCh:
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
 
 	init.mu.Lock()
-	delete(init.confirmChs, c.Name())
+	delete(init.authCodeChs, c.Name())
 	init.mu.Unlock()
 
-	if !allow {
+	if acr.code == "" {
 		return nil, errSkipped
 	}
 
 	init.sendEvent(InitEvent{Type: InitAuthRunning, Server: c.Name()})
-
-	// Wait for OAuth callback.
-	var code string
-	select {
-	case res := <-resultCh:
-		if res.Err != nil {
-			return nil, fmt.Errorf("%q: callback: %w", c.Name(), res.Err)
-		}
-		code = res.Code
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
 
 	oauthToken, err := auth.ExchangeCode(ctx, meta, &auth.AuthCodeConfig{
 		ClientID:     clientID,
 		ClientSecret: cfg.ClientSecret,
 		Scopes:       cfg.Scopes,
 		Resource:     c.config.URL,
-	}, pkce, redirectURI, code)
+	}, pkce, acr.redirectURI, acr.code)
 	if err != nil {
 		return nil, fmt.Errorf("%q: exchange code: %w", c.Name(), err)
 	}

@@ -126,7 +126,7 @@ var defaultCommandDefs = []Command{
 		func(s *Session, _ context.Context, args string) { s.handleFork(args) }},
 	{CommandNameVideoConfig, "Set video FPS and resolution", "<fps> <0|1>", CmdIdle,
 		func(s *Session, _ context.Context, args string) { s.handleVideoConfig(args) }},
-	{CommandNameMCPAuth, "Authorize (yes) or skip (no) an MCP OAuth server", "<server> yes|no", CmdIdle,
+	{CommandNameMCPAuth, "Authorize or decline MCP OAuth server", "<server> [<code> <redirect_uri>]", CmdIdle,
 		func(s *Session, ctx context.Context, args string) { s.handleMCPAuth(ctx, args) }},
 	{CommandNameMCPSkip, "Cancel MCP initialization", "", CmdImmediate,
 		func(s *Session, _ context.Context, _ string) { s.handleMCPCancel() }},

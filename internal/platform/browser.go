@@ -1,5 +1,6 @@
-// Package platform provides OS-level utilities that are needed by both
-// the core and adapter layers (e.g., opening a URL in the default browser).
+// Package platform provides OS-level utilities for adapter implementations
+// (e.g., opening a URL in the default browser, starting an OAuth callback
+// server on localhost).
 package platform
 
 import (

@@ -104,7 +104,6 @@ and their tools are discovered at startup.
 | Flag | Description |
 |------|-------------|
 | `--debug-mcp` | Log raw JSON-RPC messages to `alayacore-debug-mcp-N.log` |
-| `--oauth-callback-addr` | Listen `address` for OAuth callback server. Default `127.0.0.1:0`. Use the core's external IP (e.g., `192.168.1.5:0`) if the browser runs on a different machine |
 
 ## Tool Naming
 

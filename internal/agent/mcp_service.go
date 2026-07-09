@@ -73,12 +73,14 @@ func (m *MCPService) Cancel() {
 	}
 }
 
-// Confirm responds to an auth_confirm event for a specific server.
-func (m *MCPService) Confirm(server string, allow bool) bool {
+// SendAuthCodeResult forwards the adapter's response (confirm + optional auth code)
+// to the MCP init goroutine waiting in runOAuthForServer.
+// code == "" means user declined; code != "" means confirmed + here's the code.
+func (m *MCPService) SendAuthCodeResult(server, code, redirectURI string) bool {
 	if m.init == nil {
 		return false
 	}
-	return m.init.Confirm(server, allow)
+	return m.init.SendAuthCodeResult(server, code, redirectURI)
 }
 
 // ============================================================================
@@ -103,6 +105,7 @@ type MCPMsgData struct {
 	Server string
 	URL    string
 	Error  string
+	State  string
 }
 
 // HandleEvent processes a single MCP initialization event.
@@ -138,6 +141,7 @@ func (m *MCPService) HandleEvent(evt *mcp.InitEvent) *MCPEventResult {
 				Status: "auth_confirm",
 				Server: evt.Server,
 				URL:    evt.URL,
+				State:  evt.State,
 			},
 		}
 
@@ -190,5 +194,6 @@ func (m *MCPService) sendSystemMsg(data *MCPMsgData) {
 		Server: data.Server,
 		URL:    data.URL,
 		Error:  data.Error,
+		State:  data.State,
 	})
 }

@@ -99,6 +99,7 @@ type MCPMsg struct {
 	Server string `json:"server,omitempty"`
 	URL    string `json:"url,omitempty"`   // set for "auth_confirm"
 	Error  string `json:"error,omitempty"` // set for "failed"
+	State  string `json:"state,omitempty"` // set for "auth_confirm" — OAuth CSRF state
 }
 
 func (MCPMsg) SystemMsgType() string { return "mcp" }

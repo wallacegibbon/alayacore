@@ -6,6 +6,7 @@ package terminal
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -248,12 +249,30 @@ func (m *Terminal) handleConfirmTool(r *ConfirmResult, fromCmd bool) (tea.Model,
 func (m *Terminal) handleConfirmMCPAuth(r *ConfirmResult, fromCmd bool) (tea.Model, tea.Cmd) {
 	switch {
 	case r.Confirmed:
-		if r.ToolInput != "" {
-			if err := platform.OpenURL(r.ToolInput); err != nil {
-				m.out.WriteError("Failed to open browser: %v", err)
-			}
+		// Start a callback server on the adapter's machine so the browser
+		// (also on this machine) can redirect to localhost.
+		resultCh, redirectURI, cleanup := platform.StartCallbackServer("127.0.0.1:0", r.State)
+
+		// Replace the placeholder in the auth URL with the actual redirect_uri.
+		encodedRedirect := url.QueryEscape(redirectURI)
+		filledURL := strings.ReplaceAll(r.ToolInput, "REDIRECT_URI_HERE", encodedRedirect)
+
+		if err := platform.OpenURL(filledURL); err != nil {
+			m.out.WriteError("Failed to open browser: %v", err)
 		}
-		m.emitCommand(":mcp_auth " + r.ToolID + " yes")
+
+		// Wait for the auth code in a background goroutine.
+		go func() {
+			res := <-resultCh
+			cleanup()
+			if res.Err != nil {
+				m.out.WriteError("MCP auth callback error: %v", res.Err)
+				m.emitCommand(":mcp_cancel")
+				return
+			}
+			m.emitCommand(fmt.Sprintf(":mcp_auth %s %s %s",
+				r.ToolID, res.Code, redirectURI))
+		}()
 	case r.CtrlGCanceled:
 		m.out.ClearMCPAuths()
 		m.emitCommand(":mcp_cancel")
@@ -261,7 +280,7 @@ func (m *Terminal) handleConfirmMCPAuth(r *ConfirmResult, fromCmd bool) (tea.Mod
 		if fromCmd {
 			m.input.SetValue("")
 		}
-		m.emitCommand(":mcp_auth " + r.ToolID + " no")
+		m.emitCommand(":mcp_auth " + r.ToolID)
 	}
 	m.restoreFocusAfterConfirm()
 	return m, scheduleTick()

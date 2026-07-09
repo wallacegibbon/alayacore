@@ -179,8 +179,8 @@ func (om *OverlayManager) OpenConfirmTool(id, toolName, toolInput string) {
 }
 
 // OpenConfirmMCPAuth opens the MCP OAuth authorization confirmation dialog.
-func (om *OverlayManager) OpenConfirmMCPAuth(serverName, serverURL string) {
-	om.confirmOverlay.OpenMCPAuth(serverName, serverURL)
+func (om *OverlayManager) OpenConfirmMCPAuth(serverName, serverURL, state string) {
+	om.confirmOverlay.OpenMCPAuth(serverName, serverURL, state)
 }
 
 // ============================================================================
@@ -219,8 +219,8 @@ func (om *OverlayManager) HandleMCPProgress(out OutputWriter) OverlayAction {
 	// 3. MCP auth confirm — open confirm dialog on top of init overlay.
 	// Same guard: don't overwrite an already-open confirm dialog.
 	if !om.confirmOverlay.IsOpen() {
-		if server, url, ok := out.GetPendingMCPAuth(); ok {
-			om.OpenConfirmMCPAuth(server, url)
+		if server, url, state, ok := out.GetPendingMCPAuth(); ok {
+			om.OpenConfirmMCPAuth(server, url, state)
 			return OverlayAction{OpenedConfirm: true}
 		}
 	}

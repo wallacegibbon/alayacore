@@ -75,7 +75,8 @@ func buildHelpItems() []HelpItem {
 		// Commands
 		{ID: nextID(), IsSection: true, Description: "Commands"},
 		{ID: nextID(), Key: ":confirm <id> <yes|no>", Description: "Confirm or deny pending tool", Type: HelpItemCommand},
-		{ID: nextID(), Key: ":mcp_auth <server> <yes|no>", Description: "Authorize MCP OAuth server", Type: HelpItemCommand},
+		{ID: nextID(), Key: ":mcp_auth <server> <code> <redirect_uri>", Description: "Confirm OAuth authorization", Type: HelpItemCommand},
+		{ID: nextID(), Key: ":mcp_auth <server>", Description: "Decline OAuth authorization", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":mcp_cancel", Description: "Cancel MCP initialization", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":continue", Description: "Retry last prompt", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":reason <0|1|2>", Description: "Set reasoning level", Type: HelpItemCommand},
@@ -83,7 +84,7 @@ func buildHelpItems() []HelpItem {
 		{ID: nextID(), Key: ":summarize", Description: "Summarize & compress history", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":theme_set <name>", Description: "Switch theme by name", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":model_set <id>", Description: "Switch model by ID", Type: HelpItemCommand},
-		{ID: nextID(), Key: ":model_load", Description: "Reload model config from file", Type: HelpItemCommand},
+		{ID: nextID(), Key: ":model_load", Description: "Reload model config", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":model_sync", Description: "Apply edited model config", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":save [filename]", Description: "Save session", Type: HelpItemCommand},
 		{ID: nextID(), Key: ":fork <id> <filename>", Description: "Fork session up to content", Type: HelpItemCommand},
