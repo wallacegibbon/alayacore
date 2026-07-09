@@ -349,6 +349,10 @@ func (init *Init) runOAuthForServer(ctx context.Context, c *Client, meta *auth.A
 	cfg.obtainedToken = token
 
 	// Reconnect with the obtained token.
+	// The first Connect attempt returned ErrNeedsAuth, leaving the client
+	// in StateFailed (see Connect's deferred cleanup). We must reset to
+	// StateDisconnected before retrying — Connect uses CAS from
+	// StateDisconnected → StateConnecting and would reject StateFailed.
 	c.resetState()
 	if err := c.Connect(ctx); err != nil {
 		cfg.obtainedToken = nil
