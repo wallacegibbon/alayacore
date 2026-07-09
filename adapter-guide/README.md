@@ -293,7 +293,7 @@ The **semantics** of the history ID differ by tag type:
 
 **Key rules:**
 - Different history ID → different content block (all tags)
-- No NUL prefix → plain text, no history ID (stdout: `AT-plain.bin`, SM; stdin: all frames)
+- No NUL prefix → plain text, no history ID (SM only; stdin: all frames)
 - History IDs are ephemeral: rebuilt from `seqID++` on session load, not persisted
 - On session replay, ALL content parts (AT, AR, AF, UF, UT/UI/UA/UV/UD) carry a history ID,
   matching the format they had during live streaming
@@ -447,9 +447,7 @@ UV-echo-video-url.bin          UV \x00 4 \x00 https://...
 At-hello.bin                   At \x00 1 \x00 Hello
 At-world.bin                   At \x00 1 \x00 world (same stream)
 At-new-step.bin                At \x00 2 \x00 Next step (new stream)
-AT-plain.bin                   AT "plain text without history id"   ← special case: no NUL prefix, no delta
 Ar-thinking.bin                Ar \x00 3 \x00 thinking...
-AR-plain.bin                   AR "thinking about the solution..."   ← special case: no NUL prefix, no delta
 ```
 
 **stdout — tool frames (with history ID `\x00<id>\x00`, JSON `"id"` for matching):**
