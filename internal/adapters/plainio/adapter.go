@@ -48,12 +48,15 @@ func (a *Adapter) Start() int {
 		return 1
 	}
 
+	// done is closed on error to discard any buffered stdin lines.
+	done := make(chan struct{})
+
 	exitCh := make(chan int, 1)
 
 	// readStdin reads prompts from stdin and emits TLV messages.
 	// Only this goroutine touches inputWriter.
 	readStdin := func() {
-		err := readPrompts(inputWriter, os.Stdin)
+		err := readPrompts(done, inputWriter, os.Stdin)
 		// Close signals EOF regardless, unblocking the session.
 		inputWriter.Close()
 		if err != nil {
@@ -76,6 +79,10 @@ func (a *Adapter) Start() int {
 	case code = <-exitCh:
 	case <-output.ErrorChannel():
 		code = 1
+		// Close done first so the next line read from bufio.Reader's
+		// internal buffer is discarded rather than processed.
+		close(done)
+		// Then close stdin to unblock the pending ReadString.
 		os.Stdin.Close()
 	case <-session.Done():
 	}

@@ -10,13 +10,25 @@ import (
 
 // readPrompts reads lines from stdin and emits them as TLV messages.
 // Lines ending with `\` are continued on the next line (backslash-escaped newline).
-// Returns nil on EOF (Ctrl-D) or an error.
-func readPrompts(input io.Writer, reader io.Reader) error {
+// Returns nil on EOF (Ctrl-D), a read error, or when done is closed.
+// When done is closed, any line already buffered in bufio.Reader is discarded.
+func readPrompts(done <-chan struct{}, input io.Writer, reader io.Reader) error {
 	scanner := bufio.NewReader(reader)
 	var prompt strings.Builder
 
 	for {
 		line, err := scanner.ReadString('\n')
+
+		// Check for cancellation before processing any data.
+		// This ensures buffered lines (bufio.Reader internal buffer)
+		// are discarded when done is closed, even if the underlying
+		// file descriptor was already closed.
+		select {
+		case <-done:
+			return nil
+		default:
+		}
+
 		if err != nil {
 			if err == io.EOF {
 				if prompt.Len() > 0 || len(line) > 0 {

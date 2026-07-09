@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/alayacore/alayacore/internal/tlv"
 )
@@ -13,7 +14,7 @@ func TestReadPrompts_SingleLine(t *testing.T) {
 	var buf bytes.Buffer
 	input := strings.NewReader("hello\n")
 
-	err := readPrompts(&buf, input)
+	err := readPrompts(nil, &buf, input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -43,7 +44,7 @@ func TestReadPrompts_MultiLineBackslash(t *testing.T) {
 	var buf bytes.Buffer
 	input := strings.NewReader("first line\\\nsecond line\\\nthird line\n")
 
-	err := readPrompts(&buf, input)
+	err := readPrompts(nil, &buf, input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -75,7 +76,7 @@ func TestReadPrompts_TrailingBackslash(t *testing.T) {
 	// Trailing backslash at EOF with no continuation — the backslash
 	// is consumed, leaving "hello" as the accumulated text.
 
-	err := readPrompts(&buf, input)
+	err := readPrompts(nil, &buf, input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -105,7 +106,7 @@ func TestReadPrompts_MultipleLines(t *testing.T) {
 	var buf bytes.Buffer
 	input := strings.NewReader("first\nsecond\nthird\n")
 
-	err := readPrompts(&buf, input)
+	err := readPrompts(nil, &buf, input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -137,7 +138,7 @@ func TestReadPrompts_EmptyLines(t *testing.T) {
 	var buf bytes.Buffer
 	input := strings.NewReader("hello\n\n\nworld\n")
 
-	err := readPrompts(&buf, input)
+	err := readPrompts(nil, &buf, input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -174,7 +175,7 @@ func TestReadPrompts_EOFPartialLine(t *testing.T) {
 	var buf bytes.Buffer
 	input := strings.NewReader("partial prompt")
 
-	err := readPrompts(&buf, input)
+	err := readPrompts(nil, &buf, input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -204,7 +205,7 @@ func TestReadPrompts_Command(t *testing.T) {
 	var buf bytes.Buffer
 	input := strings.NewReader(":cancel\n")
 
-	err := readPrompts(&buf, input)
+	err := readPrompts(nil, &buf, input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -233,7 +234,7 @@ func TestReadPrompts_QuitCommand(t *testing.T) {
 
 	// :quit should return nil immediately without any output
 	input := strings.NewReader("some text\n:quit\nmore text\n")
-	err := readPrompts(&buf, input)
+	err := readPrompts(nil, &buf, input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -269,7 +270,7 @@ func TestReadPrompts_BackslashThenEOF(t *testing.T) {
 	var buf bytes.Buffer
 	input := strings.NewReader("hello\\\n")
 
-	err := readPrompts(&buf, input)
+	err := readPrompts(nil, &buf, input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -299,10 +300,83 @@ func TestReadPrompts_ReturnsEOFError(t *testing.T) {
 	var buf bytes.Buffer
 	input := &errorReader{}
 
-	err := readPrompts(&buf, input)
+	err := readPrompts(nil, &buf, input)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
+}
+
+func TestReadPrompts_DoneDiscardsBufferedLine(t *testing.T) {
+	// When done is closed, readPrompts should discard any line that was
+	// already buffered in bufio.Reader and return nil.
+	t.Run("closed before any read", func(t *testing.T) {
+		var buf bytes.Buffer
+		input := strings.NewReader("should be discarded\n")
+		done := make(chan struct{})
+		close(done)
+
+		err := readPrompts(done, &buf, input)
+		if err != nil {
+			t.Fatalf("expected nil, got %v", err)
+		}
+		if buf.Len() > 0 {
+			t.Errorf("expected no output when done is already closed, got %d bytes", buf.Len())
+		}
+	})
+
+	t.Run("closed after partial read", func(t *testing.T) {
+		var buf bytes.Buffer
+		pr, pw := io.Pipe()
+
+		done := make(chan struct{})
+
+		// Start reading in a goroutine (simulates real usage).
+		errCh := make(chan error, 1)
+		go func() {
+			errCh <- readPrompts(done, &buf, pr)
+		}()
+
+		// Write one full line and give it time to be consumed.
+		_, err := pw.Write([]byte("first\n"))
+		if err != nil {
+			t.Fatalf("write failed: %v", err)
+		}
+		time.Sleep(50 * time.Millisecond)
+
+		// Close done while there's more data pending in the pipe.
+		close(done)
+		// Close the pipe writer to unblock ReadString (same role as
+		// os.Stdin.Close() in the real adapter).
+		_ = pw.Close()
+
+		err = <-errCh
+		if err != nil {
+			t.Fatalf("expected nil, got %v", err)
+		}
+
+		// "first" should have been emitted with UE.
+		tag, value, err := tlv.ReadTLV(&buf)
+		if err != nil {
+			t.Fatalf("failed to read UT: %v", err)
+		}
+		if tag != tlv.TagUserT {
+			t.Errorf("expected UT, got %s", tag)
+		}
+		if value != "first" {
+			t.Errorf("expected 'first', got %q", value)
+		}
+		tag, _, err = tlv.ReadTLV(&buf)
+		if err != nil {
+			t.Fatalf("failed to read UE: %v", err)
+		}
+		if tag != tlv.TagUserEnd {
+			t.Errorf("expected UE, got %s", tag)
+		}
+		// No more data — subsequent lines are discarded.
+		if buf.Len() > 0 {
+			t.Errorf("expected no more data after done closed, got %d bytes", buf.Len())
+		}
+	})
 }
 
 // errorReader returns an error on every read
