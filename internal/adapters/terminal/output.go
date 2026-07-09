@@ -224,7 +224,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 		to.windowBuffer.HandleToolInputDelta(fd.ID, name, fd.Delta, parseHistoryID(id))
 
 	// Function result (JSON: id, content, is_error)
-	// May carry NUL-delimited historyID prefix
+	// Carries NUL-delimited historyID prefix
 	case tlv.TagUserF:
 		id, payload, ok := tlv.UnwrapID(value)
 		if !ok {

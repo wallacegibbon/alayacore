@@ -154,8 +154,6 @@ func (o *stdoutOutput) handleTag(tag, value string) {
 // history IDs, then prints the content delta.
 func (o *stdoutOutput) handleTextDelta(tag, value string) {
 	id, content, _ := tlv.UnwrapID(value)
-	// When id is "" (replayed from session file, no NUL prefix),
-	// we just track it as-is — no history transition to detect.
 	if o.lastHistoryID != "" && o.lastTag != tag {
 		// Transitioning from a different tag → separator
 		fmt.Fprintln(o.writer)

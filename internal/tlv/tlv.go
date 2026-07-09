@@ -106,7 +106,7 @@ func WrapID(id string, content string) string {
 
 // UnwrapID extracts the NUL-delimited history ID prefix from a value.
 // Returns (id, content, true) on success, ("", value, false) if the
-// value has no NUL prefix (e.g. plain text from session replay).
+// value has no NUL prefix (history ID not present).
 func UnwrapID(value string) (id string, content string, ok bool) {
 	if len(value) == 0 || value[0] != 0 {
 		return "", value, false
