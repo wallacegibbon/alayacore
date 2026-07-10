@@ -25,7 +25,8 @@ type RefreshConfig struct {
 	ClientSecret string
 
 	// ClientAuthMethod is the OAuth client authentication method to use.
-	// Supported values: "client_secret_basic" or "client_secret_post".
+	// Supported values: "none", "client_secret_basic", or "client_secret_post".
+	// "none" means public client (no client authentication).
 	// If empty, defaults to "client_secret_basic".
 	ClientAuthMethod string
 }
@@ -210,7 +211,9 @@ func (p *PersistentTokenProvider) refreshToken(ctx context.Context, refreshToken
 		authMethod = AuthMethodClientSecretBasic
 	}
 
-	if p.refresh.ClientSecret == "" {
+	// For confidential clients (basic/post), a client_secret is required.
+	// Public clients (none) skip authentication entirely.
+	if authMethod != AuthMethodNone && p.refresh.ClientSecret == "" {
 		return nil, fmt.Errorf("client_secret is required when using %q authentication method for refresh", authMethod)
 	}
 

@@ -17,6 +17,7 @@ import (
 const (
 	AuthMethodClientSecretBasic = "client_secret_basic"
 	AuthMethodClientSecretPost  = "client_secret_post"
+	AuthMethodNone              = "none"
 )
 
 // ErrUnsupportedAuthMethod is returned when the authorization server only
@@ -26,8 +27,7 @@ var ErrUnsupportedAuthMethod = errors.New("server requires a client authenticati
 // SelectAuthMethod determines the client authentication method based on the
 // authorization server's advertised capabilities.
 //
-// Returns the method to use, an empty string if the server only supports
-// "none" (public client), or ErrUnsupportedAuthMethod if the server only
+// Returns the method to use, or ErrUnsupportedAuthMethod if the server only
 // lists methods this client doesn't implement.
 func SelectAuthMethod(meta *ASMetadata) (string, error) {
 	if len(meta.TokenEndpointAuthMethodsSupported) == 0 {
@@ -44,7 +44,7 @@ func SelectAuthMethod(meta *ASMetadata) (string, error) {
 			hasBasic = true
 		case AuthMethodClientSecretPost:
 			hasPost = true
-		case "none":
+		case AuthMethodNone:
 			hasNone = true
 		}
 	}
@@ -55,7 +55,7 @@ func SelectAuthMethod(meta *ASMetadata) (string, error) {
 	case hasPost:
 		return AuthMethodClientSecretPost, nil
 	case hasNone:
-		return "", nil
+		return AuthMethodNone, nil
 	default:
 		// Server only lists methods we don't implement (e.g. private_key_jwt,
 		// tls_client_auth). Don't guess — error out.
@@ -109,12 +109,12 @@ func ExchangeCode(ctx context.Context, meta *ASMetadata, cfg *AuthCodeConfig, pk
 	if err != nil {
 		return nil, err
 	}
-	if authMethod != "" && cfg.ClientSecret == "" {
+	if authMethod != AuthMethodNone && cfg.ClientSecret == "" {
 		return nil, fmt.Errorf("client_secret is required when using %q authentication method", authMethod)
 	}
 	useBasic := authMethod == AuthMethodClientSecretBasic && cfg.ClientSecret != ""
 	usePost := authMethod == AuthMethodClientSecretPost && cfg.ClientSecret != ""
-	// If the server only advertises "none" (public client), don't send
+	// If the server only supports "none" (public client), don't send
 	// any client authentication regardless of configured client_secret.
 	// Sending credentials when the server explicitly says it only supports
 	// "none" will be rejected.

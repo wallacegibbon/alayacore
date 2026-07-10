@@ -31,8 +31,9 @@ type Token struct {
 
 	// ClientAuthMethod is the OAuth client authentication method used
 	// when obtaining this token. Saved so that token refresh uses the
-	// same method. Values: "client_secret_basic" or "client_secret_post".
-	// When empty (legacy tokens), defaults to "client_secret_basic".
+	// same method. Values: "none" (public client), "client_secret_basic",
+	// or "client_secret_post". When empty (legacy tokens), defaults to
+	// "client_secret_basic".
 	ClientAuthMethod string `json:"client_auth_method,omitempty"`
 }
 
