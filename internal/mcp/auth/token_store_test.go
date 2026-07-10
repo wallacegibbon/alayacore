@@ -174,12 +174,12 @@ func TestFileTokenStore_NonExpiringToken(t *testing.T) {
 	}
 
 	// Verify file content — should NOT have expires_at field
-	data, err := os.ReadFile(store.tokenFileName("test-server"))
+	data, err := os.ReadFile(store.tokenFilePath("test-server"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if contains(string(data), "expires_at") {
-		t.Errorf("non-expiring token should not have expires_at field in JSON, got: %s", data)
+		t.Errorf("non-expiring token should not have expires_at field, got: %s", data)
 	}
 
 	// Load and verify

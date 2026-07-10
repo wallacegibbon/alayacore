@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -14,9 +15,11 @@ import (
 //	key: value
 //	key: "quoted value"
 //
-// Supported types: string, int*, uint*, bool, float*, time.Time.
+// Supported types: string, int*, uint*, bool, float*, time.Time, []string,
+// map[string]string.
 //   - Strings are double-quoted and escaped (via escapeQuotedStr).
 //   - time.Time is formatted as RFC3339.
+//   - Slices and maps are serialized as JSON so the parser can read them back.
 //   - All other types use their default fmt/strconv formatting.
 //
 // Fields with a `omitempty` config tag option are skipped when zero-valued.
@@ -89,6 +92,9 @@ func formatFieldValue(v reflect.Value) string {
 		return strconv.FormatBool(v.Bool())
 	case reflect.Float32, reflect.Float64:
 		return strconv.FormatFloat(v.Float(), 'f', -1, 64)
+	case reflect.Slice, reflect.Map:
+		data, _ := json.Marshal(v.Interface())
+		return string(data)
 	default:
 		return fmt.Sprintf("%v", v.Interface())
 	}

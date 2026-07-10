@@ -48,7 +48,7 @@ auth-client-secret: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 | `auth-type` | Yes for OAuth | `authorization_code` or `static` |
 | `auth-client-id` | Yes for `authorization_code` | Your OAuth app's client ID |
 | `auth-client-secret` | No | OAuth client secret (required by most services) |
-| `auth-scopes` | No | Comma-separated OAuth scopes to request |
+| `auth-scopes` | No | JSON array of OAuth scopes to request (e.g. `["repo", "gist"]`) |
 
 For `static` auth, provide a pre-obtained token:
 
@@ -223,7 +223,7 @@ grant_type=authorization_code
 
 ### 5. Connect with Token
 
-AlayaCore saves the token to disk (`~/.alayacore/mcp-tokens/{server}.json`)
+AlayaCore saves the token to disk (`~/.alayacore/mcp-cache/{server}.conf`)
 and reconnects to the MCP server with the access token in the
 `Authorization` header:
 
@@ -261,19 +261,21 @@ restarts from the authorization step.
 
 ## Token Storage
 
-Tokens are persisted to disk at `~/.alayacore/mcp-tokens/{server}.json`:
+Tokens are persisted to disk at `~/.alayacore/mcp-cache/{server}.conf`:
 
-```json
-{
-  "access_token": "ghu_...",
-  "token_type": "Bearer",
-  "refresh_token": "ghr_...",
-  "expires_at": "2026-07-10T12:00:00+08:00",
-  "scopes": [],
-  "token_endpoint": "https://github.com/login/oauth/access_token",
-  "client_id": "<your-client-id>"
-}
+```ini
+access_token: "ghu_..."
+token_type: "Bearer"
+refresh_token: "ghr_..."
+expires_at: 1744112345
+scopes: ["repo", "gist"]
+token_endpoint: "https://github.com/login/oauth/access_token"
+client_id: "<your-client-id>"
+client_auth_method: "client_secret_basic"
 ```
+
+The format uses the same key-value syntax as `mcp.conf`, with JSON-encoded
+values for arrays and maps.
 
 On restart, tokens are loaded from disk. If the stored token is
 expired, it is refreshed automatically without user interaction.
@@ -328,4 +330,4 @@ Only two of these are user-facing interactive services:
   app credentials, reducing the risk of shared credential revocation
   or rate-limiting
 - **Tokens are stored on disk** with the same permissions as other
-  config files (`~/.alayacore/mcp-tokens/`)
+  config files (`~/.alayacore/mcp-cache/`)

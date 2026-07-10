@@ -61,7 +61,7 @@ auth-client-secret: <your-client-secret>
 | `args` | No | JSON array of command-line arguments |
 | `env` | No | JSON object of environment variables (`{"KEY": "val"}`) |
 | `auth-type` | No | OAuth type: `authorization_code` or `static` |
-| `auth-scopes` | No | Comma-separated OAuth scopes (for `authorization_code` only) |
+| `auth-scopes` | No | JSON array of OAuth scopes to request (e.g. `["repo", "gist"]`) |
 | `auth-client-id` | No* | OAuth client ID (required for `authorization_code`) |
 | `auth-client-secret` | No | OAuth client secret (required by some services for `authorization_code`) |
 | `auth-token` | No | Pre-obtained access token (for `static` auth only) |

@@ -1,12 +1,14 @@
 package auth
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/alayacore/alayacore/internal/config"
 )
 
 // TokenStore defines the interface for persisting and loading OAuth tokens.
@@ -23,9 +25,11 @@ type TokenStore interface {
 	DeleteToken(serverID string) error
 }
 
-// FileTokenStore persists OAuth tokens as JSON files on disk.
+// FileTokenStore persists OAuth tokens as key-value config files on disk.
 // Tokens are stored in a single directory, one file per server.
 // The directory is created on first use if it does not exist.
+//
+// Format: key-value with JSON values for complex types (same as mcp.conf).
 type FileTokenStore struct {
 	dir string
 	mu  sync.RWMutex
@@ -37,17 +41,13 @@ func NewFileTokenStore(dir string) *FileTokenStore {
 	return &FileTokenStore{dir: dir}
 }
 
-// tokenFileName returns the file path for a given server ID.
-// The server ID is sanitized to prevent directory traversal.
-func (s *FileTokenStore) tokenFileName(serverID string) string {
-	// Sanitize: replace any path separators with underscore
-	safeName := sanitizeFileTokenName(serverID)
-	return filepath.Join(s.dir, safeName+".json")
+// tokenFilePath returns the file path for a given server ID.
+func (s *FileTokenStore) tokenFilePath(serverID string) string {
+	return filepath.Join(s.dir, sanitizeFileTokenName(serverID)+".conf")
 }
 
 // sanitizeFileTokenName replaces characters problematic for file names.
 func sanitizeFileTokenName(name string) string {
-	// Replace path separators and null bytes, keep most other chars
 	result := make([]byte, 0, len(name))
 	for i := 0; i < len(name); i++ {
 		c := name[i]
@@ -57,30 +57,22 @@ func sanitizeFileTokenName(name string) string {
 		case c == '.' || c == '-' || c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'):
 			result = append(result, c)
 		default:
-			// Encode other characters as hex to avoid file system issues
 			result = append(result, fmt.Sprintf("_%02x", c)...)
 		}
 	}
 	return string(result)
 }
 
-// tokenFilePayload is the on-disk structure for a persisted token.
-// It mirrors Token but ensures JSON serialization is explicit.
+// tokenFilePayload mirrors Token for serialization.
 type tokenFilePayload struct {
-	AccessToken  string   `json:"access_token"`
-	TokenType    string   `json:"token_type"`
-	RefreshToken string   `json:"refresh_token,omitempty"`
-	ExpiresAt    int64    `json:"expires_at,omitempty"` // Unix timestamp (seconds), 0 = no expiration
-	Scopes       []string `json:"scopes,omitempty"`
-
-	// Refresh metadata (saved alongside token for automatic refresh).
-	TokenEndpoint string `json:"token_endpoint,omitempty"`
-	ClientID      string `json:"client_id,omitempty"`
-
-	// ClientAuthMethod is the OAuth client authentication method used
-	// when obtaining this token. Values: "client_secret_basic" or
-	// "client_secret_post". If empty, "client_secret_basic" is assumed.
-	ClientAuthMethod string `json:"client_auth_method,omitempty"`
+	AccessToken      string   `config:"access_token"`
+	TokenType        string   `config:"token_type"`
+	RefreshToken     string   `config:"refresh_token,omitempty"`
+	ExpiresAt        int64    `config:"expires_at,omitempty"` // Unix timestamp (seconds), 0 = no expiration
+	Scopes           []string `config:"scopes,omitempty"`
+	TokenEndpoint    string   `config:"token_endpoint,omitempty"`
+	ClientID         string   `config:"client_id,omitempty"`
+	ClientAuthMethod string   `config:"client_auth_method,omitempty"`
 }
 
 // LoadToken loads a persisted token for the given server ID.
@@ -89,7 +81,7 @@ func (s *FileTokenStore) LoadToken(serverID string) (*Token, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	path := s.tokenFileName(serverID)
+	path := s.tokenFilePath(serverID)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -99,10 +91,19 @@ func (s *FileTokenStore) LoadToken(serverID string) (*Token, error) {
 	}
 
 	var payload tokenFilePayload
-	if err := json.Unmarshal(data, &payload); err != nil {
-		return nil, fmt.Errorf("parse token file %s: %w", path, err)
+	if errs := config.ParseKeyValue(string(data), &payload); len(errs) > 0 {
+		var msgs []string
+		for _, e := range errs {
+			msgs = append(msgs, e.String())
+		}
+		return nil, fmt.Errorf("parse token file %s: %s", path, strings.Join(msgs, "; "))
 	}
 
+	return payloadToToken(&payload), nil
+}
+
+// payloadToToken converts a tokenFilePayload to a Token.
+func payloadToToken(payload *tokenFilePayload) *Token {
 	token := &Token{
 		AccessToken:      payload.AccessToken,
 		TokenType:        payload.TokenType,
@@ -115,9 +116,7 @@ func (s *FileTokenStore) LoadToken(serverID string) (*Token, error) {
 	if payload.ExpiresAt > 0 {
 		token.ExpiresAt = unixTime(payload.ExpiresAt)
 	}
-	// If ExpiresAt is 0, it stays as zero value → Valid() treats it as non-expiring.
-
-	return token, nil
+	return token
 }
 
 // SaveToken persists a token for the given server ID.
@@ -129,7 +128,6 @@ func (s *FileTokenStore) SaveToken(serverID string, token *Token) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// Ensure directory exists.
 	if err := os.MkdirAll(s.dir, 0700); err != nil {
 		return fmt.Errorf("create token dir %s: %w", s.dir, err)
 	}
@@ -146,15 +144,11 @@ func (s *FileTokenStore) SaveToken(serverID string, token *Token) error {
 	if !token.ExpiresAt.IsZero() {
 		payload.ExpiresAt = token.ExpiresAt.Unix()
 	}
-	// If ExpiresAt is zero (no expiration), omit the field in JSON.
 
-	data, err := json.MarshalIndent(payload, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal token: %w", err)
-	}
+	data := config.FormatKeyValue(&payload)
 
-	path := s.tokenFileName(serverID)
-	if err := os.WriteFile(path, data, 0600); err != nil {
+	path := s.tokenFilePath(serverID)
+	if err := os.WriteFile(path, []byte(data), 0600); err != nil {
 		return fmt.Errorf("write token file %s: %w", path, err)
 	}
 
@@ -166,7 +160,7 @@ func (s *FileTokenStore) DeleteToken(serverID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	path := s.tokenFileName(serverID)
+	path := s.tokenFilePath(serverID)
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("delete token file %s: %w", path, err)
 	}

@@ -195,6 +195,6 @@ func initMCPAsync(cfg *config.Settings) (*mcp.Init, []string) {
 // Returns nil if the config directory cannot be determined.
 func createTokenStore(cfg *config.Settings) *auth.FileTokenStore {
 	// Derive token directory from the config path directory (parent of mcp.conf).
-	tokenDir := filepath.Join(filepath.Dir(cfg.MCPConfigPath), "mcp-tokens")
+	tokenDir := filepath.Join(filepath.Dir(cfg.MCPConfigPath), "mcp-cache")
 	return auth.NewFileTokenStore(tokenDir)
 }
