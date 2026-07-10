@@ -268,7 +268,7 @@ func (m *Terminal) handleConfirmMCPAuth(r *ConfirmResult, fromCmd bool) (tea.Mod
 func (m *Terminal) startMCPAuthFlow(serverName, authURL string) {
 	state := platform.RandomState()
 
-	resultCh, redirectURI, cleanup := platform.StartCallbackServer("127.0.0.1:0", state)
+	resultCh, redirectURI, cleanup := platform.StartCallbackServer("127.0.0.1:0", state, serverName)
 
 	encodedRedirect := url.QueryEscape(redirectURI)
 	filledURL := authURL

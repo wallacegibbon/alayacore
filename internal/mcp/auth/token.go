@@ -28,6 +28,12 @@ type Token struct {
 	// refresh works across restarts without rediscovery.
 	TokenEndpoint string `json:"token_endpoint,omitempty"`
 	ClientID      string `json:"client_id,omitempty"`
+
+	// ClientAuthMethod is the OAuth client authentication method used
+	// when obtaining this token. Saved so that token refresh uses the
+	// same method. Values: "client_secret_basic" or "client_secret_post".
+	// When empty (legacy tokens), defaults to "client_secret_basic".
+	ClientAuthMethod string `json:"client_auth_method,omitempty"`
 }
 
 // Valid returns true if the token is still valid (not expired).

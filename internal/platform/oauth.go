@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"html"
 	"net"
 	"net/http"
 	"time"
@@ -32,12 +33,14 @@ func RandomState() string {
 //
 // listenAddr is the TCP address to bind to (e.g., "127.0.0.1:0" for
 // loopback with random port, "0.0.0.0:0" for all interfaces).
+// serverName is the human-readable name of the server being authorized
+// (used in the response page shown to the user).
 //
 // Returns:
 //   - resultCh: channel that receives the callback result (code or error)
 //   - redirectURI: the full redirect URI the server is listening on
 //   - cleanup: function to stop the server (must be called when done)
-func StartCallbackServer(listenAddr, state string) (<-chan CallbackResult, string, func()) {
+func StartCallbackServer(listenAddr, state, serverName string) (<-chan CallbackResult, string, func()) {
 	listener, err := net.Listen("tcp", listenAddr)
 	if err != nil {
 		ch := make(chan CallbackResult, 1)
@@ -66,6 +69,21 @@ func StartCallbackServer(listenAddr, state string) (<-chan CallbackResult, strin
 
 	resultCh := make(chan CallbackResult, 1)
 
+	writePage := func(w http.ResponseWriter, title, body string) {
+		html := fmt.Sprintf(`<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>%s</title></head>
+<body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;">
+<div style="text-align:center;">
+<h2>%s</h2>
+<p style="color:#666;">You can close this window.</p>
+</div>
+</body>
+</html>`, title, body)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte(html))
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
 		code := r.URL.Query().Get("code")
@@ -78,7 +96,8 @@ func StartCallbackServer(listenAddr, state string) (<-chan CallbackResult, strin
 			case resultCh <- CallbackResult{Err: fmt.Errorf("authorization error: %s: %s", errStr, errDesc)}:
 			default:
 			}
-			_, _ = w.Write([]byte("Authorization failed. You can close this window."))
+			writePage(w, "Authorization Failed",
+				fmt.Sprintf("Authorization failed for <strong>%s</strong>.", html.EscapeString(serverName)))
 			return
 		}
 		if returnedState != state {
@@ -86,7 +105,8 @@ func StartCallbackServer(listenAddr, state string) (<-chan CallbackResult, strin
 			case resultCh <- CallbackResult{Err: fmt.Errorf("state mismatch: got %q, expected %q", returnedState, state)}:
 			default:
 			}
-			_, _ = w.Write([]byte("Authorization failed. You can close this window."))
+			writePage(w, "Authorization Failed",
+				fmt.Sprintf("Authorization failed for <strong>%s</strong>.", html.EscapeString(serverName)))
 			return
 		}
 		if code == "" {
@@ -94,14 +114,16 @@ func StartCallbackServer(listenAddr, state string) (<-chan CallbackResult, strin
 			case resultCh <- CallbackResult{Err: fmt.Errorf("no authorization code in callback")}:
 			default:
 			}
-			_, _ = w.Write([]byte("Authorization failed. You can close this window."))
+			writePage(w, "Authorization Failed",
+				fmt.Sprintf("Authorization failed for <strong>%s</strong>.", html.EscapeString(serverName)))
 			return
 		}
 		select {
 		case resultCh <- CallbackResult{Code: code}:
 		default:
 		}
-		_, _ = w.Write([]byte("Authorization successful! You can close this window."))
+		writePage(w, "Authorization Successful",
+			fmt.Sprintf("Authorization successful for <strong>%s</strong>!", html.EscapeString(serverName)))
 	})
 
 	server := &http.Server{

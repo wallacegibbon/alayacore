@@ -76,6 +76,11 @@ type tokenFilePayload struct {
 	// Refresh metadata (saved alongside token for automatic refresh).
 	TokenEndpoint string `json:"token_endpoint,omitempty"`
 	ClientID      string `json:"client_id,omitempty"`
+
+	// ClientAuthMethod is the OAuth client authentication method used
+	// when obtaining this token. Values: "client_secret_basic" or
+	// "client_secret_post". If empty, "client_secret_basic" is assumed.
+	ClientAuthMethod string `json:"client_auth_method,omitempty"`
 }
 
 // LoadToken loads a persisted token for the given server ID.
@@ -99,12 +104,13 @@ func (s *FileTokenStore) LoadToken(serverID string) (*Token, error) {
 	}
 
 	token := &Token{
-		AccessToken:   payload.AccessToken,
-		TokenType:     payload.TokenType,
-		RefreshToken:  payload.RefreshToken,
-		Scopes:        payload.Scopes,
-		TokenEndpoint: payload.TokenEndpoint,
-		ClientID:      payload.ClientID,
+		AccessToken:      payload.AccessToken,
+		TokenType:        payload.TokenType,
+		RefreshToken:     payload.RefreshToken,
+		Scopes:           payload.Scopes,
+		TokenEndpoint:    payload.TokenEndpoint,
+		ClientID:         payload.ClientID,
+		ClientAuthMethod: payload.ClientAuthMethod,
 	}
 	if payload.ExpiresAt > 0 {
 		token.ExpiresAt = unixTime(payload.ExpiresAt)
@@ -129,12 +135,13 @@ func (s *FileTokenStore) SaveToken(serverID string, token *Token) error {
 	}
 
 	payload := tokenFilePayload{
-		AccessToken:   token.AccessToken,
-		TokenType:     token.TokenType,
-		RefreshToken:  token.RefreshToken,
-		Scopes:        token.Scopes,
-		TokenEndpoint: token.TokenEndpoint,
-		ClientID:      token.ClientID,
+		AccessToken:      token.AccessToken,
+		TokenType:        token.TokenType,
+		RefreshToken:     token.RefreshToken,
+		Scopes:           token.Scopes,
+		TokenEndpoint:    token.TokenEndpoint,
+		ClientID:         token.ClientID,
+		ClientAuthMethod: token.ClientAuthMethod,
 	}
 	if !token.ExpiresAt.IsZero() {
 		payload.ExpiresAt = token.ExpiresAt.Unix()

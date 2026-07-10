@@ -486,6 +486,11 @@ type AuthConfig struct {
 	// ClientSecret is the OAuth client secret (for authorization_code).
 	ClientSecret string
 
+	// ClientAuthMethod is the OAuth client authentication method for token
+	// endpoint requests. Values: "client_secret_basic" (default/recommended)
+	// or "client_secret_post". If empty, defaults to "client_secret_basic".
+	ClientAuthMethod string
+
 	// Scopes is the list of OAuth scopes to request.
 	Scopes []string
 

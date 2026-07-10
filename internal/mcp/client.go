@@ -691,18 +691,20 @@ func newAuthProvider(cfg *AuthConfig, tokenStore auth.TokenStore, serverName str
 				return base, nil
 			}
 			refreshCfg := &auth.RefreshConfig{
-				TokenEndpoint: cfg.TokenEndpoint,
-				ClientID:      cfg.ClientID,
-				ClientSecret:  cfg.ClientSecret,
+				TokenEndpoint:    cfg.TokenEndpoint,
+				ClientID:         cfg.ClientID,
+				ClientSecret:     cfg.ClientSecret,
+				ClientAuthMethod: cfg.ClientAuthMethod,
 			}
 			return auth.NewPersistentTokenProvider(base, tokenStore, serverName, refreshCfg), nil
 		}
 		// No token yet — try loading from disk via persistent provider.
 		if tokenStore != nil {
 			refreshCfg := &auth.RefreshConfig{
-				TokenEndpoint: cfg.TokenEndpoint,
-				ClientID:      cfg.ClientID,
-				ClientSecret:  cfg.ClientSecret,
+				TokenEndpoint:    cfg.TokenEndpoint,
+				ClientID:         cfg.ClientID,
+				ClientSecret:     cfg.ClientSecret,
+				ClientAuthMethod: cfg.ClientAuthMethod,
 			}
 			// Inner is nil — we have no way to get a token except from
 			// disk or refresh. The caller (AuthorizeServer) will initiate

@@ -128,10 +128,11 @@ func resolveAuthConfig(ctx context.Context, cfg *AuthConfig, serverURL string) (
 
 // discoverASMetadata discovers the authorization server metadata for an
 // MCP server. It follows the MCP OAuth discovery chain:
-//  1. Try direct well-known discovery from the MCP server URL
-//  2. Discover Protected Resource Metadata (from well-known or 401)
-//  3. Extract authorization_servers from resource metadata
-//  4. Try well-known discovery on each authorization server URL
+//  1. If token_endpoint is configured, derive issuer from it and try.
+//  2. Try direct well-known discovery from the MCP server URL.
+//  3. Discover Protected Resource Metadata (from well-known or 401).
+//  4. Extract authorization_servers from resource metadata.
+//  5. Try well-known discovery on each authorization server URL.
 func discoverASMetadata(ctx context.Context, authCfg *AuthConfig, serverURL string) (*auth.ASMetadata, error) {
 	// Step 1: If token_endpoint is configured, derive issuer from it and try.
 	if authCfg != nil && authCfg.TokenEndpoint != "" {

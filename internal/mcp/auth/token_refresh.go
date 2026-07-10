@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -22,6 +23,11 @@ type RefreshConfig struct {
 
 	// ClientSecret is the OAuth client secret (optional for public clients).
 	ClientSecret string
+
+	// ClientAuthMethod is the OAuth client authentication method to use.
+	// Supported values: "client_secret_basic" or "client_secret_post".
+	// If empty, defaults to "client_secret_basic".
+	ClientAuthMethod string
 }
 
 // PersistentTokenProvider wraps a TokenProvider with on-disk persistence
@@ -146,6 +152,9 @@ func (p *PersistentTokenProvider) tryLoadFromDisk() *Token {
 		if p.refresh.ClientID == "" {
 			p.refresh.ClientID = loaded.ClientID
 		}
+		if p.refresh.ClientAuthMethod == "" {
+			p.refresh.ClientAuthMethod = loaded.ClientAuthMethod
+		}
 		p.mu.Unlock()
 	}
 
@@ -195,7 +204,20 @@ func (p *PersistentTokenProvider) refreshToken(ctx context.Context, refreshToken
 	data.Set("grant_type", "refresh_token")
 	data.Set("refresh_token", refreshToken)
 	data.Set("client_id", p.refresh.ClientID)
-	if p.refresh.ClientSecret != "" {
+
+	authMethod := p.refresh.ClientAuthMethod
+	if authMethod == "" {
+		authMethod = AuthMethodClientSecretBasic
+	}
+
+	if p.refresh.ClientSecret == "" {
+		return nil, fmt.Errorf("client_secret is required when using %q authentication method for refresh", authMethod)
+	}
+
+	useBasic := authMethod == AuthMethodClientSecretBasic && p.refresh.ClientSecret != ""
+	usePost := authMethod == AuthMethodClientSecretPost && p.refresh.ClientSecret != ""
+
+	if usePost {
 		data.Set("client_secret", p.refresh.ClientSecret)
 	}
 
@@ -204,9 +226,20 @@ func (p *PersistentTokenProvider) refreshToken(ctx context.Context, refreshToken
 	if err != nil {
 		return nil, fmt.Errorf("refresh request: %w", err)
 	}
+
+	if useBasic {
+		auth := base64.StdEncoding.EncodeToString([]byte(p.refresh.ClientID + ":" + p.refresh.ClientSecret))
+		req.Header.Set("Authorization", "Basic "+auth)
+	}
+
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 
+	return p.doRefreshRequest(req, refreshToken)
+}
+
+// doRefreshRequest performs the HTTP request and parses the refresh token response.
+func (p *PersistentTokenProvider) doRefreshRequest(req *http.Request, oldRefreshToken string) (*Token, error) {
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -250,7 +283,7 @@ func (p *PersistentTokenProvider) refreshToken(ctx context.Context, refreshToken
 		token.RefreshToken = tokenResp.RefreshToken
 	} else {
 		// Keep the old refresh token if server didn't rotate it.
-		token.RefreshToken = refreshToken
+		token.RefreshToken = oldRefreshToken
 	}
 	if tokenResp.Scope != "" {
 		token.Scopes = strings.Split(tokenResp.Scope, " ")

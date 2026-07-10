@@ -2,7 +2,9 @@ package auth
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,6 +12,56 @@ import (
 	"strings"
 	"time"
 )
+
+// Client authentication methods for the OAuth token endpoint.
+const (
+	AuthMethodClientSecretBasic = "client_secret_basic"
+	AuthMethodClientSecretPost  = "client_secret_post"
+)
+
+// ErrUnsupportedAuthMethod is returned when the authorization server only
+// advertises client authentication methods that this client does not support.
+var ErrUnsupportedAuthMethod = errors.New("server requires a client authentication method not supported by this client")
+
+// SelectAuthMethod determines the client authentication method based on the
+// authorization server's advertised capabilities.
+//
+// Returns the method to use, an empty string if the server only supports
+// "none" (public client), or ErrUnsupportedAuthMethod if the server only
+// lists methods this client doesn't implement.
+func SelectAuthMethod(meta *ASMetadata) (string, error) {
+	if len(meta.TokenEndpointAuthMethodsSupported) == 0 {
+		// No methods advertised — use OAuth 2.1 recommended default.
+		return AuthMethodClientSecretBasic, nil
+	}
+
+	hasBasic := false
+	hasPost := false
+	hasNone := false
+	for _, m := range meta.TokenEndpointAuthMethodsSupported {
+		switch m {
+		case AuthMethodClientSecretBasic:
+			hasBasic = true
+		case AuthMethodClientSecretPost:
+			hasPost = true
+		case "none":
+			hasNone = true
+		}
+	}
+
+	switch {
+	case hasBasic:
+		return AuthMethodClientSecretBasic, nil
+	case hasPost:
+		return AuthMethodClientSecretPost, nil
+	case hasNone:
+		return "", nil
+	default:
+		// Server only lists methods we don't implement (e.g. private_key_jwt,
+		// tls_client_auth). Don't guess — error out.
+		return "", ErrUnsupportedAuthMethod
+	}
+}
 
 // AuthCodeConfig holds parameters for the authorization code flow.
 //
@@ -52,7 +104,21 @@ func ExchangeCode(ctx context.Context, meta *ASMetadata, cfg *AuthCodeConfig, pk
 	data.Set("redirect_uri", redirectURI)
 	data.Set("code_verifier", pkce.CodeVerifier)
 	data.Set("client_id", cfg.ClientID)
-	if cfg.ClientSecret != "" {
+
+	authMethod, err := SelectAuthMethod(meta)
+	if err != nil {
+		return nil, err
+	}
+	if authMethod != "" && cfg.ClientSecret == "" {
+		return nil, fmt.Errorf("client_secret is required when using %q authentication method", authMethod)
+	}
+	useBasic := authMethod == AuthMethodClientSecretBasic && cfg.ClientSecret != ""
+	usePost := authMethod == AuthMethodClientSecretPost && cfg.ClientSecret != ""
+	// If the server only advertises "none" (public client), don't send
+	// any client authentication regardless of configured client_secret.
+	// Sending credentials when the server explicitly says it only supports
+	// "none" will be rejected.
+	if usePost {
 		data.Set("client_secret", cfg.ClientSecret)
 	}
 
@@ -61,9 +127,20 @@ func ExchangeCode(ctx context.Context, meta *ASMetadata, cfg *AuthCodeConfig, pk
 	if err != nil {
 		return nil, fmt.Errorf("token request: %w", err)
 	}
+
+	if useBasic {
+		auth := base64.StdEncoding.EncodeToString([]byte(cfg.ClientID + ":" + cfg.ClientSecret))
+		req.Header.Set("Authorization", "Basic "+auth)
+	}
+
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 
+	return doTokenRequest(req)
+}
+
+// doTokenRequest performs the HTTP POST and parses the token response.
+func doTokenRequest(req *http.Request) (*Token, error) {
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {

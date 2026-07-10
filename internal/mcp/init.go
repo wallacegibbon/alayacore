@@ -252,6 +252,12 @@ func (init *Init) collectOAuthResult(ctx context.Context, c *Client) serverResul
 
 	cfg.TokenEndpoint = meta.TokenEndpoint
 	cfg.ClientID = clientID
+	authMethod, err := auth.SelectAuthMethod(meta)
+	if err != nil {
+		init.sendEvent(InitEvent{Type: InitFailed, Server: c.Name(), Error: fmt.Errorf("%q: %w", c.Name(), err).Error()})
+		return r
+	}
+	cfg.ClientAuthMethod = authMethod
 
 	if err := init.runOAuthForServer(ctx, c, meta, clientID); err != nil {
 		msg := err.Error()
@@ -333,13 +339,14 @@ func (init *Init) runOAuthForServer(ctx context.Context, c *Client, meta *auth.A
 
 	// Persist token.
 	token := &auth.Token{
-		AccessToken:   oauthToken.AccessToken,
-		TokenType:     oauthToken.TokenType,
-		RefreshToken:  oauthToken.RefreshToken,
-		ExpiresAt:     oauthToken.ExpiresAt,
-		Scopes:        oauthToken.Scopes,
-		TokenEndpoint: meta.TokenEndpoint,
-		ClientID:      clientID,
+		AccessToken:      oauthToken.AccessToken,
+		TokenType:        oauthToken.TokenType,
+		RefreshToken:     oauthToken.RefreshToken,
+		ExpiresAt:        oauthToken.ExpiresAt,
+		Scopes:           oauthToken.Scopes,
+		TokenEndpoint:    meta.TokenEndpoint,
+		ClientID:         clientID,
+		ClientAuthMethod: cfg.ClientAuthMethod,
 	}
 	if c.tokenStore != nil {
 		_ = c.tokenStore.SaveToken(c.Name(), token) // non-fatal
