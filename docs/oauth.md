@@ -201,6 +201,7 @@ AlayaCore exchanges the authorization code for tokens:
 
 ```
 POST https://github.com/login/oauth/access_token
+Authorization: Basic <base64(client_id:client_secret)>
 Content-Type: application/x-www-form-urlencoded
 Accept: application/json
 
@@ -209,7 +210,6 @@ grant_type=authorization_code
 &redirect_uri=http://127.0.0.1:PORT/callback
 &code_verifier=<original code_verifier>
 &client_id=<your-client-id>
-&client_secret=<your-client-secret>
 
 → 200 OK
 → {
@@ -241,6 +241,7 @@ using the stored refresh token:
 
 ```
 POST https://github.com/login/oauth/access_token
+Authorization: Basic <base64(client_id:client_secret)>
 Content-Type: application/x-www-form-urlencoded
 
 grant_type=refresh_token
