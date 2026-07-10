@@ -235,7 +235,13 @@ func (p *PersistentTokenProvider) refreshToken(ctx context.Context, refreshToken
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 
-	return p.doRefreshRequest(req, refreshToken)
+	token, err := p.doRefreshRequest(req, refreshToken)
+	if err != nil {
+		return nil, err
+	}
+	// Preserve the client auth method so it survives across refreshes.
+	token.ClientAuthMethod = p.refresh.ClientAuthMethod
+	return token, nil
 }
 
 // doRefreshRequest performs the HTTP request and parses the refresh token response.
