@@ -275,6 +275,9 @@ func (m *Terminal) startMCPAuthFlow(serverName, authURL string) {
 	filledURL = strings.ReplaceAll(filledURL, "{{redirect_uri}}", encodedRedirect)
 	filledURL = strings.ReplaceAll(filledURL, "{{state}}", state)
 
+	m.out.WriteNotify(fmt.Sprintf("Authorizing %s. If your browser doesn't open, open this URL:\n%s",
+		serverName, filledURL))
+
 	if err := platform.OpenURL(filledURL); err != nil {
 		m.out.WriteError("Failed to open browser: %v", err)
 	}
