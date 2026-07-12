@@ -102,10 +102,10 @@ func handleCommandOutput(stdout, stderr *bytes.Buffer, exitCode int, execErr err
 	}
 
 	if execErr != nil {
-		if output != "" {
-			return []llm.ContentPart{&llm.TextPart{Text: output}}, execErr
+		if output == "" {
+			output = execErr.Error()
 		}
-		return nil, execErr
+		return []llm.ContentPart{&llm.TextPart{Text: output}}, execErr
 	}
 
 	if output == "" {
@@ -151,8 +151,11 @@ func formatCommandOutput(stdout, stderr *bytes.Buffer, exitCode int) string {
 	}
 
 	var output string
+	if exitCode > 0 {
+		output = fmt.Sprintf("Exit Code: %d\n", exitCode)
+	}
 	if stdout.Len() > 0 {
-		output = "STDOUT:\n" + stdout.String() + "\n"
+		output += "STDOUT:\n" + stdout.String() + "\n"
 	}
 	if stderr.Len() > 0 {
 		output += "STDERR:\n" + stderr.String()
