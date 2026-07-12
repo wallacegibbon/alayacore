@@ -3,6 +3,7 @@ package tools
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -114,40 +115,210 @@ func TestExecuteCommandWorkingDir(t *testing.T) {
 	}
 }
 
-func TestHandleCommandCompletion(t *testing.T) {
+func TestHandleCommandOutput(t *testing.T) {
 	tests := []struct {
-		name       string
-		execErr    error
-		wantError  bool
-		wantInText string
+		name        string
+		stdout      string
+		stderr      string
+		exitCode    int
+		execErr     error
+		wantText    string
+		wantErr     bool
+		wantErrText string // if non-empty, error.Error() must contain this
 	}{
 		{
-			name:       "success with output",
-			execErr:    nil,
-			wantError:  false,
-			wantInText: "hello",
+			name:     "success with output",
+			stdout:   "hello",
+			stderr:   "",
+			exitCode: 0,
+			execErr:  nil,
+			wantText: "hello",
+			wantErr:  false,
+		},
+		{
+			name:     "success no output",
+			stdout:   "",
+			stderr:   "",
+			exitCode: 0,
+			execErr:  nil,
+			wantText: "Command completed successfully (no output)",
+			wantErr:  false,
+		},
+		{
+			name:     "success with stderr only",
+			stdout:   "",
+			stderr:   "warning",
+			exitCode: 0,
+			execErr:  nil,
+			wantText: "STDERR:\nwarning",
+			wantErr:  false,
+		},
+		{
+			name:     "error exit 1 with stderr",
+			stdout:   "",
+			stderr:   "not found",
+			exitCode: 1,
+			execErr:  fmt.Errorf("exit status 1"),
+			wantText: "Exit Code: 1\nSTDERR:\nnot found",
+			wantErr:  true,
+		},
+		{
+			name:     "error exit 42 no output",
+			stdout:   "",
+			stderr:   "",
+			exitCode: 42,
+			execErr:  fmt.Errorf("exit status 42"),
+			wantText: "Exit Code: 42\n",
+			wantErr:  true,
+		},
+		{
+			name:     "error exit 1 with stdout",
+			stdout:   "result",
+			stderr:   "",
+			exitCode: 1,
+			execErr:  fmt.Errorf("exit status 1"),
+			wantText: "Exit Code: 1\nSTDOUT:\nresult\n",
+			wantErr:  true,
+		},
+		{
+			name:     "canceled with exit code 130",
+			stdout:   "",
+			stderr:   "",
+			exitCode: 130,
+			execErr:  fmt.Errorf("canceled"),
+			wantText: "Exit Code: 130\n",
+			wantErr:  true,
+		},
+		{
+			name:     "canceled with partial output",
+			stdout:   "partial",
+			stderr:   "",
+			exitCode: 130,
+			execErr:  fmt.Errorf("canceled"),
+			wantText: "Exit Code: 130\nSTDOUT:\npartial\n",
+			wantErr:  true,
+		},
+		{
+			name:     "timed out no exit code no output",
+			stdout:   "",
+			stderr:   "",
+			exitCode: -1,
+			execErr:  fmt.Errorf("timed out"),
+			wantText: "timed out",
+			wantErr:  true,
+		},
+		{
+			name:     "timed out with partial output",
+			stdout:   "partial",
+			stderr:   "",
+			exitCode: -1,
+			execErr:  fmt.Errorf("timed out"),
+			wantText: "STDOUT:\npartial\n",
+			wantErr:  true,
+		},
+		{
+			name:     "unknown error no output",
+			stdout:   "",
+			stderr:   "",
+			exitCode: -1,
+			execErr:  fmt.Errorf("something went wrong"),
+			wantText: "something went wrong",
+			wantErr:  true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stdout := bytes.NewBufferString("hello")
-			stderr := &bytes.Buffer{}
+			stdout := bytes.NewBufferString(tt.stdout)
+			stderr := bytes.NewBufferString(tt.stderr)
 
-			content, err := handleCommandOutput(stdout, stderr, 0, tt.execErr)
+			content, err := handleCommandOutput(stdout, stderr, tt.exitCode, tt.execErr)
 
-			if tt.wantError {
+			if tt.wantErr {
 				if err == nil {
-					t.Error("expected error")
+					t.Fatal("expected error, got nil")
 				}
-			} else {
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
+				if tt.wantErrText != "" && !strings.Contains(err.Error(), tt.wantErrText) {
+					t.Errorf("error %q does not contain %q", err.Error(), tt.wantErrText)
 				}
-				text := extractText(content)
-				if text != tt.wantInText {
-					t.Errorf("expected %q, got %q", tt.wantInText, text)
-				}
+			} else if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			text := extractText(content)
+			if text != tt.wantText {
+				t.Errorf("text:\n  expected: %q\n  got:      %q", tt.wantText, text)
+			}
+		})
+	}
+}
+
+func TestFormatCommandOutput(t *testing.T) {
+	tests := []struct {
+		name     string
+		stdout   string
+		stderr   string
+		exitCode int
+		want     string
+	}{
+		{
+			name:     "exit 0 stdout only",
+			stdout:   "hello\n",
+			stderr:   "",
+			exitCode: 0,
+			want:     "hello\n",
+		},
+		{
+			name:     "exit 0 empty both",
+			stdout:   "",
+			stderr:   "",
+			exitCode: 0,
+			want:     "",
+		},
+		{
+			name:     "exit 1 with stderr",
+			stdout:   "",
+			stderr:   "error\n",
+			exitCode: 1,
+			want:     "Exit Code: 1\nSTDERR:\nerror\n",
+		},
+		{
+			name:     "exit 1 stdout and stderr",
+			stdout:   "out\n",
+			stderr:   "err\n",
+			exitCode: 1,
+			want:     "Exit Code: 1\nSTDOUT:\nout\n\nSTDERR:\nerr\n",
+		},
+		{
+			name:     "exit 0 with stderr",
+			stdout:   "out\n",
+			stderr:   "warn\n",
+			exitCode: 0,
+			want:     "STDOUT:\nout\n\nSTDERR:\nwarn\n",
+		},
+		{
+			name:     "exit -1 no output",
+			stdout:   "",
+			stderr:   "",
+			exitCode: -1,
+			want:     "",
+		},
+		{
+			name:     "exit -1 with stdout",
+			stdout:   "partial\n",
+			stderr:   "",
+			exitCode: -1,
+			want:     "STDOUT:\npartial\n\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stdout := bytes.NewBufferString(tt.stdout)
+			stderr := bytes.NewBufferString(tt.stderr)
+			got := formatCommandOutput(stdout, stderr, tt.exitCode)
+			if got != tt.want {
+				t.Errorf("formatCommandOutput:\n  expected: %q\n  got:      %q", tt.want, got)
 			}
 		})
 	}
