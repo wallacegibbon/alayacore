@@ -29,7 +29,8 @@ type AttachmentWindow struct {
 
 	entries    []fileEntry
 	filtered   []fileEntry
-	currentDir string
+	currentDir string // actual directory being displayed
+	baseDir    string // anchor for resolving relative path inputs (only updated on explicit navigation)
 	mode       attachmentMode
 
 	// Callback: invoked when user adds a file or URL.
@@ -75,6 +76,7 @@ func (aw *AttachmentWindow) Open() {
 	aw.ScrollIdx = 0
 	aw.SelectedIdx = 0
 	aw.currentDir, _ = os.Getwd()
+	aw.baseDir = aw.currentDir
 	aw.loadDir(aw.currentDir)
 }
 
@@ -153,6 +155,11 @@ func (aw *AttachmentWindow) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 
 func (aw *AttachmentWindow) handleLocalModeKeys(filterChanged bool, key string) {
 	if filterChanged && aw.FilterInputFocused {
+		// Ctrl+C clears the filter — also reset directory to baseDir
+		if key == keyCtrlC {
+			aw.currentDir = aw.baseDir
+			aw.loadDir(aw.baseDir)
+		}
 		aw.updateFiltered()
 	}
 	if !aw.FilterInputFocused {
@@ -195,51 +202,54 @@ func (aw *AttachmentWindow) handleURLEntry() bool {
 }
 
 func (aw *AttachmentWindow) handleEnter() bool {
-	if len(aw.filtered) > 0 && aw.SelectedIdx >= 0 {
-		return aw.selectEntry(aw.SelectedIdx)
-	}
-	return false
-}
-
-func (aw *AttachmentWindow) handleSearchEnter() {
-	if len(aw.filtered) > 0 {
-		aw.SelectedIdx = 0
-		aw.selectEntry(0)
-	}
-}
-
-func (aw *AttachmentWindow) selectEntry(idx int) bool {
-	if idx < 0 || idx >= len(aw.filtered) {
+	// Enter selects the currently highlighted file. Directories are ignored
+	// (use search input with trailing "/" to navigate into a directory).
+	if len(aw.filtered) == 0 || aw.SelectedIdx < 0 || aw.SelectedIdx >= len(aw.filtered) {
 		return false
 	}
-	entry := aw.filtered[idx]
-	fullPath := filepath.Join(aw.currentDir, entry.name)
-
-	if entry.name == ".." {
-		parent := filepath.Dir(aw.currentDir)
-		aw.currentDir = parent
-		aw.loadDir(parent)
-		aw.FilterInput.SetValue("")
-		aw.lastFilterValue = "\x00"
-		aw.updateFiltered()
-		return true
-	}
-
+	entry := aw.filtered[aw.SelectedIdx]
 	if entry.isDir {
-		aw.currentDir = fullPath
-		aw.loadDir(fullPath)
-		aw.FilterInput.SetValue("")
-		aw.lastFilterValue = "\x00"
-		aw.updateFiltered()
-		return true
+		return false
 	}
-
-	// It's a file — add it and close
+	fullPath := filepath.Join(aw.currentDir, entry.name)
 	if aw.onAdd != nil {
 		aw.onAdd(fullPath)
 	}
 	aw.State = FilteredListClosed
 	return true
+}
+
+func (aw *AttachmentWindow) handleSearchEnter() {
+	if len(aw.filtered) == 0 || aw.SelectedIdx < 0 || aw.SelectedIdx >= len(aw.filtered) {
+		return
+	}
+	entry := aw.filtered[aw.SelectedIdx]
+	if entry.isDir {
+		// Autocomplete: replace the last segment with the selected directory name.
+		// Preserve path prefix (home-relative or absolute) so the trailing "/"
+		// triggers navigateByPath correctly.
+		search := aw.FilterInput.Value()
+		switch {
+		case strings.Contains(search, "/"):
+			// Has path prefix — replace everything after the last "/"
+			prefix := search[:strings.LastIndex(search, "/")+1]
+			aw.FilterInput.SetValue(prefix + entry.name + "/")
+		case strings.HasPrefix(search, "~"):
+			// Home-relative: "~" alone → "~/dirname/"
+			aw.FilterInput.SetValue("~/" + entry.name + "/")
+		default:
+			aw.FilterInput.SetValue(entry.name + "/")
+		}
+		aw.lastFilterValue = "\x00" // force re-filter
+		aw.updateFiltered()
+		return
+	}
+	// File → add it
+	fullPath := filepath.Join(aw.currentDir, entry.name)
+	if aw.onAdd != nil {
+		aw.onAdd(fullPath)
+	}
+	aw.State = FilteredListClosed
 }
 
 func (aw *AttachmentWindow) handleListKeys(key string) {
@@ -253,6 +263,84 @@ func (aw *AttachmentWindow) handleListKeys(key string) {
 			aw.SelectedIdx--
 		}
 	}
+}
+
+// navigateByPath treats the input as a path and navigates accordingly.
+//
+// Rule: the last "/"-separated segment is the file filter, everything before
+// it is the directory. If input ends with "/", the whole path is the directory
+// (show all files).
+//
+// Three kinds of paths:
+//
+//	Absolute (starts with "/"):      /etc       → dir="/", file="etc"
+//	                               /etc/ssl   → dir="/etc", file="ssl"
+//	Home-relative (starts with "~"): ~/.ala     → dir="~", file=".ala"
+//	                                 ~/.ala/    → dir="~/.ala"
+//	Relative (contains "/" or ".."): subdir/    → dir="./subdir"
+//	                                 subdir/f   → dir="./subdir", file="f"
+//	                                 ..         → dir=".."
+func (aw *AttachmentWindow) navigateByPath(search string) string {
+	var absDir, filter string
+
+	switch {
+	case strings.HasPrefix(search, "~"):
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return search
+		}
+		if search == "~" {
+			// "~" alone → home, show all
+			aw.currentDir = home
+			aw.loadDir(home)
+			aw.lastFilterValue = "\x00"
+			return ""
+		}
+		rest := search[1:] // everything after "~"
+		if strings.HasSuffix(rest, "/") {
+			absDir = filepath.Join(home, rest)
+			filter = ""
+		} else {
+			absDir = filepath.Join(home, filepath.Dir(rest))
+			filter = filepath.Base(rest)
+		}
+
+	case strings.HasPrefix(search, "/"):
+		if strings.HasSuffix(search, "/") {
+			absDir = search
+			filter = ""
+		} else {
+			absDir = filepath.Dir(search)
+			filter = filepath.Base(search)
+		}
+
+	case strings.Contains(search, "/") || search == "..":
+		// Relative path — resolve from baseDir (fixed anchor)
+		switch {
+		case search == "..":
+			absDir = filepath.Join(aw.baseDir, "..")
+			filter = ""
+		case strings.HasSuffix(search, "/"):
+			absDir = filepath.Join(aw.baseDir, search)
+			filter = ""
+		default:
+			absDir = filepath.Join(aw.baseDir, filepath.Dir(search))
+			filter = filepath.Base(search)
+		}
+
+	default:
+		return search // normal name filtering
+	}
+
+	info, err := os.Stat(absDir)
+	if err != nil || !info.IsDir() {
+		return search // directory doesn't exist, keep filter as-is
+	}
+
+	aw.currentDir = absDir
+	aw.loadDir(absDir)
+	aw.lastFilterValue = "\x00"
+	return filter
 }
 
 // updateFiltered rebuilds the filtered file list based on filter input.
@@ -269,16 +357,8 @@ func (aw *AttachmentWindow) updateFiltered() {
 
 	aw.lastFilterValue = search
 
-	if strings.Contains(search, "/") {
-		candidate := filepath.Join(aw.currentDir, search)
-		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
-			aw.currentDir = candidate
-			aw.loadDir(candidate)
-			aw.FilterInput.SetValue("")
-			aw.lastFilterValue = "\x00"
-			search = ""
-		}
-	}
+	// Try absolute path navigation for "/" and "~" prefixes
+	search = aw.navigateByPath(search)
 
 	if search == "" {
 		aw.filtered = make([]fileEntry, len(aw.entries))
