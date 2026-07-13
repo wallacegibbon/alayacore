@@ -175,7 +175,12 @@ func (to *outputWriter) writeColored(tag string, value string) {
 		if !ok {
 			return
 		}
-		to.bufferUserContent(id, mediaLabel(tag), tag)
+		to.bufferUserContent(id, tlv.MediaLabel(tag), tag)
+
+	case tlv.TagUserEnd:
+		// Flush any pending user content. TagUserEnd should only appear
+		// on the input stream, but handle it here as a safety measure.
+		to.flushUserContent()
 
 	// Function lifecycle (JSON: id, type, name, input, status)
 	// Carries NUL-delimited historyID prefix
@@ -500,22 +505,7 @@ func (to *outputWriter) generateWindowID() string {
 // userTag returns true if tag is a user content tag.
 func userTag(tag string) bool {
 	return tag == tlv.TagUserT || tag == tlv.TagUserI ||
-		tag == tlv.TagUserV || tag == tlv.TagUserA || tag == tlv.TagUserD
-}
-
-// mediaLabel returns a display label for media tags.
-func mediaLabel(tag string) string {
-	switch tag {
-	case tlv.TagUserI:
-		return "📎 Image"
-	case tlv.TagUserV:
-		return "🎬 Video"
-	case tlv.TagUserA:
-		return "🎵 Audio"
-	case tlv.TagUserD:
-		return "📄 Document"
-	}
-	return ""
+		tag == tlv.TagUserV || tag == tlv.TagUserA || tag == tlv.TagUserD || tag == tlv.TagUserEnd
 }
 
 // bufferUserContent processes one user content frame.

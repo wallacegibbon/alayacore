@@ -409,9 +409,9 @@ func (s *Session) runTask(ctx context.Context, taskContent []llm.ContentPart, pa
 		s.taskResultCh <- contents
 	}()
 
-	s.requestSystemInfo()
-
 	contents, _ = s.handleUserPrompt(ctx, contents, parts)
+
+	s.requestSystemInfo()
 
 	if ctx.Err() == context.Canceled {
 		contents = s.appendCancelMessage(contents)

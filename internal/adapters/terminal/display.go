@@ -140,11 +140,6 @@ func (m *DisplayModel) GotoTop() {
 	m.scrollView.GotoTop()
 }
 
-func (m *DisplayModel) UpdateHeight(totalHeight int) {
-	m.scrollView.SetHeight(max(0, totalHeight-LayoutGap))
-	m.updateContent()
-}
-
 func (m *DisplayModel) shouldFollow() bool {
 	return m.autoFollow
 }

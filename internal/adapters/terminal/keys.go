@@ -51,6 +51,7 @@ const (
 	keyKCapital  = "K"
 
 	// Ctrl combinations
+	keyCtrlA = "ctrl+a"
 	keyCtrlC = "ctrl+c"
 	keyCtrlD = "ctrl+d"
 	keyCtrlF = "ctrl+f"

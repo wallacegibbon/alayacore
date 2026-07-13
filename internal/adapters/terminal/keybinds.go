@@ -36,55 +36,17 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Suspend
 	}
 
-	// 1. Confirm dialog takes priority over all other overlays.
-	//    It must be on a higher layer because confirmations (e.g. tool
-	//    execution prompts) can appear while another overlay is active.
-	if m.overlays.ConfirmOverlay().IsOpen() {
-		return m.handleOverlayConfirm(msg)
-	}
-
-	// 1b. MCP init overlay — shows MCP init progress (and behind it,
-	//     the auth confirm dialog may appear temporarily).
-	//     Ctrl+G cancels the entire MCP initialization.
-	if m.overlays.MCPInitOverlay().IsOpen() {
-		if msg.String() == keyCtrlG {
-			m.emitCommand(":mcp_cancel")
-			return m, scheduleTick()
-		}
-		return m, nil
-	}
-
-	// 2. Theme selector takes precedence when open
-	if m.overlays.ThemeSelector().IsOpen() {
-		return m.handleThemeSelectorKeys(msg)
-	}
-
-	// 3. Model selector takes precedence when open
-	if m.overlays.ModelSelector().IsOpen() {
-		return m.handleOverlayModelSelector(msg)
-	}
-
-	// 5. Help window takes precedence when open
-	if m.overlays.HelpWindow().IsOpen() {
-		t := trackOverlay(m.overlays.HelpWindow())
-		cmd := m.overlays.HelpWindow().HandleKeyMsg(msg)
-		if t.JustClosed(m.overlays.HelpWindow()) {
-			// If a command was selected via Enter, copy it to input
-			if pending := m.overlays.HelpWindow().ConsumePendingCommand(); pending != "" {
-				// Insert the command into the input box and focus it.
-				// Input and display are never focused simultaneously.
-				m.focusInput()
-				m.input.SetValue(pending + " ")
-				m.input.CursorEnd()
-				m.display.updateContent()
-				return m, nil
-			}
-			m.restoreFocus()
-		}
+	// Priority overlays (confirm, MCP init)
+	if cmd, handled := m.handlePriorityOverlayKeys(msg); handled {
 		return m, cmd
 	}
 
-	// 6. Tab toggles focus between display and input
+	// Selector overlays (theme, model, attachment, help)
+	if cmd, handled := m.handleSelectorOverlayKeys(msg); handled {
+		return m, cmd
+	}
+
+	// Tab toggles focus between display and input
 	if msg.String() == keyTab {
 		m.toggleFocus()
 		return m, nil
@@ -323,6 +285,66 @@ func (m *Terminal) handleOverlayModelSelector(msg tea.KeyMsg) (tea.Model, tea.Cm
 		m.restoreFocus()
 	}
 	return m, cmd
+}
+
+// handleMCPInitKeys handles keyboard input when the MCP init overlay is open.
+func (m *Terminal) handleMCPInitKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if msg.String() == keyCtrlG {
+		m.emitCommand(":mcp_cancel")
+		return m, scheduleTick()
+	}
+	return m, nil
+}
+
+// handlePriorityOverlayKeys handles the highest-priority overlays that
+// block all other interaction (confirm dialog, MCP init overlay).
+func (m *Terminal) handlePriorityOverlayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
+	if m.overlays.ConfirmOverlay().IsOpen() {
+		_, cmd := m.handleOverlayConfirm(msg)
+		return cmd, true
+	}
+	if m.overlays.MCPInitOverlay().IsOpen() {
+		_, cmd := m.handleMCPInitKeys(msg)
+		return cmd, true
+	}
+	return nil, false
+}
+
+// handleSelectorOverlayKeys handles selector-style overlays (theme, model,
+// attachment, help) that are mutually exclusive.
+func (m *Terminal) handleSelectorOverlayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
+	if m.overlays.ThemeSelector().IsOpen() {
+		_, cmd := m.handleThemeSelectorKeys(msg)
+		return cmd, true
+	}
+	if m.overlays.ModelSelector().IsOpen() {
+		_, cmd := m.handleOverlayModelSelector(msg)
+		return cmd, true
+	}
+	if m.overlays.AttachmentWindow().IsOpen() {
+		t := trackOverlay(m.overlays.AttachmentWindow())
+		cmd := m.overlays.AttachmentWindow().HandleKeyMsg(msg)
+		if t.JustClosed(m.overlays.AttachmentWindow()) {
+			m.restoreFocus()
+		}
+		return cmd, true
+	}
+	if m.overlays.HelpWindow().IsOpen() {
+		t := trackOverlay(m.overlays.HelpWindow())
+		cmd := m.overlays.HelpWindow().HandleKeyMsg(msg)
+		if t.JustClosed(m.overlays.HelpWindow()) {
+			if pending := m.overlays.HelpWindow().ConsumePendingCommand(); pending != "" {
+				m.focusInput()
+				m.input.SetValue(pending + " ")
+				m.input.CursorEnd()
+				m.display.updateContent()
+				return nil, true
+			}
+			m.restoreFocus()
+		}
+		return cmd, true
+	}
+	return nil, false
 }
 
 // handleOverlayConfirm handles keyboard input when the confirm dialog is open.
@@ -612,8 +634,14 @@ func (m *Terminal) handleFallback(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.handleSubmit()
 	case keyCtrlO:
 		return m, m.OpenEditor()
+	case keyCtrlA:
+		m.overlays.OpenAttachmentWindow(func(path string) {
+			m.addAttachment(path)
+		})
+		return m, nil
 	case keyCtrlC:
 		m.input.SetValue("")
+		m.clearAttachments()
 		return m, nil
 	}
 
@@ -629,11 +657,7 @@ func (m *Terminal) handleFallback(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m *Terminal) handleSubmit() tea.Cmd {
 	prompt := strings.TrimSpace(m.input.Value())
 
-	if prompt == "" {
-		return nil
-	}
-
-	// Check if it's a command (starts with ":")
+	// Check if it's a command (starts with ":") — ignore attachments for commands.
 	if command, found := strings.CutPrefix(prompt, ":"); found {
 		return m.handleCommand(strings.TrimSpace(command))
 	}
@@ -644,10 +668,21 @@ func (m *Terminal) handleSubmit() tea.Cmd {
 		return nil
 	}
 
-	// Regular prompt — stage the text, then flush with UE.
-	m.emitCommand(prompt)
+	// Nothing to send
+	if prompt == "" && len(m.pendingAttachments) == 0 {
+		return nil
+	}
+
+	// Send attachments first (if any), then text, then flush.
+	m.emitAttachments()
+	if prompt != "" {
+		m.emitCommand(prompt)
+	}
 	m.emitUE()
+
+	// Clear everything
 	m.input.SetValue("")
+	m.clearAttachments()
 
 	return scheduleTick()
 }

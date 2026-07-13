@@ -22,7 +22,7 @@ func TestStatusBarShowsLastMaxStepsOnError(t *testing.T) {
 	helpWindow := NewHelpWindow(styles)
 	confirmOverlay := NewConfirmDialog(styles)
 	mcpInitOverlay := NewConfirmDialog(styles)
-	overlays := NewOverlayManager(modelSelector, themeSelector, helpWindow, confirmOverlay, mcpInitOverlay, styles)
+	overlays := NewOverlayManager(modelSelector, themeSelector, helpWindow, confirmOverlay, mcpInitOverlay, NewAttachmentWindow(styles), styles)
 	terminal := &Terminal{
 		out:          out,
 		display:      NewDisplayModel(out.WindowBuffer(), styles),
@@ -61,7 +61,7 @@ func TestStatusBarShowsCurrentStepsDuringProgress(t *testing.T) {
 	helpWindow := NewHelpWindow(styles)
 	confirmOverlay := NewConfirmDialog(styles)
 	mcpInitOverlay := NewConfirmDialog(styles)
-	overlays := NewOverlayManager(modelSelector, themeSelector, helpWindow, confirmOverlay, mcpInitOverlay, styles)
+	overlays := NewOverlayManager(modelSelector, themeSelector, helpWindow, confirmOverlay, mcpInitOverlay, NewAttachmentWindow(styles), styles)
 	terminal := &Terminal{
 		out:          out,
 		display:      NewDisplayModel(out.WindowBuffer(), styles),

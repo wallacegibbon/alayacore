@@ -4,16 +4,19 @@ package terminal
 // It wraps an InputField which supports multi-line content.
 
 import (
+	"strings"
+
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 )
 
 // PromptInput handles text input.
 type PromptInput struct {
-	input   *InputField
-	focused bool
-	styles  *Styles
-	width   int
+	input       *InputField
+	attachments []string // pending attachment file paths to display
+	focused     bool
+	styles      *Styles
+	width       int
 }
 
 // NewPromptInput creates a new prompt input.
@@ -49,10 +52,24 @@ func (m PromptInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// View renders the input field.
+// View renders the input field, with attachments above if present.
 func (m PromptInput) View() tea.View {
 	m.updateInputStyles()
-	return tea.NewView(m.input.View())
+	content := m.input.View()
+	if len(m.attachments) > 0 {
+		innerWidth := max(0, m.width-BorderInnerPadding)
+		media := strings.Join(m.attachments, "  ")
+		styledMedia := m.styles.Attachment.Width(innerWidth).Render(media)
+		separator := m.styles.System.Width(innerWidth).Render(Separator)
+		var sb strings.Builder
+		sb.WriteString(styledMedia)
+		sb.WriteString("\n")
+		sb.WriteString(separator)
+		sb.WriteString("\n")
+		sb.WriteString(content)
+		return tea.NewView(sb.String())
+	}
+	return tea.NewView(content)
 }
 
 // updateInputStyles updates the text input styles based on current theme.
@@ -101,9 +118,20 @@ func (m *PromptInput) SetValue(value string) {
 	m.input.SetValue(value)
 }
 
-// Clear clears the input.
+// SetAttachments sets the pending attachment paths for display.
+func (m *PromptInput) SetAttachments(paths []string) {
+	m.attachments = paths
+}
+
+// Clear clears the input and attachments.
 func (m *PromptInput) Clear() {
 	m.input.SetValue("")
+	m.attachments = nil
+}
+
+// Attachments returns the current attachment paths.
+func (m PromptInput) Attachments() []string {
+	return m.attachments
 }
 
 // OpenEditor opens the external editor for multi-line input.
@@ -114,6 +142,7 @@ func (m *Terminal) OpenEditor() tea.Cmd {
 // RenderWithBorder renders the input with a border.
 // When blockInput is true, renders an empty bordered box (visually indicating
 // that input is blocked by an overlay) instead of the active input field.
+// Shows attachment list above the text input when present.
 func (m PromptInput) RenderWithBorder(blockInput bool) string {
 	borderColor := m.styles.BorderFocused
 	if !m.focused {
@@ -127,7 +156,24 @@ func (m PromptInput) RenderWithBorder(blockInput bool) string {
 		return m.styles.RenderBorderedBox("", m.width, borderColor)
 	}
 
-	return m.styles.RenderBorderedBox(m.input.View(), m.width, borderColor)
+	var content string
+	if len(m.attachments) > 0 {
+		innerWidth := max(0, m.width-BorderInnerPadding)
+		media := strings.Join(m.attachments, "  ")
+		styledMedia := m.styles.Attachment.Width(innerWidth).Render(media)
+		separator := m.styles.System.Width(innerWidth).Render(Separator)
+		var sb strings.Builder
+		sb.WriteString(styledMedia)
+		sb.WriteString("\n")
+		sb.WriteString(separator)
+		sb.WriteString("\n")
+		sb.WriteString(m.input.View())
+		content = sb.String()
+	} else {
+		content = m.input.View()
+	}
+
+	return m.styles.RenderBorderedBox(content, m.width, borderColor)
 }
 
 func (m *PromptInput) SetWidth(width int) {

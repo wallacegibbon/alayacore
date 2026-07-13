@@ -8,8 +8,10 @@ package terminal
 //   - TLV protocol communication with the session
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
@@ -45,6 +47,46 @@ func (m *Terminal) emitUE() {
 	_ = tlv.WriteTLV(m.streamInput, tlv.TagUserEnd, "")
 }
 
+// emitAttachments reads pending attachment files and sends them as TLV frames.
+// Failed files are skipped with an error message shown to the user.
+func (m *Terminal) emitAttachments() {
+	for _, a := range m.pendingAttachments {
+		data, err := os.ReadFile(a.path)
+		if err != nil {
+			m.out.WriteError("Failed to read attachment: %s", err)
+			continue
+		}
+		mime := tlv.MimeTypeForPath(a.path)
+		b64 := base64.StdEncoding.EncodeToString(data)
+		dataURI := fmt.Sprintf("data:%s;base64,%s", mime, b64)
+		_ = tlv.WriteTLV(m.streamInput, a.tag, dataURI)
+	}
+}
+
+// addAttachment adds a file path to pending attachments.
+func (m *Terminal) addAttachment(path string) {
+	tag := tlv.TagForPath(path)
+	m.pendingAttachments = append(m.pendingAttachments, attachment{path: path, tag: tag})
+	m.input.SetAttachments(m.pendingAttachmentLabels())
+	m.updateDisplayHeight()
+}
+
+// clearAttachments clears all pending attachments.
+func (m *Terminal) clearAttachments() {
+	m.pendingAttachments = nil
+	m.input.SetAttachments(nil)
+	m.updateDisplayHeight()
+}
+
+// pendingAttachmentLabels returns display labels for all pending attachments.
+func (m *Terminal) pendingAttachmentLabels() []string {
+	labels := make([]string, len(m.pendingAttachments))
+	for i, a := range m.pendingAttachments {
+		labels[i] = tlv.MediaLabel(a.tag)
+	}
+	return labels
+}
+
 // ============================================================================
 // Constants
 // ============================================================================
@@ -56,7 +98,7 @@ const (
 	// Row allocation: input box, status bar, newlines
 	InputRows  = 3
 	StatusRows = 1
-	LayoutGap  = 4 // input + status + newlines between sections
+	LayoutGap  = 4 // non-content rows subtracted for selector/list sizing
 
 	// Component sizing
 	InputPaddingH     = 8  // horizontal padding for input fields (border + padding both sides)
@@ -124,6 +166,9 @@ type Terminal struct {
 	// view and performs a full repaint rather than early-returning.
 	forceRedraw uint64
 
+	// Pending attachments for multi-modal input.
+	pendingAttachments []attachment
+
 	// pendingForceRedraw is set by handleRedraw before sending a synthetic
 	// WindowSizeMsg.  handleWindowSize consumes it; the view toggle already
 	// happened in handleRedraw, so resize()'s s.clear=true can take effect
@@ -141,6 +186,12 @@ type Terminal struct {
 	// this brief window the input border is blocked (rendered as an empty
 	// box) so it doesn't appear focused while the MCP init overlay may open.
 	postLoading bool
+}
+
+// attachment represents a pending file attachment for multi-modal input.
+type attachment struct {
+	path string
+	tag  string // TLV tag: TagUserI, TagUserV, TagUserA, or TagUserD
 }
 
 // NewTerminalWithTheme creates a new Terminal model with a custom theme.
@@ -163,7 +214,8 @@ func NewTerminalWithTheme(
 	helpWindow := NewHelpWindow(styles)
 	confirmOverlay := NewConfirmDialog(styles)
 	mcpInitOverlay := NewConfirmDialog(styles)
-	overlays := NewOverlayManager(modelSelector, themeSelector, helpWindow, confirmOverlay, mcpInitOverlay, styles)
+	attachmentWindow := NewAttachmentWindow(styles)
+	overlays := NewOverlayManager(modelSelector, themeSelector, helpWindow, confirmOverlay, mcpInitOverlay, attachmentWindow, styles)
 
 	m := &Terminal{
 		out:          out,
@@ -477,9 +529,23 @@ func (m *Terminal) handleEditorFinished(msg EditorFinishedMsg) (tea.Model, tea.C
 	}
 }
 
-// updateDisplayHeight updates the display viewport height based on window size.
+// updateDisplayHeight updates the display viewport height based on window size
+// and current input box height (which varies when attachments are present).
 func (m *Terminal) updateDisplayHeight() {
-	m.display.UpdateHeight(m.windowHeight)
+	// Layout from bottom up:
+	//   line H:          status bar (fixed, 1 line)
+	//   separator:       1 newline between input and status
+	//   lines above:     input box (3 or 5 lines)
+	//   separator:       1 newline between display and input
+	//   remaining lines: display (elastic)
+	//
+	// Total = display + inputBox + statusBar = H
+	inputBoxHeight := 3
+	if len(m.pendingAttachments) > 0 {
+		inputBoxHeight = 5
+	}
+	m.display.SetHeight(max(0, m.windowHeight-inputBoxHeight-1))
+	m.display.updateContent()
 }
 
 // updateStatus updates the status bar state from the output writer.

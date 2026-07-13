@@ -159,14 +159,8 @@ func (r *userRenderer) AppendFromTLV(tag string, value string) {
 		if value != "" {
 			r.textParts = append(r.textParts, value)
 		}
-	case tlv.TagUserI:
-		r.mediaParts = append(r.mediaParts, "📎 Image")
-	case tlv.TagUserV:
-		r.mediaParts = append(r.mediaParts, "🎬 Video")
-	case tlv.TagUserA:
-		r.mediaParts = append(r.mediaParts, "🎵 Audio")
-	case tlv.TagUserD:
-		r.mediaParts = append(r.mediaParts, "📄 Document")
+	case tlv.TagUserI, tlv.TagUserV, tlv.TagUserA, tlv.TagUserD:
+		r.mediaParts = append(r.mediaParts, tlv.MediaLabel(tag))
 	}
 	r.contentLen += len(value)
 }

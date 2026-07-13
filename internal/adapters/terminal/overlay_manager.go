@@ -16,11 +16,12 @@ import (
 
 // OverlayManager owns all overlay components and their rendering.
 type OverlayManager struct {
-	modelSelector  *ModelSelector
-	themeSelector  *ThemeSelector
-	helpWindow     *HelpWindow
-	confirmOverlay *ConfirmDialog
-	mcpInitOverlay *ConfirmDialog
+	modelSelector    *ModelSelector
+	themeSelector    *ThemeSelector
+	helpWindow       *HelpWindow
+	confirmOverlay   *ConfirmDialog
+	mcpInitOverlay   *ConfirmDialog
+	attachmentWindow *AttachmentWindow
 
 	// Focus state — which window had focus before an overlay opened.
 	focusedWindow string
@@ -36,15 +37,17 @@ func NewOverlayManager(
 	helpWindow *HelpWindow,
 	confirmOverlay *ConfirmDialog,
 	mcpInitOverlay *ConfirmDialog,
+	attachmentWindow *AttachmentWindow,
 	styles *Styles,
 ) *OverlayManager {
 	return &OverlayManager{
-		modelSelector:  modelSelector,
-		themeSelector:  themeSelector,
-		helpWindow:     helpWindow,
-		confirmOverlay: confirmOverlay,
-		mcpInitOverlay: mcpInitOverlay,
-		styles:         styles,
+		modelSelector:    modelSelector,
+		themeSelector:    themeSelector,
+		helpWindow:       helpWindow,
+		confirmOverlay:   confirmOverlay,
+		mcpInitOverlay:   mcpInitOverlay,
+		attachmentWindow: attachmentWindow,
+		styles:           styles,
 	}
 }
 
@@ -59,6 +62,7 @@ func (om *OverlayManager) SetSize(width, height int) {
 	om.helpWindow.SetSize(width, height)
 	om.confirmOverlay.SetSize(width, height)
 	om.mcpInitOverlay.SetSize(width, height)
+	om.attachmentWindow.SetSize(width, height)
 }
 
 // ============================================================================
@@ -72,6 +76,7 @@ func (om *OverlayManager) SetStyles(styles *Styles) {
 	om.themeSelector.SetStyles(styles)
 	om.helpWindow.SetStyles(styles)
 	om.confirmOverlay.SetStyles(styles)
+	om.attachmentWindow.SetStyles(styles)
 }
 
 // ============================================================================
@@ -84,6 +89,7 @@ func (om *OverlayManager) SetFocused(focused bool) {
 	om.themeSelector.SetHasFocus(focused)
 	om.helpWindow.SetHasFocus(focused)
 	om.confirmOverlay.SetHasFocus(focused)
+	om.attachmentWindow.SetHasFocus(focused)
 }
 
 // SetFocusedWindow records which window had focus before an overlay opened.
@@ -103,13 +109,14 @@ func (om *OverlayManager) RestoreFocus() string {
 // IsOverlayActive returns true if any overlay is open (excluding MCP init overlay).
 func (om *OverlayManager) IsOverlayActive() bool {
 	return om.modelSelector.IsOpen() || om.themeSelector.IsOpen() ||
-		om.helpWindow.IsOpen()
+		om.helpWindow.IsOpen() || om.attachmentWindow.IsOpen()
 }
 
 // IsAnyModalOpen returns true if any blocking overlay is open.
 func (om *OverlayManager) IsAnyModalOpen() bool {
 	return om.modelSelector.IsOpen() || om.themeSelector.IsOpen() ||
-		om.helpWindow.IsOpen() || om.confirmOverlay.IsOpen()
+		om.helpWindow.IsOpen() || om.attachmentWindow.IsOpen() ||
+		om.confirmOverlay.IsOpen()
 }
 
 // IsBlocked returns true when the user's view is covered by any overlay
@@ -138,6 +145,9 @@ func (om *OverlayManager) ThemeSelector() *ThemeSelector { return om.themeSelect
 // HelpWindow returns the help window component.
 func (om *OverlayManager) HelpWindow() *HelpWindow { return om.helpWindow }
 
+// AttachmentWindow returns the attachment window component.
+func (om *OverlayManager) AttachmentWindow() *AttachmentWindow { return om.attachmentWindow }
+
 // ConfirmOverlay returns the confirm dialog component.
 func (om *OverlayManager) ConfirmOverlay() *ConfirmDialog { return om.confirmOverlay }
 
@@ -161,6 +171,12 @@ func (om *OverlayManager) OpenThemeSelector(themes []theme.Info, activeTheme str
 // OpenHelpWindow opens the help window.
 func (om *OverlayManager) OpenHelpWindow() {
 	om.helpWindow.Open()
+}
+
+// OpenAttachmentWindow opens the attachment window.
+func (om *OverlayManager) OpenAttachmentWindow(onAdd func(path string)) {
+	om.attachmentWindow.SetOnAdd(onAdd)
+	om.attachmentWindow.Open()
 }
 
 // OpenConfirmQuit opens the quit confirmation dialog.
@@ -277,6 +293,8 @@ func (om *OverlayManager) Render(baseContent string, width, height int, forceRed
 		overlayContent = om.themeSelector.RenderOverlay(baseContent, width, height)
 	case om.helpWindow.IsOpen():
 		overlayContent = om.helpWindow.RenderOverlay(baseContent, width, height)
+	case om.attachmentWindow.IsOpen():
+		overlayContent = om.attachmentWindow.RenderOverlay(baseContent, width, height)
 	}
 
 	// Layer 2: MCP init overlay.
