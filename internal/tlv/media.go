@@ -61,6 +61,8 @@ func TagForMIME(mime string) string {
 }
 
 // MediaLabel returns the display label for a media tag.
+//
+// Use only single-codepoint emoji (see package doc.go for details).
 func MediaLabel(tag string) string {
 	switch tag {
 	case TagUserI:

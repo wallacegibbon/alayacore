@@ -83,7 +83,7 @@ The attachment type is determined by file extension (or URL path extension):
 
 | Type | Icon | TLV Tag | Extensions |
 |------|------|---------|------------|
-| Image | 🖼️ | `UI` | `.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`, `.bmp`, `.svg` |
+| Image | 📷 | `UI` | `.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`, `.bmp`, `.svg` |
 | Video | 🎬 | `UV` | `.mp4`, `.mpeg`, `.mpg`, `.avi`, `.mov`, `.webm`, `.mkv` |
 | Audio | 🎵 | `UA` | `.mp3`, `.wav`, `.ogg`, `.flac`, `.aac`, `.m4a`, `.wma` |
 | Document | 📄 | `UD` | `.pdf`, `.txt`, `.md`, others / unknown |
@@ -94,7 +94,7 @@ Attachments appear above the text input, separated by `---`, matching the render
 
 ```
 ┌───────────────────────────────┐
-│ 🖼️ Image  🎵 Audio            │
+│ 📷 Image  🎵 Audio            │
 │ ---                           │
 │ what are these?               │
 └───────────────────────────────┘

@@ -21,6 +21,14 @@
 //   - Input: io.WriteCloser sends TLV messages to the session
 //   - Output: OutputWriter parses TLV and renders styled content
 //
+// Emoji Notes:
+//
+//	Use only single-codepoint emoji throughout the TUI. Multi-codepoint
+//	emoji with variation selectors (U+FE0F) cause terminal compatibility
+//	issues — the width calculation mismatch can truncate adjacent text
+//	characters (e.g. "Image" → "Imag"). This affects all emoji used in
+//	labels, icons, and status indicators.
+//
 // Key Files:
 //
 //   - tui.go: Main Terminal model, message routing, and core state

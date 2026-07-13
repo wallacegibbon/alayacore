@@ -125,7 +125,7 @@ func TestStreamingProfile(t *testing.T) {
 	// Recommendations based on results
 	switch {
 	case avgTime > 5*time.Millisecond:
-		t.Logf("\n⚠️  SLOW: Average update time > 5ms - rate limiting recommended")
+		t.Logf("\n⚠  SLOW: Average update time > 5ms - rate limiting recommended")
 	case avgTime > 1*time.Millisecond:
 		t.Logf("\n⚡ MODERATE: Average update time 1-5ms - rate limiting may help")
 	default:
@@ -241,7 +241,7 @@ func TestCursorMovementProfile(t *testing.T) {
 	t.Logf("Moves per second: %.1f", 100/totalTime.Seconds())
 
 	if avgTime > 500*time.Microsecond {
-		t.Logf("\n⚠️  SLOW: Cursor movement > 500μs")
+		t.Logf("\n⚠  SLOW: Cursor movement > 500μs")
 	} else {
 		t.Logf("\n✅ FAST: Cursor movement < 500μs")
 	}
@@ -277,7 +277,7 @@ func TestUpdateContentSkipRate(t *testing.T) {
 	if skipped == total {
 		t.Logf("✅ All redundant updates skipped")
 	} else {
-		t.Logf("⚠️  Some updates not skipped - check caching")
+		t.Logf("⚠  Some updates not skipped - check caching")
 	}
 }
 
@@ -343,7 +343,7 @@ func TestRealisticStreamingWithTiming(t *testing.T) {
 	case totalRenderTime < totalWallTime/5:
 		t.Logf("⚡ Render overhead 10-20%% - acceptable")
 	default:
-		t.Logf("⚠️  Render overhead > 20%% - consider rate limiting")
+		t.Logf("⚠  Render overhead > 20%% - consider rate limiting")
 	}
 }
 
@@ -405,7 +405,7 @@ func TestVeryLongContentStreaming(t *testing.T) {
 
 	// Check if performance degrades significantly with content length
 	if maxTime > 2*avgTime {
-		t.Logf("⚠️  Max time is 2x average - some updates are slow")
+		t.Logf("⚠  Max time is 2x average - some updates are slow")
 	}
 	if avgTime < 1*time.Millisecond {
 		t.Logf("✅ Average < 1ms - acceptable for long content")
@@ -464,7 +464,7 @@ func TestWorstCaseStreaming(t *testing.T) {
 
 	// Check if we're CPU-bound
 	if totalRenderTime > totalWallTime/2 {
-		t.Logf("⚠️  Render-bound: render time > 50%% of wall time")
+		t.Logf("⚠  Render-bound: render time > 50%% of wall time")
 	} else {
 		t.Logf("✅ Not render-bound: render time < 50%% of wall time")
 	}
