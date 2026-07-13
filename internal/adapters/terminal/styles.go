@@ -84,7 +84,7 @@ func NewStyles(t *theme.Theme) *Styles {
 	return &Styles{
 		// Output text styles
 		Text:        baseStyle.Foreground(lipgloss.Color(t.Text)).Bold(true),
-		UserInput:   baseStyle,
+		UserInput:   baseStyle.Bold(true),
 		Tool:        baseStyle.Foreground(lipgloss.Color(t.Warning)),
 		ToolContent: baseStyle.Foreground(lipgloss.Color(t.Muted)),
 		Reasoning:   baseStyle.Foreground(lipgloss.Color(t.Muted)).Italic(true),

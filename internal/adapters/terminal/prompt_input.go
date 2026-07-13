@@ -82,12 +82,12 @@ func (m PromptInput) updateInputStyles() {
 	m.input.SetStyles(
 		inputFieldStyle{
 			Prompt:      lipgloss.NewStyle().Foreground(promptColor).Bold(true),
-			Text:        lipgloss.NewStyle(),
+			Text:        lipgloss.NewStyle().Bold(true),
 			Placeholder: lipgloss.NewStyle().Foreground(m.styles.ColorMuted),
 		},
 		inputFieldStyle{
 			Prompt:      lipgloss.NewStyle().Foreground(m.styles.ColorDim).Bold(true),
-			Text:        lipgloss.NewStyle().Foreground(m.styles.ColorDim),
+			Text:        lipgloss.NewStyle().Foreground(m.styles.ColorDim).Bold(true),
 			Placeholder: lipgloss.NewStyle().Foreground(m.styles.ColorDim),
 		},
 		m.styles.CursorColor,
