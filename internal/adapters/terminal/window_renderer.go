@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/alayacore/alayacore/internal/tlv"
 )
@@ -186,29 +187,36 @@ func (r *userRenderer) BuildInner(width int, _ bool, styles *Styles) (string, in
 		var mediaBlock strings.Builder
 		mediaBlock.WriteString(styles.Attachment.Render(media))
 		if innerWidth > 0 {
-			mediaBlockStr := wrapContent(mediaBlock.String(), innerWidth)
+			mediaBlockStr := wrapMediaLabels(mediaBlock.String(), innerWidth, styles)
 			parts = append(parts, mediaBlockStr)
 		} else {
 			parts = append(parts, mediaBlock.String())
 		}
 	}
 
-	// Text portion: each text part gets "> " prefix, separated by "---"
+	// Text portion: text parts separated by "---"
 	if len(r.textParts) > 0 {
 		var textBlock strings.Builder
 
+		// Separate from media with "---"
+		if media != "" {
+			textBlock.WriteString(styles.System.Render(Separator))
+			textBlock.WriteString("\n")
+		}
+
+		firstText := true
 		for _, part := range r.textParts {
 			trimmed := strings.TrimSpace(part)
 			if trimmed == "" {
 				continue
 			}
-			if textBlock.Len() > 0 {
+			if !firstText {
 				textBlock.WriteString("\n")
 				textBlock.WriteString(styles.System.Render(Separator))
 				textBlock.WriteString("\n")
 			}
-			textBlock.WriteString(styles.Prompt.Render("> "))
 			textBlock.WriteString(styles.UserInput.Render(trimmed))
+			firstText = false
 		}
 
 		if textBlock.Len() > 0 {
@@ -225,6 +233,54 @@ func (r *userRenderer) BuildInner(width int, _ bool, styles *Styles) (string, in
 	// Count lines (add 2 for border)
 	lineCount := strings.Count(result, "\n") + 1 + 2
 	return result, lineCount
+}
+
+// wrapMediaLabels wraps styled media labels at word boundaries (double spaces),
+// preserving ANSI styles. Each label is kept intact; wrapping only occurs at
+// the "  " separator between labels.
+func wrapMediaLabels(s string, width int, styles *Styles) string {
+	if width < 1 {
+		return s
+	}
+	// Split into individual labels by the double-space separator.
+	// We strip ANSI first, split, then re-style each label.
+	plain := ansi.Strip(s)
+	labels := strings.Split(plain, "  ")
+
+	var lines []string
+	var currentLine strings.Builder
+
+	for i, label := range labels {
+		if label == "" {
+			continue
+		}
+		labelWidth := ansi.StringWidth(label)
+		if currentLine.Len() > 0 {
+			sepWidth := 2 // "  "
+			if ansi.StringWidth(currentLine.String())+sepWidth+labelWidth > width {
+				// Flush current line and start a new one
+				// Re-apply attachment style to the raw line text
+				styled := styles.Attachment.Render(currentLine.String())
+				lines = append(lines, styled)
+				currentLine.Reset()
+				currentLine.WriteString(label)
+			} else {
+				if currentLine.Len() > 0 {
+					currentLine.WriteString("  ")
+				}
+				currentLine.WriteString(label)
+			}
+		} else {
+			currentLine.WriteString(label)
+		}
+		// If it's the last label, flush
+		if i == len(labels)-1 && currentLine.Len() > 0 {
+			styled := styles.Attachment.Render(currentLine.String())
+			lines = append(lines, styled)
+		}
+	}
+
+	return strings.Join(lines, "\n")
 }
 
 // ============================================================================

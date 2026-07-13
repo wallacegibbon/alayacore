@@ -262,6 +262,11 @@ func (w *Window) RawTag() string {
 
 // Render returns the window with border, using cache if valid.
 func (w *Window) Render(width int, isCursor bool, styles *Styles, borderStyle, cursorStyle lipgloss.Style) string {
+	// User messages use the same border color as focused input box
+	if _, ok := w.renderer.(*userRenderer); ok {
+		borderStyle = borderStyle.BorderForeground(styles.BorderFocused)
+	}
+
 	// Validate cache
 	if w.border.valid && w.border.width == width && w.border.folded == w.Folded {
 		if isCursor {

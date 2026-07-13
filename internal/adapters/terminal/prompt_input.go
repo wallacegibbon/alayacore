@@ -21,8 +21,8 @@ func NewPromptInput(styles *Styles) PromptInput {
 	input := NewInputField()
 	input.Placeholder = "Enter your prompt..."
 	input.Focus()
-	input.Prompt = "> "
-	input.SetWidth(max(0, DefaultWidth-InputPaddingH))
+	input.Prompt = ""
+	input.SetWidth(max(0, DefaultWidth-BorderInnerPadding)) // only border + padding
 
 	return PromptInput{
 		input:   input,
@@ -41,7 +41,7 @@ func (m PromptInput) Init() tea.Cmd {
 func (m PromptInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if msg, ok := msg.(tea.WindowSizeMsg); ok {
 		m.width = msg.Width
-		m.input.SetWidth(max(0, msg.Width-InputPaddingH))
+		m.input.SetWidth(max(0, msg.Width-BorderInnerPadding)) // only border + padding
 	}
 
 	m.updateFromMsg(msg)
@@ -132,7 +132,7 @@ func (m PromptInput) RenderWithBorder(blockInput bool) string {
 
 func (m *PromptInput) SetWidth(width int) {
 	m.width = width
-	m.input.SetWidth(max(0, width-InputPaddingH))
+	m.input.SetWidth(max(0, width-BorderInnerPadding)) // only border + padding
 }
 
 func (m *PromptInput) SetStyles(styles *Styles) {
