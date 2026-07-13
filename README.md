@@ -53,18 +53,31 @@ On first run, AlayaCore auto-creates a default model config at `~/.alayacore/mod
 
 ## Features
 
+### Core (all adapters)
+
 - 🤖 **Autonomous tool-calling loop** — The LLM plans, calls tools, and iterates until the task is done (no step limit by default; optionally bounded with `--max-steps`).
 - 🛠️ **Five built-in tools** — `read_file`, `edit_file`, `write_file`, `execute_command`, `search_content`. Controlled via `--builtin-tools` (default: all enabled).
 - 🌐 **Cross-platform** — Runs on Linux, macOS, and Windows. The `execute_command` tool auto-detects the shell (bash/zsh/sh on Unix, PowerShell/cmd on Windows).
 - 🧠 **Any LLM provider** — OpenAI, Anthropic, DeepSeek, Qwen, Ollama, LM Studio. Multiple models in one config, switch at runtime.
-- 🖥️ **Streaming TUI** — Real-time output with virtual scrolling, foldable windows, and vim-like keybindings.
-- 📟 **Plain IO mode** — `--plainio` for scripting and piping. No TUI, just stdin/stdout.
-- 🔌 **Raw IO mode** — `--rawio` for programmatic control. Raw TLV frames on stdin/stdout.
 - 🔗 **MCP support** — Connect to external [Model Context Protocol](https://modelcontextprotocol.io) servers for database queries, API access, code analysis, and more via `mcp.conf`.
 - 💾 **Session persistence** — Save and resume conversations automatically when `--session` is specified.
 - 🎯 **Skills system** — Extend the agent with instruction packages following the [Agent Skills](https://agentskills.io) spec.
-- 🎨 **Themes** — Customizable color schemes with live switching.
 - ✅ **Configurable tool confirmation** — Require manual approval for specific tools via `--tool-confirm`.
+
+### TUI (terminal interface)
+
+- 🖥️ **Streaming output** — Real-time display with virtual scrolling, foldable windows, and vim-like keybindings.
+- 📷 **Multi-modal input** — Attach images, audio, video, or documents alongside text via `Ctrl+A`.
+- 🎨 **Theme system** — Customizable color schemes with live switching.
+- ⌨️ **Model selector, theme selector, help window** — Overlay-based UI components for runtime configuration.
+
+### Plain IO (`--plainio`)
+
+- 📟 **Scripting-friendly** — Plain text input/output with TLV framing. No TUI dependencies.
+
+### Raw IO (`--rawio`)
+
+- 🔌 **Programmatic control** — Raw TLV frames on stdin/stdout for custom integrations.
 
 ## System Requirements
 

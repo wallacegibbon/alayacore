@@ -53,18 +53,31 @@ go install github.com/alayacore/alayacore@latest
 
 ## 功能特性
 
+### 核心（所有适配器通用）
+
 - 🤖 **自主工具调用循环** — LLM 规划、调用工具并迭代，直到任务完成（默认无步骤限制，可通过 `--max-steps` 可选设限）。
 - 🛠️ **五种内置工具** — `read_file`、`edit_file`、`write_file`、`execute_command`、`search_content`。通过 `--builtin-tools` 控制（默认全部启用）。
 - 🌐 **跨平台** — 支持 Linux、macOS 和 Windows。`execute_command` 工具可自动检测 shell（Unix 上为 bash/zsh/sh，Windows 上为 PowerShell/cmd）。
 - 🧠 **支持任何 LLM 提供商** — OpenAI、Anthropic、DeepSeek、Qwen、Ollama、LM Studio。一个配置文件支持多个模型，运行时可切换。
-- 🖥️ **流式 TUI** — 实时输出，支持虚拟滚动、可折叠窗口和类 Vim 快捷键。
-- 📟 **Plain IO 模式** — `--plainio` 用于脚本和管道。无 TUI，仅 stdin/stdout。
-- 🔌 **Raw IO 模式** — `--rawio` 用于程序化控制。stdin/stdout 上的原始 TLV 帧。
 - 🔗 **MCP 支持** — 通过 `mcp.conf` 连接外部 [Model Context Protocol](https://modelcontextprotocol.io) 服务器，扩展数据库查询、API 访问、代码分析等能力。
 - 💾 **会话持久化** — 支持保存和恢复对话，使用 `--session` 时自动保存。
 - 🎯 **技能系统** — 可按照 [Agent Skills](https://agentskills.io) 规范扩展指令包来增强 Agent 能力。
-- 🎨 **主题** — 可自定义配色方案，支持实时切换。
 - ✅ **可配置的工具确认** — 通过 `--tool-confirm` 对指定工具要求手动批准。
+
+### TUI（终端界面）
+
+- 🖥️ **流式输出** — 实时显示，支持虚拟滚动、可折叠窗口和类 Vim 快捷键。
+- 📷 **多模态输入** — 通过 `Ctrl+A` 附加图片、音频、视频或文档。
+- 🎨 **主题系统** — 可自定义配色方案，支持实时切换。
+- ⌨️ **模型选择器、主题选择器、帮助窗口** — 基于覆盖层的 UI 组件，运行时配置。
+
+### Plain IO（`--plainio`）
+
+- 📟 **适合脚本使用** — 纯文本输入/输出，带 TLV 帧。无 TUI 依赖。
+
+### Raw IO（`--rawio`）
+
+- 🔌 **程序化控制** — stdin/stdout 上的原始 TLV 帧，用于自定义集成。
 
 ## 系统要求
 
