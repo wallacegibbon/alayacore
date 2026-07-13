@@ -447,11 +447,10 @@ func styleByTag(tag, content string, styles *Styles, _ string) string {
 	case tlv.TagUserT:
 		// User text without media is styled by userRenderer directly
 		// This path is for fallback only (e.g. replayed content)
-		result := styles.Prompt.Render("> ")
-		if content != "" {
-			result += styles.UserInput.Render(content)
+		if content == "" {
+			return ""
 		}
-		return result
+		return styles.UserInput.Render(content)
 	case TagWindowSE:
 		return styleMultiline(content, styles.Error)
 	case TagWindowSN:
