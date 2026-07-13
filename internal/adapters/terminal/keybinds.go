@@ -635,9 +635,7 @@ func (m *Terminal) handleFallback(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case keyCtrlO:
 		return m, m.OpenEditor()
 	case keyCtrlA:
-		m.overlays.OpenAttachmentWindow(func(path string) {
-			m.addAttachment(path)
-		})
+		m.openAttachmentWindow()
 		return m, nil
 	case keyCtrlC:
 		m.input.SetValue("")

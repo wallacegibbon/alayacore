@@ -75,6 +75,17 @@ func (m *Terminal) openHelpWindow() {
 	m.display.updateContent()
 }
 
+// openAttachmentWindow opens the attachment picker overlay.
+func (m *Terminal) openAttachmentWindow() {
+	m.overlays.SetFocusedWindow(m.overlays.RestoreFocus())
+	m.overlays.OpenAttachmentWindow(func(path string) {
+		m.addAttachment(path)
+	})
+	m.input.Blur()
+	m.display.SetDisplayFocused(false)
+	m.display.updateContent()
+}
+
 // openConfirmQuit opens the quit confirmation dialog.
 func (m *Terminal) openConfirmQuit() {
 	m.overlays.SetFocusedWindow(m.overlays.RestoreFocus())
@@ -120,6 +131,7 @@ func (m *Terminal) handleFocus() (tea.Model, tea.Cmd) {
 	if m.overlays.ModelSelector().IsOpen() ||
 		m.overlays.ThemeSelector().IsOpen() ||
 		m.overlays.HelpWindow().IsOpen() ||
+		m.overlays.AttachmentWindow().IsOpen() ||
 		m.overlays.ConfirmOverlay().IsOpen() ||
 		m.overlays.IsMCPInitOpen() {
 		m.display.updateContent()
