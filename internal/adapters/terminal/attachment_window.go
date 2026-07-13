@@ -58,8 +58,8 @@ func (aw *AttachmentWindow) Open() {
 	aw.State = FilteredListOpen
 	aw.FilterInput.SetValue("")
 	aw.lastFilterValue = "\x00"
-	aw.FilterInputFocused = false
-	aw.FilterInput.Blur()
+	aw.FilterInputFocused = true
+	aw.FilterInput.Focus()
 	aw.updateFilterInputStyles()
 	aw.ScrollIdx = 0
 	aw.SelectedIdx = 0
@@ -232,7 +232,7 @@ func (aw *AttachmentWindow) updateFiltered() {
 		term := strings.ToLower(search)
 		aw.filtered = aw.filtered[:0]
 		for _, e := range aw.entries {
-			if strings.Contains(strings.ToLower(e.name), term) {
+			if FuzzyMatch(term, strings.ToLower(e.name)) {
 				aw.filtered = append(aw.filtered, e)
 			}
 		}
