@@ -4,7 +4,7 @@ package terminal
 // It provides two modes:
 //   - Local mode:  path input field with a filtered file list, similar to ModelSelector.
 //   - URL mode:    URL input field for adding remote attachments.
-// Users can toggle between modes with Ctrl+U.
+// Users can toggle between modes with Ctrl+A.
 
 import (
 	"fmt"
@@ -69,6 +69,7 @@ func (aw *AttachmentWindow) Open() {
 	aw.State = FilteredListOpen
 	aw.mode = modeLocal
 	aw.FilterInput.SetValue("")
+	aw.FilterInput.Prompt = "F "
 	aw.lastFilterValue = "\x00"
 	aw.FilterInputFocused = true
 	aw.FilterInput.Focus()
@@ -116,8 +117,8 @@ func (aw *AttachmentWindow) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 
 	key := msg.String()
 
-	// Ctrl+U toggles between local and URL mode
-	if key == keyCtrlU {
+	// Ctrl+A toggles between local and URL mode
+	if key == keyCtrlA {
 		aw.toggleMode()
 		return nil
 	}
@@ -127,6 +128,11 @@ func (aw *AttachmentWindow) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 		aw.handleURLEntry()
 		return nil
 	}
+
+	// Capture focus state before processing — handleEnter for a directory
+	// switches focus to the filter input, and we need to avoid double-processing
+	// when handleLocalModeKeys runs afterwards.
+	inputWasFocused := aw.FilterInputFocused
 
 	handled, filterChanged, cmd := aw.FilteredListCore.HandleKeyMsg(msg, func(extraKey string) bool {
 		if extraKey == keyEnter {
@@ -141,7 +147,7 @@ func (aw *AttachmentWindow) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 
 	if handled {
 		if aw.mode == modeLocal {
-			aw.handleLocalModeKeys(filterChanged, key)
+			aw.handleLocalModeKeys(filterChanged, key, inputWasFocused)
 		}
 		return cmd
 	}
@@ -153,7 +159,7 @@ func (aw *AttachmentWindow) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	return nil
 }
 
-func (aw *AttachmentWindow) handleLocalModeKeys(filterChanged bool, key string) {
+func (aw *AttachmentWindow) handleLocalModeKeys(filterChanged bool, key string, inputWasFocused bool) {
 	if filterChanged && aw.FilterInputFocused {
 		// Ctrl+C clears the filter — also reset directory to baseDir
 		if key == keyCtrlC {
@@ -165,7 +171,10 @@ func (aw *AttachmentWindow) handleLocalModeKeys(filterChanged bool, key string) 
 	if !aw.FilterInputFocused {
 		aw.handleListKeys(key)
 	}
-	if aw.FilterInputFocused && key == keyEnter && len(aw.filtered) > 0 {
+	// Only handle Enter if the filter input was already focused before this key
+	// event.  When the list handles Enter on a directory it switches focus to
+	// the filter — we must not double-process the same key.
+	if aw.FilterInputFocused && key == keyEnter && len(aw.filtered) > 0 && inputWasFocused {
 		aw.handleSearchEnter()
 	}
 }
@@ -181,7 +190,7 @@ func (aw *AttachmentWindow) toggleMode() {
 		aw.updateFilterInputStyles()
 	} else {
 		aw.mode = modeLocal
-		aw.FilterInput.Prompt = "/ "
+		aw.FilterInput.Prompt = "F "
 		aw.loadDir(aw.currentDir)
 		aw.FilterInput.Focus()
 		aw.FilterInputFocused = true
@@ -201,16 +210,39 @@ func (aw *AttachmentWindow) handleURLEntry() bool {
 	return true
 }
 
+// autocompleteDir replaces the last path segment in the filter input with the
+// given directory name (plus trailing "/"), then re-filters to trigger
+// navigateByPath.
+func (aw *AttachmentWindow) autocompleteDir(dirName string) {
+	search := aw.FilterInput.Value()
+	switch {
+	case strings.Contains(search, "/"):
+		prefix := search[:strings.LastIndex(search, "/")+1]
+		aw.FilterInput.SetValue(prefix + dirName + "/")
+	case strings.HasPrefix(search, "~"):
+		aw.FilterInput.SetValue("~/" + dirName + "/")
+	default:
+		aw.FilterInput.SetValue(dirName + "/")
+	}
+	aw.lastFilterValue = "\x00"
+	aw.updateFiltered()
+}
+
 func (aw *AttachmentWindow) handleEnter() bool {
-	// Enter selects the currently highlighted file. Directories are ignored
-	// (use search input with trailing "/" to navigate into a directory).
+	// Enter when the list is focused.
 	if len(aw.filtered) == 0 || aw.SelectedIdx < 0 || aw.SelectedIdx >= len(aw.filtered) {
 		return false
 	}
 	entry := aw.filtered[aw.SelectedIdx]
 	if entry.isDir {
-		return false
+		// Switch to input mode and autocomplete the directory name.
+		aw.FilterInputFocused = true
+		aw.FilterInput.Focus()
+		aw.updateFilterInputStyles()
+		aw.autocompleteDir(entry.name)
+		return true
 	}
+	// File → add it
 	fullPath := filepath.Join(aw.currentDir, entry.name)
 	if aw.onAdd != nil {
 		aw.onAdd(fullPath)
@@ -220,28 +252,13 @@ func (aw *AttachmentWindow) handleEnter() bool {
 }
 
 func (aw *AttachmentWindow) handleSearchEnter() {
+	// Enter when the filter input is focused.
 	if len(aw.filtered) == 0 || aw.SelectedIdx < 0 || aw.SelectedIdx >= len(aw.filtered) {
 		return
 	}
 	entry := aw.filtered[aw.SelectedIdx]
 	if entry.isDir {
-		// Autocomplete: replace the last segment with the selected directory name.
-		// Preserve path prefix (home-relative or absolute) so the trailing "/"
-		// triggers navigateByPath correctly.
-		search := aw.FilterInput.Value()
-		switch {
-		case strings.Contains(search, "/"):
-			// Has path prefix — replace everything after the last "/"
-			prefix := search[:strings.LastIndex(search, "/")+1]
-			aw.FilterInput.SetValue(prefix + entry.name + "/")
-		case strings.HasPrefix(search, "~"):
-			// Home-relative: "~" alone → "~/dirname/"
-			aw.FilterInput.SetValue("~/" + entry.name + "/")
-		default:
-			aw.FilterInput.SetValue(entry.name + "/")
-		}
-		aw.lastFilterValue = "\x00" // force re-filter
-		aw.updateFiltered()
+		aw.autocompleteDir(entry.name)
 		return
 	}
 	// File → add it
@@ -403,7 +420,7 @@ func (aw *AttachmentWindow) render() string {
 	if aw.mode == modeURL {
 		modeText = "URL"
 	}
-	sb.WriteString(aw.Styles.System.Render(fmt.Sprintf("  Mode: %s  (Ctrl+U to switch)", modeText)))
+	sb.WriteString(aw.Styles.System.Render(fmt.Sprintf("  Mode: %s  (Ctrl+A to switch)", modeText)))
 	sb.WriteString("\n")
 
 	// Search / URL input box
@@ -461,11 +478,11 @@ func (aw *AttachmentWindow) render() string {
 	var help string
 	switch {
 	case aw.mode == modeURL:
-		help = "  enter: add URL | ctrl+u: switch to local | esc: close"
+		help = "  enter: add URL | ctrl+a: switch to local | esc: close"
 	case aw.FilterInputFocused:
-		help = "  tab: list | enter: select dir | ctrl+u: switch to URL | esc: close"
+		help = "  tab: list | enter: select dir | ctrl+a: switch to URL | esc: close"
 	default:
-		help = "  tab: search | j/k: navigate | enter: add file | enter on dir: browse | ctrl+u: switch to URL | esc: close"
+		help = "  tab: search | j/k: navigate | enter: add file | enter on dir: browse | ctrl+a: switch to URL | esc: close"
 	}
 	sb.WriteString("\n")
 	sb.WriteString(helpStyle.Render(fmt.Sprintf("%-*s", boxWidthFrom(searchBox), help)))

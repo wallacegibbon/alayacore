@@ -51,7 +51,7 @@ AlayaCore supports multi-modal input — attaching images, audio, video, or docu
 
 ### Attachment Picker
 
-Press `Ctrl+A` to open the attachment picker overlay. Two modes are available, toggled with `Ctrl+U`:
+Press `Ctrl+A` to open and toggle the attachment picker overlay. Two modes are available:
 
 **Local Mode** (default):
 Browse and select local files via a file browser with fuzzy search.
@@ -63,7 +63,7 @@ Browse and select local files via a file browser with fuzzy search.
 | `k`, `↑` | Move selection up |
 | `Enter` on dir | Enter directory |
 | `Enter` on file | Add file as attachment and close |
-| `Ctrl+U` | Switch to URL mode |
+| `Ctrl+A` | Switch to URL mode |
 | `Esc` | Close picker without adding |
 
 **URL Mode**:
@@ -72,10 +72,10 @@ Enter a remote URL to attach as an attachment.
 | Key | Action |
 |-----|--------|
 | `Enter` | Add the URL as attachment and close |
-| `Ctrl+U` | Switch to local mode |
+| `Ctrl+A` | Switch to local mode |
 | `Esc` | Close picker without adding |
 
-The prompt prefix indicates the current mode: `/` for local, `U` for URL.
+The prompt prefix indicates the current mode: `F` for local, `U` for URL.
 
 ### Attachment Types
 
