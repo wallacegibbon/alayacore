@@ -134,6 +134,20 @@ func (m PromptInput) Attachments() []string {
 	return m.attachments
 }
 
+// Height returns the total height (in terminal lines) of the rendered input box,
+// including border and attachments if present.
+func (m PromptInput) Height() int {
+	// Base: border (2) + input field (1) = 3
+	lines := 3
+	if len(m.attachments) > 0 {
+		innerWidth := max(0, m.width-BorderInnerPadding)
+		media := strings.Join(m.attachments, "  ")
+		styledMedia := m.styles.Attachment.Width(innerWidth).Render(media)
+		lines += lipgloss.Height(styledMedia) + 1 // attachment lines + separator
+	}
+	return lines
+}
+
 // OpenEditor opens the external editor for multi-line input.
 func (m *Terminal) OpenEditor() tea.Cmd {
 	return m.editor.Open(m.input.Value())

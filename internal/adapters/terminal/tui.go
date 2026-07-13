@@ -109,15 +109,11 @@ const (
 	DefaultWidth  = 80
 	DefaultHeight = 20
 
-	// Row allocation: input box, status bar, newlines
-	InputRows  = 3
-	StatusRows = 1
-	LayoutGap  = 4 // non-content rows subtracted for selector/list sizing
-
 	// Component sizing
 	InputPaddingH     = 8  // horizontal padding for input fields (border + padding both sides)
 	SelectorMaxHeight = 30 // maximum height for model selector and similar overlays
 	SelectorListRows  = 8  // content rows inside selector borders
+	LayoutGap         = 4  // non-content rows subtracted for selector/list sizing
 )
 
 // Timing constants
@@ -558,15 +554,12 @@ func (m *Terminal) updateDisplayHeight() {
 	// Layout from bottom up:
 	//   line H:          status bar (fixed, 1 line)
 	//   separator:       1 newline between input and status
-	//   lines above:     input box (3 or 5 lines)
+	//   lines above:     input box (dynamic, based on attachments)
 	//   separator:       1 newline between display and input
 	//   remaining lines: display (elastic)
 	//
 	// Total = display + inputBox + statusBar = H
-	inputBoxHeight := 3
-	if len(m.pendingAttachments) > 0 {
-		inputBoxHeight = 5
-	}
+	inputBoxHeight := m.input.Height()
 	m.display.SetHeight(max(0, m.windowHeight-inputBoxHeight-1))
 	m.display.updateContent()
 }
