@@ -4,7 +4,11 @@ package terminal
 //
 // Extracted from tui.go. All remain methods on *Terminal.
 
-import tea "charm.land/bubbletea/v2"
+import (
+	"strings"
+
+	tea "charm.land/bubbletea/v2"
+)
 
 // toggleFocus switches between display and input windows.
 func (m *Terminal) toggleFocus() {
@@ -78,8 +82,12 @@ func (m *Terminal) openHelpWindow() {
 // openAttachmentWindow opens the attachment picker overlay.
 func (m *Terminal) openAttachmentWindow() {
 	m.overlays.SetFocusedWindow(m.overlays.RestoreFocus())
-	m.overlays.OpenAttachmentWindow(func(path string) {
-		m.addAttachment(path)
+	m.overlays.OpenAttachmentWindow(func(item string) {
+		if strings.HasPrefix(item, "http://") || strings.HasPrefix(item, "https://") {
+			m.addURLAttachment(item)
+		} else {
+			m.addAttachment(item)
+		}
 	})
 	m.input.Blur()
 	m.display.SetDisplayFocused(false)

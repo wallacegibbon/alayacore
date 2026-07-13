@@ -49,24 +49,38 @@ func (m *Terminal) emitUE() {
 
 // emitAttachments reads pending attachment files and sends them as TLV frames.
 // Failed files are skipped with an error message shown to the user.
+// URLs are sent as-is without reading.
 func (m *Terminal) emitAttachments() {
 	for _, a := range m.pendingAttachments {
-		data, err := os.ReadFile(a.path)
-		if err != nil {
-			m.out.WriteError("Failed to read attachment: %s", err)
-			continue
+		var value string
+		if a.isURL {
+			value = a.path
+		} else {
+			data, err := os.ReadFile(a.path)
+			if err != nil {
+				m.out.WriteError("Failed to read attachment: %s", err)
+				continue
+			}
+			mime := tlv.MimeTypeForPath(a.path)
+			b64 := base64.StdEncoding.EncodeToString(data)
+			value = fmt.Sprintf("data:%s;base64,%s", mime, b64)
 		}
-		mime := tlv.MimeTypeForPath(a.path)
-		b64 := base64.StdEncoding.EncodeToString(data)
-		dataURI := fmt.Sprintf("data:%s;base64,%s", mime, b64)
-		_ = tlv.WriteTLV(m.streamInput, a.tag, dataURI)
+		_ = tlv.WriteTLV(m.streamInput, a.tag, value)
 	}
 }
 
-// addAttachment adds a file path to pending attachments.
+// addAttachment adds a local file path to pending attachments.
 func (m *Terminal) addAttachment(path string) {
 	tag := tlv.TagForPath(path)
 	m.pendingAttachments = append(m.pendingAttachments, attachment{path: path, tag: tag})
+	m.input.SetAttachments(m.pendingAttachmentLabels())
+	m.updateDisplayHeight()
+}
+
+// addURLAttachment adds a URL to pending attachments.
+func (m *Terminal) addURLAttachment(url string) {
+	tag := tlv.TagForPath(url)
+	m.pendingAttachments = append(m.pendingAttachments, attachment{path: url, tag: tag, isURL: true})
 	m.input.SetAttachments(m.pendingAttachmentLabels())
 	m.updateDisplayHeight()
 }
@@ -190,8 +204,9 @@ type Terminal struct {
 
 // attachment represents a pending file attachment for multi-modal input.
 type attachment struct {
-	path string
-	tag  string // TLV tag: TagUserI, TagUserV, TagUserA, or TagUserD
+	path  string // file path or URL
+	tag   string // TLV tag: TagUserI, TagUserV, TagUserA, or TagUserD
+	isURL bool   // true if it's a URL (sent as-is, no file reading)
 }
 
 // NewTerminalWithTheme creates a new Terminal model with a custom theme.
@@ -324,6 +339,14 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.FocusMsg:
 		return m.handleFocus()
+
+	case tea.PasteMsg:
+		if m.overlays.AttachmentWindow().IsOpen() {
+			m.overlays.AttachmentWindow().FilterInput.Update(msg)
+		} else {
+			m.input.updateFromMsg(msg)
+		}
+		return m, nil
 	}
 
 	// Default: pass to prompt input
