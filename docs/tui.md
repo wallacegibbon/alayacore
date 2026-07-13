@@ -37,8 +37,78 @@ AlayaCore's terminal UI is built with [Bubble Tea](https://github.com/charmbrace
 | `Ctrl+Z` | Suspend process |
 | `Ctrl+C` | Clear text |
 | `Ctrl+F` | Fork session from cursor position |
+| `Ctrl+A` | Open attachment picker for multi-modal input |
 | `:` | Switch to input with `:` prefix (command mode) |
 | `Space` | Toggle window fold (expand/collapse) |
+
+## Multi-Modal Attachments
+
+AlayaCore supports multi-modal input — attaching images, audio, video, or documents alongside text. Attachments are sent as TLV frames **before** the text frame, all within a single `TagUserEnd`-delimited message:
+
+```
+[TagUserI/V/A/D frames...] + [TagUserT text] + [TagUserEnd]
+```
+
+### Attachment Picker
+
+Press `Ctrl+A` to open the attachment picker overlay. Two modes are available, toggled with `Ctrl+U`:
+
+**Local Mode** (default):
+Browse and select local files via a file browser with fuzzy search.
+
+| Key | Action |
+|-----|--------|
+| `Tab` | Toggle focus between path input and file list |
+| `j`, `↓` | Move selection down |
+| `k`, `↑` | Move selection up |
+| `Enter` on dir | Enter directory |
+| `Enter` on file | Add file as attachment and close |
+| `Ctrl+U` | Switch to URL mode |
+| `Esc` | Close picker without adding |
+
+**URL Mode**:
+Enter a remote URL to attach as an attachment.
+
+| Key | Action |
+|-----|--------|
+| `Enter` | Add the URL as attachment and close |
+| `Ctrl+U` | Switch to local mode |
+| `Esc` | Close picker without adding |
+
+The prompt prefix indicates the current mode: `/` for local, `U` for URL.
+
+### Attachment Types
+
+The attachment type is determined by file extension (or URL path extension):
+
+| Type | Icon | TLV Tag | Extensions |
+|------|------|---------|------------|
+| Image | 🖼️ | `UI` | `.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`, `.bmp`, `.svg` |
+| Video | 🎬 | `UV` | `.mp4`, `.mpeg`, `.mpg`, `.avi`, `.mov`, `.webm`, `.mkv` |
+| Audio | 🎵 | `UA` | `.mp3`, `.wav`, `.ogg`, `.flac`, `.aac`, `.m4a`, `.wma` |
+| Document | 📄 | `UD` | `.pdf`, `.txt`, `.md`, others / unknown |
+
+### Display
+
+Attachments appear above the text input, separated by `---`, matching the rendering of user messages in the conversation history:
+
+```
+┌───────────────────────────────┐
+│ 🖼️ Image  🎵 Audio            │
+│ ---                           │
+│ what are these?               │
+└───────────────────────────────┘
+```
+
+### Sending
+
+When you press `Enter`:
+- Local files are read, base64-encoded into `data:` URIs, and sent as TLV frames
+- URLs are sent as-is (no fetching)
+- Text is sent as a `TagUserT` frame
+- A `TagUserEnd` frame finalizes the message
+
+Attachments are cleared after sending. Use `Ctrl+C` to discard both text and pending attachments without sending.
 
 ## Session Commands
 
