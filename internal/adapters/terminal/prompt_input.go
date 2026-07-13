@@ -58,8 +58,7 @@ func (m PromptInput) View() tea.View {
 	content := m.input.View()
 	if len(m.attachments) > 0 {
 		innerWidth := max(0, m.width-BorderInnerPadding)
-		media := strings.Join(m.attachments, "  ")
-		styledMedia := m.styles.Attachment.Width(innerWidth).Render(media)
+		styledMedia := wrapLabels(m.attachments, innerWidth, m.styles.Attachment)
 		separator := m.styles.System.Width(innerWidth).Render(Separator)
 		var sb strings.Builder
 		sb.WriteString(styledMedia)
@@ -141,8 +140,7 @@ func (m PromptInput) Height() int {
 	lines := 3
 	if len(m.attachments) > 0 {
 		innerWidth := max(0, m.width-BorderInnerPadding)
-		media := strings.Join(m.attachments, "  ")
-		styledMedia := m.styles.Attachment.Width(innerWidth).Render(media)
+		styledMedia := wrapLabels(m.attachments, innerWidth, m.styles.Attachment)
 		lines += lipgloss.Height(styledMedia) + 1 // attachment lines + separator
 	}
 	return lines
@@ -173,8 +171,7 @@ func (m PromptInput) RenderWithBorder(blockInput bool) string {
 	var content string
 	if len(m.attachments) > 0 {
 		innerWidth := max(0, m.width-BorderInnerPadding)
-		media := strings.Join(m.attachments, "  ")
-		styledMedia := m.styles.Attachment.Width(innerWidth).Render(media)
+		styledMedia := wrapLabels(m.attachments, innerWidth, m.styles.Attachment)
 		separator := m.styles.System.Width(innerWidth).Render(Separator)
 		var sb strings.Builder
 		sb.WriteString(styledMedia)

@@ -94,6 +94,43 @@ func styleMultiline(content string, style lipgloss.Style) string {
 	return strings.Join(lines, "\n")
 }
 
+// wrapLabels wraps a list of labels at word boundaries (separator "  "),
+// keeping each label intact. Each resulting line is styled with the given style.
+func wrapLabels(labels []string, width int, style lipgloss.Style) string {
+	if len(labels) == 0 {
+		return ""
+	}
+	var lines []string
+	var currentLine strings.Builder
+
+	for i, label := range labels {
+		if label == "" {
+			continue
+		}
+		labelWidth := ansi.StringWidth(label)
+		if currentLine.Len() > 0 {
+			currentWidth := ansi.StringWidth(currentLine.String())
+			sepWidth := 2 // "  "
+			if currentWidth+sepWidth+labelWidth > width {
+				lines = append(lines, style.Render(currentLine.String()))
+				currentLine.Reset()
+				currentLine.WriteString(label)
+			} else {
+				currentLine.WriteString("  ")
+				currentLine.WriteString(label)
+			}
+		} else {
+			currentLine.WriteString(label)
+		}
+		// Flush last label
+		if i == len(labels)-1 && currentLine.Len() > 0 {
+			lines = append(lines, style.Render(currentLine.String()))
+		}
+	}
+
+	return strings.Join(lines, "\n")
+}
+
 // truncateWithSuffix truncates content to fit within maxWidth, using a
 // progressively shorter suffix as space shrinks: "...", "..", ".", or just "."
 // for a single character — indicating content exists but is too narrow.
