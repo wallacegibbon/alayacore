@@ -74,8 +74,9 @@ type Client struct {
 }
 
 // NewClient creates a new MCP client. Call Connect() to establish the connection.
-// The initial adapter defaults to 2025-11-25; Connect will negotiate the actual
-// protocol version and may switch to a different adapter.
+// The connection will automatically negotiate the protocol version:
+// it tries server/discover (2026-07-28+) first and falls back to
+// initialize (2025-11-25) if the server doesn't support the newer protocol.
 func NewClient(config ServerConfig) *Client {
 	return &Client{
 		config:     config,
@@ -572,7 +573,7 @@ func (c *Client) stateError(string) error {
 // ============================================================================
 
 // negotiateAndHandshake determines the protocol version and performs the
-// appropriate handshake. Strategy:
+// appropriate handshake. Strategy (try newest first):
 //  1. Try server/discover (2026-07-28+)
 //  2. If MethodNotFound → fall back to initialize (2025-11-25)
 //  3. Otherwise → propagate error
