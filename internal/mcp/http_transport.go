@@ -376,7 +376,7 @@ func (t *HTTPTransport) doPOSTOnce(ctx context.Context, req jsonrpcRequest) (*ht
 	// Standard request metadata headers (required by 2026-07-28+ spec).
 	// Earlier protocol versions ignore unknown headers.
 	httpReq.Header.Set("Mcp-Method", req.Method)
-	if name := extractResourceName(req.Method, req.Params); name != "" {
+	if name := extractRequestTarget(req.Method, req.Params); name != "" {
 		httpReq.Header.Set("Mcp-Name", name)
 	}
 
@@ -579,10 +579,10 @@ func (t *HTTPTransport) sendResponse(ctx context.Context, resp jsonrpcResponse) 
 	return nil
 }
 
-// extractResourceName extracts the resource or tool name from JSON-RPC params
+// extractRequestTarget extracts the resource or tool name from JSON-RPC params
 // for the Mcp-Name header. Only applies to tools/call, resources/read, and
 // prompts/get methods.
-func extractResourceName(method string, params json.RawMessage) string {
+func extractRequestTarget(method string, params json.RawMessage) string {
 	switch method {
 	case "tools/call", "resources/read", "prompts/get":
 	default:
