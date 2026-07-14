@@ -180,6 +180,78 @@ func TestClientCallTool(t *testing.T) {
 	}
 }
 
+func TestClientCallTool_ResultTypeInputRequired(t *testing.T) {
+	// Server returns resultType: "input_required" — client must reject.
+	resp := jsonrpcResponse{
+		JSONRPC: "2.0",
+		ID:      requestID("1"),
+		Result:  json.RawMessage(`{"resultType":"input_required","inputRequests":[],"content":[]}`),
+	}
+	data, _ := json.Marshal(resp)
+
+	client := NewClient(ServerConfig{Name: "test"})
+	client.adapter = NewAdapterV20260728()
+	client.state.Store(int32(StateReady))
+	client.storeTransport(newMockTransport([]json.RawMessage{data}))
+
+	_, err := client.CallTool(context.Background(), "my_tool", nil)
+	if err == nil {
+		t.Fatal("expected error for resultType=input_required, got nil")
+	}
+	if !strings.Contains(err.Error(), "input_required") {
+		t.Errorf("error should mention input_required, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "multi-round-trip") {
+		t.Errorf("error should mention multi-round-trip, got: %v", err)
+	}
+}
+
+func TestClientCallTool_ResultTypeUnrecognized(t *testing.T) {
+	// Server returns unknown resultType — client must reject.
+	resp := jsonrpcResponse{
+		JSONRPC: "2.0",
+		ID:      requestID("1"),
+		Result:  json.RawMessage(`{"resultType":"foobar","content":[{"type":"text","text":"hi"}]}`),
+	}
+	data, _ := json.Marshal(resp)
+
+	client := NewClient(ServerConfig{Name: "test"})
+	client.adapter = NewAdapterV20260728()
+	client.state.Store(int32(StateReady))
+	client.storeTransport(newMockTransport([]json.RawMessage{data}))
+
+	_, err := client.CallTool(context.Background(), "my_tool", nil)
+	if err == nil {
+		t.Fatal("expected error for unrecognized resultType, got nil")
+	}
+	if !strings.Contains(err.Error(), "foobar") {
+		t.Errorf("error should mention foobar, got: %v", err)
+	}
+}
+
+func TestClientCallTool_ResultTypeComplete(t *testing.T) {
+	// Server returns resultType: "complete" — normal success.
+	resp := jsonrpcResponse{
+		JSONRPC: "2.0",
+		ID:      requestID("1"),
+		Result:  json.RawMessage(`{"resultType":"complete","content":[{"type":"text","text":"ok"}]}`),
+	}
+	data, _ := json.Marshal(resp)
+
+	client := NewClient(ServerConfig{Name: "test"})
+	client.adapter = NewAdapterV20260728()
+	client.state.Store(int32(StateReady))
+	client.storeTransport(newMockTransport([]json.RawMessage{data}))
+
+	result, err := client.CallTool(context.Background(), "my_tool", nil)
+	if err != nil {
+		t.Fatalf("CallTool() error = %v", err)
+	}
+	if len(result.Content) != 1 || result.Content[0].Text != "ok" {
+		t.Errorf("unexpected result: %+v", result)
+	}
+}
+
 func TestClientStateTransitions(t *testing.T) {
 	client := NewClient(ServerConfig{Name: "test"})
 

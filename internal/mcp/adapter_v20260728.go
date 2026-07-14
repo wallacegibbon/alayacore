@@ -69,6 +69,29 @@ func (a *AdapterV20260728) BuildRequestMeta(_ *Client) any {
 	}
 }
 
+// ValidateResult checks the resultType field required by 2026-07-28+.
+// resultType must be "complete" or absent (for backward compat with
+// 2025-11-25 servers). "input_required" is rejected since alayacore
+// does not support multi-round-trip requests.
+func (a *AdapterV20260728) ValidateResult(method string, result json.RawMessage) error {
+	var rt struct {
+		ResultType string `json:"resultType"`
+	}
+	if err := json.Unmarshal(result, &rt); err != nil || rt.ResultType == "" {
+		return nil // absent = "complete" (backward compat)
+	}
+
+	switch rt.ResultType {
+	case "complete":
+		return nil
+	case "input_required":
+		return fmt.Errorf("%s: server requested additional input (resultType=%q) but alayacore does not support multi-round-trip requests",
+			method, rt.ResultType)
+	default:
+		return fmt.Errorf("%s: unrecognized resultType %q", method, rt.ResultType)
+	}
+}
+
 // EnrichRequest adds the MCP-Protocol-Version header. No session header.
 func (a *AdapterV20260728) EnrichRequest(req *http.Request) {
 	req.Header.Set("MCP-Protocol-Version", a.ProtocolVersion())

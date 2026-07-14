@@ -158,9 +158,9 @@ func (c *Client) Connect(ctx context.Context) error {
 
 	c.state.Store(int32(StateReady))
 
-	// Let the adapter start version-specific resources.
-	// (e.g. GET stream for 2025-11-25, no-op for 2026-07-28)
-	// Only for HTTP transport; stdio doesn't use OnTransportReady.
+	// Let the adapter start version-specific resources (e.g. GET stream)
+	// after the transport is ready. Only for HTTP transport; stdio doesn't
+	// use OnTransportReady.
 	if ht, ok := transport.(*HTTPTransport); ok {
 		if ha, ok := c.adapter.(HTTPAdapter); ok {
 			if err := ha.OnTransportReady(ctx, ht); err != nil {
@@ -568,7 +568,7 @@ func (c *Client) sendRequest(ctx context.Context, method string, params any) (js
 		paramsData = data
 	}
 
-	// Inject _meta if the protocol version requires it (2026-07-28+).
+	// Inject _meta via adapter if the protocol requires it.
 	if c.adapter != nil {
 		meta := c.adapter.BuildRequestMeta(c)
 		if meta != nil {
@@ -599,7 +599,22 @@ func (c *Client) sendRequest(ctx context.Context, method string, params any) (js
 		}
 		return nil, err
 	}
+
+	// Validate result via adapter.
+	if err := c.validateResult(method, result); err != nil {
+		return nil, err
+	}
+
 	return result, nil
+}
+
+// validateResult delegates to the adapter's ValidateResult. No-ops if no
+// adapter is set (e.g. before Connect).
+func (c *Client) validateResult(method string, result json.RawMessage) error {
+	if c.adapter == nil {
+		return nil
+	}
+	return c.adapter.ValidateResult(method, result)
 }
 
 // sendCanceledNotification sends a cancellation notification to the server.

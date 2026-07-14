@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 )
 
@@ -18,6 +19,11 @@ type Adapter interface {
 	// BuildRequestMeta constructs the _meta field for a JSON-RPC request.
 	// Returns nil if no _meta should be injected.
 	BuildRequestMeta(c *Client) any
+
+	// ValidateResult checks a JSON-RPC result for protocol-version-specific
+	// correctness. Returns nil if OK, error if the result is invalid or
+	// requires capabilities the client does not have.
+	ValidateResult(method string, result json.RawMessage) error
 
 	// CancelByNotification returns true if this protocol version uses a
 	// cancellation notification as the cancellation mechanism.

@@ -92,6 +92,11 @@ func (a *AdapterV20251125) BuildRequestMeta(_ *Client) any {
 	return nil
 }
 
+// ValidateResult returns nil — 2025-11-25 has no resultType field requirement.
+func (a *AdapterV20251125) ValidateResult(_ string, _ json.RawMessage) error {
+	return nil
+}
+
 // CancelByNotification returns true — 2025-11-25 uses a cancellation
 // notification as its cancellation mechanism.
 func (a *AdapterV20251125) CancelByNotification() bool { return true }
