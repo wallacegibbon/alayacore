@@ -210,22 +210,15 @@ func (init *Init) run(ctx context.Context) {
 	init.sendEvent(evt)
 }
 
-// collectServerResult handles the full lifecycle of a single server and
-// returns its discovery results.
+// collectServerResult handles the full lifecycle of a single server:
+// connect (with OAuth if needed), discover capabilities, and return results.
 func (init *Init) collectServerResult(ctx context.Context, c *Client) serverResult {
-	if c.needsPersistedAuth() {
-		return init.collectOAuthResult(ctx, c)
-	}
-	return init.collectStdResult(ctx, c)
-}
-
-func (init *Init) collectStdResult(ctx context.Context, c *Client) serverResult {
 	var r serverResult
 	r.name = c.Name()
 
 	init.sendEvent(InitEvent{Type: InitConnecting, Server: c.Name()})
 
-	if err := c.Connect(ctx); err != nil {
+	if err := init.connectWithAuth(ctx, c); err != nil {
 		init.sendEvent(InitEvent{Type: InitFailed, Server: c.Name(), Error: err.Error()})
 		return r
 	}
@@ -235,42 +228,42 @@ func (init *Init) collectStdResult(ctx context.Context, c *Client) serverResult 
 	return r
 }
 
-func (init *Init) collectOAuthResult(ctx context.Context, c *Client) serverResult {
-	var r serverResult
-	r.name = c.Name()
+// connectWithAuth connects to the server, running the OAuth authorization
+// flow first if the server requires it.
+func (init *Init) connectWithAuth(ctx context.Context, c *Client) error {
+	if !c.needsPersistedAuth() {
+		return c.Connect(ctx)
+	}
+	return init.connectOAuth(ctx, c)
+}
 
-	init.sendEvent(InitEvent{Type: InitConnecting, Server: c.Name()})
-
+// connectOAuth runs the OAuth authorization code flow and then connects.
+func (init *Init) connectOAuth(ctx context.Context, c *Client) error {
 	cfg := c.config.Auth
 
 	// 1. Discover authorization server metadata.
 	meta, clientID, err := resolveAuthConfig(ctx, cfg, c.config.URL)
 	if err != nil {
-		init.sendEvent(InitEvent{Type: InitFailed, Server: c.Name(), Error: fmt.Errorf("%q: %w", c.Name(), err).Error()})
-		return r
+		return fmt.Errorf("%q: %w", c.Name(), err)
 	}
 
 	cfg.TokenEndpoint = meta.TokenEndpoint
 	cfg.ClientID = clientID
 	authMethod, err := auth.SelectAuthMethod(meta)
 	if err != nil {
-		init.sendEvent(InitEvent{Type: InitFailed, Server: c.Name(), Error: fmt.Errorf("%q: %w", c.Name(), err).Error()})
-		return r
+		return fmt.Errorf("%q: %w", c.Name(), err)
 	}
 	cfg.ClientAuthMethod = authMethod
 
+	// 2. Run the interactive OAuth flow.
 	if err := init.runOAuthForServer(ctx, c, meta, clientID); err != nil {
-		msg := err.Error()
 		if errors.Is(err, errSkipped) {
-			msg = fmt.Sprintf("%q: skipped", c.Name())
+			return fmt.Errorf("%q: skipped", c.Name())
 		}
-		init.sendEvent(InitEvent{Type: InitFailed, Server: c.Name(), Error: msg})
-		return r
+		return err
 	}
 
-	init.discoverCapabilities(ctx, c, &r)
-	init.sendEvent(InitEvent{Type: InitConnected, Server: c.Name()})
-	return r
+	return nil
 }
 
 // runOAuthForServer runs the OAuth flow for a single server.
