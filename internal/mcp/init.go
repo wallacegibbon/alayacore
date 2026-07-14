@@ -36,6 +36,78 @@ import (
 
 var errSkipped = errors.New("skipped")
 
+// ============================================================================
+// OAuth Discovery Helpers
+// ============================================================================
+
+// resolveAuthConfig discovers authorization server metadata and resolves
+// the OAuth client credentials for a server.
+// client_id and client_secret must be configured by the user in mcp.conf
+// via auth-client-id and auth-client-secret.
+func resolveAuthConfig(ctx context.Context, cfg *AuthConfig, serverURL string) (*auth.ASMetadata, string, error) {
+	meta, err := discoverASMetadata(ctx, cfg, serverURL)
+	if err != nil {
+		return nil, "", fmt.Errorf("discover AS: %w", err)
+	}
+
+	if cfg.ClientID == "" {
+		return nil, "", fmt.Errorf("%s requires auth-client-id in mcp.conf. "+
+			"Register an OAuth app with the service and set auth-client-id and "+
+			"auth-client-secret (if needed). See docs/oauth.md for details", meta.Issuer)
+	}
+
+	return meta, cfg.ClientID, nil
+}
+
+// discoverASMetadata discovers the authorization server metadata for an
+// MCP server. It follows the MCP OAuth discovery chain:
+//  1. If token_endpoint is configured, derive issuer from it and try.
+//  2. Try direct well-known discovery from the MCP server URL.
+//  3. Discover Protected Resource Metadata (from well-known or 401).
+//  4. Extract authorization_servers from resource metadata.
+//  5. Try well-known discovery on each authorization server URL.
+func discoverASMetadata(ctx context.Context, authCfg *AuthConfig, serverURL string) (*auth.ASMetadata, error) {
+	// Step 1: If token_endpoint is configured, derive issuer from it and try.
+	if authCfg != nil && authCfg.TokenEndpoint != "" {
+		issuer := deriveIssuer(authCfg.TokenEndpoint)
+		if meta, err := auth.DiscoverASMetadata(ctx, issuer); err == nil {
+			return meta, nil
+		}
+	}
+
+	// Step 2: Try direct well-known discovery from the server URL.
+	if meta, err := auth.DiscoverASMetadata(ctx, serverURL); err == nil {
+		return meta, nil
+	}
+
+	// Step 3: Discover Protected Resource Metadata.
+	prm, err := auth.DiscoverProtectedResource(ctx, serverURL)
+	if err != nil {
+		return nil, fmt.Errorf("discover OAuth for %s: %w", serverURL, err)
+	}
+
+	// Step 4: Try each authorization server.
+	for _, asURL := range prm.AuthorizationServers {
+		if meta, err := auth.DiscoverASMetadata(ctx, asURL); err == nil {
+			return meta, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no authorization server metadata found for %s (discovered servers: %v)",
+		serverURL, prm.AuthorizationServers)
+}
+
+// deriveIssuer attempts to extract the issuer URL from a token endpoint URL.
+// e.g. "https://auth.example.com/token" → "https://auth.example.com"
+func deriveIssuer(tokenEndpoint string) string {
+	for i := len(tokenEndpoint) - 1; i >= 0; i-- {
+		if tokenEndpoint[i] == '/' {
+			return tokenEndpoint[:i]
+		}
+	}
+	return tokenEndpoint
+}
+
 // InitEvent covers everything that happens during MCP initialization.
 // The session receives these from Events() and reacts accordingly.
 type InitEventType string
@@ -330,7 +402,6 @@ func (init *Init) runOAuthForServer(ctx context.Context, c *Client, meta *auth.A
 		return fmt.Errorf("%q: OAuth returned empty access token", c.Name())
 	}
 
-	// Persist token.
 	token := &auth.Token{
 		AccessToken:      oauthToken.AccessToken,
 		TokenType:        oauthToken.TokenType,
@@ -341,23 +412,7 @@ func (init *Init) runOAuthForServer(ctx context.Context, c *Client, meta *auth.A
 		ClientID:         clientID,
 		ClientAuthMethod: cfg.ClientAuthMethod,
 	}
-	if c.tokenStore != nil {
-		_ = c.tokenStore.SaveToken(c.Name(), token) // non-fatal
-	}
-	cfg.obtainedToken = token
-
-	// Reconnect with the obtained token.
-	// The first Connect attempt returned ErrNeedsAuth, leaving the client
-	// in StateFailed (see Connect's deferred cleanup). We must reset to
-	// StateDisconnected before retrying — Connect uses CAS from
-	// StateDisconnected → StateConnecting and would reject StateFailed.
-	c.resetState()
-	if err := c.Connect(ctx); err != nil {
-		cfg.obtainedToken = nil
-		return fmt.Errorf("%q: connect after auth: %w", c.Name(), err)
-	}
-
-	return nil
+	return c.AuthorizeAndConnect(ctx, token)
 }
 
 // discoverCapabilities discovers tools, resources,

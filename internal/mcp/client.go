@@ -526,6 +526,23 @@ func (c *Client) resetState() {
 	c.state.Store(int32(StateDisconnected))
 }
 
+// AuthorizeAndConnect persists the obtained OAuth token, resets the client
+// state, and reconnects. It is called after completing the authorization
+// code flow. On failure the token is cleared so a subsequent retry can
+// restart the flow.
+func (c *Client) AuthorizeAndConnect(ctx context.Context, token *auth.Token) error {
+	c.config.Auth.obtainedToken = token
+	if c.tokenStore != nil {
+		_ = c.tokenStore.SaveToken(c.Name(), token) // non-fatal
+	}
+	c.resetState()
+	if err := c.Connect(ctx); err != nil {
+		c.config.Auth.obtainedToken = nil
+		return fmt.Errorf("%q: connect after auth: %w", c.Name(), err)
+	}
+	return nil
+}
+
 // ============================================================================
 // Transport access helpers
 // ============================================================================
