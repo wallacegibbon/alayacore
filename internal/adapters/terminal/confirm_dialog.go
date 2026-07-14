@@ -334,10 +334,10 @@ func (cd *ConfirmDialog) View() tea.View {
 	// Join with newlines
 	content := strings.Join(msgLines, "\n")
 
-	// Render with bordered box — border uses error color for visual warning.
+	// Render with bordered box — border uses warning color for visual attention.
 	// Pass fixed height so the window is always the same size, same as
 	// ModelSelector and ModelSelector overlays.
-	box := cd.styles.RenderBorderedBox(content, cd.Width, cd.styles.ColorError, ConfirmContentRows)
+	box := cd.styles.RenderBorderedBox(content, cd.Width, cd.styles.ColorWarning, ConfirmContentRows)
 
 	return tea.NewView("\n" + box + "\n")
 }
@@ -387,7 +387,7 @@ func (cd *ConfirmDialog) buildContentLines() []string {
 		lines = append(lines, cd.wrapAndCenter("Press Ctrl+G to cancel MCP initialization.", cd.styles.System, innerWidth)[0])
 		lines = append(lines, cd.wrapAndCenter("(this window will close automatically)", cd.styles.System, innerWidth)[0])
 	default:
-		lines = append(lines, cd.wrapAndCenter("y / n", cd.styles.System, innerWidth)[0])
+		lines = append(lines, cd.wrapAndCenter("y / n", cd.styles.Confirm, innerWidth)[0])
 		lines = append(lines, "")
 	}
 

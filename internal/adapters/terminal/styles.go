@@ -54,6 +54,7 @@ type Styles struct {
 	ColorAccent  color.Color
 	ColorDim     color.Color
 	ColorMuted   color.Color
+	ColorWarning color.Color
 	ColorError   color.Color
 	ColorSuccess color.Color
 	CursorColor  color.Color
@@ -85,7 +86,7 @@ func NewStyles(t *theme.Theme) *Styles {
 		// Output text styles
 		Text:        baseStyle.Foreground(lipgloss.Color(t.Text)).Bold(true),
 		UserInput:   baseStyle.Bold(true),
-		Tool:        baseStyle.Foreground(lipgloss.Color(t.Warning)),
+		Tool:        baseStyle.Foreground(lipgloss.Color(t.Tool)),
 		ToolContent: baseStyle.Foreground(lipgloss.Color(t.Muted)),
 		Reasoning:   baseStyle.Foreground(lipgloss.Color(t.Muted)).Italic(true),
 		Error:       baseStyle.Foreground(lipgloss.Color(t.Error)),
@@ -99,7 +100,7 @@ func NewStyles(t *theme.Theme) *Styles {
 		Input:       baseStyle,
 		Status:      baseStyle.Foreground(lipgloss.Color(t.Dim)),
 		Separator:   baseStyle.Foreground(lipgloss.Color(t.Dim)),
-		Confirm:     baseStyle.Foreground(lipgloss.Color(t.Error)).Bold(true),
+		Confirm:     baseStyle.Foreground(lipgloss.Color(t.Warning)).Bold(true),
 		InputBorder: baseStyle.Border(lipgloss.RoundedBorder()),
 
 		// Component-specific colors
@@ -110,6 +111,7 @@ func NewStyles(t *theme.Theme) *Styles {
 		ColorAccent:  lipgloss.Color(t.Primary),
 		ColorDim:     lipgloss.Color(t.Dim),
 		ColorMuted:   lipgloss.Color(t.Muted),
+		ColorWarning: lipgloss.Color(t.Warning),
 		ColorError:   lipgloss.Color(t.Error),
 		ColorSuccess: lipgloss.Color(t.Success),
 		CursorColor:  lipgloss.Color(t.Cursor),

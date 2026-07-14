@@ -154,13 +154,15 @@ primary: #89d4fa
 dim: #313244
 muted: #6c7086
 text: #cdd6f4
-warning: #f9e2af
+warning: #f77923
 error: #f38ba8
 success: #a6e3a1
 selection: #fab387
 cursor: #cdd6f4
 added: #a6e3a1
 removed: #f38ba8
+tool: #f9e2af
+fold_indicator: "⁝"
 ```
 
 ### Color Roles
@@ -171,11 +173,12 @@ removed: #f38ba8
 | `dim` | Window borders, separators, status bar |
 | `muted` | Secondary text, system messages, reasoning, tool content |
 | `text` | Body text |
-| `warning` | Tool call headers, pending states |
+| `warning` | Confirm dialogs, multi-line prompt hints, attachment labels |
 | `error` | Errors |
 | `success` | Success messages, completed states |
 | `selection` | Selected items in lists, cursor border highlight |
 | `cursor` | Cursor indicator |
+| `tool` | Tool call headers/labels |
 | `added` | Diff additions |
 | `removed` | Diff removals |
 | `fold_indicator` | Character repeated to form the fold splitter row (e.g. `⁝`) |

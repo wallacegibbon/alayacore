@@ -29,8 +29,8 @@ type Theme struct {
 	Dim       string `config:"dim" json:"dim"`             // Dimmed color — unfocused borders, muted text
 	Muted     string `config:"muted" json:"muted"`         // Muted color — placeholders, secondary labels
 	Text      string `config:"text" json:"text"`           // Primary text color
-	Warning   string `config:"warning" json:"warning"`     // Warning color — alerts, caution
-	Error     string `config:"error" json:"error"`         // Error color — errors, dangerous operations
+	Warning   string `config:"warning" json:"warning"`     // Warning color — alerts, caution, confirmations
+	Error     string `config:"error" json:"error"`         // Error color — errors, failures
 	Success   string `config:"success" json:"success"`     // Success color — success messages, completion status
 	Selection string `config:"selection" json:"selection"` // Selection highlight — selected list item, search match
 	Cursor    string `config:"cursor" json:"cursor"`       // Cursor color — text input cursor
@@ -38,6 +38,9 @@ type Theme struct {
 	// Diff colors
 	Added   string `config:"added" json:"added"`     // Added lines in diff
 	Removed string `config:"removed" json:"removed"` // Removed lines in diff
+
+	// Tool color
+	Tool string `config:"tool" json:"tool"` // Tool name — tool call labels in conversation
 
 	// Fold indicator character (repeated to form the fold splitter row)
 	FoldIndicator string `config:"fold_indicator" json:"fold_indicator"`

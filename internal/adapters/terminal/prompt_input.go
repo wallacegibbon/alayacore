@@ -73,10 +73,10 @@ func (m PromptInput) View() tea.View {
 
 // updateInputStyles updates the text input styles based on current theme.
 func (m PromptInput) updateInputStyles() {
-	// Use error color when there are multiple lines as a brighter visual cue.
+	// Use warning color when there are multiple lines as a brighter visual cue.
 	promptColor := m.styles.ColorAccent
 	if m.input.LineCount() > 1 {
-		promptColor = m.styles.ColorError
+		promptColor = m.styles.ColorWarning
 	}
 	m.input.SetStyles(
 		inputFieldStyle{
@@ -155,10 +155,14 @@ func (m *Terminal) OpenEditor() tea.Cmd {
 // When blockInput is true, renders an empty bordered box (visually indicating
 // that input is blocked by an overlay) instead of the active input field.
 // Shows attachment list above the text input when present.
+// When the input has multiple lines, the border uses warning color as a
+// brighter visual cue.
 func (m PromptInput) RenderWithBorder(blockInput bool) string {
 	borderColor := m.styles.BorderFocused
 	if !m.focused {
 		borderColor = m.styles.BorderBlurred
+	} else if m.input.LineCount() > 1 {
+		borderColor = m.styles.ColorWarning
 	}
 
 	// Set input styles based on focus state

@@ -36,8 +36,12 @@ error: #ff0000
 		t.Errorf("Expected Error #ff0000, got %s", th.Error)
 	}
 
-	if th.Warning != "#f9e2af" {
-		t.Errorf("Expected Warning #f9e2af (default), got %s", th.Warning)
+	if th.Warning != "#f77923" {
+		t.Errorf("Expected Warning #f77923 (default), got %s", th.Warning)
+	}
+
+	if th.Tool != "#f9e2af" {
+		t.Errorf("Expected Tool #f9e2af (default), got %s", th.Tool)
 	}
 }
 
