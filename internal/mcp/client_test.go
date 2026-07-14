@@ -34,6 +34,14 @@ func (m *mockTransport) Send(ctx context.Context, req jsonrpcRequest) error {
 	return nil
 }
 
+func (m *mockTransport) SendNotification(ctx context.Context, method string, params any) error {
+	req, err := newNotification(method, params)
+	if err != nil {
+		return err
+	}
+	return m.Send(ctx, req)
+}
+
 func (m *mockTransport) SendReceive(ctx context.Context, req jsonrpcRequest) (json.RawMessage, error) {
 	// Store the request like Send does.
 	m.mu.Lock()
