@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"sync"
+	"time"
 )
 
 // AdapterV20251125 implements the MCP 2025-11-25 protocol.
@@ -17,6 +18,11 @@ type AdapterV20251125 struct {
 	// initialization. It is sent on all subsequent requests. Empty if
 	// the server did not assign a session (which is allowed by spec).
 	sessionID string
+
+	// httpClient is the HTTP client from the transport, used to send
+	// session termination DELETE on close. Set by OnTransportReady.
+	httpClient  *http.Client
+	endpointURL string
 
 	// getSSECancel cancels the GET SSE stream context.
 	getSSECancel context.CancelFunc
@@ -90,6 +96,10 @@ func (a *AdapterV20251125) OnTransportReady(ctx context.Context, transport *HTTP
 	getCtx, cancel := context.WithCancel(ctx)
 	a.getSSECancel = cancel
 
+	// Store transport references for session cleanup on close.
+	a.httpClient = transport.httpClient
+	a.endpointURL = transport.endpointURL
+
 	closeFn, err := transport.StartGETStream(getCtx, transport.handleServerRequest)
 	if err != nil {
 		cancel()
@@ -115,4 +125,30 @@ func (a *AdapterV20251125) OnClose() {
 		a.getSSEClose = nil
 	}
 	close(a.getSSEClosed)
+
+	a.sendSessionDelete()
+}
+
+// sendSessionDelete sends an HTTP DELETE to terminate the session.
+// Best-effort — errors are ignored per spec (server may return 405).
+func (a *AdapterV20251125) sendSessionDelete() {
+	if a.sessionID == "" || a.httpClient == nil {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, a.endpointURL, nil)
+	if err != nil {
+		return
+	}
+	req.Header.Set("MCP-Protocol-Version", a.ProtocolVersion())
+	req.Header.Set("MCP-Session-Id", a.sessionID)
+
+	resp, err := a.httpClient.Do(req)
+	if err != nil {
+		return
+	}
+	resp.Body.Close()
 }
