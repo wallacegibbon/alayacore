@@ -658,36 +658,7 @@ func (c *Client) sendNotification(ctx context.Context, method string, params any
 		return fmt.Errorf("%q: no transport", c.config.Name)
 	}
 
-	// Marshal params first so we can inject _meta.
-	var paramsData json.RawMessage
-	if params != nil {
-		data, err := json.Marshal(params)
-		if err != nil {
-			return fmt.Errorf("marshal notification params: %w", err)
-		}
-		paramsData = data
-	}
-
-	// Inject _meta if the protocol version requires it (2026-07-28+).
-	if c.adapter != nil {
-		meta := c.adapter.BuildRequestMeta(c)
-		if meta != nil {
-			var err error
-			paramsData, err = injectMeta(paramsData, meta)
-			if err != nil {
-				return fmt.Errorf("inject _meta into notification: %w", err)
-			}
-		}
-	}
-
-	req := jsonrpcRequest{
-		JSONRPC: jsonrpcVersion,
-		ID:      requestID(""), // notification: no ID (omitempty omits empty string)
-		Method:  method,
-		Params:  paramsData,
-	}
-
-	return tp.Send(ctx, req)
+	return tp.SendNotification(ctx, method, params)
 }
 
 // compile-time interface checks.
