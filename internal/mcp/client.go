@@ -75,8 +75,9 @@ type Client struct {
 
 // NewClient creates a new MCP client. Call Connect() to establish the connection.
 // The connection will automatically negotiate the protocol version:
-// it tries initialize (2025-11-25) first (safe for all servers), and falls
-// back to server/discover (2026-07-28+) if the server returns MethodNotFound.
+// it tries initialize first (recognized by all MCP server versions), and
+// falls back to server/discover (2026-07-28+) if the server returns
+// MethodNotFound.
 func NewClient(config ServerConfig) *Client {
 	return &Client{
 		config:     config,
@@ -573,15 +574,16 @@ func (c *Client) stateError(string) error {
 // ============================================================================
 
 // negotiateAndHandshake determines the protocol version and performs the
-// appropriate handshake. Strategy (try safest first):
-//  1. Try initialize (2025-11-25) — all current MCP servers support this
-//  2. If MethodNotFound → try server/discover (2026-07-28+)
-//  3. Otherwise → propagate error
+// appropriate handshake. Strategy (try universally supported first):
+//  1. Try initialize (2025-11-25) — both 2025-11-25 and 2026-07-28
+//     servers recognize this method (the latter returns MethodNotFound).
+//  2. If MethodNotFound → try server/discover (2026-07-28+).
+//  3. Otherwise → propagate error.
 //
-// Initialize is tried first because sending an unrecognized method to a
+// initialize is tried first because it is universally recognized by all
+// MCP servers regardless of version. Sending an unrecognized method to an
 // STDIO server may cause it to close the connection (EOF), making fallback
-// impossible. HTTP servers safely return MethodNotFound JSON-RPC errors
-// regardless of order.
+// impossible. Since all servers recognize initialize, this is safe.
 //
 // The client's adapter is replaced with the correct one for the negotiated
 // version, so subsequent requests use version-appropriate behavior
