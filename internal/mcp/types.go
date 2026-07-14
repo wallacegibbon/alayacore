@@ -100,6 +100,10 @@ type ClientCapabilities struct {
 	Sampling *ClientSamplingCapabilities `json:"sampling,omitempty"`
 	// Elicitation is optional server-elicitation support.
 	Elicitation *ClientElicitationCapabilities `json:"elicitation,omitempty"`
+	// Extensions declares optional MCP extensions the client supports.
+	// Keys are extension identifiers (e.g. "io.modelcontextprotocol/tasks"),
+	// values are per-extension settings. Reserved for future protocol versions.
+	Extensions map[string]json.RawMessage `json:"extensions,omitempty"`
 }
 
 // ClientRootCapabilities describes the client's root resource capabilities.
@@ -139,6 +143,10 @@ type ServerCapabilities struct {
 	Resources *ServerResourceCapabilities `json:"resources,omitempty"`
 	// Tools is optional tool support.
 	Tools *ServerToolCapabilities `json:"tools,omitempty"`
+	// Extensions declares optional MCP extensions the server supports.
+	// Keys are extension identifiers, values are per-extension settings.
+	// Reserved for future protocol versions.
+	Extensions map[string]json.RawMessage `json:"extensions,omitempty"`
 }
 
 // ServerPromptCapabilities describes the server's prompt capabilities.
@@ -182,6 +190,9 @@ type InitializeResult struct {
 	// available tools, resources, etc.
 	Instructions string `json:"instructions,omitempty"`
 	Meta         Meta   `json:"_meta,omitempty"`
+
+	// Future protocol fields (2026-07-28+). Omitted for backward compatibility.
+	ResultType string `json:"resultType,omitempty"`
 }
 
 // ImplementationInfo describes the name and version of the implementation.
@@ -258,6 +269,11 @@ type ListToolsResult struct {
 	Tools      []Tool `json:"tools"`
 	NextCursor string `json:"nextCursor,omitempty"`
 	Meta       Meta   `json:"_meta,omitempty"`
+
+	// Future protocol fields (2026-07-28+). Omitted for backward compatibility.
+	ResultType string `json:"resultType,omitempty"`
+	TTLMs      int    `json:"ttlMs,omitempty"`
+	CacheScope string `json:"cacheScope,omitempty"`
 }
 
 // CallToolRequest is the params for the "tools/call" method.
@@ -268,10 +284,15 @@ type CallToolRequest struct {
 
 // CallToolResult is the result of the "tools/call" method.
 type CallToolResult struct {
-	Content    []ToolContent  `json:"content"`
-	Structured map[string]any `json:"structuredContent,omitempty"`
-	IsError    bool           `json:"isError,omitempty"`
-	Meta       Meta           `json:"_meta,omitempty"`
+	Content    []ToolContent `json:"content"`
+	Structured any           `json:"structuredContent,omitempty"`
+	IsError    bool          `json:"isError,omitempty"`
+	Meta       Meta          `json:"_meta,omitempty"`
+
+	// resultType indicates the type of result for multi-round-trip support.
+	// Value "complete" means the request completed with final content.
+	// Reserved for future protocol versions; omitted for backward compatibility.
+	ResultType string `json:"resultType,omitempty"`
 }
 
 // ToolContent represents a piece of content in a tool call result.
@@ -324,6 +345,11 @@ type ListResourcesResult struct {
 	Resources  []Resource `json:"resources"`
 	NextCursor string     `json:"nextCursor,omitempty"`
 	Meta       Meta       `json:"_meta,omitempty"`
+
+	// Future protocol fields (2026-07-28+). Omitted for backward compatibility.
+	ResultType string `json:"resultType,omitempty"`
+	TTLMs      int    `json:"ttlMs,omitempty"`
+	CacheScope string `json:"cacheScope,omitempty"`
 }
 
 // ReadResourceRequest is the params for the "resources/read" method.
@@ -335,6 +361,11 @@ type ReadResourceRequest struct {
 type ReadResourceResult struct {
 	Contents []ResourceContents `json:"contents"`
 	Meta     Meta               `json:"_meta,omitempty"`
+
+	// Future protocol fields (2026-07-28+). Omitted for backward compatibility.
+	ResultType string `json:"resultType,omitempty"`
+	TTLMs      int    `json:"ttlMs,omitempty"`
+	CacheScope string `json:"cacheScope,omitempty"`
 }
 
 // Prompt represents a prompt or prompt template exposed by an MCP server.
@@ -360,6 +391,11 @@ type ListPromptsResult struct {
 	Prompts    []Prompt `json:"prompts"`
 	NextCursor string   `json:"nextCursor,omitempty"`
 	Meta       Meta     `json:"_meta,omitempty"`
+
+	// Future protocol fields (2026-07-28+). Omitted for backward compatibility.
+	ResultType string `json:"resultType,omitempty"`
+	TTLMs      int    `json:"ttlMs,omitempty"`
+	CacheScope string `json:"cacheScope,omitempty"`
 }
 
 // GetPromptRequest is the params for the "prompts/get" method.
@@ -373,6 +409,9 @@ type GetPromptResult struct {
 	Description string          `json:"description,omitempty"`
 	Messages    []PromptMessage `json:"messages"`
 	Meta        Meta            `json:"_meta,omitempty"`
+
+	// Future protocol fields (2026-07-28+). Omitted for backward compatibility.
+	ResultType string `json:"resultType,omitempty"`
 }
 
 // PromptMessage is a single message in a prompt result.
