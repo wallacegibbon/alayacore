@@ -189,16 +189,6 @@ func (t *StdioTransport) Send(ctx context.Context, req jsonrpcRequest) error {
 	return nil
 }
 
-// SendNotification sends a JSON-RPC notification (no response expected)
-// via stdin. It builds the request with an empty ID.
-func (t *StdioTransport) SendNotification(ctx context.Context, method string, params any) error {
-	req, err := newNotification(method, params)
-	if err != nil {
-		return err
-	}
-	return t.Send(ctx, req)
-}
-
 // SendReceive sends a JSON-RPC request and waits for the matching response
 // by request ID. On context cancellation, the pending request is unregistered
 // and the response is discarded when it arrives — no transport disruption.

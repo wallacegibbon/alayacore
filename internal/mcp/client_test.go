@@ -34,14 +34,6 @@ func (m *mockTransport) Send(ctx context.Context, req jsonrpcRequest) error {
 	return nil
 }
 
-func (m *mockTransport) SendNotification(ctx context.Context, method string, params any) error {
-	req, err := newNotification(method, params)
-	if err != nil {
-		return err
-	}
-	return m.Send(ctx, req)
-}
-
 func (m *mockTransport) SendReceive(ctx context.Context, req jsonrpcRequest) (json.RawMessage, error) {
 	// Store the request like Send does.
 	m.mu.Lock()
@@ -107,10 +99,11 @@ func TestClientInitialize(t *testing.T) {
 	})
 
 	client := NewClient(ServerConfig{Name: "test"})
+	client.adapter = NewAdapterV20251125()
 	client.storeTransport(newMockTransport([]json.RawMessage{initData}))
 
 	ctx := context.Background()
-	if _, err := client.doInitialize(ctx); err != nil {
+	if _, err := client.adapter.Handshake(ctx, client); err != nil {
 		t.Fatalf("doInitialize() error = %v", err)
 	}
 
@@ -236,10 +229,11 @@ func TestClientInitialize_VersionMismatch(t *testing.T) {
 	})
 
 	client := NewClient(ServerConfig{Name: "test"})
+	client.adapter = NewAdapterV20251125()
 	client.storeTransport(newMockTransport([]json.RawMessage{initData}))
 
 	ctx := context.Background()
-	_, err := client.doInitialize(ctx)
+	_, err := client.adapter.Handshake(ctx, client)
 	if err == nil {
 		t.Fatal("expected error for version mismatch, got nil")
 	}

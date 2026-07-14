@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/alayacore/alayacore/internal/mcp/auth"
-	"github.com/alayacore/alayacore/internal/version"
 )
 
 // ClientState represents the state of an MCP client connection.
@@ -177,43 +176,6 @@ func (c *Client) Connect(ctx context.Context) error {
 
 	c.startMonitor()
 	return nil
-}
-
-// doInitialize performs the MCP initialize/initialized handshake.
-func (c *Client) doInitialize(ctx context.Context) (string, error) {
-	initResult, err := c.sendRequest(ctx, methodInitialize, InitializeRequest{
-		ProtocolVersion: protocolVersion,
-		Capabilities: ClientCapabilities{
-			Roots:    nil,
-			Sampling: nil,
-		},
-		ClientInfo: ImplementationInfo{
-			Name:    "alayacore",
-			Version: version.Version,
-		},
-	})
-	if err != nil {
-		return "", err
-	}
-
-	var result InitializeResult
-	if err := json.Unmarshal(initResult, &result); err != nil {
-		return "", fmt.Errorf("parse initialize result: %w", err)
-	}
-
-	if result.ProtocolVersion != protocolVersion {
-		return "", fmt.Errorf("unsupported protocol version %q (client supports %q)",
-			result.ProtocolVersion, protocolVersion)
-	}
-
-	c.capabilities = result.Capabilities
-	c.serverInfo = result.ServerInfo
-	c.instructions = result.Instructions
-
-	// Send initialized notification (no response expected).
-	_ = c.sendNotification(ctx, methodNotificationsInitialized, nil)
-
-	return result.ProtocolVersion, nil
 }
 
 // listAllPages is a generic pagination helper for MCP list methods.
@@ -628,7 +590,12 @@ func (c *Client) sendRequest(ctx context.Context, method string, params any) (js
 	result, err := tp.SendReceive(ctx, req)
 	if err != nil {
 		if !isHandshakeMethod(method) && (errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
-			c.sendCanceledNotification(id, err)
+			// On stdio, always send a cancellation notification (no per-
+			// request stream to close). On HTTP, only send if the protocol
+			// version uses notification-based cancellation.
+			if _, isHTTP := tp.(*HTTPTransport); !isHTTP || c.adapter.CancelByNotification() {
+				c.sendCanceledNotification(id, err)
+			}
 		}
 		return nil, err
 	}
@@ -658,7 +625,34 @@ func (c *Client) sendNotification(ctx context.Context, method string, params any
 		return fmt.Errorf("%q: no transport", c.config.Name)
 	}
 
-	return tp.SendNotification(ctx, method, params)
+	// Marshal params and inject _meta, same as sendRequest.
+	var paramsData json.RawMessage
+	if params != nil {
+		data, err := json.Marshal(params)
+		if err != nil {
+			return fmt.Errorf("marshal notification params: %w", err)
+		}
+		paramsData = data
+	}
+	if c.adapter != nil {
+		meta := c.adapter.BuildRequestMeta(c)
+		if meta != nil {
+			var err error
+			paramsData, err = injectMeta(paramsData, meta)
+			if err != nil {
+				return fmt.Errorf("inject _meta into notification: %w", err)
+			}
+		}
+	}
+
+	req := jsonrpcRequest{
+		JSONRPC: jsonrpcVersion,
+		ID:      requestID(""), // notification: no ID (omitempty omits empty string)
+		Method:  method,
+		Params:  paramsData,
+	}
+
+	return tp.Send(ctx, req)
 }
 
 // compile-time interface checks.

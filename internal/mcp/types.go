@@ -512,9 +512,6 @@ type ResourceContents struct {
 	Blob string `json:"blob,omitempty"`
 }
 
-// MCP protocol version constant.
-const protocolVersion = "2025-11-25"
-
 // Method names.
 const (
 	methodInitialize                        = "initialize"

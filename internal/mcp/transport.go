@@ -22,12 +22,6 @@ type Transport interface {
 	// is simply discarded when it arrives.
 	SendReceive(ctx context.Context, req jsonrpcRequest) (json.RawMessage, error)
 
-	// SendNotification sends a JSON-RPC notification (fire-and-forget)
-	// with the given method and optional parameters. It is a convenience
-	// wrapper around Send that constructs the proper jsonrpcRequest with
-	// an empty ID.
-	SendNotification(ctx context.Context, method string, params any) error
-
 	// Close shuts down the transport.
 	Close() error
 
@@ -39,27 +33,6 @@ type Transport interface {
 // ============================================================================
 // Shared Helpers
 // ============================================================================
-
-// newNotification builds a JSON-RPC notification request (no ID) from a
-// method and optional parameters. The returned request can be sent via
-// Transport.Send().
-func newNotification(method string, params any) (jsonrpcRequest, error) {
-	var paramsData json.RawMessage
-	if params != nil {
-		data, err := json.Marshal(params)
-		if err != nil {
-			return jsonrpcRequest{}, fmt.Errorf("marshal notification params: %w", err)
-		}
-		paramsData = data
-	}
-
-	return jsonrpcRequest{
-		JSONRPC: jsonrpcVersion,
-		ID:      requestID(""), // notification: no ID (omitempty omits empty string)
-		Method:  method,
-		Params:  paramsData,
-	}, nil
-}
 
 // mapToEnvSlice converts a map[string]string to "KEY=VALUE" strings.
 func mapToEnvSlice(env map[string]string) []string {
@@ -161,4 +134,41 @@ func parseAndDispatchJSONRPC(data []byte, pending map[requestID]chan<- jsonrpcRe
 	}
 
 	return fmt.Errorf("invalid JSON-RPC message: %s", string(data))
+}
+
+// injectMeta merges a _meta object into serialized JSON-RPC params
+// using efficient raw JSON manipulation.
+func injectMeta(params json.RawMessage, meta any) (json.RawMessage, error) {
+	if meta == nil {
+		return params, nil
+	}
+
+	metaData, err := json.Marshal(meta)
+	if err != nil {
+		return nil, fmt.Errorf("marshal _meta: %w", err)
+	}
+
+	if len(params) == 0 {
+		return json.RawMessage(`{"_meta":` + string(metaData) + `}`), nil
+	}
+
+	end := len(params)
+	for end > 0 && (params[end-1] == ' ' || params[end-1] == '\t' || params[end-1] == '\n' || params[end-1] == '\r') {
+		end--
+	}
+	if end == 0 || params[end-1] != '}' {
+		return nil, fmt.Errorf("params must be a JSON object for _meta injection, got: %s", string(params))
+	}
+
+	result := make([]byte, end-1+len(metaData)+13)
+	copy(result, params[:end-1])
+	result[end-1] = ','
+	offset := end
+	copy(result[offset:], `"_meta":`)
+	offset += 8
+	copy(result[offset:], metaData)
+	offset += len(metaData)
+	result[offset] = '}'
+	offset++
+	return result[:offset], nil
 }

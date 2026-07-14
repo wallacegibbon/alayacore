@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/alayacore/alayacore/internal/debug"
 	"github.com/alayacore/alayacore/internal/mcp/auth"
@@ -174,15 +173,6 @@ func (t *HTTPTransport) Send(ctx context.Context, req jsonrpcRequest) error {
 	return nil
 }
 
-// SendNotification sends a JSON-RPC notification via HTTP POST.
-func (t *HTTPTransport) SendNotification(ctx context.Context, method string, params any) error {
-	req, err := newNotification(method, params)
-	if err != nil {
-		return err
-	}
-	return t.Send(ctx, req)
-}
-
 // SendReceive sends a JSON-RPC request and waits for the matching response.
 // The server may respond with either:
 //   - Content-Type: application/json (immediate JSON response)
@@ -264,7 +254,7 @@ func (t *HTTPTransport) DebugWriter() io.Writer {
 // StartGETStream starts a long-lived GET SSE connection for receiving
 // server-to-client messages. Only valid for 2025-11-25 protocol.
 // Returns a close function that terminates the stream.
-func (t *HTTPTransport) StartGETStream(ctx context.Context, handler ServerRequestHandler) (func(), error) {
+func (t *HTTPTransport) StartGETStream(ctx context.Context) (func(), error) {
 	httpReq, err := http.NewRequestWithContext(ctx, "GET", t.endpointURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create GET request: %w", err)
@@ -300,7 +290,11 @@ func (t *HTTPTransport) StartGETStream(ctx context.Context, handler ServerReques
 	go func() {
 		defer close(closed)
 		defer sr.Close()
-		t.readSSELoop(sr, handler, t.notificationHandler)
+		var srh ServerRequestHandler
+		if t.adapter != nil {
+			srh = t.adapter.ServerRequestHandler
+		}
+		t.readSSELoop(sr, srh, t.notificationHandler)
 	}()
 
 	return func() { sr.Close(); <-closed }, nil
@@ -480,7 +474,11 @@ func (t *HTTPTransport) readSSEResponse(ctx context.Context, resp *http.Response
 	readDone := make(chan struct{})
 	go func() {
 		defer close(readDone)
-		t.readSSELoop(sr, t.handleServerRequest, t.notificationHandler)
+		var srh ServerRequestHandler
+		if t.adapter != nil {
+			srh = t.adapter.ServerRequestHandler
+		}
+		t.readSSELoop(sr, srh, t.notificationHandler)
 	}()
 
 	select {
@@ -510,73 +508,6 @@ func (t *HTTPTransport) readSSEResponse(ctx context.Context, resp *http.Response
 		t.pendingMu.Unlock()
 		return nil, fmt.Errorf("SSE stream ended before response for %q was received", reqID)
 	}
-}
-
-// ============================================================================
-// Server-to-Client Request Handling
-// ============================================================================
-
-// handleServerRequest handles a JSON-RPC request from the server (e.g. ping).
-func (t *HTTPTransport) handleServerRequest(id requestID, method string) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	switch method {
-	case methodPing:
-		_ = t.sendResponse(ctx, jsonrpcResponse{
-			JSONRPC: jsonrpcVersion,
-			ID:      id,
-			Result:  json.RawMessage(`{}`),
-		})
-
-	default:
-		_ = t.sendResponse(ctx, jsonrpcResponse{
-			JSONRPC: jsonrpcVersion,
-			ID:      id,
-			Error: &jsonrpcError{
-				Code:    -32601,
-				Message: "Method not found: " + method,
-			},
-		})
-	}
-}
-
-// sendResponse sends a JSON-RPC response via HTTP POST to the endpoint.
-func (t *HTTPTransport) sendResponse(ctx context.Context, resp jsonrpcResponse) error {
-	data, err := json.Marshal(resp)
-	if err != nil {
-		return fmt.Errorf("marshal response: %w", err)
-	}
-
-	if t.debugWriter != nil {
-		fmt.Fprintf(t.debugWriter, ">>> (response) %s\n", formatJSON(data))
-	}
-
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", t.endpointURL, strings.NewReader(string(data)))
-	if err != nil {
-		return fmt.Errorf("create POST request: %w", err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Accept", "application/json, text/event-stream")
-
-	// Standard metadata headers for intermediate inspection.
-	httpReq.Header.Set("Mcp-Method", "response")
-
-	if t.adapter != nil {
-		t.adapter.EnrichRequest(httpReq)
-	}
-
-	httpResp, err := t.httpClient.Do(httpReq)
-	if err != nil {
-		return fmt.Errorf("POST response: %w", err)
-	}
-	httpResp.Body.Close()
-
-	if httpResp.StatusCode != http.StatusAccepted {
-		return fmt.Errorf("POST response: unexpected status %d (expected 202)", httpResp.StatusCode)
-	}
-
-	return nil
 }
 
 // extractRequestTarget extracts the resource or tool name from JSON-RPC params

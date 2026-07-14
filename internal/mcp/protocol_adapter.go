@@ -19,6 +19,12 @@ type Adapter interface {
 	// Returns nil if no _meta should be injected.
 	BuildRequestMeta(c *Client) any
 
+	// CancelByNotification returns true if this protocol version uses a
+	// cancellation notification as the cancellation mechanism.
+	// When false, transport-level cancellation is used instead
+	// (e.g. closing the SSE response stream for HTTP 2026-07-28+).
+	CancelByNotification() bool
+
 	// OnClose is called when the client is shutting down.
 	// The adapter can clean up version-specific resources.
 	OnClose()
@@ -42,4 +48,15 @@ type HTTPAdapter interface {
 	// transport is ready. The adapter can start version-specific
 	// resources (e.g. GET SSE stream for 2025-11-25).
 	OnTransportReady(ctx context.Context, transport *HTTPTransport) error
+
+	// ServerRequestHandler handles a JSON-RPC request from the server on
+	// an SSE stream. 2025-11-25 responds to ping; 2026-07-28 has no
+	// server-to-client requests and is a no-op.
+	ServerRequestHandler(id requestID, method string)
 }
+
+// compile-time checks.
+var (
+	_ Adapter = (*AdapterV20251125)(nil)
+	_ Adapter = (*AdapterV20260728)(nil)
+)

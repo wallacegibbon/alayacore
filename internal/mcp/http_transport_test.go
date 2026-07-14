@@ -362,7 +362,7 @@ func TestHTTPTransport_GETStream(t *testing.T) {
 	defer tr.Close()
 
 	ctx := context.Background()
-	closeFn, err := tr.StartGETStream(ctx, nil)
+	closeFn, err := tr.StartGETStream(ctx)
 	if err != nil {
 		t.Fatalf("StartGETStream: %v", err)
 	}
@@ -415,7 +415,7 @@ func TestHTTPTransport_GETStreamMethodNotAllowed(t *testing.T) {
 	tr := NewHTTPTransport(serverURL, false)
 	defer tr.Close()
 
-	_, err = tr.StartGETStream(context.Background(), nil)
+	_, err = tr.StartGETStream(context.Background())
 	if err == nil {
 		t.Fatal("expected error for 405 GET, got nil")
 	}

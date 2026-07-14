@@ -2,10 +2,15 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/alayacore/alayacore/internal/version"
 )
 
 // AdapterV20251125 implements the MCP 2025-11-25 protocol.
@@ -47,13 +52,89 @@ func (a *AdapterV20251125) ProtocolVersion() string {
 
 // Handshake performs the 2025-11-25 initialize/initialized handshake.
 func (a *AdapterV20251125) Handshake(ctx context.Context, c *Client) (string, error) {
-	return c.doInitialize(ctx)
+	initResult, err := c.sendRequest(ctx, methodInitialize, InitializeRequest{
+		ProtocolVersion: a.ProtocolVersion(),
+		Capabilities: ClientCapabilities{
+			Roots:    nil,
+			Sampling: nil,
+		},
+		ClientInfo: ImplementationInfo{
+			Name:    "alayacore",
+			Version: version.Version,
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+
+	var result InitializeResult
+	if err := json.Unmarshal(initResult, &result); err != nil {
+		return "", fmt.Errorf("parse initialize result: %w", err)
+	}
+
+	if result.ProtocolVersion != a.ProtocolVersion() {
+		return "", fmt.Errorf("unsupported protocol version %q (client supports %q)",
+			result.ProtocolVersion, a.ProtocolVersion())
+	}
+
+	c.capabilities = result.Capabilities
+	c.serverInfo = result.ServerInfo
+	c.instructions = result.Instructions
+
+	_ = c.sendNotification(ctx, methodNotificationsInitialized, nil)
+
+	return result.ProtocolVersion, nil
 }
 
 // BuildRequestMeta returns nil — 2025-11-25 does not require structured _meta
 // in every request.
 func (a *AdapterV20251125) BuildRequestMeta(_ *Client) any {
 	return nil
+}
+
+// CancelByNotification returns true — 2025-11-25 uses a cancellation
+// notification as its cancellation mechanism.
+func (a *AdapterV20251125) CancelByNotification() bool { return true }
+
+// ServerRequestHandler handles a server-to-client request on an SSE stream
+// (ping in 2025-11-25). Responds to ping, rejects unknown methods.
+func (a *AdapterV20251125) ServerRequestHandler(id requestID, method string) {
+	if a.httpClient == nil || a.endpointURL == "" {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	resp := jsonrpcResponse{
+		JSONRPC: jsonrpcVersion,
+		ID:      id,
+		Error:   &jsonrpcError{Code: -32601, Message: "Method not found: " + method},
+	}
+	if method == methodPing {
+		resp.Error = nil
+		resp.Result = json.RawMessage(`{}`)
+	}
+
+	data, err := json.Marshal(resp)
+	if err != nil {
+		return
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", a.endpointURL, strings.NewReader(string(data)))
+	if err != nil {
+		return
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Accept", "application/json, text/event-stream")
+	httpReq.Header.Set("MCP-Protocol-Version", a.ProtocolVersion())
+	if a.sessionID != "" {
+		httpReq.Header.Set("MCP-Session-Id", a.sessionID)
+	}
+
+	if r, err := a.httpClient.Do(httpReq); err == nil {
+		r.Body.Close()
+	}
 }
 
 // EnrichRequest adds MCP-Protocol-Version and (if assigned) MCP-Session-Id
@@ -100,7 +181,7 @@ func (a *AdapterV20251125) OnTransportReady(ctx context.Context, transport *HTTP
 	a.httpClient = transport.httpClient
 	a.endpointURL = transport.endpointURL
 
-	closeFn, err := transport.StartGETStream(getCtx, transport.handleServerRequest)
+	closeFn, err := transport.StartGETStream(getCtx)
 	if err != nil {
 		cancel()
 		a.getSSECancel = nil
