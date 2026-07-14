@@ -636,23 +636,7 @@ func (c *Client) sendNotification(ctx context.Context, method string, params any
 		return fmt.Errorf("%q: no transport", c.config.Name)
 	}
 
-	var paramsData json.RawMessage
-	if params != nil {
-		data, err := json.Marshal(params)
-		if err != nil {
-			return fmt.Errorf("marshal params: %w", err)
-		}
-		paramsData = data
-	}
-
-	req := jsonrpcRequest{
-		JSONRPC: jsonrpcVersion,
-		ID:      requestID(""), // notification: no ID (omitempty omits empty string)
-		Method:  method,
-		Params:  paramsData,
-	}
-
-	return tp.Send(ctx, req)
+	return tp.SendNotification(ctx, method, params)
 }
 
 // Ensure interfaces are satisfied.

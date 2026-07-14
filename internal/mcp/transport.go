@@ -22,6 +22,12 @@ type Transport interface {
 	// is simply discarded when it arrives.
 	SendReceive(ctx context.Context, req jsonrpcRequest) (json.RawMessage, error)
 
+	// SendNotification sends a JSON-RPC notification (fire-and-forget)
+	// with the given method and optional parameters. It is a convenience
+	// wrapper around Send that constructs the proper jsonrpcRequest with
+	// an empty ID.
+	SendNotification(ctx context.Context, method string, params any) error
+
 	// Close shuts down the transport.
 	Close() error
 
@@ -33,6 +39,27 @@ type Transport interface {
 // ============================================================================
 // Shared Helpers
 // ============================================================================
+
+// newNotification builds a JSON-RPC notification request (no ID) from a
+// method and optional parameters. The returned request can be sent via
+// Transport.Send().
+func newNotification(method string, params any) (jsonrpcRequest, error) {
+	var paramsData json.RawMessage
+	if params != nil {
+		data, err := json.Marshal(params)
+		if err != nil {
+			return jsonrpcRequest{}, fmt.Errorf("marshal notification params: %w", err)
+		}
+		paramsData = data
+	}
+
+	return jsonrpcRequest{
+		JSONRPC: jsonrpcVersion,
+		ID:      requestID(""), // notification: no ID (omitempty omits empty string)
+		Method:  method,
+		Params:  paramsData,
+	}, nil
+}
 
 // mapToEnvSlice converts a map[string]string to "KEY=VALUE" strings.
 func mapToEnvSlice(env map[string]string) []string {

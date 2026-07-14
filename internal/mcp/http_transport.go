@@ -181,6 +181,16 @@ func (t *StreamableHTTPTransport) Send(ctx context.Context, req jsonrpcRequest) 
 	return nil
 }
 
+// SendNotification sends a JSON-RPC notification (no response expected)
+// via HTTP POST. It builds the request with an empty ID.
+func (t *StreamableHTTPTransport) SendNotification(ctx context.Context, method string, params any) error {
+	req, err := newNotification(method, params)
+	if err != nil {
+		return err
+	}
+	return t.Send(ctx, req)
+}
+
 // SendReceive sends a JSON-RPC request and waits for the matching response.
 // The server may respond with either:
 //   - Content-Type: application/json (immediate JSON response)
