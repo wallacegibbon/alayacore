@@ -42,9 +42,12 @@ type Adapter interface {
 type HTTPAdapter interface {
 	Adapter
 
-	// EnrichRequest modifies the outgoing HTTP request before it is sent
-	// (e.g. add MCP-Protocol-Version, MCP-Session-Id headers).
-	EnrichRequest(req *http.Request)
+	// EnrichRequest modifies the outgoing HTTP request before it is sent.
+	// method and params carry the JSON-RPC method and params for this POST
+	// (empty for GET requests). The adapter can inject version-specific
+	// headers (e.g. MCP-Protocol-Version, MCP-Session-Id, Mcp-Method,
+	// Mcp-Name, Mcp-Param-{Name}).
+	EnrichRequest(req *http.Request, method string, params json.RawMessage)
 
 	// HandleResponseHeaders processes HTTP response headers after each
 	// response is received (e.g. extract MCP-Session-Id).
@@ -59,6 +62,11 @@ type HTTPAdapter interface {
 	// an SSE stream. 2025-11-25 responds to ping; 2026-07-28 has no
 	// server-to-client requests and is a no-op.
 	ServerRequestHandler(id requestID, method string)
+
+	// SetToolHeaderMappings feeds the adapter tool header mappings from the
+	// last ListTools response, used for Mcp-Param-{Name} header injection
+	// in EnrichRequest for tools/call requests.
+	SetToolHeaderMappings(tools []Tool)
 }
 
 // compile-time checks.

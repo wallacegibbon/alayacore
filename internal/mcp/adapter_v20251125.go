@@ -143,13 +143,17 @@ func (a *AdapterV20251125) ServerRequestHandler(id requestID, method string) {
 }
 
 // EnrichRequest adds MCP-Protocol-Version and (if assigned) MCP-Session-Id
-// headers to the outgoing HTTP request.
-func (a *AdapterV20251125) EnrichRequest(req *http.Request) {
+// headers to the outgoing HTTP request. Ignores method/params — 2025-11-25
+// does not use Mcp-Method or Mcp-Name headers.
+func (a *AdapterV20251125) EnrichRequest(req *http.Request, _ string, _ json.RawMessage) {
 	req.Header.Set("MCP-Protocol-Version", a.ProtocolVersion())
 	if a.sessionID != "" {
 		req.Header.Set("MCP-Session-Id", a.sessionID)
 	}
 }
+
+// SetToolHeaderMappings is a no-op — 2025-11-25 does not use Mcp-Param headers.
+func (a *AdapterV20251125) SetToolHeaderMappings(_ []Tool) {}
 
 // HandleResponseHeaders extracts MCP-Session-Id from the response headers
 // and stores it for subsequent requests. Per the 2025-11-25 spec, the

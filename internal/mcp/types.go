@@ -290,6 +290,24 @@ type ToolExecution struct {
 	TaskSupport string `json:"taskSupport,omitempty"`
 }
 
+// HeaderMapping describes a single x-mcp-header annotation on a tool
+// parameter. The client must mirror the parameter value into an HTTP header
+// named Mcp-Param-{HeaderName} when calling the tool.
+type HeaderMapping struct {
+	// ParamPath is the JSON path to the parameter value in the call arguments.
+	// For top-level properties this is just the property name (e.g. "region").
+	// For nested properties it is the chain of keys (e.g. ["location", "region"]).
+	ParamPath []string `json:"-"`
+
+	// HeaderName is the suffix after "Mcp-Param-" (e.g. "Region" → header
+	// name is "Mcp-Param-Region").
+	HeaderName string `json:"-"`
+
+	// ParamType is the JSON Schema type of the parameter.
+	// One of "string", "integer", "boolean".
+	ParamType string `json:"-"`
+}
+
 // Tool represents a tool exposed by an MCP server.
 // This is the response type for tools/list.
 type Tool struct {
@@ -307,6 +325,10 @@ type Tool struct {
 	OutputSchema json.RawMessage `json:"outputSchema,omitempty"`
 	// Meta is an optional metadata object for experimental features.
 	Meta Meta `json:"_meta,omitempty"`
+
+	// HeaderMappings holds parsed x-mcp-header annotations from inputSchema.
+	// Populated client-side after ListTools; not serialized to JSON.
+	HeaderMappings []HeaderMapping `json:"-"`
 }
 
 // ToolAnnotations provides optional hints about a tool to clients.

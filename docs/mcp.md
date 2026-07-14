@@ -285,13 +285,15 @@ an MCP Host). The protocol version is selected per-server via the
 | `resources/list` / `resources/read` | Same as 2025-11-25 |
 | `prompts/list` / `prompts/get` | Same as 2025-11-25 |
 | `_meta` per-request | Carries `protocolVersion`, `clientInfo`, `clientCapabilities` |
+| `Mcp-Method`, `Mcp-Name`, `Mcp-Param-{Name}` HTTP headers | Required request metadata for intermediaries |
+| `x-mcp-header` annotation support | Mirror tool parameters to HTTP headers |
 | Streamable HTTP transport (POST only) | No session, no GET stream, no `Mcp-Session-Id` |
 
 ### ❌ Not Implemented (both versions)
 
 | Feature | Spec Section | Reason |
 |---------|-------------|--------|
-| `_meta` / `progressToken` | General fields, Progress | Progress notifications; optional, we don't initiate long-running ops |
+| `progressToken` | Progress | Progress notifications; optional, we don't initiate long-running ops |
 | `resources/subscribe` / `resources/unsubscribe` | Resources | Resource change subscription; not needed for agent use case |
 | `notifications/resources/list_changed` | Resources | Resource lists are fetched at startup and injected into the system prompt; dynamic updates not required |
 | `notifications/resources/updated` | Resources | Requires subscribe; not implemented |

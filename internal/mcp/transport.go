@@ -91,10 +91,11 @@ func dispatchResponse(resp jsonrpcResponse, pending map[requestID]chan<- jsonrpc
 	// No pending request for this ID — discard the response.
 }
 
-// ServerRequestHandler is a callback for handling server-to-client requests.
-// These are JSON-RPC requests sent by the server to the client (e.g. ping,
-// sampling/createMessage, roots/list). The handler should respond to the
-// request using the transport's Send method.
+// ServerRequestHandler is a callback for handling server-to-client requests
+// on SSE streams. In 2025-11-25, servers may send requests such as ping.
+// In 2026-07-28+, servers do not send JSON-RPC requests (they use MRTR
+// InputRequiredResult instead). The handler should respond to the request
+// using the transport's Send method.
 type ServerRequestHandler func(id requestID, method string)
 
 // NotificationHandler is a callback for handling server-to-client notifications.

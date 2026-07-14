@@ -12,11 +12,18 @@ import (
 // AdapterV20260728 implements the MCP 2026-07-28 protocol.
 // This version is stateless — no session, no GET stream.
 // Version identity and capabilities are carried in _meta per request.
-type AdapterV20260728 struct{}
+type AdapterV20260728 struct {
+	// toolHeaderMappings caches x-mcp-header annotations from the last
+	// ListTools response, keyed by tool name. Used in EnrichRequest to
+	// inject Mcp-Param-{Name} headers.
+	toolHeaderMappings map[string][]HeaderMapping
+}
 
 // NewAdapterV20260728 creates a new adapter for the 2026-07-28 protocol.
 func NewAdapterV20260728() *AdapterV20260728 {
-	return &AdapterV20260728{}
+	return &AdapterV20260728{
+		toolHeaderMappings: make(map[string][]HeaderMapping),
+	}
 }
 
 // ProtocolVersion returns "2026-07-28".
@@ -92,9 +99,121 @@ func (a *AdapterV20260728) ValidateResult(method string, result json.RawMessage)
 	}
 }
 
-// EnrichRequest adds the MCP-Protocol-Version header. No session header.
-func (a *AdapterV20260728) EnrichRequest(req *http.Request) {
+// SetToolHeaderMappings caches tool header mappings for Mcp-Param-{Name}
+// injection. Called by Client.ListTools after fetching tool definitions.
+func (a *AdapterV20260728) SetToolHeaderMappings(tools []Tool) {
+	a.toolHeaderMappings = make(map[string][]HeaderMapping, len(tools))
+	for i := range tools {
+		if len(tools[i].HeaderMappings) > 0 {
+			m := make([]HeaderMapping, len(tools[i].HeaderMappings))
+			copy(m, tools[i].HeaderMappings)
+			a.toolHeaderMappings[tools[i].Name] = m
+		}
+	}
+}
+
+// EnrichRequest adds version-specific HTTP headers required by 2026-07-28:
+//   - MCP-Protocol-Version (required on all requests)
+//   - Mcp-Method (required on all POST requests)
+//   - Mcp-Name (required for tools/call, resources/read, prompts/get)
+//   - Mcp-Param-{Name} (required when tool has x-mcp-header annotations)
+func (a *AdapterV20260728) EnrichRequest(req *http.Request, method string, params json.RawMessage) {
 	req.Header.Set("MCP-Protocol-Version", a.ProtocolVersion())
+
+	if method == "" {
+		// GET request (2025-11-25 GET stream adapter compatibility).
+		return
+	}
+
+	// Mcp-Method: mirror the JSON-RPC method.
+	req.Header.Set("Mcp-Method", method)
+
+	// Mcp-Name: mirror the resource/tool/prompt name for specific methods.
+	if name := extractMcpName(method, params); name != "" {
+		req.Header.Set("Mcp-Name", name)
+	}
+
+	// Mcp-Param-{Name}: mirror x-mcp-header annotated parameters.
+	if method == "tools/call" && len(a.toolHeaderMappings) > 0 {
+		a.injectParamHeaders(req, params)
+	}
+}
+
+// injectParamHeaders reads the tool name and arguments from a tools/call
+// params body and injects Mcp-Param-{Name} headers for any annotated
+// parameters that have values in the arguments.
+func (a *AdapterV20260728) injectParamHeaders(req *http.Request, params json.RawMessage) {
+	var callReq struct {
+		Name      string          `json:"name"`
+		Arguments json.RawMessage `json:"arguments"`
+	}
+	if err := json.Unmarshal(params, &callReq); err != nil || callReq.Name == "" {
+		return
+	}
+
+	mappings, ok := a.toolHeaderMappings[callReq.Name]
+	if !ok || len(mappings) == 0 {
+		return
+	}
+
+	headers := buildToolHeadersFromMappings(mappings, callReq.Arguments)
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+}
+
+// extractMcpName extracts the resource or tool name from JSON-RPC params
+// for the Mcp-Name header. Only applies to tools/call, resources/read,
+// and prompts/get methods.
+func extractMcpName(method string, params json.RawMessage) string {
+	switch method {
+	case "tools/call", "resources/read", "prompts/get":
+	default:
+		return ""
+	}
+
+	var fields struct {
+		Name string `json:"name"`
+		URI  string `json:"uri"`
+	}
+	if err := json.Unmarshal(params, &fields); err != nil {
+		return ""
+	}
+	if fields.Name != "" {
+		return fields.Name
+	}
+	return fields.URI
+}
+
+// buildToolHeadersFromMappings constructs Mcp-Param-{Name} headers from
+// tool header mappings and call arguments.
+func buildToolHeadersFromMappings(mappings []HeaderMapping, args json.RawMessage) map[string]string {
+	if len(args) == 0 || len(mappings) == 0 {
+		return nil
+	}
+
+	var argsMap map[string]any
+	if err := json.Unmarshal(args, &argsMap); err != nil {
+		return nil
+	}
+
+	headers := make(map[string]string, len(mappings))
+	for _, m := range mappings {
+		value, found := resolveNestedValue(argsMap, m.ParamPath)
+		if !found || value == nil {
+			continue
+		}
+		encoded, _ := encodeHeaderValue(value, m.ParamType)
+		if encoded == "" {
+			continue
+		}
+		headers["Mcp-Param-"+m.HeaderName] = encoded
+	}
+
+	if len(headers) == 0 {
+		return nil
+	}
+	return headers
 }
 
 // HandleResponseHeaders is a no-op — 2026-07-28 has no session concept.

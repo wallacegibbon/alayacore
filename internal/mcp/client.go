@@ -58,6 +58,10 @@ type Client struct {
 	// staleReason is set when the server is marked stale (e.g. tool list changed).
 	staleReason string
 
+	// toolsCache caches tool definitions (with parsed HeaderMappings) keyed
+	// by tool name. Used by CallTool to inject x-mcp-header HTTP headers.
+	toolsCache map[string]*Tool
+
 	// Request ID counter.
 	reqID atomic.Int32
 
@@ -72,6 +76,7 @@ func NewClient(config ServerConfig) *Client {
 		config:     config,
 		tokenStore: config.TokenStore,
 		closedCh:   make(chan struct{}),
+		toolsCache: make(map[string]*Tool),
 	}
 }
 
@@ -221,8 +226,27 @@ func listAllPages[T any, P any](ctx context.Context, c *Client, op string, metho
 
 // ListTools fetches the list of available tools from the server.
 func (c *Client) ListTools(ctx context.Context) ([]Tool, error) {
-	return listAllPages(ctx, c, "list tools", methodListTools,
+	tools, err := listAllPages(ctx, c, "list tools", methodListTools,
 		func(p *ListToolsResult) ([]Tool, string) { return p.Tools, p.NextCursor })
+	if err != nil {
+		return nil, err
+	}
+
+	// Update tools cache with parsed header mappings for x-mcp-header support.
+	c.toolsCache = make(map[string]*Tool, len(tools))
+	for i := range tools {
+		t := &tools[i]
+		t.HeaderMappings = parseHeaderMappings(t.InputSchema)
+		c.toolsCache[t.Name] = t
+	}
+
+	// Push tool header mappings to the adapter for Mcp-Param-{Name}
+	// injection on subsequent tools/call requests.
+	if ha, ok := c.adapter.(HTTPAdapter); ok {
+		ha.SetToolHeaderMappings(tools)
+	}
+
+	return tools, nil
 }
 
 // CallTool invokes a tool on the server and returns the result.
