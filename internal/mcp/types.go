@@ -84,11 +84,66 @@ type jsonrpcError struct {
 // MCP Protocol Types (subset needed for tool support)
 // ============================================================================
 
+// ProgressToken is used to associate progress notifications with the
+// original request. Values can be a string or number.
+// Defined here for future protocol versions.
+type ProgressToken = string
+
+// LoggingLevel represents the severity of a log message.
+// Defined here for future protocol versions.
+type LoggingLevel string
+
+const (
+	LoggingLevelDebug   LoggingLevel = "debug"
+	LoggingLevelInfo    LoggingLevel = "info"
+	LoggingLevelNotice  LoggingLevel = "notice"
+	LoggingLevelWarning LoggingLevel = "warning"
+	LoggingLevelError   LoggingLevel = "error"
+	LoggingLevelCritical LoggingLevel = "critical"
+)
+
 // Meta is an optional metadata object for experimental features, as defined by
 // the MCP spec (_meta?: { [key: string]: unknown }). It carries
 // implementation-specific data that parties may use to extend the protocol
 // without waiting for the specification to add new fields.
 type Meta map[string]json.RawMessage
+
+// RequestMetaObject represents the structured _meta field required by the
+// MCP 2026-07-28+ protocol specification. It extends Meta with reserved
+// fields for protocol version, client identity, and capabilities.
+//
+// In the 2025-11-25 protocol this type is not used (Meta is sufficient).
+// It is defined here to prepare for migration and to document the expected
+// structure.
+//
+// Key naming rules (from the spec):
+//   - Prefix: optional reverse-DNS notation (e.g. "io.modelcontextprotocol/")
+//   - Any prefix where the second label is "modelcontextprotocol" or "mcp"
+//     is reserved for MCP use.
+type RequestMetaObject struct {
+	// ProgressToken requests out-of-band progress notifications for
+	// this request. Optional.
+	ProgressToken *ProgressToken `json:"progressToken,omitempty"`
+
+	// ProtocolVersion is the MCP protocol version used for this request.
+	// Required in 2026-07-28+. Maps to "io.modelcontextprotocol/protocolVersion".
+	ProtocolVersion string `json:"io.modelcontextprotocol/protocolVersion,omitempty"`
+
+	// ClientInfo identifies the client software making the request.
+	// Required in 2026-07-28+. Maps to "io.modelcontextprotocol/clientInfo".
+	ClientInfo *ImplementationInfo `json:"io.modelcontextprotocol/clientInfo,omitempty"`
+
+	// ClientCapabilities declares the client's capabilities for this request.
+	// Required in 2026-07-28+. Maps to "io.modelcontextprotocol/clientCapabilities".
+	ClientCapabilities *ClientCapabilities `json:"io.modelcontextprotocol/clientCapabilities,omitempty"`
+
+	// LogLevel requests a specific log level for this request.
+	// Optional, deprecated in 2026-07-28. Maps to "io.modelcontextprotocol/logLevel".
+	LogLevel *LoggingLevel `json:"io.modelcontextprotocol/logLevel,omitempty"`
+
+	// Additional arbitrary metadata keys.
+	Extra map[string]json.RawMessage `json:"-"`
+}
 
 // ClientCapabilities describes the capabilities the client supports.
 type ClientCapabilities struct {
