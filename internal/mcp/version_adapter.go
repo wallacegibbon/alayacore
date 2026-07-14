@@ -49,6 +49,6 @@ func (a *V2025_11_25Adapter) Initialize(ctx context.Context, c *Client) error {
 
 // BuildRequestMeta returns nil — the 2025-11-25 spec does not require
 // structured _meta in every request.
-func (a *V2025_11_25Adapter) BuildRequestMeta(c *Client) any {
+func (a *V2025_11_25Adapter) BuildRequestMeta(_ *Client) any {
 	return nil
 }

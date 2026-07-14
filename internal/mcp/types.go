@@ -94,11 +94,11 @@ type ProgressToken = string
 type LoggingLevel string
 
 const (
-	LoggingLevelDebug   LoggingLevel = "debug"
-	LoggingLevelInfo    LoggingLevel = "info"
-	LoggingLevelNotice  LoggingLevel = "notice"
-	LoggingLevelWarning LoggingLevel = "warning"
-	LoggingLevelError   LoggingLevel = "error"
+	LoggingLevelDebug    LoggingLevel = "debug"
+	LoggingLevelInfo     LoggingLevel = "info"
+	LoggingLevelNotice   LoggingLevel = "notice"
+	LoggingLevelWarning  LoggingLevel = "warning"
+	LoggingLevelError    LoggingLevel = "error"
 	LoggingLevelCritical LoggingLevel = "critical"
 )
 
