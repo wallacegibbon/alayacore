@@ -47,6 +47,9 @@ type Client struct {
 	transport  atomic.Value // stores Transport or nil
 	state      atomic.Int32 // stores ClientState as int32
 
+	// adapter handles protocol-version-specific behavior (initialize vs discover).
+	adapter ProtocolAdapter
+
 	// Server capabilities reported during initialization.
 	capabilities ServerCapabilities
 	serverInfo   ImplementationInfo
@@ -76,6 +79,7 @@ func NewClient(config ServerConfig) *Client {
 		config:     config,
 		tokenStore: config.TokenStore,
 		closedCh:   make(chan struct{}),
+		adapter:    NewV2025_11_25Adapter(),
 	}
 }
 
@@ -132,24 +136,27 @@ func (c *Client) Connect(ctx context.Context) error {
 	}
 
 	// Set up OAuth auth provider if configured.
-	if err := c.setupStreamableAuth(transport); err != nil {
+	if authErr := c.setupStreamableAuth(transport); authErr != nil {
 		transport.Close()
-		return err
+		return authErr
 	}
 
 	c.storeTransport(transport)
 	c.setupNotificationHandler(transport)
 	c.state.Store(int32(StateInitializing))
-	if err := c.doInitialize(ctx); err != nil {
+
+	// Perform protocol handshake (initialize or discover, with fallback).
+	negotiatedVersion, err := c.adapter.Handshake(ctx, c)
+	if err != nil {
 		transport.Close()
-		return fmt.Errorf("%q: initialize: %w", c.config.Name, err)
+		return fmt.Errorf("%q: handshake: %w", c.config.Name, err)
 	}
 
 	// Set the negotiated protocol version on Streamable HTTP transport
 	// so it can include the MCP-Protocol-Version header on all subsequent
-	// HTTP requests (required by spec 2025-11-25).
+	// HTTP requests (required by spec 2025-11-25 for Streamable HTTP).
 	if st, ok := transport.(*StreamableHTTPTransport); ok {
-		st.SetProtocolVersion(protocolVersion)
+		st.SetProtocolVersion(negotiatedVersion)
 	}
 
 	c.state.Store(int32(StateReady))
@@ -159,7 +166,8 @@ func (c *Client) Connect(ctx context.Context) error {
 }
 
 // doInitialize performs the MCP initialize/initialized handshake.
-func (c *Client) doInitialize(ctx context.Context) error {
+// Returns the negotiated protocol version.
+func (c *Client) doInitialize(ctx context.Context) (string, error) {
 	initResult, err := c.sendRequest(ctx, methodInitialize, InitializeRequest{
 		ProtocolVersion: protocolVersion,
 		Capabilities: ClientCapabilities{
@@ -172,18 +180,18 @@ func (c *Client) doInitialize(ctx context.Context) error {
 		},
 	})
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	var result InitializeResult
 	if err := json.Unmarshal(initResult, &result); err != nil {
-		return fmt.Errorf("parse initialize result: %w", err)
+		return "", fmt.Errorf("parse initialize result: %w", err)
 	}
 
 	// Verify protocol version compatibility per spec.
 	// If the server responds with a version we don't support, we MUST disconnect.
 	if result.ProtocolVersion != protocolVersion {
-		return fmt.Errorf("unsupported protocol version %q (client supports %q)",
+		return "", fmt.Errorf("unsupported protocol version %q (client supports %q)",
 			result.ProtocolVersion, protocolVersion)
 	}
 
@@ -194,7 +202,7 @@ func (c *Client) doInitialize(ctx context.Context) error {
 	// Send initialized notification (no response expected).
 	_ = c.sendNotification(ctx, methodNotificationsInitialized, nil)
 
-	return nil
+	return result.ProtocolVersion, nil
 }
 
 // listAllPages is a generic pagination helper for MCP list methods.

@@ -250,6 +250,24 @@ type InitializeResult struct {
 	ResultType string `json:"resultType,omitempty"`
 }
 
+// DiscoverResult is the result of the "server/discover" method (MCP 2026-07-28+).
+// It replaces InitializeResult in the new protocol. The server advertises its
+// supported protocol versions, capabilities, and metadata.
+type DiscoverResult struct {
+	// SupportedVersions lists the MCP protocol versions this server supports.
+	SupportedVersions []string `json:"supportedVersions"`
+	// Capabilities describes the server's capabilities.
+	Capabilities ServerCapabilities `json:"capabilities"`
+	// ServerInfo identifies the server implementation.
+	ServerInfo ImplementationInfo `json:"serverInfo"`
+	// Instructions provides natural-language guidance about using the server.
+	Instructions string `json:"instructions,omitempty"`
+	Meta         Meta   `json:"_meta,omitempty"`
+
+	// Future protocol fields.
+	ResultType string `json:"resultType,omitempty"`
+}
+
 // ImplementationInfo describes the name and version of the implementation.
 type ImplementationInfo struct {
 	Name        string `json:"name"`
@@ -503,6 +521,7 @@ const protocolVersion = "2025-11-25"
 // Method names.
 const (
 	methodInitialize                        = "initialize"
+	methodDiscover                          = "server/discover"
 	methodListTools                         = "tools/list"
 	methodCallTool                          = "tools/call"
 	methodListResources                     = "resources/list"

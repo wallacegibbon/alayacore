@@ -110,7 +110,7 @@ func TestClientInitialize(t *testing.T) {
 	client.storeTransport(newMockTransport([]json.RawMessage{initData}))
 
 	ctx := context.Background()
-	if err := client.doInitialize(ctx); err != nil {
+	if _, err := client.doInitialize(ctx); err != nil {
 		t.Fatalf("doInitialize() error = %v", err)
 	}
 
@@ -239,7 +239,7 @@ func TestClientInitialize_VersionMismatch(t *testing.T) {
 	client.storeTransport(newMockTransport([]json.RawMessage{initData}))
 
 	ctx := context.Background()
-	err := client.doInitialize(ctx)
+	_, err := client.doInitialize(ctx)
 	if err == nil {
 		t.Fatal("expected error for version mismatch, got nil")
 	}
