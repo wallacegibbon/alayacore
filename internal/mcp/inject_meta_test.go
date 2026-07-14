@@ -95,3 +95,51 @@ func TestInjectMeta_InvalidParams(t *testing.T) {
 		t.Error("expected error for array params")
 	}
 }
+
+func TestInjectMeta_OverwritesExistingMeta(t *testing.T) {
+	// Params already has a _meta key — injectMeta should overwrite it,
+	// not produce duplicate keys.
+	params := json.RawMessage(`{"name":"tool1","_meta":{"existing":"value"}}`)
+	meta := map[string]string{"version": "2.0"}
+	result, err := injectMeta(params, meta)
+	if err != nil {
+		t.Fatalf("injectMeta with existing _meta: %v", err)
+	}
+
+	var parsed map[string]any
+	if err := json.Unmarshal(result, &parsed); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	// Verify original key preserved.
+	if parsed["name"] != "tool1" {
+		t.Errorf("name = %v, want tool1", parsed["name"])
+	}
+
+	// Verify _meta was overwritten, not appended.
+	metaVal, ok := parsed["_meta"]
+	if !ok {
+		t.Fatal("expected _meta key in result")
+	}
+	metaMap, ok := metaVal.(map[string]any)
+	if !ok {
+		t.Fatalf("_meta is %T, want map", metaVal)
+	}
+	if metaMap["version"] != "2.0" {
+		t.Errorf("_meta.version = %v, want 2.0", metaMap["version"])
+	}
+	if _, exists := metaMap["existing"]; exists {
+		t.Error("old _meta.existing should be overwritten but still present")
+	}
+
+	// Verify there's only one _meta key by counting occurrences in raw JSON.
+	count := 0
+	for i := 0; i < len(result)-7; i++ {
+		if string(result[i:i+7]) == `"_meta"` {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Errorf("found %d occurrences of \"_meta\" in output (expected 1), raw: %s", count, string(result))
+	}
+}

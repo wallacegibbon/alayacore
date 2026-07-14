@@ -136,8 +136,17 @@ func parseAndDispatchJSONRPC(data []byte, pending map[requestID]chan<- jsonrpcRe
 	return fmt.Errorf("invalid JSON-RPC message: %s", string(data))
 }
 
-// injectMeta merges a _meta object into serialized JSON-RPC params
-// using efficient raw JSON manipulation.
+// injectMeta merges a _meta object into serialized JSON-RPC params.
+//
+// It unmarshals params into a map, inserts (or overwrites) the _meta key,
+// then re-marshals. This approach:
+//   - Naturally handles existing _meta keys (overwrites instead of duplicating)
+//   - Avoids fragile raw-JSON string manipulation
+//   - Produces valid JSON regardless of params structure
+//
+// The output JSON may have keys in a different order than the input
+// (Go map iteration order). This is acceptable per JSON spec since
+// JSON objects are unordered collections.
 func injectMeta(params json.RawMessage, meta any) (json.RawMessage, error) {
 	if meta == nil {
 		return params, nil
@@ -148,27 +157,24 @@ func injectMeta(params json.RawMessage, meta any) (json.RawMessage, error) {
 		return nil, fmt.Errorf("marshal _meta: %w", err)
 	}
 
-	if len(params) == 0 {
+	// No existing params: create a new object with just _meta.
+	if len(params) == 0 || string(params) == "null" {
 		return json.RawMessage(`{"_meta":` + string(metaData) + `}`), nil
 	}
 
-	end := len(params)
-	for end > 0 && (params[end-1] == ' ' || params[end-1] == '\t' || params[end-1] == '\n' || params[end-1] == '\r') {
-		end--
-	}
-	if end == 0 || params[end-1] != '}' {
-		return nil, fmt.Errorf("params must be a JSON object for _meta injection, got: %s", string(params))
+	// Unmarshal existing params into a map. This naturally handles all
+	// JSON types and will error on non-objects (arrays, scalars).
+	var obj map[string]json.RawMessage
+	if uerr := json.Unmarshal(params, &obj); uerr != nil {
+		return nil, fmt.Errorf("params must be a JSON object for _meta injection: %w", uerr)
 	}
 
-	result := make([]byte, end-1+len(metaData)+13)
-	copy(result, params[:end-1])
-	result[end-1] = ','
-	offset := end
-	copy(result[offset:], `"_meta":`)
-	offset += 8
-	copy(result[offset:], metaData)
-	offset += len(metaData)
-	result[offset] = '}'
-	offset++
-	return result[:offset], nil
+	// Insert or overwrite _meta.
+	obj["_meta"] = metaData
+
+	result, err := json.Marshal(obj)
+	if err != nil {
+		return nil, fmt.Errorf("serialize params with _meta: %w", err)
+	}
+	return result, nil
 }
