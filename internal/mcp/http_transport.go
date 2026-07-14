@@ -373,6 +373,13 @@ func (t *HTTPTransport) doPOSTOnce(ctx context.Context, req jsonrpcRequest) (*ht
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Accept", "application/json, text/event-stream")
 
+	// Standard request metadata headers (required by 2026-07-28+ spec).
+	// Earlier protocol versions ignore unknown headers.
+	httpReq.Header.Set("Mcp-Method", req.Method)
+	if name := extractResourceName(req.Method, req.Params); name != "" {
+		httpReq.Header.Set("Mcp-Name", name)
+	}
+
 	// Let the adapter add version-specific headers (e.g. MCP-Protocol-Version,
 	// MCP-Session-Id for 2025-11-25).
 	if t.adapter != nil {
@@ -552,6 +559,9 @@ func (t *HTTPTransport) sendResponse(ctx context.Context, resp jsonrpcResponse) 
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Accept", "application/json, text/event-stream")
 
+	// Standard request metadata headers.
+	httpReq.Header.Set("Mcp-Method", "response")
+
 	if t.adapter != nil {
 		t.adapter.EnrichRequest(httpReq)
 	}
@@ -567,6 +577,30 @@ func (t *HTTPTransport) sendResponse(ctx context.Context, resp jsonrpcResponse) 
 	}
 
 	return nil
+}
+
+// extractResourceName extracts the resource or tool name from JSON-RPC params
+// for the Mcp-Name header. Only applies to tools/call, resources/read, and
+// prompts/get methods.
+func extractResourceName(method string, params json.RawMessage) string {
+	switch method {
+	case "tools/call", "resources/read", "prompts/get":
+	default:
+		return ""
+	}
+
+	// Extract `name` or `uri` from params with a single JSON pass.
+	var fields struct {
+		Name string `json:"name"`
+		URI  string `json:"uri"`
+	}
+	if err := json.Unmarshal(params, &fields); err != nil {
+		return ""
+	}
+	if fields.Name != "" {
+		return fields.Name
+	}
+	return fields.URI
 }
 
 // processSSELine parses a single SSE field line.
