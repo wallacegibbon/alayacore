@@ -75,8 +75,8 @@ type Client struct {
 
 // NewClient creates a new MCP client. Call Connect() to establish the connection.
 // The connection will automatically negotiate the protocol version:
-// it tries server/discover (2026-07-28+) first and falls back to
-// initialize (2025-11-25) if the server doesn't support the newer protocol.
+// it tries initialize (2025-11-25) first (safe for all servers), and falls
+// back to server/discover (2026-07-28+) if the server returns MethodNotFound.
 func NewClient(config ServerConfig) *Client {
 	return &Client{
 		config:     config,
@@ -573,30 +573,37 @@ func (c *Client) stateError(string) error {
 // ============================================================================
 
 // negotiateAndHandshake determines the protocol version and performs the
-// appropriate handshake. Strategy (try newest first):
-//  1. Try server/discover (2026-07-28+)
-//  2. If MethodNotFound → fall back to initialize (2025-11-25)
+// appropriate handshake. Strategy (try safest first):
+//  1. Try initialize (2025-11-25) — all current MCP servers support this
+//  2. If MethodNotFound → try server/discover (2026-07-28+)
 //  3. Otherwise → propagate error
+//
+// Initialize is tried first because sending an unrecognized method to a
+// STDIO server may cause it to close the connection (EOF), making fallback
+// impossible. HTTP servers safely return MethodNotFound JSON-RPC errors
+// regardless of order.
 //
 // The client's adapter is replaced with the correct one for the negotiated
 // version, so subsequent requests use version-appropriate behavior
 // (e.g., _meta injection in 2026-07-28+).
 func (c *Client) negotiateAndHandshake(ctx context.Context) (string, error) {
-	// Phase 1: Try server/discover (2026-07-28+).
-	discoverAdapter := NewV2026_07_28Adapter()
-	version, err := discoverAdapter.Handshake(ctx, c)
+	// Phase 1: Try initialize (2025-11-25) — safe for all servers.
+	legacyAdapter := NewV2025_11_25Adapter()
+	version, err := legacyAdapter.Handshake(ctx, c)
 	if err == nil {
-		c.adapter = discoverAdapter
+		// initialize succeeded — stay on 2025-11-25 adapter.
 		return version, nil
 	}
 
 	// If it's not a MethodNotFound error, propagate it.
+	// For STDIO servers, an unrecognized method can cause EOF (server exit),
+	// but initialize is universally supported so this shouldn't happen here.
 	if !isMethodNotFound(err) {
 		return "", err
 	}
 
-	// Phase 2: Fall back to initialize (2025-11-25).
-	c.adapter = NewV2025_11_25Adapter()
+	// Phase 2: Server returned MethodNotFound for initialize — try discover.
+	c.adapter = NewV2026_07_28Adapter()
 	return c.adapter.Handshake(ctx, c)
 }
 
