@@ -14,26 +14,27 @@ import (
 	"github.com/alayacore/alayacore/internal/version"
 )
 
-// AdapterV20251125 implements the MCP 2025-11-25 protocol.
+// AdapterV20250618 implements the MCP 2025-06-18 protocol.
+//
+// This version removed JSON-RPC batch support, added structured tool output,
+// elicitation, resource links, required MCP-Protocol-Version header on HTTP,
+// and introduced security best practices.
 //
 // TRANSPORT
 //
 //	stdio:  ✅ fully supported
 //	HTTP:   ✅ Streamable HTTP (POST with optional SSE streaming response;
 //	        GET stream for server-to-client messages; MCP-Session-Id header
-//	        for session management; HTTP DELETE to terminate session;
-//	        SSE polling via server-side disconnect)
+//	        for session management; HTTP DELETE to terminate session)
 //
 // FEATURES IMPLEMENTED
 //
 //	✅ initialize / initialized handshake
 //	✅ capabilities in handshake request (roots: nil, sampling: nil)
 //	✅ version negotiation (strict match required)
-//	✅ MCP-Protocol-Version header on all HTTP requests
+//	✅ MCP-Protocol-Version header on all HTTP requests (required by this spec)
 //	✅ MCP-Session-Id header (receive from server, echo on requests)
 //	✅ GET SSE stream for server-to-client messages (ping, listChanged)
-//	✅ SSE polling — GET stream supports server-side disconnect and
-//	   reconnection (handled by HTTPTransport.StartGETStream)
 //	✅ ping response on SSE stream
 //	✅ session termination via HTTP DELETE on close
 //	✅ request cancel via cancel notification
@@ -42,43 +43,41 @@ import (
 //	✅ tool annotations (handled by adapter.go formatAnnotations)
 //	✅ ping response on stdio (handled by StdioTransport internally)
 //
-// FEATURES NOT IMPLEMENTED (relative to 2025-11-25 spec)
+// FEATURES NOT IMPLEMENTED (relative to 2025-06-18 spec)
 //
 //	❌ roots list — ClientCapabilities.roots is nil (intentional)
-//	❌ sampling — ClientCapabilities.sampling is nil (intentional);
-//	   sampling with tools/toolChoice parameters not supported
+//	❌ sampling — ClientCapabilities.sampling is nil (intentional)
 //	❌ experimental capabilities — not declared
-//	❌ elicitation — ClientCapabilities.elicitation is nil; URL mode
-//	   elicitation not supported (intentional)
+//	❌ elicitation — ClientCapabilities.elicitation is nil; servers
+//	   should not send elicit requests (intentional)
 //	❌ completions capability — not declared
 //	❌ logging — server may send logging notifications; silently discarded
-//	❌ tasks extension — not declared in capabilities; experimental
-//	   tasks not implemented
-//	❌ OpenID Connect Discovery — not implemented in auth layer
-//	❌ OAuth Client ID Metadata Documents — not implemented
-//	❌ JSON Schema 2020-12 as default dialect — schema handling is
-//	   pass-through; validation assumes JSON Schema draft-07 compatibility
-//	❌ incremental scope consent via WWW-Authenticate — not implemented
-//	   in auth layer
-//	❌ tool icons — exposed metadata for tools/resources/prompts not
-//	   processed; icons are ignored
+//	❌ structured tool output — tool results with structuredContent are
+//	   returned as-is without special parsing; handled pass-through by
+//	   convertToolContent
+//	❌ SSE stream resumability / Last-Event-ID — GET stream is not
+//	   resumed on disconnection; client re-establishes on reconnect
 //	❌ progress notifications — progressToken is never set; incoming
 //	   progress notifications are silently discarded
-//	❌ SSE stream resumability — not implemented; on disconnect the
-//	   client re-establishes a fresh stream
 //
 // SHARED FEATURES (not in adapter, handled at other layers)
 //
-//	✅ OAuth 2.1 authorization + OIDC + Client ID Metadata Docs — handled
-//	   by internal/mcp/auth, same for all Streamable HTTP versions
-type AdapterV20251125 struct {
+//	✅ OAuth 2.1 authorization + security best practices — handled by
+//	   internal/mcp/auth, same for all Streamable HTTP versions
+//	   (2025-03-26 and later)
+//
+// REMOVED FROM SPEC (relative to 2025-03-26)
+//
+//	⚠️ JSON-RPC batch — existed in 2025-03-26, removed in this version
+//	   (PR #416). Not supported by the transport layer; each JSON-RPC
+//	   message is sent as a separate HTTP POST.
+type AdapterV20250618 struct {
 	// sessionID is the Mcp-Session-Id received from the server during
-	// initialization. It is sent on all subsequent requests. Empty if
-	// the server did not assign a session (which is allowed by spec).
+	// initialization. It is sent on all subsequent requests.
 	sessionID string
 
-	// httpClient is the HTTP client from the transport, used to send
-	// session termination DELETE on close. Set by OnTransportReady.
+	// httpClient and endpointURL are used to send session termination
+	// DELETE and to respond to server-to-client requests (ping).
 	httpClient  *http.Client
 	endpointURL string
 
@@ -91,20 +90,20 @@ type AdapterV20251125 struct {
 	getSSEMu     sync.Mutex
 }
 
-// NewAdapterV20251125 creates a new adapter for the 2025-11-25 protocol.
-func NewAdapterV20251125() *AdapterV20251125 {
-	return &AdapterV20251125{
+// NewAdapterV20250618 creates a new adapter for the 2025-06-18 protocol.
+func NewAdapterV20250618() *AdapterV20250618 {
+	return &AdapterV20250618{
 		getSSEClosed: make(chan struct{}),
 	}
 }
 
-// ProtocolVersion returns "2025-11-25".
-func (a *AdapterV20251125) ProtocolVersion() string {
-	return "2025-11-25"
+// ProtocolVersion returns "2025-06-18".
+func (a *AdapterV20250618) ProtocolVersion() string {
+	return "2025-06-18"
 }
 
-// Handshake performs the 2025-11-25 initialize/initialized handshake.
-func (a *AdapterV20251125) Handshake(ctx context.Context, c *Client) (string, error) {
+// Handshake performs the 2025-06-18 initialize/initialized handshake.
+func (a *AdapterV20250618) Handshake(ctx context.Context, c *Client) (string, error) {
 	initResult, err := c.sendRequest(ctx, methodInitialize, InitializeRequest{
 		ProtocolVersion: a.ProtocolVersion(),
 		Capabilities: ClientCapabilities{
@@ -139,24 +138,22 @@ func (a *AdapterV20251125) Handshake(ctx context.Context, c *Client) (string, er
 	return result.ProtocolVersion, nil
 }
 
-// BuildRequestMeta returns nil — 2025-11-25 does not require structured _meta
-// in every request.
-func (a *AdapterV20251125) BuildRequestMeta(_ *Client) any {
+// BuildRequestMeta returns nil — 2025-06-18 does not require structured _meta.
+func (a *AdapterV20250618) BuildRequestMeta(_ *Client) any {
 	return nil
 }
 
-// ValidateResult returns nil — 2025-11-25 has no resultType field requirement.
-func (a *AdapterV20251125) ValidateResult(_ string, _ json.RawMessage) error {
+// ValidateResult returns nil — 2025-06-18 has no resultType field requirement.
+func (a *AdapterV20250618) ValidateResult(_ string, _ json.RawMessage) error {
 	return nil
 }
 
-// CancelByNotification returns true — 2025-11-25 uses a cancellation
-// notification as its cancellation mechanism.
-func (a *AdapterV20251125) CancelByNotification() bool { return true }
+// CancelByNotification returns true — 2025-06-18 uses cancellation notification.
+func (a *AdapterV20250618) CancelByNotification() bool { return true }
 
 // ServerRequestHandler handles a server-to-client request on an SSE stream
-// (ping in 2025-11-25). Responds to ping, rejects unknown methods.
-func (a *AdapterV20251125) ServerRequestHandler(id requestID, method string) {
+// (ping in 2025-06-18). Responds to ping, rejects unknown methods.
+func (a *AdapterV20250618) ServerRequestHandler(id requestID, method string) {
 	if a.httpClient == nil || a.endpointURL == "" {
 		return
 	}
@@ -196,40 +193,35 @@ func (a *AdapterV20251125) ServerRequestHandler(id requestID, method string) {
 }
 
 // EnrichRequest adds MCP-Protocol-Version and (if assigned) MCP-Session-Id
-// headers to the outgoing HTTP request. Ignores method/params — 2025-11-25
-// does not use Mcp-Method or Mcp-Name headers.
-func (a *AdapterV20251125) EnrichRequest(req *http.Request, _ string, _ json.RawMessage) {
+// headers to the outgoing HTTP request.
+func (a *AdapterV20250618) EnrichRequest(req *http.Request, _ string, _ json.RawMessage) {
 	req.Header.Set("MCP-Protocol-Version", a.ProtocolVersion())
 	if a.sessionID != "" {
 		req.Header.Set("MCP-Session-Id", a.sessionID)
 	}
 }
 
-// SetToolHeaderMappings is a no-op — 2025-11-25 does not use Mcp-Param headers.
-func (a *AdapterV20251125) SetToolHeaderMappings(_ []Tool) {}
+// SetToolHeaderMappings is a no-op — 2025-06-18 does not use Mcp-Param headers.
+func (a *AdapterV20250618) SetToolHeaderMappings(_ []Tool) {}
 
-// HandleResponseHeaders extracts MCP-Session-Id from the response headers
-// and stores it for subsequent requests. Per the 2025-11-25 spec, the
-// server assigns a session ID in its InitializeResult response.
-func (a *AdapterV20251125) HandleResponseHeaders(resp *http.Response) {
+// HandleResponseHeaders extracts MCP-Session-Id from the response headers.
+func (a *AdapterV20250618) HandleResponseHeaders(resp *http.Response) {
 	if sid := resp.Header.Get("MCP-Session-Id"); sid != "" {
 		a.sessionID = sid
 	}
 }
 
 // OnTransportReady starts the GET SSE stream for server-to-client messages.
-func (a *AdapterV20251125) OnTransportReady(ctx context.Context, transport *HTTPTransport) error {
+func (a *AdapterV20250618) OnTransportReady(ctx context.Context, transport *HTTPTransport) error {
 	a.getSSEMu.Lock()
 	defer a.getSSEMu.Unlock()
 
-	// Reset closed channel if previous GET stream finished.
 	select {
 	case <-a.getSSEClosed:
 		a.getSSEClosed = make(chan struct{})
 	default:
 	}
 
-	// Check transport is still alive before starting a new stream.
 	select {
 	case <-transport.Done():
 		return io.ErrClosedPipe
@@ -239,7 +231,6 @@ func (a *AdapterV20251125) OnTransportReady(ctx context.Context, transport *HTTP
 	getCtx, cancel := context.WithCancel(ctx)
 	a.getSSECancel = cancel
 
-	// Store transport references for session cleanup on close.
 	a.httpClient = transport.httpClient
 	a.endpointURL = transport.endpointURL
 
@@ -255,7 +246,7 @@ func (a *AdapterV20251125) OnTransportReady(ctx context.Context, transport *HTTP
 }
 
 // OnClose terminates the session and cleans up the GET stream.
-func (a *AdapterV20251125) OnClose() {
+func (a *AdapterV20250618) OnClose() {
 	a.getSSEMu.Lock()
 	defer a.getSSEMu.Unlock()
 
@@ -273,8 +264,7 @@ func (a *AdapterV20251125) OnClose() {
 }
 
 // sendSessionDelete sends an HTTP DELETE to terminate the session.
-// Best-effort — errors are ignored per spec (server may return 405).
-func (a *AdapterV20251125) sendSessionDelete() {
+func (a *AdapterV20250618) sendSessionDelete() {
 	if a.sessionID == "" || a.httpClient == nil {
 		return
 	}

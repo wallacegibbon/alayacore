@@ -65,7 +65,7 @@ auth-client-secret: <your-client-secret>
 | `command` | One of url/command | Executable command for stdio transport |
 | `args` | No | JSON array of command-line arguments |
 | `env` | No | JSON object of environment variables (`{"KEY": "val"}`) |
-| `proto-version` | Yes | MCP protocol version: `"2025-11-25"` or `"2026-07-28"` |
+| `proto-version` | Yes | MCP protocol version (see [Protocol Support](#protocol-support)) |
 | `auth-type` | No | OAuth type: `authorization_code` or `static` |
 | `auth-scopes` | No | JSON array of OAuth scopes to request (e.g. `["repo", "gist"]`) |
 | `auth-client-id` | No* | OAuth client ID (required for `authorization_code`) |
@@ -86,7 +86,7 @@ Server configurations are validated at load time. A server block is **rejected**
 
 - `server` name is empty
 - `server` name duplicates another block — the first occurrence is kept, subsequent duplicates are skipped
-- `proto-version` is missing or unsupported — must be `"2025-11-25"` or `"2026-07-28"`
+- `proto-version` is missing or unsupported — see [Protocol Support](#protocol-support) for valid versions
 
 Rejected servers are skipped and an error is reported to the adapter. Other valid servers in the same file are unaffected.
 
@@ -259,6 +259,55 @@ AlayaCore implements the MCP **client** side of the protocol (it acts as
 an MCP Host). The protocol version is selected per-server via the
 `proto-version` config field.
 
+### 2024-11-05 ⚠️
+
+| Feature | Notes |
+|---------|-------|
+| `initialize` / `initialized` | Version negotiation, capability exchange |
+| `tools/list` | With cursor-based pagination |
+| `tools/call` | With content type conversion (text, image, audio, resource, resource_link) |
+| `resources/list` / `resources/read` | Pre-fetched at startup and injected into system prompt; exposed as `{server}_read_resource` tool |
+| `prompts/list` / `prompts/get` | Pre-fetched at startup and injected into system prompt; exposed as `{server}_get_prompt` tool |
+| `ping` | Both client → server and server → client |
+| `notifications/cancelled` | Best-effort on context cancellation |
+| `notifications/tools/list_changed` | Marks server stale, requires restart |
+| Stdio transport | NDJSON, graceful shutdown (stdin→SIGTERM→SIGKILL) |
+
+> ⚠️ **HTTP not supported.** 2024-11-05 uses the legacy HTTP+SSE transport
+> pattern (client opens SSE connection first, server sends `endpoint` event,
+> responses arrive on the SSE stream). AlayaCore only implements Streamable
+> HTTP, so this version is restricted to stdio transport.
+
+### 2025-03-26 ✅
+
+| Feature | Notes |
+|---------|-------|
+| `initialize` / `initialized` | Version negotiation, capability exchange |
+| `tools/list` | With cursor-based pagination |
+| `tools/call` | With content type conversion (text, image, audio, resource, resource_link) |
+| `resources/list` / `resources/read` | Pre-fetched at startup and injected into system prompt; exposed as `{server}_read_resource` tool |
+| `prompts/list` / `prompts/get` | Pre-fetched at startup and injected into system prompt; exposed as `{server}_get_prompt` tool |
+| `ping` | Both client → server and server → client |
+| `notifications/cancelled` | Best-effort on context cancellation |
+| `notifications/tools/list_changed` | Marks server stale, requires restart |
+| Stdio transport | NDJSON, graceful shutdown (stdin→SIGTERM→SIGKILL) |
+| Streamable HTTP transport | JSON + SSE responses, GET stream, `Mcp-Session-Id`, `MCP-Protocol-Version` header |
+
+### 2025-06-18 ✅
+
+| Feature | Notes |
+|---------|-------|
+| `initialize` / `initialized` | Version negotiation, capability exchange |
+| `tools/list` | With cursor-based pagination |
+| `tools/call` | With content type conversion (text, image, audio, structured content, resource, resource_link) |
+| `resources/list` / `resources/read` | Pre-fetched at startup and injected into system prompt; exposed as `{server}_read_resource` tool |
+| `prompts/list` / `prompts/get` | Pre-fetched at startup and injected into system prompt; exposed as `{server}_get_prompt` tool |
+| `ping` | Both client → server and server → client |
+| `notifications/cancelled` | Best-effort on context cancellation |
+| `notifications/tools/list_changed` | Marks server stale, requires restart |
+| Stdio transport | NDJSON, graceful shutdown (stdin→SIGTERM→SIGKILL) |
+| Streamable HTTP transport | JSON + SSE responses, GET stream, `Mcp-Session-Id`, `MCP-Protocol-Version` header (required by spec) |
+
 ### 2025-11-25 ✅
 
 | Feature | Notes |
@@ -289,7 +338,7 @@ an MCP Host). The protocol version is selected per-server via the
 | `x-mcp-header` annotation support | Mirror tool parameters to HTTP headers |
 | Streamable HTTP transport (POST only) | No session, no GET stream, no `Mcp-Session-Id` |
 
-### ❌ Not Implemented (both versions)
+### ❌ Not Implemented
 
 | Feature | Spec Section | Reason |
 |---------|-------------|--------|

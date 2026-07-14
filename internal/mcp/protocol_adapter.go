@@ -71,6 +71,9 @@ type HTTPAdapter interface {
 
 // compile-time checks.
 var (
+	_ Adapter = (*AdapterV20241105)(nil)
+	_ Adapter = (*AdapterV20250326)(nil)
+	_ Adapter = (*AdapterV20250618)(nil)
 	_ Adapter = (*AdapterV20251125)(nil)
 	_ Adapter = (*AdapterV20260728)(nil)
 )

@@ -9,9 +9,71 @@ import (
 	"github.com/alayacore/alayacore/internal/version"
 )
 
-// AdapterV20260728 implements the MCP 2026-07-28 protocol.
-// This version is stateless — no session, no GET stream.
-// Version identity and capabilities are carried in _meta per request.
+// AdapterV20260728 implements the MCP 2026-07-28 protocol (RC).
+//
+// This version is stateless — no initialize/initialized handshake, no session,
+// no GET stream. Version identity, client info, and capabilities are carried
+// in the _meta field of every request.
+//
+// TRANSPORT
+//
+//	stdio:  ✅ fully supported
+//	HTTP:   ✅ Streamable HTTP (POST with optional SSE streaming response;
+//	        Mcp-Method, Mcp-Name, Mcp-Param-{Name} headers on HTTP POST;
+//	        no session, no GET stream, no HTTP DELETE)
+//
+// FEATURES IMPLEMENTED
+//
+//	✅ server/discover handshake (advertise supported versions)
+//	✅ version negotiation via server/discover response
+//	✅ _meta on every request (io.modelcontextprotocol/protocolVersion,
+//	   io.modelcontextprotocol/clientInfo,
+//	   io.modelcontextprotocol/clientCapabilities)
+//	✅ resultType validation ("complete" accepted, "input_required" rejected)
+//	✅ MCP-Protocol-Version header on all HTTP requests
+//	✅ Mcp-Method header (mirrors JSON-RPC method name)
+//	✅ Mcp-Name header (mirrors resource/tool/prompt name for
+//	   tools/call, resources/read, prompts/get)
+//	✅ Mcp-Param-{Name} headers (from x-mcp-header tool annotations)
+//	✅ request cancel via cancel notification — fallback for stdio;
+//	   HTTP uses transport-level cancellation
+//	✅ audio content type (handled by adapter.go convertToolContent)
+//	✅ resource_link content type (handled by adapter.go convertToolContent)
+//	✅ tool annotations (handled by adapter.go formatAnnotations)
+//	✅ ping response on stdio (handled by StdioTransport internally)
+//
+// FEATURES NOT IMPLEMENTED (relative to 2026-07-28-RC spec)
+//
+//	❌ MRTR (Multi Round-Trip Requests) — resultType "input_required" is
+//	   explicitly rejected with an error; alayacore does not support
+//	   multi-round-trip interactions
+//	❌ subscriptions/listen — not implemented; server-to-client
+//	   notifications (listChanged) are not received
+//	❌ caching (ttlMs, cacheScope) — list results are not cached;
+//	   ttlMs and cacheScope fields in responses are ignored
+//	❌ Extensions — ClientCapabilities.extensions is nil; optional
+//	   extensions beyond core protocol are not declared
+//	❌ OpenTelemetry trace context (traceparent, tracestate,
+//	   baggage in _meta) — not propagated
+//	❌ error code renumbering — error codes returned by alayacore
+//	   follow pre-2026-07-28 conventions; new error codes
+//	   (-32020, -32021, -32022) are not used
+//	❌ tasks extension — moved out of core protocol; not implemented
+//	❌ elicitation — merged into MRTR; not implemented
+//	❌ progress notifications — progressToken is never set; incoming
+//	   progress notifications are silently discarded
+//
+// DEPRECATED FEATURES (spec-deprecated, intentionally not implemented)
+//
+//	⚠️ roots — deprecated in 2026-07-28 spec; not implemented
+//	⚠️ sampling — deprecated in 2026-07-28 spec; not implemented
+//	⚠️ logging — deprecated in 2026-07-28 spec; server notifications
+//	   are silently discarded
+//
+// SHARED FEATURES (not in adapter, handled at other layers)
+//
+//	✅ OAuth 2.1 authorization — handled by internal/mcp/auth, same for
+//	   all Streamable HTTP versions
 type AdapterV20260728 struct {
 	// toolHeaderMappings caches x-mcp-header annotations from the last
 	// ListTools response, keyed by tool name. Used in EnrichRequest to

@@ -107,6 +107,8 @@ func (c *Client) MarkStale(reason string) {
 }
 
 // Connect establishes the transport and performs MCP initialization.
+//
+//nolint:gocyclo
 func (c *Client) Connect(ctx context.Context) error {
 	if !c.state.CompareAndSwap(int32(StateDisconnected), int32(StateConnecting)) {
 		return fmt.Errorf("%q: already connecting", c.config.Name)
@@ -118,6 +120,15 @@ func (c *Client) Connect(ctx context.Context) error {
 
 	// proto-version is required — no default.
 	switch c.config.ProtoVersion {
+	case "2024-11-05":
+		c.adapter = NewAdapterV20241105()
+		if c.config.URL != "" {
+			return fmt.Errorf("%q: proto-version 2024-11-05 only supports stdio transport", c.config.Name)
+		}
+	case "2025-03-26":
+		c.adapter = NewAdapterV20250326()
+	case "2025-06-18":
+		c.adapter = NewAdapterV20250618()
 	case "2025-11-25":
 		c.adapter = NewAdapterV20251125()
 	case "2026-07-28":
