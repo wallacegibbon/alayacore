@@ -64,16 +64,19 @@ func ParseSystemMsgType(value string) (string, bool) {
 }
 
 // WriteSystemMsg marshals msg as a TagSystemMsg TLV frame.
+//
+// It builds the envelope JSON manually instead of using a second json.Marshal
+// call. msg.SystemMsgType() returns safe ASCII constants (defined in this
+// package and in agent/session_types.go), so no JSON escaping is needed for
+// the type field.
 func WriteSystemMsg(w io.Writer, msg SystemMsg) error {
 	data, err := json.Marshal(msg)
 	if err != nil {
 		return err
 	}
-	env, err := json.Marshal(SystemMsgEnvelope{Type: msg.SystemMsgType(), Data: data})
-	if err != nil {
-		return err
-	}
-	return tlv.WriteTLV(w, tlv.TagSystemMsg, string(env))
+	// Build {"type":"<type>","data":<data>} as a single string.
+	s := `{"type":"` + msg.SystemMsgType() + `","data":` + string(data) + `}`
+	return tlv.WriteTLV(w, tlv.TagSystemMsg, s)
 }
 
 // ToolInputData is the JSON payload for TagAssistantF (AF).
