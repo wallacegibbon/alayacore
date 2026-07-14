@@ -559,7 +559,7 @@ func (t *HTTPTransport) sendResponse(ctx context.Context, resp jsonrpcResponse) 
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Accept", "application/json, text/event-stream")
 
-	// Standard request metadata headers.
+	// Standard metadata headers for intermediate inspection.
 	httpReq.Header.Set("Mcp-Method", "response")
 
 	if t.adapter != nil {
