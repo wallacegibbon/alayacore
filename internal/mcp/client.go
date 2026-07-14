@@ -514,10 +514,6 @@ func (c *Client) Ping(ctx context.Context) error {
 	return err
 }
 
-// resetState resets the client state to Disconnected, allowing it to be re-connected.
-// This is used after ErrNeedsAuth to retry with a token.
-// It closes any existing transport to prevent resource leaks from
-// partially-established connections.
 // resetState resets the client to StateDisconnected and closes any
 // lingering transport. Used when reconnecting after OAuth auth —
 // Connect leaves the client in StateFailed on ErrNeedsAuth, so we

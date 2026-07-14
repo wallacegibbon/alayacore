@@ -133,7 +133,7 @@ type NotificationHandler func(method string)
 // responses to waiting callers. Returns nil on success, or an error
 // if the data cannot be parsed.
 //
-// Per the MCP spec (2025-11-25), batch responses are no longer supported.
+// Batch responses are not supported (MCP uses single-response only).
 // Server-to-client requests are detected and forwarded to handleServerReq.
 // Server-to-client notifications (no ID) are forwarded to handleNotification.
 func parseAndDispatchJSONRPC(data []byte, pending map[requestID]chan<- jsonrpcResponse, mu sync.Locker, debugWriter io.Writer, handleServerReq ServerRequestHandler, handleNotification NotificationHandler) error {
