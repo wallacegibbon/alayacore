@@ -5,35 +5,37 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
+	"github.com/alayacore/alayacore/internal/version"
 )
 
 // ProtocolAdapter abstracts protocol-version-specific behavior,
 // allowing the MCP client to support multiple protocol versions
 // (e.g. 2025-11-25 and 2026-07-28) through a common interface.
-//
-// Currently only the 2025-11-25 adapter is implemented. When migrating
-// to a newer protocol version, implement this interface and wire it
-// into the Client via version negotiation.
 type ProtocolAdapter interface {
 	// ProtocolVersion returns the protocol version string this adapter
 	// implements (e.g. "2025-11-25" or "2026-07-28").
 	ProtocolVersion() string
 
 	// Handshake performs the initial handshake with the server.
-	// The adapter should try newer protocol handshakes first and fall
-	// back to older ones if the server doesn't support them.
 	// Returns the negotiated protocol version on success.
 	Handshake(ctx context.Context, c *Client) (string, error)
 
-	// BuildRequestMeta constructs the _meta field for a request.
-	// In 2025-11-25 this returns nil or a simple map.
-	// In 2026-07-28 this returns a structured RequestMetaObject with
-	// protocol version, client info, and capabilities.
+	// BuildRequestMeta constructs the _meta field for a JSON-RPC request.
+	// Returns nil if no _meta should be injected (2025-11-25 behavior).
+	// Returns a structured RequestMetaObject for 2026-07-28+.
 	BuildRequestMeta(c *Client) any
 }
 
-// compile-time check: ensure the concrete adapter implements the interface.
-var _ ProtocolAdapter = (*V2025_11_25Adapter)(nil)
+// compile-time checks.
+var (
+	_ ProtocolAdapter = (*V2025_11_25Adapter)(nil)
+	_ ProtocolAdapter = (*V2026_07_28Adapter)(nil)
+)
+
+// ============================================================================
+// 2025-11-25 Adapter: initialize handshake, no structured _meta
+// ============================================================================
 
 // V2025_11_25Adapter implements ProtocolAdapter for MCP spec 2025-11-25.
 type V2025_11_25Adapter struct{}
@@ -48,67 +50,99 @@ func (a *V2025_11_25Adapter) ProtocolVersion() string {
 	return protocolVersion
 }
 
-// Handshake performs initialization with version negotiation.
-// Strategy: try server/discover (2026-07-28) first; if the server
-// responds with MethodNotFound, fall back to initialize (2025-11-25).
-// If discover succeeds, the server supports a newer protocol — but
-// this adapter only implements 2025-11-25, so we report the version
-// mismatch and let the caller decide how to proceed.
+// Handshake performs the 2025-11-25 initialize/initialized handshake.
 func (a *V2025_11_25Adapter) Handshake(ctx context.Context, c *Client) (string, error) {
-	// Step 1: Try server/discover (new protocol).
-	supported, err := c.tryDiscover(ctx)
-	if err == nil {
-		// Discover succeeded — server supports a newer protocol.
-		// Check if 2025-11-25 is in its supported list.
-		for _, v := range supported {
-			if v == a.ProtocolVersion() {
-				// Server supports 2025-11-25 alongside newer versions.
-				// Fall through to initialize handshake.
-				return c.doInitialize(ctx)
-			}
-		}
-		// Server doesn't support 2025-11-25 at all.
-		return "", fmt.Errorf("server supports versions %v, but client only supports %q",
-			supported, a.ProtocolVersion())
-	}
-
-	// Step 2: If discover returned MethodNotFound, try initialize.
-	if isMethodNotFound(err) {
-		return c.doInitialize(ctx)
-	}
-
-	// Some other error — propagate.
-	return "", err
+	return c.doInitialize(ctx)
 }
 
-// BuildRequestMeta returns nil — the 2025-11-25 spec does not require
-// structured _meta in every request.
+// BuildRequestMeta returns nil — 2025-11-25 does not require structured _meta
+// in every request.
 func (a *V2025_11_25Adapter) BuildRequestMeta(_ *Client) any {
 	return nil
 }
 
-// tryDiscover sends a server/discover request to check if the server
-// supports the newer protocol. Returns the list of supported versions
-// on success. Returns an error if the method is not found or the
-// request fails.
-//
-// This is used by the adapter during handshake negotiation.
-func (c *Client) tryDiscover(ctx context.Context) ([]string, error) {
+// ============================================================================
+// 2026-07-28 Adapter: discover handshake, structured _meta in every request
+// ============================================================================
+
+// V2026_07_28Adapter implements ProtocolAdapter for MCP spec 2026-07-28.
+type V2026_07_28Adapter struct{}
+
+// NewV2026_07_28Adapter creates a new adapter for the 2026-07-28 protocol.
+func NewV2026_07_28Adapter() *V2026_07_28Adapter {
+	return &V2026_07_28Adapter{}
+}
+
+// ProtocolVersion returns "2026-07-28".
+func (a *V2026_07_28Adapter) ProtocolVersion() string {
+	return "2026-07-28"
+}
+
+// Handshake performs the 2026-07-28 server/discover handshake.
+// Does NOT fall back to initialize — if the server doesn't support
+// discover, the caller (negotiateAndHandshake) will try a different adapter.
+func (a *V2026_07_28Adapter) Handshake(ctx context.Context, c *Client) (string, error) {
+	return c.doDiscover(ctx)
+}
+
+// BuildRequestMeta returns a structured RequestMetaObject for the
+// 2026-07-28+ protocol. Every request must carry _meta with the
+// protocol version, client identity, and capabilities.
+func (a *V2026_07_28Adapter) BuildRequestMeta(_ *Client) any {
+	return &RequestMetaObject{
+		ProtocolVersion: a.ProtocolVersion(),
+		ClientInfo: &ImplementationInfo{
+			Name:    "alayacore",
+			Version: version.Version,
+		},
+		ClientCapabilities: &ClientCapabilities{
+			Roots:       nil,
+			Sampling:    nil,
+			Elicitation: nil,
+			Extensions:  nil,
+		},
+	}
+}
+
+// ============================================================================
+// Shared helpers
+// ============================================================================
+
+// doDiscover sends server/discover and stores the server's capabilities.
+// Returns the negotiated protocol version (the first mutually supported
+// version, preferring the adapter's own version).
+func (c *Client) doDiscover(ctx context.Context) (string, error) {
 	result, err := c.sendRequest(ctx, methodDiscover, nil)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	var discover DiscoverResult
 	if err := json.Unmarshal(result, &discover); err != nil {
-		return nil, fmt.Errorf("parse server/discover result: %w", err)
+		return "", fmt.Errorf("parse server/discover result: %w", err)
 	}
 
 	c.capabilities = discover.Capabilities
 	c.serverInfo = discover.ServerInfo
 	c.instructions = discover.Instructions
 
-	return discover.SupportedVersions, nil
+	// Pick the best mutually supported version.
+	// Prefer the adapter's own version first.
+	adapterVersion := "2026-07-28"
+	for _, v := range discover.SupportedVersions {
+		if v == adapterVersion {
+			return v, nil
+		}
+	}
+	// Fall back to any version we might know about.
+	for _, v := range discover.SupportedVersions {
+		if v == protocolVersion { // 2025-11-25
+			return v, nil
+		}
+	}
+	// No compatible version found.
+	return "", fmt.Errorf("no compatible protocol version: server supports %v",
+		discover.SupportedVersions)
 }
 
 // isMethodNotFound checks if a JSON-RPC error indicates MethodNotFound.
@@ -123,3 +157,24 @@ func isMethodNotFound(err error) bool {
 // MethodNotFound is the JSON-RPC error code for method not found.
 // Used during handshake negotiation to detect older protocol servers.
 const MethodNotFound = -32601
+
+// injectMeta merges a _meta object into serialized JSON-RPC params.
+// If params is nil, creates a new object with just _meta.
+// If meta is nil, returns params unchanged.
+func injectMeta(params json.RawMessage, meta any) (json.RawMessage, error) {
+	if meta == nil {
+		return params, nil
+	}
+
+	var target map[string]any
+	if params != nil {
+		if err := json.Unmarshal(params, &target); err != nil {
+			return nil, fmt.Errorf("unmarshal params for _meta injection: %w", err)
+		}
+	} else {
+		target = make(map[string]any)
+	}
+
+	target["_meta"] = meta
+	return json.Marshal(target)
+}

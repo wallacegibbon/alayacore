@@ -74,6 +74,8 @@ type Client struct {
 }
 
 // NewClient creates a new MCP client. Call Connect() to establish the connection.
+// The initial adapter defaults to 2025-11-25; Connect will negotiate the actual
+// protocol version and may switch to a different adapter.
 func NewClient(config ServerConfig) *Client {
 	return &Client{
 		config:     config,
@@ -145,8 +147,9 @@ func (c *Client) Connect(ctx context.Context) error {
 	c.setupNotificationHandler(transport)
 	c.state.Store(int32(StateInitializing))
 
-	// Perform protocol handshake (initialize or discover, with fallback).
-	negotiatedVersion, err := c.adapter.Handshake(ctx, c)
+	// Negotiate protocol version: try server/discover first (2026-07-28+),
+	// fall back to initialize (2025-11-25) if the server doesn't support it.
+	negotiatedVersion, err := c.negotiateAndHandshake(ctx)
 	if err != nil {
 		transport.Close()
 		return fmt.Errorf("%q: handshake: %w", c.config.Name, err)
@@ -200,6 +203,7 @@ func (c *Client) doInitialize(ctx context.Context) (string, error) {
 	c.instructions = result.Instructions
 
 	// Send initialized notification (no response expected).
+	// Only applicable for 2025-11-25 protocol; 2026-07-28+ does not use it.
 	_ = c.sendNotification(ctx, methodNotificationsInitialized, nil)
 
 	return result.ProtocolVersion, nil
@@ -564,6 +568,38 @@ func (c *Client) stateError(string) error {
 }
 
 // ============================================================================
+// Protocol Negotiation
+// ============================================================================
+
+// negotiateAndHandshake determines the protocol version and performs the
+// appropriate handshake. Strategy:
+//  1. Try server/discover (2026-07-28+)
+//  2. If MethodNotFound → fall back to initialize (2025-11-25)
+//  3. Otherwise → propagate error
+//
+// The client's adapter is replaced with the correct one for the negotiated
+// version, so subsequent requests use version-appropriate behavior
+// (e.g., _meta injection in 2026-07-28+).
+func (c *Client) negotiateAndHandshake(ctx context.Context) (string, error) {
+	// Phase 1: Try server/discover (2026-07-28+).
+	discoverAdapter := NewV2026_07_28Adapter()
+	version, err := discoverAdapter.Handshake(ctx, c)
+	if err == nil {
+		c.adapter = discoverAdapter
+		return version, nil
+	}
+
+	// If it's not a MethodNotFound error, propagate it.
+	if !isMethodNotFound(err) {
+		return "", err
+	}
+
+	// Phase 2: Fall back to initialize (2025-11-25).
+	c.adapter = NewV2025_11_25Adapter()
+	return c.adapter.Handshake(ctx, c)
+}
+
+// ============================================================================
 // JSON-RPC Request/Response
 // ============================================================================
 
@@ -594,6 +630,18 @@ func (c *Client) sendRequest(ctx context.Context, method string, params any) (js
 			return nil, fmt.Errorf("marshal params: %w", err)
 		}
 		paramsData = data
+	}
+
+	// Inject _meta if the protocol version requires it (2026-07-28+).
+	if c.adapter != nil {
+		meta := c.adapter.BuildRequestMeta(c)
+		if meta != nil {
+			var err error
+			paramsData, err = injectMeta(paramsData, meta)
+			if err != nil {
+				return nil, fmt.Errorf("inject _meta: %w", err)
+			}
+		}
 	}
 
 	req := jsonrpcRequest{
