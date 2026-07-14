@@ -213,9 +213,6 @@ type ServerPromptCapabilities struct {
 
 // ServerResourceCapabilities describes the server's resource capabilities.
 type ServerResourceCapabilities struct {
-	// Subscribe indicates whether the server supports subscribing to
-	// resource updates.
-	Subscribe bool `json:"subscribe,omitempty"`
 	// ListChanged indicates whether the server supports notifications for
 	// changes to the resource list.
 	ListChanged bool `json:"listChanged,omitempty"`

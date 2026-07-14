@@ -600,6 +600,13 @@ func (c *Client) negotiateAndHandshake(ctx context.Context) (string, error) {
 	return c.adapter.Handshake(ctx, c)
 }
 
+// isHandshakeMethod returns true if the method is part of the protocol
+// handshake (initialize or discover). These requests MUST NOT be canceled
+// with a cancellation notification per the MCP spec.
+func isHandshakeMethod(method string) bool {
+	return method == methodInitialize || method == methodDiscover
+}
+
 // ============================================================================
 // JSON-RPC Request/Response
 // ============================================================================
@@ -659,7 +666,8 @@ func (c *Client) sendRequest(ctx context.Context, method string, params any) (js
 		// processing. This is a notification (fire-and-forget), so we
 		// don't wait for it.
 		// Per spec, the initialize request MUST NOT be canceled.
-		if method != methodInitialize && (errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
+		// Also exclude discover — it's a handshake method, not a tool call.
+		if !isHandshakeMethod(method) && (errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
 			c.sendCanceledNotification(id, err)
 		}
 		return nil, err

@@ -82,7 +82,7 @@ func (a *V2026_07_28Adapter) ProtocolVersion() string {
 // Does NOT fall back to initialize — if the server doesn't support
 // discover, the caller (negotiateAndHandshake) will try a different adapter.
 func (a *V2026_07_28Adapter) Handshake(ctx context.Context, c *Client) (string, error) {
-	return c.doDiscover(ctx)
+	return c.doDiscover(ctx, a.ProtocolVersion())
 }
 
 // BuildRequestMeta returns a structured RequestMetaObject for the
@@ -109,9 +109,9 @@ func (a *V2026_07_28Adapter) BuildRequestMeta(_ *Client) any {
 // ============================================================================
 
 // doDiscover sends server/discover and stores the server's capabilities.
-// Returns the negotiated protocol version (the first mutually supported
-// version, preferring the adapter's own version).
-func (c *Client) doDiscover(ctx context.Context) (string, error) {
+// preferredVersion is the protocol version the adapter wants to use;
+// the method picks the best mutually supported version.
+func (c *Client) doDiscover(ctx context.Context, preferredVersion string) (string, error) {
 	result, err := c.sendRequest(ctx, methodDiscover, nil)
 	if err != nil {
 		return "", err
@@ -127,10 +127,9 @@ func (c *Client) doDiscover(ctx context.Context) (string, error) {
 	c.instructions = discover.Instructions
 
 	// Pick the best mutually supported version.
-	// Prefer the adapter's own version first.
-	adapterVersion := "2026-07-28"
+	// Prefer the adapter's preferred version first.
 	for _, v := range discover.SupportedVersions {
-		if v == adapterVersion {
+		if v == preferredVersion {
 			return v, nil
 		}
 	}
