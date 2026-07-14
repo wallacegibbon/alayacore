@@ -778,8 +778,8 @@ func newAuthProvider(cfg *AuthConfig, tokenStore auth.TokenStore, serverName str
 				ClientAuthMethod: cfg.ClientAuthMethod,
 			}
 			// Inner is nil — we have no way to get a token except from
-			// disk or refresh. The caller (AuthorizeServer) will initiate
-			// the interactive flow if no token is found.
+			// disk or refresh. The init flow (runOAuthForServer) will
+			// start the interactive authorization if no token is found.
 			return auth.NewPersistentTokenProvider(nil, tokenStore, serverName, refreshCfg), nil
 		}
 		return nil, nil // no token yet, connect will be skipped by ErrNeedsAuth
