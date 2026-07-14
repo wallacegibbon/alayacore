@@ -17,52 +17,44 @@ import (
 )
 
 // ============================================================================
-// Streamable HTTP Transport
+// HTTP Transport
 // ============================================================================
 //
-// StreamableHTTPTransport implements the MCP Streamable HTTP transport
-// defined in specification 2025-11-25.
+// HTTPTransport implements the MCP Streamable HTTP transport in a
+// protocol-version-agnostic way. It handles:
+//   - HTTP POST with JSON-RPC messages
+//   - Response parsing (JSON or SSE stream)
+//   - OAuth token injection
+//   - Debug logging
 //
-// Protocol overview:
-//   - Server exposes a single MCP endpoint URL supporting both POST and GET
-//   - POST: client sends JSON-RPC messages; server responds with either
-//     a JSON response (Content-Type: application/json) or an SSE stream
-//     (Content-Type: text/event-stream)
-//   - GET: client opens an SSE stream for server-to-client messages
-//   - Session management via Mcp-Session-Id header
+// Protocol-version-specific behavior (session management, GET stream,
+// header injection) is handled by the HTTPAdapter attached to this
+// transport. The adapter's hooks are called before each request and after
+// each response.
 
-// StreamableHTTPTransport communicates with an MCP server using the
-// Streamable HTTP transport (spec 2025-11-25).
-type StreamableHTTPTransport struct {
+// HTTPTransport communicates with an MCP server via HTTP POST.
+// It is protocol-version agnostic — version-specific behavior is
+// delegated to the attached HTTPAdapter.
+type HTTPTransport struct {
 	endpointURL string
-	sessionID   string // Mcp-Session-Id from server, if any
 	httpClient  *http.Client
+
+	// adapter provides version-specific hooks (session ID, headers, etc.).
+	// Set after handshake negotiation. May be nil initially.
+	adapter HTTPAdapter
 
 	// authProvider provides OAuth tokens for Authorization header injection.
 	authProvider auth.TokenProvider
 
-	// negotiatedVersion is the protocol version negotiated during
-	// initialization. It is set after the initialize handshake and is
-	// included as the MCP-Protocol-Version header on all subsequent
-	// HTTP requests (required by spec 2025-11-25).
-	negotiatedVersion string
-
 	// SSE stream from a POST response that's still active.
-	// Only one POST-response SSE stream can be active at a time.
 	postSSEStream *sseReadCloser
 	postSSEMu     sync.Mutex
-
-	// Long-lived GET SSE stream for server-to-client messages.
-	getSSEClosed chan struct{} // closed when GET SSE goroutine exits
-	getSSEMu     sync.Mutex
-	getSSECancel context.CancelFunc // cancels the GET SSE request
 
 	pending   map[requestID]chan<- jsonrpcResponse
 	pendingMu sync.Mutex
 
 	closeOnce sync.Once
 	done      chan struct{}
-	readerWg  sync.WaitGroup
 
 	debugWriter io.WriteCloser
 
@@ -111,15 +103,12 @@ func (s *sseReadCloser) readEvent() (eventType, data string, err error) {
 			if currentEvent != "" || currentData.Len() > 0 {
 				return currentEvent, currentData.String(), nil
 			}
-			// Consecutive blank lines produce empty events; skip.
 			continue
 		}
 
-		// Parse SSE field.
 		processSSELine(line, &currentEvent, &currentData)
 	}
 
-	// Scanner finished.
 	if err := s.scanner.Err(); err != nil {
 		return "", "", fmt.Errorf("SSE read: %w", err)
 	}
@@ -134,28 +123,34 @@ func (s *sseReadCloser) Close() error {
 	return s.body.Close()
 }
 
-// NewStreamableHTTPTransport creates a new Streamable HTTP transport.
+// NewHTTPTransport creates a new HTTP transport.
 // It does NOT connect immediately; the first Send/SendReceive will POST
 // to the endpoint.
-func NewStreamableHTTPTransport(endpointURL string, enableDebug bool) *StreamableHTTPTransport {
-	t := &StreamableHTTPTransport{
+func NewHTTPTransport(endpointURL string, enableDebug bool) *HTTPTransport {
+	t := &HTTPTransport{
 		endpointURL: endpointURL,
 		httpClient: &http.Client{
-			Timeout: 0, // No timeout; caller contexts control request lifetime.
+			Timeout: 0,
 		},
-		pending:      make(map[requestID]chan<- jsonrpcResponse),
-		done:         make(chan struct{}),
-		getSSEClosed: make(chan struct{}),
+		pending: make(map[requestID]chan<- jsonrpcResponse),
+		done:    make(chan struct{}),
 	}
 
 	if enableDebug {
 		t.debugWriter = debug.NewDebugWriter("alayacore-debug-mcp")
 		if t.debugWriter != nil {
-			fmt.Fprintf(t.debugWriter, "MCP Streamable HTTP debug log started for: %s\n", endpointURL)
+			fmt.Fprintf(t.debugWriter, "MCP HTTP debug log started for: %s\n", endpointURL)
 		}
 	}
 
 	return t
+}
+
+// SetHTTPAdapter attaches the HTTP adapter for version-specific request/response
+// hooks (header injection, session ID extraction). Must be called before or
+// during handshake, before any regular requests.
+func (t *HTTPTransport) SetHTTPAdapter(a HTTPAdapter) {
+	t.adapter = a
 }
 
 // ============================================================================
@@ -163,16 +158,14 @@ func NewStreamableHTTPTransport(endpointURL string, enableDebug bool) *Streamabl
 // ============================================================================
 
 // Send sends a JSON-RPC notification (no response expected) via HTTP POST.
-// The server MUST respond with 202 Accepted and no body.
-func (t *StreamableHTTPTransport) Send(ctx context.Context, req jsonrpcRequest) error {
+func (t *HTTPTransport) Send(ctx context.Context, req jsonrpcRequest) error {
 	resp, err := t.doPOST(ctx, req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 
-	// Drain and discard body.
-	_, _ = io.Copy(io.Discard, resp.Body) // discard
+	_, _ = io.Copy(io.Discard, resp.Body)
 
 	if resp.StatusCode != http.StatusAccepted {
 		return fmt.Errorf("POST notification: unexpected status %d (expected 202)", resp.StatusCode)
@@ -181,9 +174,8 @@ func (t *StreamableHTTPTransport) Send(ctx context.Context, req jsonrpcRequest) 
 	return nil
 }
 
-// SendNotification sends a JSON-RPC notification (no response expected)
-// via HTTP POST. It builds the request with an empty ID.
-func (t *StreamableHTTPTransport) SendNotification(ctx context.Context, method string, params any) error {
+// SendNotification sends a JSON-RPC notification via HTTP POST.
+func (t *HTTPTransport) SendNotification(ctx context.Context, method string, params any) error {
 	req, err := newNotification(method, params)
 	if err != nil {
 		return err
@@ -195,32 +187,25 @@ func (t *StreamableHTTPTransport) SendNotification(ctx context.Context, method s
 // The server may respond with either:
 //   - Content-Type: application/json (immediate JSON response)
 //   - Content-Type: text/event-stream (SSE stream containing the response)
-//
-// If the server opens an SSE stream, this method reads events until the
-// matching response is received, dispatching any intermediate server-to-client
-// requests/notifications to the handler.
-func (t *StreamableHTTPTransport) SendReceive(ctx context.Context, req jsonrpcRequest) (json.RawMessage, error) {
+func (t *HTTPTransport) SendReceive(ctx context.Context, req jsonrpcRequest) (json.RawMessage, error) {
 	resp, err := t.doPOST(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 
 	contentType := resp.Header.Get("Content-Type")
-	contentType = strings.SplitN(contentType, ";", 2)[0] // strip params
+	contentType = strings.SplitN(contentType, ";", 2)[0]
 	contentType = strings.TrimSpace(contentType)
 
 	switch contentType {
 	case "application/json":
-		// Immediate JSON response.
 		defer resp.Body.Close()
 		return t.readJSONResponse(resp.Body)
 
 	case "text/event-stream":
-		// SSE stream — read events until we get the matching response.
 		return t.readSSEResponse(ctx, resp, req.ID)
 
 	case "text/plain":
-		// Plain text response — likely an HTTP-level error message.
 		defer resp.Body.Close()
 		return t.readTextResponse(resp.Body)
 
@@ -230,16 +215,9 @@ func (t *StreamableHTTPTransport) SendReceive(ctx context.Context, req jsonrpcRe
 	}
 }
 
-// Close shuts down the transport, including any active SSE connections.
-func (t *StreamableHTTPTransport) Close() error {
+// Close shuts down the transport.
+func (t *HTTPTransport) Close() error {
 	t.closeOnce.Do(func() {
-		// Cancel GET SSE stream if active.
-		t.getSSEMu.Lock()
-		if t.getSSECancel != nil {
-			t.getSSECancel()
-		}
-		t.getSSEMu.Unlock()
-
 		// Close POST SSE stream if active.
 		t.postSSEMu.Lock()
 		if t.postSSEStream != nil {
@@ -247,149 +225,89 @@ func (t *StreamableHTTPTransport) Close() error {
 		}
 		t.postSSEMu.Unlock()
 
-		// Wait for goroutines.
-		t.readerWg.Wait()
-
-		// Close debug log file if open.
 		if t.debugWriter != nil {
 			t.debugWriter.Close()
 		}
 
-		// Signal done.
 		close(t.done)
 	})
 	return nil
 }
 
 // Done returns a channel that closes when the transport is shut down.
-func (t *StreamableHTTPTransport) Done() <-chan struct{} {
+func (t *HTTPTransport) Done() <-chan struct{} {
 	return t.done
 }
 
 // SetNotificationHandler registers a handler for server-to-client notifications.
-func (t *StreamableHTTPTransport) SetNotificationHandler(h NotificationHandler) {
+func (t *HTTPTransport) SetNotificationHandler(h NotificationHandler) {
 	t.notificationHandler = h
 }
 
-// SetProtocolVersion sets the protocol version negotiated during initialization.
-// This version is included as the MCP-Protocol-Version header on all subsequent
-// HTTP requests, as required by the MCP Streamable HTTP specification.
-// If not set, the header is omitted.
-func (t *StreamableHTTPTransport) SetProtocolVersion(version string) {
-	t.negotiatedVersion = version
-}
-
 // SetAuthProvider sets the OAuth token provider for this transport.
-// If set, an Authorization: Bearer header is injected into every request.
-func (t *StreamableHTTPTransport) SetAuthProvider(ap auth.TokenProvider) {
+func (t *HTTPTransport) SetAuthProvider(ap auth.TokenProvider) {
 	t.authProvider = ap
 }
 
 // DebugWriter returns the debug log writer, or nil if debug is not enabled.
-func (t *StreamableHTTPTransport) DebugWriter() io.Writer {
+func (t *HTTPTransport) DebugWriter() io.Writer {
 	return t.debugWriter
 }
 
 // ============================================================================
 // GET SSE Stream (Server-to-Client Messages)
 // ============================================================================
+//
+// Only used in protocol version 2025-11-25. The adapter manages this
+// stream via the StartGETStream / StopGETStream methods.
 
 // StartGETStream starts a long-lived GET SSE connection for receiving
-// server-to-client messages (requests and notifications).
-// This is optional per the spec; the client MAY do this.
-//
-// The handler is called for each server-to-client request or notification
-// received on the stream. If the handler is nil, server requests are
-// responded to with method-not-found errors and notifications are ignored.
-//
-// The stream runs until the transport is closed or the GET request fails.
-func (t *StreamableHTTPTransport) StartGETStream(ctx context.Context, handler ServerRequestHandler) error {
-	t.getSSEMu.Lock()
-	defer t.getSSEMu.Unlock()
-
-	// Only one GET stream at a time.
-	select {
-	case <-t.getSSEClosed:
-		// Previous stream closed; reset the channel.
-		t.getSSEClosed = make(chan struct{})
-	default:
-		select {
-		case <-t.done:
-			return io.ErrClosedPipe
-		default:
-		}
-	}
-
-	// Create a cancelable context for this stream.
-	var getCtx context.Context
-	getCtx, cancel := context.WithCancel(ctx)
-	t.getSSECancel = cancel
-
-	// Create request with the cancelable context.
-	httpReq, err := http.NewRequestWithContext(getCtx, "GET", t.endpointURL, nil)
+// server-to-client messages. Only valid for 2025-11-25 protocol.
+// Returns a close function that terminates the stream.
+func (t *HTTPTransport) StartGETStream(ctx context.Context, handler ServerRequestHandler) (func(), error) {
+	httpReq, err := http.NewRequestWithContext(ctx, "GET", t.endpointURL, nil)
 	if err != nil {
-		cancel()
-		return fmt.Errorf("create GET request: %w", err)
+		return nil, fmt.Errorf("create GET request: %w", err)
 	}
 	httpReq.Header.Set("Accept", "text/event-stream")
-	if t.negotiatedVersion != "" {
-		httpReq.Header.Set("MCP-Protocol-Version", t.negotiatedVersion)
-	}
-	if t.sessionID != "" {
-		httpReq.Header.Set("Mcp-Session-Id", t.sessionID)
+
+	if t.adapter != nil {
+		t.adapter.EnrichRequest(httpReq)
 	}
 
 	resp, err := t.httpClient.Do(httpReq)
 	if err != nil {
-		cancel()
-		return fmt.Errorf("GET SSE: %w", err)
+		return nil, fmt.Errorf("GET SSE: %w", err)
 	}
 
 	if resp.StatusCode == http.StatusMethodNotAllowed {
 		resp.Body.Close()
-		cancel()
-		return fmt.Errorf("GET SSE: server returned 405 Method Not Allowed")
+		return nil, fmt.Errorf("GET SSE: server returned 405 Method Not Allowed")
 	}
 	if resp.StatusCode != http.StatusOK {
 		resp.Body.Close()
-		cancel()
-		return fmt.Errorf("GET SSE: unexpected status %d", resp.StatusCode)
+		return nil, fmt.Errorf("GET SSE: unexpected status %d", resp.StatusCode)
 	}
 
 	contentType := strings.TrimSpace(strings.SplitN(resp.Header.Get("Content-Type"), ";", 2)[0])
 	if contentType != "text/event-stream" {
 		resp.Body.Close()
-		cancel()
-		return fmt.Errorf("GET SSE: expected text/event-stream, got %q", contentType)
+		return nil, fmt.Errorf("GET SSE: expected text/event-stream, got %q", contentType)
 	}
 
-	// Start reading in background.
 	sr := newSSEReadCloser(resp.Body)
-	t.readerWg.Add(1)
-	go t.readSSEStream(sr, handler)
-
-	return nil
-}
-
-// readSSEStream reads SSE events from a stream in a background goroutine.
-// It ensures cleanup of the stream, reader goroutine tracking, and GET
-// stream state (cancel func, closed channel) on exit.
-func (t *StreamableHTTPTransport) readSSEStream(sr *sseReadCloser, handler ServerRequestHandler) {
-	defer t.readerWg.Done()
-	defer sr.Close()
-	defer func() {
-		t.getSSEMu.Lock()
-		t.getSSECancel = nil
-		t.getSSEMu.Unlock()
-		close(t.getSSEClosed)
+	closed := make(chan struct{})
+	go func() {
+		defer close(closed)
+		defer sr.Close()
+		t.readSSELoop(sr, handler, t.notificationHandler)
 	}()
 
-	t.readSSELoop(sr, handler, t.notificationHandler)
+	return func() { sr.Close(); <-closed }, nil
 }
 
 // readSSELoop reads SSE events from a stream and dispatches them.
-// Used for both POST-response SSE streams and GET SSE streams.
-func (t *StreamableHTTPTransport) readSSELoop(sr *sseReadCloser, handler ServerRequestHandler, notifHandler NotificationHandler) {
+func (t *HTTPTransport) readSSELoop(sr *sseReadCloser, handler ServerRequestHandler, notifHandler NotificationHandler) {
 	for {
 		eventType, data, err := sr.readEvent()
 		if err != nil {
@@ -405,7 +323,7 @@ func (t *StreamableHTTPTransport) readSSELoop(sr *sseReadCloser, handler ServerR
 		case "message":
 			if err := parseAndDispatchJSONRPC([]byte(data), t.pending, &t.pendingMu, t.debugWriter, handler, notifHandler); err != nil {
 				if t.debugWriter != nil {
-					fmt.Fprintf(t.debugWriter, "MCP Streamable HTTP: malformed message: %v\n", err)
+					fmt.Fprintf(t.debugWriter, "MCP HTTP: malformed message: %v\n", err)
 				}
 			}
 		default:
@@ -418,11 +336,8 @@ func (t *StreamableHTTPTransport) readSSELoop(sr *sseReadCloser, handler ServerR
 // HTTP Request Helpers
 // ============================================================================
 
-// doPOST sends an HTTP POST with the JSON-RPC message and returns the response.
-// It handles session ID injection, Authorization header injection,
-// and debug logging. If the server returns 401 and an AuthProvider is
-// configured, the cached token is cleared and the request is retried once.
-func (t *StreamableHTTPTransport) doPOST(ctx context.Context, req jsonrpcRequest) (*http.Response, error) {
+// doPOST sends an HTTP POST with the JSON-RPC message.
+func (t *HTTPTransport) doPOST(ctx context.Context, req jsonrpcRequest) (*http.Response, error) {
 	resp, err := t.doPOSTOnce(ctx, req)
 	if err != nil {
 		return nil, err
@@ -441,7 +356,7 @@ func (t *StreamableHTTPTransport) doPOST(ctx context.Context, req jsonrpcRequest
 }
 
 // doPOSTOnce is the inner POST implementation without 401 retry.
-func (t *StreamableHTTPTransport) doPOSTOnce(ctx context.Context, req jsonrpcRequest) (*http.Response, error) {
+func (t *HTTPTransport) doPOSTOnce(ctx context.Context, req jsonrpcRequest) (*http.Response, error) {
 	data, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("marshal request: %w", err)
@@ -457,12 +372,14 @@ func (t *StreamableHTTPTransport) doPOSTOnce(ctx context.Context, req jsonrpcReq
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Accept", "application/json, text/event-stream")
-	if t.negotiatedVersion != "" {
-		httpReq.Header.Set("MCP-Protocol-Version", t.negotiatedVersion)
+
+	// Let the adapter add version-specific headers (e.g. MCP-Protocol-Version,
+	// MCP-Session-Id for 2025-11-25).
+	if t.adapter != nil {
+		t.adapter.EnrichRequest(httpReq)
 	}
-	if t.sessionID != "" {
-		httpReq.Header.Set("Mcp-Session-Id", t.sessionID)
-	}
+
+	// Inject auth token if available.
 	if t.authProvider != nil {
 		tok, tokErr := t.authProvider.Token(ctx)
 		if tokErr == nil && tok != nil {
@@ -475,19 +392,16 @@ func (t *StreamableHTTPTransport) doPOSTOnce(ctx context.Context, req jsonrpcReq
 		return nil, err
 	}
 
-	// Check for session ID in response.
-	if sid := resp.Header.Get("Mcp-Session-Id"); sid != "" {
-		t.sessionID = sid
-		if t.debugWriter != nil {
-			fmt.Fprintf(t.debugWriter, "Session-Id: %s\n", sid)
-		}
+	// Let the adapter process response headers (e.g. extract session ID).
+	if t.adapter != nil {
+		t.adapter.HandleResponseHeaders(resp)
 	}
 
 	return resp, nil
 }
 
 // readJSONResponse reads and parses a JSON-RPC response body.
-func (t *StreamableHTTPTransport) readJSONResponse(body io.ReadCloser) (json.RawMessage, error) {
+func (t *HTTPTransport) readJSONResponse(body io.ReadCloser) (json.RawMessage, error) {
 	var resp jsonrpcResponse
 	if err := json.NewDecoder(body).Decode(&resp); err != nil {
 		return nil, fmt.Errorf("decode JSON response: %w", err)
@@ -503,12 +417,10 @@ func (t *StreamableHTTPTransport) readJSONResponse(body io.ReadCloser) (json.Raw
 	return resp.Result, nil
 }
 
-// readTextResponse reads a text/plain response body and returns it as an
-// RPCError with code -32000 (server error). Text responses indicate an
-// HTTP-level error (e.g. "Forbidden: insufficient scopes").
+// readTextResponse reads a text/plain response body.
 //
-//nolint:unparam // result 0 is always nil — signature matches readJSONResponse
-func (t *StreamableHTTPTransport) readTextResponse(body io.ReadCloser) (json.RawMessage, error) {
+//nolint:unparam // signature matches readJSONResponse for switch consistency
+func (t *HTTPTransport) readTextResponse(body io.ReadCloser) (json.RawMessage, error) {
 	data, err := io.ReadAll(body)
 	if err != nil {
 		return nil, fmt.Errorf("read text response: %w", err)
@@ -520,12 +432,10 @@ func (t *StreamableHTTPTransport) readTextResponse(body io.ReadCloser) (json.Raw
 	return nil, &RPCError{Code: -32000, Message: msg}
 }
 
-// readSSEResponse reads an SSE stream from a POST response, dispatching
-// events until the matching response for reqID is received.
-func (t *StreamableHTTPTransport) readSSEResponse(ctx context.Context, resp *http.Response, reqID requestID) (json.RawMessage, error) {
+// readSSEResponse reads an SSE stream from a POST response.
+func (t *HTTPTransport) readSSEResponse(ctx context.Context, resp *http.Response, reqID requestID) (json.RawMessage, error) {
 	sr := newSSEReadCloser(resp.Body)
 
-	// Store the SSE reader so Close() can abort it.
 	t.postSSEMu.Lock()
 	t.postSSEStream = sr
 	t.postSSEMu.Unlock()
@@ -539,10 +449,8 @@ func (t *StreamableHTTPTransport) readSSEResponse(ctx context.Context, resp *htt
 		sr.Close()
 	}()
 
-	// Channel for the matching response.
 	respCh := make(chan jsonrpcResponse, 1)
 
-	// Register the pending request.
 	t.pendingMu.Lock()
 	select {
 	case <-t.done:
@@ -562,7 +470,6 @@ func (t *StreamableHTTPTransport) readSSEResponse(ctx context.Context, resp *htt
 		}
 	}()
 
-	// Read SSE events in a goroutine so we can select on ctx/t.done.
 	readDone := make(chan struct{})
 	go func() {
 		defer close(readDone)
@@ -591,8 +498,6 @@ func (t *StreamableHTTPTransport) readSSEResponse(ctx context.Context, resp *htt
 		return nil, io.EOF
 
 	case <-readDone:
-		// SSE stream ended without our response — check once more
-		// in case it arrived between the last read and stream close.
 		t.pendingMu.Lock()
 		delete(t.pending, reqID)
 		t.pendingMu.Unlock()
@@ -605,11 +510,7 @@ func (t *StreamableHTTPTransport) readSSEResponse(ctx context.Context, resp *htt
 // ============================================================================
 
 // handleServerRequest handles a JSON-RPC request from the server (e.g. ping).
-// Responses are sent via HTTP POST to the endpoint (best-effort).
-func (t *StreamableHTTPTransport) handleServerRequest(id requestID, method string) {
-	// Use a short timeout for responding to server requests. If the server
-	// cannot accept our response within 10 seconds, we drop it — there's
-	// nothing more we can do.
+func (t *HTTPTransport) handleServerRequest(id requestID, method string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -634,7 +535,7 @@ func (t *StreamableHTTPTransport) handleServerRequest(id requestID, method strin
 }
 
 // sendResponse sends a JSON-RPC response via HTTP POST to the endpoint.
-func (t *StreamableHTTPTransport) sendResponse(ctx context.Context, resp jsonrpcResponse) error {
+func (t *HTTPTransport) sendResponse(ctx context.Context, resp jsonrpcResponse) error {
 	data, err := json.Marshal(resp)
 	if err != nil {
 		return fmt.Errorf("marshal response: %w", err)
@@ -650,11 +551,9 @@ func (t *StreamableHTTPTransport) sendResponse(ctx context.Context, resp jsonrpc
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Accept", "application/json, text/event-stream")
-	if t.negotiatedVersion != "" {
-		httpReq.Header.Set("MCP-Protocol-Version", t.negotiatedVersion)
-	}
-	if t.sessionID != "" {
-		httpReq.Header.Set("Mcp-Session-Id", t.sessionID)
+
+	if t.adapter != nil {
+		t.adapter.EnrichRequest(httpReq)
 	}
 
 	httpResp, err := t.httpClient.Do(httpReq)
@@ -667,16 +566,10 @@ func (t *StreamableHTTPTransport) sendResponse(ctx context.Context, resp jsonrpc
 		return fmt.Errorf("POST response: unexpected status %d (expected 202)", httpResp.StatusCode)
 	}
 
-	// Check for session ID update.
-	if sid := httpResp.Header.Get("Mcp-Session-Id"); sid != "" {
-		t.sessionID = sid
-	}
-
 	return nil
 }
 
-// processSSELine parses a single SSE field line and updates event/data state.
-// The SSE spec allows an optional space after the "event:" and "data:" field names.
+// processSSELine parses a single SSE field line.
 func processSSELine(line string, currentEvent *string, currentData *strings.Builder) {
 	switch {
 	case strings.HasPrefix(line, "event:"):

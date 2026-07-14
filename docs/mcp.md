@@ -31,21 +31,26 @@ One block per server, separated by `---`:
 server: my-db
 command: npx
 args: ["@anthropic/mcp-db-server"]
+proto-version: 2025-11-25
 ---
 server: my-git
 command: uvx
 args: ["mcp-git"]
+proto-version: 2025-11-25
 ---
 server: remote-api
 url: https://example.com/mcp
+proto-version: 2026-07-28
 ---
 server: my-service
 url: https://example.com/mcp
+proto-version: 2025-11-25
 auth-type: static
 auth-token: <your-token>
 ---
 server: github
 url: https://api.githubcopilot.com/mcp/
+proto-version: 2026-07-28
 auth-type: authorization_code
 auth-client-id: <your-client-id>
 auth-client-secret: <your-client-secret>
@@ -60,6 +65,7 @@ auth-client-secret: <your-client-secret>
 | `command` | One of url/command | Executable command for stdio transport |
 | `args` | No | JSON array of command-line arguments |
 | `env` | No | JSON object of environment variables (`{"KEY": "val"}`) |
+| `proto-version` | Yes | MCP protocol version: `"2025-11-25"` or `"2026-07-28"` |
 | `auth-type` | No | OAuth type: `authorization_code` or `static` |
 | `auth-scopes` | No | JSON array of OAuth scopes to request (e.g. `["repo", "gist"]`) |
 | `auth-client-id` | No* | OAuth client ID (required for `authorization_code`) |
@@ -80,6 +86,7 @@ Server configurations are validated at load time. A server block is **rejected**
 
 - `server` name is empty
 - `server` name duplicates another block — the first occurrence is kept, subsequent duplicates are skipped
+- `proto-version` is missing or unsupported — must be `"2025-11-25"` or `"2026-07-28"`
 
 Rejected servers are skipped and an error is reported to the adapter. Other valid servers in the same file are unaffected.
 
@@ -93,16 +100,19 @@ cat >> ~/.alayacore/mcp.conf << 'EOF'
 server: my-db
 command: npx
 args: ["@anthropic/mcp-db-server"]
+proto-version: 2025-11-25
 ---
 server: my-git
 command: uvx
 args: ["mcp-git"]
+proto-version: 2025-11-25
 EOF
 
 # Streamable HTTP transport
 cat >> ~/.alayacore/mcp.conf << 'EOF'
 server: remote-api
 url: https://example.com/mcp
+proto-version: 2026-07-28
 EOF
 ```
 
@@ -166,8 +176,8 @@ Agent Loop
 
 1. **Startup**: AlayaCore reads `mcp.conf`, creates the appropriate
    transport for each server (stdio or Streamable HTTP), performs the
-   MCP initialize handshake, and calls `tools/list` to discover
-   available tools.
+   MCP handshake (`initialize` for 2025-11-25 or `server/discover` for
+   2026-07-28), and calls `tools/list` to discover available tools.
 
 2. **Tool registration**: Each discovered tool is wrapped as an
    `llm.Tool` with the prefixed name and wired to route calls back
@@ -246,9 +256,10 @@ JSON is pretty-printed for readability.
 ## Protocol Support
 
 AlayaCore implements the MCP **client** side of the protocol (it acts as
-an MCP Host). The table below covers spec `2025-11-25`.
+an MCP Host). The protocol version is selected per-server via the
+`proto-version` config field.
 
-### ✅ Implemented
+### 2025-11-25 ✅
 
 | Feature | Notes |
 |---------|-------|
@@ -264,7 +275,19 @@ an MCP Host). The table below covers spec `2025-11-25`.
 | Streamable HTTP transport | JSON + SSE responses, GET stream, `Mcp-Session-Id`, `MCP-Protocol-Version` header |
 | Cursor pagination | All list methods |
 
-### ❌ Not Implemented
+### 2026-07-28 ✅
+
+| Feature | Notes |
+|---------|-------|
+| `server/discover` | Version discovery and capability advertisement |
+| `tools/list` | With cursor-based pagination |
+| `tools/call` | With content type conversion |
+| `resources/list` / `resources/read` | Same as 2025-11-25 |
+| `prompts/list` / `prompts/get` | Same as 2025-11-25 |
+| `_meta` per-request | Carries `protocolVersion`, `clientInfo`, `clientCapabilities` |
+| Streamable HTTP transport (POST only) | No session, no GET stream, no `Mcp-Session-Id` |
+
+### ❌ Not Implemented (both versions)
 
 | Feature | Spec Section | Reason |
 |---------|-------------|--------|
@@ -282,9 +305,7 @@ an MCP Host). The table below covers spec `2025-11-25`.
 | Client `elicitation` capability | Client → Elicitation | Server requests user info; not needed (agent controls the loop) |
 | Client `tasks` capability | Client → Tasks | Task-augmented execution (polling pattern) |
 | Server `tasks` capability | Server → Tasks | Task-augmented execution (polling pattern) |
-| `server/discover` | Server → Discover | Advertise supported protocol versions (draft) |
-| `subscriptions/listen` | Server → Subscriptions | Long-lived notification channel (draft) |
-| OAuth 2.1 authorization | Authorization | Not needed for tools-only use |
+| `subscriptions/listen` | Server → Subscriptions | Long-lived notification channel (2026-07-28+ only) |
 
 ### Schema Coverage
 

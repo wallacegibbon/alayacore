@@ -570,6 +570,10 @@ type ServerConfig struct {
 
 	// Debug enables logging of raw JSON-RPC messages to a file.
 	Debug bool
+
+	// ProtoVersion forces a specific MCP protocol version.
+	// Must be set to "2025-11-25" or "2026-07-28".
+	ProtoVersion string
 }
 
 // AuthType enumerates the supported OAuth authentication modes.
@@ -627,6 +631,8 @@ type ServerConfigFile struct {
 	AuthToken        string   `config:"auth-token"`
 	AuthClientID     string   `config:"auth-client-id"`
 	AuthClientSecret string   `config:"auth-client-secret"`
+
+	ProtoVersion string `config:"proto-version"`
 }
 
 // RPCError represents a JSON-RPC error response.
@@ -648,6 +654,8 @@ func (f *ServerConfigFile) ToServerConfig() ServerConfig {
 		Command: f.Command,
 		Args:    f.Args,
 		Env:     f.Env,
+
+		ProtoVersion: f.ProtoVersion,
 	}
 
 	if f.AuthType != "" {

@@ -47,14 +47,13 @@ type Client struct {
 	transport  atomic.Value // stores Transport or nil
 	state      atomic.Int32 // stores ClientState as int32
 
-	// adapter handles protocol-version-specific behavior (initialize vs discover).
-	adapter ProtocolAdapter
+	// adapter handles protocol-version-specific behavior
+	// (handshake, _meta injection, and HTTP transport hooks).
+	adapter Adapter
 
 	// Server capabilities reported during initialization.
 	capabilities ServerCapabilities
 	serverInfo   ImplementationInfo
-	// Instructions from the server's InitializeResult, used by clients
-	// to improve the LLM's understanding of available tools/resources.
 	instructions string
 
 	// staleReason is set when the server is marked stale (e.g. tool list changed).
@@ -63,27 +62,17 @@ type Client struct {
 	// Request ID counter.
 	reqID atomic.Int32
 
-	// closeDone is set to true when the client is shut down (either by
-	// Close() or by the monitor on transport death). The Swap(true) atomic
-	// ensures only one goroutine ever closes closedCh.
+	// closeDone is set to true when the client is shut down.
 	closeDone atomic.Bool
-
-	// closedCh is closed exactly once: by the first goroutine that
-	// sets closeDone to true (Close() or the transport death monitor).
-	closedCh chan struct{}
+	closedCh  chan struct{}
 }
 
 // NewClient creates a new MCP client. Call Connect() to establish the connection.
-// The connection will automatically negotiate the protocol version:
-// it tries initialize first (recognized by all MCP server versions), and
-// falls back to server/discover (2026-07-28+) if the server returns
-// MethodNotFound.
 func NewClient(config ServerConfig) *Client {
 	return &Client{
 		config:     config,
 		tokenStore: config.TokenStore,
 		closedCh:   make(chan struct{}),
-		adapter:    NewV2025_11_25Adapter(),
 	}
 }
 
@@ -103,22 +92,17 @@ func (c *Client) ServerInfo() ImplementationInfo {
 }
 
 // Instructions returns the server's instructions from initialization, if any.
-// These can be used by clients to improve the LLM's understanding of
-// available tools, resources, etc.
 func (c *Client) Instructions() string {
 	return c.instructions
 }
 
-// MarkStale marks the server as stale, indicating its tool list has changed
-// and a restart is needed. Subsequent tool calls will return an error
-// describing the reason.
+// MarkStale marks the server as stale, indicating its tool list has changed.
 func (c *Client) MarkStale(reason string) {
 	c.state.Store(int32(StateStale))
 	c.staleReason = reason
 }
 
 // Connect establishes the transport and performs MCP initialization.
-// Returns an error if the connection or handshake fails.
 func (c *Client) Connect(ctx context.Context) error {
 	if !c.state.CompareAndSwap(int32(StateDisconnected), int32(StateConnecting)) {
 		return fmt.Errorf("%q: already connecting", c.config.Name)
@@ -127,6 +111,18 @@ func (c *Client) Connect(ctx context.Context) error {
 		c.state.CompareAndSwap(int32(StateConnecting), int32(StateFailed))
 		c.state.CompareAndSwap(int32(StateInitializing), int32(StateFailed))
 	}()
+
+	// proto-version is required — no default.
+	switch c.config.ProtoVersion {
+	case "2025-11-25":
+		c.adapter = NewAdapterV20251125()
+	case "2026-07-28":
+		c.adapter = NewAdapterV20260728()
+	case "":
+		return fmt.Errorf("%q: proto-version is required (e.g. proto-version=2025-11-25)", c.config.Name)
+	default:
+		return fmt.Errorf("%q: unsupported proto-version %q", c.config.Name, c.config.ProtoVersion)
+	}
 
 	transport, err := c.createTransport()
 	if err != nil {
@@ -140,38 +136,50 @@ func (c *Client) Connect(ctx context.Context) error {
 	}
 
 	// Set up OAuth auth provider if configured.
-	if authErr := c.setupStreamableAuth(transport); authErr != nil {
-		transport.Close()
-		return authErr
-	}
+	c.setupAuth(transport)
 
 	c.storeTransport(transport)
 	c.setupNotificationHandler(transport)
 	c.state.Store(int32(StateInitializing))
 
-	// Negotiate protocol version: try server/discover first (2026-07-28+),
-	// fall back to initialize (2025-11-25) if the server doesn't support it.
-	negotiatedVersion, err := c.negotiateAndHandshake(ctx)
+	// Negotiate protocol version using the configured adapter.
+	// Attach adapter to HTTP transport before handshake so version headers
+	// (MCP-Protocol-Version, etc.) are included on all requests.
+	if ht, ok := transport.(*HTTPTransport); ok {
+		if ha, ok := c.adapter.(HTTPAdapter); ok {
+			ht.SetHTTPAdapter(ha)
+		}
+	}
+
+	_, err = c.negotiateAndHandshake(ctx)
 	if err != nil {
 		transport.Close()
 		return fmt.Errorf("%q: handshake: %w", c.config.Name, err)
 	}
 
-	// Set the negotiated protocol version on Streamable HTTP transport
-	// so it can include the MCP-Protocol-Version header on all subsequent
-	// HTTP requests (required by spec 2025-11-25 for Streamable HTTP).
-	if st, ok := transport.(*StreamableHTTPTransport); ok {
-		st.SetProtocolVersion(negotiatedVersion)
+	c.state.Store(int32(StateReady))
+
+	// Let the adapter start version-specific resources.
+	// (e.g. GET stream for 2025-11-25, no-op for 2026-07-28)
+	// Only for HTTP transport; stdio doesn't use OnTransportReady.
+	if ht, ok := transport.(*HTTPTransport); ok {
+		if ha, ok := c.adapter.(HTTPAdapter); ok {
+			if err := ha.OnTransportReady(ctx, ht); err != nil {
+				if c.config.Debug {
+					if dw := ht.DebugWriter(); dw != nil {
+						fmt.Fprintf(dw, "MCP: OnTransportReady failed for %q: %v\n", c.config.Name, err)
+					}
+				}
+				// Non-fatal — the client still works for tool calls via POST.
+			}
+		}
 	}
 
-	c.state.Store(int32(StateReady))
-	c.startGETStream()
 	c.startMonitor()
 	return nil
 }
 
 // doInitialize performs the MCP initialize/initialized handshake.
-// Returns the negotiated protocol version.
 func (c *Client) doInitialize(ctx context.Context) (string, error) {
 	initResult, err := c.sendRequest(ctx, methodInitialize, InitializeRequest{
 		ProtocolVersion: protocolVersion,
@@ -193,8 +201,6 @@ func (c *Client) doInitialize(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("parse initialize result: %w", err)
 	}
 
-	// Verify protocol version compatibility per spec.
-	// If the server responds with a version we don't support, we MUST disconnect.
 	if result.ProtocolVersion != protocolVersion {
 		return "", fmt.Errorf("unsupported protocol version %q (client supports %q)",
 			result.ProtocolVersion, protocolVersion)
@@ -205,15 +211,12 @@ func (c *Client) doInitialize(ctx context.Context) (string, error) {
 	c.instructions = result.Instructions
 
 	// Send initialized notification (no response expected).
-	// Only applicable for 2025-11-25 protocol; 2026-07-28+ does not use it.
 	_ = c.sendNotification(ctx, methodNotificationsInitialized, nil)
 
 	return result.ProtocolVersion, nil
 }
 
 // listAllPages is a generic pagination helper for MCP list methods.
-// It handles cursor-based pagination by repeatedly calling sendRequest
-// and extracting items via the callback until nextCursor is empty.
 func listAllPages[T any, P any](ctx context.Context, c *Client, op string, method string, extract func(*P) ([]T, string)) ([]T, error) {
 	if c.State() != StateReady {
 		return nil, c.stateError(op)
@@ -255,7 +258,6 @@ func listAllPages[T any, P any](ctx context.Context, c *Client, op string, metho
 }
 
 // ListTools fetches the list of available tools from the server.
-// Supports cursor-based pagination per the MCP spec.
 func (c *Client) ListTools(ctx context.Context) ([]Tool, error) {
 	return listAllPages(ctx, c, "list tools", methodListTools,
 		func(p *ListToolsResult) ([]Tool, string) { return p.Tools, p.NextCursor })
@@ -283,7 +285,7 @@ func (c *Client) CallTool(ctx context.Context, name string, arguments json.RawMe
 	return &callResult, nil
 }
 
-// HasTools returns true if the server advertised tool support during init.
+// HasTools returns true if the server advertised tool support.
 func (c *Client) HasTools() bool {
 	return c.capabilities.Tools != nil
 }
@@ -352,13 +354,15 @@ func (c *Client) GetPrompt(ctx context.Context, name string, args map[string]str
 }
 
 // Close shuts down the client and its transport.
-// The Done channel is closed permanently.
-// Safe to call concurrently — only the first call performs the shutdown.
 func (c *Client) Close() error {
-	// closeDone ensures only one goroutine runs the shutdown.
 	if !c.closeDone.Swap(true) {
 		ch := c.closedCh
 		close(ch)
+
+		// Notify adapter before closing transport.
+		if c.adapter != nil {
+			c.adapter.OnClose()
+		}
 
 		if tp := c.loadTransport(); tp != nil {
 			err := tp.Close()
@@ -385,7 +389,7 @@ func (c *Client) createTransport() (Transport, error) {
 		}
 		return t, nil
 	case c.config.URL != "":
-		return NewStreamableHTTPTransport(c.config.URL, c.config.Debug), nil
+		return NewHTTPTransport(c.config.URL, c.config.Debug), nil
 	default:
 		return nil, fmt.Errorf("%q: no command or URL specified", c.config.Name)
 	}
@@ -393,7 +397,6 @@ func (c *Client) createTransport() (Transport, error) {
 
 // needsPersistedAuth returns true if the server needs authorization_code
 // auth but no token is available (in-memory or on disk).
-// If a persisted token is found, it sets obtainedToken and returns false.
 func (c *Client) needsPersistedAuth() bool {
 	if c.config.Auth == nil || c.config.Auth.Type != AuthTypeAuthorizationCode {
 		return false
@@ -401,7 +404,6 @@ func (c *Client) needsPersistedAuth() bool {
 	if c.config.Auth.obtainedToken != nil {
 		return false
 	}
-	// Try loading from disk.
 	if c.tokenStore != nil {
 		loaded, loadErr := c.tokenStore.LoadToken(c.config.Name)
 		if loadErr == nil && loaded != nil && (loaded.Valid() || loaded.RefreshToken != "") {
@@ -412,20 +414,20 @@ func (c *Client) needsPersistedAuth() bool {
 	return true
 }
 
-// setupStreamableAuth creates an auth provider for Streamable HTTP transport.
-func (c *Client) setupStreamableAuth(transport Transport) error {
-	ht, ok := transport.(*StreamableHTTPTransport)
-	if !ok || c.config.Auth == nil {
-		return nil
+// setupAuth creates an auth provider for the transport, if configured.
+func (c *Client) setupAuth(transport Transport) {
+	if c.config.Auth == nil {
+		return
 	}
-	provider, err := newAuthProvider(c.config.Auth, c.tokenStore, c.config.Name)
-	if err != nil {
-		return fmt.Errorf("%q auth: %w", c.config.Name, err)
+
+	provider := newAuthProvider(c.config.Auth, c.tokenStore, c.config.Name)
+	if provider == nil {
+		return
 	}
-	if provider != nil {
+
+	if ht, ok := transport.(*HTTPTransport); ok {
 		ht.SetAuthProvider(provider)
 	}
-	return nil
 }
 
 // ============================================================================
@@ -433,8 +435,6 @@ func (c *Client) setupStreamableAuth(transport Transport) error {
 // ============================================================================
 
 // startMonitor launches a goroutine that watches for transport death.
-// If the transport dies unexpectedly (process crash, connection drop),
-// the client transitions to StateFailed and signals it via Done().
 func (c *Client) startMonitor() {
 	tp := c.loadTransport()
 	if tp == nil {
@@ -445,31 +445,30 @@ func (c *Client) startMonitor() {
 }
 
 // monitorTransport waits for the transport to finish and transitions the
-// client to StateFailed if it dies unexpectedly (i.e. not via Close()).
+// client to StateFailed if it dies unexpectedly.
 func (c *Client) monitorTransport(tp Transport) {
 	<-tp.Done()
 
-	// Only transition from Ready — Close() may have set Disconnected.
 	if !c.state.CompareAndSwap(int32(StateReady), int32(StateFailed)) {
 		return
 	}
 
-	// Claim the right to close closedCh.
-	// If Close() ran first (closeDone already true), skip.
 	if !c.closeDone.Swap(true) {
 		ch := c.closedCh
 		close(ch)
 	}
 }
 
-// setupNotificationHandler registers a notification handler on the transport
-// so the client can react to server-to-client notifications (e.g. tool list changes).
+// setupNotificationHandler registers a notification handler on the transport.
 func (c *Client) setupNotificationHandler(tp Transport) {
 	h := NotificationHandler(c.handleNotification)
+
+	// Both transport types support SetNotificationHandler via their
+	// Transport interface or type-specific method.
 	switch t := tp.(type) {
 	case *StdioTransport:
 		t.SetNotificationHandler(h)
-	case *StreamableHTTPTransport:
+	case *HTTPTransport:
 		t.SetNotificationHandler(h)
 	}
 }
@@ -486,26 +485,7 @@ func (c *Client) handleNotification(method string) {
 	}
 }
 
-// startGETStream starts a long-lived GET SSE stream for Streamable HTTP transport
-// to receive server-to-client messages (e.g. notifications). This is best-effort;
-// errors are non-fatal — the MCP client still works for tool calls, resource reads,
-// etc. via POST. Unexpected errors are written to the transport's debug log file
-// if --debug-mcp is enabled.
-func (c *Client) startGETStream() {
-	st, ok := c.loadTransport().(*StreamableHTTPTransport)
-	if !ok {
-		return
-	}
-	// Use a background context; the stream is managed by the transport's Close().
-	if err := st.StartGETStream(context.Background(), st.handleServerRequest); err != nil {
-		if c.config.Debug && st.DebugWriter() != nil {
-			fmt.Fprintf(st.DebugWriter(), "MCP: GET SSE stream failed for %q: %v\n", c.config.Name, err)
-		}
-	}
-}
-
 // Ping sends a ping request to check server health.
-// Returns nil if the server is alive and responsive.
 func (c *Client) Ping(ctx context.Context) error {
 	if c.State() != StateReady {
 		return c.stateError("ping")
@@ -514,10 +494,7 @@ func (c *Client) Ping(ctx context.Context) error {
 	return err
 }
 
-// resetState resets the client to StateDisconnected and closes any
-// lingering transport. Used when reconnecting after OAuth auth —
-// Connect leaves the client in StateFailed on ErrNeedsAuth, so we
-// must reset to Disconnected before the next Connect attempt.
+// resetState resets the client to StateDisconnected for reconnection.
 func (c *Client) resetState() {
 	if tp := c.loadTransport(); tp != nil {
 		tp.Close()
@@ -526,14 +503,11 @@ func (c *Client) resetState() {
 	c.state.Store(int32(StateDisconnected))
 }
 
-// AuthorizeAndConnect persists the obtained OAuth token, resets the client
-// state, and reconnects. It is called after completing the authorization
-// code flow. On failure the token is cleared so a subsequent retry can
-// restart the flow.
+// AuthorizeAndConnect persists the obtained OAuth token and reconnects.
 func (c *Client) AuthorizeAndConnect(ctx context.Context, token *auth.Token) error {
 	c.config.Auth.obtainedToken = token
 	if c.tokenStore != nil {
-		_ = c.tokenStore.SaveToken(c.Name(), token) // non-fatal
+		_ = c.tokenStore.SaveToken(c.Name(), token)
 	}
 	c.resetState()
 	if err := c.Connect(ctx); err != nil {
@@ -586,45 +560,21 @@ func (c *Client) stateError(string) error {
 // Protocol Negotiation
 // ============================================================================
 
-// negotiateAndHandshake determines the protocol version and performs the
-// appropriate handshake. Strategy (try universally supported first):
-//  1. Try initialize (2025-11-25) — both 2025-11-25 and 2026-07-28
-//     servers recognize this method (the latter returns MethodNotFound).
-//  2. If MethodNotFound → try server/discover (2026-07-28+).
-//  3. Otherwise → propagate error.
-//
-// initialize is tried first because it is universally recognized by all
-// MCP servers regardless of version. Sending an unrecognized method to an
-// STDIO server may cause it to close the connection (EOF), making fallback
-// impossible. Since all servers recognize initialize, this is safe.
-//
-// The client's adapter is replaced with the correct one for the negotiated
-// version, so subsequent requests use version-appropriate behavior
-// (e.g., _meta injection in 2026-07-28+).
+// negotiateAndHandshake performs the handshake and verifies the server
+// supports the configured proto-version.
 func (c *Client) negotiateAndHandshake(ctx context.Context) (string, error) {
-	// Phase 1: Try initialize (2025-11-25) — safe for all servers.
-	legacyAdapter := NewV2025_11_25Adapter()
-	version, err := legacyAdapter.Handshake(ctx, c)
-	if err == nil {
-		// initialize succeeded — stay on 2025-11-25 adapter.
-		return version, nil
+	version, err := c.adapter.Handshake(ctx, c)
+	if err != nil {
+		return "", fmt.Errorf("handshake with %s: %w", c.config.ProtoVersion, err)
 	}
-
-	// If it's not a MethodNotFound error, propagate it.
-	// For STDIO servers, an unrecognized method can cause EOF (server exit),
-	// but initialize is universally supported so this shouldn't happen here.
-	if !isMethodNotFound(err) {
-		return "", err
+	if version != c.config.ProtoVersion {
+		return "", fmt.Errorf("server does not support protocol version %q (supports %q)",
+			c.config.ProtoVersion, version)
 	}
-
-	// Phase 2: Server returned MethodNotFound for initialize — try discover.
-	c.adapter = NewV2026_07_28Adapter()
-	return c.adapter.Handshake(ctx, c)
+	return version, nil
 }
 
-// isHandshakeMethod returns true if the method is part of the protocol
-// handshake (initialize or discover). These requests MUST NOT be canceled
-// with a cancellation notification per the MCP spec.
+// isHandshakeMethod returns true if the method is a handshake method.
 func isHandshakeMethod(method string) bool {
 	return method == methodInitialize || method == methodDiscover
 }
@@ -634,18 +584,12 @@ func isHandshakeMethod(method string) bool {
 // ============================================================================
 
 // sendRequest sends a JSON-RPC request and returns the response result.
-// Request/response matching is handled by the transport layer via request ID.
-//
-// If the context is canceled while waiting for a response, a best-effort
-// cancellation notification is sent to the server so it can abort
-// processing early.
 func (c *Client) sendRequest(ctx context.Context, method string, params any) (json.RawMessage, error) {
 	tp := c.loadTransport()
 	if tp == nil {
 		return nil, fmt.Errorf("%q: no transport", c.config.Name)
 	}
 
-	// Check context before doing any work.
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
@@ -683,12 +627,6 @@ func (c *Client) sendRequest(ctx context.Context, method string, params any) (js
 
 	result, err := tp.SendReceive(ctx, req)
 	if err != nil {
-		// If the request was canceled (user :cancel, timeout), send a
-		// best-effort cancellation notification so the server can abort
-		// processing. This is a notification (fire-and-forget), so we
-		// don't wait for it.
-		// Per spec, the initialize request MUST NOT be canceled.
-		// Also exclude discover — it's a handshake method, not a tool call.
 		if !isHandshakeMethod(method) && (errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
 			c.sendCanceledNotification(id, err)
 		}
@@ -697,20 +635,17 @@ func (c *Client) sendRequest(ctx context.Context, method string, params any) (js
 	return result, nil
 }
 
-// sendCanceledNotification sends a cancellation notification to the
-// server as a best-effort hint that it should abort processing of the given
-// request. Uses a short timeout context so it doesn't block indefinitely.
+// sendCanceledNotification sends a cancellation notification to the server.
 func (c *Client) sendCanceledNotification(id requestID, cause error) {
 	reason := "request canceled"
 	if errors.Is(cause, context.DeadlineExceeded) {
 		reason = "timeout"
 	}
 
-	// Use a short timeout so a slow/hung server doesn't block shutdown.
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	_ = c.sendNotification(ctx, methodNotificationsCanceled, CanceledNotificationParams{ // best-effort
+	_ = c.sendNotification(ctx, methodNotificationsCanceled, CanceledNotificationParams{
 		RequestID: id,
 		Reason:    reason,
 	})
@@ -726,40 +661,34 @@ func (c *Client) sendNotification(ctx context.Context, method string, params any
 	return tp.SendNotification(ctx, method, params)
 }
 
-// Ensure interfaces are satisfied.
-var _ error = (*RPCError)(nil) // compile-time interface check
+// compile-time interface checks.
+var _ error = (*RPCError)(nil)
 
 // newAuthProvider creates an auth.TokenProvider from the given AuthConfig.
-// Returns nil if config is nil or type is empty/unknown.
-// If tokenStore is non-nil and the auth type supports persistence, the
-// returned provider will persist and load tokens from the store and
-// automatically use refresh tokens for renewal.
-func newAuthProvider(cfg *AuthConfig, tokenStore auth.TokenStore, serverName string) (auth.TokenProvider, error) { //nolint:unparam // error may be used by future auth types
+func newAuthProvider(cfg *AuthConfig, tokenStore auth.TokenStore, serverName string) auth.TokenProvider {
 	if cfg == nil {
-		return nil, nil
+		return nil
 	}
 
 	switch cfg.Type {
 	case AuthTypeStatic:
 		if cfg.Token == "" {
-			return nil, nil
+			return nil
 		}
 		return auth.NewCached(&auth.StaticProvider{
 			TokenValue: &auth.Token{
 				AccessToken: cfg.Token,
 				TokenType:   "Bearer",
 			},
-		}), nil
+		})
 
 	case AuthTypeAuthorizationCode:
 		if cfg.obtainedToken != nil {
-			// We have a token from the interactive flow — wrap in persistent
-			// provider so it gets cached and persisted.
 			base := auth.NewCached(&auth.StaticProvider{
 				TokenValue: cfg.obtainedToken,
 			})
 			if tokenStore == nil {
-				return base, nil
+				return base
 			}
 			refreshCfg := &auth.RefreshConfig{
 				TokenEndpoint:    cfg.TokenEndpoint,
@@ -767,9 +696,8 @@ func newAuthProvider(cfg *AuthConfig, tokenStore auth.TokenStore, serverName str
 				ClientSecret:     cfg.ClientSecret,
 				ClientAuthMethod: cfg.ClientAuthMethod,
 			}
-			return auth.NewPersistentTokenProvider(base, tokenStore, serverName, refreshCfg), nil
+			return auth.NewPersistentTokenProvider(base, tokenStore, serverName, refreshCfg)
 		}
-		// No token yet — try loading from disk via persistent provider.
 		if tokenStore != nil {
 			refreshCfg := &auth.RefreshConfig{
 				TokenEndpoint:    cfg.TokenEndpoint,
@@ -777,14 +705,11 @@ func newAuthProvider(cfg *AuthConfig, tokenStore auth.TokenStore, serverName str
 				ClientSecret:     cfg.ClientSecret,
 				ClientAuthMethod: cfg.ClientAuthMethod,
 			}
-			// Inner is nil — we have no way to get a token except from
-			// disk or refresh. The init flow (runOAuthForServer) will
-			// start the interactive authorization if no token is found.
-			return auth.NewPersistentTokenProvider(nil, tokenStore, serverName, refreshCfg), nil
+			return auth.NewPersistentTokenProvider(nil, tokenStore, serverName, refreshCfg)
 		}
-		return nil, nil // no token yet, connect will be skipped by ErrNeedsAuth
+		return nil
 
 	default:
-		return nil, nil
+		return nil
 	}
 }
