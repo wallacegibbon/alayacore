@@ -157,7 +157,17 @@ func isMethodNotFound(err error) bool {
 // Used during handshake negotiation to detect older protocol servers.
 const MethodNotFound = -32601
 
-// injectMeta merges a _meta object into serialized JSON-RPC params.
+// injectMeta merges a _meta object into serialized JSON-RPC params
+// using efficient raw JSON manipulation.
+//
+// Instead of the naive approach (unmarshal → modify → re-marshal the
+// entire params), this works at the JSON bytes level:
+//  1. Marshal the meta object (small, 3-5 fields)
+//  2. Trim the trailing '}' from params
+//  3. Append ',"_meta":<meta>' + '}'
+//
+// This avoids two full JSON passes on potentially large params.
+//
 // If params is nil, creates a new object with just _meta.
 // If meta is nil, returns params unchanged.
 func injectMeta(params json.RawMessage, meta any) (json.RawMessage, error) {
@@ -165,15 +175,37 @@ func injectMeta(params json.RawMessage, meta any) (json.RawMessage, error) {
 		return params, nil
 	}
 
-	var target map[string]any
-	if params != nil {
-		if err := json.Unmarshal(params, &target); err != nil {
-			return nil, fmt.Errorf("unmarshal params for _meta injection: %w", err)
-		}
-	} else {
-		target = make(map[string]any)
+	metaData, err := json.Marshal(meta)
+	if err != nil {
+		return nil, fmt.Errorf("marshal _meta: %w", err)
 	}
 
-	target["_meta"] = meta
-	return json.Marshal(target)
+	if len(params) == 0 {
+		// No existing params — create {"_meta": ...}.
+		return json.RawMessage(`{"_meta":` + string(metaData) + `}`), nil
+	}
+
+	// Find the last '}' in the params JSON and insert before it.
+	// This trims trailing whitespace and the closing brace.
+	end := len(params)
+	for end > 0 && (params[end-1] == ' ' || params[end-1] == '\t' || params[end-1] == '\n' || params[end-1] == '\r') {
+		end--
+	}
+	if end == 0 || params[end-1] != '}' {
+		// Not a JSON object — MCP params must always be objects.
+		return nil, fmt.Errorf("params must be a JSON object for _meta injection, got: %s", string(params))
+	}
+
+	// Insert before the final '}'.
+	result := make([]byte, end-1+len(metaData)+13) // 13 = `,"_meta":` + `}`
+	copy(result, params[:end-1])
+	result[end-1] = ','
+	offset := end
+	copy(result[offset:], `"_meta":`)
+	offset += 8
+	copy(result[offset:], metaData)
+	offset += len(metaData)
+	result[offset] = '}'
+	offset++
+	return result[:offset], nil
 }
