@@ -290,7 +290,7 @@ func (init *Init) collectServerResult(ctx context.Context, c *Client) serverResu
 
 	init.sendEvent(InitEvent{Type: InitConnecting, Server: c.Name()})
 
-	if err := init.connectWithAuth(ctx, c); err != nil {
+	if err := init.connectServer(ctx, c); err != nil {
 		init.sendEvent(InitEvent{Type: InitFailed, Server: c.Name(), Error: err.Error()})
 		return r
 	}
@@ -300,11 +300,14 @@ func (init *Init) collectServerResult(ctx context.Context, c *Client) serverResu
 	return r
 }
 
-// connectWithAuth connects to the server, running the OAuth authorization
+// connectServer connects to the server, running the OAuth authorization
 // flow first if the server requires it.
-func (init *Init) connectWithAuth(ctx context.Context, c *Client) error {
+func (init *Init) connectServer(ctx context.Context, c *Client) error {
 	if !c.needsPersistedAuth() {
-		return c.Connect(ctx)
+		if err := c.Connect(ctx); err != nil {
+			return fmt.Errorf("%q: %w", c.Name(), err)
+		}
+		return nil
 	}
 	return init.connectOAuth(ctx, c)
 }
@@ -376,7 +379,7 @@ func (init *Init) runOAuthForServer(ctx context.Context, c *Client, meta *auth.A
 	select {
 	case acr = <-authCodeCh:
 	case <-ctx.Done():
-		return ctx.Err()
+		return fmt.Errorf("%q: %w", c.Name(), ctx.Err())
 	}
 
 	init.mu.Lock()
@@ -412,7 +415,7 @@ func (init *Init) runOAuthForServer(ctx context.Context, c *Client, meta *auth.A
 		ClientID:         clientID,
 		ClientAuthMethod: cfg.ClientAuthMethod,
 	}
-	return c.AuthorizeAndConnect(ctx, token)
+	return c.connectWithOAuthToken(ctx, token)
 }
 
 // discoverCapabilities discovers tools, resources,
@@ -420,21 +423,21 @@ func (init *Init) runOAuthForServer(ctx context.Context, c *Client, meta *auth.A
 func (init *Init) discoverCapabilities(ctx context.Context, c *Client, r *serverResult) {
 	if c.HasTools() {
 		if tools, err := c.ListTools(ctx); err != nil {
-			init.sendEvent(InitEvent{Type: InitFailed, Server: c.Name(), Error: fmt.Sprintf("list tools: %v", err)})
+			init.sendEvent(InitEvent{Type: InitFailed, Server: c.Name(), Error: err.Error()})
 		} else {
 			r.tools = tools
 		}
 	}
 	if c.HasResources() {
 		if resources, err := c.ListResources(ctx); err != nil {
-			init.sendEvent(InitEvent{Type: InitFailed, Server: c.Name(), Error: fmt.Sprintf("list resources: %v", err)})
+			init.sendEvent(InitEvent{Type: InitFailed, Server: c.Name(), Error: err.Error()})
 		} else {
 			r.resources = resources
 		}
 	}
 	if c.HasPrompts() {
 		if prompts, err := c.ListPrompts(ctx); err != nil {
-			init.sendEvent(InitEvent{Type: InitFailed, Server: c.Name(), Error: fmt.Sprintf("list prompts: %v", err)})
+			init.sendEvent(InitEvent{Type: InitFailed, Server: c.Name(), Error: err.Error()})
 		} else {
 			r.prompts = prompts
 		}

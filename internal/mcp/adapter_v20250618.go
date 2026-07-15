@@ -125,7 +125,7 @@ func (a *AdapterV20250618) Handshake(ctx context.Context, c *Client) (string, er
 	}
 
 	if result.ProtocolVersion != a.ProtocolVersion() {
-		return "", fmt.Errorf("unsupported protocol version %q (client supports %q)",
+		return "", fmt.Errorf("protocol version mismatch: server returned %q, configured %q",
 			result.ProtocolVersion, a.ProtocolVersion())
 	}
 

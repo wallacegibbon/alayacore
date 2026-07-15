@@ -115,7 +115,7 @@ func (a *AdapterV20260728) Handshake(ctx context.Context, c *Client) (string, er
 			return v, nil
 		}
 	}
-	return "", fmt.Errorf("unsupported protocol version %q: server supports %v",
+	return "", fmt.Errorf("protocol version mismatch: configured %q, server supports %v",
 		preferred, discover.SupportedVersions)
 }
 

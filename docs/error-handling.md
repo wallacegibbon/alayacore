@@ -140,3 +140,147 @@ Max steps and truncation behavior is tested in `internal/llm/agent_maxsteps_test
 | `TestAgentTruncatedMaxTokens` | Agent returns `ErrResponseTruncated` for `max_tokens`, partial messages preserved |
 | `TestAgentTruncatedLength` | Agent returns `ErrResponseTruncated` for `length`, partial messages preserved |
 | `TestAgentNoTruncationOnEndTurn` | Agent does not return `ErrResponseTruncated` for `end_turn` |
+
+## Error Message Construction (`fmt.Errorf` Chaining)
+
+When wrapping errors with `fmt.Errorf("...: %w", ...)`, each layer must add **only** the information it knows that lower layers do not. Never repeat information already present in the wrapped error.
+
+### Principle
+
+**Each layer adds what the layer below doesn't have. Never repeat.**
+
+### Layer Responsibilities
+
+| Layer | Knows | Adds | Why |
+|-------|-------|------|-----|
+| Transport (HTTP/stdio) | wire-level failure | `write: connection reset` | Transport doesn't know server name |
+| `sendRequest` | request failure | `no transport` / `marshal params: ...` / `ctx.Err()` | Callers always wrap with server name |
+| `stateError` | state info | `not ready (state=5)` / `server connection lost` | Callers always wrap with server name |
+| adapter (handshake) | version negotiation | `protocol version mismatch: server returned "X", configured "Y"` | Doesn't know server name |
+| `Connect` | connection failure | `already connecting` / `not ready` | Callers always wrap with server name |
+| `connectServer` | server name (non-OAuth) | `"server": <error>` | Lower layer (`Connect`) doesn't include it |
+| `connectOAuth` | server name (OAuth steps) | `"server": pkce: <error>` | Lower layer (auth) doesn't include it |
+| `connectWithOAuthToken` | server name + reconnect | `"server": connect after auth: <error>` | Lower layer (`Connect`) doesn't include it |
+| `listAllPages` | op name + server name | `"server": list tools: <error>` | Lower layer didn't include either |
+| `CallTool` | tool name + server name | `"server": call greet: <error>` | Lower layer didn't include either |
+| `discoverCapabilities` | nothing new | passes `err.Error()` directly | Lower layer already has server name + op name |
+| `session_loop` | it's an MCP error | `MCP: <error>` | Lower layer is MCP-agnostic |
+
+### Rule of Thumb
+
+- **Lower layers** (transport, `sendRequest`, adapter, `stateError`, `Connect`): Never include server name. They don't know it, or their callers always add it.
+- **Middle layers** (`connectServer`, `connectWithOAuthToken`, `listAllPages`, `CallTool`): Add server name + operation context. The lower layer has neither.
+- **Upper layers** (`discoverCapabilities`, `session_loop`): Add only what's new. The lower layer already has server name.
+
+### Examples
+
+#### Good: MCP Handshake Error
+
+```
+adapter          protocol version mismatch: server returned "2024-11-05", configured "2025-11-25"
+↓
+negotiateAndHandshake   handshake: <above>
+↓
+Connect          returns directly (no wrapping)
+↓
+connectServer  "embedded": <above>
+↓
+session_loop     MCP: <above>
+```
+
+```
+MCP: "embedded": handshake: protocol version mismatch: server returned "2024-11-05", configured "2025-11-25"
+```
+
+Each piece of information appears exactly once.
+
+#### Good: List Tools with Canceled Context
+
+```
+sendRequest      context canceled
+↓
+listAllPages     "db": list tools: <above>
+↓
+discoverCapabilities   passes through
+↓
+session_loop     MCP: <above>
+```
+
+```
+MCP: "db": list tools: context canceled
+```
+
+Server name is added exactly once, by `listAllPages`.
+
+#### Good: CallTool with State Error
+
+```
+stateError       not ready (state=5)
+↓
+CallTool         "my-server": call greet: <above>
+```
+
+```
+MCP: "my-server": call greet: not ready (state=5)
+```
+
+#### Good: Non-OAuth Connect Failure
+
+```
+stateError       not ready (state=5)
+↓
+Connect          returns directly (no wrapping)
+↓
+connectServer  "my-server": <above>
+```
+
+```
+MCP: "my-server": not ready (state=5)
+```
+
+#### Good: Connect after Auth Failure
+
+```
+stateError       not ready (state=5)
+↓
+Connect          returns directly (no wrapping)
+↓
+connectWithOAuthToken  "my-server": connect after auth: <above>
+```
+
+```
+MCP: "my-server": connect after auth: not ready (state=5)
+```
+
+### Anti-patterns
+
+```go
+// ❌ BAD: Upper layer repeats what lower layer already said ("handshake" twice)
+return fmt.Errorf("%q: handshake: %w", c.config.Name, err)
+// Lower layer already says "handshake: ..."
+// Result: "server": handshake: handshake: ...
+
+// ❌ BAD: Upper layer repeats operation name that lower layer already added
+Error: fmt.Sprintf("list tools: %v", err)
+// Lower layer (listAllPages) already says list tools: ...
+// Result: list tools: "server": list tools: ...
+
+// ❌ BAD: sendRequest adds server name, but every caller adds it too
+return fmt.Errorf("%q: no transport", c.config.Name)
+// All callers (listAllPages, CallTool, etc.) wrap with server name
+// Result: "server": list tools: "server": no transport  (double)
+
+// ❌ BAD: Caller doesn't wrap with server name + operation context
+return c.stateError(op)
+// stateError no longer includes server name
+// Result: not ready...  (missing "server": and "list tools:" context)
+```
+
+### Checklist
+
+When writing `fmt.Errorf("...: %w", ...)`, ask:
+
+1. **What new information does this layer know?** (e.g. server name, operation name, protocol version)
+2. **Is that information already in the wrapped error?** If yes, omit it.
+3. **Will every caller of this function wrap with the same info?** If yes, don't add it here — let callers do it.
+4. **Can the user understand the error without this layer's context?** If no, add it — but only the new piece.

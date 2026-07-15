@@ -111,7 +111,7 @@ func (c *Client) MarkStale(reason string) {
 //nolint:gocyclo
 func (c *Client) Connect(ctx context.Context) error {
 	if !c.state.CompareAndSwap(int32(StateDisconnected), int32(StateConnecting)) {
-		return fmt.Errorf("%q: already connecting", c.config.Name)
+		return fmt.Errorf("already connecting")
 	}
 	defer func() {
 		c.state.CompareAndSwap(int32(StateConnecting), int32(StateFailed))
@@ -123,7 +123,7 @@ func (c *Client) Connect(ctx context.Context) error {
 	case "2024-11-05":
 		c.adapter = NewAdapterV20241105()
 		if c.config.URL != "" {
-			return fmt.Errorf("%q: proto-version 2024-11-05 only supports stdio transport", c.config.Name)
+			return fmt.Errorf("proto-version 2024-11-05 only supports stdio transport")
 		}
 	case "2025-03-26":
 		c.adapter = NewAdapterV20250326()
@@ -134,9 +134,9 @@ func (c *Client) Connect(ctx context.Context) error {
 	case "2026-07-28":
 		c.adapter = NewAdapterV20260728()
 	case "":
-		return fmt.Errorf("%q: proto-version is required (e.g. proto-version=2025-11-25)", c.config.Name)
+		return fmt.Errorf("proto-version is required (e.g. proto-version=2025-11-25)")
 	default:
-		return fmt.Errorf("%q: unsupported proto-version %q", c.config.Name, c.config.ProtoVersion)
+		return fmt.Errorf("unsupported proto-version %q", c.config.ProtoVersion)
 	}
 
 	transport, err := c.createTransport()
@@ -169,7 +169,7 @@ func (c *Client) Connect(ctx context.Context) error {
 	_, err = c.negotiateAndHandshake(ctx)
 	if err != nil {
 		transport.Close()
-		return fmt.Errorf("%q: handshake: %w", c.config.Name, err)
+		return fmt.Errorf("%w", err)
 	}
 
 	c.state.Store(int32(StateReady))
@@ -197,7 +197,7 @@ func (c *Client) Connect(ctx context.Context) error {
 // listAllPages is a generic pagination helper for MCP list methods.
 func listAllPages[T any, P any](ctx context.Context, c *Client, op string, method string, extract func(*P) ([]T, string)) ([]T, error) {
 	if c.State() != StateReady {
-		return nil, c.stateError(op)
+		return nil, fmt.Errorf("%q: %s: %w", c.config.Name, op, c.stateError(op))
 	}
 
 	type listParams struct {
@@ -215,12 +215,12 @@ func listAllPages[T any, P any](ctx context.Context, c *Client, op string, metho
 
 		result, err := c.sendRequest(ctx, method, params)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%q: %s: %w", c.config.Name, op, err)
 		}
 
 		var page P
 		if err := json.Unmarshal(result, &page); err != nil {
-			return nil, fmt.Errorf("parse %s: %w", op, err)
+			return nil, fmt.Errorf("%q: %s: parse: %w", c.config.Name, op, err)
 		}
 
 		items, nextCursor := extract(&page)
@@ -263,7 +263,7 @@ func (c *Client) ListTools(ctx context.Context) ([]Tool, error) {
 // CallTool invokes a tool on the server and returns the result.
 func (c *Client) CallTool(ctx context.Context, name string, arguments json.RawMessage) (*CallToolResult, error) {
 	if c.State() != StateReady {
-		return nil, c.stateError(fmt.Sprintf("call %s", name))
+		return nil, fmt.Errorf("%q: call %s: %w", c.config.Name, name, c.stateError(name))
 	}
 
 	result, err := c.sendRequest(ctx, methodCallTool, CallToolRequest{
@@ -301,7 +301,7 @@ func (c *Client) ListResources(ctx context.Context) ([]Resource, error) {
 // ReadResource reads a resource by URI from the server.
 func (c *Client) ReadResource(ctx context.Context, uri string) (*ReadResourceResult, error) {
 	if c.State() != StateReady {
-		return nil, c.stateError("read resource")
+		return nil, fmt.Errorf("%q: read resource: %w", c.config.Name, c.stateError("read resource"))
 	}
 
 	result, err := c.sendRequest(ctx, methodReadResource, ReadResourceRequest{URI: uri})
@@ -331,7 +331,7 @@ func (c *Client) ListPrompts(ctx context.Context) ([]Prompt, error) {
 // GetPrompt fetches a prompt by name with optional arguments.
 func (c *Client) GetPrompt(ctx context.Context, name string, args map[string]string) (*GetPromptResult, error) {
 	if c.State() != StateReady {
-		return nil, c.stateError("get prompt")
+		return nil, fmt.Errorf("%q: get prompt: %w", c.config.Name, c.stateError("get prompt"))
 	}
 
 	result, err := c.sendRequest(ctx, methodGetPrompt, GetPromptRequest{
@@ -382,13 +382,13 @@ func (c *Client) createTransport() (Transport, error) {
 	case c.config.Command != "":
 		t, err := NewStdioTransport(c.config.Command, c.config.Args, c.config.Env, c.config.Debug)
 		if err != nil {
-			return nil, fmt.Errorf("%q: %w", c.config.Name, err)
+			return nil, fmt.Errorf("%w", err)
 		}
 		return t, nil
 	case c.config.URL != "":
 		return NewHTTPTransport(c.config.URL, c.config.Debug), nil
 	default:
-		return nil, fmt.Errorf("%q: no command or URL specified", c.config.Name)
+		return nil, fmt.Errorf("no command or URL specified")
 	}
 }
 
@@ -485,7 +485,7 @@ func (c *Client) handleNotification(method string) {
 // Ping sends a ping request to check server health.
 func (c *Client) Ping(ctx context.Context) error {
 	if c.State() != StateReady {
-		return c.stateError("ping")
+		return fmt.Errorf("%q: ping: %w", c.config.Name, c.stateError("ping"))
 	}
 	_, err := c.sendRequest(ctx, methodPing, nil)
 	return err
@@ -500,8 +500,8 @@ func (c *Client) resetState() {
 	c.state.Store(int32(StateDisconnected))
 }
 
-// AuthorizeAndConnect persists the obtained OAuth token and reconnects.
-func (c *Client) AuthorizeAndConnect(ctx context.Context, token *auth.Token) error {
+// connectWithOAuthToken persists the obtained OAuth token and reconnects.
+func (c *Client) connectWithOAuthToken(ctx context.Context, token *auth.Token) error {
 	c.config.Auth.obtainedToken = token
 	if c.tokenStore != nil {
 		_ = c.tokenStore.SaveToken(c.Name(), token)
@@ -541,15 +541,16 @@ func (c *Client) storeTransport(t Transport) {
 }
 
 // stateError returns a descriptive error for the current client state.
+// It does NOT include the server name — callers wrap with %q instead.
 func (c *Client) stateError(string) error {
 	st := c.State()
 	switch st {
 	case StateFailed:
-		return fmt.Errorf("%q: server connection lost", c.config.Name)
+		return fmt.Errorf("server connection lost")
 	case StateStale:
-		return fmt.Errorf("%q: %s", c.config.Name, c.staleReason)
+		return fmt.Errorf("%s", c.staleReason)
 	default:
-		return fmt.Errorf("%q: not ready (state=%d)", c.config.Name, st)
+		return fmt.Errorf("not ready (state=%d)", st)
 	}
 }
 
@@ -562,10 +563,10 @@ func (c *Client) stateError(string) error {
 func (c *Client) negotiateAndHandshake(ctx context.Context) (string, error) {
 	version, err := c.adapter.Handshake(ctx, c)
 	if err != nil {
-		return "", fmt.Errorf("handshake with %s: %w", c.config.ProtoVersion, err)
+		return "", fmt.Errorf("handshake: %w", err)
 	}
 	if version != c.config.ProtoVersion {
-		return "", fmt.Errorf("server does not support protocol version %q (supports %q)",
+		return "", fmt.Errorf("protocol version mismatch: configured %q, server returned %q",
 			c.config.ProtoVersion, version)
 	}
 	return version, nil
@@ -584,7 +585,7 @@ func isHandshakeMethod(method string) bool {
 func (c *Client) sendRequest(ctx context.Context, method string, params any) (json.RawMessage, error) {
 	tp := c.loadTransport()
 	if tp == nil {
-		return nil, fmt.Errorf("%q: no transport", c.config.Name)
+		return nil, fmt.Errorf("no transport")
 	}
 
 	select {
@@ -672,7 +673,7 @@ func (c *Client) sendCanceledNotification(id requestID, cause error) {
 func (c *Client) sendNotification(ctx context.Context, method string, params any) error {
 	tp := c.loadTransport()
 	if tp == nil {
-		return fmt.Errorf("%q: no transport", c.config.Name)
+		return fmt.Errorf("no transport")
 	}
 
 	// Marshal params and inject _meta, same as sendRequest.

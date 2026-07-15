@@ -309,8 +309,8 @@ func TestClientInitialize_VersionMismatch(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for version mismatch, got nil")
 	}
-	if !strings.Contains(err.Error(), "unsupported protocol version") {
-		t.Errorf("expected 'unsupported protocol version' error, got: %v", err)
+	if !strings.Contains(err.Error(), "protocol version mismatch") {
+		t.Errorf("expected 'protocol version mismatch' error, got: %v", err)
 	}
 	if !strings.Contains(err.Error(), "2024-11-05") {
 		t.Errorf("expected server version in error, got: %v", err)

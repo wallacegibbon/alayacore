@@ -631,7 +631,7 @@ type AuthConfig struct {
 	// Token is a pre-obtained access token (for static auth).
 	Token string
 
-	// obtainedToken is set by Client.AuthorizeAndConnect after the interactive
+	// obtainedToken is set by Client.connectWithOAuthToken after the interactive
 	// authorization_code flow completes. It is not persisted to disk.
 	obtainedToken *auth.Token
 }

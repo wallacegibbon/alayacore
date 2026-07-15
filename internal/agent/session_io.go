@@ -508,7 +508,7 @@ func (s *Session) handleMCPCancel() {
 	case !s.mcpService.HasInit():
 		s.writeError("No MCP servers configured.")
 	case s.mcpService.IsReady():
-		s.writeError("MCP initialization has already completed.")
+		s.writeError("MCP initialization is not in progress.")
 	default:
 		s.mcpService.Cancel()
 	}
@@ -530,7 +530,7 @@ func (s *Session) handleMCPAuth(_ context.Context, args string) {
 		return
 	}
 	if s.mcpService.IsReady() {
-		s.writeError("MCP initialization has already completed.")
+		s.writeError("MCP initialization is not in progress.")
 		return
 	}
 
