@@ -78,7 +78,8 @@ type OutputWriter interface {
 	ConsumeMCPDone() bool // returns true if MCP init just completed
 
 	// Update signaling
-	DrainDirty() bool // returns true if display was dirty, clears the flag
+	FlushPendingDeltas() // flushes accumulated delta frames to WindowBuffer
+	DrainDirty() bool    // returns true if display was dirty, clears the flag
 	WindowBuffer() *WindowBuffer
 }
 

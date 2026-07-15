@@ -415,6 +415,9 @@ func TestWindowBufferDeltaRouting(t *testing.T) {
 	if err != nil {
 		t.Fatalf("WriteTLV failed: %v", err)
 	}
+	// Flush pending deltas so windows are created in the buffer.
+	out.FlushPendingDeltas()
+	out.DrainDirty()
 	// Check window count
 	windows := out.windowBuffer.AllWindows()
 	if len(windows) != 2 {

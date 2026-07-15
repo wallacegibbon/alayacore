@@ -20,6 +20,7 @@ package terminal
 //   outputWriter.mu → sessionState.mu      (TagSystemMsg, exclusive with WindowBuffer)
 //
 // Bubble Tea goroutine call paths:
+//   outputWriter.mu → WindowBuffer.mu      (FlushPendingDeltas, exclusive with sessionState)
 //   WindowBuffer.mu  (via display update, tick — never nested with sessionState)
 //   sessionState.mu  (via snapshot methods — never nested with WindowBuffer)
 //
@@ -33,6 +34,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -59,6 +61,28 @@ type outputWriter struct {
 	activeUserWindowIdx int    // index into windowBuffer.windows, -1 = none
 	activeUserWindowID  string // window ID (for LookupID fallback)
 	pendingUserMaxID    uint64 // max history ID across all parts
+
+	// Pending delta coalescing — accumulates "At"/"Ar" and "Af" frames
+	// and flushes them to WindowBuffer in batches, reducing lock contention
+	// and WindowBuffer churn during high-speed streaming.
+	pendingTextDeltas map[string]*pendingTextDelta // key: windowID (historyID)
+	pendingToolDeltas map[string]*pendingToolDelta // key: toolCallID
+}
+
+// pendingTextDelta accumulates "At" / "Ar" frames for the same window.
+// Flushed as a single AppendOrUpdate call.
+type pendingTextDelta struct {
+	content    strings.Builder
+	historyID  uint64
+	displayTag string // "AT" or "AR" — used only if window doesn't exist yet
+}
+
+// pendingToolDelta accumulates "Af" frames for the same tool call.
+// Flushed as a single HandleToolInputDelta call.
+type pendingToolDelta struct {
+	content   strings.Builder
+	historyID uint64
+	toolName  string
 }
 
 func NewTerminalOutput(styles *Styles) *outputWriter { //nolint:revive // tests need access to internal methods
@@ -66,6 +90,8 @@ func NewTerminalOutput(styles *Styles) *outputWriter { //nolint:revive // tests 
 		windowBuffer:        NewWindowBuffer(DefaultWidth, styles),
 		status:              sessionState{mu: &sync.Mutex{}},
 		activeUserWindowIdx: -1,
+		pendingTextDeltas:   make(map[string]*pendingTextDelta),
+		pendingToolDeltas:   make(map[string]*pendingToolDelta),
 	}
 	to.styles.Store(styles)
 	return to
@@ -129,6 +155,13 @@ func (to *outputWriter) processBuffer() {
 func (to *outputWriter) writeColored(tag string, value string) {
 	to.triggerUpdateForTag(tag)
 
+	// Flush any pending deltas before processing a non-delta frame.
+	// This ensures the WindowBuffer reflects the latest accumulated content
+	// before authoritative frames (AT, AR, AF, UF, etc.) arrive.
+	if !isDeltaTag(tag) {
+		to.flushPendingDeltas()
+	}
+
 	// Flush pending user content before any non-user tag.
 	if to.activeUserWindowIdx >= 0 && !userTag(tag) {
 		to.flushUserContent()
@@ -136,7 +169,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 
 	switch tag {
 	// Streaming delta frames — incremental content appended to existing window.
-	// Use uppercase tag for styling (lowercase/uppercase share same display).
+	// Instead of writing directly to WindowBuffer, accumulate for coalescing.
 	case tlv.TagAssistantTDelta, tlv.TagAssistantRDelta:
 		id, content, ok := tlv.UnwrapID(value)
 		if !ok {
@@ -147,7 +180,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 		if tag == tlv.TagAssistantRDelta {
 			displayTag = tlv.TagAssistantR
 		}
-		to.windowBuffer.AppendOrUpdate(displayTag, id, content)
+		to.pendTextDelta(id, displayTag, content)
 
 	// Complete authoritative frames — content already delivered via deltas
 	// during live streaming, but carries the authoritative content during
@@ -226,7 +259,7 @@ func (to *outputWriter) writeColored(tag string, value string) {
 		if info := to.windowBuffer.GetFunctionInfo(fd.ID); info != nil {
 			name = info.Name
 		}
-		to.windowBuffer.HandleToolInputDelta(fd.ID, name, fd.Delta, parseHistoryID(id))
+		to.pendToolDelta(fd.ID, name, fd.Delta, parseHistoryID(id))
 
 	// Function result (JSON: id, content, is_error)
 	// Carries NUL-delimited historyID prefix
@@ -256,15 +289,95 @@ func (to *outputWriter) writeColored(tag string, value string) {
 
 // triggerUpdateForTag marks the display as dirty for tags that modify the display.
 //
+// Delta tags (At, Ar, Af) are NOT included — they only accumulate pending data
+// without modifying WindowBuffer. The dirty flag is set by flushPendingDeltas()
+// when accumulated deltas are actually written to WindowBuffer.
+//
 // TagSystemMsg is NOT listed here because handleSystemMsg() calls dirty.Store(true)
 // after processing, so it doesn't need the early dirty flag from this function.
 func (to *outputWriter) triggerUpdateForTag(tag string) {
 	switch tag {
 	case tlv.TagAssistantT, tlv.TagAssistantR, tlv.TagAssistantF,
-		tlv.TagAssistantTDelta, tlv.TagAssistantRDelta, tlv.TagAssistantFDelta,
 		tlv.TagUserT, tlv.TagUserF, tlv.TagUserI, tlv.TagUserV, tlv.TagUserA, tlv.TagUserD:
 		to.dirty.Store(true)
 	}
+}
+
+// isDeltaTag returns true for streaming delta TLV tags that should be coalesced.
+func isDeltaTag(tag string) bool {
+	return tag == tlv.TagAssistantTDelta || tag == tlv.TagAssistantRDelta || tag == tlv.TagAssistantFDelta
+}
+
+// pendTextDelta accumulates a text delta ("At" / "Ar") for coalescing.
+// Multiple deltas for the same window are merged into a single
+// AppendOrUpdate call when flushPendingDeltas is called.
+// Must be called under outputWriter.mu.
+func (to *outputWriter) pendTextDelta(id, displayTag, content string) {
+	pd, ok := to.pendingTextDeltas[id]
+	if !ok {
+		pd = &pendingTextDelta{displayTag: displayTag}
+		to.pendingTextDeltas[id] = pd
+	}
+	pd.content.WriteString(content)
+	// Track max history ID from the window ID string.
+	if hid, err := strconv.ParseUint(id, 10, 64); err == nil && hid > pd.historyID {
+		pd.historyID = hid
+	}
+}
+
+// pendToolDelta accumulates a tool input delta ("Af") for coalescing.
+// Multiple JSON argument fragments for the same tool call are merged
+// into a single HandleToolInputDelta call.
+// Must be called under outputWriter.mu.
+func (to *outputWriter) pendToolDelta(toolID, toolName, delta string, historyID uint64) {
+	pd, ok := to.pendingToolDeltas[toolID]
+	if !ok {
+		pd = &pendingToolDelta{toolName: toolName}
+		to.pendingToolDeltas[toolID] = pd
+	}
+	pd.content.WriteString(delta)
+	if historyID > pd.historyID {
+		pd.historyID = historyID
+	}
+}
+
+// flushPendingDeltas writes all accumulated delta frames to the WindowBuffer
+// as single batched calls. This reduces WindowBuffer.mu lock acquisitions,
+// markDirty calls, and incremental render updates during high-speed streaming.
+// Must be called under outputWriter.mu.
+func (to *outputWriter) flushPendingDeltas() {
+	if len(to.pendingTextDeltas) == 0 && len(to.pendingToolDeltas) == 0 {
+		return
+	}
+
+	// Flush text deltas — one AppendOrUpdate per window.
+	for id, pd := range to.pendingTextDeltas {
+		to.windowBuffer.AppendOrUpdate(pd.displayTag, id, pd.content.String())
+	}
+
+	// Flush tool deltas — one HandleToolInputDelta per tool call.
+	for toolID, pd := range to.pendingToolDeltas {
+		to.windowBuffer.HandleToolInputDelta(toolID, pd.toolName, pd.content.String(), pd.historyID)
+	}
+
+	// Allocate fresh maps to avoid retaining references and
+	// to provide clear GC boundaries for the builder strings.
+	to.pendingTextDeltas = make(map[string]*pendingTextDelta)
+	to.pendingToolDeltas = make(map[string]*pendingToolDelta)
+
+	to.dirty.Store(true)
+}
+
+// FlushPendingDeltas is the public, lock-safe version of flushPendingDeltas.
+// It flushes all accumulated delta frames to the WindowBuffer so the TUI
+// can render the latest content. Called from the TUI tick loop.
+//
+// writeColored calls the internal flushPendingDeltas directly since it
+// already holds outputWriter.mu.
+func (to *outputWriter) FlushPendingDeltas() {
+	to.mu.Lock()
+	to.flushPendingDeltas()
+	to.mu.Unlock()
 }
 
 // handleSystemMsg processes a TagSystemMsg frame.

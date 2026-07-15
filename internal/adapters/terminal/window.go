@@ -260,6 +260,15 @@ func (w *Window) RawTag() string {
 	return w.Tag()
 }
 
+// RawDelta returns the current tool delta buffer for testing.
+// Returns empty string for non-tool windows.
+func (w *Window) RawDelta() string {
+	if tr, ok := w.renderer.(*toolRenderer); ok {
+		return tr.deltaBuffer
+	}
+	return ""
+}
+
 // Render returns the window with border, using cache if valid.
 func (w *Window) Render(width int, isCursor bool, styles *Styles, borderStyle, cursorStyle lipgloss.Style) string {
 	// User messages use the same border color as focused input box

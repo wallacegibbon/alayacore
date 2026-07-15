@@ -445,6 +445,7 @@ func (m *Terminal) handleSessionLoadedMsg() (tea.Model, tea.Cmd) {
 	m.postLoading = true
 
 	// Drain any buffered output written during loading.
+	m.out.FlushPendingDeltas()
 	m.out.DrainDirty()
 
 	// Reset appliedTheme so the session's theme data (from sendThemeListMsg)
@@ -492,6 +493,10 @@ func (m *Terminal) handleSessionLoadingError(err error) (tea.Model, tea.Cmd) {
 // handleDisplayRefresh checks if the display needs updating and returns
 // a tea.Cmd for model selector updates if models changed.
 func (m *Terminal) handleDisplayRefresh() tea.Cmd {
+	// Flush pending deltas first so the WindowBuffer has the latest content
+	// before we check the dirty flag.
+	m.out.FlushPendingDeltas()
+
 	if !m.out.DrainDirty() {
 		m.updateStatus()
 		return nil
