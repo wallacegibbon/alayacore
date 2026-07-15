@@ -44,10 +44,10 @@ Every capability available to built-in adapters must be achievable through TLV f
 | adapter → agent (stdin) | `UT` | All commands (`:save`, `:cancel`, `:model_set`, etc.) |
 | adapter → agent (stdin) | `UI`/`UV`/`UA`/`UD` | Media input (image/video/audio/document) |
 | agent → adapter (stdout) | `UT`/`UI`/`UV`/`UA`/`UD` | User message echo (with assigned history ID) |
-| agent → adapter (stdout) | `AT`/`AR` | Assistant text/reasoning (complete/authoritative) |
-| agent → adapter (stdout) | `At`/`Ar` | Assistant text/reasoning (streaming deltas) |
+| agent → adapter (stdout) | `AT`/`AR` | Assistant text/reasoning (complete/authoritative; empty content if deltas preceded it) |
+| agent → adapter (stdout) | `At`/`Ar` | Assistant text/reasoning (streaming deltas; absent with `--no-delta`) |
 | agent → adapter (stdout) | `AF`/`UF` | Tool calls and results (JSON) |
-| agent → adapter (stdout) | `Af` | Tool call arguments (streaming delta, partial JSON) |
+| agent → adapter (stdout) | `Af` | Tool call arguments (streaming delta, partial JSON; absent with `--no-delta`) |
 | agent → adapter (stdout) | `SM` | System state — task, model, theme, reasoning, mcp, error, notify, tool_confirm, version |
 
 > **Note:** User tags (UT, UI, UV, UA, UD) flow in **both** directions.

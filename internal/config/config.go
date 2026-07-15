@@ -116,6 +116,9 @@ type Settings struct {
 	AutoSummarize bool
 	ToolConfirm   []string         // tool names requiring user confirmation
 	BuiltinTools  tools.ToolFilter // built-in tools to enable
+
+	// Delta streaming
+	NoDelta bool // If true, suppress delta frames (At, Ar, Af); use complete frames only
 }
 
 // Parse parses CLI flags and returns settings
@@ -150,6 +153,7 @@ func Parse() *Settings {
 	maxSteps := flag.Int("max-steps", DefaultMaxSteps, "Maximum agent loop steps (0 = no limit)")
 	autoSummarize := flag.Bool("auto-summarize", false, "Automatically summarize conversation when context exceeds 65% of limit")
 	toolConfirm := flag.String("tool-confirm", "", "Comma-separated tool `names` requiring user confirmation (e.g. execute_command,search_content)")
+	noDelta := flag.Bool("no-delta", false, "Disable delta frames (At, Ar, Af); use complete frames only")
 	flag.String("builtin-tools", "", "Comma-separated built-in tool `names` to enable (empty = no builtin tools, unspecified = all tools)")
 
 	flag.Parse()
@@ -195,6 +199,7 @@ func Parse() *Settings {
 		AutoSummarize: *autoSummarize,
 		ToolConfirm:   parseToolConfirm(*toolConfirm),
 		BuiltinTools:  builtinToolsFilter,
+		NoDelta:       *noDelta,
 	}
 
 	return s

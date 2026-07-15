@@ -166,6 +166,7 @@ type SessionConfig struct {
 	AutoSummarize bool
 	ProxyURL      string
 	NoTheme       bool // If true, skip all theme loading, detection, and broadcasting
+	NoDelta       bool // If true, suppress delta frames (At, Ar, Af); use complete frames only
 
 	// External dependencies
 	SkillsMgr *skills.Manager

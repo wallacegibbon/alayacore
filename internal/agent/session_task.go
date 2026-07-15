@@ -226,14 +226,28 @@ func (s *Session) handleToolOutput(toolCallID string, contents []llm.ContentPart
 }
 
 // handleTextComplete writes the complete authoritative text to the output.
+// When delta streaming is enabled (default), the content is empty — the
+// text was already delivered via At delta frames, so AT serves only as a
+// terminator/flush signal. When --no-delta is set, AT carries the full text.
 func (s *Session) handleTextComplete(text string, historyID uint64) error {
-	s.writeTLVWithID(tlv.TagAssistantT, historyID, text)
+	content := text
+	if !s.NoDelta {
+		content = "" // deltas already delivered the content
+	}
+	s.writeTLVWithID(tlv.TagAssistantT, historyID, content)
 	return nil
 }
 
 // handleReasoningComplete writes the complete authoritative reasoning to the output.
+// When delta streaming is enabled (default), the content is empty — the
+// reasoning was already delivered via Ar delta frames. When --no-delta is
+// set, AR carries the full reasoning text.
 func (s *Session) handleReasoningComplete(text string, historyID uint64) error {
-	s.writeTLVWithID(tlv.TagAssistantR, historyID, text)
+	content := text
+	if !s.NoDelta {
+		content = "" // deltas already delivered the content
+	}
+	s.writeTLVWithID(tlv.TagAssistantR, historyID, content)
 	return nil
 }
 
@@ -309,13 +323,10 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.ContentPart) 
 
 	dw := &deltaWriter{output: s.Output}
 
-	_, err := s.Agent().Stream(ctx, history, llm.StreamCallbacks{
-		OnTextDelta:         dw.handleTextDelta,
+	callbacks := llm.StreamCallbacks{
 		OnTextComplete:      s.handleTextComplete,
-		OnReasoningDelta:    dw.handleReasoningDelta,
 		OnReasoningComplete: s.handleReasoningComplete,
 		OnToolInputStart:    s.handleToolInputStart,
-		OnToolInputDelta:    dw.handleToolInputDelta,
 		OnToolInputComplete: s.handleToolInputComplete,
 		OnToolOutput:        s.handleToolOutput,
 		OnToolConfirm:       s.handleToolConfirm,
@@ -323,7 +334,18 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.ContentPart) 
 		OnStepStart:         s.handleStepStart,
 		OnStepFinish:        onStepFinish,
 		IDGen:               s.histIncAndGet,
-	})
+	}
+
+	if !s.NoDelta {
+		// Delta streaming enabled: register delta callbacks.
+		// AT/AR complete frames carry empty content (terminators only)
+		// since the content was already delivered via deltas.
+		callbacks.OnTextDelta = dw.handleTextDelta
+		callbacks.OnReasoningDelta = dw.handleReasoningDelta
+		callbacks.OnToolInputDelta = dw.handleToolInputDelta
+	}
+
+	_, err := s.Agent().Stream(ctx, history, callbacks)
 
 	if err != nil {
 		return fullContents, 0, err

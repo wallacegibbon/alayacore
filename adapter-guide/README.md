@@ -27,8 +27,8 @@ UE  → stdin   User message end — flushes staged content as a single message
 At  ← stdout  Assistant text (streaming delta: \x00<id>\x00<content>)
 Ar  ← stdout  Assistant reasoning (streaming delta: \x00<id>\x00<content>)
 Af  ← stdout  Function/tool argument (streaming delta: \x00<id>\x00<JSON>)
-AT  ← stdout  Assistant text (complete/authoritative: \x00<id>\x00<content>)
-AR  ← stdout  Assistant reasoning (complete/authoritative: \x00<id>\x00<content>)
+AT  ← stdout  Assistant text (complete/authoritative: \x00<id>\x00[content]; content empty if deltas preceded it)
+AR  ← stdout  Assistant reasoning (complete/authoritative: \x00<id>\x00[content]; content empty if deltas preceded it)
 AF  ← stdout  Function/tool lifecycle (\x00<id>\x00<JSON>)
 UF  ← stdout  Function/tool result (\x00<id>\x00<JSON>)
 SM  ← stdout  System message, no history ID (JSON: {"type":"...","data":{...}})
@@ -64,7 +64,7 @@ Each tag is two characters: **role** + **type**.
 **Case convention:** Uppercase tags carry complete/authoritative content.
 Lowercase tags carry streaming delta (incremental) content:
 - `At`/`Ar` — text/reasoning deltas, appended to the window per chunk
-- `AT`/`AR` — complete text/reasoning, sent after all deltas for that block (adapter may use this instead of or after accumulating deltas; useful for replay where no deltas precede it)
+- `AT`/`AR` — complete text/reasoning, sent after all deltas for that block (content is empty when deltas preceded it; carries full text during replay or `--no-delta` mode)
 - `Af` — tool argument delta, partial JSON chunk during streaming
 - `AF` — complete tool call (start + input frames)
 
@@ -112,6 +112,17 @@ choose either approach:
 
 During replay (session load) only the uppercase frames are sent; no deltas
 precede them — the adapter must use the uppercase frame to display the content.
+
+**`--no-delta` mode:** When the `--no-delta` flag is set, no lowercase delta
+frames (At, Ar, Af) are sent. Instead, the uppercase frames (AT, AR, AF)
+carry the complete content directly. This mode is useful for adapters that
+prefer batch delivery over streaming, or for environments where the overhead
+of many small frames is undesirable.
+
+| Mode | At/Ar | Af | AT/AR content | AF content |
+|------|-------|----|---------------|------------|
+| Default (deltas on) | Sent | Sent | Empty (terminator only) | Repaired JSON (always complete) |
+| `--no-delta` | Not sent | Not sent | Full text | Repaired JSON (always complete) |
 
 **History ID format:** a flat monotonic history counter (e.g. `1`, `2`, `3`).
 Each content block (text, reasoning, tool call, user content part) receives a
@@ -187,7 +198,7 @@ Session writes → stdout:       UT \x00 1 \x00 Read the file main.go        ←
                                AF \x00 2 \x00 {"id":"t1","input":{"path":"main.go"}}  ← complete args
                                UF \x00 3 \x00 {"id":"t1","output":[{"text":"package main...","type":"text"}]}
                                At \x00 4 \x00 Here's what main.go does...    ← streaming text delta
-                               AT \x00 4 \x00 Here's what main.go does...    ← authoritative complete
+                               AT \x00 4 \x00                                 ← authoritative complete (empty terminator)
                                SM {"type":"task","data":{"in_progress":false,"context":1500}}
 ```
 
@@ -448,8 +459,8 @@ At-hello.bin                   At \x00 1 \x00 Hello
 At-world.bin                   At \x00 1 \x00 world (same stream)
 At-new-step.bin                At \x00 2 \x00 Next step (new stream)
 Ar-thinking.bin                Ar \x00 3 \x00 thinking...
-AT-complete.bin                AT \x00 4 \x00 Here's what main.go does...
-AR-complete.bin                AR \x00 3 \x00 I need to read the file first...
+AT-complete.bin                AT \x00 4 \x00 Here's what main.go does...   (content varies by mode)
+AR-complete.bin                AR \x00 3 \x00 I need to read the file first... (content varies by mode)
 ```
 
 **stdout — tool frames (with history ID `\x00<id>\x00`, JSON `"id"` for matching):**

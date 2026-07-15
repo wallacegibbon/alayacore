@@ -57,6 +57,7 @@ func StartSession(cfg *Config, output io.Writer, input io.Reader) (*agentpkg.Ses
 		ToolConfirmTools:    cfg.ToolConfirmTools,
 		MCPInit:             cfg.MCPInit,
 		NoTheme:             cfg.Cfg.RawIO || cfg.Cfg.PlainIO,
+		NoDelta:             cfg.Cfg.NoDelta,
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to load session: %w", err)

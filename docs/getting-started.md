@@ -59,6 +59,7 @@ export ALAYACORE_SHELL=zsh
 | `--auto-summarize` | `false` | Automatically summarize when context exceeds 65% of `context_limit` |
 | `--tool-confirm` | *(none)* | Comma-separated tool `names` that require user confirmation before execution (e.g. `--tool-confirm execute_command,search_content`) |
 | `--builtin-tools` | *(all)* | Comma-separated built-in tool `names` to enable. Empty (`--builtin-tools=`) disables all built-in tools. Unspecified means all tools enabled. |
+| `--no-delta` | `false` | Disable delta frames (At, Ar, Af); use complete frames only. Reduces wire overhead when the adapter does not need streaming previews. |
 | `--rawio` | `false` | Raw TLV stdin/stdout mode — pipe TLV frames directly between agent and controlling process |
 | `--plainio` | `false` | Plain stdin/stdout mode — no TUI, for scripting and piping |
 | `--debug-api` | `false` | Write raw API requests and responses to a log file |

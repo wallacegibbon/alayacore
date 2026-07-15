@@ -10,8 +10,8 @@
 //   - UA: User audio
 //   - UD: User document
 //   - UE: User message end
-//   - AT: Assistant text (complete/authoritative)
-//   - AR: Assistant reasoning (complete/authoritative)
+//   - AT: Assistant text (complete/authoritative; empty if deltas preceded it)
+//   - AR: Assistant reasoning (complete/authoritative; empty if deltas preceded it)
 //   - AF: Assistant function / tool call (complete/authoritative)
 //   - UF: User function / tool result
 //   - SM: System message
@@ -20,6 +20,10 @@
 //   - At: Assistant text delta (streaming fragment)
 //   - Ar: Assistant reasoning delta (streaming fragment)
 //   - Af: Assistant function / tool call delta (partial JSON argument)
+//
+// AT/AR behavior varies by mode:
+//   - Default (deltas enabled): At/Ar carry content; AT/AR are empty terminators.
+//   - --no-delta mode: At/Ar are absent; AT/AR carry the full content.
 package tlv
 
 import (
