@@ -10,6 +10,21 @@ import (
 	"github.com/alayacore/alayacore/internal/tlv"
 )
 
+// loadMedia reads a media file and returns its TLV tag and data URI.
+func loadMedia(path string) (tag string, dataURI string, err error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", "", fmt.Errorf("read %s: %w", path, err)
+	}
+
+	mime := tlv.MimeTypeForPath(path)
+	b64 := base64.StdEncoding.EncodeToString(data)
+	dataURI = fmt.Sprintf("data:%s;base64,%s", mime, b64)
+	tag = tlv.TagForMIME(mime)
+
+	return tag, dataURI, nil
+}
+
 func main() {
 	if len(os.Args) < 3 {
 		fmt.Fprintf(os.Stderr, "usage: go run misc/gen_tlv_request.go <prompt> <media1> [media2 ...]\n")
@@ -19,16 +34,11 @@ func main() {
 	prompt := os.Args[1]
 
 	for _, mediaPath := range os.Args[2:] {
-		data, err := os.ReadFile(mediaPath)
+		tag, dataURI, err := loadMedia(mediaPath)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "read %s: %v\n", mediaPath, err)
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
-
-		mime := tlv.MimeTypeForPath(mediaPath)
-		b64 := base64.StdEncoding.EncodeToString(data)
-		dataURI := fmt.Sprintf("data:%s;base64,%s", mime, b64)
-		tag := tlv.TagForMIME(mime)
 
 		if _, err := os.Stdout.Write(tlv.EncodeTLV(tag, dataURI)); err != nil {
 			fmt.Fprintf(os.Stderr, "write: %v\n", err)
