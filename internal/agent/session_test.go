@@ -28,7 +28,7 @@ func (m *MockOutput) Write(p []byte) (int, error) {
 
 func TestSaveAndLoadSession(t *testing.T) {
 	tmpDir := t.TempDir()
-	sessionPath := filepath.Join(tmpDir, "test-session.md")
+	sessionPath := filepath.Join(tmpDir, "test-session.alaya")
 
 	// Create a minimal session for testing
 	session := &Session{
@@ -93,7 +93,7 @@ func TestLoadOrNewSession(t *testing.T) {
 	}
 
 	// Test manual save to a specific file
-	testFile := "/tmp/test-session.md"
+	testFile := "/tmp/test-session.alaya"
 	if err := session.saveContentToFile(testFile, session.Contents); err != nil {
 		t.Errorf("Failed to save session: %v", err)
 	}
@@ -119,7 +119,7 @@ func (m *mockOutput) Write(p []byte) (n int, err error) {
 
 func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 	tmpDir := t.TempDir()
-	sessionPath := filepath.Join(tmpDir, "test-messages.md")
+	sessionPath := filepath.Join(tmpDir, "test-messages.alaya")
 
 	// Create content parts simulating a realistic agent conversation:
 	// user → assistant(reasoning+text+toolcall) → tool(result) → assistant(reasoning+text)
@@ -213,7 +213,7 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 
 func TestMarkdownFormat_HumanReadable(t *testing.T) {
 	tmpDir := t.TempDir()
-	sessionPath := filepath.Join(tmpDir, "readable.md")
+	sessionPath := filepath.Join(tmpDir, "readable.alaya")
 
 	var id uint64
 	nextID := func() uint64 { id++; return id }
@@ -261,7 +261,7 @@ func TestMarkdownFormat_HumanReadable(t *testing.T) {
 
 func TestReasoningOnlyMessage(t *testing.T) {
 	tmpDir := t.TempDir()
-	sessionPath := filepath.Join(tmpDir, "reasoning-only.md")
+	sessionPath := filepath.Join(tmpDir, "reasoning-only.alaya")
 
 	var id uint64
 	nextID := func() uint64 { id++; return id }
@@ -314,7 +314,7 @@ func TestReasoningOnlyMessage(t *testing.T) {
 
 func TestTextAndReasoningInSameMessage(t *testing.T) {
 	tmpDir := t.TempDir()
-	sessionPath := filepath.Join(tmpDir, "text-and-reasoning.md")
+	sessionPath := filepath.Join(tmpDir, "text-and-reasoning.alaya")
 
 	var id uint64
 	nextID := func() uint64 { id++; return id }
@@ -634,7 +634,7 @@ func TestCleanIncompleteToolCalls(t *testing.T) {
 // session file content embedded in tool results (the recursion problem).
 func TestTLVFormatRecursionProtection(t *testing.T) {
 	tmpDir := t.TempDir()
-	sessionPath := filepath.Join(tmpDir, "recursion-test.md")
+	sessionPath := filepath.Join(tmpDir, "recursion-test.alaya")
 
 	var id uint64
 	nextID := func() uint64 { id++; return id }
@@ -643,7 +643,7 @@ func TestTLVFormatRecursionProtection(t *testing.T) {
 	contents := []llm.ContentPart{
 		&llm.TextPart{Text: "Read the session file", ContentPartMeta: llm.ContentPartMeta{HistoryID: nextID(), Role: llm.RoleUser}},
 		&llm.ToolInputPart{
-			ID: "call1", Name: "read_file", Input: json.RawMessage(`{"path": "old-session.md"}`),
+			ID: "call1", Name: "read_file", Input: json.RawMessage(`{"path": "old-session.alaya"}`),
 			ContentPartMeta: llm.ContentPartMeta{HistoryID: nextID(), Role: llm.RoleAssistant},
 		},
 		&llm.ToolOutputPart{
@@ -822,7 +822,7 @@ func TestLoadSessionVersionValid(t *testing.T) {
 // error when the session file has a non-matching version.
 func TestLoadOrNewSessionVersionMismatch(t *testing.T) {
 	tmpDir := t.TempDir()
-	sessionPath := filepath.Join(tmpDir, "old-session.md")
+	sessionPath := filepath.Join(tmpDir, "old-session.alaya")
 
 	// Write a session file with missing version
 	if err := os.WriteFile(sessionPath, []byte("---\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\n---\n"), 0600); err != nil {

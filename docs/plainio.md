@@ -67,13 +67,13 @@ tool calls, tool results) in key-value frontmatter + binary TLV format.
 
 ```sh
 # First prompt — creates the session file
-alayacore --plainio --session my-convo.md <<< "my name is Alice"
+alayacore --plainio --session my-convo.alaya <<< "my name is Alice"
 
 # Second prompt — loads the previous conversation, appends this turn
-alayacore --plainio --session my-convo.md <<< "what is my name?"
+alayacore --plainio --session my-convo.alaya <<< "what is my name?"
 
 # Third prompt — session now has 3 turns
-alayacore --plainio --session my-convo.md <<< "remember this fact: dogs are fluffy"
+alayacore --plainio --session my-convo.alaya <<< "remember this fact: dogs are fluffy"
 ```
 
 Since the session file contains binary TLV data after the key-value frontmatter, it is not human-readable as plain text. Use `tlvcat.go` (in `misc/`) to inspect the contents, or use the `--plainio` mode to replay the conversation.

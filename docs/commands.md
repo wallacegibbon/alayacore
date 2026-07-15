@@ -54,7 +54,7 @@ Some commands are handled directly by each adapter and never reach the session c
 The `:fork` command saves all session content from the beginning up to (and including) a specific history ID to a new file. This is useful for extracting a conversation segment into a standalone session file.
 
 ```
-:fork 42 ./extract.md
+:fork 42 ./extract.alaya
 ```
 
 In the TUI, you can also press `Ctrl+F` at a window to pre-fill the `:fork` command with that window's history ID.

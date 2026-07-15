@@ -24,7 +24,7 @@ To use other providers, edit the config file — press `Ctrl+L` then `e` in the 
 1. **Start a conversation** — Type a prompt and press `Enter`. The agent will stream a response.
 2. **Give it a task** — Try `"read main.go and explain what this project does"`. The agent will use the `read_file` tool (or `search_content` to find content first), then answer.
 3. **Switch models** — Press `Ctrl+L` to open the model selector. Press `e` to edit your config, `r` to reload, `Enter` to select.
-4. **Save your session** — Type `:save my-session.md` or press `Ctrl+S`.
+4. **Save your session** — Type `:save my-session.alaya` or press `Ctrl+S`.
 
 ## Cross-Platform Support
 
@@ -79,7 +79,7 @@ alayacore --config-path ./my-config
 alayacore --model "OpenAI GPT-4o"
 
 # Session persistence
-alayacore --session ~/sessions/refactor.md
+alayacore --session ~/sessions/refactor.alaya
 
 # Multiple skill directories
 alayacore --skill ./skills/weather --skill ./skills/pdf
