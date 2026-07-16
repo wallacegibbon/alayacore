@@ -295,12 +295,9 @@ func (r *toolRenderer) BuildInner(width int, _ bool, styles *Styles) (string, in
 		// Flatten delta to single line.
 		deltaContent = strings.ReplaceAll(deltaContent, "\n", " ")
 		deltaContent = strings.ReplaceAll(deltaContent, "\r", "")
-		// Truncate to fit available width (indicator + name + ": " + delta).
-		// Reserve ~5 chars for "• " and ": " and "…".
-		maxDelta := max(0, innerWidth-lipgloss.Width(r.name)-5)
-		if len(deltaContent) > maxDelta {
-			deltaContent = deltaContent[:maxDelta] + "…"
-		}
+		// Truncate to fit available width (indicator + ": " + tool name).
+		maxDelta := max(0, innerWidth-lipgloss.Width(r.name)-4)
+		deltaContent = truncateWithSuffix(deltaContent, maxDelta)
 		display := r.status.Indicator(styles) + styles.Tool.Render(r.name) + styles.ToolContent.Render(": "+deltaContent)
 		return display, strings.Count(display, "\n") + 1 + 2
 	}

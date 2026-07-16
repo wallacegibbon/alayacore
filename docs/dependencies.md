@@ -54,7 +54,7 @@ Handles width measurement, truncation, and line-breaking on **text that already 
 
 ```go
 func wrapContent(s string, width int) string {
-    s = ansi.Hardwrap(s, width, false)  // break lines at width
+    s = ansi.Hardwrap(s, width, true)  // hard-break at width
     // ...
 }
 ```
@@ -64,7 +64,7 @@ The input to `wrapContent` is Lip Gloss **rendered** output containing `\033[32m
 **② Confirmation dialog (`confirm_dialog.go`)**
 
 ```go
-wrapped := ansi.Hardwrap(styled, innerWidth, false)
+wrapped := ansi.Hardwrap(styled, innerWidth, true)
 line = ansi.Truncate(line, limit, "")
 ```
 
@@ -82,7 +82,7 @@ The text here is **plain text** (user input, no ANSI codes). It reuses the proje
 
 | Scenario | `ansi` | `runewidth` |
 |----------|--------|-------------|
-| `Hardwrap("\033[32mHello\033[0m", 3, false)` | `"\033[32mHel\nlo\033[0m"` ✅ | `"\033[32mHel"` ❌ (counts ANSI as visible width) |
+| `Hardwrap("\033[32mHello\033[0m", 3, true)` | `"\033[32mHel\nlo\033[0m"` ✅ | `"\033[32mHel"` ❌ (counts ANSI as visible width) |
 | `Truncate("\033[32mHello\033[0m", 3, "")` | `"\033[32mHel\033[0m"` ✅ | `"\033[32mH"` ❌ (truncates mid-ANSI) |
 | `StringWidth("\033[32mHello\033[0m")` | `5` ✅ | `16` ❌ (counts ANSI bytes) |
 

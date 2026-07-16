@@ -32,6 +32,46 @@ func TestWrapLines(t *testing.T) {
 	}
 }
 
+func TestTruncateWithSuffix(t *testing.T) {
+	tests := []struct {
+		name     string
+		content  string
+		maxWidth int
+		want     string
+	}{
+		// Zero and negative width
+		{"zero width", "hello", 0, ""},
+		{"negative width", "hello", -1, ""},
+
+		// Content fits without truncation
+		{"fits exactly", "abc", 3, "abc"},
+		{"fits with room", "a", 5, "a"},
+		{"empty content", "", 5, ""},
+
+		// maxWidth = 1
+		{"single char fits", "a", 1, "a"},
+		{"single char truncated", "ab", 1, "\u2026"},
+		{"single char truncated long", "abcdef", 1, "\u2026"},
+
+		// Normal truncation with …
+		{"truncate short", "abcd", 3, "ab\u2026"},
+		{"truncate longer", "hello world", 5, "hell\u2026"},
+		{"truncate exactly at boundary", "abcdef", 5, "abcd\u2026"},
+
+		// Exact boundary behavior
+		{"exact fit no truncation", "hello", 5, "hello"},
+		{"one over", "hello!", 5, "hell\u2026"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := truncateWithSuffix(tt.content, tt.maxWidth)
+			if got != tt.want {
+				t.Errorf("truncateWithSuffix(%q, %d) = %q, want %q", tt.content, tt.maxWidth, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestIncrementalWrap(t *testing.T) {
 	width := 80
 

@@ -501,8 +501,6 @@ func (ms *ModelSelector) renderModelRow(i, idWidth, nameMaxWidth, ctxColWidth, p
 	return ms.Styles.System.Render(line)
 }
 
-// truncateWithSuffix truncates content to fit within maxWidth, using a
-// progressively shorter suffix as space shrinks: "...", "..", ".", or just "."
 // formatContextLimit formats a context limit (in tokens) as a human-readable
 // size string like "256KB", "1MB", or "∞" for unlimited (0).
 func formatContextLimit(n int64) string {

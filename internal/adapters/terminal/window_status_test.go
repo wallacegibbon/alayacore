@@ -193,7 +193,7 @@ func TestToolRendererDeltaTruncation(t *testing.T) {
 			toolName:  "cat",
 			delta:     `{"path":"/tmp/foo"}`,
 			wantLines: 3,
-			wantTrim:  true,
+			wantTrim:  false, // no room for delta after "• cat: " (7 cols) in innerWidth=6
 		},
 	}
 

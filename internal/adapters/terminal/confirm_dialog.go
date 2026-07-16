@@ -22,7 +22,7 @@ import (
 // ConfirmContentRows defines the fixed number of content lines inside
 // the confirm dialog border. Matches SelectorListRows (8) used by
 // ModelSelector, ModelSelector, ThemeSelector, and HelpWindow.
-// If content exceeds this, it gets truncated with a "..." indicator —
+// If content exceeds this, it gets truncated with a "…" indicator —
 // same pattern used by ModelSelector for items.
 const ConfirmContentRows = 8
 
@@ -197,7 +197,7 @@ func (cd *ConfirmDialog) OpenTool(toolID, toolName, toolInput string) {
 	cd.toolInput = toolInput
 	// Derive description from tool input (up to 2 line-break segments).
 	// HardWrap in buildContentLines handles wrapping long lines, and the
-	// 2-row cap with "..." handles overflow beyond 2 rows.
+	// 2-row cap with "…" handles overflow beyond 2 rows.
 	// Strip the redundant "toolName: " prefix since it's already shown in the title.
 	parts := strings.SplitN(toolInput, "\n", 2)
 	desc := strings.Join(parts, "\n")
@@ -206,7 +206,7 @@ func (cd *ConfirmDialog) OpenTool(toolID, toolName, toolInput string) {
 	}
 	// Strip trailing newline — FormatCall adds one for display window layout,
 	// but in the confirm dialog it creates a spurious empty line that triggers
-	// the 2-row "..." truncation prematurely.
+	// the 2-row "…" truncation prematurely.
 	desc = strings.TrimRight(desc, "\n")
 	cd.Description = desc
 	cd.confirmed = false
@@ -352,7 +352,7 @@ func (cd *ConfirmDialog) View() tea.View {
 //	[y / n]  [trailing empty]
 //
 // The description always occupies exactly 2 rows. If the text is shorter, the
-// second row is empty. If it wraps beyond 2 rows, it's truncated with "...".
+// second row is empty. If it wraps beyond 2 rows, it's truncated with "…".
 func (cd *ConfirmDialog) buildContentLines() []string {
 	innerWidth := max(0, cd.Width-BorderInnerPadding)
 	maxBodyLines := max(0, ConfirmContentRows-2)
@@ -425,7 +425,7 @@ func (cd *ConfirmDialog) buildTitleText() string {
 }
 
 // renderTitleLine hard-wraps the styled title, takes only 1 row.
-// If it overflows, truncates and appends "...", then centers it.
+// If it overflows, truncates with "…", then centers it.
 func (cd *ConfirmDialog) renderTitleLine(titleText string, innerWidth int) string {
 	styled := cd.styles.Confirm.Render(titleText)
 	wrapped := wrapContent(styled, innerWidth)
@@ -433,11 +433,7 @@ func (cd *ConfirmDialog) renderTitleLine(titleText string, innerWidth int) strin
 
 	line := lines[0]
 	if len(lines) > 1 {
-		limit := max(0, innerWidth-3)
-		if ansi.StringWidth(line) > limit {
-			line = ansi.Truncate(line, limit, "")
-		}
-		line += "..."
+		line = truncateWithSuffix(line, innerWidth)
 	}
 
 	w := lipgloss.Width(line)
@@ -446,20 +442,16 @@ func (cd *ConfirmDialog) renderTitleLine(titleText string, innerWidth int) strin
 }
 
 // renderDescriptionRows hard-wraps the description, takes at most 2 rows.
-// If it overflows, the second row is truncated with "...". Returns 2
+// If it overflows, the second row is truncated with "…". Returns 2
 // centered, styled strings suitable for appending to the body.
 func (cd *ConfirmDialog) renderDescriptionRows(innerWidth int) []string {
-	rawWrapped := ansi.Hardwrap(cd.Description, innerWidth, false)
+	rawWrapped := ansi.Hardwrap(cd.Description, innerWidth, true)
 	rawLines := strings.Split(rawWrapped, "\n")
 
 	rawDesc := rawLines
 	if len(rawDesc) > 2 {
 		rawDesc = rawDesc[:2]
-		limit := max(0, innerWidth-3)
-		if ansi.StringWidth(rawDesc[1]) > limit {
-			rawDesc[1] = ansi.Truncate(rawDesc[1], limit, "")
-		}
-		rawDesc[1] += "..."
+		rawDesc[1] = truncateWithSuffix(rawDesc[1], innerWidth)
 	}
 	for len(rawDesc) < 2 {
 		rawDesc = append(rawDesc, "")

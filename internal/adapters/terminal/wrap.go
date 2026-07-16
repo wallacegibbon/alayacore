@@ -3,7 +3,7 @@ package terminal
 // Line wrapping and truncation utilities for window content rendering.
 // These functions handle wrapping styled content at display width
 // boundaries while preserving ANSI styles across line breaks, and
-// display-width-aware truncation with progressive suffix degradation.
+// display-width-aware truncation with a "…" suffix.
 //
 // Used by Window.renderer.BuildInner, tool.go
 // (RenderDiffContent), model_selector.go, help_window.go,
@@ -26,7 +26,7 @@ func wrapContent(s string, width int) string {
 		return s
 	}
 	// Step 1: hard-wrap at character boundaries (like a terminal)
-	s = ansi.Hardwrap(s, width, false)
+	s = ansi.Hardwrap(s, width, true)
 	// Step 2: re-apply ANSI styles after each inserted newline
 	var buf bytes.Buffer
 	w := lipgloss.NewWrapWriter(&buf)
@@ -131,31 +131,23 @@ func wrapLabels(labels []string, width int, style lipgloss.Style) string {
 	return strings.Join(lines, "\n")
 }
 
-// truncateWithSuffix truncates content to fit within maxWidth, using a
-// progressively shorter suffix as space shrinks: "...", "..", ".", or just "."
-// for a single character — indicating content exists but is too narrow.
+// truncateWithSuffix truncates content to fit within maxWidth, appending "…"
+// to indicate content has been cut. The result is guaranteed to be at most
+// maxWidth display columns wide.
 func truncateWithSuffix(content string, maxWidth int) string {
 	if maxWidth <= 0 {
 		return ""
 	}
-	if maxWidth == 1 {
-		return "."
-	}
-	truncated := ansi.Hardwrap(content, maxWidth, false)
+
+	truncated := ansi.Hardwrap(content, maxWidth, true)
 	if truncated == content {
 		return content
 	}
 
-	var suffix string
-	switch {
-	case maxWidth >= 4:
-		suffix = "..."
-	case maxWidth == 3:
-		suffix = ".."
-	case maxWidth == 2:
-		suffix = "."
+	if maxWidth == 1 {
+		return "…"
 	}
 
-	inner := ansi.Hardwrap(content, max(1, maxWidth-lipgloss.Width(suffix)), false)
-	return strings.SplitN(inner, "\n", 2)[0] + suffix
+	inner := ansi.Hardwrap(content, maxWidth-1, true)
+	return strings.SplitN(inner, "\n", 2)[0] + "…"
 }

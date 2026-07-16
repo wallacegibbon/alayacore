@@ -287,14 +287,13 @@ func (aw *AttachmentWindow) handleListKeys(key string) {
 
 // navigateByPath treats the input as a path and navigates accordingly.
 //
-// Rule: the last "/"-separated segment is the file filter, everything before
-// it is the directory. If input ends with "/", the whole path is the directory
-// (show all files).
+// Rule: the last "/"-separated segment is the file filter, everything before it is the directory.
+// If input ends with "/", the whole path is the directory (show all files).
 //
 // Three kinds of paths:
 //
 //	Absolute (starts with "/"):      /etc       → dir="/", file="etc"
-//	                               /etc/ssl   → dir="/etc", file="ssl"
+//	                                 /etc/ssl   → dir="/etc", file="ssl"
 //	Home-relative (starts with "~"): ~/.ala     → dir="~", file=".ala"
 //	                                 ~/.ala/    → dir="~/.ala"
 //	Relative (contains "/" or ".."): subdir/    → dir="./subdir"
@@ -431,49 +430,12 @@ func (aw *AttachmentWindow) render() string {
 	sb.WriteString(searchBox)
 	sb.WriteString("\n")
 
-	switch aw.mode {
-	case modeURL:
-		hint := aw.Styles.System.Render("  Enter a URL to attach (e.g. https://example.com/image.jpg)")
-		sb.WriteString(hint)
-		sb.WriteString("\n")
-	default:
-		sb.WriteString(aw.Styles.System.Render(aw.currentDir))
-		sb.WriteString("\n")
+	boxWidth := lipgloss.Width(searchBox)
 
-		boxWidth := lipgloss.Width(searchBox)
-		listBorderColor := aw.ListBorderColor()
-		listHeight := SelectorListRows
-		innerWidth := max(0, boxWidth-BorderInnerPadding)
-
-		var content strings.Builder
-		switch {
-		case len(aw.entries) == 0:
-			content.WriteString(aw.Styles.System.Render("Directory is empty."))
-		default:
-			aw.EnsureVisible()
-			for i := aw.ScrollIdx; i < min(aw.ScrollIdx+listHeight, len(aw.filtered)); i++ {
-				e := aw.filtered[i]
-				isSelected := i == aw.SelectedIdx
-
-				name := e.name
-				if e.isDir {
-					name += "/"
-				}
-
-				truncated := truncateWithSuffix(name, max(1, innerWidth-2))
-				if isSelected {
-					content.WriteString(aw.Styles.Prompt.Render("> ") + aw.Styles.Text.Render(truncated))
-				} else {
-					content.WriteString(aw.Styles.System.Render("  " + truncated))
-				}
-				if i < min(aw.ScrollIdx+listHeight, len(aw.filtered))-1 {
-					content.WriteString("\n")
-				}
-			}
-		}
-
-		fileBox := aw.Styles.RenderBorderedBox(content.String(), boxWidth, listBorderColor, listHeight)
-		sb.WriteString(fileBox)
+	if aw.mode == modeURL {
+		aw.renderURLBody(&sb)
+	} else {
+		aw.renderLocalBody(&sb, boxWidth)
 	}
 
 	// Help bar
@@ -488,18 +450,50 @@ func (aw *AttachmentWindow) render() string {
 		help = "  tab: search | j/k: navigate | enter: add file | enter on dir: browse | ctrl+a: switch to URL | esc: close"
 	}
 	sb.WriteString("\n")
-	sb.WriteString(helpStyle.Render(fmt.Sprintf("%-*s", boxWidthFrom(searchBox), help)))
+	sb.WriteString(helpStyle.Render(fmt.Sprintf("%-*s", boxWidth, help)))
 
 	return sb.String()
 }
 
-// boxWidthFrom returns the display width of a bordered box string.
-func boxWidthFrom(boxStr string) int {
-	lines := strings.Split(boxStr, "\n")
-	if len(lines) > 0 {
-		return lipgloss.Width(lines[0])
+// renderURLBody renders the URL mode body — just a hint line.
+func (aw *AttachmentWindow) renderURLBody(sb *strings.Builder) {
+	sb.WriteString(aw.Styles.System.Render("  Enter a URL to attach (e.g. https://example.com/image.jpg)"))
+	sb.WriteString("\n")
+}
+
+// renderLocalBody renders the local file browser body — directory path and file list.
+func (aw *AttachmentWindow) renderLocalBody(sb *strings.Builder, boxWidth int) {
+	sb.WriteString(aw.Styles.System.Render(aw.currentDir))
+	sb.WriteString("\n")
+
+	listBorderColor := aw.ListBorderColor()
+	listHeight := SelectorListRows
+	innerWidth := max(0, boxWidth-BorderInnerPadding)
+
+	var content strings.Builder
+	aw.EnsureVisible()
+	for i := aw.ScrollIdx; i < min(aw.ScrollIdx+listHeight, len(aw.filtered)); i++ {
+		e := aw.filtered[i]
+		isSelected := i == aw.SelectedIdx
+
+		name := e.name
+		if e.isDir {
+			name += "/"
+		}
+
+		truncated := truncateWithSuffix(name, max(1, innerWidth-2))
+		if isSelected {
+			content.WriteString(aw.Styles.Prompt.Render("> ") + aw.Styles.Text.Render(truncated))
+		} else {
+			content.WriteString(aw.Styles.System.Render("  " + truncated))
+		}
+		if i < min(aw.ScrollIdx+listHeight, len(aw.filtered))-1 {
+			content.WriteString("\n")
+		}
 	}
-	return 0
+
+	fileBox := aw.Styles.RenderBorderedBox(content.String(), boxWidth, listBorderColor, listHeight)
+	sb.WriteString(fileBox)
 }
 
 // RenderOverlay renders the attachment window on top of base content.
