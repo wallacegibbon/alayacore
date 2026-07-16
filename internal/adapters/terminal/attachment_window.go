@@ -39,8 +39,9 @@ type AttachmentWindow struct {
 
 // fileEntry represents a single file system entry.
 type fileEntry struct {
-	name  string
-	isDir bool
+	name      string
+	nameLower string // pre-computed lowercase of name, for filtering
+	isDir     bool
 }
 
 // NewAttachmentWindow creates a new attachment picker.
@@ -98,12 +99,14 @@ func (aw *AttachmentWindow) readDir(dir string) []fileEntry {
 	}
 	result := []fileEntry{}
 	if dir != "/" {
-		result = append(result, fileEntry{name: "..", isDir: true})
+		result = append(result, fileEntry{name: "..", nameLower: "..", isDir: true})
 	}
 	for _, e := range entries {
+		name := e.Name()
 		result = append(result, fileEntry{
-			name:  e.Name(),
-			isDir: e.IsDir(),
+			name:      name,
+			nameLower: strings.ToLower(name),
+			isDir:     e.IsDir(),
 		})
 	}
 	return result
@@ -384,7 +387,7 @@ func (aw *AttachmentWindow) updateFiltered() {
 		term := strings.ToLower(search)
 		aw.filtered = aw.filtered[:0]
 		for _, e := range aw.entries {
-			if FuzzyMatch(term, strings.ToLower(e.name)) {
+			if FuzzyMatch(term, e.nameLower) {
 				aw.filtered = append(aw.filtered, e)
 			}
 		}
