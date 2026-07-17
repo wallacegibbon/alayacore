@@ -20,7 +20,7 @@ import (
 type EditorAction int
 
 const (
-	EditorActionNone   EditorAction = iota // e.g. display viewing — no side effects
+	EditorActionNone        EditorAction = iota // e.g. display viewing — no side effects
 	EditorActionUpdateInput                     // update input field with editor content
 )
 

@@ -50,6 +50,8 @@ func (m DisplayModel) Init() tea.Cmd { return nil }
 // Update handles key messages for display navigation and cursor movement.
 // Only pure display operations are handled here; cross-component actions
 // (e.g. switching focus, opening editor) are handled by Terminal.
+//
+//nolint:gocyclo
 func (m DisplayModel) Update(msg tea.Msg) (DisplayModel, tea.Cmd) {
 	keyMsg, ok := msg.(tea.KeyMsg)
 	if !ok {
