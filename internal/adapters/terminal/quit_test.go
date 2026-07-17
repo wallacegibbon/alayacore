@@ -16,6 +16,7 @@ func TestQuitCommandRequiresConfirm(t *testing.T) {
 	msg := tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter})
 
 	model, cmd := terminal.Update(msg)
+	terminal = model.(Terminal)
 
 	// Should return a model and no command (just shows dialog)
 	if model == nil {
@@ -47,7 +48,7 @@ func TestQuitCommandCanceledClearsInput(t *testing.T) {
 	// Press Enter to submit the command
 	terminal.focusInput()
 	msg := tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter})
-	terminal.Update(msg)
+	model, _ := terminal.Update(msg); terminal = model.(Terminal)
 
 	// Verify dialog is shown
 	if !terminal.overlays.ConfirmOverlay().IsOpen() {
@@ -59,7 +60,7 @@ func TestQuitCommandCanceledClearsInput(t *testing.T) {
 
 	// Press 'n' to cancel
 	msg = tea.KeyPressMsg(tea.Key{Code: 'n'})
-	terminal.Update(msg)
+	model, _ = terminal.Update(msg); terminal = model.(Terminal)
 
 	// Input should be cleared after canceling the dialog
 	if terminal.input.Value() != "" {
@@ -79,7 +80,7 @@ func TestQuitCommandEscapeCancels(t *testing.T) {
 	// Press Enter to submit the command
 	terminal.focusInput()
 	msg := tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter})
-	terminal.Update(msg)
+	model, _ := terminal.Update(msg); terminal = model.(Terminal)
 
 	// Verify dialog is shown
 	if !terminal.overlays.ConfirmOverlay().IsOpen() {
@@ -91,7 +92,7 @@ func TestQuitCommandEscapeCancels(t *testing.T) {
 
 	// Press Escape to cancel
 	msg = tea.KeyPressMsg(tea.Key{Code: tea.KeyEscape})
-	terminal.Update(msg)
+	model, _ = terminal.Update(msg); terminal = model.(Terminal)
 
 	// Input should be cleared after canceling the dialog
 	if terminal.input.Value() != "" {
@@ -111,7 +112,7 @@ func TestQuitCommandConfirmed(t *testing.T) {
 	// Press Enter to submit the command
 	terminal.focusInput()
 	msg := tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter})
-	terminal.Update(msg)
+	model, _ := terminal.Update(msg); terminal = model.(Terminal)
 
 	// Verify dialog is shown
 	if !terminal.overlays.ConfirmOverlay().IsOpen() {
@@ -124,6 +125,7 @@ func TestQuitCommandConfirmed(t *testing.T) {
 	// Press 'y' to confirm
 	msg = tea.KeyPressMsg(tea.Key{Code: 'y'})
 	model, cmd := terminal.Update(msg)
+	terminal = model.(Terminal)
 
 	// Should return quit command
 	if model == nil {
@@ -149,6 +151,7 @@ func TestFullQuitCommandRequiresConfirm(t *testing.T) {
 	msg := tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter})
 
 	model, cmd := terminal.Update(msg)
+	terminal = model.(Terminal)
 
 	// Should return a model and no command (just shows dialog)
 	if model == nil {

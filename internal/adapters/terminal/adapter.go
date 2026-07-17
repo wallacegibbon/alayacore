@@ -79,7 +79,7 @@ func (a *Adapter) Start() int {
 
 	// If the session failed to load asynchronously, report the error now
 	// that the terminal is back in cooked mode.
-	if term, ok := finalModel.(*Terminal); ok && term.loadingError != nil {
+	if term, ok := finalModel.(Terminal); ok && term.loadingError != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", term.loadingError)
 		return 1
 	}

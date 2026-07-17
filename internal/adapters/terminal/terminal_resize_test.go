@@ -35,7 +35,7 @@ func TestTerminalResizeCursorValidation(t *testing.T) {
 	}
 
 	model, _ := terminal.Update(resizeMsg)
-	terminal, ok := model.(*Terminal)
+	terminal, ok := model.(Terminal)
 	if !ok {
 		t.Fatalf("Expected *Terminal, got %T", model)
 	}
@@ -68,7 +68,7 @@ func TestTerminalResizeClampsCursor(t *testing.T) {
 	}
 
 	model, _ := terminal.Update(resizeMsg)
-	terminal, ok := model.(*Terminal)
+	terminal, ok := model.(Terminal)
 	if !ok {
 		t.Fatalf("Expected *Terminal, got %T", model)
 	}
@@ -109,7 +109,7 @@ func TestTerminalResizeUpdatesDisplayContent(t *testing.T) {
 	}
 
 	model, _ := terminal.Update(resizeMsg)
-	terminal, ok := model.(*Terminal)
+	terminal, ok := model.(Terminal)
 	if !ok {
 		t.Fatalf("Expected *Terminal, got %T", model)
 	}

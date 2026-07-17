@@ -215,7 +215,7 @@ func NewTerminalWithTheme(
 	theme *theme.Theme,
 	themeManager *ThemeManager,
 	themeName string,
-) *Terminal {
+) Terminal {
 	styles := NewStyles(theme)
 
 	editor := NewEditor()
@@ -228,7 +228,7 @@ func NewTerminalWithTheme(
 	attachmentWindow := NewAttachmentWindow(styles)
 	overlays := NewOverlayManager(modelSelector, themeSelector, helpWindow, confirmOverlay, mcpInitOverlay, attachmentWindow, styles)
 
-	m := &Terminal{
+	m := Terminal{
 		out:          out,
 		streamInput:  inputWriter,
 		appConfig:    appCfg,
@@ -257,7 +257,7 @@ func NewTerminalWithTheme(
 
 // Init starts the periodic tick loop for processing session updates.
 // When loading is true, it also kicks off async session loading.
-func (m *Terminal) Init() tea.Cmd {
+func (m Terminal) Init() tea.Cmd {
 	// Display any buffered init errors from initialization
 	if m.themeManager != nil {
 		if errs := m.themeManager.GetInitErrors(); len(errs) > 0 {
@@ -301,7 +301,7 @@ func (m *Terminal) loadSessionCmd() tea.Cmd {
 //  4. Editor messages - external editor completion
 //  5. Focus/Blur - application focus changes
 //  6. Paste - clipboard paste
-func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Loading message handling — these take priority during startup.
 	switch msg := msg.(type) {
 	case sessionLoadedMsg:
@@ -359,7 +359,7 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 type tickMsg struct{}
 
 // handleWindowSize handles terminal resize events.
-func (m *Terminal) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
+func (m *Terminal) handleWindowSize(msg tea.WindowSizeMsg) (Terminal, tea.Cmd) {
 	m.windowWidth = msg.Width
 	m.windowHeight = msg.Height
 
@@ -386,15 +386,15 @@ func (m *Terminal) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 	// Re-render display content with new width (windowBuffer was marked dirty by SetWindowWidth)
 	m.display = m.display.updateContent()
 
-	return m, nil
+	return *m, nil
 }
 
 // handleTick processes periodic updates for display and model switching.
-func (m *Terminal) handleTick() (tea.Model, tea.Cmd) {
+func (m *Terminal) handleTick() (Terminal, tea.Cmd) {
 	// During async loading, the only periodic task is to re-render the
 	// loading screen (spinner animation). Skip all session-driven updates.
 	if m.loading {
-		return m, tea.Tick(TickInterval, func(_ time.Time) tea.Msg {
+		return *m, tea.Tick(TickInterval, func(_ time.Time) tea.Msg {
 			return tickMsg{}
 		})
 	}
@@ -411,7 +411,7 @@ func (m *Terminal) handleTick() (tea.Model, tea.Cmd) {
 	}
 
 	cmd := m.handleDisplayRefresh()
-	return m, tea.Batch(
+	return *m, tea.Batch(
 		tea.Tick(TickInterval, func(_ time.Time) tea.Msg {
 			return tickMsg{}
 		}),
@@ -445,7 +445,7 @@ func (m *Terminal) handleMCPOverlays() {
 // It transitions the UI from the loading spinner to the normal TUI view,
 // applying the loaded theme, populating the model selector, and preparing
 // for MCP initialization if needed.
-func (m *Terminal) handleSessionLoadedMsg() (tea.Model, tea.Cmd) {
+func (m *Terminal) handleSessionLoadedMsg() (Terminal, tea.Cmd) {
 	m.loading = false
 	m.postLoading = true
 
@@ -485,16 +485,16 @@ func (m *Terminal) handleSessionLoadedMsg() (tea.Model, tea.Cmd) {
 
 	ms, cmd := m.overlays.ModelSelector().LoadModels(modelSnap.Models, modelSnap.ActiveID)
 	m.overlays.SetModelSelector(ms)
-	return m, cmd
+	return *m, cmd
 }
 
 // handleSessionLoadingError is called when the async session loading fails.
 // It transitions the UI to a quitting state with the error recorded.
-func (m *Terminal) handleSessionLoadingError(err error) (tea.Model, tea.Cmd) {
+func (m *Terminal) handleSessionLoadingError(err error) (Terminal, tea.Cmd) {
 	m.loading = false
 	m.loadingError = err
 	m.quitting = true
-	return m, tea.Quit
+	return *m, tea.Quit
 }
 
 // handleDisplayRefresh checks if the display needs updating and returns
@@ -530,16 +530,16 @@ func (m *Terminal) handleDisplayRefresh() tea.Cmd {
 //   - EditorActionNone:          view-only (display), no side effects
 //   - EditorActionSubmit:        submit content as user input
 //   - EditorActionReloadConfig:  reload configuration after file edit
-func (m *Terminal) handleEditorFinished(msg EditorFinishedMsg) (tea.Model, tea.Cmd) {
+func (m *Terminal) handleEditorFinished(msg EditorFinishedMsg) (Terminal, tea.Cmd) {
 	if msg.Err != nil {
 		m.out.WriteError("Editor error: %v", msg.Err)
-		return m, nil
+		return *m, nil
 	}
 
 	switch msg.Action {
 	case EditorActionNone:
 		// View-only (display window viewing) — nothing to do
-		return m, nil
+		return *m, nil
 
 	case EditorActionSubmit:
 		if msg.Content != "" {
@@ -549,16 +549,16 @@ func (m *Terminal) handleEditorFinished(msg EditorFinishedMsg) (tea.Model, tea.C
 			m.input = m.input.CursorEnd()
 			m.focusInput()
 		}
-		return m, nil
+		return *m, nil
 
 	case EditorActionReloadConfig:
 		if msg.FileType == "model_config" {
 			m.emitCommand(":model_load")
 		}
-		return m, nil
+		return *m, nil
 
 	default:
-		return m, nil
+		return *m, nil
 	}
 }
 
@@ -593,7 +593,7 @@ func (m *Terminal) syncThemeFromSession(sessionTheme string, themeData *theme.Th
 }
 
 // View renders the complete terminal UI.
-func (m *Terminal) View() tea.View {
+func (m Terminal) View() tea.View {
 	// Loading screen: shown while the session is being loaded asynchronously.
 	if m.loading {
 		return m.renderLoadingView()

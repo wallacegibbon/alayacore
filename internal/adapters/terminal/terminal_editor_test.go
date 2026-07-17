@@ -26,6 +26,7 @@ func TestCtrlOOpensEditor(t *testing.T) {
 	})
 
 	model, cmd := terminal.Update(msg)
+	terminal = model.(Terminal)
 
 	if model == nil {
 		t.Fatal("Update returned nil model")
@@ -46,6 +47,7 @@ func TestCtrlOWithExistingContent(t *testing.T) {
 	})
 
 	model, cmd := terminal.Update(msg)
+	terminal = model.(Terminal)
 
 	if model == nil {
 		t.Fatal("Update returned nil model")
@@ -70,6 +72,7 @@ func TestEditorFinishedMsg(t *testing.T) {
 	}
 
 	model, _ := terminal.Update(msg)
+	terminal = model.(Terminal)
 
 	if model == nil {
 		t.Fatal("Update returned nil model")
@@ -91,6 +94,7 @@ func TestEditorFinishedMsgWithWhitespace(t *testing.T) {
 	}
 
 	model, _ := terminal.Update(msg)
+	terminal = model.(Terminal)
 
 	if model == nil {
 		t.Fatal("Update returned nil model")
@@ -112,6 +116,7 @@ func TestEditorFinishedMsgWithMultipleTrailingNewlines(t *testing.T) {
 	}
 
 	model, _ := terminal.Update(msg)
+	terminal = model.(Terminal)
 
 	if model == nil {
 		t.Fatal("Update returned nil model")
@@ -133,6 +138,7 @@ func TestEditorFinishedMsgMultiline(t *testing.T) {
 	}
 
 	model, _ := terminal.Update(msg)
+	terminal = model.(Terminal)
 
 	if model == nil {
 		t.Fatal("Update returned nil model")
@@ -155,6 +161,7 @@ func TestEditorFinishedMsgWithError(t *testing.T) {
 	}
 
 	model, _ := terminal.Update(msg)
+	terminal = model.(Terminal)
 
 	if model == nil {
 		t.Fatal("Update returned nil model")
@@ -282,6 +289,7 @@ func TestCtrlCClearsInput(t *testing.T) {
 	msg := tea.KeyPressMsg(tea.Key{Code: 'c', Mod: tea.ModCtrl})
 
 	model, cmd := terminal.Update(msg)
+	terminal = model.(Terminal)
 
 	// Should return a model and no command
 	if model == nil {
@@ -308,6 +316,7 @@ func TestCtrlCInDisplayWindow(t *testing.T) {
 	msg := tea.KeyPressMsg(tea.Key{Code: 'c', Mod: tea.ModCtrl})
 
 	model, cmd := terminal.Update(msg)
+	terminal = model.(Terminal)
 
 	// Should return a model and no command
 	if model == nil {
@@ -334,6 +343,7 @@ func TestCtrlGTriggersCancel(t *testing.T) {
 	msg := tea.KeyPressMsg(tea.Key{Code: 'g', Mod: tea.ModCtrl})
 
 	model, cmd := terminal.Update(msg)
+	terminal = model.(Terminal)
 
 	// Should return a model and no command (just shows dialog)
 	if model == nil {
@@ -359,7 +369,7 @@ func TestCtrlGTriggersCancel(t *testing.T) {
 
 	// Test confirming the dialog by pressing 'y'
 	msg = tea.KeyPressMsg(tea.Key{Code: 'y'})
-	_, cmd = terminal.Update(msg)
+	model, cmd = terminal.Update(msg); terminal = model.(Terminal)
 
 	// Now should emit cancel command
 	if cmd == nil {
@@ -381,6 +391,7 @@ func TestCtrlUClearsInput(t *testing.T) {
 	msg := tea.KeyPressMsg(tea.Key{Code: 'u', Mod: tea.ModCtrl})
 
 	model, cmd := terminal.Update(msg)
+	terminal = model.(Terminal)
 
 	// Should return a model and no command
 	if model == nil {
@@ -626,6 +637,7 @@ func TestEKeyOpensDisplayWindowInEditor(t *testing.T) {
 	msg := tea.KeyPressMsg(tea.Key{Code: 'e'})
 
 	model, cmd := terminal.Update(msg)
+	terminal = model.(Terminal)
 
 	if model == nil {
 		t.Fatal("Update returned nil model")
@@ -648,6 +660,7 @@ func TestEKeyDoesNothingWithNoWindow(t *testing.T) {
 	msg := tea.KeyPressMsg(tea.Key{Code: 'e'})
 
 	model, cmd := terminal.Update(msg)
+	terminal = model.(Terminal)
 
 	if model == nil {
 		t.Fatal("Update returned nil model")
@@ -670,6 +683,7 @@ func TestEKeyDoesNothingInInputWindow(t *testing.T) {
 	msg := tea.KeyPressMsg(tea.Key{Code: 'e'})
 
 	model, cmd := terminal.Update(msg)
+	terminal = model.(Terminal)
 
 	if model == nil {
 		t.Fatal("Update returned nil model")
@@ -692,6 +706,7 @@ func TestDisplayEditorFinishedDoesNotPopulateInput(t *testing.T) {
 	msg := EditorFinishedMsg{Action: EditorActionNone, Err: nil}
 
 	model, _ := terminal.Update(msg)
+	terminal = model.(Terminal)
 
 	if model == nil {
 		t.Fatal("Update returned nil model")
@@ -711,6 +726,7 @@ func TestDisplayEditorFinishedWithError(t *testing.T) {
 	msg := EditorFinishedMsg{Action: EditorActionNone, Err: fmt.Errorf("editor failed")}
 
 	model, _ := terminal.Update(msg)
+	terminal = model.(Terminal)
 
 	if model == nil {
 		t.Fatal("Update returned nil model")

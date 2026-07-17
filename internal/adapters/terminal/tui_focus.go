@@ -122,17 +122,17 @@ func (m *Terminal) openConfirmTool(id, toolName, toolInput string) {
 }
 
 // handleBlur handles loss of application focus.
-func (m *Terminal) handleBlur() (tea.Model, tea.Cmd) {
+func (m *Terminal) handleBlur() (Terminal, tea.Cmd) {
 	m.hasFocus = false
 	m.display = m.display.SetDisplayFocused(false)
 	m.input = m.input.Blur()
 	m.overlays.SetFocused(false)
 	m.display = m.display.updateContent()
-	return m, nil
+	return *m, nil
 }
 
 // handleFocus handles gain of application focus.
-func (m *Terminal) handleFocus() (tea.Model, tea.Cmd) {
+func (m *Terminal) handleFocus() (Terminal, tea.Cmd) {
 	m.hasFocus = true
 	m.overlays.SetFocused(true)
 
@@ -143,7 +143,7 @@ func (m *Terminal) handleFocus() (tea.Model, tea.Cmd) {
 		m.overlays.ConfirmOverlay().IsOpen() ||
 		m.overlays.IsMCPInitOpen() {
 		m.display = m.display.updateContent()
-		return m, nil
+		return *m, nil
 	}
 
 	fw := m.overlays.RestoreFocus()
@@ -153,5 +153,5 @@ func (m *Terminal) handleFocus() (tea.Model, tea.Cmd) {
 		m.focusInput()
 	}
 	m.display = m.display.updateContent()
-	return m, nil
+	return *m, nil
 }
