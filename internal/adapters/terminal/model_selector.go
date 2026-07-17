@@ -213,23 +213,26 @@ type ModelSelectorUpdate struct {
 // --- Key Handling ---
 
 //nolint:gocyclo
-func (ms ModelSelector) Update(msg tea.KeyMsg) (ModelSelector, ModelSelectorUpdate) {
+func (ms ModelSelector) Update(msg tea.Msg) (ModelSelector, ModelSelectorUpdate) {
 	if ms.State == FilteredListClosed {
 		return ms, ModelSelectorUpdate{}
 	}
 
-	key := msg.String()
+	keyMsg, ok := msg.(tea.KeyMsg)
+	if !ok {
+		return ms, ModelSelectorUpdate{}
+	}
+	key := keyMsg.String()
 
-	fl, handled, filterChanged, cmd := ms.FilteredListCore.Update(msg, func(extraKey string) bool {
-		return extraKey == keyEnter
-	})
+	fl, result := ms.FilteredListCore.Update(msg)
+	ms.FilteredListCore = fl
 
-	update := ModelSelectorUpdate{Cmd: cmd}
+	update := ModelSelectorUpdate{Cmd: result.Cmd}
 
 	modelSelected := false
 
 	// Handle Enter selection in the list.
-	if key == keyEnter && handled && !fl.FilterInputFocused {
+	if key == keyEnter && result.Handled && !fl.FilterInputFocused {
 		if len(ms.filteredModels) > 0 && fl.SelectedIdx >= 0 {
 			ms.activeModel = &ms.filteredModels[fl.SelectedIdx]
 			modelSelected = true
@@ -243,8 +246,8 @@ func (ms ModelSelector) Update(msg tea.KeyMsg) (ModelSelector, ModelSelectorUpda
 
 	ms.FilteredListCore = fl
 
-	if handled {
-		if filterChanged && ms.FilterInputFocused {
+	if result.Handled {
+		if result.FilterChanged && ms.FilterInputFocused {
 			ms = ms.updateFilteredModels()
 		}
 		if !ms.FilterInputFocused {

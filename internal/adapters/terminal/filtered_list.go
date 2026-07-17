@@ -31,6 +31,13 @@ const (
 	FilteredListOpen
 )
 
+// FilteredListUpdate describes the result of a FilteredListCore update.
+type FilteredListUpdate struct {
+	Cmd           tea.Cmd
+	Handled       bool
+	FilterChanged bool
+}
+
 // FilteredListCore holds shared state and methods for filtered list components.
 type FilteredListCore struct {
 	State       FilteredListState
@@ -54,7 +61,7 @@ func (fl FilteredListCore) Close() FilteredListCore {
 	return fl
 }
 
-// SetSize updates the width and height of the filtered list.
+// WithSize updates the width and height of the filtered list.
 func (fl FilteredListCore) WithSize(width, height int) FilteredListCore {
 	if width > 0 {
 		fl.Width = width
@@ -64,7 +71,7 @@ func (fl FilteredListCore) WithSize(width, height int) FilteredListCore {
 	return fl
 }
 
-// SetStyles updates the styles and re-applies them to the filter input.
+// WithStyles updates the styles and re-applies them to the filter input.
 func (fl FilteredListCore) WithStyles(styles *Styles) FilteredListCore {
 	fl.Styles = styles
 	return fl.updateFilterInputStyles()
@@ -117,61 +124,62 @@ func (fl FilteredListCore) HandleFilterCtrlC() FilteredListCore {
 	return fl
 }
 
-// HandleKeyMsg handles common filtered list navigation keys.
-// Returns (fl, handled, filterChanged, cmd).
-func (fl FilteredListCore) Update(msg tea.KeyMsg, onExtra func(string) bool) (FilteredListCore, bool, bool, tea.Cmd) {
-	key := msg.String()
+// Update handles common filtered list navigation keys.
+func (fl FilteredListCore) Update(msg tea.Msg) (FilteredListCore, FilteredListUpdate) {
+	key, ok := msg.(tea.KeyMsg)
+	if !ok {
+		return fl, FilteredListUpdate{}
+	}
 
-	if key == keyTab {
-		return fl.HandleTabKey(), true, false, nil
+	keyStr := key.String()
+
+	if keyStr == keyTab {
+		return fl.HandleTabKey(), FilteredListUpdate{Handled: true}
 	}
 
 	if fl.FilterInputFocused {
-		return fl.handleFilterFocusedKey(msg, key)
+		return fl.handleFilterFocusedKey(key, keyStr)
 	}
 
-	return fl.handleListFocusedKey(key, onExtra)
+	return fl.handleListFocusedKey(keyStr)
 }
 
 // handleFilterFocusedKey handles keys when the filter input is focused.
-func (fl FilteredListCore) handleFilterFocusedKey(msg tea.KeyMsg, key string) (FilteredListCore, bool, bool, tea.Cmd) {
+func (fl FilteredListCore) handleFilterFocusedKey(msg tea.KeyMsg, key string) (FilteredListCore, FilteredListUpdate) {
 	if key == keyEsc {
 		fl.State = FilteredListClosed
-		return fl, true, false, nil
+		return fl, FilteredListUpdate{Handled: true}
 	}
 
 	if key == keyCtrlC {
 		fl = fl.HandleFilterCtrlC()
-		return fl, true, true, nil
+		return fl, FilteredListUpdate{Handled: true, FilterChanged: true}
 	}
 
 	if key == keyCtrlU || key == keyCtrlD {
-		return fl, true, false, nil
+		return fl, FilteredListUpdate{Handled: true}
 	}
 
 	oldValue := fl.FilterInput.Value()
 	var cmd tea.Cmd
 	fl.FilterInput, cmd = fl.FilterInput.Update(msg)
-	return fl, true, oldValue != fl.FilterInput.Value(), cmd
+	return fl, FilteredListUpdate{Handled: true, FilterChanged: oldValue != fl.FilterInput.Value(), Cmd: cmd}
 }
 
 // handleListFocusedKey handles keys when the list is focused.
-func (fl FilteredListCore) handleListFocusedKey(key string, onExtra func(string) bool) (FilteredListCore, bool, bool, tea.Cmd) {
+func (fl FilteredListCore) handleListFocusedKey(key string) (FilteredListCore, FilteredListUpdate) {
 	switch key {
 	case keyQ, keyEsc:
 		fl.State = FilteredListClosed
-		return fl, true, false, nil
+		return fl, FilteredListUpdate{Handled: true}
 	case keyJ, keyDown:
-		return fl, true, false, nil
+		return fl, FilteredListUpdate{Handled: true}
 	case keyK, keyUp:
-		return fl, true, false, nil
+		return fl, FilteredListUpdate{Handled: true}
 	case keyEnter:
-		if onExtra != nil && onExtra(key) {
-			return fl, true, false, nil
-		}
-		return fl, true, false, nil
+		return fl, FilteredListUpdate{Handled: true}
 	}
-	return fl, false, false, nil
+	return fl, FilteredListUpdate{}
 }
 
 // ClampSelection clamps the selected index to valid bounds.

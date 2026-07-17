@@ -63,7 +63,7 @@ func (m Terminal) openThemeSelector() Terminal {
 		return m
 	}
 	m.overlays = m.overlays.WithFocusedWindow(m.overlays.RestoreFocus())
-	m.overlays = m.overlays.OpenThemeSelector(m.themeManager.GetThemes(), m.activeTheme)
+	m.overlays = m.overlays.OpenThemeSelector(m.themeManager.GetThemes(), m.activeTheme, m.themeManager)
 	m.input = m.input.Blur()
 	m.display = m.display.WithDisplayFocused(false)
 	m.display = m.display.updateContent()

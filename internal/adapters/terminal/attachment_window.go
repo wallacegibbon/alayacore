@@ -163,25 +163,23 @@ func (aw AttachmentWindow) updateForKeyMsg(msg tea.KeyMsg) (AttachmentWindow, te
 
 	inputWasFocused := aw.FilterInputFocused
 
-	fl, handled, filterChanged, cmd := aw.FilteredListCore.Update(msg, func(extraKey string) bool {
-		return extraKey == keyEnter || extraKey == keyEsc
-	})
+	fl, result := aw.FilteredListCore.Update(msg)
+	aw.FilteredListCore = fl
 
-	// Handle Enter selection in the list after HandleKeyMsg returns.
-	if key == keyEnter && handled && !fl.FilterInputFocused {
-		aw.FilteredListCore = fl
+	// Handle Enter selection in the list after Update returns.
+	if key == keyEnter && result.Handled && !fl.FilterInputFocused {
 		aw = aw.handleEnter()
 		fl = aw.FilteredListCore
-	} else if key == keyEsc && handled {
+	} else if key == keyEsc && result.Handled {
 		fl = fl.Close()
 	}
 	aw.FilteredListCore = fl
 
-	if handled {
+	if result.Handled {
 		if aw.mode == modeLocal {
-			aw = aw.handleLocalModeKeys(filterChanged, key, inputWasFocused)
+			aw = aw.handleLocalModeKeys(result.FilterChanged, key, inputWasFocused)
 		}
-		return aw, cmd
+		return aw, result.Cmd
 	}
 
 	if aw.mode == modeLocal && !aw.FilterInputFocused {

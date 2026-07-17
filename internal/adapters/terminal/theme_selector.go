@@ -25,6 +25,9 @@ type ThemeSelector struct {
 
 	// Selection state
 	originalThemeName string // Theme name when selector was opened (for cancel)
+
+	// Dependencies
+	themeManager *ThemeManager // for loading preview themes
 }
 
 // NewThemeSelector creates a new theme selector.
@@ -56,8 +59,9 @@ func (ts ThemeSelector) WithFocus(focused bool) ThemeSelector {
 	return ts
 }
 
-func (ts ThemeSelector) Open(themes []theme.Info, activeTheme string) ThemeSelector {
+func (ts ThemeSelector) Open(themes []theme.Info, activeTheme string, themeManager *ThemeManager) ThemeSelector {
 	ts.themes = themes
+	ts.themeManager = themeManager
 	ts.State = ScrollableListOpen
 	ts.ScrollIdx = 0
 	ts.SelectedIdx = 0
@@ -65,8 +69,8 @@ func (ts ThemeSelector) Open(themes []theme.Info, activeTheme string) ThemeSelec
 	ts.previewTheme = nil
 	ts.previewThemeName = ""
 
-	for i, theme := range ts.themes {
-		if theme.Name == activeTheme {
+	for i, t := range ts.themes {
+		if t.Name == activeTheme {
 			ts.SelectedIdx = i
 			break
 		}
@@ -120,39 +124,45 @@ func (ts ThemeSelector) View() tea.View {
 
 // --- Key Handling ---
 
-func (ts ThemeSelector) Update(msg tea.KeyMsg, themeManager *ThemeManager) (ThemeSelector, ThemeSelectorUpdate) {
+func (ts ThemeSelector) Update(msg tea.Msg) (ThemeSelector, ThemeSelectorUpdate) {
 	if ts.State == ScrollableListClosed {
 		return ts, ThemeSelectorUpdate{}
 	}
 
-	key := msg.String()
+	key, ok := msg.(tea.KeyMsg)
+	if !ok {
+		return ts, ThemeSelectorUpdate{}
+	}
+
+	keyStr := key.String()
 
 	// Handle 'r' for reload (parent handles the actual reload)
-	if key == keyR {
+	if keyStr == keyR {
 		return ts, ThemeSelectorUpdate{}
 	}
 
 	var previewTheme *theme.Theme
 
 	// Handle navigation and close via base type
-	sl, handled, isClose := ts.ScrollableListCore.Update(msg, len(ts.themes))
+	ts.ScrollableListCore = ts.ScrollableListCore.WithItemsLen(len(ts.themes))
+	sl, result := ts.ScrollableListCore.Update(msg)
 	ts.ScrollableListCore = sl
-	if handled {
-		if isClose {
+	if result.Handled {
+		if result.IsClose {
 			// Closed without selection — close properly
 			ts = ts.Close()
 			return ts, ThemeSelectorUpdate{Closed: true}
 		}
 		// Navigated — get preview
-		ts, previewTheme = ts.getPreviewTheme(themeManager)
+		ts, previewTheme = ts.getPreviewTheme()
 		return ts, ThemeSelectorUpdate{PreviewTheme: previewTheme}
 	}
 
 	// Handle Enter for selection
-	if key == keyEnter {
+	if keyStr == keyEnter {
 		if len(ts.themes) > 0 && ts.SelectedIdx >= 0 {
 			ts.State = ScrollableListClosed
-			ts, previewTheme = ts.getPreviewTheme(themeManager)
+			ts, previewTheme = ts.getPreviewTheme()
 			return ts, ThemeSelectorUpdate{PreviewTheme: previewTheme, ThemeSelected: true}
 		}
 	}
@@ -160,8 +170,8 @@ func (ts ThemeSelector) Update(msg tea.KeyMsg, themeManager *ThemeManager) (Them
 	return ts, ThemeSelectorUpdate{}
 }
 
-func (ts ThemeSelector) getPreviewTheme(themeManager *ThemeManager) (ThemeSelector, *theme.Theme) {
-	if themeManager == nil {
+func (ts ThemeSelector) getPreviewTheme() (ThemeSelector, *theme.Theme) {
+	if ts.themeManager == nil {
 		return ts, nil
 	}
 
@@ -174,7 +184,7 @@ func (ts ThemeSelector) getPreviewTheme(themeManager *ThemeManager) (ThemeSelect
 		return ts, ts.previewTheme
 	}
 
-	ts.previewTheme = themeManager.LoadTheme(themeName)
+	ts.previewTheme = ts.themeManager.LoadTheme(themeName)
 	ts.previewThemeName = themeName
 	return ts, ts.previewTheme
 }

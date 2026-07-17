@@ -205,8 +205,8 @@ func (om OverlayManager) OpenModelSelector() OverlayManager {
 }
 
 // OpenThemeSelector opens the theme selector with the given themes and active name.
-func (om OverlayManager) OpenThemeSelector(themes []theme.Info, activeTheme string) OverlayManager {
-	om.themeSelector = om.themeSelector.Open(themes, activeTheme)
+func (om OverlayManager) OpenThemeSelector(themes []theme.Info, activeTheme string, themeManager *ThemeManager) OverlayManager {
+	om.themeSelector = om.themeSelector.Open(themes, activeTheme, themeManager)
 	return om
 }
 

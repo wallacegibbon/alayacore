@@ -73,14 +73,15 @@ func (m Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 	// Check if it's a reload request
 	if msg.String() == keyR && m.themeManager != nil {
 		m.themeManager.ReloadThemes()
-		m.overlays.ThemeSelector().Open(m.themeManager.GetThemes(), m.activeTheme)
+		ts := m.overlays.ThemeSelector().Open(m.themeManager.GetThemes(), m.activeTheme, m.themeManager)
+		m.overlays = m.overlays.WithThemeSelector(ts)
 		return m, nil
 	}
 
 	// Track if selector was open before handling key
 	wasOpen := m.overlays.ThemeSelector().IsOpen()
 
-	ts, result := m.overlays.ThemeSelector().Update(msg, m.themeManager)
+	ts, result := m.overlays.ThemeSelector().Update(msg)
 	m.overlays = m.overlays.WithThemeSelector(ts)
 
 	// Check if theme was selected (Enter key)

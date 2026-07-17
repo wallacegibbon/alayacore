@@ -12,7 +12,7 @@ package terminal
 // a plain scrollable list.
 //
 // Embedding types embed ScrollableListCore and add their own item
-// types, rendering, and specialized key handling via the onExtra callback.
+// types, rendering, and specialized key handling.
 //
 // SINGLE-GOROUTINE: All methods of ScrollableListCore are called
 // exclusively from the Bubble Tea event loop. No mutex is needed.
@@ -31,6 +31,12 @@ const (
 	ScrollableListOpen
 )
 
+// ScrollableListUpdate describes the result of a ScrollableListCore update.
+type ScrollableListUpdate struct {
+	Handled bool
+	IsClose bool // true if the list was closed by this key
+}
+
 // ScrollableListCore holds shared state for scrollable list components.
 type ScrollableListCore struct {
 	State       ScrollableListState
@@ -40,6 +46,7 @@ type ScrollableListCore struct {
 	Height      int
 	Styles      *Styles
 	HasFocus    bool
+	ItemsLen    int // number of items in the parent's list (for bounds checking)
 }
 
 func (sl ScrollableListCore) IsOpen() bool { return sl.State != ScrollableListClosed }
@@ -47,7 +54,13 @@ func (sl ScrollableListCore) IsOpen() bool { return sl.State != ScrollableListCl
 // Close closes the list.
 func (sl ScrollableListCore) Close() ScrollableListCore { sl.State = ScrollableListClosed; return sl }
 
-// SetStyles updates the styles.
+// WithItemsLen sets the number of items in the parent list for selection bounds.
+func (sl ScrollableListCore) WithItemsLen(n int) ScrollableListCore {
+	sl.ItemsLen = n
+	return sl
+}
+
+// WithStyles updates the styles.
 func (sl ScrollableListCore) WithStyles(styles *Styles) ScrollableListCore {
 	sl.Styles = styles
 	return sl
@@ -59,7 +72,7 @@ func (sl ScrollableListCore) WithFocus(hasFocus bool) ScrollableListCore {
 	return sl
 }
 
-// SetSize updates the width and height of the scrollable list.
+// WithSize updates the width and height of the scrollable list.
 // Height is clamped to prevent the overlay from exceeding the available space.
 func (sl ScrollableListCore) WithSize(width, height int) ScrollableListCore {
 	if width > 0 {
@@ -119,27 +132,30 @@ func (sl ScrollableListCore) RenderOverlay(baseContent, renderedList string, scr
 	return renderOverlay(baseContent, renderedList, screenWidth, screenHeight)
 }
 
-// HandleKeyMsg handles common scrollable list navigation keys.
-// Returns (handled, isClose). If handled is false, the caller should
-// check component-specific keys. If isClose is true, the list was closed.
-// itemsLen is the number of items in the list (for bounds checking).
-func (sl ScrollableListCore) Update(msg tea.KeyMsg, itemsLen int) (ScrollableListCore, bool, bool) {
-	switch msg.String() {
+// Update handles key events for scrollable list navigation.
+// ItemsLen must be set before calling Update (via WithItemsLen).
+func (sl ScrollableListCore) Update(msg tea.Msg) (ScrollableListCore, ScrollableListUpdate) {
+	key, ok := msg.(tea.KeyMsg)
+	if !ok {
+		return sl, ScrollableListUpdate{}
+	}
+
+	switch key.String() {
 	case keyQ, keyEsc:
 		sl.State = ScrollableListClosed
-		return sl, true, true
+		return sl, ScrollableListUpdate{Handled: true, IsClose: true}
 	case keyJ, keyDown:
-		if sl.SelectedIdx < itemsLen-1 {
+		if sl.SelectedIdx < sl.ItemsLen-1 {
 			sl.SelectedIdx++
 			sl = sl.EnsureVisible()
 		}
-		return sl, true, false
+		return sl, ScrollableListUpdate{Handled: true}
 	case keyK, keyUp:
 		if sl.SelectedIdx > 0 {
 			sl.SelectedIdx--
 			sl = sl.EnsureVisible()
 		}
-		return sl, true, false
+		return sl, ScrollableListUpdate{Handled: true}
 	}
-	return sl, false, false
+	return sl, ScrollableListUpdate{}
 }

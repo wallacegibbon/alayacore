@@ -252,28 +252,32 @@ type HelpWindowUpdate struct {
 }
 
 //nolint:gocyclo
-func (hw HelpWindow) Update(msg tea.KeyMsg) (HelpWindow, HelpWindowUpdate) {
-	key := msg.String()
+func (hw HelpWindow) Update(msg tea.Msg) (HelpWindow, HelpWindowUpdate) {
+	keyMsg, ok := msg.(tea.KeyMsg)
+	if !ok {
+		return hw, HelpWindowUpdate{}
+	}
+	key := keyMsg.String()
 
-	fl, handled, filterChanged, cmd := hw.FilteredListCore.Update(msg, func(extraKey string) bool {
-		if extraKey == keyEnter {
-			if hw.SelectedIdx >= 0 && hw.SelectedIdx < hw.filteredLen() {
-				item := hw.filteredItems[hw.SelectedIdx]
-				if !item.IsSection && item.Type == HelpItemCommand {
-					parts := strings.Fields(item.Key)
-					if len(parts) > 0 {
-						hw.pendingCommand = parts[0]
-					} else {
-						hw.pendingCommand = item.Key
-					}
+	fl, result := hw.FilteredListCore.Update(msg)
+	hw.FilteredListCore = fl
+
+	// Check if Enter was pressed on a command item
+	if key == keyEnter && result.Handled && !fl.FilterInputFocused {
+		if hw.SelectedIdx >= 0 && hw.SelectedIdx < hw.filteredLen() {
+			item := hw.filteredItems[hw.SelectedIdx]
+			if !item.IsSection && item.Type == HelpItemCommand {
+				parts := strings.Fields(item.Key)
+				if len(parts) > 0 {
+					hw.pendingCommand = parts[0]
+				} else {
+					hw.pendingCommand = item.Key
 				}
 			}
-			return true
 		}
-		return false
-	})
+	}
 
-	update := HelpWindowUpdate{Cmd: cmd}
+	update := HelpWindowUpdate{Cmd: result.Cmd}
 
 	if hw.pendingCommand != "" {
 		update.PendingCommand = hw.pendingCommand
@@ -282,8 +286,8 @@ func (hw HelpWindow) Update(msg tea.KeyMsg) (HelpWindow, HelpWindowUpdate) {
 	}
 	hw.FilteredListCore = fl
 
-	if handled {
-		if filterChanged {
+	if result.Handled {
+		if result.FilterChanged {
 			hw = hw.updateFilteredItems()
 		}
 		if !hw.FilterInputFocused {
