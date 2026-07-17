@@ -34,38 +34,49 @@ type sessionLoadingErrorMsg struct {
 	err error
 }
 
-// emitCommand sends a user-level command to the session via TLV.
-// Errors are silently ignored — commands are best-effort and the
-// session may close the input stream at any time.
-func (m Terminal) emitCommand(cmd string) {
+// emitCommand returns a tea.Cmd that writes a user-level command to the
+// session via TLV when executed by Bubble Tea's runtime. Errors are silently
+// ignored — commands are best-effort and the session may close the input
+// stream at any time.
+func (m Terminal) emitCommand(cmd string) tea.Cmd {
+	return func() tea.Msg {
+		_ = tlv.WriteTLV(m.streamInput, tlv.TagUserT, cmd)
+		return nil
+	}
+}
+
+// writeTLVCommand directly writes a TLV command to the session stream.
+// Only for use outside Update (e.g. goroutines), where tea.Cmd cannot be returned.
+func (m Terminal) writeTLVCommand(cmd string) {
 	_ = tlv.WriteTLV(m.streamInput, tlv.TagUserT, cmd)
 }
 
-// emitUE sends a TagUserEnd frame, flushing any staged content
-// as a complete user message.
-func (m Terminal) emitUE() {
-	_ = tlv.WriteTLV(m.streamInput, tlv.TagUserEnd, "")
-}
-
-// emitAttachments reads pending attachment files and sends them as TLV frames.
-// Failed files are skipped with an error message shown to the user.
-// URLs are sent as-is without reading.
-func (m Terminal) emitAttachments() {
-	for _, a := range m.pendingAttachments {
-		var value string
-		if a.isURL {
-			value = a.path
-		} else {
-			data, err := os.ReadFile(a.path)
-			if err != nil {
-				m.out.WriteError("Failed to read attachment: %s", err)
-				continue
+// submitCmd returns a tea.Cmd that sends staged content (attachments + text)
+// as a complete user message via TLV. Runs outside Update when executed by
+// Bubble Tea's runtime.
+func submitCmd(w io.WriteCloser, out OutputWriter, attachments []attachment, prompt string) tea.Cmd {
+	return func() tea.Msg {
+		for _, a := range attachments {
+			var value string
+			if a.isURL {
+				value = a.path
+			} else {
+				data, err := os.ReadFile(a.path)
+				if err != nil {
+					out.WriteError("Failed to read attachment: %s", err)
+					continue
+				}
+				mime := tlv.MimeTypeForPath(a.path)
+				b64 := base64.StdEncoding.EncodeToString(data)
+				value = fmt.Sprintf("data:%s;base64,%s", mime, b64)
 			}
-			mime := tlv.MimeTypeForPath(a.path)
-			b64 := base64.StdEncoding.EncodeToString(data)
-			value = fmt.Sprintf("data:%s;base64,%s", mime, b64)
+			_ = tlv.WriteTLV(w, a.tag, value)
 		}
-		_ = tlv.WriteTLV(m.streamInput, a.tag, value)
+		if prompt != "" {
+			_ = tlv.WriteTLV(w, tlv.TagUserT, prompt)
+		}
+		_ = tlv.WriteTLV(w, tlv.TagUserEnd, "")
+		return nil
 	}
 }
 
@@ -559,7 +570,7 @@ func (m Terminal) handleEditorFinished(msg EditorFinishedMsg) (Terminal, tea.Cmd
 
 	case EditorActionReloadConfig:
 		if msg.FileType == "model_config" {
-			m.emitCommand(":model_load")
+			return m, m.emitCommand(":model_load")
 		}
 		return m, nil
 
