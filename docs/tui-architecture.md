@@ -12,112 +12,127 @@ View   →  pure function: Model → Html (rendering)
 
 Properties:
 - **Immutable state** — `Update` returns a new `Model`, never mutates the old one
-- **Side effects as data** — `Cmd` describes what to do, not how to do it
-- **Composition** — child components nest inside parent models
+- **Side effects as data** — `Cmd` describes what to do, not how to do it (inspectable record)
+- **Same-frame Cmd processing** — Runtime can inspect Cmd data and recursively call `update` within the same frame before rendering
 
-## Bubble Tea: Elm adapted for Go
-
-Bubble Tea's `tea.Model` interface:
+## Bubble Tea: Key Differences from Elm
 
 ```go
-type Model interface {
-    Init() tea.Cmd
-    Update(msg tea.Msg) (tea.Model, tea.Cmd)
-    View() tea.View
-}
+type Cmd func() Msg  // not data — an opaque function
 ```
 
-### What Bubble Tea keeps from Elm
+| Aspect | Elm | Bubble Tea | Consequence |
+|--------|-----|------------|-------------|
+| Cmd | Data (inspectable record) | `func() Msg` (opaque) | BT cannot inspect Cmd; renders before executing it |
+| Msg dispatch | Sum types, exhaustive | `interface{}` + type switch | No compiler guarantee |
+| Same-frame Cmd | Yes — runtime recurses before render | No — renders first, executes Cmd after | Continuous UI events must bypass Cmd to avoid 1-frame delay |
 
-| Concept | Elm | Bubble Tea |
-|---------|-----|------------|
-| Model-Update-View | ✅ | ✅ |
-| Messages drive changes | ✅ | ✅ (tea.Msg) |
-| Side effects via Cmd | ✅ | ✅ (tea.Cmd) |
-
-### What Bubble Tea changes
-
-| Aspect | Elm | Bubble Tea | Reason |
-|--------|-----|------------|--------|
-| Model Update | Pure function, no mutation | Pointer receiver mutates + returns self | Go performance & idiom |
-| Messages | Algebraic data types (exhaustive) | `interface{}` + runtime type switch | Go has no sum types |
-| Cmd | Data (inspectable record) | Opaque `func() Msg` | Simpler runtime |
-| Sub-components | All implement Model | Plain structs with methods OK | Optional composition |
-
-## AlayaCore TUI Design
-
-### Before Refactoring (Problems)
-
-- All components stored as **pointers** (`*PromptInput`, `*ModelSelector`, etc.)
-- **Mutation shortcuts** like `updateFromMsg` bypassed the Update chain
-- **Consume* polling**: after `HandleKeyMsg`, callers polled `ConsumeModelSelected()`, `ConsumeThemeSelected()`, etc.
-- **Dead Update methods** on non-root components that implemented `tea.Model` but were never called
-- **InputField used closures** (`cursorRender`, `promptRender`) making it non-copyable
-
-### After Refactoring
-
-#### Principle: Every component is a value type
+## Architecture Overview
 
 ```
-Terminal          value receiver Update → (Terminal, tea.Cmd)
-├── input         PromptInput    value type, value receiver methods
-│   └── input     InputField     value type, value receiver Update
-├── display       DisplayModel   value type, value receiver methods
-│   └── scrollView ScrollView    value type, value receiver methods
-└── overlays      OverlayManager (stores value types, has setters)
-    ├── modelSelector    ModelSelector     HandleKeyMsg → (Self, Result)
-    ├── themeSelector    ThemeSelector     HandleKeyMsg → (Self, Result)
-    ├── helpWindow       HelpWindow        HandleKeyMsg → (Self, Result)
-    ├── confirmOverlay   ConfirmDialog     HandleKeyMsg → (Self, Result)
-    ├── mcpInitOverlay   ConfirmDialog     HandleKeyMsg → (Self, Result)
-    └── attachmentWindow AttachmentWindow  HandleKeyMsg → (Self, Result)
+Terminal (value type, root model)
+├── Update(msg tea.Msg) → (tea.Model, tea.Cmd)     ← single entry point
+│
+├── Dispatches messages to components:
+│   ├── KeyMsg  → handleKeyMsg → overlay.Update(msg)
+│   ├── ThemeSelectedMsg  → emit theme_set command
+│   ├── ModelSelectedMsg  → emit model_set command
+│   ├── ConfirmResultMsg  → handleConfirmResult
+│   ├── HelpCmdMsg        → focus input with command
+│   ├── AttachmentSelectedMsg → addAttachment
+│   ├── OverlayClosedMsg  → restoreFocus
+│   ├── PasteMsg   → handlePaste (attachment window or input)
+│   ├── BlurMsg    → handleBlur
+│   ├── FocusMsg   → handleFocus
+│   ├── WindowSize → handleWindowSize
+│   └── default (unknown msg) → stderr log
+│
+├── Components (each has Update returning tea.Cmd):
+│   ├── ConfirmDialog     Update(msg tea.Msg) → (ConfirmDialog, tea.Cmd)
+│   ├── ThemeSelector     Update(msg tea.Msg) → (ThemeSelector, tea.Cmd)
+│   ├── ModelSelector     Update(msg tea.Msg) → (ModelSelector, tea.Cmd)
+│   ├── HelpWindow        Update(msg tea.Msg) → (HelpWindow, tea.Cmd)
+│   ├── AttachmentWindow  Update(msg tea.Msg) → (AttachmentWindow, tea.Cmd)
+│   ├── PromptInput       Update(msg tea.Msg) → (PromptInput, tea.Cmd)
+│   └── InputField        Update(msg tea.Msg) → (InputField, tea.Cmd)
+│
+├── Code reuse units (pure functions, no tea.Cmd):
+│   ├── FilteredListCore  HandleKey(msg tea.KeyMsg) → (Self, FilteredListResult)
+│   └── ScrollableListCore HandleKey(msg tea.KeyMsg) → (Self, ScrollableListResult)
+│
+└── External systems (via interfaces/pointers):
+    ├── out         OutputWriter    (session output, shared mutable)
+    ├── streamInput io.WriteCloser  (TLV pipe to session)
+    └── themeManager *ThemeManager  (theme file cache)
+
 ```
 
-#### Rules
+## Component vs Code Reuse Unit
 
-1. **All components are value types** — no shared mutable pointers.
-   Exception: shared read-only state (`*Styles`, `*WindowBuffer`, `*[\]attachment`).
-2. **All mutation methods are value receivers returning `Self`** — no in-place mutation.
-3. **All callers capture return values** — `m.input = m.input.SetValue("")`, never `m.input.SetValue("")`.
-4. **Results are explicit** — `HandleKeyMsg` returns a typed result struct, no `Consume*` polling.
-5. **No dead code** — no unused `tea.Model` implementations.
-6. **Root model uses pointer receivers internally** — `Update` is value receiver, but internal helpers (`handleKeyMsg`, `handleTick`, etc.) use `*Terminal` for convenience.
+### Components
+- Have their own lifecycle (open/close)
+- Communicate with Terminal via messages (ThemeSelectedMsg, etc.)
+- All have `Update(msg tea.Msg) → (Self, tea.Cmd)`
 
-#### Data Flow
+### Code Reuse Units (FilteredListCore, ScrollableListCore)
+- Cannot exist independently — embedded into components
+- Have `HandleKey(msg tea.KeyMsg) → (Self, Result)` — no tea.Cmd
+- Used for continuous UI operations (scrolling, filtering) where
+  a 1-frame delay from Cmd routing would cause perceptible lag
+- This is NOT a hack; Elm does the same thing with pure helper functions.
+  The difference is that Elm's Cmd system is same-frame, so the optimization
+  is unnecessary there. In Bubble Tea, Cmd execution adds 1 frame delay.
+
+## Message-Based Communication
+
+Components communicate with Terminal through messages, not by returning
+result structs that Terminal reads:
 
 ```
-tea.KeyMsg
-  │
-  ▼
-Terminal.Update(msg)          value receiver (m is a copy)
-  │
-  ├─ m.handleKeyMsg(msg)      Go auto-addrs &m, pointer to copy
-  │   ├─ handleSelectorOverlayKeys → overlay.HandleKeyMsg(msg)
-  │   │                                    │
-  │   │                              returns (Self, Result)
-  │   │                                    │
-  │   │                              caller: overlays.SetModelSelector(ms)
-  │   │
-  │   └─ handleFallback → m.input.Update(msg)
-  │
-  └─ return m, cmd             return updated copy
+ThemeSelector.Update     → tea.Cmd(ThemeSelectedMsg)  → Terminal.Update handles it
+ModelSelector.Update     → tea.Cmd(ModelSelectedMsg)  → Terminal.Update handles it
+HelpWindow.Update        → tea.Cmd(HelpCmdMsg)        → Terminal.Update handles it
+AttachmentWindow.Update  → tea.Cmd(AttachmentSelectedMsg) → Terminal.Update handles it
+ConfirmDialog.Update     → tea.Cmd(ConfirmResultMsg)  → Terminal.Update handles it
 ```
 
-### Key Changes by Phase
+Terminal does NOT read component internals. It only handles messages
+in its own Update switch.
 
-| Phase | Change | Rationale |
-|-------|--------|-----------|
-| 1 | Remove `updateFromMsg` shortcut | All state changes must go through `Update` |
-| 2 | `InputField` value type (remove closures) | Make it copyable with value semantics |
-| 3 | All overlays → value types | Consistency, no hidden pointer mutations |
-| 4 | `Consume*` → explicit result types | Implicit polling protocol replaced by typed return values |
-| 5 | Terminal `Init`/`Update`/`View` → value receivers | Root model satisfies `tea.Model` consistently |
+## I/O Strategy
 
-### Remaining Differences from Elm
+| I/O Operation | Path | Reason |
+|--------------|------|--------|
+| `emitCommand` (TLV write) | `tea.Cmd` | Always in Update context |
+| `submitCmd` (batch TLV writes) | `tea.Cmd` | Multiple writes, one unit |
+| `startMCPAuthFlow` (OAuth) | `tea.Cmd` | Blocking wait, must be async |
+| `WriteError` (in Update) | `tea.Cmd` | Notification, can be deferred 1 frame |
+| `WriteError` (in Init) | Direct write | Not in Update, cannot return Cmd |
+| `StartCallbackServer` | Direct write in Update | Unavoidable — Cmd needs resultCh |
+
+Principle: All I/O in Update goes through `tea.Cmd`. Exceptions are operations
+that must happen synchronously because their result is needed before the Cmd
+can be created (e.g., `StartCallbackServer` creates the channel that the Cmd
+waits on).
+
+## Concurrency Model
+
+```
+tea.Cmd        → go p.Send(cmd())              ← goroutine
+tea.Batch(a,b) → go a(); go b()                ← goroutine per Cmd
+tea.Sequence(a,b) → a(); b()                   ← event loop, no goroutine
+```
+
+- `tea.Batch` is for independent operations (no ordering needed)
+- `tea.Sequence` is for dependent operations (e.g., Close before Quit)
+
+## Remaining Differences from Elm
 
 | Aspect | Pure Elm | Our Code | Acceptable? |
 |--------|----------|----------|-------------|
-| Messages | Sum types with exhaustive matching | `interface{}` + type switch | Yes (Go limit) |
-| Cmd | Data | Function | Yes (BT convention) |
-| Internal helpers | Pure functions | Pointer receivers | Yes (root model only) |
-| Shared state | None | `*Styles`, `*WindowBuffer` | Yes (read-only after init) |
+| Cmd | Data (inspectable) | `func() Msg` (opaque) | Yes — Bubble Tea constraint |
+| Same-frame Cmd | Yes (recursive before render) | No (render before exec) | Yes — BT limitation |
+| Continuous UI | Cmd is fine (same-frame) | Pure `HandleKey` (bypass Cmd) | Yes — necessary optimization |
+| Messages | Sum types, exhaustive | `interface{}` + type switch | Yes — Go limitation |
+| Sub-components | `Cmd.map` for type-safe routing | Flat switch in Terminal | Yes — Go has no generics for this |
+| Immutable syntax | Record update `{ x \| f = v }` | Field assignment on local copy | Yes — equivalent semantics |
