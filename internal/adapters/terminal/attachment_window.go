@@ -221,7 +221,7 @@ func (aw *AttachmentWindow) handlePaste(msg tea.PasteMsg) {
 	if !aw.FilterInputFocused {
 		return
 	}
-	aw.FilterInput.Update(msg)
+	aw.FilterInput, _ = aw.FilterInput.Update(msg)
 	if aw.mode == modeLocal {
 		aw.updateFiltered()
 	}

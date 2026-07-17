@@ -643,8 +643,9 @@ func (m *Terminal) handleFallback(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	m.input.updateFromMsg(msg)
-	return m, nil
+	var cmd tea.Cmd
+	m.input, cmd = m.input.Update(msg)
+	return m, cmd
 }
 
 // ============================================================================

@@ -20,14 +20,14 @@ type PromptInput struct {
 }
 
 // NewPromptInput creates a new prompt input.
-func NewPromptInput(styles *Styles) PromptInput {
+func NewPromptInput(styles *Styles) *PromptInput {
 	input := NewInputField()
 	input.Placeholder = "Enter your prompt..."
 	input.Focus()
 	input.Prompt = ""
 	input.SetWidth(max(0, DefaultWidth-BorderInnerPadding)) // only border + padding
 
-	return PromptInput{
+	return &PromptInput{
 		input:   input,
 		focused: true,
 		styles:  styles,
@@ -41,15 +41,14 @@ func (m PromptInput) Init() tea.Cmd {
 }
 
 // Update handles messages for the prompt input.
-func (m PromptInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *PromptInput) Update(msg tea.Msg) (*PromptInput, tea.Cmd) {
+	var cmd tea.Cmd
 	if msg, ok := msg.(tea.WindowSizeMsg); ok {
 		m.width = msg.Width
-		m.input.SetWidth(max(0, msg.Width-BorderInnerPadding)) // only border + padding
+		m.input.SetWidth(max(0, msg.Width-BorderInnerPadding))
 	}
-
-	m.updateFromMsg(msg)
-
-	return m, nil
+	m.input, cmd = m.input.Update(msg)
+	return m, cmd
 }
 
 // View renders the input field, with attachments above if present.
@@ -210,10 +209,3 @@ func (m *PromptInput) CursorEnd() {
 func (m PromptInput) CursorPos() int {
 	return m.input.CursorPos()
 }
-
-// updateFromMsg handles a message and updates internal state (non-tea.Model interface).
-func (m *PromptInput) updateFromMsg(msg tea.Msg) {
-	m.input, _ = m.input.Update(msg)
-}
-
-var _ tea.Model = (*PromptInput)(nil)

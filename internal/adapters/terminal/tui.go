@@ -149,7 +149,7 @@ type Terminal struct {
 
 	// UI components
 	display      DisplayModel
-	input        PromptInput
+	input        *PromptInput
 	themeManager *ThemeManager
 	overlays     *OverlayManager
 
@@ -340,14 +340,17 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.overlays.AttachmentWindow().IsOpen() {
 			m.overlays.AttachmentWindow().handlePaste(msg)
 		} else {
-			m.input.updateFromMsg(msg)
+			var cmd tea.Cmd
+			m.input, cmd = m.input.Update(msg)
+			return m, cmd
 		}
 		return m, nil
 	}
 
 	// Default: pass to prompt input
-	m.input.updateFromMsg(msg)
-	return m, nil
+	var cmd tea.Cmd
+	m.input, cmd = m.input.Update(msg)
+	return m, cmd
 }
 
 // tickMsg is sent periodically to update the display.
