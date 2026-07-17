@@ -397,9 +397,8 @@ func (m Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	default:
-		var cmd tea.Cmd
-		m.input, cmd = m.input.Update(msg)
-		return m, cmd
+		fmt.Fprintf(os.Stderr, "terminal: unhandled message type %T\n", msg)
+		return m, nil
 	}
 }
 
