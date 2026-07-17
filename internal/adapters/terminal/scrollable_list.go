@@ -33,6 +33,7 @@ const (
 
 // ScrollableListUpdate describes the result of a ScrollableListCore update.
 type ScrollableListUpdate struct {
+	Cmd     tea.Cmd
 	Handled bool
 	IsClose bool // true if the list was closed by this key
 }

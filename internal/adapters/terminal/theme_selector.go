@@ -102,6 +102,7 @@ func (ts ThemeSelector) GetPreviewTheme() *theme.Theme {
 
 // ThemeSelectorUpdate captures the outcome of a HandleKeyMsg call.
 type ThemeSelectorUpdate struct {
+	Cmd           tea.Cmd      // always nil for now; reserved for future I/O
 	PreviewTheme  *theme.Theme // non-nil when navigation should trigger a preview
 	ThemeSelected bool         // true when Enter selected a theme
 	Closed        bool         // true when the selector was closed (ESC/q)
