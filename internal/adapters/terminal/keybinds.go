@@ -129,7 +129,7 @@ func (m Terminal) handleThemePreview(msg themePreviewMsg) Terminal {
 func (m Terminal) handleConfirmQuit(r *ConfirmResult, fromCmd bool) (Terminal, tea.Cmd) {
 	if r.Confirmed {
 		m.quitting = true
-		return m, tea.Batch(
+		return m, tea.Sequence(
 			func() tea.Msg {
 				m.streamInput.Close()
 				m.out.Close()
