@@ -259,17 +259,25 @@ func TestHelpWindowEnterOnCommand(t *testing.T) {
 	}
 
 	// Press Enter on :quit
-	hw, result := hw.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	hw, cmd := hw.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 
 	// Window should be closed
 	if hw.IsOpen() {
 		t.Error("Help window should be closed after Enter on command")
 	}
 
-	// Pending command should be set
-	pending := result.PendingCommand
-	if pending != ":quit" {
-		t.Errorf("Expected pending command ':quit', got %q", pending)
+	// Cmd should carry HelpCmdMsg
+	if cmd == nil {
+		t.Fatal("Expected cmd to be non-nil after Enter on command")
+	}
+	if resultMsg := cmd(); resultMsg != nil {
+		if hc, ok := resultMsg.(HelpCmdMsg); ok {
+			if hc.Command != ":quit" {
+				t.Errorf("Expected pending command ':quit', got %q", hc.Command)
+			}
+		} else {
+			t.Errorf("Expected HelpCmdMsg, got %T", resultMsg)
+		}
 	}
 }
 
@@ -286,27 +294,39 @@ func TestHelpWindowEnterOnCommandStripsArgs(t *testing.T) {
 	}
 	hw = hw.Open()
 
+	// Helper to extract command from cmd
+	getCmd := func(hw HelpWindow) string {
+		hw2, cmd := hw.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+		_ = hw2
+		if cmd == nil {
+			return ""
+		}
+		if resultMsg := cmd(); resultMsg != nil {
+			if hc, ok := resultMsg.(HelpCmdMsg); ok {
+				return hc.Command
+			}
+		}
+		return ""
+	}
+
 	// Press Enter on :continue — should produce ":continue"
-	hw, result := hw.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
-	if result.PendingCommand != ":continue" {
-		t.Errorf("Expected pending command ':continue', got %q", result.PendingCommand)
+	if cmd := getCmd(hw); cmd != ":continue" {
+		t.Errorf("Expected pending command ':continue', got %q", cmd)
 	}
 
 	// Re-open and test :theme_set <name> — should produce ":theme_set"
 	hw = hw.Open()
 	hw = hw.moveDown()
-	hw, result = hw.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
-	if result.PendingCommand != ":theme_set" {
-		t.Errorf("Expected pending command ':theme_set', got %q", result.PendingCommand)
+	if cmd := getCmd(hw); cmd != ":theme_set" {
+		t.Errorf("Expected pending command ':theme_set', got %q", cmd)
 	}
 
 	// Re-open and test :confirm <id> <yes|no> — should produce ":confirm"
 	hw = hw.Open()
 	hw = hw.moveDown()
 	hw = hw.moveDown()
-	hw, result = hw.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
-	if result.PendingCommand != ":confirm" {
-		t.Errorf("Expected pending command ':confirm', got %q", result.PendingCommand)
+	if cmd := getCmd(hw); cmd != ":confirm" {
+		t.Errorf("Expected pending command ':confirm', got %q", cmd)
 	}
 }
 
@@ -323,16 +343,16 @@ func TestHelpWindowEnterOnKeyBinding(t *testing.T) {
 	hw = hw.Open()
 
 	// Press Enter on Ctrl+H (not a :command)
-	hw, result := hw.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	hw, cmd := hw.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 
 	// Window should stay open - Enter on non-command does nothing
 	if !hw.IsOpen() {
 		t.Error("Help window should stay open after Enter on key binding")
 	}
 
-	// No pending command
-	if result.PendingCommand != "" {
-		t.Errorf("Expected no pending command, got %q", result.PendingCommand)
+	// No command
+	if cmd != nil {
+		t.Errorf("Expected no command, got %v", cmd)
 	}
 }
 

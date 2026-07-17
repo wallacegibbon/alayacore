@@ -204,11 +204,6 @@ func (ms ModelSelector) selectActiveModel() ModelSelector {
 }
 
 // ModelSelectorUpdate captures the outcome of a HandleKeyMsg call.
-type ModelSelectorUpdate struct {
-	Cmd           tea.Cmd
-	ModelSelected bool
-	ReloadModels  bool
-}
 
 // --- Key Handling ---
 

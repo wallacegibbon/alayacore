@@ -194,11 +194,6 @@ func (cd ConfirmDialog) Close() ConfirmDialog {
 // ---- Key Handling ----
 
 // ConfirmDialogUpdate captures the outcome of a HandleKeyMsg call.
-type ConfirmDialogUpdate struct {
-	Cmd     tea.Cmd
-	Handled bool
-	Result  *ConfirmResult // non-nil when dialog committed a result (confirmed/canceled)
-}
 
 // HandleKeyMsg processes a key press and updates state.
 // Returns the updated dialog and a result struct describing what happened.

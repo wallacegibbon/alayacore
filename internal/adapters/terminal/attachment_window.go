@@ -145,6 +145,7 @@ func (aw AttachmentWindow) Update(msg tea.Msg) (AttachmentWindow, tea.Cmd) {
 	return aw, nil
 }
 
+//nolint:gocyclo
 func (aw AttachmentWindow) updateForKeyMsg(msg tea.KeyMsg) (AttachmentWindow, tea.Cmd) {
 	if aw.State == FilteredListClosed {
 		return aw, nil
@@ -158,6 +159,10 @@ func (aw AttachmentWindow) updateForKeyMsg(msg tea.KeyMsg) (AttachmentWindow, te
 
 	if aw.mode == modeURL && key == keyEnter {
 		aw = aw.handleURLEntry()
+		if aw.selectedPath != "" {
+			path := aw.selectedPath
+			return aw, func() tea.Msg { return AttachmentSelectedMsg{Path: path} }
+		}
 		return aw, nil
 	}
 
@@ -178,6 +183,11 @@ func (aw AttachmentWindow) updateForKeyMsg(msg tea.KeyMsg) (AttachmentWindow, te
 	if result.Handled {
 		if aw.mode == modeLocal {
 			aw = aw.handleLocalModeKeys(result.FilterChanged, key, inputWasFocused)
+		}
+		// If a path was selected, send it as a message
+		if aw.selectedPath != "" {
+			path := aw.selectedPath
+			return aw, func() tea.Msg { return AttachmentSelectedMsg{Path: path} }
 		}
 		return aw, result.Cmd
 	}

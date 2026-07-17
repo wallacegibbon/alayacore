@@ -280,11 +280,16 @@ func (m Terminal) handleSelectorOverlayKeys(msg tea.KeyMsg) (Terminal, tea.Cmd, 
 		aw, cmd := aw.Update(msg)
 		m.overlays = m.overlays.WithAttachmentWindow(aw)
 		if t.JustClosed(aw) {
-			if path := aw.SelectedPath(); path != "" {
-				if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
-					m = m.addURLAttachment(path)
-				} else {
-					m = m.addAttachment(path)
+			// Check if a file/URL was selected (via AttachmentSelectedMsg)
+			if cmd != nil {
+				if resultMsg := cmd(); resultMsg != nil {
+					if ac, ok := resultMsg.(AttachmentSelectedMsg); ok {
+						if strings.HasPrefix(ac.Path, "http://") || strings.HasPrefix(ac.Path, "https://") {
+							m = m.addURLAttachment(ac.Path)
+						} else {
+							m = m.addAttachment(ac.Path)
+						}
+					}
 				}
 			}
 			m = m.restoreFocus()
@@ -294,19 +299,24 @@ func (m Terminal) handleSelectorOverlayKeys(msg tea.KeyMsg) (Terminal, tea.Cmd, 
 	if m.overlays.HelpWindow().IsOpen() {
 		hw := m.overlays.HelpWindow()
 		t := trackOverlay(hw)
-		hw, result := hw.Update(msg)
+		hw, cmd := hw.Update(msg)
 		m.overlays = m.overlays.WithHelpWindow(hw)
 		if t.JustClosed(hw) {
-			if result.PendingCommand != "" {
-				m = m.focusInput()
-				m.input = m.input.WithValue(result.PendingCommand + " ")
-				m.input = m.input.CursorEnd()
-				m.display = m.display.updateContent()
-				return m, nil, true
+			// Check if a command was selected (via HelpCmdMsg)
+			if cmd != nil {
+				if resultMsg := cmd(); resultMsg != nil {
+					if hc, ok := resultMsg.(HelpCmdMsg); ok {
+						m = m.focusInput()
+						m.input = m.input.WithValue(hc.Command + " ")
+						m.input = m.input.CursorEnd()
+						m.display = m.display.updateContent()
+						return m, nil, true
+					}
+				}
 			}
 			m = m.restoreFocus()
 		}
-		return m, result.Cmd, true
+		return m, nil, true
 	}
 	return m, nil, false
 }

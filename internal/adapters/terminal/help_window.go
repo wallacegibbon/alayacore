@@ -36,7 +36,6 @@ type HelpWindow struct {
 
 	items          []HelpItem
 	filteredItems  []HelpItem
-	pendingCommand string
 	keyColumnWidth int
 }
 
@@ -245,17 +244,13 @@ func (hw HelpWindow) filteredLen() int {
 	return len(hw.filteredItems)
 }
 
-// HelpWindowUpdate captures the outcome of a HandleKeyMsg call.
-type HelpWindowUpdate struct {
-	Cmd            tea.Cmd
-	PendingCommand string // non-empty when a command was selected
-}
+// HelpWindowUpdate removed — use HelpCmdMsg instead {
 
 //nolint:gocyclo
-func (hw HelpWindow) Update(msg tea.Msg) (HelpWindow, HelpWindowUpdate) {
+func (hw HelpWindow) Update(msg tea.Msg) (HelpWindow, tea.Cmd) {
 	keyMsg, ok := msg.(tea.KeyMsg)
 	if !ok {
-		return hw, HelpWindowUpdate{}
+		return hw, nil
 	}
 	key := keyMsg.String()
 
@@ -263,25 +258,22 @@ func (hw HelpWindow) Update(msg tea.Msg) (HelpWindow, HelpWindowUpdate) {
 	hw.FilteredListCore = fl
 
 	// Check if Enter was pressed on a command item
+	var pendingCmd string
 	if key == keyEnter && result.Handled && !fl.FilterInputFocused {
 		if hw.SelectedIdx >= 0 && hw.SelectedIdx < hw.filteredLen() {
 			item := hw.filteredItems[hw.SelectedIdx]
 			if !item.IsSection && item.Type == HelpItemCommand {
 				parts := strings.Fields(item.Key)
 				if len(parts) > 0 {
-					hw.pendingCommand = parts[0]
+					pendingCmd = parts[0]
 				} else {
-					hw.pendingCommand = item.Key
+					pendingCmd = item.Key
 				}
 			}
 		}
 	}
 
-	update := HelpWindowUpdate{Cmd: result.Cmd}
-
-	if hw.pendingCommand != "" {
-		update.PendingCommand = hw.pendingCommand
-		hw.pendingCommand = ""
+	if pendingCmd != "" {
 		fl = fl.Close()
 	}
 	hw.FilteredListCore = fl
@@ -300,9 +292,12 @@ func (hw HelpWindow) Update(msg tea.Msg) (HelpWindow, HelpWindowUpdate) {
 				hw = hw.moveUp()
 			}
 		}
-		return hw, update
+		if pendingCmd != "" {
+			return hw, func() tea.Msg { return HelpCmdMsg{Command: pendingCmd} }
+		}
+		return hw, result.Cmd
 	}
-	return hw, update
+	return hw, nil
 }
 
 func (hw HelpWindow) handleTabToList() HelpWindow { return hw }
