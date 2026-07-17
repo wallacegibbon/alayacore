@@ -28,7 +28,6 @@ import (
 //   - Input messages from the user (via inputPump → inputMsgCh)
 //   - Task state changes (via task goroutine → taskEventCh)
 //   - Task completion signals (via taskResultCh)
-//   - System info refresh requests (via taskRefreshCh)
 //   - MCP initialization events (via mcpService.Events())
 func (s *Session) run() {
 	defer close(s.runDoneCh)
@@ -67,9 +66,6 @@ func (s *Session) run() {
 
 		case contents := <-s.taskResultCh:
 			s.handleTaskDone(contents)
-
-		case <-s.taskRefreshCh:
-			s.sendSystemInfo(SystemInfoTask)
 
 		case evt, ok := <-mcpEvents:
 			if !ok {
@@ -170,8 +166,7 @@ func (s *Session) flushPendingEvents() {
 // task complete before the session exits.
 //
 // Priority: taskResultCh is checked first to avoid processing redundant
-// events when the task has already finished. taskRefreshCh is ignored
-// during shutdown since the UI is about to close anyway.
+// events when the task has already finished.
 func (s *Session) drainUntilTaskDone() {
 	for {
 		// Check taskResultCh first with priority to avoid unnecessary
@@ -209,10 +204,12 @@ func (s *Session) handleTaskEvent(ev TaskEvent) {
 		if newContext > 0 {
 			s.ContextTokens = newContext
 		}
+		s.sendSystemInfo(SystemInfoTask)
 
 	case SetContextTokensEvent:
 		if e.Tokens > 0 {
 			s.ContextTokens = e.Tokens
 		}
+		s.sendSystemInfo(SystemInfoTask)
 	}
 }

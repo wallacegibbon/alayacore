@@ -7,18 +7,13 @@ package agent
 //
 //   Guaranteed broadcasts (critical state transitions):
 //     handleTaskEvent(StepStartEvent)  → sendSystemInfo(SystemInfoTask)  — step counter
+//     handleTaskEvent(StepFinishEvent) → sendSystemInfo(SystemInfoTask)  — token count update
+//     handleTaskEvent(SetContextTokensEvent) → sendSystemInfo(SystemInfoTask) — summary correction
 //     handleTaskDone()                 → sendSystemInfo(SystemInfoTask)  — task completion
 //     handleModelSet/ModelLoad         → sendSystemInfo(SystemInfoModel) — model switch
 //     SetReasoningLevel()              → sendSystemInfo(SystemInfoReasoning)
 //     SetVideoConfig()                 → sendSystemInfo(SystemInfoVideoConfig)
 //     handleThemeSet()                 → sendSystemInfo(SystemInfoTheme)
-//
-//   Best-effort broadcasts (UI responsiveness optimization):
-//     The task goroutine calls requestSystemInfo() which sends on
-//     taskRefreshCh (non-blocking). The run() goroutine picks it up
-//     and calls sendSystemInfo(SystemInfoTask). If the send is dropped
-//     (buffer full), the TUI misses a transient update but catches
-//     up at the next guaranteed broadcast above.
 //
 // All state reads in sendSystemInfo are from fields owned by run()
 // or from atomic fields — no mutex needed.
@@ -116,20 +111,6 @@ func (s *Session) writeToolOutput(id string, contents []llm.ContentPart, isError
 // ============================================================================
 // System Info Broadcasting
 // ============================================================================
-
-// requestSystemInfo signals the run() goroutine to broadcast task info.
-// Non-blocking — if a signal is already pending, this is a no-op.
-// Only the latest state matters, and critical state transitions
-// (step counter, task completion) are sent directly from run(), so
-// dropping a redundant request is harmless.
-// Called from the task goroutine whenever state changes that should be
-// reflected in the UI (step boundaries, errors, etc.).
-func (s *Session) requestSystemInfo() {
-	select {
-	case s.taskRefreshCh <- struct{}{}:
-	default:
-	}
-}
 
 // sendSystemInfo sends one or more TagSystemMsg frames to the adapter.
 // Must only be called from the run() goroutine.

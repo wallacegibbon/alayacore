@@ -59,7 +59,6 @@ func (s *Session) handleUserPrompt(ctx context.Context, contents []llm.ContentPa
 	fullContents, outputTokens, err := s.processPrompt(ctx, contents)
 	if err != nil {
 		s.writeError(err.Error())
-		s.requestSystemInfo()
 		return contents, 0
 	}
 
@@ -116,7 +115,6 @@ func (s *Session) doAutoSummarize(ctx context.Context, contents []llm.ContentPar
 	fullContents, outputTokens, err := s.processPrompt(ctx, contents)
 	if err != nil {
 		s.writeError(err.Error())
-		s.requestSystemInfo()
 		return contents
 	}
 
@@ -160,7 +158,6 @@ func (s *Session) buildSummary(fullContents []llm.ContentPart, beforeLen int, ou
 	}
 
 	s.writeNotify("Summarized conversation")
-	s.requestSystemInfo()
 	return contents
 }
 
@@ -283,7 +280,6 @@ func (s *Session) needsToolConfirm(name string) bool {
 // handleStepStart handles the start of a new agent step.
 func (s *Session) handleStepStart(step int) error {
 	s.sendEvent(StepStartEvent{Step: step})
-	s.requestSystemInfo()
 	return nil
 }
 
@@ -317,7 +313,6 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.ContentPart) 
 		fullContents = cleanIncompleteToolInputs(contents)
 		s.sendEvent(usageToStepFinishEvent(usage))
 		outputTokens += usage.OutputTokens
-		s.requestSystemInfo()
 		return nil
 	}
 
@@ -433,8 +428,6 @@ func (s *Session) runTask(ctx context.Context, taskContent []llm.ContentPart, pa
 
 	contents, _ = s.handleUserPrompt(ctx, contents, parts)
 
-	s.requestSystemInfo()
-
 	if ctx.Err() == context.Canceled {
 		contents = s.appendCancelMessage(contents)
 	}
@@ -468,7 +461,6 @@ func (s *Session) runContinue(ctx context.Context, taskContent []llm.ContentPart
 		fullContents, _, err := s.processPrompt(ctx, contents)
 		if err != nil {
 			s.writeError(err.Error())
-			s.requestSystemInfo()
 		}
 		contents = fullContents
 	}

@@ -24,7 +24,6 @@ package agent
 //     taskEventCh (taskEvent)        — task → run()
 //     taskCancel (func call)         — run() → task (cancellation via cancelRunningTask)
 //     taskResultCh                   — task → run (full ContentParts list)
-//     taskRefreshCh                  — task → run() (best-effort system-info refresh; see session_output.go)
 //     mcpService.Events()            — MCPService → run() (MCP init events: connect/OAuth/discover)
 //
 // Related files:
@@ -80,10 +79,9 @@ type runState struct {
 
 	activeTask *taskHandle // non-nil when a task is running; nil when idle
 
-	inputMsgCh    chan inputMsg // inputPump → run: parsed TLV messages
-	taskEventCh   chan TaskEvent
-	taskResultCh  chan []llm.ContentPart
-	taskRefreshCh chan struct{}
+	inputMsgCh   chan inputMsg // inputPump → run: parsed TLV messages
+	taskEventCh  chan TaskEvent
+	taskResultCh chan []llm.ContentPart
 
 	// mcpService drives the entire MCP initialization lifecycle.
 	// The run() goroutine reads from its Events() channel and reacts:
@@ -206,10 +204,9 @@ func NewSession(cfg SessionConfig) *Session {
 			SessionConfig: cfg,
 		},
 		runState: runState{
-			Contents:      make([]llm.ContentPart, 0),
-			taskEventCh:   make(chan TaskEvent, 64),
-			taskResultCh:  make(chan []llm.ContentPart, 1),
-			taskRefreshCh: make(chan struct{}, 1),
+			Contents:     make([]llm.ContentPart, 0),
+			taskEventCh:  make(chan TaskEvent, 64),
+			taskResultCh: make(chan []llm.ContentPart, 1),
 		},
 		sharedState: sharedState{
 			sessionCtx:    ctx,
@@ -250,10 +247,9 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 			SessionConfig: cfg,
 		},
 		runState: runState{
-			Contents:      data.Contents,
-			taskEventCh:   make(chan TaskEvent, 64),
-			taskResultCh:  make(chan []llm.ContentPart, 1),
-			taskRefreshCh: make(chan struct{}, 1),
+			Contents:     data.Contents,
+			taskEventCh:  make(chan TaskEvent, 64),
+			taskResultCh: make(chan []llm.ContentPart, 1),
 		},
 		sharedState: sharedState{
 			sessionCtx:    ctx,
