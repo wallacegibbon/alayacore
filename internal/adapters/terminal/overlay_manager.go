@@ -16,12 +16,12 @@ import (
 
 // OverlayManager owns all overlay components and their rendering.
 type OverlayManager struct {
-	modelSelector    *ModelSelector
-	themeSelector    *ThemeSelector
-	helpWindow       *HelpWindow
+	modelSelector    ModelSelector
+	themeSelector    ThemeSelector
+	helpWindow       HelpWindow
 	confirmOverlay   ConfirmDialog
 	mcpInitOverlay   ConfirmDialog
-	attachmentWindow *AttachmentWindow
+	attachmentWindow AttachmentWindow
 
 	// Focus state — which window had focus before an overlay opened.
 	focusedWindow string
@@ -32,12 +32,12 @@ type OverlayManager struct {
 
 // NewOverlayManager creates an OverlayManager with the given components.
 func NewOverlayManager(
-	modelSelector *ModelSelector,
-	themeSelector *ThemeSelector,
-	helpWindow *HelpWindow,
+	modelSelector ModelSelector,
+	themeSelector ThemeSelector,
+	helpWindow HelpWindow,
 	confirmOverlay ConfirmDialog,
 	mcpInitOverlay ConfirmDialog,
-	attachmentWindow *AttachmentWindow,
+	attachmentWindow AttachmentWindow,
 	styles *Styles,
 ) *OverlayManager {
 	return &OverlayManager{
@@ -57,12 +57,12 @@ func NewOverlayManager(
 
 // SetSize updates the size of all overlay components.
 func (om *OverlayManager) SetSize(width, height int) {
-	om.modelSelector.SetSize(width, height)
-	om.themeSelector.SetSize(width, height)
-	om.helpWindow.SetSize(width, height)
+	om.modelSelector = om.modelSelector.SetSize(width, height)
+	om.themeSelector = om.themeSelector.SetSize(width, height)
+	om.helpWindow = om.helpWindow.SetSize(width, height)
 	om.confirmOverlay = om.confirmOverlay.SetSize(width, height)
 	om.mcpInitOverlay = om.mcpInitOverlay.SetSize(width, height)
-	om.attachmentWindow.SetSize(width, height)
+	om.attachmentWindow = om.attachmentWindow.SetSize(width, height)
 }
 
 // ============================================================================
@@ -72,11 +72,11 @@ func (om *OverlayManager) SetSize(width, height int) {
 // SetStyles updates the styles on all overlay components.
 func (om *OverlayManager) SetStyles(styles *Styles) {
 	om.styles = styles
-	om.modelSelector.SetStyles(styles)
-	om.themeSelector.SetStyles(styles)
-	om.helpWindow.SetStyles(styles)
+	om.modelSelector = om.modelSelector.SetStyles(styles)
+	om.themeSelector = om.themeSelector.SetStyles(styles)
+	om.helpWindow = om.helpWindow.SetStyles(styles)
 	om.confirmOverlay = om.confirmOverlay.SetStyles(styles)
-	om.attachmentWindow.SetStyles(styles)
+	om.attachmentWindow = om.attachmentWindow.SetStyles(styles)
 }
 
 // ============================================================================
@@ -85,11 +85,11 @@ func (om *OverlayManager) SetStyles(styles *Styles) {
 
 // SetFocused updates the focus state on all overlay components.
 func (om *OverlayManager) SetFocused(focused bool) {
-	om.modelSelector.SetHasFocus(focused)
-	om.themeSelector.SetHasFocus(focused)
-	om.helpWindow.SetHasFocus(focused)
+	om.modelSelector = om.modelSelector.SetHasFocus(focused)
+	om.themeSelector = om.themeSelector.SetHasFocus(focused)
+	om.helpWindow = om.helpWindow.SetHasFocus(focused)
 	om.confirmOverlay = om.confirmOverlay.SetHasFocus(focused)
-	om.attachmentWindow.SetHasFocus(focused)
+	om.attachmentWindow = om.attachmentWindow.SetHasFocus(focused)
 }
 
 // SetFocusedWindow records which window had focus before an overlay opened.
@@ -137,16 +137,28 @@ func (om *OverlayManager) IsMCPInitOpen() bool {
 }
 
 // ModelSelector returns the model selector component.
-func (om *OverlayManager) ModelSelector() *ModelSelector { return om.modelSelector }
+func (om *OverlayManager) ModelSelector() ModelSelector { return om.modelSelector }
+
+// SetModelSelector replaces the model selector component.
+func (om *OverlayManager) SetModelSelector(ms ModelSelector) { om.modelSelector = ms }
 
 // ThemeSelector returns the theme selector component.
-func (om *OverlayManager) ThemeSelector() *ThemeSelector { return om.themeSelector }
+func (om *OverlayManager) ThemeSelector() ThemeSelector { return om.themeSelector }
+
+// SetThemeSelector replaces the theme selector component.
+func (om *OverlayManager) SetThemeSelector(ts ThemeSelector) { om.themeSelector = ts }
 
 // HelpWindow returns the help window component.
-func (om *OverlayManager) HelpWindow() *HelpWindow { return om.helpWindow }
+func (om *OverlayManager) HelpWindow() HelpWindow { return om.helpWindow }
+
+// SetHelpWindow replaces the help window component.
+func (om *OverlayManager) SetHelpWindow(hw HelpWindow) { om.helpWindow = hw }
 
 // AttachmentWindow returns the attachment window component.
-func (om *OverlayManager) AttachmentWindow() *AttachmentWindow { return om.attachmentWindow }
+func (om *OverlayManager) AttachmentWindow() AttachmentWindow { return om.attachmentWindow }
+
+// SetAttachmentWindow replaces the attachment window component.
+func (om *OverlayManager) SetAttachmentWindow(aw AttachmentWindow) { om.attachmentWindow = aw }
 
 // ConfirmOverlay returns the confirm dialog component.
 func (om *OverlayManager) ConfirmOverlay() ConfirmDialog { return om.confirmOverlay }
@@ -166,23 +178,23 @@ func (om *OverlayManager) SetMCPInitOverlay(cd ConfirmDialog) { om.mcpInitOverla
 
 // OpenModelSelector opens the model selector.
 func (om *OverlayManager) OpenModelSelector() {
-	om.modelSelector.Open()
+	om.modelSelector = om.modelSelector.Open()
 }
 
 // OpenThemeSelector opens the theme selector with the given themes and active name.
 func (om *OverlayManager) OpenThemeSelector(themes []theme.Info, activeTheme string) {
-	om.themeSelector.Open(themes, activeTheme)
+	om.themeSelector = om.themeSelector.Open(themes, activeTheme)
 }
 
 // OpenHelpWindow opens the help window.
 func (om *OverlayManager) OpenHelpWindow() {
-	om.helpWindow.Open()
+	om.helpWindow = om.helpWindow.Open()
 }
 
 // OpenAttachmentWindow opens the attachment window.
 func (om *OverlayManager) OpenAttachmentWindow(onAdd func(path string)) {
-	om.attachmentWindow.SetOnAdd(onAdd)
-	om.attachmentWindow.Open()
+	om.attachmentWindow = om.attachmentWindow.SetOnAdd(onAdd)
+	om.attachmentWindow = om.attachmentWindow.Open()
 }
 
 // OpenConfirmQuit opens the quit confirmation dialog.

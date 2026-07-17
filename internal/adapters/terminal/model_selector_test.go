@@ -128,8 +128,8 @@ func TestModelSelectorCtrlCClearsSearch(t *testing.T) {
 		{ModelConfig: config.ModelConfig{Name: "OpenAI GPT-4", ProtocolType: "openai", ModelName: "gpt-4"}},
 		{ModelConfig: config.ModelConfig{Name: "Zhipu / GLM-5", ProtocolType: "anthropic", ModelName: "glm-5"}},
 	}
-	ms.SetModels(models)
-	ms.Open()
+	ms = ms.SetModels(models)
+	ms = ms.Open()
 
 	// Focus the search input first (simulates user pressing Tab to focus search)
 	ms.FilterInputFocused = true
@@ -138,7 +138,7 @@ func TestModelSelectorCtrlCClearsSearch(t *testing.T) {
 
 	// Type in search input
 	ms.FilterInput = ms.FilterInput.SetValue("gpt4")
-	ms.updateFilteredModels()
+	ms = ms.updateFilteredModels()
 
 	if ms.FilterInput.Value() != "gpt4" {
 		t.Fatalf("Expected search input to be 'gpt4', got %q", ms.FilterInput.Value())
@@ -146,7 +146,7 @@ func TestModelSelectorCtrlCClearsSearch(t *testing.T) {
 
 	// Press Ctrl+C
 	msg := tea.KeyPressMsg(tea.Key{Code: 'c', Mod: tea.ModCtrl})
-	cmd := ms.HandleKeyMsg(msg)
+	ms, cmd := ms.HandleKeyMsg(msg)
 
 	// Check that search input is cleared
 	if ms.FilterInput.Value() != "" {
@@ -173,8 +173,8 @@ func TestModelSelectorSetModelsUpdatesFilteredModels(t *testing.T) {
 		{ModelConfig: config.ModelConfig{Name: "OpenAI GPT-4", ProtocolType: "openai", ModelName: "gpt-4"}},
 		{ModelConfig: config.ModelConfig{Name: "Zhipu / GLM-5", ProtocolType: "anthropic", ModelName: "glm-5"}},
 	}
-	ms.SetModels(models)
-	ms.Open()
+	ms = ms.SetModels(models)
+	ms = ms.Open()
 
 	// Verify filteredModels is set
 	if len(ms.filteredModels) != 2 {
@@ -183,7 +183,7 @@ func TestModelSelectorSetModelsUpdatesFilteredModels(t *testing.T) {
 
 	// Simulate user typing a search (so lastSearchValue is set)
 	ms.FilterInput = ms.FilterInput.SetValue("gpt")
-	ms.updateFilteredModels()
+	ms = ms.updateFilteredModels()
 
 	// Verify filtered models are now filtered
 	if len(ms.filteredModels) != 1 {
@@ -200,7 +200,7 @@ func TestModelSelectorSetModelsUpdatesFilteredModels(t *testing.T) {
 		{ModelConfig: config.ModelConfig{Name: "OpenAI GPT-4", ProtocolType: "openai", ModelName: "gpt-4"}},
 		{ModelConfig: config.ModelConfig{Name: "Claude 3.5", ProtocolType: "anthropic", ModelName: "claude-3.5"}},
 	}
-	ms.SetModels(newModels)
+	ms = ms.SetModels(newModels)
 
 	// After SetModels, filteredModels should be updated with the new models
 	// The search "gpt" should now match both GPT-4o and GPT-4
@@ -210,7 +210,7 @@ func TestModelSelectorSetModelsUpdatesFilteredModels(t *testing.T) {
 
 	// Clear search and verify all 3 models are shown
 	ms.FilterInput = ms.FilterInput.SetValue("")
-	ms.updateFilteredModels()
+	ms = ms.updateFilteredModels()
 	if len(ms.filteredModels) != 3 {
 		t.Errorf("Expected 3 filtered models after clearing search, got %d", len(ms.filteredModels))
 	}
@@ -229,10 +229,10 @@ func TestModelSelectorLoadModelsBeforeOpen(t *testing.T) {
 	}
 
 	// Load models first (models arrive via tick loop before the selector opens)
-	ms.LoadModels(models, 3) // Model C is active
+	ms, _ = ms.LoadModels(models, 3) // Model C is active
 
 	// Then open (simulates Ctrl+L)
-	ms.Open()
+	ms = ms.Open()
 
 	// The cursor should be at the active model (Model C, index 2)
 	if ms.SelectedIdx != 2 {
@@ -251,7 +251,7 @@ func TestModelSelectorOpenBeforeLoadModelsThenTick(t *testing.T) {
 	ms := NewModelSelector(styles)
 
 	// Simulate the race: selector opens with no models loaded yet
-	ms.Open()
+	ms = ms.Open()
 
 	// Verify selector is open but empty
 	if !ms.IsOpen() {
@@ -267,7 +267,7 @@ func TestModelSelectorOpenBeforeLoadModelsThenTick(t *testing.T) {
 		{ID: 2, Name: "Model B", ProtocolType: "anthropic", ModelName: "model-b"},
 		{ID: 3, Name: "Model C", ProtocolType: "anthropic", ModelName: "model-c"},
 	}
-	ms.LoadModels(models, 3) // Model C is active
+	ms, _ = ms.LoadModels(models, 3) // Model C is active
 
 	// activeModel should be set correctly
 	if ms.activeModel == nil {
@@ -295,8 +295,8 @@ func TestModelSelectorLoadModelsPreservesSelection(t *testing.T) {
 		{ID: 1, Name: "Model A", ProtocolType: "openai", ModelName: "model-a"},
 		{ID: 2, Name: "Model B", ProtocolType: "anthropic", ModelName: "model-b"},
 	}
-	ms.LoadModels(models, 1) // Model A is active
-	ms.Open()
+	ms, _ = ms.LoadModels(models, 1) // Model A is active
+	ms = ms.Open()
 
 	// Select second model (simulates user navigating with j/k)
 	ms.SelectedIdx = 1
@@ -308,7 +308,7 @@ func TestModelSelectorLoadModelsPreservesSelection(t *testing.T) {
 		{ID: 2, Name: "Model B", ProtocolType: "anthropic", ModelName: "model-b"},
 		{ID: 3, Name: "Model C", ProtocolType: "anthropic", ModelName: "model-c"},
 	}
-	ms.LoadModels(newModels, 1) // Model A is still active
+	ms, _ = ms.LoadModels(newModels, 1) // Model A is still active
 
 	// Selection should still be at index 1 (Model B)
 	if ms.SelectedIdx != 1 {

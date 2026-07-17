@@ -23,31 +23,27 @@ const (
 	modeURL
 )
 
-// AttachmentWindow manages file/URL selection for multi-modal input.
 type AttachmentWindow struct {
 	FilteredListCore
 
 	entries    []fileEntry
 	filtered   []fileEntry
-	currentDir string // actual directory being displayed
-	baseDir    string // anchor for resolving relative path inputs (only updated on explicit navigation)
+	currentDir string
+	baseDir    string
 	mode       attachmentMode
 
-	// Callback: invoked when user adds a file or URL.
 	onAdd func(path string)
 }
 
-// fileEntry represents a single file system entry.
 type fileEntry struct {
 	name      string
-	nameLower string // pre-computed lowercase of name, for filtering
+	nameLower string
 	isDir     bool
 }
 
-// NewAttachmentWindow creates a new attachment picker.
-func NewAttachmentWindow(styles *Styles) *AttachmentWindow {
+func NewAttachmentWindow(styles *Styles) AttachmentWindow {
 	input := newFilterInput("Search files...")
-	aw := &AttachmentWindow{
+	aw := AttachmentWindow{
 		entries:  []fileEntry{},
 		filtered: []fileEntry{},
 	}
@@ -60,26 +56,27 @@ func NewAttachmentWindow(styles *Styles) *AttachmentWindow {
 	return aw
 }
 
-// SetOnAdd sets the callback for when a file or URL is selected.
-func (aw *AttachmentWindow) SetOnAdd(fn func(path string)) {
+func (aw AttachmentWindow) SetOnAdd(fn func(path string)) AttachmentWindow {
 	aw.onAdd = fn
+	return aw
 }
 
-// SetSize updates the width and height of the attachment window.
-func (aw *AttachmentWindow) SetSize(width, height int) {
+func (aw AttachmentWindow) SetSize(width, height int) AttachmentWindow {
 	aw.FilteredListCore = aw.FilteredListCore.SetSize(width, height)
+	return aw
 }
 
-func (aw *AttachmentWindow) SetStyles(styles *Styles) {
+func (aw AttachmentWindow) SetStyles(styles *Styles) AttachmentWindow {
 	aw.FilteredListCore = aw.FilteredListCore.SetStyles(styles)
+	return aw
 }
 
-func (aw *AttachmentWindow) SetHasFocus(focused bool) {
+func (aw AttachmentWindow) SetHasFocus(focused bool) AttachmentWindow {
 	aw.FilteredListCore = aw.FilteredListCore.SetHasFocus(focused)
+	return aw
 }
 
-// Open opens the attachment window and loads the current directory.
-func (aw *AttachmentWindow) Open() {
+func (aw AttachmentWindow) Open() AttachmentWindow {
 	aw.State = FilteredListOpen
 	aw.mode = modeLocal
 	aw.FilterInput = aw.FilterInput.SetValue("")
@@ -92,10 +89,10 @@ func (aw *AttachmentWindow) Open() {
 	aw.SelectedIdx = 0
 	aw.currentDir, _ = os.Getwd()
 	aw.baseDir = aw.currentDir
-	aw.loadDir(aw.currentDir)
+	return aw.loadDir(aw.currentDir)
 }
 
-func (aw *AttachmentWindow) loadDir(dir string) {
+func (aw AttachmentWindow) loadDir(dir string) AttachmentWindow {
 	aw.entries = aw.readDir(dir)
 	aw.filtered = make([]fileEntry, len(aw.entries))
 	copy(aw.filtered, aw.entries)
@@ -103,9 +100,10 @@ func (aw *AttachmentWindow) loadDir(dir string) {
 	aw.ScrollIdx = 0
 	aw.FilteredListCore = aw.FilteredListCore.ClampSelection(len(aw.filtered))
 	aw.FilteredListCore = aw.FilteredListCore.EnsureVisible()
+	return aw
 }
 
-func (aw *AttachmentWindow) readDir(dir string) []fileEntry {
+func (aw AttachmentWindow) readDir(dir string) []fileEntry {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil
@@ -125,80 +123,70 @@ func (aw *AttachmentWindow) readDir(dir string) []fileEntry {
 	return result
 }
 
-// HandleKeyMsg handles keyboard input.
-func (aw *AttachmentWindow) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
+func (aw AttachmentWindow) HandleKeyMsg(msg tea.KeyMsg) (AttachmentWindow, tea.Cmd) {
 	if aw.State == FilteredListClosed {
-		return nil
+		return aw, nil
 	}
 
 	key := msg.String()
 
-	// Ctrl+A toggles between local and URL mode
 	if key == keyCtrlA {
-		aw.toggleMode()
-		return nil
+		return aw.toggleMode(), nil
 	}
 
-	// URL mode: Enter submits the URL immediately
 	if aw.mode == modeURL && key == keyEnter {
-		aw.handleURLEntry()
-		return nil
+		aw = aw.handleURLEntry()
+		return aw, nil
 	}
 
-	// Capture focus state before processing — handleEnter for a directory
-	// switches focus to the filter input, and we need to avoid double-processing
-	// when handleLocalModeKeys runs afterwards.
 	inputWasFocused := aw.FilterInputFocused
 
 	fl, handled, filterChanged, cmd := aw.FilteredListCore.HandleKeyMsg(msg, func(extraKey string) bool {
-		if extraKey == keyEnter {
-			return aw.handleEnter()
-		}
-		if extraKey == keyEsc {
-			return true
-		}
-		return false
+		return extraKey == keyEnter || extraKey == keyEsc
 	})
-	if !aw.IsOpen() {
+
+	// Handle Enter selection in the list after HandleKeyMsg returns.
+	if key == keyEnter && handled && !fl.FilterInputFocused {
+		aw.FilteredListCore = fl
+		aw = aw.handleEnter()
+		fl = aw.FilteredListCore
+	} else if key == keyEsc && handled {
 		fl = fl.Close()
 	}
 	aw.FilteredListCore = fl
 
 	if handled {
 		if aw.mode == modeLocal {
-			aw.handleLocalModeKeys(filterChanged, key, inputWasFocused)
+			aw = aw.handleLocalModeKeys(filterChanged, key, inputWasFocused)
 		}
-		return cmd
+		return aw, cmd
 	}
 
 	if aw.mode == modeLocal && !aw.FilterInputFocused {
-		aw.handleListKeys(key)
+		aw = aw.handleListKeys(key)
 	}
 
-	return nil
+	return aw, nil
 }
 
-func (aw *AttachmentWindow) handleLocalModeKeys(filterChanged bool, key string, inputWasFocused bool) {
+func (aw AttachmentWindow) handleLocalModeKeys(filterChanged bool, key string, inputWasFocused bool) AttachmentWindow {
 	if filterChanged && aw.FilterInputFocused {
-		// Ctrl+C clears the filter — also reset directory to baseDir
 		if key == keyCtrlC {
 			aw.currentDir = aw.baseDir
-			aw.loadDir(aw.baseDir)
+			aw = aw.loadDir(aw.baseDir)
 		}
-		aw.updateFiltered()
+		aw = aw.updateFiltered()
 	}
 	if !aw.FilterInputFocused {
-		aw.handleListKeys(key)
+		aw = aw.handleListKeys(key)
 	}
-	// Only handle Enter if the filter input was already focused before this key
-	// event.  When the list handles Enter on a directory it switches focus to
-	// the filter — we must not double-process the same key.
 	if aw.FilterInputFocused && key == keyEnter && len(aw.filtered) > 0 && inputWasFocused {
-		aw.handleSearchEnter()
+		aw = aw.handleSearchEnter()
 	}
+	return aw
 }
 
-func (aw *AttachmentWindow) toggleMode() {
+func (aw AttachmentWindow) toggleMode() AttachmentWindow {
 	aw.FilterInput = aw.FilterInput.SetValue("")
 	aw.lastFilterValue = "\x00"
 	if aw.mode == modeLocal {
@@ -210,43 +198,38 @@ func (aw *AttachmentWindow) toggleMode() {
 	} else {
 		aw.mode = modeLocal
 		aw.FilterInput.Prompt = "F "
-		aw.loadDir(aw.currentDir)
+		aw = aw.loadDir(aw.currentDir)
 		aw.FilterInput = aw.FilterInput.Focus()
 		aw.FilterInputFocused = true
 		aw.FilteredListCore = aw.FilteredListCore.updateFilterInputStyles()
 	}
+	return aw
 }
 
-func (aw *AttachmentWindow) handleURLEntry() bool {
+func (aw AttachmentWindow) handleURLEntry() AttachmentWindow {
 	url := strings.TrimSpace(aw.FilterInput.Value())
 	if url == "" {
-		return false
+		return aw
 	}
 	if aw.onAdd != nil {
 		aw.onAdd(url)
 	}
 	aw.State = FilteredListClosed
-	return true
+	return aw
 }
 
-// handlePaste handles paste events in the attachment window.
-// It updates the input field and, in local mode, triggers directory
-// navigation and file list filtering — the same update path that
-// keyboard input follows via HandleKeyMsg.
-func (aw *AttachmentWindow) handlePaste(msg tea.PasteMsg) {
+func (aw AttachmentWindow) handlePaste(msg tea.PasteMsg) AttachmentWindow {
 	if !aw.FilterInputFocused {
-		return
+		return aw
 	}
 	aw.FilterInput, _ = aw.FilterInput.Update(msg)
 	if aw.mode == modeLocal {
-		aw.updateFiltered()
+		aw = aw.updateFiltered()
 	}
+	return aw
 }
 
-// autocompleteDir replaces the last path segment in the filter input with the
-// given directory name (plus trailing "/"), then re-filters to trigger
-// navigateByPath.
-func (aw *AttachmentWindow) autocompleteDir(dirName string) {
+func (aw AttachmentWindow) autocompleteDir(dirName string) AttachmentWindow {
 	search := aw.FilterInput.Value()
 	switch {
 	case strings.Contains(search, "/"):
@@ -258,51 +241,46 @@ func (aw *AttachmentWindow) autocompleteDir(dirName string) {
 		aw.FilterInput = aw.FilterInput.SetValue(dirName + "/")
 	}
 	aw.lastFilterValue = "\x00"
-	aw.updateFiltered()
+	return aw.updateFiltered()
 }
 
-func (aw *AttachmentWindow) handleEnter() bool {
-	// Enter when the list is focused.
+func (aw AttachmentWindow) handleEnter() AttachmentWindow {
 	if len(aw.filtered) == 0 || aw.SelectedIdx < 0 || aw.SelectedIdx >= len(aw.filtered) {
-		return false
+		return aw
 	}
 	entry := aw.filtered[aw.SelectedIdx]
 	if entry.isDir {
-		// Switch to input mode and autocomplete the directory name.
 		aw.FilterInputFocused = true
 		aw.FilterInput = aw.FilterInput.Focus()
 		aw.FilteredListCore = aw.FilteredListCore.updateFilterInputStyles()
-		aw.autocompleteDir(entry.name)
-		return true
+		aw = aw.autocompleteDir(entry.name)
+		return aw
 	}
-	// File → add it
 	fullPath := filepath.Join(aw.currentDir, entry.name)
 	if aw.onAdd != nil {
 		aw.onAdd(fullPath)
 	}
 	aw.State = FilteredListClosed
-	return true
+	return aw
 }
 
-func (aw *AttachmentWindow) handleSearchEnter() {
-	// Enter when the filter input is focused.
+func (aw AttachmentWindow) handleSearchEnter() AttachmentWindow {
 	if len(aw.filtered) == 0 || aw.SelectedIdx < 0 || aw.SelectedIdx >= len(aw.filtered) {
-		return
+		return aw
 	}
 	entry := aw.filtered[aw.SelectedIdx]
 	if entry.isDir {
-		aw.autocompleteDir(entry.name)
-		return
+		return aw.autocompleteDir(entry.name)
 	}
-	// File → add it
 	fullPath := filepath.Join(aw.currentDir, entry.name)
 	if aw.onAdd != nil {
 		aw.onAdd(fullPath)
 	}
 	aw.State = FilteredListClosed
+	return aw
 }
 
-func (aw *AttachmentWindow) handleListKeys(key string) {
+func (aw AttachmentWindow) handleListKeys(key string) AttachmentWindow {
 	switch key {
 	case keyJ, keyDown:
 		if aw.SelectedIdx < len(aw.filtered)-1 {
@@ -313,39 +291,25 @@ func (aw *AttachmentWindow) handleListKeys(key string) {
 			aw.SelectedIdx--
 		}
 	}
+	return aw
 }
 
-// navigateByPath treats the input as a path and navigates accordingly.
-//
-// Rule: the last "/"-separated segment is the file filter, everything before it is the directory.
-// If input ends with "/", the whole path is the directory (show all files).
-//
-// Three kinds of paths:
-//
-//	Absolute (starts with "/"):      /etc       → dir="/", file="etc"
-//	                                 /etc/ssl   → dir="/etc", file="ssl"
-//	Home-relative (starts with "~"): ~/.ala     → dir="~", file=".ala"
-//	                                 ~/.ala/    → dir="~/.ala"
-//	Relative (contains "/" or ".."): subdir/    → dir="./subdir"
-//	                                 subdir/f   → dir="./subdir", file="f"
-//	                                 ..         → dir=".."
-func (aw *AttachmentWindow) navigateByPath(search string) string {
+func (aw AttachmentWindow) navigateByPath(search string) (AttachmentWindow, string) {
 	var absDir, filter string
 
 	switch {
 	case strings.HasPrefix(search, "~"):
 		home, err := os.UserHomeDir()
 		if err != nil {
-			return search
+			return aw, search
 		}
 		if search == "~" {
-			// "~" alone → home, show all
 			aw.currentDir = home
-			aw.loadDir(home)
+			aw = aw.loadDir(home)
 			aw.lastFilterValue = "\x00"
-			return ""
+			return aw, ""
 		}
-		rest := search[1:] // everything after "~"
+		rest := search[1:]
 		if strings.HasSuffix(rest, "/") {
 			absDir = filepath.Join(home, rest)
 			filter = ""
@@ -364,7 +328,6 @@ func (aw *AttachmentWindow) navigateByPath(search string) string {
 		}
 
 	case strings.Contains(search, "/") || search == "..":
-		// Relative path — resolve from baseDir (fixed anchor)
 		switch {
 		case search == "..":
 			absDir = filepath.Join(aw.baseDir, "..")
@@ -378,25 +341,24 @@ func (aw *AttachmentWindow) navigateByPath(search string) string {
 		}
 
 	default:
-		return search // normal name filtering
+		return aw, search
 	}
 
 	info, err := os.Stat(absDir)
 	if err != nil || !info.IsDir() {
-		return search // directory doesn't exist, keep filter as-is
+		return aw, search
 	}
 
 	aw.currentDir = absDir
-	aw.loadDir(absDir)
+	aw = aw.loadDir(absDir)
 	aw.lastFilterValue = "\x00"
-	return filter
+	return aw, filter
 }
 
-// updateFiltered rebuilds the filtered file list based on filter input.
-func (aw *AttachmentWindow) updateFiltered() {
+func (aw AttachmentWindow) updateFiltered() AttachmentWindow {
 	search := aw.FilterInput.Value()
 	if search == aw.lastFilterValue {
-		return
+		return aw
 	}
 
 	var prevSelectedIdx int
@@ -406,14 +368,14 @@ func (aw *AttachmentWindow) updateFiltered() {
 
 	aw.lastFilterValue = search
 
-	// Try absolute path navigation for "/" and "~" prefixes
-	search = aw.navigateByPath(search)
+	var filter string
+	aw, filter = aw.navigateByPath(search)
 
-	if search == "" {
+	if filter == "" {
 		aw.filtered = make([]fileEntry, len(aw.entries))
 		copy(aw.filtered, aw.entries)
 	} else {
-		term := strings.ToLower(search)
+		term := strings.ToLower(filter)
 		aw.filtered = aw.filtered[:0]
 		for _, e := range aw.entries {
 			if FuzzyMatch(term, e.nameLower) {
@@ -430,24 +392,23 @@ func (aw *AttachmentWindow) updateFiltered() {
 	aw.FilteredListCore = aw.FilteredListCore.ClampSelection(len(aw.filtered))
 	aw.FilteredListCore = aw.FilteredListCore.EnsureVisible()
 	aw.FilteredListCore = aw.FilteredListCore.ClampScroll(len(aw.filtered))
+	return aw
 }
 
-// View renders the attachment window.
-func (aw *AttachmentWindow) View() tea.View {
+func (aw AttachmentWindow) View() tea.View {
 	if aw.State == FilteredListClosed {
 		return tea.NewView("")
 	}
 	return tea.NewView(aw.render())
 }
 
-func (aw *AttachmentWindow) render() string {
+func (aw AttachmentWindow) render() string {
 	var sb strings.Builder
 
 	titleStyle := lipgloss.NewStyle().Background(aw.Styles.ColorDim).Foreground(aw.Styles.ColorAccent).Bold(true)
 	sb.WriteString(titleStyle.Render(fmt.Sprintf("%-*s", aw.Width, "  Attachments")))
 	sb.WriteString("\n")
 
-	// Mode indicator
 	modeText := "Local"
 	if aw.mode == modeURL {
 		modeText = "URL"
@@ -455,7 +416,6 @@ func (aw *AttachmentWindow) render() string {
 	sb.WriteString(aw.Styles.System.Render(fmt.Sprintf("  Mode: %s  (Ctrl+A to switch)", modeText)))
 	sb.WriteString("\n")
 
-	// Search / URL input box
 	searchBox := aw.Styles.RenderBorderedBox(aw.FilterInput.View(), aw.Width, aw.FilterBorderColor())
 	sb.WriteString(searchBox)
 	sb.WriteString("\n")
@@ -468,7 +428,6 @@ func (aw *AttachmentWindow) render() string {
 		aw.renderLocalBody(&sb, boxWidth)
 	}
 
-	// Help bar
 	helpStyle := lipgloss.NewStyle().Background(aw.Styles.ColorDim).Foreground(aw.Styles.ColorMuted)
 	var help string
 	switch {
@@ -485,14 +444,12 @@ func (aw *AttachmentWindow) render() string {
 	return sb.String()
 }
 
-// renderURLBody renders the URL mode body — just a hint line.
-func (aw *AttachmentWindow) renderURLBody(sb *strings.Builder) {
+func (aw AttachmentWindow) renderURLBody(sb *strings.Builder) {
 	sb.WriteString(aw.Styles.System.Render("  Enter a URL to attach (e.g. https://example.com/image.jpg)"))
 	sb.WriteString("\n")
 }
 
-// renderLocalBody renders the local file browser body — directory path and file list.
-func (aw *AttachmentWindow) renderLocalBody(sb *strings.Builder, boxWidth int) {
+func (aw AttachmentWindow) renderLocalBody(sb *strings.Builder, boxWidth int) {
 	sb.WriteString(aw.Styles.System.Render(aw.currentDir))
 	sb.WriteString("\n")
 
@@ -526,8 +483,7 @@ func (aw *AttachmentWindow) renderLocalBody(sb *strings.Builder, boxWidth int) {
 	sb.WriteString(fileBox)
 }
 
-// RenderOverlay renders the attachment window on top of base content.
-func (aw *AttachmentWindow) RenderOverlay(baseContent string, screenWidth, screenHeight int) string {
+func (aw AttachmentWindow) RenderOverlay(baseContent string, screenWidth, screenHeight int) string {
 	if aw.State == FilteredListClosed {
 		return baseContent
 	}

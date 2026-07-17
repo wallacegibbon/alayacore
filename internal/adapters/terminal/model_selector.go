@@ -14,14 +14,11 @@ import (
 	"github.com/alayacore/alayacore/internal/config"
 )
 
-// searchableModel wraps config.ModelConfig with a pre-computed
-// lowercase search string for fuzzy matching.
 type searchableModel struct {
 	config.ModelConfig
-	searchStr string // lowercase "id name context provider" — matches what users see in the list
+	searchStr string
 }
 
-// ModelSelector manages model selection and configuration UI.
 type ModelSelector struct {
 	FilteredListCore
 
@@ -34,10 +31,9 @@ type ModelSelector struct {
 	lastModelCount    int
 }
 
-// NewModelSelector creates a new model selector.
-func NewModelSelector(styles *Styles) *ModelSelector {
+func NewModelSelector(styles *Styles) ModelSelector {
 	input := newFilterInput("Search models...")
-	ms := &ModelSelector{
+	ms := ModelSelector{
 		models: []searchableModel{},
 	}
 	ms.Width = 60
@@ -49,7 +45,6 @@ func NewModelSelector(styles *Styles) *ModelSelector {
 	return ms
 }
 
-// newFilterInput creates a shared InputField for filtering.
 func newFilterInput(placeholder string) InputField {
 	input := NewInputField()
 	input.Placeholder = placeholder
@@ -60,16 +55,19 @@ func newFilterInput(placeholder string) InputField {
 
 // --- Model Management ---
 
-func (ms *ModelSelector) GetActiveModel() *config.ModelConfig {
+func (ms ModelSelector) GetActiveModel() *config.ModelConfig {
 	if ms.activeModel == nil {
 		return nil
 	}
 	return &ms.activeModel.ModelConfig
 }
 
-func (ms *ModelSelector) SetActiveModel(m *searchableModel) { ms.activeModel = m }
+func (ms ModelSelector) SetActiveModel(m *searchableModel) ModelSelector {
+	ms.activeModel = m
+	return ms
+}
 
-func (ms *ModelSelector) GetModels() []config.ModelConfig {
+func (ms ModelSelector) GetModels() []config.ModelConfig {
 	result := make([]config.ModelConfig, len(ms.models))
 	for i := range ms.models {
 		result[i] = ms.models[i].ModelConfig
@@ -77,17 +75,16 @@ func (ms *ModelSelector) GetModels() []config.ModelConfig {
 	return result
 }
 
-func (ms *ModelSelector) SetModels(models []searchableModel) {
+func (ms ModelSelector) SetModels(models []searchableModel) ModelSelector {
 	ms.models = models
 	for i := range ms.models {
 		ms.models[i].searchStr = buildSearchStr(&ms.models[i])
 	}
 	ms.lastFilterValue = "\x00"
-	ms.updateFilteredModels()
+	return ms.updateFilteredModels()
 }
 
-func (ms *ModelSelector) LoadModels(models []config.ModelConfig, activeID int) tea.Cmd {
-	// Skip update if model list hasn't changed.
+func (ms ModelSelector) LoadModels(models []config.ModelConfig, activeID int) (ModelSelector, tea.Cmd) {
 	if ms.modelsUnchangedSinceLastLoad(models) {
 		for i := range ms.models {
 			if ms.models[i].ID == activeID {
@@ -95,7 +92,7 @@ func (ms *ModelSelector) LoadModels(models []config.ModelConfig, activeID int) t
 				break
 			}
 		}
-		return nil
+		return ms, nil
 	}
 
 	prevModelCount := ms.lastModelCount
@@ -104,8 +101,6 @@ func (ms *ModelSelector) LoadModels(models []config.ModelConfig, activeID int) t
 
 	savedSelectedIdx := ms.SelectedIdx
 	savedScrollIdx := ms.ScrollIdx
-	// Save the ID of the model at the old cursor position so we can
-	// detect if it was deleted after the reload.
 	var prevSelectedModelID int
 	if savedSelectedIdx >= 0 && savedSelectedIdx < len(ms.filteredModels) {
 		prevSelectedModelID = ms.filteredModels[savedSelectedIdx].ID
@@ -126,25 +121,21 @@ func (ms *ModelSelector) LoadModels(models []config.ModelConfig, activeID int) t
 	}
 
 	ms.lastFilterValue = "\x00"
-	ms.updateFilteredModels()
+	ms = ms.updateFilteredModels()
 	if shouldPreserveSelection {
 		if prevModelCount == 0 {
-			ms.selectActiveModel()
+			ms = ms.selectActiveModel()
 		} else {
 			ms.SelectedIdx = savedSelectedIdx
 			ms.ScrollIdx = savedScrollIdx
 			ms.FilteredListCore = ms.FilteredListCore.ClampSelection(len(ms.filteredModels))
-			ms.selectActiveModelIfPrevDeleted(prevSelectedModelID)
+			ms = ms.selectActiveModelIfPrevDeleted(prevSelectedModelID)
 		}
 	}
-	return func() tea.Msg { return nil }
+	return ms, func() tea.Msg { return nil }
 }
 
-// modelsUnchangedSinceLastLoad checks whether the given model list is
-// identical to the currently cached models. SetModels may have been called
-// independently between LoadModels calls, so we check both ms.models length
-// AND ms.lastModelCount.
-func (ms *ModelSelector) modelsUnchangedSinceLastLoad(models []config.ModelConfig) bool {
+func (ms ModelSelector) modelsUnchangedSinceLastLoad(models []config.ModelConfig) bool {
 	if len(models) != len(ms.models) || len(models) != ms.lastModelCount {
 		return false
 	}
@@ -156,54 +147,54 @@ func (ms *ModelSelector) modelsUnchangedSinceLastLoad(models []config.ModelConfi
 	return true
 }
 
-// selectActiveModelIfPrevDeleted moves the cursor to the active model if the
-// model that was selected before a reload no longer exists in the filtered
-// list (e.g. it was deleted from the config file).
-func (ms *ModelSelector) selectActiveModelIfPrevDeleted(prevSelectedModelID int) {
+func (ms ModelSelector) selectActiveModelIfPrevDeleted(prevSelectedModelID int) ModelSelector {
 	if prevSelectedModelID <= 0 {
-		return
+		return ms
 	}
 	for _, m := range ms.filteredModels {
 		if m.ID == prevSelectedModelID {
-			return
+			return ms
 		}
 	}
-	ms.selectActiveModel()
+	return ms.selectActiveModel()
 }
 
 // --- Action Consumption ---
 
-func (ms *ModelSelector) ConsumeModelSelected() bool {
+func (ms ModelSelector) ConsumeModelSelected() (ModelSelector, bool) {
 	if ms.modelJustSelected {
 		ms.modelJustSelected = false
-		return true
+		return ms, true
 	}
-	return false
+	return ms, false
 }
 
-func (ms *ModelSelector) ConsumeReloadModels() bool {
+func (ms ModelSelector) ConsumeReloadModels() (ModelSelector, bool) {
 	if ms.reloadModels {
 		ms.reloadModels = false
-		return true
+		return ms, true
 	}
-	return false
+	return ms, false
 }
 
 // --- Open / Close ---
 
-func (ms *ModelSelector) SetSize(width, height int) {
+func (ms ModelSelector) SetSize(width, height int) ModelSelector {
 	ms.FilteredListCore = ms.FilteredListCore.SetSize(width, height)
+	return ms
 }
 
-func (ms *ModelSelector) SetStyles(styles *Styles) {
+func (ms ModelSelector) SetStyles(styles *Styles) ModelSelector {
 	ms.FilteredListCore = ms.FilteredListCore.SetStyles(styles)
+	return ms
 }
 
-func (ms *ModelSelector) SetHasFocus(focused bool) {
+func (ms ModelSelector) SetHasFocus(focused bool) ModelSelector {
 	ms.FilteredListCore = ms.FilteredListCore.SetHasFocus(focused)
+	return ms
 }
 
-func (ms *ModelSelector) Open() {
+func (ms ModelSelector) Open() ModelSelector {
 	ms.State = FilteredListOpen
 	ms.FilterInput = ms.FilterInput.SetValue("")
 	ms.lastFilterValue = "\x00"
@@ -211,89 +202,92 @@ func (ms *ModelSelector) Open() {
 	ms.FilterInput = ms.FilterInput.Blur()
 	ms.FilteredListCore = ms.FilteredListCore.updateFilterInputStyles()
 	ms.ScrollIdx = 0
-	ms.updateFilteredModels()
-	ms.selectActiveModel()
+	ms = ms.updateFilteredModels()
+	return ms.selectActiveModel()
 }
 
-// selectActiveModel positions the cursor at the active model in the filtered list.
-func (ms *ModelSelector) selectActiveModel() {
+func (ms ModelSelector) selectActiveModel() ModelSelector {
 	if ms.activeModel == nil {
 		ms.FilteredListCore = ms.FilteredListCore.ClampSelection(len(ms.filteredModels))
-		return
+		return ms
 	}
 	for i, m := range ms.filteredModels {
 		if m.ID == ms.activeModel.ID {
 			ms.SelectedIdx = i
 			ms.FilteredListCore = ms.FilteredListCore.EnsureVisible()
-			return
+			return ms
 		}
 	}
 	ms.FilteredListCore = ms.FilteredListCore.ClampSelection(len(ms.filteredModels))
+	return ms
 }
 
 // --- Key Handling ---
 
-func (ms *ModelSelector) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
+func (ms ModelSelector) HandleKeyMsg(msg tea.KeyMsg) (ModelSelector, tea.Cmd) {
 	if ms.State == FilteredListClosed {
-		return nil
+		return ms, nil
 	}
 
 	key := msg.String()
 
-	// Common filtered list handling (tab, esc, ctrl+c, filter input, j/k)
 	fl, handled, filterChanged, cmd := ms.FilteredListCore.HandleKeyMsg(msg, func(extraKey string) bool {
-		if extraKey == keyEnter {
-			return ms.handleListEnter()
-		}
-		return false
+		// Callback handles Enter key usage by the core.
+		// Selection logic runs after HandleKeyMsg to avoid
+		// closure capture issues with value types.
+		return extraKey == keyEnter
 	})
-	if ms.modelJustSelected {
-		fl = fl.Close()
+
+	// Handle Enter selection in the list: react after GetFilteredListCore returns.
+	if key == keyEnter && handled && !fl.FilterInputFocused {
+		// Check the condition that handleListEnter would check
+		if len(ms.filteredModels) > 0 && fl.SelectedIdx >= 0 {
+			ms.activeModel = &ms.filteredModels[fl.SelectedIdx]
+			ms.modelJustSelected = true
+			fl = fl.Close()
+		}
 	}
+
 	ms.FilteredListCore = fl
 
 	if handled {
 		if filterChanged && ms.FilterInputFocused {
-			ms.updateFilteredModels()
+			ms = ms.updateFilteredModels()
 		}
 		if !ms.FilterInputFocused {
-			ms.handleListKeys(key)
+			ms = ms.handleListKeys(key)
 		}
 		if ms.FilterInputFocused && key == keyEnter && len(ms.filteredModels) > 0 {
-			ms.handleSearchEnter()
+			ms = ms.handleSearchEnter()
 		}
-		return cmd
+		return ms, cmd
 	}
 
-	// Let component-specific keys (e, r) through even if the core didn't
-	// recognize them as navigation keys.
 	if !ms.FilterInputFocused {
-		ms.handleListKeys(key)
+		ms = ms.handleListKeys(key)
 	}
 
-	return nil
+	return ms, nil
 }
 
-// handleListEnter handles Enter when the list is focused.
-func (ms *ModelSelector) handleListEnter() bool {
+func (ms ModelSelector) handleListEnter() (ModelSelector, bool) {
 	if len(ms.filteredModels) > 0 && ms.SelectedIdx >= 0 {
 		ms.activeModel = &ms.filteredModels[ms.SelectedIdx]
 		ms.modelJustSelected = true
-		return true
+		return ms, true
 	}
-	return false
+	return ms, false
 }
 
-// handleSearchEnter handles Enter when the search input is focused.
-func (ms *ModelSelector) handleSearchEnter() {
+func (ms ModelSelector) handleSearchEnter() ModelSelector {
 	ms.SelectedIdx = 0
 	ms.activeModel = &ms.filteredModels[0]
 	ms.modelJustSelected = true
 	ms.FilteredListCore = ms.FilteredListCore.Close()
+	return ms
 }
 
-// handleListKeys handles navigation and action keys when the list is focused.
-func (ms *ModelSelector) handleListKeys(key string) {
+func (ms ModelSelector) handleListKeys(key string) ModelSelector {
 	switch key {
 	case keyJ, keyDown:
 		if ms.SelectedIdx < len(ms.filteredModels)-1 {
@@ -306,14 +300,14 @@ func (ms *ModelSelector) handleListKeys(key string) {
 	case keyR:
 		ms.reloadModels = true
 	}
+	return ms
 }
 
 // --- Rendering ---
 
-func (ms *ModelSelector) renderList() string {
+func (ms ModelSelector) renderList() string {
 	var sb strings.Builder
 
-	// Title bar with background
 	titleStyle := lipgloss.NewStyle().Background(ms.Styles.ColorDim).Foreground(ms.Styles.ColorAccent).Bold(true)
 	sb.WriteString(titleStyle.Render(fmt.Sprintf("%-*s", ms.Width, "  Model Selector")))
 	sb.WriteString("\n")
@@ -332,7 +326,6 @@ func (ms *ModelSelector) renderList() string {
 	boxWidth := lipgloss.Width(searchBox)
 	sb.WriteString(ms.renderModelList(boxWidth, listBorderColor))
 
-	// Help bar with background
 	helpStyle := lipgloss.NewStyle().Background(ms.Styles.ColorDim).Foreground(ms.Styles.ColorMuted)
 	var help string
 	if ms.FilterInputFocused {
@@ -346,7 +339,7 @@ func (ms *ModelSelector) renderList() string {
 	return sb.String()
 }
 
-func (ms *ModelSelector) renderModelList(width int, borderColor color.Color) string {
+func (ms ModelSelector) renderModelList(width int, borderColor color.Color) string {
 	var content strings.Builder
 	listHeight := SelectorListRows
 	innerWidth := max(0, width-BorderInnerPadding)
@@ -360,7 +353,6 @@ func (ms *ModelSelector) renderModelList(width int, borderColor color.Color) str
 		content.WriteString(ms.Styles.System.Render("No models match your search."))
 	default:
 		ms.FilteredListCore = ms.FilteredListCore.EnsureVisible()
-
 		idWidth := ms.maxIDWidth()
 		nameMaxWidth, ctxColWidth, provColWidth := ms.measureColumns(listHeight, innerWidth, idWidth)
 
@@ -376,8 +368,7 @@ func (ms *ModelSelector) renderModelList(width int, borderColor color.Color) str
 	return ms.Styles.RenderBorderedBox(content.String(), width, borderColor, listHeight)
 }
 
-// maxIDWidth returns the display width needed for the largest model ID.
-func (ms *ModelSelector) maxIDWidth() int {
+func (ms ModelSelector) maxIDWidth() int {
 	maxID := 0
 	for _, m := range ms.filteredModels {
 		if m.ID > maxID {
@@ -387,20 +378,7 @@ func (ms *ModelSelector) maxIDWidth() int {
 	return len(fmt.Sprintf("%d", maxID))
 }
 
-// measureColumns allocates column widths for the model list, respecting
-// priority: name (most important) gets space first, then context, then
-// provider (rightmost, least important). The name gets enough space to
-// show its longest visible entry; right columns only take leftovers.
-//
-// Layout (all columns visible):
-//
-//	cursor(2) + index(idWidth) + gap(2) + name + gap(1) + ctx + gap(1) + prov
-//
-// When a right column is hidden (width 0), its gap is also removed from
-// the line, giving the name more room.
-func (ms *ModelSelector) measureColumns(listHeight, innerWidth, idWidth int) (nameMaxWidth, ctxColWidth, provColWidth int) {
-	// Measure display widths of the longest name, context, and provider
-	// among the visible rows.
+func (ms ModelSelector) measureColumns(listHeight, innerWidth, idWidth int) (nameMaxWidth, ctxColWidth, provColWidth int) {
 	longestName := 0
 	naturalCtx := 0
 	naturalProv := 0
@@ -421,85 +399,61 @@ func (ms *ModelSelector) measureColumns(listHeight, innerWidth, idWidth int) (na
 	naturalCtx = max(1, naturalCtx)
 	naturalProv = max(1, naturalProv)
 
-	// Fixed prefix: cursor(2) + index(idWidth) + gap(2) = 4 + idWidth
 	prefixWidth := 4 + idWidth
-
-	// The name should be wide enough to show its longest entry.
-	// If the window is too narrow, it gets whatever space is available.
 	minName := max(10, longestName)
-
-	// Name takes all remaining space first.
 	nameMaxWidth = innerWidth - prefixWidth
 
-	// Try to fit context column after name (needs a gap + content).
-	// Gracefully degrades: full, "...", "..", ".", then "." at 1 char.
-	minCol := 2 // gap(1) + minContent(1)
+	minCol := 2
 	extraCtx := nameMaxWidth - minName
 	switch {
 	case extraCtx >= 1+naturalCtx:
-		// Full context fits.
 		ctxColWidth = naturalCtx
 		nameMaxWidth -= 1 + naturalCtx
 	case extraCtx >= minCol:
-		// Partial context (gracefully degraded).
 		ctxColWidth = extraCtx - 1
 		nameMaxWidth = minName
 	}
-	// else ctx stays 0
 
-	// Try to fit provider column after context (needs a gap + content).
 	extraProv := nameMaxWidth - minName
 	switch {
 	case extraProv >= 1+naturalProv:
-		// Full provider fits.
 		provColWidth = naturalProv
 		nameMaxWidth -= 1 + naturalProv
 	case extraProv >= minCol:
-		// Partial provider (gracefully degraded).
 		provColWidth = extraProv - 1
 		nameMaxWidth = minName
 	}
-	// else prov stays 0
 
 	return max(1, nameMaxWidth), ctxColWidth, provColWidth
 }
 
-// renderModelRow builds a single model list row as a raw (unstyled) string.
-// Layout: cursor(2) + index(idWidth) + gap(2) + name + gap(1) + context(right) + gap(1) + provider(left).
-func (ms *ModelSelector) renderModelRow(i, idWidth, nameMaxWidth, ctxColWidth, provColWidth int) string {
+func (ms ModelSelector) renderModelRow(i, idWidth, nameMaxWidth, ctxColWidth, provColWidth int) string {
 	m := ms.filteredModels[i]
 	isSelected := i == ms.SelectedIdx && !ms.FilterInputFocused
 
-	// Cursor + index
 	idxStr := fmt.Sprintf("%0*d", idWidth, m.ID)
 	leftRaw := "  " + idxStr
 	if isSelected {
 		leftRaw = "> " + idxStr
 	}
 
-	// Right-aligned context column (gracefully truncated)
 	ctx := formatContextLimit(int64(m.ContextLimit))
 	if ctxColWidth > 0 {
 		ctx = truncateWithSuffix(ctx, ctxColWidth)
 	}
 	ctxRaw := fmt.Sprintf("%*s", ctxColWidth, ctx)
 
-	// Left-aligned provider column (gracefully truncated)
 	provider := capitalize(m.ProtocolType)
 	if provColWidth > 0 {
 		provider = truncateWithSuffix(provider, provColWidth)
 	}
 	provRaw := fmt.Sprintf("%-*s", provColWidth, provider)
 
-	// Truncate name if needed (gracefully)
 	name := m.Name
 	if nameMaxWidth > 0 {
 		name = truncateWithSuffix(name, nameMaxWidth)
 	}
 
-	// Build and style the full line
-	// Use display-width-aware padding instead of fmt.Sprintf, which pads by rune count
-	// and misaligns wide characters (e.g. CJK).
 	padding := max(0, nameMaxWidth-lipgloss.Width(name))
 	namePadded := name + strings.Repeat(" ", padding)
 	line := leftRaw + "  " + namePadded
@@ -516,8 +470,6 @@ func (ms *ModelSelector) renderModelRow(i, idWidth, nameMaxWidth, ctxColWidth, p
 	return ms.Styles.System.Render(line)
 }
 
-// formatContextLimit formats a context limit (in tokens) as a human-readable
-// size string like "256KB", "1MB", or "∞" for unlimited (0).
 func formatContextLimit(n int64) string {
 	if n <= 0 {
 		return "∞"
@@ -539,16 +491,12 @@ func formatContextLimit(n int64) string {
 	return fmt.Sprintf("%d", n)
 }
 
-// buildSearchStr builds a single lowercase search string from a model's
-// display fields, matching what users see in the list.
 func buildSearchStr(m *searchableModel) string {
 	ctx := formatContextLimit(int64(m.ContextLimit))
 	provider := capitalize(m.ProtocolType)
 	return strings.ToLower(fmt.Sprintf("%d %s %s %s", m.ID, m.Name, ctx, provider))
 }
 
-// capitalize returns s with the first letter uppercased.
-// Special-cases "openai" → "OpenAI".
 func capitalize(s string) string {
 	if s == "" {
 		return ""
@@ -559,34 +507,26 @@ func capitalize(s string) string {
 	return strings.ToUpper(s[:1]) + s[1:]
 }
 
-// View renders the model selector as a string (used by RenderOverlay).
-func (ms *ModelSelector) View() tea.View {
+func (ms ModelSelector) View() tea.View {
 	if ms.State == FilteredListClosed {
 		return tea.NewView("")
 	}
 	return tea.NewView(ms.renderList())
 }
 
-// RenderOverlay renders the model selector as an overlay on top of base content.
-func (ms *ModelSelector) RenderOverlay(baseContent string, screenWidth, screenHeight int) string {
+func (ms ModelSelector) RenderOverlay(baseContent string, screenWidth, screenHeight int) string {
 	if ms.State == FilteredListClosed {
 		return baseContent
 	}
 	return renderOverlay(baseContent, ms.View().Content, screenWidth, screenHeight)
 }
 
-// --- Filtering ---
-
-// updateFilteredModels rebuilds filteredModels from models based on the current
-// filter input. Preserves the cursor position by matching the previously selected
-// model's ID, falling back to the first item if it was filtered out.
-func (ms *ModelSelector) updateFilteredModels() {
+func (ms ModelSelector) updateFilteredModels() ModelSelector {
 	search := ms.FilterInput.Value()
 	if search == ms.lastFilterValue {
-		return
+		return ms
 	}
 
-	// Save previous selection to preserve cursor position across filter changes.
 	var prevSelectedID = -1
 	if ms.SelectedIdx >= 0 && ms.SelectedIdx < len(ms.filteredModels) {
 		prevSelectedID = ms.filteredModels[ms.SelectedIdx].ID
@@ -607,8 +547,6 @@ func (ms *ModelSelector) updateFilteredModels() {
 		}
 	}
 
-	// Preserve cursor position if the previously selected model is still in
-	// the filtered list. Only adjust scroll when the selection is not visible.
 	if prevSelectedID >= 0 {
 		found := false
 		for i, m := range ms.filteredModels {
@@ -622,7 +560,6 @@ func (ms *ModelSelector) updateFilteredModels() {
 			ms.FilteredListCore = ms.FilteredListCore.EnsureVisible()
 			ms.FilteredListCore = ms.FilteredListCore.ClampScroll(len(ms.filteredModels))
 		} else {
-			// Previous item no longer in filtered list, reset to first item.
 			ms.SelectedIdx = 0
 			ms.ScrollIdx = 0
 			ms.FilteredListCore = ms.FilteredListCore.ClampSelection(len(ms.filteredModels))
@@ -632,4 +569,5 @@ func (ms *ModelSelector) updateFilteredModels() {
 		ms.ScrollIdx = 0
 		ms.FilteredListCore = ms.FilteredListCore.ClampSelection(len(ms.filteredModels))
 	}
+	return ms
 }

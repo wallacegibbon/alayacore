@@ -338,7 +338,9 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.PasteMsg:
 		if m.overlays.AttachmentWindow().IsOpen() {
-			m.overlays.AttachmentWindow().handlePaste(msg)
+			aw := m.overlays.AttachmentWindow()
+			aw = aw.handlePaste(msg)
+			m.overlays.SetAttachmentWindow(aw)
 		} else {
 			var cmd tea.Cmd
 			m.input, cmd = m.input.Update(msg)
@@ -481,7 +483,9 @@ func (m *Terminal) handleSessionLoadedMsg() (tea.Model, tea.Cmd) {
 	m.input = m.input.Blur()
 	m.handleMCPOverlays()
 
-	return m, m.overlays.ModelSelector().LoadModels(modelSnap.Models, modelSnap.ActiveID)
+	ms, cmd := m.overlays.ModelSelector().LoadModels(modelSnap.Models, modelSnap.ActiveID)
+	m.overlays.SetModelSelector(ms)
+	return m, cmd
 }
 
 // handleSessionLoadingError is called when the async session loading fails.
@@ -515,7 +519,9 @@ func (m *Terminal) handleDisplayRefresh() tea.Cmd {
 	}
 
 	modelSnap := m.out.SnapshotModels()
-	return m.overlays.ModelSelector().LoadModels(modelSnap.Models, modelSnap.ActiveID)
+	ms, cmd := m.overlays.ModelSelector().LoadModels(modelSnap.Models, modelSnap.ActiveID)
+	m.overlays.SetModelSelector(ms)
+	return cmd
 }
 
 // handleEditorFinished handles completion of the external editor.

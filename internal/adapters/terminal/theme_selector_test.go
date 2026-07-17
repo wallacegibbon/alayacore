@@ -19,7 +19,7 @@ func TestThemeSelectorCancelRestoresOriginalTheme(t *testing.T) {
 	}
 
 	// Open with "theme-dark" as active theme
-	ts.Open(themes, "theme-dark")
+	ts = ts.Open(themes, "theme-dark")
 
 	// Verify original theme name is saved
 	if ts.GetOriginalThemeName() != "theme-dark" {
@@ -28,7 +28,7 @@ func TestThemeSelectorCancelRestoresOriginalTheme(t *testing.T) {
 
 	// Navigate to second theme (theme-light) - simulate j key
 	// Note: we pass nil for theme manager since we're just testing selection tracking
-	_, handled := ts.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'j'}), nil)
+	ts, _, handled := ts.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'j'}), nil)
 	if !handled {
 		t.Log("HandleKeyMsg returned not handled (expected due to nil theme manager)")
 	}
@@ -40,7 +40,7 @@ func TestThemeSelectorCancelRestoresOriginalTheme(t *testing.T) {
 	}
 
 	// Press ESC to cancel
-	ts.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyEsc}), nil)
+	ts, _, _ = ts.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyEsc}), nil)
 
 	// Verify selector is closed
 	if ts.IsOpen() {
@@ -64,16 +64,17 @@ func TestThemeSelectorEnterSavesTheme(t *testing.T) {
 	}
 
 	// Open with "theme-dark" as active theme
-	ts.Open(themes, "theme-dark")
+	ts = ts.Open(themes, "theme-dark")
 
 	// Navigate to theme-light
-	ts.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'j'}), nil)
+	ts, _, _ = ts.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'j'}), nil)
 
 	// Press Enter to select
-	ts.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}), nil)
+	ts, _, _ = ts.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}), nil)
 
 	// Verify theme was selected
-	if !ts.ConsumeThemeSelected() {
+	ts, justSelected := ts.ConsumeThemeSelected()
+	if !justSelected {
 		t.Errorf("Expected theme to be selected after Enter")
 	}
 

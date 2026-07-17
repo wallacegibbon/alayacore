@@ -14,12 +14,12 @@ func TestHelpWindowOpenClose(t *testing.T) {
 		t.Error("Help window should not be open initially")
 	}
 
-	hw.Open()
+	hw = hw.Open()
 	if !hw.IsOpen() {
 		t.Error("Help window should be open after Open()")
 	}
 
-	hw.Close()
+	hw = hw.Close()
 	if hw.IsOpen() {
 		t.Error("Help window should not be open after Close()")
 	}
@@ -28,7 +28,7 @@ func TestHelpWindowOpenClose(t *testing.T) {
 func TestHelpWindowNavigation(t *testing.T) {
 	styles := DefaultStyles()
 	hw := NewHelpWindow(styles)
-	hw.Open()
+	hw = hw.Open()
 
 	// First selectable item should be index 1 (index 0 is a section header)
 	if hw.SelectedIdx != 1 {
@@ -36,19 +36,19 @@ func TestHelpWindowNavigation(t *testing.T) {
 	}
 
 	// Move down
-	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'j'}))
+	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'j'}))
 	if hw.SelectedIdx != 2 {
 		t.Errorf("Expected selectedIdx to be 2 after j, got %d", hw.SelectedIdx)
 	}
 
 	// Move down again
-	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'j'}))
+	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'j'}))
 	if hw.SelectedIdx != 3 {
 		t.Errorf("Expected selectedIdx to be 3 after second j, got %d", hw.SelectedIdx)
 	}
 
 	// Move up
-	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'k'}))
+	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'k'}))
 	if hw.SelectedIdx != 2 {
 		t.Errorf("Expected selectedIdx to be 2 after k, got %d", hw.SelectedIdx)
 	}
@@ -65,7 +65,7 @@ func TestHelpWindowSkipsSectionHeaders(t *testing.T) {
 		{ID: 3, IsSection: true, Description: "Section 2"},
 		{ID: 4, Key: "b", Description: "Action B"},
 	}
-	hw.Open()
+	hw = hw.Open()
 
 	// Should start at index 1 (first non-header)
 	if hw.SelectedIdx != 1 {
@@ -73,13 +73,13 @@ func TestHelpWindowSkipsSectionHeaders(t *testing.T) {
 	}
 
 	// Move down should skip header at index 2 and land on index 3
-	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'j'}))
+	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'j'}))
 	if hw.SelectedIdx != 3 {
 		t.Errorf("Expected selectedIdx to be 3 (skipping header), got %d", hw.SelectedIdx)
 	}
 
 	// Move up should skip header at index 2 and land on index 1
-	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'k'}))
+	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'k'}))
 	if hw.SelectedIdx != 1 {
 		t.Errorf("Expected selectedIdx to be 1 (skipping header up), got %d", hw.SelectedIdx)
 	}
@@ -94,7 +94,7 @@ func TestHelpWindowNavigationBoundary(t *testing.T) {
 		{ID: 2, Key: "a", Description: "Action A"},
 		{ID: 3, Key: "b", Description: "Action B"},
 	}
-	hw.Open()
+	hw = hw.Open()
 
 	// Start at index 1
 	if hw.SelectedIdx != 1 {
@@ -102,19 +102,19 @@ func TestHelpWindowNavigationBoundary(t *testing.T) {
 	}
 
 	// Move up at top - should stay at 1
-	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'k'}))
+	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'k'}))
 	if hw.SelectedIdx != 1 {
 		t.Errorf("Expected selectedIdx to stay at 1 at top, got %d", hw.SelectedIdx)
 	}
 
 	// Move down to last item
-	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'j'}))
+	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'j'}))
 	if hw.SelectedIdx != 2 {
 		t.Errorf("Expected selectedIdx to be 2, got %d", hw.SelectedIdx)
 	}
 
 	// Move down at bottom - should stay at 2
-	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'j'}))
+	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'j'}))
 	if hw.SelectedIdx != 2 {
 		t.Errorf("Expected selectedIdx to stay at 2 at bottom, got %d", hw.SelectedIdx)
 	}
@@ -125,16 +125,16 @@ func TestHelpWindowCloseKeys(t *testing.T) {
 
 	// Test 'q' key
 	hw := NewHelpWindow(styles)
-	hw.Open()
-	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'q'}))
+	hw = hw.Open()
+	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'q'}))
 	if hw.IsOpen() {
 		t.Error("Help window should be closed after pressing q")
 	}
 
 	// Test 'esc' key
 	hw = NewHelpWindow(styles)
-	hw.Open()
-	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyEsc}))
+	hw = hw.Open()
+	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyEsc}))
 	if hw.IsOpen() {
 		t.Error("Help window should be closed after pressing esc")
 	}
@@ -161,7 +161,7 @@ func TestHelpWindowViewWhenClosed(t *testing.T) {
 func TestHelpWindowViewWhenOpen(t *testing.T) {
 	styles := DefaultStyles()
 	hw := NewHelpWindow(styles)
-	hw.Open()
+	hw = hw.Open()
 
 	view := hw.View()
 	if view.Content == "" {
@@ -189,7 +189,7 @@ func TestHelpWindowSetSize(t *testing.T) {
 	styles := DefaultStyles()
 	hw := NewHelpWindow(styles)
 
-	hw.SetSize(80, 30)
+	hw = hw.SetSize(80, 30)
 	if hw.Width != 80 {
 		t.Errorf("Expected width 80, got %d", hw.Width)
 	}
@@ -252,14 +252,14 @@ func TestHelpWindowEnterOnCommand(t *testing.T) {
 		{ID: 2, Key: ":quit", Description: "Exit application", Type: HelpItemCommand},
 		{ID: 3, Key: ":save", Description: "Save session", Type: HelpItemCommand},
 	}
-	hw.Open()
+	hw = hw.Open()
 	// Should start at index 1 (first non-header)
 	if hw.SelectedIdx != 1 {
 		t.Fatalf("Expected selectedIdx to be 1, got %d", hw.SelectedIdx)
 	}
 
 	// Press Enter on :quit
-	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 
 	// Window should be closed
 	if hw.IsOpen() {
@@ -267,13 +267,13 @@ func TestHelpWindowEnterOnCommand(t *testing.T) {
 	}
 
 	// Pending command should be set
-	pending := hw.ConsumePendingCommand()
+	hw, pending := hw.ConsumePendingCommand()
 	if pending != ":quit" {
 		t.Errorf("Expected pending command ':quit', got %q", pending)
 	}
 
 	// Consuming again should return empty
-	pending = hw.ConsumePendingCommand()
+	hw, pending = hw.ConsumePendingCommand()
 	if pending != "" {
 		t.Errorf("Expected empty after consume, got %q", pending)
 	}
@@ -290,30 +290,30 @@ func TestHelpWindowEnterOnCommandStripsArgs(t *testing.T) {
 		{ID: 3, Key: ":theme_set <name>", Description: "Switch theme by name", Type: HelpItemCommand},
 		{ID: 4, Key: ":confirm <id> <yes|no>", Description: "Confirm or deny pending tool", Type: HelpItemCommand},
 	}
-	hw.Open()
+	hw = hw.Open()
 
 	// Press Enter on :continue — should produce ":continue"
-	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
-	pending := hw.ConsumePendingCommand()
+	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	hw, pending := hw.ConsumePendingCommand()
 	if pending != ":continue" {
 		t.Errorf("Expected pending command ':continue', got %q", pending)
 	}
 
 	// Re-open and test :theme_set <name> — should produce ":theme_set"
-	hw.Open()
-	hw.moveDown()
-	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
-	pending = hw.ConsumePendingCommand()
+	hw = hw.Open()
+	hw = hw.moveDown()
+	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	hw, pending = hw.ConsumePendingCommand()
 	if pending != ":theme_set" {
 		t.Errorf("Expected pending command ':theme_set', got %q", pending)
 	}
 
 	// Re-open and test :confirm <id> <yes|no> — should produce ":confirm"
-	hw.Open()
-	hw.moveDown()
-	hw.moveDown()
-	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
-	pending = hw.ConsumePendingCommand()
+	hw = hw.Open()
+	hw = hw.moveDown()
+	hw = hw.moveDown()
+	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	hw, pending = hw.ConsumePendingCommand()
 	if pending != ":confirm" {
 		t.Errorf("Expected pending command ':confirm', got %q", pending)
 	}
@@ -328,11 +328,11 @@ func TestHelpWindowEnterOnKeyBinding(t *testing.T) {
 		{ID: 1, IsSection: true, Description: "Global Shortcuts"},
 		{ID: 2, Key: "Ctrl+H", Description: "Open help window"},
 	}
-	hw.updateFilteredItems()
-	hw.Open()
+	hw = hw.updateFilteredItems()
+	hw = hw.Open()
 
 	// Press Enter on Ctrl+H (not a :command)
-	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 
 	// Window should stay open - Enter on non-command does nothing
 	if !hw.IsOpen() {
@@ -340,7 +340,7 @@ func TestHelpWindowEnterOnKeyBinding(t *testing.T) {
 	}
 
 	// No pending command
-	pending := hw.ConsumePendingCommand()
+	hw, pending := hw.ConsumePendingCommand()
 	if pending != "" {
 		t.Errorf("Expected no pending command, got %q", pending)
 	}
@@ -349,7 +349,7 @@ func TestHelpWindowEnterOnKeyBinding(t *testing.T) {
 func TestHelpWindowFilter(t *testing.T) {
 	styles := DefaultStyles()
 	hw := NewHelpWindow(styles)
-	hw.Open()
+	hw = hw.Open()
 
 	// Initially all items should be shown
 	totalItems := len(hw.items)
@@ -360,10 +360,10 @@ func TestHelpWindowFilter(t *testing.T) {
 	// Type "quit" into filter
 	hw.FilterInputFocused = true
 	hw.FilterInput = hw.FilterInput.Focus()
-	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'q'}))
-	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'u'}))
-	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'i'}))
-	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 't'}))
+	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'q'}))
+	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'u'}))
+	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'i'}))
+	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 't'}))
 
 	// Should have filtered items (section header + :quit)
 	if hw.filteredLen() == 0 {
@@ -383,7 +383,7 @@ func TestHelpWindowFilter(t *testing.T) {
 	}
 
 	// Clear filter with ctrl+c
-	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'c', Mod: tea.ModCtrl}))
+	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'c', Mod: tea.ModCtrl}))
 	if hw.filteredLen() != totalItems {
 		t.Errorf("Expected all items after clear, got %d", hw.filteredLen())
 	}
@@ -392,15 +392,15 @@ func TestHelpWindowFilter(t *testing.T) {
 func TestHelpWindowFilterSectionHeaders(t *testing.T) {
 	styles := DefaultStyles()
 	hw := NewHelpWindow(styles)
-	hw.Open()
+	hw = hw.Open()
 
 	// Filter for "Ctrl" - should only show Global Shortcuts section (has Ctrl+ entries)
 	hw.FilterInputFocused = true
 	hw.FilterInput = hw.FilterInput.Focus()
-	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'C'}))
-	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 't'}))
-	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'r'}))
-	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'l'}))
+	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'C'}))
+	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 't'}))
+	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'r'}))
+	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'l'}))
 
 	// Should include Global Shortcuts section header
 	hasGlobalShortcuts := false
@@ -425,7 +425,7 @@ func TestHelpWindowFilterSectionHeaders(t *testing.T) {
 func TestHelpWindowTabToggle(t *testing.T) {
 	styles := DefaultStyles()
 	hw := NewHelpWindow(styles)
-	hw.Open()
+	hw = hw.Open()
 
 	// Initially list is focused
 	if hw.FilterInputFocused {
@@ -433,13 +433,13 @@ func TestHelpWindowTabToggle(t *testing.T) {
 	}
 
 	// Tab to filter
-	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
+	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
 	if !hw.FilterInputFocused {
 		t.Error("Expected filter focused after Tab")
 	}
 
 	// Tab back to list
-	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
+	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
 	if hw.FilterInputFocused {
 		t.Error("Expected list focused after second Tab")
 	}
@@ -448,12 +448,12 @@ func TestHelpWindowTabToggle(t *testing.T) {
 func TestHelpWindowFilterEmptyResult(t *testing.T) {
 	styles := DefaultStyles()
 	hw := NewHelpWindow(styles)
-	hw.Open()
+	hw = hw.Open()
 
 	// Directly set filter value to test filtering logic
 	hw.FilterInput = hw.FilterInput.SetValue("zzz")
 	hw.lastFilterValue = "" // Force update
-	hw.updateFilteredItems()
+	hw = hw.updateFilteredItems()
 
 	if hw.filteredLen() != 0 {
 		t.Errorf("Expected 0 filtered items for 'zzz', got %d", hw.filteredLen())
@@ -484,7 +484,7 @@ func TestHelpWindowHeaderReappearsOnScrollBack(t *testing.T) {
 		{ID: 9, Key: ":h", Description: "H"},
 		{ID: 10, Key: ":i", Description: "I"},
 	}
-	hw.Open()
+	hw = hw.Open()
 
 	// Verify header is visible at start (scrollIdx = 0)
 	if hw.ScrollIdx != 0 {
@@ -496,7 +496,7 @@ func TestHelpWindowHeaderReappearsOnScrollBack(t *testing.T) {
 
 	// Move down past the visible area to push header out of view
 	for i := 0; i < SelectorListRows; i++ {
-		hw.moveDown()
+		hw = hw.moveDown()
 	}
 
 	// Header should be out of view now
@@ -509,7 +509,7 @@ func TestHelpWindowHeaderReappearsOnScrollBack(t *testing.T) {
 
 	// Now move all the way back up
 	for i := 0; i < SelectorListRows; i++ {
-		hw.moveUp()
+		hw = hw.moveUp()
 	}
 
 	// Header should reappear

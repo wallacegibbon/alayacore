@@ -80,14 +80,17 @@ func (m *Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	// Track if selector was open before handling key
 	wasOpen := m.overlays.ThemeSelector().IsOpen()
 
-	previewTheme, handled := m.overlays.ThemeSelector().HandleKeyMsg(msg, m.themeManager)
+	ts, previewTheme, handled := m.overlays.ThemeSelector().HandleKeyMsg(msg, m.themeManager)
+	m.overlays.SetThemeSelector(ts)
 	if !handled {
 		return m, nil
 	}
 
 	// Check if theme was selected (Enter key)
-	if m.overlays.ThemeSelector().ConsumeThemeSelected() {
-		selectedTheme := m.overlays.ThemeSelector().GetSelectedTheme()
+	ts, themeSelected := ts.ConsumeThemeSelected()
+	m.overlays.SetThemeSelector(ts)
+	if themeSelected {
+		selectedTheme := ts.GetSelectedTheme()
 		if selectedTheme != nil {
 			// Send theme_set command to session via TLV
 			// The session will persist the theme and the terminal will apply
@@ -99,8 +102,8 @@ func (m *Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	}
 
 	// If selector closed without selection (ESC/q), restore original theme
-	if wasOpen && !m.overlays.ThemeSelector().IsOpen() {
-		originalThemeName := m.overlays.ThemeSelector().GetOriginalThemeName()
+	if wasOpen && !ts.IsOpen() {
+		originalThemeName := ts.GetOriginalThemeName()
 		originalTheme := m.themeManager.LoadTheme(originalThemeName)
 		m.applyTheme(originalTheme)
 		m.restoreFocus()
@@ -274,15 +277,22 @@ func (m *Terminal) restoreFocusAfterConfirm() {
 // handleOverlayModelSelector handles keyboard input when the model selector is open.
 func (m *Terminal) handleOverlayModelSelector(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	wasOpen := m.overlays.ModelSelector().IsOpen()
-	cmd := m.overlays.ModelSelector().HandleKeyMsg(msg)
+	ms, cmd := m.overlays.ModelSelector().HandleKeyMsg(msg)
+	m.overlays.SetModelSelector(ms)
 
-	if m.overlays.ModelSelector().ConsumeModelSelected() {
+	ms, modelSelected := ms.ConsumeModelSelected()
+	m.overlays.SetModelSelector(ms)
+	if modelSelected {
 		m.switchToSelectedModel()
 	}
-	if m.overlays.ModelSelector().ConsumeReloadModels() {
+
+	ms, reloadModels := ms.ConsumeReloadModels()
+	m.overlays.SetModelSelector(ms)
+	if reloadModels {
 		m.emitCommand(":model_load")
 	}
-	if wasOpen && !m.overlays.ModelSelector().IsOpen() {
+
+	if wasOpen && !ms.IsOpen() {
 		m.restoreFocus()
 	}
 	return m, cmd
@@ -323,18 +333,24 @@ func (m *Terminal) handleSelectorOverlayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 		return cmd, true
 	}
 	if m.overlays.AttachmentWindow().IsOpen() {
-		t := trackOverlay(m.overlays.AttachmentWindow())
-		cmd := m.overlays.AttachmentWindow().HandleKeyMsg(msg)
-		if t.JustClosed(m.overlays.AttachmentWindow()) {
+		aw := m.overlays.AttachmentWindow()
+		t := trackOverlay(aw)
+		aw, cmd := aw.HandleKeyMsg(msg)
+		m.overlays.SetAttachmentWindow(aw)
+		if t.JustClosed(aw) {
 			m.restoreFocus()
 		}
 		return cmd, true
 	}
 	if m.overlays.HelpWindow().IsOpen() {
-		t := trackOverlay(m.overlays.HelpWindow())
-		cmd := m.overlays.HelpWindow().HandleKeyMsg(msg)
-		if t.JustClosed(m.overlays.HelpWindow()) {
-			if pending := m.overlays.HelpWindow().ConsumePendingCommand(); pending != "" {
+		hw := m.overlays.HelpWindow()
+		t := trackOverlay(hw)
+		hw, cmd := hw.HandleKeyMsg(msg)
+		m.overlays.SetHelpWindow(hw)
+		if t.JustClosed(hw) {
+			hw, pending := hw.ConsumePendingCommand()
+			m.overlays.SetHelpWindow(hw)
+			if pending != "" {
 				m.focusInput()
 				m.input = m.input.SetValue(pending + " ")
 				m.input = m.input.CursorEnd()
