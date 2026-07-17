@@ -65,7 +65,7 @@ func TestEditorFinishedMsg(t *testing.T) {
 	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
 
 	msg := EditorFinishedMsg{
-		Action:  EditorActionSubmit,
+		Action:  EditorActionUpdateInput,
 		Content: "test content from editor",
 		Err:     nil,
 	}
@@ -87,7 +87,7 @@ func TestEditorFinishedMsgWithWhitespace(t *testing.T) {
 	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
 
 	msg := EditorFinishedMsg{
-		Action:  EditorActionSubmit,
+		Action:  EditorActionUpdateInput,
 		Content: "  content with leading and trailing spaces  \n",
 		Err:     nil,
 	}
@@ -109,7 +109,7 @@ func TestEditorFinishedMsgWithMultipleTrailingNewlines(t *testing.T) {
 	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
 
 	msg := EditorFinishedMsg{
-		Action:  EditorActionSubmit,
+		Action:  EditorActionUpdateInput,
 		Content: "content with multiple trailing newlines\n\n\n",
 		Err:     nil,
 	}
@@ -131,7 +131,7 @@ func TestEditorFinishedMsgMultiline(t *testing.T) {
 	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
 
 	msg := EditorFinishedMsg{
-		Action:  EditorActionSubmit,
+		Action:  EditorActionUpdateInput,
 		Content: "line1\nline2\nline3",
 		Err:     nil,
 	}
@@ -154,7 +154,7 @@ func TestEditorFinishedMsgWithError(t *testing.T) {
 	terminal.input = terminal.input.WithValue("original content")
 
 	msg := EditorFinishedMsg{
-		Action:  EditorActionSubmit,
+		Action:  EditorActionUpdateInput,
 		Content: "",
 		Err:     fmt.Errorf("editor failed"),
 	}

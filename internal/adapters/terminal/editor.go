@@ -20,22 +20,18 @@ import (
 type EditorAction int
 
 const (
-	EditorActionNone         EditorAction = iota // e.g. display viewing — no side effects
-	EditorActionSubmit                           // submit content as user input
-	EditorActionReloadConfig                     // reload model/runtime config after edit
+	EditorActionNone   EditorAction = iota // e.g. display viewing — no side effects
+	EditorActionUpdateInput                     // update input field with editor content
 )
 
 // EditorFinishedMsg is sent when an external editor closes.
 //
 // - For EditorActionNone: content is empty, no side effects.
-// - For EditorActionSubmit: content contains the editor's text.
-// - For EditorActionReloadConfig: Path + FileType identify the edited file.
+// - For EditorActionUpdateInput: content contains the editor's text.
 type EditorFinishedMsg struct {
-	Content  string
-	Err      error
-	Action   EditorAction
-	Path     string // for EditorActionReloadConfig
-	FileType string // for EditorActionReloadConfig ("model_config", etc.)
+	Content string
+	Err     error
+	Action  EditorAction
 }
 
 // editorStartMsg is sent to trigger actual editor execution (lazy temp file creation)
@@ -43,8 +39,6 @@ type editorStartMsg struct {
 	editorCmd  string
 	editorArgs []string
 	action     EditorAction
-	path       string
-	fileType   string
 }
 
 // ============================================================================
@@ -75,52 +69,23 @@ func NewEditor() *Editor {
 
 // Open opens an external editor for multi-line input.
 func (e *Editor) Open(currentContent string) tea.Cmd {
-	return e.openWithAction(currentContent, EditorActionSubmit, "", "")
+	return e.openWithAction(currentContent, EditorActionUpdateInput)
 }
 
 // OpenForDisplay opens an external editor to view display window content.
 // Content is NOT read back — this is a view-only operation.
 func (e *Editor) OpenForDisplay(content string) tea.Cmd {
-	return e.openWithAction(content, EditorActionNone, "", "")
-}
-
-// OpenFile opens an external editor for a specific file path.
-func (e *Editor) OpenFile(path, fileType string) tea.Cmd {
-	editorCmd := getEditorCommand(os.Getenv("EDITOR"))
-
-	if editorCmd == "" {
-		return func() tea.Msg {
-			return EditorFinishedMsg{
-				Err:      errEditorNotFound(),
-				Action:   EditorActionReloadConfig,
-				Path:     path,
-				FileType: fileType,
-			}
-		}
-	}
-
-	cmd, args := splitEditorCmd(editorCmd)
-	cmdArgs := append([]string{path}, args...)
-
-	//nolint:gosec // G204: Editor command from user config is intentional
-	return tea.ExecProcess(exec.Command(cmd, cmdArgs...), func(err error) tea.Msg {
-		return EditorFinishedMsg{
-			Err:      err,
-			Action:   EditorActionReloadConfig,
-			Path:     path,
-			FileType: fileType,
-		}
-	})
+	return e.openWithAction(content, EditorActionNone)
 }
 
 // openWithAction is the shared implementation for all editor operations
 // that require temp file creation (input, display viewing).
-func (e *Editor) openWithAction(content string, action EditorAction, path, fileType string) tea.Cmd {
+func (e *Editor) openWithAction(content string, action EditorAction) tea.Cmd {
 	editorCmd := getEditorCommand(os.Getenv("EDITOR"))
 
 	if editorCmd == "" {
 		return func() tea.Msg {
-			return EditorFinishedMsg{Err: errEditorNotFound(), Action: action, Path: path, FileType: fileType}
+			return EditorFinishedMsg{Err: errEditorNotFound(), Action: action}
 		}
 	}
 
@@ -134,8 +99,6 @@ func (e *Editor) openWithAction(content string, action EditorAction, path, fileT
 			editorCmd:  cmd,
 			editorArgs: args,
 			action:     action,
-			path:       path,
-			fileType:   fileType,
 		}
 	}
 }
@@ -183,12 +146,10 @@ func (m Terminal) handleEditorStart(msg editorStartMsg) (Terminal, tea.Cmd) {
 	return m, tea.ExecProcess(cmd, func(err error) tea.Msg {
 		defer os.Remove(tmpFileName)
 
-		// Build the result message with common fields
+		// Build the result message
 		result := EditorFinishedMsg{
-			Err:      err,
-			Action:   msg.action,
-			Path:     msg.path,
-			FileType: msg.fileType,
+			Err:    err,
+			Action: msg.action,
 		}
 
 		if err != nil {

@@ -56,6 +56,11 @@ func (m PromptInput) Update(msg tea.Msg) (PromptInput, tea.Cmd) {
 		m.width = msg.Width
 		m.input = m.input.WithWidth(max(0, msg.Width-BorderInnerPadding))
 	}
+	if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMsg.String() == keyCtrlO {
+		return m, func() tea.Msg {
+			return openEditorForPromptMsg{content: m.input.Value()}
+		}
+	}
 	m.input, cmd = m.input.Update(msg)
 	return m, cmd
 }

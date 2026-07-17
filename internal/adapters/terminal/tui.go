@@ -72,6 +72,12 @@ type focusInputWithValueMsg struct {
 	value string
 }
 
+// openEditorForPromptMsg is sent by PromptInput when the user presses
+// Ctrl+O to edit the current input content in an external editor.
+type openEditorForPromptMsg struct {
+	content string
+}
+
 // emitCommand returns a tea.Cmd that writes a user-level command to the
 // session via TLV when executed by Bubble Tea's runtime.
 // Errors are silently ignored — commands are best-effort and the
@@ -396,6 +402,9 @@ func (m Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.display = m.display.updateContent()
 		return m, nil
 
+	case openEditorForPromptMsg:
+		return m, m.editor.Open(msg.content)
+
 	case EditorFinishedMsg:
 		return m.handleEditorFinished(msg)
 
@@ -595,8 +604,7 @@ func (m Terminal) handleDisplayRefresh() (Terminal, tea.Cmd) {
 // Dispatches based on the EditorAction to handle different editor scenarios:
 //
 //   - EditorActionNone:          view-only (display), no side effects
-//   - EditorActionSubmit:        submit content as user input
-//   - EditorActionReloadConfig:  reload configuration after file edit
+//   - EditorActionUpdateInput:  update input field with editor content
 func (m Terminal) handleEditorFinished(msg EditorFinishedMsg) (Terminal, tea.Cmd) {
 	if msg.Err != nil {
 		return m, func() tea.Msg {
@@ -610,19 +618,13 @@ func (m Terminal) handleEditorFinished(msg EditorFinishedMsg) (Terminal, tea.Cmd
 		// View-only (display window viewing) — nothing to do
 		return m, nil
 
-	case EditorActionSubmit:
+	case EditorActionUpdateInput:
 		if msg.Content != "" {
 			// Strip trailing newlines that text editors add by default.
 			content := strings.TrimRight(msg.Content, "\n")
 			m.input = m.input.WithValue(content)
 			m.input = m.input.CursorEnd()
 			m = m.focusInput()
-		}
-		return m, nil
-
-	case EditorActionReloadConfig:
-		if msg.FileType == "model_config" {
-			return m, m.emitCommand(":model_load")
 		}
 		return m, nil
 

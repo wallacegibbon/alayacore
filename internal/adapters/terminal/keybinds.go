@@ -481,8 +481,6 @@ func (m Terminal) handleInputKeys(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 	switch msg.String() {
 	case keyEnter:
 		return m.handleSubmit()
-	case keyCtrlO:
-		return m, m.OpenEditor()
 	case keyCtrlA:
 		m = m.openAttachmentWindow()
 		return m, nil
