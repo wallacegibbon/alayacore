@@ -213,6 +213,20 @@ func (aw *AttachmentWindow) handleURLEntry() bool {
 	return true
 }
 
+// handlePaste handles paste events in the attachment window.
+// It updates the input field and, in local mode, triggers directory
+// navigation and file list filtering — the same update path that
+// keyboard input follows via HandleKeyMsg.
+func (aw *AttachmentWindow) handlePaste(msg tea.PasteMsg) {
+	if !aw.FilterInputFocused {
+		return
+	}
+	aw.FilterInput.Update(msg)
+	if aw.mode == modeLocal {
+		aw.updateFiltered()
+	}
+}
+
 // autocompleteDir replaces the last path segment in the filter input with the
 // given directory name (plus trailing "/"), then re-filters to trigger
 // navigateByPath.

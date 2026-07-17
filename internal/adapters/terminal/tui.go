@@ -338,7 +338,7 @@ func (m *Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.PasteMsg:
 		if m.overlays.AttachmentWindow().IsOpen() {
-			m.overlays.AttachmentWindow().FilterInput.Update(msg)
+			m.overlays.AttachmentWindow().handlePaste(msg)
 		} else {
 			m.input.updateFromMsg(msg)
 		}
