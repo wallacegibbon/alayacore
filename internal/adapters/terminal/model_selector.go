@@ -26,7 +26,6 @@ type ModelSelector struct {
 	filteredModels []searchableModel
 
 	activeModel       *searchableModel
-	modelJustSelected bool
 	reloadModels      bool
 	lastModelCount    int
 }
@@ -159,24 +158,6 @@ func (ms ModelSelector) selectActiveModelIfPrevDeleted(prevSelectedModelID int) 
 	return ms.selectActiveModel()
 }
 
-// --- Action Consumption ---
-
-func (ms ModelSelector) ConsumeModelSelected_DELETED() (ModelSelector, bool) {
-	if ms.modelJustSelected {
-		ms.modelJustSelected = false
-		return ms, true
-	}
-	return ms, false
-}
-
-func (ms ModelSelector) ConsumeReloadModels_DELETED() (ModelSelector, bool) {
-	if ms.reloadModels {
-		ms.reloadModels = false
-		return ms, true
-	}
-	return ms, false
-}
-
 // --- Open / Close ---
 
 func (ms ModelSelector) SetSize(width, height int) ModelSelector {
@@ -244,18 +225,19 @@ func (ms ModelSelector) HandleKeyMsg(msg tea.KeyMsg) (ModelSelector, ModelSelect
 
 	update := ModelSelectorUpdate{Cmd: cmd}
 
+	modelSelected := false
+
 	// Handle Enter selection in the list.
 	if key == keyEnter && handled && !fl.FilterInputFocused {
 		if len(ms.filteredModels) > 0 && fl.SelectedIdx >= 0 {
 			ms.activeModel = &ms.filteredModels[fl.SelectedIdx]
-			ms.modelJustSelected = true
+			modelSelected = true
 			fl = fl.Close()
 		}
 	}
 
-	if ms.modelJustSelected {
+	if modelSelected {
 		update.ModelSelected = true
-		ms.modelJustSelected = false
 	}
 
 	ms.FilteredListCore = fl
@@ -285,19 +267,9 @@ func (ms ModelSelector) HandleKeyMsg(msg tea.KeyMsg) (ModelSelector, ModelSelect
 	return ms, update
 }
 
-func (ms ModelSelector) handleListEnter() (ModelSelector, bool) {
-	if len(ms.filteredModels) > 0 && ms.SelectedIdx >= 0 {
-		ms.activeModel = &ms.filteredModels[ms.SelectedIdx]
-		ms.modelJustSelected = true
-		return ms, true
-	}
-	return ms, false
-}
-
 func (ms ModelSelector) handleSearchEnter() ModelSelector {
 	ms.SelectedIdx = 0
 	ms.activeModel = &ms.filteredModels[0]
-	ms.modelJustSelected = true
 	ms.FilteredListCore = ms.FilteredListCore.Close()
 	return ms
 }

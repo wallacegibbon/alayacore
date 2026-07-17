@@ -75,7 +75,7 @@ func TestEnsureCursorVisible_OversizedWindowScrollsWhenOffScreen(t *testing.T) {
 	display = display.SetWindowCursor(0)
 
 	// Scroll to the very bottom so window-0 is entirely above the viewport
-	display.scrollView.GotoBottom()
+	display.scrollView = display.scrollView.GotoBottom()
 	display = display.updateContent()
 
 	yOffsetBefore := display.scrollView.YOffset()
@@ -125,7 +125,7 @@ func TestEnsureCursorVisible_PartiallyVisibleWindowNotMoved(t *testing.T) {
 
 	// Position viewport so the window is partially visible
 	partialOffset := startLine + 2
-	display.scrollView.SetYOffset(partialOffset)
+	display.scrollView = display.scrollView.SetYOffset(partialOffset)
 
 	yOffsetBefore := display.scrollView.YOffset()
 	t.Logf("YOffset before: %d (viewport %d-%d)", yOffsetBefore, yOffsetBefore, yOffsetBefore+20)
@@ -159,7 +159,7 @@ func TestEnsureCursorVisible_OffScreenWindowScrolls(t *testing.T) {
 	display = display.SetWindowCursor(10)
 
 	// Start at top — window 10 is entirely below viewport
-	display.scrollView.SetYOffset(0)
+	display.scrollView = display.scrollView.SetYOffset(0)
 
 	yOffsetBefore := display.scrollView.YOffset()
 	t.Logf("YOffset before: %d", yOffsetBefore)
@@ -200,7 +200,7 @@ func TestEnsureCursorVisible_EntirelyAboveScrolls(t *testing.T) {
 	display = display.SetWindowCursor(3)
 
 	// Scroll to bottom so the window is entirely above the viewport
-	display.scrollView.GotoBottom()
+	display.scrollView = display.scrollView.GotoBottom()
 	display = display.updateContent()
 
 	display = display.EnsureCursorVisible()
@@ -432,7 +432,7 @@ func TestScrollCursorToTop_PartiallyVisibleWindowMovesToTop(t *testing.T) {
 
 	// Position viewport so window 5 is partially visible at the bottom
 	viewportHeight := display.GetHeight()
-	display.scrollView.SetYOffset(startLine5 - 2) // window starts 2 lines above viewport bottom
+	display.scrollView = display.scrollView.SetYOffset(startLine5 - 2) // window starts 2 lines above viewport bottom
 	display = display.updateContent()
 
 	viewportTopBefore := display.scrollView.YOffset()

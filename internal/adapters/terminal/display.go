@@ -11,7 +11,7 @@ import (
 
 // DisplayModel holds the viewport over WindowBuffer content.
 type DisplayModel struct {
-	scrollView     *ScrollView
+	scrollView     ScrollView
 	windowBuffer   *WindowBuffer
 	styles         *Styles
 	width          int
@@ -46,7 +46,7 @@ func (m DisplayModel) View() tea.View {
 
 func (m DisplayModel) SetHeight(height int) DisplayModel {
 	m.height = height
-	m.scrollView.SetHeight(max(0, height))
+	m.scrollView = m.scrollView.SetHeight(max(0, height))
 	return m
 }
 
@@ -56,7 +56,7 @@ func (m DisplayModel) GetHeight() int {
 
 func (m DisplayModel) SetWidth(width int) DisplayModel {
 	m.width = width
-	m.scrollView.SetWidth(max(0, width))
+	m.scrollView = m.scrollView.SetWidth(max(0, width))
 	return m
 }
 
@@ -104,17 +104,17 @@ func (m DisplayModel) updateContent() DisplayModel {
 	}
 	m.lastContent = newContent
 
-	m.scrollView.SetContent(newContent)
+	m.scrollView = m.scrollView.SetContent(newContent)
 
 	if m.autoFollow {
-		m.scrollView.GotoBottom()
+		m.scrollView = m.scrollView.GotoBottom()
 	}
 	return m
 }
 
 // ScrollDown scrolls down by lines
 func (m DisplayModel) ScrollDown(lines int) DisplayModel {
-	m.scrollView.ScrollDown(lines)
+	m.scrollView = m.scrollView.ScrollDown(lines)
 	return m
 }
 
@@ -125,19 +125,19 @@ func (m DisplayModel) AtBottom() bool {
 
 // ScrollUp scrolls up by lines
 func (m DisplayModel) ScrollUp(lines int) DisplayModel {
-	m.scrollView.ScrollUp(lines)
+	m.scrollView = m.scrollView.ScrollUp(lines)
 	return m
 }
 
 // GotoBottom goes to bottom
 func (m DisplayModel) GotoBottom() DisplayModel {
-	m.scrollView.GotoBottom()
+	m.scrollView = m.scrollView.GotoBottom()
 	return m
 }
 
 // GotoTop goes to top
 func (m DisplayModel) GotoTop() DisplayModel {
-	m.scrollView.GotoTop()
+	m.scrollView = m.scrollView.GotoTop()
 	return m
 }
 
@@ -293,10 +293,10 @@ func (m DisplayModel) EnsureCursorVisible() DisplayModel {
 
 	if endLine <= viewportTop {
 		// Entirely above — show the bottom edge
-		m.scrollView.SetYOffset(max(0, endLine-m.scrollView.Height()))
+		m.scrollView = m.scrollView.SetYOffset(max(0, endLine-m.scrollView.Height()))
 	} else if startLine >= viewportBottom {
 		// Entirely below — show the top edge
-		m.scrollView.SetYOffset(startLine)
+		m.scrollView = m.scrollView.SetYOffset(startLine)
 	}
 	return m
 }
@@ -310,7 +310,7 @@ func (m DisplayModel) ScrollCursorToTop() DisplayModel {
 		return m
 	}
 	startLine, _ := m.windowBuffer.GetWindowLineRange(m.windowCursor)
-	m.scrollView.SetYOffset(startLine)
+	m.scrollView = m.scrollView.SetYOffset(startLine)
 	return m
 }
 

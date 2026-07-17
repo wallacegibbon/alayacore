@@ -194,7 +194,7 @@ func (ts ThemeSelector) renderList() string {
 	case len(ts.themes) == 0:
 		lines = append(lines, ts.Styles.System.Render("  No Theme"))
 	default:
-		ts.EnsureVisible()
+		ts.ScrollableListCore = ts.ScrollableListCore.EnsureVisible()
 		for i := ts.ScrollIdx; i < min(ts.ScrollIdx+listHeight, len(ts.themes)); i++ {
 			t := ts.themes[i]
 			nameMaxWidth := max(0, innerWidth-2)
