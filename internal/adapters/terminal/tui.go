@@ -205,9 +205,17 @@ const (
 // pointers.  See docs/tui-architecture.md for the rationale.
 type Terminal struct {
 	// ── Elm UI state (value types, copied on every Update) ──────────────
-	display  DisplayModel   // conversation display with virtual scrolling
-	input    PromptInput    // text input, attachments, focus
-	overlays OverlayManager // overlay stack: model/theme/help/confirm/attachment
+	display       DisplayModel // conversation display with virtual scrolling
+	input         PromptInput  // text input, attachments, focus
+	focusedWindow string       // which pane has focus: "input" or "display"
+
+	// ── Overlay components (individual, no container) ───────────────────
+	modelSelector    ModelSelector
+	themeSelector    ThemeSelector
+	helpWindow       HelpWindow
+	confirmOverlay   ConfirmDialog
+	mcpInitOverlay   ConfirmDialog
+	attachmentWindow AttachmentWindow
 
 	// ── Status bar (primitive state, updated via WithXxx) ───────────────
 	statusText    string
@@ -278,30 +286,34 @@ func NewTerminalWithTheme(
 	confirmOverlay := NewConfirmDialog(styles)
 	mcpInitOverlay := NewConfirmDialog(styles)
 	attachmentWindow := NewAttachmentWindow(styles)
-	overlays := NewOverlayManager(modelSelector, themeSelector, helpWindow, confirmOverlay, mcpInitOverlay, attachmentWindow, styles)
 
 	m := Terminal{
-		out:          out,
-		streamInput:  inputWriter,
-		appConfig:    appCfg,
-		editor:       editor,
-		display:      NewDisplayModel(out.WindowBuffer(), styles),
-		input:        NewPromptInput(styles),
-		themeManager: themeManager,
-		overlays:     overlays,
-		windowWidth:  initialWidth,
-		windowHeight: initialHeight,
-		styles:       styles,
-		hasFocus:     true,
-		activeTheme:  themeName,
-		appliedTheme: themeName,
+		out:              out,
+		streamInput:      inputWriter,
+		appConfig:        appCfg,
+		editor:           editor,
+		display:          NewDisplayModel(out.WindowBuffer(), styles),
+		input:            NewPromptInput(styles),
+		themeManager:     themeManager,
+		modelSelector:    modelSelector,
+		themeSelector:    themeSelector,
+		helpWindow:       helpWindow,
+		confirmOverlay:   confirmOverlay,
+		mcpInitOverlay:   mcpInitOverlay,
+		attachmentWindow: attachmentWindow,
+		focusedWindow:    focusInput,
+		windowWidth:      initialWidth,
+		windowHeight:     initialHeight,
+		styles:           styles,
+		hasFocus:         true,
+		activeTheme:      themeName,
+		appliedTheme:     themeName,
 	}
 
 	// Initialize component widths
 	m.display = m.display.WithWidth(initialWidth)
 	m.input = m.input.WithWidth(initialWidth)
-	m.overlays = m.overlays.WithSize(initialWidth, initialHeight)
-	m.overlays = m.overlays.WithFocusedWindow(focusInput)
+	m = m.updateComponentSizes(initialWidth, initialHeight)
 	m = m.updateDisplayHeight()
 
 	return m
@@ -434,7 +446,7 @@ func (m Terminal) handleWindowSize(msg tea.WindowSizeMsg) Terminal {
 	m.out.SetWindowWidth(max(0, msg.Width))
 	m.display = m.display.WithWidth(max(0, msg.Width))
 	m.input = m.input.WithWidth(max(0, msg.Width))
-	m.overlays = m.overlays.WithSize(msg.Width, msg.Height)
+	m = m.updateComponentSizes(msg.Width, msg.Height)
 	m = m.updateDisplayHeight()
 
 	// Clamp cursor to valid bounds (windows may have been removed) but
@@ -472,7 +484,7 @@ func (m Terminal) handleTick() (Terminal, tea.Cmd) {
 	// focus if no overlay is blocking it.
 	if m.postLoading {
 		m.postLoading = false
-		if !m.overlays.IsBlocked() {
+		if !m.isBlocked() {
 			m = m.restoreFocus()
 		}
 	}
@@ -494,9 +506,9 @@ func (m Terminal) handleTick() (Terminal, tea.Cmd) {
 // The confirm overlay (confirmOverlay) handles auth confirm and tool
 // confirm as temporary dialogs on top of the init overlay.
 func (m Terminal) handleMCPOverlays() Terminal {
-	wasOpen := m.overlays.IsMCPInitOpen()
+	wasOpen := m.mcpInitOverlay.IsOpen()
 	var action OverlayAction
-	m.overlays, action = m.overlays.HandleMCPProgress(m.out)
+	m, action = m.handleMCPProgress()
 	if action.CloseInitOverlay {
 		m = m.restoreFocusAfterConfirm()
 	}
@@ -553,8 +565,8 @@ func (m Terminal) handleSessionLoadedMsg() (Terminal, tea.Cmd) {
 	m.input = m.input.Blur()
 	m = m.handleMCPOverlays()
 
-	ms, cmd := m.overlays.ModelSelector().LoadModels(modelSnap.Models, modelSnap.ActiveID)
-	m.overlays = m.overlays.WithModelSelector(ms)
+	ms, cmd := m.modelSelector.LoadModels(modelSnap.Models, modelSnap.ActiveID)
+	m.modelSelector = ms
 	return m, cmd
 }
 
@@ -589,8 +601,8 @@ func (m Terminal) handleDisplayRefresh() (Terminal, tea.Cmd) {
 	}
 
 	modelSnap := m.out.SnapshotModels()
-	ms, cmd := m.overlays.ModelSelector().LoadModels(modelSnap.Models, modelSnap.ActiveID)
-	m.overlays = m.overlays.WithModelSelector(ms)
+	ms, cmd := m.modelSelector.LoadModels(modelSnap.Models, modelSnap.ActiveID)
+	m.modelSelector = ms
 	return m, cmd
 }
 
@@ -682,7 +694,7 @@ func (m Terminal) View() tea.View {
 	// Input area — empty bordered box (blurred) while MCP init or
 	// post-loading is in progress, same as confirm overlay behavior.
 	sb.WriteString(m.input.RenderWithBorder(
-		m.overlays.IsConfirmOpen() || m.overlays.IsMCPInitOpen() || m.postLoading))
+		m.isConfirmOpen() || m.isMCPInitOpen() || m.postLoading))
 	sb.WriteString("\n")
 
 	// Status bar (simplified - just render directly)
@@ -691,7 +703,7 @@ func (m Terminal) View() tea.View {
 	baseContent := sb.String()
 
 	// Render all overlay layers through the overlay manager.
-	overlayContent, hasConfirm := m.overlays.Render(baseContent, m.windowWidth, m.windowHeight, m.forceRedraw&1 == 1)
+	overlayContent, hasConfirm := m.renderOverlays(baseContent, m.windowWidth, m.windowHeight, m.forceRedraw&1 == 1)
 
 	if hasConfirm {
 		v := tea.NewView(overlayContent)
@@ -733,6 +745,7 @@ func (m Terminal) renderLoadingView() tea.View {
 	return v
 }
 
+// ensure Terminal implements tea.Model
 var _ tea.Model = Terminal{}
 
 func (m Terminal) applyTheme(theme *theme.Theme) Terminal {
@@ -740,7 +753,124 @@ func (m Terminal) applyTheme(theme *theme.Theme) Terminal {
 	m.out.WithStyles(m.styles)
 	m.display = m.display.WithStyles(m.styles)
 	m.input = m.input.WithStyles(m.styles)
-	m.overlays = m.overlays.WithStyles(m.styles)
+	m.modelSelector = m.modelSelector.WithStyles(m.styles)
+	m.themeSelector = m.themeSelector.WithStyles(m.styles)
+	m.helpWindow = m.helpWindow.WithStyles(m.styles)
+	m.confirmOverlay = m.confirmOverlay.WithStyles(m.styles)
+	m.attachmentWindow = m.attachmentWindow.WithStyles(m.styles)
 	m.display = m.display.updateContent()
 	return m
 }
+
+// updateComponentSizes updates the size of all overlay components.
+func (m Terminal) updateComponentSizes(width, height int) Terminal {
+	m.modelSelector = m.modelSelector.WithSize(width, height)
+	m.themeSelector = m.themeSelector.WithSize(width, height)
+	m.helpWindow = m.helpWindow.WithSize(width, height)
+	m.confirmOverlay = m.confirmOverlay.WithSize(width, height)
+	m.mcpInitOverlay = m.mcpInitOverlay.WithSize(width, height)
+	m.attachmentWindow = m.attachmentWindow.WithSize(width, height)
+	return m
+}
+
+// isBlocked returns true when the user's view is covered by any overlay
+// that prevents interaction with the prompt input.
+func (m Terminal) isBlocked() bool {
+	return m.modelSelector.IsOpen() || m.themeSelector.IsOpen() ||
+		m.helpWindow.IsOpen() || m.attachmentWindow.IsOpen() ||
+		m.confirmOverlay.IsOpen() || m.mcpInitOverlay.IsOpen()
+}
+
+// isConfirmOpen returns true if the confirm dialog is open.
+func (m Terminal) isConfirmOpen() bool {
+	return m.confirmOverlay.IsOpen()
+}
+
+// isMCPInitOpen returns true if the MCP init overlay is open.
+func (m Terminal) isMCPInitOpen() bool {
+	return m.mcpInitOverlay.IsOpen()
+}
+
+// handleMCPProgress manages all MCP overlay state.
+// Extracted from the former OverlayManager.
+func (m Terminal) handleMCPProgress() (Terminal, OverlayAction) {
+	out := m.out
+	if out.ConsumeMCPDone() {
+		if m.mcpInitOverlay.IsOpen() {
+			m.mcpInitOverlay = m.mcpInitOverlay.Close()
+			return m, OverlayAction{CloseInitOverlay: true}
+		}
+		return m, OverlayAction{}
+	}
+
+	if !m.confirmOverlay.IsOpen() {
+		if id, name, input, ok := out.GetPendingToolConfirm(); ok {
+			m.confirmOverlay = m.confirmOverlay.OpenTool(id, name, input)
+			return m, OverlayAction{OpenedConfirm: true}
+		}
+	}
+
+	if !m.confirmOverlay.IsOpen() {
+		if server, url, ok := out.GetPendingMCPAuth(); ok {
+			m.confirmOverlay = m.confirmOverlay.OpenMCPAuth(server, url)
+			return m, OverlayAction{OpenedConfirm: true}
+		}
+	}
+
+	st := out.SnapshotStatus()
+	if st.MCPStatus != "" && st.MCPStatus != "done" {
+		if m.mcpInitOverlay.IsOpen() {
+			m.mcpInitOverlay = m.mcpInitOverlay.UpdateMCPInitProgress(st.MCPServers)
+		} else {
+			m.mcpInitOverlay = m.mcpInitOverlay.OpenMCPInit()
+			m.mcpInitOverlay = m.mcpInitOverlay.UpdateMCPInitProgress(st.MCPServers)
+		}
+		return m, OverlayAction{InitOverlayActive: true}
+	}
+
+	return m, OverlayAction{}
+}
+
+// renderOverlays applies all overlay layers to the base content and returns
+// the final view string.
+func (m Terminal) renderOverlays(baseContent string, width, height int, forceRedraw bool) (string, bool) {
+	overlayContent := baseContent
+
+	switch {
+	case m.modelSelector.IsOpen():
+		overlayContent = m.modelSelector.RenderOverlay(baseContent, width, height)
+	case m.themeSelector.IsOpen():
+		overlayContent = m.themeSelector.RenderOverlay(baseContent, width, height)
+	case m.helpWindow.IsOpen():
+		overlayContent = m.helpWindow.RenderOverlay(baseContent, width, height)
+	case m.attachmentWindow.IsOpen():
+		overlayContent = m.attachmentWindow.RenderOverlay(baseContent, width, height)
+	}
+
+	if m.mcpInitOverlay.IsOpen() {
+		overlayContent = m.mcpInitOverlay.RenderOverlay(overlayContent, width, height)
+	}
+
+	if m.confirmOverlay.IsOpen() {
+		fullContent := m.confirmOverlay.RenderOverlay(overlayContent, width, height)
+		if forceRedraw {
+			fullContent += "\x1b[0m"
+		}
+		return fullContent, true
+	}
+
+	if forceRedraw {
+		overlayContent += "\x1b[0m"
+	}
+	return overlayContent, false
+}
+
+// OverlayAction describes what happened during handleMCPProgress.
+type OverlayAction struct {
+	CloseInitOverlay  bool
+	OpenedConfirm     bool
+	InitOverlayActive bool
+}
+
+// ensure Terminal implements tea.Model
+var _ tea.Model = Terminal{}

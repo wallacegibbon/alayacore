@@ -32,7 +32,7 @@ func statusStepsSegment(lastMaxSteps int, taskError bool, lastCurrentStep int, i
 // or an overlay is active (the status bar is treated as an
 // attachment to the prompt input).
 func (m Terminal) renderStatusBar() string {
-	active := m.overlays.FocusedWindow() == focusInput && !m.overlays.IsBlocked()
+	active := m.focusedWindow == focusInput && !m.isBlocked()
 
 	var indicator string
 	if m.inProgress {

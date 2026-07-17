@@ -59,7 +59,7 @@ func (m Terminal) handleKeyMsg(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 	}
 
 	// Focus-specific key handling
-	switch m.overlays.FocusedWindow() {
+	switch m.focusedWindow {
 	case focusDisplay:
 		return m.handleDisplayKeys(msg)
 
@@ -76,15 +76,15 @@ func (m Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 	// Check if it's a reload request
 	if msg.String() == keyR && m.themeManager != nil {
 		m.themeManager.ReloadThemes()
-		ts := m.overlays.ThemeSelector().Open(m.themeManager.GetThemes(), m.activeTheme, m.themeManager)
-		m.overlays = m.overlays.WithThemeSelector(ts)
+		ts := m.themeSelector.Open(m.themeManager.GetThemes(), m.activeTheme, m.themeManager)
+		m.themeSelector = ts
 		return m, nil
 	}
 
-	wasOpen := m.overlays.ThemeSelector().IsOpen()
+	wasOpen := m.themeSelector.IsOpen()
 
-	ts, cmd := m.overlays.ThemeSelector().Update(msg)
-	m.overlays = m.overlays.WithThemeSelector(ts)
+	ts, cmd := m.themeSelector.Update(msg)
+	m.themeSelector = ts
 
 	// If closed without selection, restore original theme
 	if wasOpen && !ts.IsOpen() {
@@ -241,8 +241,8 @@ func (m Terminal) startMCPAuthFlow(serverName, authURL string) tea.Cmd {
 // the confirm appeared, it remains active — the overlay naturally catches
 // keys in handleKeyMsg.
 func (m Terminal) restoreFocusAfterConfirm() Terminal {
-	if m.overlays.ModelSelector().IsOpen() || m.overlays.ThemeSelector().IsOpen() ||
-		m.overlays.HelpWindow().IsOpen() || m.overlays.IsMCPInitOpen() {
+	if m.modelSelector.IsOpen() || m.themeSelector.IsOpen() ||
+		m.helpWindow.IsOpen() || m.mcpInitOverlay.IsOpen() {
 		m.display = m.display.updateContent()
 		return m
 	}
@@ -252,9 +252,9 @@ func (m Terminal) restoreFocusAfterConfirm() Terminal {
 
 // handleOverlayModelSelector handles keyboard input when the model selector is open.
 func (m Terminal) handleOverlayModelSelector(msg tea.KeyMsg) (Terminal, tea.Cmd) {
-	wasOpen := m.overlays.ModelSelector().IsOpen()
-	ms, cmd := m.overlays.ModelSelector().Update(msg)
-	m.overlays = m.overlays.WithModelSelector(ms)
+	wasOpen := m.modelSelector.IsOpen()
+	ms, cmd := m.modelSelector.Update(msg)
+	m.modelSelector = ms
 	if wasOpen && !ms.IsOpen() {
 		m = m.restoreFocus()
 	}
@@ -275,11 +275,11 @@ func (m Terminal) handleMCPInitKeys(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 // handlePriorityOverlayKeys handles the highest-priority overlays that
 // block all other interaction (confirm dialog, MCP init overlay).
 func (m Terminal) handlePriorityOverlayKeys(msg tea.KeyMsg) (Terminal, tea.Cmd, bool) {
-	if m.overlays.ConfirmOverlay().IsOpen() {
+	if m.confirmOverlay.IsOpen() {
 		tm, cmd := m.handleOverlayConfirm(msg)
 		return tm, cmd, true
 	}
-	if m.overlays.MCPInitOverlay().IsOpen() {
+	if m.mcpInitOverlay.IsOpen() {
 		tm, cmd := m.handleMCPInitKeys(msg)
 		return tm, cmd, true
 	}
@@ -289,19 +289,19 @@ func (m Terminal) handlePriorityOverlayKeys(msg tea.KeyMsg) (Terminal, tea.Cmd, 
 // handleSelectorOverlayKeys handles selector-style overlays (theme, model,
 // attachment, help) that are mutually exclusive.
 func (m Terminal) handleSelectorOverlayKeys(msg tea.KeyMsg) (Terminal, tea.Cmd, bool) {
-	if m.overlays.ThemeSelector().IsOpen() {
+	if m.themeSelector.IsOpen() {
 		tm, cmd := m.handleThemeSelectorKeys(msg)
 		return tm, cmd, true
 	}
-	if m.overlays.ModelSelector().IsOpen() {
+	if m.modelSelector.IsOpen() {
 		tm, cmd := m.handleOverlayModelSelector(msg)
 		return tm, cmd, true
 	}
-	if m.overlays.AttachmentWindow().IsOpen() {
-		aw := m.overlays.AttachmentWindow()
+	if m.attachmentWindow.IsOpen() {
+		aw := m.attachmentWindow
 		t := trackOverlay(aw)
 		aw, cmd := aw.Update(msg)
-		m.overlays = m.overlays.WithAttachmentWindow(aw)
+		m.attachmentWindow = aw
 		if t.JustClosed(aw) {
 			// Check if a file/URL was selected (via AttachmentSelectedMsg)
 			if cmd != nil {
@@ -319,11 +319,11 @@ func (m Terminal) handleSelectorOverlayKeys(msg tea.KeyMsg) (Terminal, tea.Cmd, 
 		}
 		return m, cmd, true
 	}
-	if m.overlays.HelpWindow().IsOpen() {
-		hw := m.overlays.HelpWindow()
+	if m.helpWindow.IsOpen() {
+		hw := m.helpWindow
 		t := trackOverlay(hw)
 		hw, cmd := hw.Update(msg)
-		m.overlays = m.overlays.WithHelpWindow(hw)
+		m.helpWindow = hw
 		if t.JustClosed(hw) {
 			// Check if a command was selected (via HelpCmdMsg)
 			if cmd != nil {
@@ -348,15 +348,15 @@ func (m Terminal) handleSelectorOverlayKeys(msg tea.KeyMsg) (Terminal, tea.Cmd, 
 func (m Terminal) handleOverlayConfirm(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 	// 'e' opens the full tool input in an external editor for inspection
 	// (view-only — dialog stays open after editor closes)
-	if msg.String() == keyE && m.overlays.ConfirmOverlay().Kind() == ConfirmTool && m.overlays.ConfirmOverlay().ToolInput() != "" {
-		content := m.overlays.ConfirmOverlay().ToolInput()
-		if toolName := m.overlays.ConfirmOverlay().ToolName(); toolName != "" && strings.HasPrefix(content, toolName+": ") {
+	if msg.String() == keyE && m.confirmOverlay.Kind() == ConfirmTool && m.confirmOverlay.ToolInput() != "" {
+		content := m.confirmOverlay.ToolInput()
+		if toolName := m.confirmOverlay.ToolName(); toolName != "" && strings.HasPrefix(content, toolName+": ") {
 			content = content[len(toolName)+2:]
 		}
 		return m, m.editor.OpenForDisplay(content)
 	}
-	cd, cmd := m.overlays.ConfirmOverlay().Update(msg)
-	m.overlays = m.overlays.WithConfirmOverlay(cd)
+	cd, cmd := m.confirmOverlay.Update(msg)
+	m.confirmOverlay = cd
 	if cmd != nil {
 		// Process confirm result synchronously
 		if resultMsg := cmd(); resultMsg != nil {

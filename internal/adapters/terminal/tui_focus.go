@@ -8,8 +8,7 @@ import tea "charm.land/bubbletea/v2"
 
 // toggleFocus switches between display and input windows.
 func (m Terminal) toggleFocus() Terminal {
-	fw := m.overlays.FocusedWindow()
-	if fw == focusDisplay {
+	if m.focusedWindow == focusDisplay {
 		m = m.focusInput()
 	} else {
 		m = m.focusDisplay()
@@ -20,7 +19,7 @@ func (m Terminal) toggleFocus() Terminal {
 
 // focusInput switches focus to the input window.
 func (m Terminal) focusInput() Terminal {
-	m.overlays = m.overlays.WithFocusedWindow(focusInput)
+	m.focusedWindow = focusInput
 	m.display = m.display.WithDisplayFocused(false)
 	m.input = m.input.Focus()
 	return m
@@ -28,7 +27,7 @@ func (m Terminal) focusInput() Terminal {
 
 // focusDisplay switches focus to the display window.
 func (m Terminal) focusDisplay() Terminal {
-	m.overlays = m.overlays.WithFocusedWindow(focusDisplay)
+	m.focusedWindow = focusDisplay
 	m.display = m.display.WithDisplayFocused(true)
 	m.input = m.input.Blur()
 	if m.display.GetWindowCursor() < 0 {
@@ -39,8 +38,7 @@ func (m Terminal) focusDisplay() Terminal {
 
 // openModelSelector opens the model selector UI.
 func (m Terminal) openModelSelector() Terminal {
-	m.overlays = m.overlays.WithFocusedWindow(m.overlays.FocusedWindow())
-	m.overlays = m.overlays.OpenModelSelector()
+	m.modelSelector = m.modelSelector.Open()
 	m.input = m.input.Blur()
 	m.display = m.display.WithDisplayFocused(false)
 	m.display = m.display.updateContent()
@@ -49,8 +47,7 @@ func (m Terminal) openModelSelector() Terminal {
 
 // restoreFocus restores focus to the previously focused window after an overlay closes.
 func (m Terminal) restoreFocus() Terminal {
-	fw := m.overlays.FocusedWindow()
-	if fw == focusDisplay {
+	if m.focusedWindow == focusDisplay {
 		m = m.focusDisplay()
 	} else {
 		m = m.focusInput()
@@ -64,8 +61,7 @@ func (m Terminal) openThemeSelector() Terminal {
 	if m.themeManager == nil {
 		return m
 	}
-	m.overlays = m.overlays.WithFocusedWindow(m.overlays.FocusedWindow())
-	m.overlays = m.overlays.OpenThemeSelector(m.themeManager.GetThemes(), m.activeTheme, m.themeManager)
+	m.themeSelector = m.themeSelector.Open(m.themeManager.GetThemes(), m.activeTheme, m.themeManager)
 	m.input = m.input.Blur()
 	m.display = m.display.WithDisplayFocused(false)
 	m.display = m.display.updateContent()
@@ -74,8 +70,7 @@ func (m Terminal) openThemeSelector() Terminal {
 
 // openHelpWindow opens the help window UI.
 func (m Terminal) openHelpWindow() Terminal {
-	m.overlays = m.overlays.WithFocusedWindow(m.overlays.FocusedWindow())
-	m.overlays = m.overlays.OpenHelpWindow()
+	m.helpWindow = m.helpWindow.Open()
 	m.input = m.input.Blur()
 	m.display = m.display.WithDisplayFocused(false)
 	m.display = m.display.updateContent()
@@ -84,8 +79,7 @@ func (m Terminal) openHelpWindow() Terminal {
 
 // openAttachmentWindow opens the attachment picker overlay.
 func (m Terminal) openAttachmentWindow() Terminal {
-	m.overlays = m.overlays.WithFocusedWindow(m.overlays.FocusedWindow())
-	m.overlays = m.overlays.OpenAttachmentWindow()
+	m.attachmentWindow = m.attachmentWindow.Open()
 	m.input = m.input.Blur()
 	m.display = m.display.WithDisplayFocused(false)
 	m.display = m.display.updateContent()
@@ -94,8 +88,7 @@ func (m Terminal) openAttachmentWindow() Terminal {
 
 // openConfirmQuit opens the quit confirmation dialog.
 func (m Terminal) openConfirmQuit() Terminal {
-	m.overlays = m.overlays.WithFocusedWindow(m.overlays.FocusedWindow())
-	m.overlays = m.overlays.OpenConfirmQuit()
+	m.confirmOverlay = m.confirmOverlay.OpenQuit()
 	m.input = m.input.Blur()
 	m.display = m.display.WithDisplayFocused(false)
 	m.display = m.display.updateContent()
@@ -104,8 +97,7 @@ func (m Terminal) openConfirmQuit() Terminal {
 
 // openConfirmCancel opens the cancel-task confirmation dialog.
 func (m Terminal) openConfirmCancel() Terminal {
-	m.overlays = m.overlays.WithFocusedWindow(m.overlays.FocusedWindow())
-	m.overlays = m.overlays.OpenConfirmCancel()
+	m.confirmOverlay = m.confirmOverlay.OpenCancel()
 	m.input = m.input.Blur()
 	m.display = m.display.WithDisplayFocused(false)
 	m.display = m.display.updateContent()
@@ -114,8 +106,7 @@ func (m Terminal) openConfirmCancel() Terminal {
 
 // openConfirmTool opens the tool-execution confirmation dialog.
 func (m Terminal) openConfirmTool(id, toolName, toolInput string) Terminal {
-	m.overlays = m.overlays.WithFocusedWindow(m.overlays.FocusedWindow())
-	m.overlays = m.overlays.OpenConfirmTool(id, toolName, toolInput)
+	m.confirmOverlay = m.confirmOverlay.OpenTool(id, toolName, toolInput)
 	m.input = m.input.Blur()
 	m.display = m.display.WithDisplayFocused(false)
 	m.display = m.display.updateContent()
@@ -127,7 +118,11 @@ func (m Terminal) handleBlur() Terminal {
 	m.hasFocus = false
 	m.display = m.display.WithDisplayFocused(false)
 	m.input = m.input.Blur()
-	m.overlays = m.overlays.WithFocus(false)
+	m.modelSelector = m.modelSelector.WithFocus(false)
+	m.themeSelector = m.themeSelector.WithFocus(false)
+	m.helpWindow = m.helpWindow.WithFocus(false)
+	m.confirmOverlay = m.confirmOverlay.WithFocus(false)
+	m.attachmentWindow = m.attachmentWindow.WithFocus(false)
 	m.display = m.display.updateContent()
 	return m
 }
@@ -135,20 +130,23 @@ func (m Terminal) handleBlur() Terminal {
 // handleFocus handles gain of application focus.
 func (m Terminal) handleFocus() Terminal {
 	m.hasFocus = true
-	m.overlays = m.overlays.WithFocus(true)
+	m.modelSelector = m.modelSelector.WithFocus(true)
+	m.themeSelector = m.themeSelector.WithFocus(true)
+	m.helpWindow = m.helpWindow.WithFocus(true)
+	m.confirmOverlay = m.confirmOverlay.WithFocus(true)
+	m.attachmentWindow = m.attachmentWindow.WithFocus(true)
 
-	if m.overlays.ModelSelector().IsOpen() ||
-		m.overlays.ThemeSelector().IsOpen() ||
-		m.overlays.HelpWindow().IsOpen() ||
-		m.overlays.AttachmentWindow().IsOpen() ||
-		m.overlays.ConfirmOverlay().IsOpen() ||
-		m.overlays.IsMCPInitOpen() {
+	if m.modelSelector.IsOpen() ||
+		m.themeSelector.IsOpen() ||
+		m.helpWindow.IsOpen() ||
+		m.attachmentWindow.IsOpen() ||
+		m.confirmOverlay.IsOpen() ||
+		m.mcpInitOverlay.IsOpen() {
 		m.display = m.display.updateContent()
 		return m
 	}
 
-	fw := m.overlays.FocusedWindow()
-	if fw == focusDisplay {
+	if m.focusedWindow == focusDisplay {
 		m = m.focusDisplay()
 	} else {
 		m = m.focusInput()
@@ -159,11 +157,10 @@ func (m Terminal) handleFocus() Terminal {
 
 // handlePaste handles clipboard paste events.
 func (m Terminal) handlePaste(msg tea.PasteMsg) (Terminal, tea.Cmd) {
-	if m.overlays.AttachmentWindow().IsOpen() {
-		aw := m.overlays.AttachmentWindow()
-		aw, _ = aw.Update(msg)
-		m.overlays = m.overlays.WithAttachmentWindow(aw)
-		return m, nil
+	if m.attachmentWindow.IsOpen() {
+		aw, cmd := m.attachmentWindow.Update(msg)
+		m.attachmentWindow = aw
+		return m, cmd
 	}
 	var cmd tea.Cmd
 	m.input, cmd = m.input.Update(msg)

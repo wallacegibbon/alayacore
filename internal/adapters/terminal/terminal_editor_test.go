@@ -359,11 +359,11 @@ func TestCtrlGTriggersCancel(t *testing.T) {
 	}
 
 	// Cancel confirmation dialog should be shown
-	if !terminal.overlays.ConfirmOverlay().IsOpen() {
+	if !terminal.confirmOverlay.IsOpen() {
 		t.Fatal("Ctrl+G should open confirm overlay")
 	}
-	if terminal.overlays.ConfirmOverlay().Kind() != ConfirmCancel {
-		t.Errorf("Ctrl+G should set confirm overlay kind to ConfirmCancel, got %v", terminal.overlays.ConfirmOverlay().Kind())
+	if terminal.confirmOverlay.Kind() != ConfirmCancel {
+		t.Errorf("Ctrl+G should set confirm overlay kind to ConfirmCancel, got %v", terminal.confirmOverlay.Kind())
 	}
 
 	// Input should remain unchanged
@@ -382,7 +382,7 @@ func TestCtrlGTriggersCancel(t *testing.T) {
 	}
 
 	// Cancel dialog should be closed
-	if terminal.overlays.ConfirmOverlay().IsOpen() {
+	if terminal.confirmOverlay.IsOpen() {
 		t.Errorf("Cancel dialog should be closed after confirming")
 	}
 }
