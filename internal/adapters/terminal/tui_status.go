@@ -77,7 +77,7 @@ func formatTokenCount(n int64) string {
 }
 
 // updateStatus updates the status bar state from the output writer.
-func (m *Terminal) updateStatus() {
+func (m *Terminal) updateStatus() Terminal {
 	snap := m.out.SnapshotStatus()
 
 	valStyle := m.styles.Status.Foreground(m.styles.ColorMuted)
@@ -153,6 +153,7 @@ func (m *Terminal) updateStatus() {
 	m.statusTextDim = dimStatus
 	m.inProgress = snap.InProgress
 
-	m.syncThemeFromSession(snap.ActiveTheme, snap.ActiveThemeData)
+	*m = m.syncThemeFromSession(snap.ActiveTheme, snap.ActiveThemeData)
 	m.activeTheme = snap.ActiveTheme
+	return *m
 }

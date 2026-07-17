@@ -70,26 +70,29 @@ func (m *Terminal) emitAttachments() {
 }
 
 // addAttachment adds a local file path to pending attachments.
-func (m *Terminal) addAttachment(path string) {
+func (m *Terminal) addAttachment(path string) Terminal {
 	tag := tlv.TagForPath(path)
 	m.pendingAttachments = append(m.pendingAttachments, attachment{path: path, tag: tag})
 	m.input = m.input.SetAttachments(m.pendingAttachmentLabels())
 	m.updateDisplayHeight()
+	return *m
 }
 
 // addURLAttachment adds a URL to pending attachments.
-func (m *Terminal) addURLAttachment(url string) {
+func (m *Terminal) addURLAttachment(url string) Terminal {
 	tag := tlv.TagForPath(url)
 	m.pendingAttachments = append(m.pendingAttachments, attachment{path: url, tag: tag, isURL: true})
 	m.input = m.input.SetAttachments(m.pendingAttachmentLabels())
 	m.updateDisplayHeight()
+	return *m
 }
 
 // clearAttachments clears all pending attachments.
-func (m *Terminal) clearAttachments() {
+func (m *Terminal) clearAttachments() Terminal {
 	m.pendingAttachments = nil
 	m.input = m.input.SetAttachments(nil)
 	m.updateDisplayHeight()
+	return *m
 }
 
 // pendingAttachmentLabels returns display labels for all pending attachments.
@@ -399,18 +402,19 @@ func (m *Terminal) handleTick() (Terminal, tea.Cmd) {
 		})
 	}
 
-	m.handleMCPOverlays()
+	*m = m.handleMCPOverlays()
 
 	// First tick after loading: initialization is done — restore input
 	// focus if no overlay is blocking it.
 	if m.postLoading {
 		m.postLoading = false
 		if !m.overlays.IsBlocked() {
-			m.restoreFocus()
+			*m = m.restoreFocus()
 		}
 	}
 
-	cmd := m.handleDisplayRefresh()
+	var cmd tea.Cmd
+	*m, cmd = m.handleDisplayRefresh()
 	return *m, tea.Batch(
 		tea.Tick(TickInterval, func(_ time.Time) tea.Msg {
 			return tickMsg{}
@@ -425,11 +429,11 @@ func (m *Terminal) handleTick() (Terminal, tea.Cmd) {
 // The init overlay (mcpInitOverlay) persists throughout MCP init.
 // The confirm overlay (confirmOverlay) handles auth confirm and tool
 // confirm as temporary dialogs on top of the init overlay.
-func (m *Terminal) handleMCPOverlays() {
+func (m *Terminal) handleMCPOverlays() Terminal {
 	wasOpen := m.overlays.IsMCPInitOpen()
 	action := m.overlays.HandleMCPProgress(m.out)
 	if action.CloseInitOverlay {
-		m.restoreFocusAfterConfirm()
+		*m = m.restoreFocusAfterConfirm()
 	}
 	if action.InitOverlayActive || action.OpenedConfirm {
 		// MCP init overlay just opened — blur input so its border renders
@@ -439,6 +443,7 @@ func (m *Terminal) handleMCPOverlays() {
 		}
 		m.display = m.display.updateContent()
 	}
+	return *m
 }
 
 // handleSessionLoadedMsg is called when the async session loading completes.
@@ -460,7 +465,7 @@ func (m *Terminal) handleSessionLoadedMsg() (Terminal, tea.Cmd) {
 	m.appliedTheme = ""
 
 	if m.out.WindowBuffer().WindowCount() > 0 {
-		m.updateStatus()
+		*m = m.updateStatus()
 		m.updateDisplayHeight()
 		if m.display.shouldFollow() {
 			m.display = m.display.SetCursorToLastWindow()
@@ -472,7 +477,7 @@ func (m *Terminal) handleSessionLoadedMsg() (Terminal, tea.Cmd) {
 	// (Fallback when there are no windows yet — updateStatus above already
 	// handles the normal case via syncThemeFromSession.)
 	snap := m.out.SnapshotStatus()
-	m.syncThemeFromSession(snap.ActiveTheme, snap.ActiveThemeData)
+	*m = m.syncThemeFromSession(snap.ActiveTheme, snap.ActiveThemeData)
 
 	// Populate model selector from the now-loaded model list.
 	modelSnap := m.out.SnapshotModels()
@@ -481,7 +486,7 @@ func (m *Terminal) handleSessionLoadedMsg() (Terminal, tea.Cmd) {
 	// The input stays blurred (rendered as empty box) until the first
 	// tick determines whether MCP init is needed.
 	m.input = m.input.Blur()
-	m.handleMCPOverlays()
+	*m = m.handleMCPOverlays()
 
 	ms, cmd := m.overlays.ModelSelector().LoadModels(modelSnap.Models, modelSnap.ActiveID)
 	m.overlays.SetModelSelector(ms)
@@ -499,18 +504,18 @@ func (m *Terminal) handleSessionLoadingError(err error) (Terminal, tea.Cmd) {
 
 // handleDisplayRefresh checks if the display needs updating and returns
 // a tea.Cmd for model selector updates if models changed.
-func (m *Terminal) handleDisplayRefresh() tea.Cmd {
+func (m *Terminal) handleDisplayRefresh() (Terminal, tea.Cmd) {
 	// Flush pending deltas first so the WindowBuffer has the latest content
 	// before we check the dirty flag.
 	m.out.FlushPendingDeltas()
 
 	if !m.out.DrainDirty() {
-		m.updateStatus()
-		return nil
+		*m = m.updateStatus()
+		return *m, nil
 	}
 
 	if m.out.WindowBuffer().WindowCount() > 0 {
-		m.updateStatus()
+		*m = m.updateStatus()
 		m.updateDisplayHeight()
 		if m.display.shouldFollow() {
 			m.display = m.display.SetCursorToLastWindow()
@@ -521,7 +526,7 @@ func (m *Terminal) handleDisplayRefresh() tea.Cmd {
 	modelSnap := m.out.SnapshotModels()
 	ms, cmd := m.overlays.ModelSelector().LoadModels(modelSnap.Models, modelSnap.ActiveID)
 	m.overlays.SetModelSelector(ms)
-	return cmd
+	return *m, cmd
 }
 
 // handleEditorFinished handles completion of the external editor.
@@ -547,7 +552,7 @@ func (m *Terminal) handleEditorFinished(msg EditorFinishedMsg) (Terminal, tea.Cm
 			content := strings.TrimRight(msg.Content, "\n")
 			m.input = m.input.SetValue(content)
 			m.input = m.input.CursorEnd()
-			m.focusInput()
+			*m = m.focusInput()
 		}
 		return *m, nil
 
@@ -578,18 +583,19 @@ func (m *Terminal) updateDisplayHeight() {
 	m.display = m.display.updateContent()
 }
 
-// updateStatus updates the status bar state from the output writer.
-func (m *Terminal) syncThemeFromSession(sessionTheme string, themeData *theme.Theme) {
+// syncThemeFromSession updates the applied theme when the session reports a change.
+func (m *Terminal) syncThemeFromSession(sessionTheme string, themeData *theme.Theme) Terminal {
 	if m.appliedTheme == sessionTheme || sessionTheme == "" {
-		return
+		return *m
 	}
 	if themeData != nil {
-		m.applyTheme(themeData)
+		*m = m.applyTheme(themeData)
 	} else if m.themeManager != nil {
 		t := m.themeManager.LoadTheme(sessionTheme)
-		m.applyTheme(t)
+		*m = m.applyTheme(t)
 	}
 	m.appliedTheme = sessionTheme
+	return *m
 }
 
 // View renders the complete terminal UI.
@@ -668,11 +674,12 @@ func (m *Terminal) renderLoadingView() tea.View {
 
 var _ tea.Model = (*Terminal)(nil)
 
-func (m *Terminal) applyTheme(theme *theme.Theme) {
+func (m *Terminal) applyTheme(theme *theme.Theme) Terminal {
 	m.styles = NewStyles(theme)
 	m.out.SetStyles(m.styles)
 	m.display = m.display.SetStyles(m.styles)
 	m.input = m.input.SetStyles(m.styles)
 	m.overlays.SetStyles(m.styles)
 	m.display = m.display.updateContent()
+	return *m
 }

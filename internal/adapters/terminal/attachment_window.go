@@ -32,7 +32,11 @@ type AttachmentWindow struct {
 	baseDir    string
 	mode       attachmentMode
 
-	onAdd func(path string)
+	// selectedPath stores the path selected by the user when Enter is pressed.
+	// It is set by handleEnter/handleSearchEnter/handleURLEntry before closing
+	// the window, and read by handleSelectorOverlayKeys to add the attachment
+	// using the current *Terminal (avoiding stale closure captures).
+	selectedPath string
 }
 
 type fileEntry struct {
@@ -56,11 +60,6 @@ func NewAttachmentWindow(styles *Styles) AttachmentWindow {
 	return aw
 }
 
-func (aw AttachmentWindow) SetOnAdd(fn func(path string)) AttachmentWindow {
-	aw.onAdd = fn
-	return aw
-}
-
 func (aw AttachmentWindow) SetSize(width, height int) AttachmentWindow {
 	aw.FilteredListCore = aw.FilteredListCore.SetSize(width, height)
 	return aw
@@ -75,6 +74,11 @@ func (aw AttachmentWindow) SetHasFocus(focused bool) AttachmentWindow {
 	aw.FilteredListCore = aw.FilteredListCore.SetHasFocus(focused)
 	return aw
 }
+
+// SelectedPath returns the path that was selected when Enter was pressed,
+// or empty string if no selection was made. Used by handleSelectorOverlayKeys
+// to add the attachment to the current Terminal.
+func (aw AttachmentWindow) SelectedPath() string { return aw.selectedPath }
 
 func (aw AttachmentWindow) Open() AttachmentWindow {
 	aw.State = FilteredListOpen
@@ -211,9 +215,7 @@ func (aw AttachmentWindow) handleURLEntry() AttachmentWindow {
 	if url == "" {
 		return aw
 	}
-	if aw.onAdd != nil {
-		aw.onAdd(url)
-	}
+	aw.selectedPath = url
 	aw.State = FilteredListClosed
 	return aw
 }
@@ -257,9 +259,7 @@ func (aw AttachmentWindow) handleEnter() AttachmentWindow {
 		return aw
 	}
 	fullPath := filepath.Join(aw.currentDir, entry.name)
-	if aw.onAdd != nil {
-		aw.onAdd(fullPath)
-	}
+	aw.selectedPath = fullPath
 	aw.State = FilteredListClosed
 	return aw
 }
@@ -273,9 +273,7 @@ func (aw AttachmentWindow) handleSearchEnter() AttachmentWindow {
 		return aw.autocompleteDir(entry.name)
 	}
 	fullPath := filepath.Join(aw.currentDir, entry.name)
-	if aw.onAdd != nil {
-		aw.onAdd(fullPath)
-	}
+	aw.selectedPath = fullPath
 	aw.State = FilteredListClosed
 	return aw
 }

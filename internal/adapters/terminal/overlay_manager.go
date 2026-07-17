@@ -192,8 +192,7 @@ func (om *OverlayManager) OpenHelpWindow() {
 }
 
 // OpenAttachmentWindow opens the attachment window.
-func (om *OverlayManager) OpenAttachmentWindow(onAdd func(path string)) {
-	om.attachmentWindow = om.attachmentWindow.SetOnAdd(onAdd)
+func (om *OverlayManager) OpenAttachmentWindow() {
 	om.attachmentWindow = om.attachmentWindow.Open()
 }
 

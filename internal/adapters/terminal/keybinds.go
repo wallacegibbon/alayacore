@@ -37,31 +37,31 @@ func (m *Terminal) handleKeyMsg(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 	}
 
 	// Priority overlays (confirm, MCP init)
-	if cmd, handled := m.handlePriorityOverlayKeys(msg); handled {
-		return *m, cmd
+	if tm, cmd, handled := m.handlePriorityOverlayKeys(msg); handled {
+		return tm, cmd
 	}
 
 	// Selector overlays (theme, model, attachment, help)
-	if cmd, handled := m.handleSelectorOverlayKeys(msg); handled {
-		return *m, cmd
+	if tm, cmd, handled := m.handleSelectorOverlayKeys(msg); handled {
+		return tm, cmd
 	}
 
 	// Tab toggles focus between display and input
 	if msg.String() == keyTab {
-		m.toggleFocus()
+		*m = m.toggleFocus()
 		return *m, nil
 	}
 
 	// 7. Display-specific keys when display is focused
 	if m.overlays.RestoreFocus() == focusDisplay {
-		if cmd, handled := m.handleDisplayKeys(msg); handled {
-			return *m, cmd
+		if tm, cmd, handled := m.handleDisplayKeys(msg); handled {
+			return tm, cmd
 		}
 	}
 
 	// 8. Global shortcuts (work from any context)
-	if cmd, handled := m.handleGlobalKeys(msg); handled {
-		return *m, cmd
+	if tm, cmd, handled := m.handleGlobalKeys(msg); handled {
+		return tm, cmd
 	}
 
 	// 9. Fallback: pass to input field (no-op when display focused)
@@ -89,7 +89,7 @@ func (m *Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 		if selectedTheme != nil {
 			m.emitCommand(":theme_set " + selectedTheme.Name)
 		}
-		m.restoreFocus()
+		*m = m.restoreFocus()
 		return *m, nil
 	}
 
@@ -97,8 +97,8 @@ func (m *Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 	if wasOpen && !ts.IsOpen() {
 		originalThemeName := ts.GetOriginalThemeName()
 		originalTheme := m.themeManager.LoadTheme(originalThemeName)
-		m.applyTheme(originalTheme)
-		m.restoreFocus()
+		*m = m.applyTheme(originalTheme)
+		*m = m.restoreFocus()
 		return *m, nil
 	}
 
@@ -120,7 +120,7 @@ func (m *Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 			})
 		}
 		// Apply immediately for other keys
-		m.applyTheme(result.PreviewTheme)
+		*m = m.applyTheme(result.PreviewTheme)
 	}
 
 	return *m, nil
@@ -135,7 +135,7 @@ type themePreviewMsg struct {
 func (m *Terminal) handleThemePreview(msg themePreviewMsg) (Terminal, tea.Cmd) {
 	// Only apply if this preview is still the current one (debouncing)
 	if msg.id == m.themePreviewID {
-		m.applyTheme(msg.theme)
+		*m = m.applyTheme(msg.theme)
 	}
 	return *m, nil
 }
@@ -173,7 +173,7 @@ func (m *Terminal) handleConfirmQuit(r *ConfirmResult, fromCmd bool) (Terminal, 
 	if fromCmd {
 		m.input = m.input.SetValue("")
 	}
-	m.restoreFocusAfterConfirm()
+	*m = m.restoreFocusAfterConfirm()
 	return *m, nil
 }
 
@@ -181,9 +181,9 @@ func (m *Terminal) handleConfirmCancel(r *ConfirmResult, fromCmd bool) (Terminal
 	if fromCmd {
 		m.input = m.input.SetValue("")
 	}
-	m.restoreFocusAfterConfirm()
+	*m = m.restoreFocusAfterConfirm()
 	if r.Confirmed {
-		return *m, m.submitCommand("cancel", fromCmd)
+		return m.submitCommand("cancel", fromCmd)
 	}
 	return *m, nil
 }
@@ -197,9 +197,9 @@ func (m *Terminal) handleConfirmTool(r *ConfirmResult, fromCmd bool) (Terminal, 
 		m.input = m.input.SetValue("")
 	}
 	m.emitCommand(":confirm " + r.ToolID + " " + action)
-	m.restoreFocusAfterConfirm()
+	*m = m.restoreFocusAfterConfirm()
 	if nextID, nextName, nextInput, ok := m.out.GetPendingToolConfirm(); ok {
-		m.openConfirmTool(nextID, nextName, nextInput)
+		*m = m.openConfirmTool(nextID, nextName, nextInput)
 	}
 	return *m, scheduleTick()
 }
@@ -217,7 +217,7 @@ func (m *Terminal) handleConfirmMCPAuth(r *ConfirmResult, fromCmd bool) (Termina
 		}
 		m.emitCommand(":mcp_auth " + r.ToolID)
 	}
-	m.restoreFocusAfterConfirm()
+	*m = m.restoreFocusAfterConfirm()
 	return *m, scheduleTick()
 }
 
@@ -257,13 +257,14 @@ func (m *Terminal) startMCPAuthFlow(serverName, authURL string) {
 // is still open. If another overlay (e.g. model selector) was active before
 // the confirm appeared, it remains active — the overlay naturally catches
 // keys in handleKeyMsg.
-func (m *Terminal) restoreFocusAfterConfirm() {
+func (m *Terminal) restoreFocusAfterConfirm() Terminal {
 	if m.overlays.ModelSelector().IsOpen() || m.overlays.ThemeSelector().IsOpen() ||
 		m.overlays.HelpWindow().IsOpen() || m.overlays.IsMCPInitOpen() {
 		m.display = m.display.updateContent()
-		return
+		return *m
 	}
-	m.restoreFocus()
+	*m = m.restoreFocus()
+	return *m
 }
 
 // handleOverlayModelSelector handles keyboard input when the model selector is open.
@@ -273,13 +274,13 @@ func (m *Terminal) handleOverlayModelSelector(msg tea.KeyMsg) (Terminal, tea.Cmd
 	m.overlays.SetModelSelector(ms)
 
 	if result.ModelSelected {
-		m.switchToSelectedModel()
+		*m = m.switchToSelectedModel()
 	}
 	if result.ReloadModels {
 		m.emitCommand(":model_load")
 	}
 	if wasOpen && !ms.IsOpen() {
-		m.restoreFocus()
+		*m = m.restoreFocus()
 	}
 	return *m, result.Cmd
 }
@@ -295,28 +296,28 @@ func (m *Terminal) handleMCPInitKeys(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 
 // handlePriorityOverlayKeys handles the highest-priority overlays that
 // block all other interaction (confirm dialog, MCP init overlay).
-func (m *Terminal) handlePriorityOverlayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
+func (m *Terminal) handlePriorityOverlayKeys(msg tea.KeyMsg) (Terminal, tea.Cmd, bool) {
 	if m.overlays.ConfirmOverlay().IsOpen() {
-		_, cmd := m.handleOverlayConfirm(msg)
-		return cmd, true
+		tm, cmd := m.handleOverlayConfirm(msg)
+		return tm, cmd, true
 	}
 	if m.overlays.MCPInitOverlay().IsOpen() {
-		_, cmd := m.handleMCPInitKeys(msg)
-		return cmd, true
+		tm, cmd := m.handleMCPInitKeys(msg)
+		return tm, cmd, true
 	}
-	return nil, false
+	return *m, nil, false
 }
 
 // handleSelectorOverlayKeys handles selector-style overlays (theme, model,
 // attachment, help) that are mutually exclusive.
-func (m *Terminal) handleSelectorOverlayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
+func (m *Terminal) handleSelectorOverlayKeys(msg tea.KeyMsg) (Terminal, tea.Cmd, bool) {
 	if m.overlays.ThemeSelector().IsOpen() {
-		_, cmd := m.handleThemeSelectorKeys(msg)
-		return cmd, true
+		tm, cmd := m.handleThemeSelectorKeys(msg)
+		return tm, cmd, true
 	}
 	if m.overlays.ModelSelector().IsOpen() {
-		_, cmd := m.handleOverlayModelSelector(msg)
-		return cmd, true
+		tm, cmd := m.handleOverlayModelSelector(msg)
+		return tm, cmd, true
 	}
 	if m.overlays.AttachmentWindow().IsOpen() {
 		aw := m.overlays.AttachmentWindow()
@@ -324,9 +325,16 @@ func (m *Terminal) handleSelectorOverlayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 		aw, cmd := aw.HandleKeyMsg(msg)
 		m.overlays.SetAttachmentWindow(aw)
 		if t.JustClosed(aw) {
-			m.restoreFocus()
+			if path := aw.SelectedPath(); path != "" {
+				if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
+					*m = m.addURLAttachment(path)
+				} else {
+					*m = m.addAttachment(path)
+				}
+			}
+			*m = m.restoreFocus()
 		}
-		return cmd, true
+		return *m, cmd, true
 	}
 	if m.overlays.HelpWindow().IsOpen() {
 		hw := m.overlays.HelpWindow()
@@ -335,17 +343,17 @@ func (m *Terminal) handleSelectorOverlayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 		m.overlays.SetHelpWindow(hw)
 		if t.JustClosed(hw) {
 			if result.PendingCommand != "" {
-				m.focusInput()
+				*m = m.focusInput()
 				m.input = m.input.SetValue(result.PendingCommand + " ")
 				m.input = m.input.CursorEnd()
 				m.display = m.display.updateContent()
-				return nil, true
+				return *m, nil, true
 			}
-			m.restoreFocus()
+			*m = m.restoreFocus()
 		}
-		return result.Cmd, true
+		return *m, result.Cmd, true
 	}
-	return nil, false
+	return *m, nil, false
 }
 
 // handleOverlayConfirm handles keyboard input when the confirm dialog is open.
@@ -426,96 +434,97 @@ func gotoTop(m *Terminal) {
 	m.display = m.display.updateContent()
 }
 
-// DisplayKeyHandler handles a display key event and returns an optional tea.Cmd.
-type DisplayKeyHandler func(*Terminal) tea.Cmd
+// DisplayKeyHandler handles a display key event and returns the updated Terminal
+// and an optional tea.Cmd.
+type DisplayKeyHandler func(*Terminal) (Terminal, tea.Cmd)
 
 // ---------- display key handler implementations ----------
 
-func handleDisplayKeyH(m *Terminal) tea.Cmd {
+func handleDisplayKeyH(m *Terminal) (Terminal, tea.Cmd) {
 	var moved bool
 	m.display, moved = m.display.MoveWindowCursorToTop()
 	if moved {
 		m.display = m.display.EnsureCursorVisible()
 		m.display = m.display.updateContent()
 	}
-	return nil
+	return *m, nil
 }
 
-func handleDisplayKeyL(m *Terminal) tea.Cmd {
+func handleDisplayKeyL(m *Terminal) (Terminal, tea.Cmd) {
 	var moved bool
 	m.display, moved = m.display.MoveWindowCursorToBottom()
 	if moved {
 		m.display = m.display.EnsureCursorVisible()
 		m.display = m.display.updateContent()
 	}
-	return nil
+	return *m, nil
 }
 
-func handleDisplayKeyM(m *Terminal) tea.Cmd {
+func handleDisplayKeyM(m *Terminal) (Terminal, tea.Cmd) {
 	var moved bool
 	m.display, moved = m.display.MoveWindowCursorToCenter()
 	if moved {
 		m.display = m.display.EnsureCursorVisible()
 		m.display = m.display.updateContent()
 	}
-	return nil
+	return *m, nil
 }
 
-func handleDisplayKeyColon(m *Terminal) tea.Cmd {
-	m.focusInput()
+func handleDisplayKeyColon(m *Terminal) (Terminal, tea.Cmd) {
+	*m = m.focusInput()
 	m.input = m.input.SetValue(keyColon)
 	m.input = m.input.CursorEnd()
 	m.display = m.display.updateContent()
-	return nil
+	return *m, nil
 }
 
-func handleDisplayKeySpace(m *Terminal) tea.Cmd {
+func handleDisplayKeySpace(m *Terminal) (Terminal, tea.Cmd) {
 	var toggled bool
 	m.display, toggled = m.display.ToggleWindowFold()
 	if toggled {
 		m.display = m.display.EnsureCursorVisible()
 		m.display = m.display.updateContent()
 	}
-	return nil
+	return *m, nil
 }
 
-func handleDisplayKeyF(m *Terminal) tea.Cmd {
+func handleDisplayKeyF(m *Terminal) (Terminal, tea.Cmd) {
 	var moved bool
 	m.display, moved = m.display.MoveWindowCursorToNextUserPrompt()
 	if moved {
 		m.display = m.display.ScrollCursorToTop()
 		m.display = m.display.updateContent()
 	}
-	return nil
+	return *m, nil
 }
 
-func handleDisplayKeyB(m *Terminal) tea.Cmd {
+func handleDisplayKeyB(m *Terminal) (Terminal, tea.Cmd) {
 	var moved bool
 	m.display, moved = m.display.MoveWindowCursorToPrevUserPrompt()
 	if moved {
 		m.display = m.display.ScrollCursorToTop()
 		m.display = m.display.updateContent()
 	}
-	return nil
+	return *m, nil
 }
 
-func handleDisplayKeyE(m *Terminal) tea.Cmd {
+func handleDisplayKeyE(m *Terminal) (Terminal, tea.Cmd) {
 	content := m.display.GetCursorWindowContent()
 	if content != "" {
 		m.display = m.display.MarkUserScrolled()
-		return m.editor.OpenForDisplay(content)
+		return *m, m.editor.OpenForDisplay(content)
 	}
-	return nil
+	return *m, nil
 }
 
-func handleDisplayKeyCtrlF(m *Terminal) tea.Cmd {
+func handleDisplayKeyCtrlF(m *Terminal) (Terminal, tea.Cmd) {
 	if historyID := m.display.GetCursorWindowHistoryID(); historyID > 0 {
-		m.focusInput()
+		*m = m.focusInput()
 		m.input = m.input.SetValue(fmt.Sprintf(":fork %d ", historyID))
 		m.input = m.input.CursorEnd()
 		m.display = m.display.updateContent()
 	}
-	return nil
+	return *m, nil
 }
 
 // ---------- display key handler map ----------
@@ -524,25 +533,25 @@ func handleDisplayKeyCtrlF(m *Terminal) tea.Cmd {
 // All display keys are listed in a single map; handlers that don't need
 // to return a command simply return nil.
 var displayKeyHandlers = map[string]DisplayKeyHandler{
-	keyJ:         func(m *Terminal) tea.Cmd { moveWindowCursorDown(m); return nil },
-	keyDown:      func(m *Terminal) tea.Cmd { moveWindowCursorDown(m); return nil },
-	keyK:         func(m *Terminal) tea.Cmd { moveWindowCursorUp(m); return nil },
-	keyUp:        func(m *Terminal) tea.Cmd { moveWindowCursorUp(m); return nil },
-	keyCtrlD:     func(m *Terminal) tea.Cmd { scrollDownHalf(m); return nil },
-	keyPgDown:    func(m *Terminal) tea.Cmd { scrollDownHalf(m); return nil },
-	keyCtrlU:     func(m *Terminal) tea.Cmd { scrollUpHalf(m); return nil },
-	keyPgUp:      func(m *Terminal) tea.Cmd { scrollUpHalf(m); return nil },
-	keyJCapital:  func(m *Terminal) tea.Cmd { scrollDownLine(m); return nil },
-	keyShiftDown: func(m *Terminal) tea.Cmd { scrollDownLine(m); return nil },
-	keyKCapital:  func(m *Terminal) tea.Cmd { scrollUpLine(m); return nil },
-	keyShiftUp:   func(m *Terminal) tea.Cmd { scrollUpLine(m); return nil },
+	keyJ:         func(m *Terminal) (Terminal, tea.Cmd) { moveWindowCursorDown(m); return *m, nil },
+	keyDown:      func(m *Terminal) (Terminal, tea.Cmd) { moveWindowCursorDown(m); return *m, nil },
+	keyK:         func(m *Terminal) (Terminal, tea.Cmd) { moveWindowCursorUp(m); return *m, nil },
+	keyUp:        func(m *Terminal) (Terminal, tea.Cmd) { moveWindowCursorUp(m); return *m, nil },
+	keyCtrlD:     func(m *Terminal) (Terminal, tea.Cmd) { scrollDownHalf(m); return *m, nil },
+	keyPgDown:    func(m *Terminal) (Terminal, tea.Cmd) { scrollDownHalf(m); return *m, nil },
+	keyCtrlU:     func(m *Terminal) (Terminal, tea.Cmd) { scrollUpHalf(m); return *m, nil },
+	keyPgUp:      func(m *Terminal) (Terminal, tea.Cmd) { scrollUpHalf(m); return *m, nil },
+	keyJCapital:  func(m *Terminal) (Terminal, tea.Cmd) { scrollDownLine(m); return *m, nil },
+	keyShiftDown: func(m *Terminal) (Terminal, tea.Cmd) { scrollDownLine(m); return *m, nil },
+	keyKCapital:  func(m *Terminal) (Terminal, tea.Cmd) { scrollUpLine(m); return *m, nil },
+	keyShiftUp:   func(m *Terminal) (Terminal, tea.Cmd) { scrollUpLine(m); return *m, nil },
 	keyH:         handleDisplayKeyH,
 	keyL:         handleDisplayKeyL,
 	keyM:         handleDisplayKeyM,
-	keyG:         func(m *Terminal) tea.Cmd { gotoBottom(m); return nil },
-	keyEnd:       func(m *Terminal) tea.Cmd { gotoBottom(m); return nil },
-	keyGSmall:    func(m *Terminal) tea.Cmd { gotoTop(m); return nil },
-	keyHome:      func(m *Terminal) tea.Cmd { gotoTop(m); return nil },
+	keyG:         func(m *Terminal) (Terminal, tea.Cmd) { gotoBottom(m); return *m, nil },
+	keyEnd:       func(m *Terminal) (Terminal, tea.Cmd) { gotoBottom(m); return *m, nil },
+	keyGSmall:    func(m *Terminal) (Terminal, tea.Cmd) { gotoTop(m); return *m, nil },
+	keyHome:      func(m *Terminal) (Terminal, tea.Cmd) { gotoTop(m); return *m, nil },
 	keyColon:     handleDisplayKeyColon,
 	keySpace:     handleDisplayKeySpace,
 	keyF:         handleDisplayKeyF,
@@ -557,57 +566,60 @@ var displayKeyHandlers = map[string]DisplayKeyHandler{
 // (EnsureCursorVisible() or ScrollCursorToTop()) BEFORE updateContent().
 // This ensures the viewport position is updated before content is
 // regenerated, preventing blank areas in the virtual rendering.
-func (m *Terminal) handleDisplayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
+func (m *Terminal) handleDisplayKeys(msg tea.KeyMsg) (Terminal, tea.Cmd, bool) {
 	if fn, ok := displayKeyHandlers[msg.String()]; ok {
-		return fn(m), true
+		tm, cmd := fn(m)
+		return tm, cmd, true
 	}
-	return nil, false
+	return *m, nil, false
 }
 
 // handleGlobalKeys handles global keyboard shortcuts.
-func (m *Terminal) handleGlobalKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
+func (m *Terminal) handleGlobalKeys(msg tea.KeyMsg) (Terminal, tea.Cmd, bool) {
 	switch msg.String() {
 	case keyCtrlG:
-		m.openConfirmCancel()
+		*m = m.openConfirmCancel()
 		m.confirmFromCommand = false
-		return nil, true
+		return *m, nil, true
 
 	case keyCtrlS:
-		return m.handleSaveKey(), true
+		tm, cmd := m.handleSaveKey()
+		return tm, cmd, true
 
 	case keyCtrlL:
-		m.openModelSelector()
-		return nil, true
+		*m = m.openModelSelector()
+		return *m, nil, true
 
 	case keyCtrlP:
-		m.openThemeSelector()
-		return nil, true
+		*m = m.openThemeSelector()
+		return *m, nil, true
 
 	case keyCtrlQ:
-		return nil, true
+		return *m, nil, true
 
 	case keyCtrlR:
-		return m.handleRedraw(), true
+		tm, cmd := m.handleRedraw()
+		return tm, cmd, true
 
 	case keyCtrlH, keyF1:
-		m.openHelpWindow()
-		return nil, true
+		*m = m.openHelpWindow()
+		return *m, nil, true
 	}
 
-	return nil, false
+	return *m, nil, false
 }
 
 // handleSaveKey handles the Ctrl+S save shortcut.
 // If no session file is bound, it focuses the input and inserts ":save "
 // so the user can type a filename (same pattern as Ctrl+F for :fork).
 // If a session file is bound, it submits the save command directly.
-func (m *Terminal) handleSaveKey() tea.Cmd {
+func (m *Terminal) handleSaveKey() (Terminal, tea.Cmd) {
 	if m.appConfig.Cfg.Session == "" {
-		m.focusInput()
+		*m = m.focusInput()
 		m.input = m.input.SetValue(":save ")
 		m.input = m.input.CursorEnd()
 		m.display = m.display.updateContent()
-		return nil
+		return *m, nil
 	}
 	return m.submitCommand("save", false)
 }
@@ -625,13 +637,13 @@ func (m *Terminal) handleSaveKey() tea.Cmd {
 // flush becomes a full clear+repaint instead of a diff.  If both are
 // dropped (rare), the view change from layer 1 still ensures a diff-based
 // redraw that covers every content cell.
-func (m *Terminal) handleRedraw() tea.Cmd {
+func (m *Terminal) handleRedraw() (Terminal, tea.Cmd) {
 	m.forceRedraw++
 	m.display = m.display.ForceContentDirty()
 	m.display = m.display.updateContent()
 
 	m.pendingForceRedraw = true
-	return tea.Batch(
+	return *m, tea.Batch(
 		tea.ClearScreen,
 		func() tea.Msg {
 			return tea.WindowSizeMsg{Width: m.windowWidth, Height: m.windowHeight}
@@ -648,15 +660,15 @@ func (m *Terminal) handleFallback(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 
 	switch msg.String() {
 	case keyEnter:
-		return *m, m.handleSubmit()
+		return m.handleSubmit()
 	case keyCtrlO:
 		return *m, m.OpenEditor()
 	case keyCtrlA:
-		m.openAttachmentWindow()
+		*m = m.openAttachmentWindow()
 		return *m, nil
 	case keyCtrlC:
 		m.input = m.input.SetValue("")
-		m.clearAttachments()
+		*m = m.clearAttachments()
 		return *m, nil
 	}
 
@@ -670,7 +682,7 @@ func (m *Terminal) handleFallback(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 // ============================================================================
 
 // handleSubmit processes the input when Shift+Enter is pressed.
-func (m *Terminal) handleSubmit() tea.Cmd {
+func (m *Terminal) handleSubmit() (Terminal, tea.Cmd) {
 	prompt := strings.TrimSpace(m.input.Value())
 
 	// Check if it's a command (starts with ":") — ignore attachments for commands.
@@ -681,12 +693,12 @@ func (m *Terminal) handleSubmit() tea.Cmd {
 	// If a task is running, reject without clearing input.
 	if m.inProgress {
 		m.out.WriteError("A task is already running. Wait for it to complete or cancel it.")
-		return nil
+		return *m, nil
 	}
 
 	// Nothing to send
 	if prompt == "" && len(m.pendingAttachments) == 0 {
-		return nil
+		return *m, nil
 	}
 
 	// Send attachments first (if any), then text, then flush.
@@ -698,38 +710,38 @@ func (m *Terminal) handleSubmit() tea.Cmd {
 
 	// Clear everything
 	m.input = m.input.SetValue("")
-	m.clearAttachments()
+	*m = m.clearAttachments()
 
-	return scheduleTick()
+	return *m, scheduleTick()
 }
 
 // handleCommand processes a command string (without the ":" prefix).
-func (m *Terminal) handleCommand(command string) tea.Cmd {
+func (m *Terminal) handleCommand(command string) (Terminal, tea.Cmd) {
 	// Quit command
 	if command == cmdQuit || command == cmdQShort {
-		m.openConfirmQuit()
+		*m = m.openConfirmQuit()
 		m.confirmFromCommand = true
-		return nil
+		return *m, nil
 	}
 
 	// Cancel command
 	if command == cmdCancel {
-		m.openConfirmCancel()
+		*m = m.openConfirmCancel()
 		m.confirmFromCommand = true
-		return nil
+		return *m, nil
 	}
 
 	// Suspend command - suspends the process (like Ctrl+Z)
 	if command == cmdSuspend {
 		m.input = m.input.SetValue("")
-		return tea.Suspend
+		return *m, tea.Suspend
 	}
 
 	// Help command - opens help window locally, not sent to session
 	if command == cmdHelp {
 		m.input = m.input.SetValue("")
-		m.openHelpWindow()
-		return nil
+		*m = m.openHelpWindow()
+		return *m, nil
 	}
 
 	// All other commands - pass through to session
@@ -737,12 +749,12 @@ func (m *Terminal) handleCommand(command string) tea.Cmd {
 }
 
 // submitCommand sends a command to the session and optionally clears input.
-func (m *Terminal) submitCommand(command string, clearInput bool) tea.Cmd {
+func (m *Terminal) submitCommand(command string, clearInput bool) (Terminal, tea.Cmd) {
 	m.emitCommand(":" + command)
 	if clearInput {
 		m.input = m.input.SetValue("")
 	}
-	return scheduleTick()
+	return *m, scheduleTick()
 }
 
 // scheduleTick schedules a tick message for UI updates.
@@ -753,14 +765,15 @@ func scheduleTick() tea.Cmd {
 }
 
 // switchToSelectedModel sends a model_set command to switch to the selected model.
-func (m *Terminal) switchToSelectedModel() {
+func (m *Terminal) switchToSelectedModel() Terminal {
 	selectedModel := m.overlays.ModelSelector().GetActiveModel()
 	if selectedModel == nil {
-		return
+		return *m
 	}
 
 	// Send model_set command to session
 	if selectedModel.ID != 0 {
 		m.emitCommand(fmt.Sprintf(":model_set %d", selectedModel.ID))
 	}
+	return *m
 }
