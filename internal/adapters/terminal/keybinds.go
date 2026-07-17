@@ -196,8 +196,8 @@ func (m Terminal) handleConfirmMCPAuth(r *ConfirmResult, fromCmd bool) (Terminal
 
 // startMCPAuthFlow starts the OAuth callback server, opens the browser,
 // and returns a tea.Cmd that waits for the authorization code.
-// The callback server and notification are started synchronously (during Update);
-// only the blocking wait for the HTTP callback executes in Bubble Tea's goroutine.
+// The callback server is started synchronously (needed before the Cmd);
+// all user-facing I/O (notification, browser, TLV writes) runs in the Cmd.
 func (m Terminal) startMCPAuthFlow(serverName, authURL string) tea.Cmd {
 	state := platform.RandomState()
 
@@ -208,14 +208,14 @@ func (m Terminal) startMCPAuthFlow(serverName, authURL string) tea.Cmd {
 	filledURL = strings.ReplaceAll(filledURL, "{{redirect_uri}}", encodedRedirect)
 	filledURL = strings.ReplaceAll(filledURL, "{{state}}", state)
 
-	m.out.WriteNotify(fmt.Sprintf("Authorizing %s. If your browser doesn't open, open this URL:\n%s",
-		serverName, filledURL))
-
-	if err := platform.OpenURL(filledURL); err != nil {
-		m.out.WriteError("Failed to open browser: %v", err)
-	}
-
 	return func() tea.Msg {
+		m.out.WriteNotify(fmt.Sprintf("Authorizing %s. If your browser doesn't open, open this URL:\n%s",
+			serverName, filledURL))
+
+		if err := platform.OpenURL(filledURL); err != nil {
+			m.out.WriteError("Failed to open browser: %v", err)
+		}
+
 		res := <-resultCh
 		cleanup()
 		if res.Err != nil {
