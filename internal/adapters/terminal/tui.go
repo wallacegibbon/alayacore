@@ -392,6 +392,12 @@ func (m Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.PasteMsg:
 		return m.handlePaste(msg)
 
+	case tea.ColorProfileMsg:
+		return m, nil
+
+	case tea.EnvMsg:
+		return m, nil
+
 	default:
 		fmt.Fprintf(os.Stderr, "terminal: unhandled message type %T\n", msg)
 		return m, nil
