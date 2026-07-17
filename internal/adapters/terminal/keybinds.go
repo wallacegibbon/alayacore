@@ -346,24 +346,23 @@ func (m Terminal) handleSelectorOverlayKeys(msg tea.KeyMsg) (Terminal, tea.Cmd, 
 
 // handleOverlayConfirm handles keyboard input when the confirm dialog is open.
 func (m Terminal) handleOverlayConfirm(msg tea.KeyMsg) (Terminal, tea.Cmd) {
-	// 'e' opens the full tool input in an external editor for inspection
-	// (view-only — dialog stays open after editor closes)
-	if msg.String() == keyE && m.confirmOverlay.Kind() == ConfirmTool && m.confirmOverlay.ToolInput() != "" {
-		content := m.confirmOverlay.ToolInput()
-		if toolName := m.confirmOverlay.ToolName(); toolName != "" && strings.HasPrefix(content, toolName+": ") {
-			content = content[len(toolName)+2:]
-		}
-		return m, m.editor.OpenForDisplay(content)
-	}
 	cd, cmd := m.confirmOverlay.Update(msg)
 	m.confirmOverlay = cd
 	if cmd != nil {
-		// Process confirm result synchronously
-		if resultMsg := cmd(); resultMsg != nil {
-			if r, ok := resultMsg.(ConfirmResultMsg); ok {
-				return m.handleConfirmResult(r.Result)
-			}
+		// Execute cmd once and inspect the message type
+		resultMsg := cmd()
+		if resultMsg == nil {
+			return m, nil
 		}
+		if r, ok := resultMsg.(ConfirmResultMsg); ok {
+			// ConfirmResultMsg must be processed synchronously
+			// (modifies Terminal state inline)
+			return m.handleConfirmResult(r.Result)
+		}
+		// Other messages (e.g. openEditorForDisplayMsg):
+		// re-wrap and let Terminal.Update handle them normally
+		msg := resultMsg
+		return m, func() tea.Msg { return msg }
 	}
 	return m, nil
 }

@@ -251,6 +251,18 @@ func (cd ConfirmDialog) Update(msg tea.Msg) (ConfirmDialog, tea.Cmd) {
 			return result, func() tea.Msg { return ConfirmResultMsg{Result: r} }
 		}
 		return cd, nil // handled but no result
+
+	case keyE:
+		if cd.kind == ConfirmTool && cd.toolInput != "" {
+			content := cd.toolInput
+			if cd.toolName != "" && strings.HasPrefix(content, cd.toolName+": ") {
+				content = content[len(cd.toolName)+2:]
+			}
+			return cd, func() tea.Msg {
+				return openEditorForDisplayMsg{content: content}
+			}
+		}
+		return cd, nil
 	}
 
 	return cd, nil
