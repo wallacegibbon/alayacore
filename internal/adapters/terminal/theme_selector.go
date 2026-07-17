@@ -200,26 +200,20 @@ func (ts ThemeSelector) renderList() string {
 	innerWidth := max(0, ts.Width-BorderInnerPadding)
 	var lines []string
 
-	switch {
-	case len(ts.themes) == 0:
-		lines = append(lines, ts.Styles.System.Render("  No Theme"))
-	default:
-		ts.ScrollableListCore = ts.ScrollableListCore.EnsureVisible()
-		for i := ts.ScrollIdx; i < min(ts.ScrollIdx+listHeight, len(ts.themes)); i++ {
-			t := ts.themes[i]
-			nameMaxWidth := max(0, innerWidth-2)
-			themeName := t.Name
-			if nameMaxWidth > 0 {
-				themeName = truncateWithSuffix(themeName, nameMaxWidth)
-			}
-			if i == ts.SelectedIdx {
-				lines = append(lines, ts.Styles.Prompt.Render("> ")+ts.Styles.Text.Render(themeName))
-			} else {
-				lines = append(lines, ts.Styles.System.Render("  "+themeName))
-			}
+	ts.ScrollableListCore = ts.ScrollableListCore.EnsureVisible()
+	for i := ts.ScrollIdx; i < min(ts.ScrollIdx+listHeight, len(ts.themes)); i++ {
+		t := ts.themes[i]
+		nameMaxWidth := max(0, innerWidth-2)
+		themeName := t.Name
+		if nameMaxWidth > 0 {
+			themeName = truncateWithSuffix(themeName, nameMaxWidth)
+		}
+		if i == ts.SelectedIdx {
+			lines = append(lines, ts.Styles.Prompt.Render("> ")+ts.Styles.Text.Render(themeName))
+		} else {
+			lines = append(lines, ts.Styles.System.Render("  "+themeName))
 		}
 	}
-
 	for len(lines) < listHeight {
 		lines = append(lines, "")
 	}

@@ -326,10 +326,6 @@ func (ms ModelSelector) renderModelList(width int, borderColor color.Color) stri
 	innerWidth := max(0, width-BorderInnerPadding)
 
 	switch {
-	case len(ms.models) == 0:
-		content.WriteString(ms.Styles.System.Render("No models configured."))
-		content.WriteString("\n")
-		content.WriteString(ms.Styles.System.Render("Press 'e' to edit the model config file."))
 	case len(ms.filteredModels) == 0:
 		content.WriteString(ms.Styles.System.Render("No models match your search."))
 	default:
