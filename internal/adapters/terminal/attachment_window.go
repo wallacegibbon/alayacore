@@ -127,6 +127,24 @@ func (aw AttachmentWindow) readDir(dir string) []fileEntry {
 	return result
 }
 
+// Update handles all messages for the attachment window: key events and paste.
+func (aw AttachmentWindow) Update(msg tea.Msg) (AttachmentWindow, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		return aw.HandleKeyMsg(msg)
+	case tea.PasteMsg:
+		if !aw.FilterInputFocused {
+			return aw, nil
+		}
+		aw.FilterInput, _ = aw.FilterInput.Update(msg)
+		if aw.mode == modeLocal {
+			aw = aw.updateFiltered()
+		}
+		return aw, nil
+	}
+	return aw, nil
+}
+
 func (aw AttachmentWindow) HandleKeyMsg(msg tea.KeyMsg) (AttachmentWindow, tea.Cmd) {
 	if aw.State == FilteredListClosed {
 		return aw, nil
@@ -217,17 +235,6 @@ func (aw AttachmentWindow) handleURLEntry() AttachmentWindow {
 	}
 	aw.selectedPath = url
 	aw.State = FilteredListClosed
-	return aw
-}
-
-func (aw AttachmentWindow) handlePaste(msg tea.PasteMsg) AttachmentWindow {
-	if !aw.FilterInputFocused {
-		return aw
-	}
-	aw.FilterInput, _ = aw.FilterInput.Update(msg)
-	if aw.mode == modeLocal {
-		aw = aw.updateFiltered()
-	}
 	return aw
 }
 

@@ -345,7 +345,7 @@ func (m Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.PasteMsg:
 		if m.overlays.AttachmentWindow().IsOpen() {
 			aw := m.overlays.AttachmentWindow()
-			aw = aw.handlePaste(msg)
+			aw, _ = aw.Update(msg)
 			m.overlays = m.overlays.SetAttachmentWindow(aw)
 		} else {
 			var cmd tea.Cmd
