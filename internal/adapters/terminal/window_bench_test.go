@@ -166,6 +166,9 @@ func BenchmarkWindowBufferDeltaWithGetAll(b *testing.B) {
 
 // BenchmarkVirtualRenderingCursorMovement benchmarks cursor movement with virtual rendering.
 // This tests the EnsureCursorVisible + updateContent path.
+// Uses 20 cursor moves per iteration for statistical significance while keeping
+// wall time reasonable.  See BenchmarkVirtualRenderingCursorMovementSingle for
+// the per-move cost.
 func BenchmarkVirtualRenderingCursorMovement(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
@@ -189,8 +192,8 @@ func BenchmarkVirtualRenderingCursorMovement(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		// Simulate moving cursor through all windows
-		for j := 0; j < 100; j++ {
+		// Simulate moving cursor through windows
+		for j := 0; j < 20; j++ {
 			dm = dm.WithWindowCursor(j)
 			dm = dm.EnsureCursorVisible()
 			dm = dm.updateContent()
@@ -347,6 +350,7 @@ func BenchmarkJustAppendUpdate(b *testing.B) {
 }
 
 // BenchmarkJustEnsureLineHeights isolates the ensureLineHeights cost
+// when a single window is dirty (incremental path).
 func BenchmarkJustEnsureLineHeights(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
@@ -364,12 +368,9 @@ func BenchmarkJustEnsureLineHeights(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		b.StopTimer()
 		wb.AppendOrUpdate("AT", historyID, " word")
 		wb.dirty = true
 		wb.dirtyIndex = wb.idIndex[historyID]
-		b.StartTimer()
-
 		_ = wb.GetTotalLines()
 	}
 }
@@ -725,28 +726,29 @@ func BenchmarkGetAllWithoutVirtual(b *testing.B) {
 func BenchmarkWindowBufferResize(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
 
+	// Build state once
+	wb := NewWindowBuffer(80, styles)
+	for j := 0; j < 50; j++ {
+		id := fmt.Sprintf("msg%d", j)
+		content := strings.Repeat("Content line\n", 5)
+		wb.AppendOrUpdate("AT", id, content)
+	}
+	_ = wb.GetTotalLines()
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		b.StopTimer()
-		wb := NewWindowBuffer(80, styles)
-
-		// Create 50 windows
-		for j := 0; j < 50; j++ {
-			id := fmt.Sprintf("msg%d", j)
-			content := strings.Repeat("Content line\n", 5)
-			wb.AppendOrUpdate("AT", id, content)
+		// Toggle width to force re-wrap every other iteration
+		if i%2 == 0 {
+			wb.WithWidth(120)
+		} else {
+			wb.WithWidth(80)
 		}
-		_ = wb.GetTotalLines()
-
-		b.StartTimer()
-
-		// Simulate resize
-		wb.WithWidth(120)
 		_ = wb.GetTotalLines()
 	}
 }
 
 // BenchmarkVirtualRenderingScroll benchmarks scrolling with virtual rendering.
+// Uses 20 scroll steps per direction per iteration.
 func BenchmarkVirtualRenderingScroll(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
@@ -770,11 +772,11 @@ func BenchmarkVirtualRenderingScroll(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Scroll through content
-		for j := 0; j < 100; j++ {
+		for j := 0; j < 20; j++ {
 			dm = dm.ScrollDown(1)
 			dm = dm.updateContent()
 		}
-		for j := 0; j < 100; j++ {
+		for j := 0; j < 20; j++ {
 			dm = dm.ScrollUp(1)
 			dm = dm.updateContent()
 		}
@@ -804,87 +806,82 @@ func BenchmarkGetWindowLineRangeCached(b *testing.B) {
 	}
 }
 
-// BenchmarkEnsureLineHeightsIncremental vs full rebuild
+// BenchmarkEnsureLineHeightsIncremental vs full rebuild.
+//
+// State is built ONCE outside the loop. Each iteration appends a delta to
+// msg50 and measures GetTotalLines — the incremental path.  Content grows
+// across iterations but that's fine: the whole point is that incremental
+// path is O(delta) regardless of total content size.
 func BenchmarkEnsureLineHeightsIncremental(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
+	wb := NewWindowBuffer(80, styles)
+	for j := 0; j < 100; j++ {
+		id := fmt.Sprintf("msg%d", j)
+		content := strings.Repeat("Content line\n", 5)
+		wb.AppendOrUpdate("AT", id, content)
+	}
+	_ = wb.GetTotalLines()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		b.StopTimer()
-		// Create fresh buffer for each iteration
-		wb := NewWindowBuffer(80, styles)
-		for j := 0; j < 100; j++ {
-			id := fmt.Sprintf("msg%d", j)
-			content := strings.Repeat("Content line\n", 5)
-			wb.AppendOrUpdate("AT", id, content)
-		}
-		// Pre-calculate line heights
-		_ = wb.GetTotalLines()
-
-		// Now append to one window (incremental path)
 		wb.AppendOrUpdate("AT", "msg50", " new content")
-		b.StartTimer()
-
 		_ = wb.GetTotalLines()
 	}
 }
 
 func BenchmarkEnsureLineHeightsFullRebuild(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
+	wb := NewWindowBuffer(80, styles)
+	for j := 0; j < 100; j++ {
+		id := fmt.Sprintf("msg%d", j)
+		content := strings.Repeat("Content line\n", 5)
+		wb.AppendOrUpdate("AT", id, content)
+	}
+	// Do NOT pre-calculate — force full rebuild on each iteration
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		b.StopTimer()
-		// Create fresh buffer for each iteration
-		wb := NewWindowBuffer(80, styles)
-		for j := 0; j < 100; j++ {
-			id := fmt.Sprintf("msg%d", j)
-			content := strings.Repeat("Content line\n", 5)
-			wb.AppendOrUpdate("AT", id, content)
-		}
-		// Don't pre-calculate - force full rebuild
-		b.StartTimer()
-
+		wb.dirty = true
+		wb.dirtyIndex = dirtyFullRebuild
 		_ = wb.GetTotalLines()
 	}
 }
 
-// BenchmarkIncrementalWrapping vs full wrapping
+// BenchmarkIncrementalWrapping measures incremental append-to-existing-wrappedLines.
+// State is built once; each iteration appends a small delta and tracks
+// the line count (incremental path — no full re-wrap).
 func BenchmarkIncrementalWrappingPath(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
+	wb := NewWindowBuffer(80, styles)
+	wb.AppendOrUpdate("AT", "msg0", strings.Repeat("Initial content line\n", 10))
+	_ = wb.GetTotalLines()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		b.StopTimer()
-		wb := NewWindowBuffer(80, styles)
-
-		// Create one window with initial content
-		wb.AppendOrUpdate("AT", "msg0", strings.Repeat("Initial content line\n", 10))
-		// Trigger initial render to populate wrappedLines cache
-		_ = wb.GetTotalLines()
-
-		b.StartTimer()
-
-		// Append small delta - should use incremental wrapping
 		wb.AppendOrUpdate("AT", "msg0", " new text")
 		_ = wb.GetTotalLines()
 	}
 }
 
+// BenchmarkFullWrappingPath measures full wrap from scratch on an
+// uncached window. State is built once; each iteration invalidates the
+// cache to force full re-wrap on GetTotalLines.
 func BenchmarkFullWrappingPath(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
+	wb := NewWindowBuffer(80, styles)
+	historyID := "msg0"
+	wb.AppendOrUpdate("AT", historyID, strings.Repeat("Initial content line\n", 10))
+
+	// Ensure content is populated so GetTotalLines has work to do
+	_ = wb.GetTotalLines()
+	idx := wb.idIndex[historyID]
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		b.StopTimer()
-		wb := NewWindowBuffer(80, styles)
-
-		// Create one window with content
-		wb.AppendOrUpdate("AT", "msg0", strings.Repeat("Initial content line\n", 10))
-
-		b.StartTimer()
-
-		// First render - full wrapping
+		// Invalidate renderer cache AND mark window buffer as dirty
+		wb.windows[idx].Invalidate()
+		wb.dirty = true
+		wb.dirtyIndex = idx
 		_ = wb.GetTotalLines()
 	}
 }
