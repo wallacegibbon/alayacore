@@ -146,7 +146,8 @@ func (m *Terminal) handleThemePreview(msg themePreviewMsg) (tea.Model, tea.Cmd) 
 }
 
 func (m *Terminal) handleConfirmResult() (tea.Model, tea.Cmd) {
-	r := m.overlays.ConfirmOverlay().ConsumeResult()
+	cd, r := m.overlays.ConfirmOverlay().ConsumeResult()
+	m.overlays.SetConfirmOverlay(cd)
 	if r == nil {
 		return m, nil
 	}
@@ -358,7 +359,8 @@ func (m *Terminal) handleOverlayConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, m.editor.OpenForDisplay(content)
 	}
-	if handled := m.overlays.ConfirmOverlay().HandleKeyMsg(msg); handled {
+	if cd, handled := m.overlays.ConfirmOverlay().HandleKeyMsg(msg); handled {
+		m.overlays.SetConfirmOverlay(cd)
 		return m.handleConfirmResult()
 	}
 	return m, nil

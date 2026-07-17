@@ -19,8 +19,8 @@ type OverlayManager struct {
 	modelSelector    *ModelSelector
 	themeSelector    *ThemeSelector
 	helpWindow       *HelpWindow
-	confirmOverlay   *ConfirmDialog
-	mcpInitOverlay   *ConfirmDialog
+	confirmOverlay   ConfirmDialog
+	mcpInitOverlay   ConfirmDialog
 	attachmentWindow *AttachmentWindow
 
 	// Focus state — which window had focus before an overlay opened.
@@ -35,8 +35,8 @@ func NewOverlayManager(
 	modelSelector *ModelSelector,
 	themeSelector *ThemeSelector,
 	helpWindow *HelpWindow,
-	confirmOverlay *ConfirmDialog,
-	mcpInitOverlay *ConfirmDialog,
+	confirmOverlay ConfirmDialog,
+	mcpInitOverlay ConfirmDialog,
 	attachmentWindow *AttachmentWindow,
 	styles *Styles,
 ) *OverlayManager {
@@ -60,8 +60,8 @@ func (om *OverlayManager) SetSize(width, height int) {
 	om.modelSelector.SetSize(width, height)
 	om.themeSelector.SetSize(width, height)
 	om.helpWindow.SetSize(width, height)
-	om.confirmOverlay.SetSize(width, height)
-	om.mcpInitOverlay.SetSize(width, height)
+	om.confirmOverlay = om.confirmOverlay.SetSize(width, height)
+	om.mcpInitOverlay = om.mcpInitOverlay.SetSize(width, height)
 	om.attachmentWindow.SetSize(width, height)
 }
 
@@ -75,7 +75,7 @@ func (om *OverlayManager) SetStyles(styles *Styles) {
 	om.modelSelector.SetStyles(styles)
 	om.themeSelector.SetStyles(styles)
 	om.helpWindow.SetStyles(styles)
-	om.confirmOverlay.SetStyles(styles)
+	om.confirmOverlay = om.confirmOverlay.SetStyles(styles)
 	om.attachmentWindow.SetStyles(styles)
 }
 
@@ -88,7 +88,7 @@ func (om *OverlayManager) SetFocused(focused bool) {
 	om.modelSelector.SetHasFocus(focused)
 	om.themeSelector.SetHasFocus(focused)
 	om.helpWindow.SetHasFocus(focused)
-	om.confirmOverlay.SetHasFocus(focused)
+	om.confirmOverlay = om.confirmOverlay.SetHasFocus(focused)
 	om.attachmentWindow.SetHasFocus(focused)
 }
 
@@ -149,10 +149,16 @@ func (om *OverlayManager) HelpWindow() *HelpWindow { return om.helpWindow }
 func (om *OverlayManager) AttachmentWindow() *AttachmentWindow { return om.attachmentWindow }
 
 // ConfirmOverlay returns the confirm dialog component.
-func (om *OverlayManager) ConfirmOverlay() *ConfirmDialog { return om.confirmOverlay }
+func (om *OverlayManager) ConfirmOverlay() ConfirmDialog { return om.confirmOverlay }
+
+// SetConfirmOverlay replaces the confirm dialog component.
+func (om *OverlayManager) SetConfirmOverlay(cd ConfirmDialog) { om.confirmOverlay = cd }
 
 // MCPInitOverlay returns the MCP init overlay component.
-func (om *OverlayManager) MCPInitOverlay() *ConfirmDialog { return om.mcpInitOverlay }
+func (om *OverlayManager) MCPInitOverlay() ConfirmDialog { return om.mcpInitOverlay }
+
+// SetMCPInitOverlay replaces the MCP init overlay component.
+func (om *OverlayManager) SetMCPInitOverlay(cd ConfirmDialog) { om.mcpInitOverlay = cd }
 
 // ============================================================================
 // Opening Overlays
@@ -181,22 +187,22 @@ func (om *OverlayManager) OpenAttachmentWindow(onAdd func(path string)) {
 
 // OpenConfirmQuit opens the quit confirmation dialog.
 func (om *OverlayManager) OpenConfirmQuit() {
-	om.confirmOverlay.OpenQuit()
+	om.confirmOverlay = om.confirmOverlay.OpenQuit()
 }
 
 // OpenConfirmCancel opens the cancel-task confirmation dialog.
 func (om *OverlayManager) OpenConfirmCancel() {
-	om.confirmOverlay.OpenCancel()
+	om.confirmOverlay = om.confirmOverlay.OpenCancel()
 }
 
 // OpenConfirmTool opens the tool-execution confirmation dialog.
 func (om *OverlayManager) OpenConfirmTool(id, toolName, toolInput string) {
-	om.confirmOverlay.OpenTool(id, toolName, toolInput)
+	om.confirmOverlay = om.confirmOverlay.OpenTool(id, toolName, toolInput)
 }
 
 // OpenConfirmMCPAuth opens the MCP OAuth authorization confirmation dialog.
 func (om *OverlayManager) OpenConfirmMCPAuth(serverName, serverURL string) {
-	om.confirmOverlay.OpenMCPAuth(serverName, serverURL)
+	om.confirmOverlay = om.confirmOverlay.OpenMCPAuth(serverName, serverURL)
 }
 
 // ============================================================================
@@ -204,51 +210,36 @@ func (om *OverlayManager) OpenConfirmMCPAuth(serverName, serverURL string) {
 // ============================================================================
 
 // HandleMCPProgress manages all MCP overlay state.
-//
-// The init overlay (mcpInitOverlay) persists throughout MCP init.
-// The confirm overlay (confirmOverlay) handles auth confirm and tool
-// confirm as temporary dialogs on top of the init overlay.
-//
-// Returns an OverlayAction describing what happened, so the caller
-// (Terminal) can adjust focus accordingly.
 func (om *OverlayManager) HandleMCPProgress(out OutputWriter) OverlayAction {
-	// 1. Done signal — close init overlay (one-shot).
 	if out.ConsumeMCPDone() {
 		if om.mcpInitOverlay.IsOpen() {
-			om.mcpInitOverlay.Close()
+			om.mcpInitOverlay = om.mcpInitOverlay.Close()
 			return OverlayAction{CloseInitOverlay: true}
 		}
 		return OverlayAction{}
 	}
 
-	// 2. Tool confirm (separate from MCP init).
-	// Only pop when no confirm dialog is already showing — the tick
-	// runs every 250ms and would otherwise overwrite the current dialog
-	// with the next queued item before the user can respond.
 	if !om.confirmOverlay.IsOpen() {
 		if id, name, input, ok := out.GetPendingToolConfirm(); ok {
-			om.OpenConfirmTool(id, name, input)
+			om.confirmOverlay = om.confirmOverlay.OpenTool(id, name, input)
 			return OverlayAction{OpenedConfirm: true}
 		}
 	}
 
-	// 3. MCP auth confirm — open confirm dialog on top of init overlay.
-	// Same guard: don't overwrite an already-open confirm dialog.
 	if !om.confirmOverlay.IsOpen() {
 		if server, url, ok := out.GetPendingMCPAuth(); ok {
-			om.OpenConfirmMCPAuth(server, url)
+			om.confirmOverlay = om.confirmOverlay.OpenMCPAuth(server, url)
 			return OverlayAction{OpenedConfirm: true}
 		}
 	}
 
-	// 4. Init overlay — show for any active (non-empty, non-done) status.
 	st := out.SnapshotStatus()
 	if st.MCPStatus != "" && st.MCPStatus != "done" {
 		if om.mcpInitOverlay.IsOpen() {
-			om.mcpInitOverlay.UpdateMCPInitProgress(st.MCPServers)
+			om.mcpInitOverlay = om.mcpInitOverlay.UpdateMCPInitProgress(st.MCPServers)
 		} else {
-			om.mcpInitOverlay.OpenMCPInit()
-			om.mcpInitOverlay.UpdateMCPInitProgress(st.MCPServers)
+			om.mcpInitOverlay = om.mcpInitOverlay.OpenMCPInit()
+			om.mcpInitOverlay = om.mcpInitOverlay.UpdateMCPInitProgress(st.MCPServers)
 		}
 		return OverlayAction{InitOverlayActive: true}
 	}
@@ -269,21 +260,7 @@ type OverlayAction struct {
 
 // Render applies all overlay layers to the base content and returns the
 // final view string. Also applies force-redraw suffix if needed.
-//
-// Layer 1: Regular overlay windows (model selector, theme selector, help).
-//
-//	These are mutually exclusive — only one can be open at a time.
-//
-// Layer 2: MCP init overlay — persistent, shows init/OAuth progress.
-//
-//	Rendered behind the confirm dialog so it stays visible when
-//	the confirm dialog closes.
-//
-// Layer 3: Confirm dialog — rendered ON TOP of everything, including
-//
-//	the MCP init overlay.
 func (om *OverlayManager) Render(baseContent string, width, height int, forceRedraw bool) (string, bool) {
-	// Layer 1: Regular overlay windows (mutually exclusive).
 	overlayContent := baseContent
 
 	switch {
@@ -297,12 +274,10 @@ func (om *OverlayManager) Render(baseContent string, width, height int, forceRed
 		overlayContent = om.attachmentWindow.RenderOverlay(baseContent, width, height)
 	}
 
-	// Layer 2: MCP init overlay.
 	if om.mcpInitOverlay.IsOpen() {
 		overlayContent = om.mcpInitOverlay.RenderOverlay(overlayContent, width, height)
 	}
 
-	// Layer 3: Confirm dialog.
 	if om.confirmOverlay.IsOpen() {
 		fullContent := om.confirmOverlay.RenderOverlay(overlayContent, width, height)
 		if forceRedraw {

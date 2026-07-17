@@ -39,25 +39,14 @@ const (
 )
 
 // ConfirmDialog manages a floating confirmation overlay.
-//
-// Renders as a centered dialog box.
-// For tool confirmations, the tool input is shown below the message.
-//
-// Key handling: y/Y = confirm, n/N/esc = cancel.
 type ConfirmDialog struct {
-	// Core state — follows the ScrollableListCore pattern.
 	state    FilteredListState
 	kind     ConfirmKind
 	hasFocus bool
 	styles   *Styles
+	Width    int
+	Height   int
 
-	// Width is set by SetSize with the full terminal width, matching
-	// the overlay pattern used by ModelSelector, ThemeSelector, etc.
-	Width  int
-	Height int
-
-	// Description shown below the title (used for all kinds).
-	// Rendered as up to 2 centered rows in muted style.
 	Description string
 
 	// Tool confirm fields (only used for ConfirmTool kind)
@@ -66,156 +55,130 @@ type ConfirmDialog struct {
 	toolInput string
 
 	// Result flags — consumed by the Terminal after key handling.
-	// Only one of these is set per interaction.
 	confirmed     bool
 	canceled      bool
 	ctrlGCanceled bool // true when canceled via Ctrl+G (MCP auth → cancel all)
 }
 
 // NewConfirmDialog creates a new confirm dialog.
-func NewConfirmDialog(styles *Styles) *ConfirmDialog {
-	return &ConfirmDialog{
-		styles: styles,
-	}
+func NewConfirmDialog(styles *Styles) ConfirmDialog {
+	return ConfirmDialog{styles: styles}
 }
 
 // SetStyles updates the styles used for rendering.
-func (cd *ConfirmDialog) SetStyles(styles *Styles) {
+func (cd ConfirmDialog) SetStyles(styles *Styles) ConfirmDialog {
 	cd.styles = styles
+	return cd
 }
 
 // SetHasFocus sets the focus state for styling.
-func (cd *ConfirmDialog) SetHasFocus(focused bool) {
+func (cd ConfirmDialog) SetHasFocus(focused bool) ConfirmDialog {
 	cd.hasFocus = focused
+	return cd
 }
 
 // Kind returns the type of confirmation dialog currently active.
-func (cd *ConfirmDialog) Kind() ConfirmKind {
-	return cd.kind
-}
+func (cd ConfirmDialog) Kind() ConfirmKind { return cd.kind }
 
 // ToolName returns the tool name for tool confirmations.
-func (cd *ConfirmDialog) ToolName() string { return cd.toolName }
+func (cd ConfirmDialog) ToolName() string { return cd.toolName }
 
 // ToolInput returns the tool input for tool confirmations.
-func (cd *ConfirmDialog) ToolInput() string { return cd.toolInput }
+func (cd ConfirmDialog) ToolInput() string { return cd.toolInput }
 
-// IsCtrlGCanceled returns true if the dialog was closed via Ctrl+G
-// rather than a regular n/N/Esc. Used by MCP auth to distinguish
-// "decline this server" from "cancel all MCP initialization".
-func (cd *ConfirmDialog) IsCtrlGCanceled() bool { return cd.ctrlGCanceled }
+// IsCtrlGCanceled returns true if the dialog was closed via Ctrl+G.
+func (cd ConfirmDialog) IsCtrlGCanceled() bool { return cd.ctrlGCanceled }
 
 // ToolID returns the tool call ID for tool confirmations.
-func (cd *ConfirmDialog) ToolID() string { return cd.toolID }
+func (cd ConfirmDialog) ToolID() string { return cd.toolID }
 
 // SetSize updates the terminal dimensions for responsive sizing.
-// Called on initialization and terminal resize.
-func (cd *ConfirmDialog) SetSize(width, height int) {
+func (cd ConfirmDialog) SetSize(width, height int) ConfirmDialog {
 	if width > 0 {
 		cd.Width = width
 	}
 	cd.Height = height
+	return cd
 }
 
 // IsOpen returns true if the dialog is currently shown.
-func (cd *ConfirmDialog) IsOpen() bool {
+func (cd ConfirmDialog) IsOpen() bool {
 	return cd.state != FilteredListClosed
 }
 
 // ---- Open / Close ----
 
-// OpenQuit opens the dialog for confirming application exit.
-func (cd *ConfirmDialog) OpenQuit() {
+func (cd ConfirmDialog) open(kind ConfirmKind) ConfirmDialog {
 	cd.state = FilteredListOpen
-	cd.kind = ConfirmQuit
-	cd.Description = "All unsaved progress will be lost."
-	cd.toolID = ""
-	cd.toolName = ""
-	cd.toolInput = ""
+	cd.kind = kind
 	cd.confirmed = false
 	cd.canceled = false
+	cd.ctrlGCanceled = false
+	return cd
+}
+
+// OpenQuit opens the dialog for confirming application exit.
+func (cd ConfirmDialog) OpenQuit() ConfirmDialog {
+	cd = cd.open(ConfirmQuit)
+	cd.Description = "All unsaved progress will be lost."
+	return cd
 }
 
 // OpenCancel opens the dialog for confirming task cancellation.
-func (cd *ConfirmDialog) OpenCancel() {
-	cd.state = FilteredListOpen
-	cd.kind = ConfirmCancel
+func (cd ConfirmDialog) OpenCancel() ConfirmDialog {
+	cd = cd.open(ConfirmCancel)
 	cd.Description = "The current request will be stopped."
-	cd.toolID = ""
-	cd.toolName = ""
-	cd.toolInput = ""
-	cd.confirmed = false
-	cd.canceled = false
+	return cd
 }
 
 // OpenMCPAuth opens the dialog for confirming MCP OAuth authorization.
-func (cd *ConfirmDialog) OpenMCPAuth(serverName, serverURL string) {
-	cd.state = FilteredListOpen
-	cd.kind = ConfirmMCPAuth
+func (cd ConfirmDialog) OpenMCPAuth(serverName, serverURL string) ConfirmDialog {
+	cd = cd.open(ConfirmMCPAuth)
 	cd.toolID = serverName
 	cd.toolName = serverName
 	cd.toolInput = serverURL
 	cd.Description = serverURL
-	cd.confirmed = false
-	cd.canceled = false
+	return cd
 }
 
 // OpenMCPInit opens the dialog to show that MCP servers are initializing.
-// This is a non-interactive overlay — it shows "Initializing MCP servers…"
-// while the async init runs in the background. Press Ctrl+G to cancel.
-// All keys are consumed (no-op) while this overlay is shown.
-func (cd *ConfirmDialog) OpenMCPInit() {
-	cd.state = FilteredListOpen
-	cd.kind = ConfirmMCPInit
-	cd.toolID = ""
-	cd.toolName = ""
-	cd.toolInput = ""
+func (cd ConfirmDialog) OpenMCPInit() ConfirmDialog {
+	cd = cd.open(ConfirmMCPInit)
 	cd.Description = "Connecting to MCP servers and discovering tools."
-	cd.confirmed = false
-	cd.canceled = false
+	return cd
 }
 
 // UpdateMCPInitProgress updates the description with the current server list.
-// Called when the session reports a new init progress event.
-func (cd *ConfirmDialog) UpdateMCPInitProgress(servers []string) {
+func (cd ConfirmDialog) UpdateMCPInitProgress(servers []string) ConfirmDialog {
 	if cd.kind != ConfirmMCPInit {
-		return
+		return cd
 	}
 	if len(servers) > 0 {
 		cd.Description = strings.Join(servers, ", ")
 	} else {
 		cd.Description = "Discovering tools..."
 	}
+	return cd
 }
 
 // OpenTool opens the dialog for confirming a tool call.
-func (cd *ConfirmDialog) OpenTool(toolID, toolName, toolInput string) {
-	cd.state = FilteredListOpen
-	cd.kind = ConfirmTool
+func (cd ConfirmDialog) OpenTool(toolID, toolName, toolInput string) ConfirmDialog {
+	cd = cd.open(ConfirmTool)
 	cd.toolID = toolID
 	cd.toolName = toolName
 	cd.toolInput = toolInput
-	// Derive description from tool input (up to 2 line-break segments).
-	// HardWrap in buildContentLines handles wrapping long lines, and the
-	// 2-row cap with "…" handles overflow beyond 2 rows.
-	// Strip the redundant "toolName: " prefix since it's already shown in the title.
 	parts := strings.SplitN(toolInput, "\n", 2)
 	desc := strings.Join(parts, "\n")
 	if toolName != "" && strings.HasPrefix(desc, toolName+": ") {
 		desc = desc[len(toolName)+2:]
 	}
-	// Strip trailing newline — FormatCall adds one for display window layout,
-	// but in the confirm dialog it creates a spurious empty line that triggers
-	// the 2-row "…" truncation prematurely.
 	desc = strings.TrimRight(desc, "\n")
 	cd.Description = desc
-	cd.confirmed = false
-	cd.canceled = false
+	return cd
 }
 
 // Close closes the dialog without committing any action.
-// This is equivalent to the user pressing esc.
-func (cd *ConfirmDialog) Close() {
+func (cd ConfirmDialog) Close() ConfirmDialog {
 	cd.state = FilteredListClosed
 	cd.kind = ConfirmNone
 	cd.Description = ""
@@ -225,70 +188,67 @@ func (cd *ConfirmDialog) Close() {
 	cd.confirmed = false
 	cd.canceled = false
 	cd.ctrlGCanceled = false
+	return cd
 }
 
 // ---- Key Handling ----
 
 // HandleKeyMsg processes a key press and updates state.
-// Returns true if the key was consumed by the dialog.
-func (cd *ConfirmDialog) HandleKeyMsg(msg tea.KeyMsg) bool {
+// Returns the updated dialog and whether the key was consumed.
+func (cd ConfirmDialog) HandleKeyMsg(msg tea.KeyMsg) (ConfirmDialog, bool) {
 	if !cd.IsOpen() {
-		return false
+		return cd, false
 	}
 
 	key := msg.String()
 
-	// For the init overlay, only Ctrl+G cancels MCP initialization.
 	if cd.kind == ConfirmMCPInit {
 		if key == keyCtrlG {
 			cd.canceled = true
 			cd.state = FilteredListClosed
 		}
-		return true
+		return cd, true
 	}
 
 	switch key {
 	case keyY, keyYCapital:
 		cd.confirmed = true
 		cd.state = FilteredListClosed
-		return true
+		return cd, true
 
 	case keyN, keyNCapital, keyEsc:
 		cd.canceled = true
 		cd.state = FilteredListClosed
-		return true
+		return cd, true
 
 	case keyCtrlG:
 		if cd.kind == ConfirmMCPAuth {
 			cd.ctrlGCanceled = true
 			cd.canceled = true
 			cd.state = FilteredListClosed
-			return true
+			return cd, true
 		}
-		return true
+		return cd, true
 	}
 
-	// All other keys are consumed while the dialog is open
-	return true
+	return cd, true
 }
 
 // ConfirmResult captures the complete result of a confirm dialog interaction.
-// The Terminal uses this to dispatch actions without needing separate
-// confirmed/canceled handler functions.
 type ConfirmResult struct {
 	Kind          ConfirmKind
 	Confirmed     bool
 	Canceled      bool
-	ToolID        string // server name (MCPAuth) or tool call ID (Tool)
-	ToolInput     string // authorization URL (MCPAuth) or tool input (Tool)
-	CtrlGCanceled bool   // true if canceled via Ctrl+G (MCPAuth → cancel all)
+	ToolID        string
+	ToolInput     string
+	CtrlGCanceled bool
 }
 
 // ConsumeResult returns the result of the dialog interaction and resets
 // the dialog to its closed state. Returns nil if no result is pending.
-func (cd *ConfirmDialog) ConsumeResult() *ConfirmResult {
+func (cd ConfirmDialog) ConsumeResult() (ConfirmDialog, *ConfirmResult) {
 	if !cd.confirmed && !cd.canceled {
-		return nil
+		return cd, nil
 	}
 
 	r := &ConfirmResult{
@@ -300,60 +260,28 @@ func (cd *ConfirmDialog) ConsumeResult() *ConfirmResult {
 		CtrlGCanceled: cd.ctrlGCanceled,
 	}
 
-	// Reset to closed state.
-	cd.state = FilteredListClosed
-	cd.kind = ConfirmNone
-	cd.Description = ""
-	cd.toolID = ""
-	cd.toolName = ""
-	cd.toolInput = ""
-	cd.confirmed = false
-	cd.canceled = false
-	cd.ctrlGCanceled = false
-
-	return r
+	cd = cd.Close()
+	return cd, r
 }
 
 // ---- Rendering ----
 
-// Uses RenderBorderedBox for consistent styling with other overlays.
-// The dialog has a fixed content height (ConfirmContentRows) matching
-func (cd *ConfirmDialog) View() tea.View {
+func (cd ConfirmDialog) View() tea.View {
 	if !cd.IsOpen() {
 		return tea.NewView("")
 	}
 
-	// Build the message lines (pre-styled with Confirm/System styles)
 	msgLines := cd.buildContentLines()
-
-	// Pad to the fixed content height, same as ModelSelector
 	for len(msgLines) < ConfirmContentRows {
 		msgLines = append(msgLines, "")
 	}
-
-	// Join with newlines
 	content := strings.Join(msgLines, "\n")
-
-	// Render with bordered box — border uses warning color for visual attention.
-	// Pass fixed height so the window is always the same size, same as
-	// ModelSelector and ModelSelector overlays.
 	box := cd.styles.RenderBorderedBox(content, cd.Width, cd.styles.ColorWarning, ConfirmContentRows)
-
 	return tea.NewView("\n" + box + "\n")
 }
 
-// buildContentLines returns the display lines for the dialog content,
-// with styles already applied (Confirm for the title, System for description/hints).
-// (Borders are applied by View via RenderBorderedBox.)
-//
-// Every variant uses the same 3-part layout:
-//
-//	[spacing]  [title]  [spacing]  [description row 1]  [description row 2]  [spacing]
-//	[y / n]  [trailing empty]
-//
-// The description always occupies exactly 2 rows. If the text is shorter, the
-// second row is empty. If it wraps beyond 2 rows, it's truncated with "…".
-func (cd *ConfirmDialog) buildContentLines() []string {
+// buildContentLines returns the display lines for the dialog content.
+func (cd ConfirmDialog) buildContentLines() []string {
 	innerWidth := max(0, cd.Width-BorderInnerPadding)
 	maxBodyLines := max(0, ConfirmContentRows-2)
 
@@ -371,7 +299,6 @@ func (cd *ConfirmDialog) buildContentLines() []string {
 	body = append(body, descRows...)
 	body = append(body, "")
 
-	// If the body exceeds the available rows, truncate from the bottom.
 	if len(body) > maxBodyLines {
 		body = body[:maxBodyLines-1]
 		body = append(body, cd.wrapAndCenter("...", cd.styles.System, innerWidth)[0])
@@ -394,8 +321,7 @@ func (cd *ConfirmDialog) buildContentLines() []string {
 	return lines
 }
 
-// buildTitleText returns the title string for the current dialog kind.
-func (cd *ConfirmDialog) buildTitleText() string {
+func (cd ConfirmDialog) buildTitleText() string {
 	switch cd.kind {
 	case ConfirmQuit:
 		return "Exit AlayaCore?"
@@ -424,30 +350,22 @@ func (cd *ConfirmDialog) buildTitleText() string {
 	}
 }
 
-// renderTitleLine hard-wraps the styled title, takes only 1 row.
-// If it overflows, truncates with "…", then centers it.
-func (cd *ConfirmDialog) renderTitleLine(titleText string, innerWidth int) string {
+func (cd ConfirmDialog) renderTitleLine(titleText string, innerWidth int) string {
 	styled := cd.styles.Confirm.Render(titleText)
 	wrapped := wrapContent(styled, innerWidth)
 	lines := strings.Split(wrapped, "\n")
-
 	line := lines[0]
 	if len(lines) > 1 {
 		line = truncateWithSuffix(line, innerWidth)
 	}
-
 	w := lipgloss.Width(line)
 	pad := max(0, (innerWidth-w)/2)
 	return strings.Repeat(" ", pad) + line + strings.Repeat(" ", innerWidth-w-pad)
 }
 
-// renderDescriptionRows hard-wraps the description, takes at most 2 rows.
-// If it overflows, the second row is truncated with "…". Returns 2
-// centered, styled strings suitable for appending to the body.
-func (cd *ConfirmDialog) renderDescriptionRows(innerWidth int) []string {
+func (cd ConfirmDialog) renderDescriptionRows(innerWidth int) []string {
 	rawWrapped := ansi.Hardwrap(cd.Description, innerWidth, true)
 	rawLines := strings.Split(rawWrapped, "\n")
-
 	rawDesc := rawLines
 	if len(rawDesc) > 2 {
 		rawDesc = rawDesc[:2]
@@ -456,12 +374,10 @@ func (cd *ConfirmDialog) renderDescriptionRows(innerWidth int) []string {
 	for len(rawDesc) < 2 {
 		rawDesc = append(rawDesc, "")
 	}
-
 	styled := make([]string, 2)
 	for i, line := range rawDesc {
 		styled[i] = cd.styles.System.Render(line)
 	}
-
 	maxW := 0
 	for _, line := range styled {
 		if w := lipgloss.Width(line); w > maxW {
@@ -477,20 +393,10 @@ func (cd *ConfirmDialog) renderDescriptionRows(innerWidth int) []string {
 	return rows
 }
 
-// wrapAndCenter styles, wraps, and centers text for display in the dialog.
-// When text wraps to multiple lines, the entire block is centered as a unit
-// so all lines share the same left margin — no jagged alignment.
-func (cd *ConfirmDialog) wrapAndCenter(text string, style lipgloss.Style, width int) []string {
-	// Style the text
+func (cd ConfirmDialog) wrapAndCenter(text string, style lipgloss.Style, width int) []string {
 	styled := style.Render(text)
-
-	// Wrap at the given width
 	wrapped := wrapContent(styled, width)
-
-	// Split into lines
 	rawLines := strings.Split(wrapped, "\n")
-
-	// Find the widest line (in display columns)
 	maxLineWidth := 0
 	for _, line := range rawLines {
 		w := lipgloss.Width(line)
@@ -498,23 +404,18 @@ func (cd *ConfirmDialog) wrapAndCenter(text string, style lipgloss.Style, width 
 			maxLineWidth = w
 		}
 	}
-
-	// Pad all lines to the same width, then add identical left padding
-	// so the whole block is centered as one unit.
 	blockPadding := max(0, (width-maxLineWidth)/2)
 	lines := make([]string, 0, len(rawLines))
 	for _, line := range rawLines {
 		w := lipgloss.Width(line)
 		rightPad := maxLineWidth - w
-		// Add right padding so all lines are equal width, then left padding for centering
 		lines = append(lines, strings.Repeat(" ", blockPadding)+line+strings.Repeat(" ", rightPad))
 	}
 	return lines
 }
 
 // RenderOverlay renders the dialog as a centered overlay on top of base content.
-// Uses the same renderOverlay function as all other overlays.
-func (cd *ConfirmDialog) RenderOverlay(baseContent string, screenWidth, screenHeight int) string {
+func (cd ConfirmDialog) RenderOverlay(baseContent string, screenWidth, screenHeight int) string {
 	if !cd.IsOpen() {
 		return baseContent
 	}
