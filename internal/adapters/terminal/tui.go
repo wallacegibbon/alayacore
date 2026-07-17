@@ -37,20 +37,20 @@ type sessionLoadingErrorMsg struct {
 // emitCommand sends a user-level command to the session via TLV.
 // Errors are silently ignored — commands are best-effort and the
 // session may close the input stream at any time.
-func (m *Terminal) emitCommand(cmd string) {
+func (m Terminal) emitCommand(cmd string) {
 	_ = tlv.WriteTLV(m.streamInput, tlv.TagUserT, cmd)
 }
 
 // emitUE sends a TagUserEnd frame, flushing any staged content
 // as a complete user message.
-func (m *Terminal) emitUE() {
+func (m Terminal) emitUE() {
 	_ = tlv.WriteTLV(m.streamInput, tlv.TagUserEnd, "")
 }
 
 // emitAttachments reads pending attachment files and sends them as TLV frames.
 // Failed files are skipped with an error message shown to the user.
 // URLs are sent as-is without reading.
-func (m *Terminal) emitAttachments() {
+func (m Terminal) emitAttachments() {
 	for _, a := range m.pendingAttachments {
 		var value string
 		if a.isURL {
@@ -70,33 +70,33 @@ func (m *Terminal) emitAttachments() {
 }
 
 // addAttachment adds a local file path to pending attachments.
-func (m *Terminal) addAttachment(path string) Terminal {
+func (m Terminal) addAttachment(path string) Terminal {
 	tag := tlv.TagForPath(path)
 	m.pendingAttachments = append(m.pendingAttachments, attachment{path: path, tag: tag})
 	m.input = m.input.SetAttachments(m.pendingAttachmentLabels())
 	m.updateDisplayHeight()
-	return *m
+	return m
 }
 
 // addURLAttachment adds a URL to pending attachments.
-func (m *Terminal) addURLAttachment(url string) Terminal {
+func (m Terminal) addURLAttachment(url string) Terminal {
 	tag := tlv.TagForPath(url)
 	m.pendingAttachments = append(m.pendingAttachments, attachment{path: url, tag: tag, isURL: true})
 	m.input = m.input.SetAttachments(m.pendingAttachmentLabels())
 	m.updateDisplayHeight()
-	return *m
+	return m
 }
 
 // clearAttachments clears all pending attachments.
-func (m *Terminal) clearAttachments() Terminal {
+func (m Terminal) clearAttachments() Terminal {
 	m.pendingAttachments = nil
 	m.input = m.input.SetAttachments(nil)
 	m.updateDisplayHeight()
-	return *m
+	return m
 }
 
 // pendingAttachmentLabels returns display labels for all pending attachments.
-func (m *Terminal) pendingAttachmentLabels() []string {
+func (m Terminal) pendingAttachmentLabels() []string {
 	labels := make([]string, len(m.pendingAttachments))
 	for i, a := range m.pendingAttachments {
 		labels[i] = tlv.MediaLabel(a.tag)
@@ -286,7 +286,7 @@ func (m Terminal) Init() tea.Cmd {
 
 // loadSessionCmd returns a tea.Cmd that runs app.StartSession in a goroutine.
 // It is only used when the TUI starts in loading mode (m.loading == true).
-func (m *Terminal) loadSessionCmd() tea.Cmd {
+func (m Terminal) loadSessionCmd() tea.Cmd {
 	return func() tea.Msg {
 		_, _, err := app.StartSession(m.appConfig, m.out, m.pipeReader)
 		if err != nil {
@@ -362,7 +362,7 @@ func (m Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 type tickMsg struct{}
 
 // handleWindowSize handles terminal resize events.
-func (m *Terminal) handleWindowSize(msg tea.WindowSizeMsg) (Terminal, tea.Cmd) {
+func (m Terminal) handleWindowSize(msg tea.WindowSizeMsg) (Terminal, tea.Cmd) {
 	m.windowWidth = msg.Width
 	m.windowHeight = msg.Height
 
@@ -389,33 +389,33 @@ func (m *Terminal) handleWindowSize(msg tea.WindowSizeMsg) (Terminal, tea.Cmd) {
 	// Re-render display content with new width (windowBuffer was marked dirty by SetWindowWidth)
 	m.display = m.display.updateContent()
 
-	return *m, nil
+	return m, nil
 }
 
 // handleTick processes periodic updates for display and model switching.
-func (m *Terminal) handleTick() (Terminal, tea.Cmd) {
+func (m Terminal) handleTick() (Terminal, tea.Cmd) {
 	// During async loading, the only periodic task is to re-render the
 	// loading screen (spinner animation). Skip all session-driven updates.
 	if m.loading {
-		return *m, tea.Tick(TickInterval, func(_ time.Time) tea.Msg {
+		return m, tea.Tick(TickInterval, func(_ time.Time) tea.Msg {
 			return tickMsg{}
 		})
 	}
 
-	*m = m.handleMCPOverlays()
+	m = m.handleMCPOverlays()
 
 	// First tick after loading: initialization is done — restore input
 	// focus if no overlay is blocking it.
 	if m.postLoading {
 		m.postLoading = false
 		if !m.overlays.IsBlocked() {
-			*m = m.restoreFocus()
+			m = m.restoreFocus()
 		}
 	}
 
 	var cmd tea.Cmd
-	*m, cmd = m.handleDisplayRefresh()
-	return *m, tea.Batch(
+	m, cmd = m.handleDisplayRefresh()
+	return m, tea.Batch(
 		tea.Tick(TickInterval, func(_ time.Time) tea.Msg {
 			return tickMsg{}
 		}),
@@ -429,11 +429,11 @@ func (m *Terminal) handleTick() (Terminal, tea.Cmd) {
 // The init overlay (mcpInitOverlay) persists throughout MCP init.
 // The confirm overlay (confirmOverlay) handles auth confirm and tool
 // confirm as temporary dialogs on top of the init overlay.
-func (m *Terminal) handleMCPOverlays() Terminal {
+func (m Terminal) handleMCPOverlays() Terminal {
 	wasOpen := m.overlays.IsMCPInitOpen()
 	action := m.overlays.HandleMCPProgress(m.out)
 	if action.CloseInitOverlay {
-		*m = m.restoreFocusAfterConfirm()
+		m = m.restoreFocusAfterConfirm()
 	}
 	if action.InitOverlayActive || action.OpenedConfirm {
 		// MCP init overlay just opened — blur input so its border renders
@@ -443,14 +443,14 @@ func (m *Terminal) handleMCPOverlays() Terminal {
 		}
 		m.display = m.display.updateContent()
 	}
-	return *m
+	return m
 }
 
 // handleSessionLoadedMsg is called when the async session loading completes.
 // It transitions the UI from the loading spinner to the normal TUI view,
 // applying the loaded theme, populating the model selector, and preparing
 // for MCP initialization if needed.
-func (m *Terminal) handleSessionLoadedMsg() (Terminal, tea.Cmd) {
+func (m Terminal) handleSessionLoadedMsg() (Terminal, tea.Cmd) {
 	m.loading = false
 	m.postLoading = true
 
@@ -465,7 +465,7 @@ func (m *Terminal) handleSessionLoadedMsg() (Terminal, tea.Cmd) {
 	m.appliedTheme = ""
 
 	if m.out.WindowBuffer().WindowCount() > 0 {
-		*m = m.updateStatus()
+		m = m.updateStatus()
 		m.updateDisplayHeight()
 		if m.display.shouldFollow() {
 			m.display = m.display.SetCursorToLastWindow()
@@ -477,7 +477,7 @@ func (m *Terminal) handleSessionLoadedMsg() (Terminal, tea.Cmd) {
 	// (Fallback when there are no windows yet — updateStatus above already
 	// handles the normal case via syncThemeFromSession.)
 	snap := m.out.SnapshotStatus()
-	*m = m.syncThemeFromSession(snap.ActiveTheme, snap.ActiveThemeData)
+	m = m.syncThemeFromSession(snap.ActiveTheme, snap.ActiveThemeData)
 
 	// Populate model selector from the now-loaded model list.
 	modelSnap := m.out.SnapshotModels()
@@ -486,36 +486,36 @@ func (m *Terminal) handleSessionLoadedMsg() (Terminal, tea.Cmd) {
 	// The input stays blurred (rendered as empty box) until the first
 	// tick determines whether MCP init is needed.
 	m.input = m.input.Blur()
-	*m = m.handleMCPOverlays()
+	m = m.handleMCPOverlays()
 
 	ms, cmd := m.overlays.ModelSelector().LoadModels(modelSnap.Models, modelSnap.ActiveID)
 	m.overlays.SetModelSelector(ms)
-	return *m, cmd
+	return m, cmd
 }
 
 // handleSessionLoadingError is called when the async session loading fails.
 // It transitions the UI to a quitting state with the error recorded.
-func (m *Terminal) handleSessionLoadingError(err error) (Terminal, tea.Cmd) {
+func (m Terminal) handleSessionLoadingError(err error) (Terminal, tea.Cmd) {
 	m.loading = false
 	m.loadingError = err
 	m.quitting = true
-	return *m, tea.Quit
+	return m, tea.Quit
 }
 
 // handleDisplayRefresh checks if the display needs updating and returns
 // a tea.Cmd for model selector updates if models changed.
-func (m *Terminal) handleDisplayRefresh() (Terminal, tea.Cmd) {
+func (m Terminal) handleDisplayRefresh() (Terminal, tea.Cmd) {
 	// Flush pending deltas first so the WindowBuffer has the latest content
 	// before we check the dirty flag.
 	m.out.FlushPendingDeltas()
 
 	if !m.out.DrainDirty() {
-		*m = m.updateStatus()
-		return *m, nil
+		m = m.updateStatus()
+		return m, nil
 	}
 
 	if m.out.WindowBuffer().WindowCount() > 0 {
-		*m = m.updateStatus()
+		m = m.updateStatus()
 		m.updateDisplayHeight()
 		if m.display.shouldFollow() {
 			m.display = m.display.SetCursorToLastWindow()
@@ -526,7 +526,7 @@ func (m *Terminal) handleDisplayRefresh() (Terminal, tea.Cmd) {
 	modelSnap := m.out.SnapshotModels()
 	ms, cmd := m.overlays.ModelSelector().LoadModels(modelSnap.Models, modelSnap.ActiveID)
 	m.overlays.SetModelSelector(ms)
-	return *m, cmd
+	return m, cmd
 }
 
 // handleEditorFinished handles completion of the external editor.
@@ -535,16 +535,16 @@ func (m *Terminal) handleDisplayRefresh() (Terminal, tea.Cmd) {
 //   - EditorActionNone:          view-only (display), no side effects
 //   - EditorActionSubmit:        submit content as user input
 //   - EditorActionReloadConfig:  reload configuration after file edit
-func (m *Terminal) handleEditorFinished(msg EditorFinishedMsg) (Terminal, tea.Cmd) {
+func (m Terminal) handleEditorFinished(msg EditorFinishedMsg) (Terminal, tea.Cmd) {
 	if msg.Err != nil {
 		m.out.WriteError("Editor error: %v", msg.Err)
-		return *m, nil
+		return m, nil
 	}
 
 	switch msg.Action {
 	case EditorActionNone:
 		// View-only (display window viewing) — nothing to do
-		return *m, nil
+		return m, nil
 
 	case EditorActionSubmit:
 		if msg.Content != "" {
@@ -552,24 +552,24 @@ func (m *Terminal) handleEditorFinished(msg EditorFinishedMsg) (Terminal, tea.Cm
 			content := strings.TrimRight(msg.Content, "\n")
 			m.input = m.input.SetValue(content)
 			m.input = m.input.CursorEnd()
-			*m = m.focusInput()
+			m = m.focusInput()
 		}
-		return *m, nil
+		return m, nil
 
 	case EditorActionReloadConfig:
 		if msg.FileType == "model_config" {
 			m.emitCommand(":model_load")
 		}
-		return *m, nil
+		return m, nil
 
 	default:
-		return *m, nil
+		return m, nil
 	}
 }
 
 // updateDisplayHeight updates the display viewport height based on window size
 // and current input box height (which varies when attachments are present).
-func (m *Terminal) updateDisplayHeight() {
+func (m Terminal) updateDisplayHeight() {
 	// Layout from bottom up:
 	//   line H:          status bar (fixed, 1 line)
 	//   separator:       1 newline between input and status
@@ -584,18 +584,18 @@ func (m *Terminal) updateDisplayHeight() {
 }
 
 // syncThemeFromSession updates the applied theme when the session reports a change.
-func (m *Terminal) syncThemeFromSession(sessionTheme string, themeData *theme.Theme) Terminal {
+func (m Terminal) syncThemeFromSession(sessionTheme string, themeData *theme.Theme) Terminal {
 	if m.appliedTheme == sessionTheme || sessionTheme == "" {
-		return *m
+		return m
 	}
 	if themeData != nil {
-		*m = m.applyTheme(themeData)
+		m = m.applyTheme(themeData)
 	} else if m.themeManager != nil {
 		t := m.themeManager.LoadTheme(sessionTheme)
-		*m = m.applyTheme(t)
+		m = m.applyTheme(t)
 	}
 	m.appliedTheme = sessionTheme
-	return *m
+	return m
 }
 
 // View renders the complete terminal UI.
@@ -649,7 +649,7 @@ func (m Terminal) View() tea.View {
 // being loaded asynchronously. It displays a centered message with a simple
 // spinner animation (updated by tickMsg) so the user gets instant feedback
 // even on slow machines.
-func (m *Terminal) renderLoadingView() tea.View {
+func (m Terminal) renderLoadingView() tea.View {
 	// Simple spinner frames.
 	spinner := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 	frame := int(time.Now().UnixMilli()/150) % len(spinner)
@@ -672,14 +672,14 @@ func (m *Terminal) renderLoadingView() tea.View {
 	return v
 }
 
-var _ tea.Model = (*Terminal)(nil)
+var _ tea.Model = Terminal{}
 
-func (m *Terminal) applyTheme(theme *theme.Theme) Terminal {
+func (m Terminal) applyTheme(theme *theme.Theme) Terminal {
 	m.styles = NewStyles(theme)
 	m.out.SetStyles(m.styles)
 	m.display = m.display.SetStyles(m.styles)
 	m.input = m.input.SetStyles(m.styles)
 	m.overlays.SetStyles(m.styles)
 	m.display = m.display.updateContent()
-	return *m
+	return m
 }

@@ -167,18 +167,18 @@ func (e *Editor) createTempFile() (string, error) {
 
 // handleEditorStart handles the lazy start of the external editor.
 // Temp file is created here, ensuring cleanup happens properly.
-func (m *Terminal) handleEditorStart(msg editorStartMsg) (Terminal, tea.Cmd) {
+func (m Terminal) handleEditorStart(msg editorStartMsg) (Terminal, tea.Cmd) {
 	tmpFileName, err := m.editor.createTempFile()
 	if err != nil {
 		m.out.WriteError("Failed to create temp file: %v", err)
-		return *m, nil
+		return m, nil
 	}
 
 	cmdArgs := append([]string{tmpFileName}, msg.editorArgs...)
 	//nolint:gosec // G204: Editor command from user config is intentional
 	cmd := exec.Command(msg.editorCmd, cmdArgs...)
 
-	return *m, tea.ExecProcess(cmd, func(err error) tea.Msg {
+	return m, tea.ExecProcess(cmd, func(err error) tea.Msg {
 		defer os.Remove(tmpFileName)
 
 		// Build the result message with common fields

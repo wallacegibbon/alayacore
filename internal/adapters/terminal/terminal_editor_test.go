@@ -285,7 +285,7 @@ func TestCtrlCClearsInput(t *testing.T) {
 	terminal.input = terminal.input.SetValue("test input text")
 
 	// Press Ctrl+C while in input window
-	terminal.focusInput()
+	terminal = terminal.focusInput()
 	msg := tea.KeyPressMsg(tea.Key{Code: 'c', Mod: tea.ModCtrl})
 
 	model, cmd := terminal.Update(msg)
@@ -312,7 +312,7 @@ func TestCtrlCInDisplayWindow(t *testing.T) {
 	terminal.input = terminal.input.SetValue("test input text")
 
 	// Press Ctrl+C while in display window
-	terminal.focusDisplay()
+	terminal = terminal.focusDisplay()
 	msg := tea.KeyPressMsg(tea.Key{Code: 'c', Mod: tea.ModCtrl})
 
 	model, cmd := terminal.Update(msg)
@@ -339,7 +339,7 @@ func TestCtrlGTriggersCancel(t *testing.T) {
 	terminal.input = terminal.input.SetValue("test input text")
 
 	// Press Ctrl+G (should work regardless of focus)
-	terminal.focusInput()
+	terminal = terminal.focusInput()
 	msg := tea.KeyPressMsg(tea.Key{Code: 'g', Mod: tea.ModCtrl})
 
 	model, cmd := terminal.Update(msg)
@@ -387,7 +387,7 @@ func TestCtrlUClearsInput(t *testing.T) {
 	terminal.input = terminal.input.SetValue("test input text")
 
 	// Press Ctrl+U while in input window
-	terminal.focusInput()
+	terminal = terminal.focusInput()
 	msg := tea.KeyPressMsg(tea.Key{Code: 'u', Mod: tea.ModCtrl})
 
 	model, cmd := terminal.Update(msg)
@@ -625,7 +625,7 @@ func TestWindowBufferWidthMatchesInput(t *testing.T) {
 
 func TestEKeyOpensDisplayWindowInEditor(t *testing.T) {
 	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
-	terminal.focusDisplay()
+	terminal = terminal.focusDisplay()
 
 	// Add a window with content
 	terminal.out.WindowBuffer().AppendOrUpdate(tlv.TagAssistantT, "test1", "Hello from display")
@@ -651,7 +651,7 @@ func TestEKeyOpensDisplayWindowInEditor(t *testing.T) {
 
 func TestEKeyDoesNothingWithNoWindow(t *testing.T) {
 	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
-	terminal.focusDisplay()
+	terminal = terminal.focusDisplay()
 
 	// No windows in buffer
 	terminal.display = terminal.display.SetWindowCursor(-1)
@@ -674,7 +674,7 @@ func TestEKeyDoesNothingWithNoWindow(t *testing.T) {
 
 func TestEKeyDoesNothingInInputWindow(t *testing.T) {
 	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
-	terminal.focusInput()
+	terminal = terminal.focusInput()
 
 	// Add a window with content
 	terminal.out.WindowBuffer().AppendOrUpdate(tlv.TagAssistantT, "test1", "Hello from display")

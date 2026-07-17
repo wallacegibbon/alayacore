@@ -37,7 +37,7 @@ func TestStatusBarShowsLastMaxStepsOnError(t *testing.T) {
 	terminal.overlays.SetFocusedWindow("input")
 
 	// Update status
-	terminal.updateStatus()
+	*terminal = terminal.updateStatus()
 
 	// Check that status shows last step info (2/50) after completion
 	expectedSubstring := "2/50"
@@ -75,7 +75,7 @@ func TestStatusBarShowsCurrentStepsDuringProgress(t *testing.T) {
 	}
 
 	// Update status
-	terminal.updateStatus()
+	*terminal = terminal.updateStatus()
 
 	// Check that status shows current step progress
 	expectedSubstring := "7/20"

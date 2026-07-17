@@ -151,7 +151,7 @@ func (m PromptInput) Height() int {
 }
 
 // OpenEditor opens the external editor for multi-line input.
-func (m *Terminal) OpenEditor() tea.Cmd {
+func (m Terminal) OpenEditor() tea.Cmd {
 	return m.editor.Open(m.input.Value())
 }
 

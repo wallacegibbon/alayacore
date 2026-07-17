@@ -12,7 +12,7 @@ func TestQuitCommandRequiresConfirm(t *testing.T) {
 	terminal.input = terminal.input.SetValue(":q")
 
 	// Press Enter to submit the command
-	terminal.focusInput()
+	terminal = terminal.focusInput()
 	msg := tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter})
 
 	model, cmd := terminal.Update(msg)
@@ -46,7 +46,7 @@ func TestQuitCommandCanceledClearsInput(t *testing.T) {
 	terminal.input = terminal.input.SetValue(":q")
 
 	// Press Enter to submit the command
-	terminal.focusInput()
+	terminal = terminal.focusInput()
 	msg := tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter})
 	model, _ := terminal.Update(msg); terminal = model.(Terminal)
 
@@ -78,7 +78,7 @@ func TestQuitCommandEscapeCancels(t *testing.T) {
 	terminal.input = terminal.input.SetValue(":q")
 
 	// Press Enter to submit the command
-	terminal.focusInput()
+	terminal = terminal.focusInput()
 	msg := tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter})
 	model, _ := terminal.Update(msg); terminal = model.(Terminal)
 
@@ -110,7 +110,7 @@ func TestQuitCommandConfirmed(t *testing.T) {
 	terminal.input = terminal.input.SetValue(":q")
 
 	// Press Enter to submit the command
-	terminal.focusInput()
+	terminal = terminal.focusInput()
 	msg := tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter})
 	model, _ := terminal.Update(msg); terminal = model.(Terminal)
 
@@ -147,7 +147,7 @@ func TestFullQuitCommandRequiresConfirm(t *testing.T) {
 	terminal.input = terminal.input.SetValue(":quit")
 
 	// Press Enter to submit the command
-	terminal.focusInput()
+	terminal = terminal.focusInput()
 	msg := tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter})
 
 	model, cmd := terminal.Update(msg)

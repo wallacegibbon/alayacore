@@ -31,7 +31,7 @@ func statusStepsSegment(lastMaxSteps int, taskError bool, lastCurrentStep int, i
 // Highlights reflect input focus: dimmed when display is focused
 // or an overlay is active (the status bar is treated as an
 // attachment to the prompt input).
-func (m *Terminal) renderStatusBar() string {
+func (m Terminal) renderStatusBar() string {
 	active := m.overlays.RestoreFocus() == focusInput && !m.overlays.IsBlocked()
 
 	var indicator string
@@ -77,7 +77,7 @@ func formatTokenCount(n int64) string {
 }
 
 // updateStatus updates the status bar state from the output writer.
-func (m *Terminal) updateStatus() Terminal {
+func (m Terminal) updateStatus() Terminal {
 	snap := m.out.SnapshotStatus()
 
 	valStyle := m.styles.Status.Foreground(m.styles.ColorMuted)
@@ -153,7 +153,7 @@ func (m *Terminal) updateStatus() Terminal {
 	m.statusTextDim = dimStatus
 	m.inProgress = snap.InProgress
 
-	*m = m.syncThemeFromSession(snap.ActiveTheme, snap.ActiveThemeData)
+	m = m.syncThemeFromSession(snap.ActiveTheme, snap.ActiveThemeData)
 	m.activeTheme = snap.ActiveTheme
-	return *m
+	return m
 }

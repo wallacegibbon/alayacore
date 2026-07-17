@@ -10,7 +10,7 @@ import (
 
 func TestSpaceKeyTogglesFold(t *testing.T) {
 	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
-	terminal.focusDisplay()
+	terminal = terminal.focusDisplay()
 
 	// Add a window with content that can be folded
 	terminal.out.WindowBuffer().AppendOrUpdate(tlv.TagAssistantT, "test1", "Hello world")
@@ -58,7 +58,7 @@ func TestSpaceKeyTogglesFold(t *testing.T) {
 
 func TestSpaceKeyDoesNothingInInputWindow(t *testing.T) {
 	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
-	terminal.focusInput()
+	terminal = terminal.focusInput()
 
 	// Add a window with content
 	terminal.out.WindowBuffer().AppendOrUpdate(tlv.TagAssistantT, "test1", "Hello world")
@@ -83,7 +83,7 @@ func TestSpaceKeyDoesNothingInInputWindow(t *testing.T) {
 
 func TestSpaceKeyDoesNothingWithNoWindow(t *testing.T) {
 	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
-	terminal.focusDisplay()
+	terminal = terminal.focusDisplay()
 
 	// No windows in buffer
 	terminal.display = terminal.display.SetWindowCursor(-1)
