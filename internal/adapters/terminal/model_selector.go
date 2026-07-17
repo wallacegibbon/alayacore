@@ -219,11 +219,22 @@ func (ms ModelSelector) Update(msg tea.Msg) (ModelSelector, tea.Cmd) {
 	}
 	key := keyMsg.String()
 
-	fl, result := ms.FilteredListCore.Update(msg)
+	fl, cmd := ms.FilteredListCore.Update(msg)
 	ms.FilteredListCore = fl
 
+	// Extract handled/filterChanged from cmd
+	var handled, filterChanged bool
+	if cmd != nil {
+		if resultMsg := cmd(); resultMsg != nil {
+			if h, ok := resultMsg.(FilteredListHandledMsg); ok {
+				handled = true
+				filterChanged = h.FilterChanged
+			}
+		}
+	}
+
 	// Handle Enter selection in the list.
-	if key == keyEnter && result.Handled && !fl.FilterInputFocused {
+	if key == keyEnter && handled && !fl.FilterInputFocused {
 		if len(ms.filteredModels) > 0 && fl.SelectedIdx >= 0 {
 			ms.activeModel = &ms.filteredModels[fl.SelectedIdx]
 			fl = fl.Close()
@@ -232,8 +243,8 @@ func (ms ModelSelector) Update(msg tea.Msg) (ModelSelector, tea.Cmd) {
 		}
 	}
 
-	if result.Handled {
-		if result.FilterChanged && ms.FilterInputFocused {
+	if handled {
+		if filterChanged && ms.FilterInputFocused {
 			ms = ms.updateFilteredModels()
 		}
 		if !ms.FilterInputFocused {

@@ -168,28 +168,41 @@ func (aw AttachmentWindow) updateForKeyMsg(msg tea.KeyMsg) (AttachmentWindow, te
 
 	inputWasFocused := aw.FilterInputFocused
 
-	fl, result := aw.FilteredListCore.Update(msg)
+	fl, cmd := aw.FilteredListCore.Update(msg)
 	aw.FilteredListCore = fl
 
+	// Extract handled/filterChanged from cmd
+	var handled, filterChanged bool
+	var innerCmd tea.Cmd
+	if cmd != nil {
+		if resultMsg := cmd(); resultMsg != nil {
+			if h, ok := resultMsg.(FilteredListHandledMsg); ok {
+				handled = true
+				filterChanged = h.FilterChanged
+				innerCmd = h.Cmd
+			}
+		}
+	}
+
 	// Handle Enter selection in the list after Update returns.
-	if key == keyEnter && result.Handled && !fl.FilterInputFocused {
+	if key == keyEnter && handled && !fl.FilterInputFocused {
 		aw = aw.handleEnter()
 		fl = aw.FilteredListCore
-	} else if key == keyEsc && result.Handled {
+	} else if key == keyEsc && handled {
 		fl = fl.Close()
 	}
 	aw.FilteredListCore = fl
 
-	if result.Handled {
+	if handled {
 		if aw.mode == modeLocal {
-			aw = aw.handleLocalModeKeys(result.FilterChanged, key, inputWasFocused)
+			aw = aw.handleLocalModeKeys(filterChanged, key, inputWasFocused)
 		}
 		// If a path was selected, send it as a message
 		if aw.selectedPath != "" {
 			path := aw.selectedPath
 			return aw, func() tea.Msg { return AttachmentSelectedMsg{Path: path} }
 		}
-		return aw, result.Cmd
+		return aw, innerCmd
 	}
 
 	if aw.mode == modeLocal && !aw.FilterInputFocused {

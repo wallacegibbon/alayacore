@@ -137,16 +137,20 @@ func (ts ThemeSelector) Update(msg tea.Msg) (ThemeSelector, tea.Cmd) {
 
 	// Handle navigation and close via base type
 	ts.ScrollableListCore = ts.ScrollableListCore.WithItemsLen(len(ts.themes))
-	sl, result := ts.ScrollableListCore.Update(msg)
+	sl, cmd := ts.ScrollableListCore.Update(msg)
 	ts.ScrollableListCore = sl
-	if result.Handled {
-		if result.IsClose {
-			ts = ts.Close()
-			return ts, func() tea.Msg { return OverlayClosedMsg{} }
+	if cmd != nil {
+		if resultMsg := cmd(); resultMsg != nil {
+			if h, ok := resultMsg.(ScrollableListHandledMsg); ok {
+				if h.IsClose {
+					ts = ts.Close()
+					return ts, func() tea.Msg { return OverlayClosedMsg{} }
+				}
+				// Navigated — load preview theme
+				ts = ts.loadPreviewTheme()
+				return ts, nil
+			}
 		}
-		// Navigated — load preview theme
-		ts = ts.loadPreviewTheme()
-		return ts, nil
 	}
 
 	// Handle Enter for selection

@@ -254,12 +254,25 @@ func (hw HelpWindow) Update(msg tea.Msg) (HelpWindow, tea.Cmd) {
 	}
 	key := keyMsg.String()
 
-	fl, result := hw.FilteredListCore.Update(msg)
+	fl, cmd := hw.FilteredListCore.Update(msg)
 	hw.FilteredListCore = fl
+
+	// Extract handled/filterChanged from cmd
+	var handled, filterChanged bool
+	var innerCmd tea.Cmd
+	if cmd != nil {
+		if resultMsg := cmd(); resultMsg != nil {
+			if h, ok := resultMsg.(FilteredListHandledMsg); ok {
+				handled = true
+				filterChanged = h.FilterChanged
+				innerCmd = h.Cmd
+			}
+		}
+	}
 
 	// Check if Enter was pressed on a command item
 	var pendingCmd string
-	if key == keyEnter && result.Handled && !fl.FilterInputFocused {
+	if key == keyEnter && handled && !fl.FilterInputFocused {
 		if hw.SelectedIdx >= 0 && hw.SelectedIdx < hw.filteredLen() {
 			item := hw.filteredItems[hw.SelectedIdx]
 			if !item.IsSection && item.Type == HelpItemCommand {
@@ -278,8 +291,8 @@ func (hw HelpWindow) Update(msg tea.Msg) (HelpWindow, tea.Cmd) {
 	}
 	hw.FilteredListCore = fl
 
-	if result.Handled {
-		if result.FilterChanged {
+	if handled {
+		if filterChanged {
 			hw = hw.updateFilteredItems()
 		}
 		if !hw.FilterInputFocused {
@@ -295,7 +308,7 @@ func (hw HelpWindow) Update(msg tea.Msg) (HelpWindow, tea.Cmd) {
 		if pendingCmd != "" {
 			return hw, func() tea.Msg { return HelpCmdMsg{Command: pendingCmd} }
 		}
-		return hw, result.Cmd
+		return hw, innerCmd
 	}
 	return hw, nil
 }
