@@ -132,12 +132,12 @@ type themePreviewMsg struct {
 	id    int // ID to check if this preview is still current
 }
 
-func (m Terminal) handleThemePreview(msg themePreviewMsg) (Terminal, tea.Cmd) {
+func (m Terminal) handleThemePreview(msg themePreviewMsg) Terminal {
 	// Only apply if this preview is still the current one (debouncing)
 	if msg.id == m.themePreviewID {
 		m = m.applyTheme(msg.theme)
 	}
-	return m, nil
+	return m
 }
 
 func (m Terminal) handleConfirmResult(cd ConfirmDialog, update ConfirmDialogUpdate) (Terminal, tea.Cmd) {
@@ -382,6 +382,8 @@ func (m Terminal) handleOverlayConfirm(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 // (EnsureCursorVisible() or ScrollCursorToTop()) BEFORE updateContent().
 // This ensures the viewport position is updated before content is
 // regenerated, preventing blank areas in the virtual rendering.
+//
+//nolint:gocyclo
 func (m Terminal) handleDisplayKeys(msg tea.KeyMsg) (Terminal, tea.Cmd, bool) {
 	switch msg.String() {
 	case keyJ, keyDown:

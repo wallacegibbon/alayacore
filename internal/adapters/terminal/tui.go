@@ -322,25 +322,25 @@ func (m Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleKeyMsg(msg)
 
 	case tea.WindowSizeMsg:
-		return m.handleWindowSize(msg)
+		return m.handleWindowSize(msg), nil
 
 	case tickMsg:
 		return m.handleTick()
 
 	case themePreviewMsg:
-		return m.handleThemePreview(msg)
+		return m.handleThemePreview(msg), nil
 
 	case editorStartMsg:
 		return m.handleEditorStart(msg)
 
 	case EditorFinishedMsg:
-		return m.handleEditorFinished(msg)
+		return m.handleEditorFinished(msg), nil
 
 	case tea.BlurMsg:
-		return m.handleBlur()
+		return m.handleBlur(), nil
 
 	case tea.FocusMsg:
-		return m.handleFocus()
+		return m.handleFocus(), nil
 
 	case tea.PasteMsg:
 		if m.overlays.AttachmentWindow().IsOpen() {
@@ -365,7 +365,7 @@ func (m Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 type tickMsg struct{}
 
 // handleWindowSize handles terminal resize events.
-func (m Terminal) handleWindowSize(msg tea.WindowSizeMsg) (Terminal, tea.Cmd) {
+func (m Terminal) handleWindowSize(msg tea.WindowSizeMsg) Terminal {
 	m.windowWidth = msg.Width
 	m.windowHeight = msg.Height
 
@@ -392,7 +392,7 @@ func (m Terminal) handleWindowSize(msg tea.WindowSizeMsg) (Terminal, tea.Cmd) {
 	// Re-render display content with new width (windowBuffer was marked dirty by SetWindowWidth)
 	m.display = m.display.updateContent()
 
-	return m, nil
+	return m
 }
 
 // handleTick processes periodic updates for display and model switching.
@@ -539,16 +539,16 @@ func (m Terminal) handleDisplayRefresh() (Terminal, tea.Cmd) {
 //   - EditorActionNone:          view-only (display), no side effects
 //   - EditorActionSubmit:        submit content as user input
 //   - EditorActionReloadConfig:  reload configuration after file edit
-func (m Terminal) handleEditorFinished(msg EditorFinishedMsg) (Terminal, tea.Cmd) {
+func (m Terminal) handleEditorFinished(msg EditorFinishedMsg) Terminal {
 	if msg.Err != nil {
 		m.out.WriteError("Editor error: %v", msg.Err)
-		return m, nil
+		return m
 	}
 
 	switch msg.Action {
 	case EditorActionNone:
 		// View-only (display window viewing) — nothing to do
-		return m, nil
+		return m
 
 	case EditorActionSubmit:
 		if msg.Content != "" {
@@ -558,16 +558,16 @@ func (m Terminal) handleEditorFinished(msg EditorFinishedMsg) (Terminal, tea.Cmd
 			m.input = m.input.CursorEnd()
 			m = m.focusInput()
 		}
-		return m, nil
+		return m
 
 	case EditorActionReloadConfig:
 		if msg.FileType == "model_config" {
 			m.emitCommand(":model_load")
 		}
-		return m, nil
+		return m
 
 	default:
-		return m, nil
+		return m
 	}
 }
 

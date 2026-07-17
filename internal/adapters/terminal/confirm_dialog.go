@@ -210,11 +210,11 @@ func (cd ConfirmDialog) HandleKeyMsg(msg tea.KeyMsg) (ConfirmDialog, ConfirmDial
 
 	if cd.kind == ConfirmMCPInit {
 		if key == keyCtrlG {
-			cd, r := cd.buildResult()
+			result, r := cd.buildResult()
 			r.CtrlGCanceled = true
-			cd.canceled = true
-			cd.state = FilteredListClosed
-			return cd, ConfirmDialogUpdate{Handled: true, Result: r}
+			result.canceled = true
+			result.state = FilteredListClosed
+			return result, ConfirmDialogUpdate{Handled: true, Result: r}
 		}
 		return cd, ConfirmDialogUpdate{Handled: true}
 	}
@@ -234,12 +234,12 @@ func (cd ConfirmDialog) HandleKeyMsg(msg tea.KeyMsg) (ConfirmDialog, ConfirmDial
 
 	case keyCtrlG:
 		if cd.kind == ConfirmMCPAuth {
-			cd, r := cd.buildResult()
+			result, r := cd.buildResult()
 			r.CtrlGCanceled = true
-			cd.ctrlGCanceled = true
-			cd.canceled = true
-			cd.state = FilteredListClosed
-			return cd, ConfirmDialogUpdate{Handled: true, Result: r}
+			result.ctrlGCanceled = true
+			result.canceled = true
+			result.state = FilteredListClosed
+			return result, ConfirmDialogUpdate{Handled: true, Result: r}
 		}
 		return cd, ConfirmDialogUpdate{Handled: true}
 	}
@@ -269,7 +269,6 @@ type ConfirmResult struct {
 	ToolInput     string
 	CtrlGCanceled bool
 }
-
 
 // ---- Rendering ----
 

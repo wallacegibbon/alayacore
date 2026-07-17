@@ -132,6 +132,8 @@ func (ts ThemeSelector) HandleKeyMsg(msg tea.KeyMsg, themeManager *ThemeManager)
 		return ts, ThemeSelectorUpdate{}
 	}
 
+	var previewTheme *theme.Theme
+
 	// Handle navigation and close via base type
 	sl, handled, isClose := ts.ScrollableListCore.HandleKeyMsg(msg, len(ts.themes))
 	ts.ScrollableListCore = sl
@@ -142,7 +144,7 @@ func (ts ThemeSelector) HandleKeyMsg(msg tea.KeyMsg, themeManager *ThemeManager)
 			return ts, ThemeSelectorUpdate{Closed: true}
 		}
 		// Navigated — get preview
-		ts, previewTheme := ts.getPreviewTheme(themeManager)
+		ts, previewTheme = ts.getPreviewTheme(themeManager)
 		return ts, ThemeSelectorUpdate{PreviewTheme: previewTheme}
 	}
 
@@ -150,7 +152,7 @@ func (ts ThemeSelector) HandleKeyMsg(msg tea.KeyMsg, themeManager *ThemeManager)
 	if key == keyEnter {
 		if len(ts.themes) > 0 && ts.SelectedIdx >= 0 {
 			ts.State = ScrollableListClosed
-			ts, previewTheme := ts.getPreviewTheme(themeManager)
+			ts, previewTheme = ts.getPreviewTheme(themeManager)
 			return ts, ThemeSelectorUpdate{PreviewTheme: previewTheme, ThemeSelected: true}
 		}
 	}

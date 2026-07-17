@@ -456,7 +456,6 @@ func (aw AttachmentWindow) renderLocalBody(sb *strings.Builder, boxWidth int) {
 	innerWidth := max(0, boxWidth-BorderInnerPadding)
 
 	var content strings.Builder
-	aw.FilteredListCore = aw.FilteredListCore.EnsureVisible()
 	for i := aw.ScrollIdx; i < min(aw.ScrollIdx+listHeight, len(aw.filtered)); i++ {
 		e := aw.filtered[i]
 		isSelected := i == aw.SelectedIdx

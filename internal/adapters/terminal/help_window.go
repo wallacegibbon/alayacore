@@ -16,7 +16,7 @@ import (
 type HelpItemType int
 
 const (
-	HelpItemKey     HelpItemType = iota
+	HelpItemKey HelpItemType = iota
 	HelpItemCommand
 )
 
@@ -34,8 +34,8 @@ type HelpItem struct {
 type HelpWindow struct {
 	FilteredListCore
 
-	items         []HelpItem
-	filteredItems []HelpItem
+	items          []HelpItem
+	filteredItems  []HelpItem
 	pendingCommand string
 	keyColumnWidth int
 }
@@ -251,6 +251,7 @@ type HelpWindowUpdate struct {
 	PendingCommand string // non-empty when a command was selected
 }
 
+//nolint:gocyclo
 func (hw HelpWindow) HandleKeyMsg(msg tea.KeyMsg) (HelpWindow, HelpWindowUpdate) {
 	key := msg.String()
 

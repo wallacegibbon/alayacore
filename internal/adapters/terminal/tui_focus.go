@@ -4,10 +4,6 @@ package terminal
 //
 // Extracted from tui.go.
 
-import (
-	tea "charm.land/bubbletea/v2"
-)
-
 // toggleFocus switches between display and input windows.
 func (m Terminal) toggleFocus() Terminal {
 	fw := m.overlays.RestoreFocus()
@@ -125,17 +121,17 @@ func (m Terminal) openConfirmTool(id, toolName, toolInput string) Terminal {
 }
 
 // handleBlur handles loss of application focus.
-func (m Terminal) handleBlur() (Terminal, tea.Cmd) {
+func (m Terminal) handleBlur() Terminal {
 	m.hasFocus = false
 	m.display = m.display.SetDisplayFocused(false)
 	m.input = m.input.Blur()
 	m.overlays = m.overlays.SetFocused(false)
 	m.display = m.display.updateContent()
-	return m, nil
+	return m
 }
 
 // handleFocus handles gain of application focus.
-func (m Terminal) handleFocus() (Terminal, tea.Cmd) {
+func (m Terminal) handleFocus() Terminal {
 	m.hasFocus = true
 	m.overlays = m.overlays.SetFocused(true)
 
@@ -146,7 +142,7 @@ func (m Terminal) handleFocus() (Terminal, tea.Cmd) {
 		m.overlays.ConfirmOverlay().IsOpen() ||
 		m.overlays.IsMCPInitOpen() {
 		m.display = m.display.updateContent()
-		return m, nil
+		return m
 	}
 
 	fw := m.overlays.RestoreFocus()
@@ -156,5 +152,5 @@ func (m Terminal) handleFocus() (Terminal, tea.Cmd) {
 		m = m.focusInput()
 	}
 	m.display = m.display.updateContent()
-	return m, nil
+	return m
 }

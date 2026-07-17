@@ -48,7 +48,8 @@ func TestQuitCommandCanceledClearsInput(t *testing.T) {
 	// Press Enter to submit the command
 	terminal = terminal.focusInput()
 	msg := tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter})
-	model, _ := terminal.Update(msg); terminal = model.(Terminal)
+	model, _ := terminal.Update(msg)
+	terminal = model.(Terminal)
 
 	// Verify dialog is shown
 	if !terminal.overlays.ConfirmOverlay().IsOpen() {
@@ -60,7 +61,8 @@ func TestQuitCommandCanceledClearsInput(t *testing.T) {
 
 	// Press 'n' to cancel
 	msg = tea.KeyPressMsg(tea.Key{Code: 'n'})
-	model, _ = terminal.Update(msg); terminal = model.(Terminal)
+	model, _ = terminal.Update(msg)
+	terminal = model.(Terminal)
 
 	// Input should be cleared after canceling the dialog
 	if terminal.input.Value() != "" {
@@ -80,7 +82,8 @@ func TestQuitCommandEscapeCancels(t *testing.T) {
 	// Press Enter to submit the command
 	terminal = terminal.focusInput()
 	msg := tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter})
-	model, _ := terminal.Update(msg); terminal = model.(Terminal)
+	model, _ := terminal.Update(msg)
+	terminal = model.(Terminal)
 
 	// Verify dialog is shown
 	if !terminal.overlays.ConfirmOverlay().IsOpen() {
@@ -92,7 +95,8 @@ func TestQuitCommandEscapeCancels(t *testing.T) {
 
 	// Press Escape to cancel
 	msg = tea.KeyPressMsg(tea.Key{Code: tea.KeyEscape})
-	model, _ = terminal.Update(msg); terminal = model.(Terminal)
+	model, _ = terminal.Update(msg)
+	terminal = model.(Terminal)
 
 	// Input should be cleared after canceling the dialog
 	if terminal.input.Value() != "" {
@@ -112,7 +116,8 @@ func TestQuitCommandConfirmed(t *testing.T) {
 	// Press Enter to submit the command
 	terminal = terminal.focusInput()
 	msg := tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter})
-	model, _ := terminal.Update(msg); terminal = model.(Terminal)
+	model, _ := terminal.Update(msg)
+	terminal = model.(Terminal)
 
 	// Verify dialog is shown
 	if !terminal.overlays.ConfirmOverlay().IsOpen() {

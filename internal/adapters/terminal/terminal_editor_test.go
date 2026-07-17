@@ -26,7 +26,6 @@ func TestCtrlOOpensEditor(t *testing.T) {
 	})
 
 	model, cmd := terminal.Update(msg)
-	terminal = model.(Terminal)
 
 	if model == nil {
 		t.Fatal("Update returned nil model")
@@ -369,7 +368,8 @@ func TestCtrlGTriggersCancel(t *testing.T) {
 
 	// Test confirming the dialog by pressing 'y'
 	msg = tea.KeyPressMsg(tea.Key{Code: 'y'})
-	model, cmd = terminal.Update(msg); terminal = model.(Terminal)
+	model, cmd = terminal.Update(msg)
+	terminal = model.(Terminal)
 
 	// Now should emit cancel command
 	if cmd == nil {

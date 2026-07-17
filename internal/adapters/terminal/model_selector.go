@@ -25,9 +25,9 @@ type ModelSelector struct {
 	models         []searchableModel
 	filteredModels []searchableModel
 
-	activeModel       *searchableModel
-	reloadModels      bool
-	lastModelCount    int
+	activeModel    *searchableModel
+	reloadModels   bool
+	lastModelCount int
 }
 
 func NewModelSelector(styles *Styles) ModelSelector {
@@ -212,6 +212,7 @@ type ModelSelectorUpdate struct {
 
 // --- Key Handling ---
 
+//nolint:gocyclo
 func (ms ModelSelector) HandleKeyMsg(msg tea.KeyMsg) (ModelSelector, ModelSelectorUpdate) {
 	if ms.State == FilteredListClosed {
 		return ms, ModelSelectorUpdate{}
