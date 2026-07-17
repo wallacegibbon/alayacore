@@ -59,12 +59,20 @@ type ConfirmResultMsg struct{ Result *ConfirmResult }
 // OverlayClosedMsg is sent when any overlay is dismissed without a result.
 type OverlayClosedMsg struct{}
 
-// emitCommand writes a user-level command to the session via TLV.
+// emitCommand returns a tea.Cmd that writes a user-level command to the
+// session via TLV when executed by Bubble Tea's runtime.
 // Errors are silently ignored — commands are best-effort and the
 // session may close the input stream at any time.
-// This is a direct write (not a tea.Cmd) — intended for single commands
-// outside the submit path. For batch writes, use submitCmd.
-func (m Terminal) emitCommand(cmd string) {
+func (m Terminal) emitCommand(cmd string) tea.Cmd {
+	return func() tea.Msg {
+		_ = tlv.WriteTLV(m.streamInput, tlv.TagUserT, cmd)
+		return nil
+	}
+}
+
+// emitCommandNow directly writes a TLV command without going through tea.Cmd.
+// Only for use outside Update (goroutines, Init), where tea.Cmd cannot be returned.
+func (m Terminal) emitCommandNow(cmd string) {
 	_ = tlv.WriteTLV(m.streamInput, tlv.TagUserT, cmd)
 }
 
@@ -355,16 +363,13 @@ func (m Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleTick()
 
 	case ThemeSelectedMsg:
-		m.emitCommand(":theme_set " + msg.Name)
-		return m, nil
+		return m, m.emitCommand(":theme_set " + msg.Name)
 
 	case ModelSelectedMsg:
-		m.emitCommand(fmt.Sprintf(":model_set %d", msg.ID))
-		return m, nil
+		return m, m.emitCommand(fmt.Sprintf(":model_set %d", msg.ID))
 
 	case ReloadModelsMsg:
-		m.emitCommand(":model_load")
-		return m, nil
+		return m, m.emitCommand(":model_load")
 
 	case ConfirmResultMsg:
 		return m.handleConfirmResult(msg.Result)
@@ -376,7 +381,7 @@ func (m Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleEditorStart(msg)
 
 	case EditorFinishedMsg:
-		return m.handleEditorFinished(msg), nil
+		return m.handleEditorFinished(msg)
 
 	case tea.BlurMsg:
 		return m.handleBlur(), nil
@@ -571,16 +576,16 @@ func (m Terminal) handleDisplayRefresh() (Terminal, tea.Cmd) {
 //   - EditorActionNone:          view-only (display), no side effects
 //   - EditorActionSubmit:        submit content as user input
 //   - EditorActionReloadConfig:  reload configuration after file edit
-func (m Terminal) handleEditorFinished(msg EditorFinishedMsg) Terminal {
+func (m Terminal) handleEditorFinished(msg EditorFinishedMsg) (Terminal, tea.Cmd) {
 	if msg.Err != nil {
 		m.out.WriteError("Editor error: %v", msg.Err)
-		return m
+		return m, nil
 	}
 
 	switch msg.Action {
 	case EditorActionNone:
 		// View-only (display window viewing) — nothing to do
-		return m
+		return m, nil
 
 	case EditorActionSubmit:
 		if msg.Content != "" {
@@ -590,16 +595,16 @@ func (m Terminal) handleEditorFinished(msg EditorFinishedMsg) Terminal {
 			m.input = m.input.CursorEnd()
 			m = m.focusInput()
 		}
-		return m
+		return m, nil
 
 	case EditorActionReloadConfig:
 		if msg.FileType == "model_config" {
-			m.emitCommand(":model_load")
+			return m, m.emitCommand(":model_load")
 		}
-		return m
+		return m, nil
 
 	default:
-		return m
+		return m, nil
 	}
 }
 

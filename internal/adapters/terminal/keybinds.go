@@ -158,12 +158,12 @@ func (m Terminal) handleConfirmTool(r *ConfirmResult, fromCmd bool) (Terminal, t
 	if fromCmd {
 		m.input = m.input.WithValue("")
 	}
-	m.emitCommand(":confirm " + r.ToolID + " " + action)
+	cmd := m.emitCommand(":confirm " + r.ToolID + " " + action)
 	m = m.restoreFocusAfterConfirm()
 	if nextID, nextName, nextInput, ok := m.out.GetPendingToolConfirm(); ok {
 		m = m.openConfirmTool(nextID, nextName, nextInput)
 	}
-	return m, scheduleTick()
+	return m, tea.Batch(cmd, scheduleTick())
 }
 
 func (m Terminal) handleConfirmMCPAuth(r *ConfirmResult, fromCmd bool) (Terminal, tea.Cmd) {
@@ -172,12 +172,14 @@ func (m Terminal) handleConfirmMCPAuth(r *ConfirmResult, fromCmd bool) (Terminal
 		m.startMCPAuthFlow(r.ToolID, r.ToolInput)
 	case r.CtrlGCanceled:
 		m.out.ClearMCPAuths()
-		m.emitCommand(":mcp_cancel")
+		cmd := m.emitCommand(":mcp_cancel")
+		return m, cmd
 	default:
 		if fromCmd {
 			m.input = m.input.WithValue("")
 		}
-		m.emitCommand(":mcp_auth " + r.ToolID)
+		cmd := m.emitCommand(":mcp_auth " + r.ToolID)
+		return m, cmd
 	}
 	m = m.restoreFocusAfterConfirm()
 	return m, scheduleTick()
@@ -207,10 +209,10 @@ func (m Terminal) startMCPAuthFlow(serverName, authURL string) {
 		cleanup()
 		if res.Err != nil {
 			m.out.WriteError("MCP auth callback error: %v", res.Err)
-			m.emitCommand(":mcp_cancel")
+			m.emitCommandNow(":mcp_cancel")
 			return
 		}
-		m.emitCommand(fmt.Sprintf(":mcp_auth %s %s %s",
+		m.emitCommandNow(fmt.Sprintf(":mcp_auth %s %s %s",
 			serverName, res.Code, redirectURI))
 	}()
 }
@@ -243,8 +245,10 @@ func (m Terminal) handleOverlayModelSelector(msg tea.KeyMsg) (Terminal, tea.Cmd)
 // handleMCPInitKeys handles keyboard input when the MCP init overlay is open.
 func (m Terminal) handleMCPInitKeys(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 	if msg.String() == keyCtrlG {
-		m.emitCommand(":mcp_cancel")
-		return m, scheduleTick()
+		return m, tea.Batch(
+			m.emitCommand(":mcp_cancel"),
+			scheduleTick(),
+		)
 	}
 	return m, nil
 }
@@ -661,11 +665,11 @@ func (m Terminal) handleCommand(command string) (Terminal, tea.Cmd) {
 
 // submitCommand sends a command to the session and optionally clears input.
 func (m Terminal) submitCommand(command string, clearInput bool) (Terminal, tea.Cmd) {
-	m.emitCommand(":" + command)
+	cmd := m.emitCommand(":" + command)
 	if clearInput {
 		m.input = m.input.WithValue("")
 	}
-	return m, scheduleTick()
+	return m, tea.Batch(cmd, scheduleTick())
 }
 
 // scheduleTick schedules a tick message for UI updates.
