@@ -348,23 +348,25 @@ func (m Terminal) handleSelectorOverlayKeys(msg tea.KeyMsg) (Terminal, tea.Cmd, 
 func (m Terminal) handleOverlayConfirm(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 	cd, cmd := m.confirmOverlay.Update(msg)
 	m.confirmOverlay = cd
-	if cmd != nil {
-		// Execute cmd once and inspect the message type
-		resultMsg := cmd()
-		if resultMsg == nil {
-			return m, nil
-		}
-		if r, ok := resultMsg.(ConfirmResultMsg); ok {
-			// ConfirmResultMsg must be processed synchronously
-			// (modifies Terminal state inline)
-			return m.handleConfirmResult(r.Result)
-		}
-		// Other messages (e.g. openEditorForDisplayMsg):
-		// re-wrap and let Terminal.Update handle them normally
-		msg := resultMsg
-		return m, func() tea.Msg { return msg }
+
+	if cmd == nil {
+		return m, nil
 	}
-	return m, nil
+
+	resultMsg := cmd()
+	if resultMsg == nil {
+		return m, nil
+	}
+
+	if r, ok := resultMsg.(ConfirmResultMsg); ok {
+		// ConfirmResultMsg must be processed synchronously
+		// (modifies Terminal state inline)
+		return m.handleConfirmResult(r.Result)
+	}
+
+	// Other messages (e.g. openEditorForDisplayMsg):
+	// re-wrap and let Terminal.Update handle them normally
+	return m, func() tea.Msg { return resultMsg }
 }
 
 // handleConfirmResult processes a ConfirmResult (triggered by ConfirmResultMsg).

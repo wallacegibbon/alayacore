@@ -196,54 +196,42 @@ const (
 //
 // Field groups are separated by blank lines:
 //
-//	Elm UI state  — value types with WithXxx methods, copied on every Update.
+//	Elm UI state  — value types, copied on every Update.
+//	Transient     — one-shot or infrequently-set flags.
 //	Dependencies  — pointer types for external services / shared singletons.
-//	Flags         — bool/int primitives that toggle behavior.
 //	Loading       — async session startup state (transient, set once).
 //
 // All Elm UI state fields use value receivers; all dependency fields use
 // pointers.  See docs/tui-architecture.md for the rationale.
 type Terminal struct {
 	// ── Elm UI state (value types, copied on every Update) ──────────────
-	display       DisplayModel // conversation display with virtual scrolling
-	input         PromptInput  // text input, attachments, focus
-	focusedWindow string       // which pane has focus: "input" or "display"
+	display            DisplayModel     // conversation display with virtual scrolling
+	input              PromptInput      // text input, attachments, focus
+	modelSelector      ModelSelector    // model switching overlay
+	themeSelector      ThemeSelector    // theme switching overlay
+	helpWindow         HelpWindow       // keybinding help overlay
+	confirmOverlay     ConfirmDialog    // quit/cancel/tool confirm dialogs
+	mcpInitOverlay     ConfirmDialog    // MCP initialization progress overlay
+	attachmentWindow   AttachmentWindow // file/URL attachment picker
+	focusedWindow      string           // which pane has focus: "input" or "display"
+	statusText         string           // status bar text (active)
+	statusTextDim      string           // status bar text (dimmed, out of focus)
+	inProgress         bool             // whether a task is currently running
+	windowWidth        int              // terminal width in cells
+	windowHeight       int              // terminal height in cells
+	activeTheme        string           // last theme name from system info updates
+	appliedTheme       string           // last theme name that was visually applied
+	forceRedraw        uint64           // odd → append invisible SGR reset so renderer repaints
+	pendingAttachments []attachment     // pending file attachments for multi-modal input
 
-	// ── Overlay components (individual, no container) ───────────────────
-	modelSelector    ModelSelector
-	themeSelector    ThemeSelector
-	helpWindow       HelpWindow
-	confirmOverlay   ConfirmDialog
-	mcpInitOverlay   ConfirmDialog
-	attachmentWindow AttachmentWindow
-
-	// ── Status bar (primitive state, updated via WithXxx) ───────────────
-	statusText    string
-	statusTextDim string // dimmed version of statusText for inactive focus
-	inProgress    bool
-
-	// ── Configuration / window size (primitives, set on resize) ─────────
-	windowWidth  int
-	windowHeight int
-
-	// ── Theme tracking (string identifiers, compared on system-info) ────
-	activeTheme  string // last theme name from system info updates
-	appliedTheme string // last theme name that was visually applied
-
-	// ── Force-redraw toggle ─────────────────────────────────────────────
-	forceRedraw uint64 // odd → append invisible SGR reset so renderer repaints
-
-	// ── Pending attachments (multi-modal input) ─────────────────────────
-	pendingAttachments []attachment
-
-	// ── Flags / one-shot state ──────────────────────────────────────────
-	quitting           bool
+	// ── Transient state (set once or infrequently, not Elm-copied semantically) ─
+	quitting           bool // terminal is shutting down
 	confirmFromCommand bool // cancel came from :cancel command (vs Ctrl+G)
 	hasFocus           bool // terminal has application focus
 	themePreviewID     int  // debounce ID for pending theme preview
 	pendingForceRedraw bool // Ctrl-R sets this; handleWindowSize consumes it
 
-	// ── Dependencies (pointers to shared services, not copied semantically) ──
+	// ── Dependencies (pointer types, shared, not copied semantically) ──
 	out          OutputWriter   // TLV output writer (shared, thread-safe)
 	streamInput  io.WriteCloser // TLV input writer (shared, thread-safe)
 	pipeReader   *io.PipeReader // read end of input pipe; set before async loading

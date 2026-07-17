@@ -231,24 +231,17 @@ func (cd ConfirmDialog) Update(msg tea.Msg) (ConfirmDialog, tea.Cmd) {
 	switch key {
 	case keyY, keyYCapital:
 		cd.confirmed = true
-		cd.state = FilteredListClosed
-		_, r := cd.buildResult()
-		return cd, func() tea.Msg { return ConfirmResultMsg{Result: r} }
+		return cd.closeWithResult()
 
 	case keyN, keyNCapital, keyEsc:
 		cd.canceled = true
-		cd.state = FilteredListClosed
-		_, r := cd.buildResult()
-		return cd, func() tea.Msg { return ConfirmResultMsg{Result: r} }
+		return cd.closeWithResult()
 
 	case keyCtrlG:
 		if cd.kind == ConfirmMCPAuth {
-			result, r := cd.buildResult()
-			r.CtrlGCanceled = true
-			result.ctrlGCanceled = true
-			result.canceled = true
-			result.state = FilteredListClosed
-			return result, func() tea.Msg { return ConfirmResultMsg{Result: r} }
+			cd.ctrlGCanceled = true
+			cd.canceled = true
+			return cd.closeWithResult()
 		}
 		return cd, nil // handled but no result
 
@@ -279,6 +272,14 @@ func (cd ConfirmDialog) buildResult() (ConfirmDialog, *ConfirmResult) {
 		CtrlGCanceled: cd.ctrlGCanceled,
 	}
 	return cd, r
+}
+
+// closeWithResult closes the dialog and returns a Command that emits a ConfirmResultMsg.
+// The caller should set flags (confirmed, canceled, etc.) on cd before calling this.
+func (cd ConfirmDialog) closeWithResult() (ConfirmDialog, tea.Cmd) {
+	cd.state = FilteredListClosed
+	_, r := cd.buildResult()
+	return cd, func() tea.Msg { return ConfirmResultMsg{Result: r} }
 }
 
 // ConfirmResult captures the complete result of a confirm dialog interaction.
