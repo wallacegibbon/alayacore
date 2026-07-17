@@ -81,7 +81,7 @@ func (m Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 	wasOpen := m.overlays.ThemeSelector().IsOpen()
 
 	ts, result := m.overlays.ThemeSelector().HandleKeyMsg(msg, m.themeManager)
-	m.overlays.SetThemeSelector(ts)
+	m.overlays = m.overlays.SetThemeSelector(ts)
 
 	// Check if theme was selected (Enter key)
 	if result.ThemeSelected {
@@ -142,7 +142,7 @@ func (m Terminal) handleThemePreview(msg themePreviewMsg) (Terminal, tea.Cmd) {
 
 func (m Terminal) handleConfirmResult(cd ConfirmDialog, update ConfirmDialogUpdate) (Terminal, tea.Cmd) {
 	r := update.Result
-	m.overlays.SetConfirmOverlay(cd)
+	m.overlays = m.overlays.SetConfirmOverlay(cd)
 	if r == nil {
 		return m, nil
 	}
@@ -271,7 +271,7 @@ func (m Terminal) restoreFocusAfterConfirm() Terminal {
 func (m Terminal) handleOverlayModelSelector(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 	wasOpen := m.overlays.ModelSelector().IsOpen()
 	ms, result := m.overlays.ModelSelector().HandleKeyMsg(msg)
-	m.overlays.SetModelSelector(ms)
+	m.overlays = m.overlays.SetModelSelector(ms)
 
 	if result.ModelSelected {
 		m = m.switchToSelectedModel()
@@ -323,7 +323,7 @@ func (m Terminal) handleSelectorOverlayKeys(msg tea.KeyMsg) (Terminal, tea.Cmd, 
 		aw := m.overlays.AttachmentWindow()
 		t := trackOverlay(aw)
 		aw, cmd := aw.HandleKeyMsg(msg)
-		m.overlays.SetAttachmentWindow(aw)
+		m.overlays = m.overlays.SetAttachmentWindow(aw)
 		if t.JustClosed(aw) {
 			if path := aw.SelectedPath(); path != "" {
 				if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
@@ -340,7 +340,7 @@ func (m Terminal) handleSelectorOverlayKeys(msg tea.KeyMsg) (Terminal, tea.Cmd, 
 		hw := m.overlays.HelpWindow()
 		t := trackOverlay(hw)
 		hw, result := hw.HandleKeyMsg(msg)
-		m.overlays.SetHelpWindow(hw)
+		m.overlays = m.overlays.SetHelpWindow(hw)
 		if t.JustClosed(hw) {
 			if result.PendingCommand != "" {
 				m = m.focusInput()

@@ -154,7 +154,7 @@ type Terminal struct {
 	display      DisplayModel
 	input        PromptInput
 	themeManager *ThemeManager
-	overlays     *OverlayManager
+	overlays     OverlayManager
 
 	// Status bar state (simplified - no separate struct)
 	statusText    string
@@ -251,8 +251,8 @@ func NewTerminalWithTheme(
 	// Initialize component widths
 	m.display = m.display.SetWidth(initialWidth)
 	m.input = m.input.SetWidth(initialWidth)
-	m.overlays.SetSize(initialWidth, initialHeight)
-	m.overlays.SetFocusedWindow(focusInput)
+	m.overlays = m.overlays.SetSize(initialWidth, initialHeight)
+	m.overlays = m.overlays.SetFocusedWindow(focusInput)
 	m = m.updateDisplayHeight()
 
 	return m
@@ -343,7 +343,7 @@ func (m Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.overlays.AttachmentWindow().IsOpen() {
 			aw := m.overlays.AttachmentWindow()
 			aw = aw.handlePaste(msg)
-			m.overlays.SetAttachmentWindow(aw)
+			m.overlays = m.overlays.SetAttachmentWindow(aw)
 		} else {
 			var cmd tea.Cmd
 			m.input, cmd = m.input.Update(msg)
@@ -370,7 +370,7 @@ func (m Terminal) handleWindowSize(msg tea.WindowSizeMsg) (Terminal, tea.Cmd) {
 	m.out.SetWindowWidth(max(0, msg.Width))
 	m.display = m.display.SetWidth(max(0, msg.Width))
 	m.input = m.input.SetWidth(max(0, msg.Width))
-	m.overlays.SetSize(msg.Width, msg.Height)
+	m.overlays = m.overlays.SetSize(msg.Width, msg.Height)
 	m = m.updateDisplayHeight()
 
 	// Clamp cursor to valid bounds (windows may have been removed) but
@@ -431,7 +431,8 @@ func (m Terminal) handleTick() (Terminal, tea.Cmd) {
 // confirm as temporary dialogs on top of the init overlay.
 func (m Terminal) handleMCPOverlays() Terminal {
 	wasOpen := m.overlays.IsMCPInitOpen()
-	action := m.overlays.HandleMCPProgress(m.out)
+	var action OverlayAction
+	m.overlays, action = m.overlays.HandleMCPProgress(m.out)
 	if action.CloseInitOverlay {
 		m = m.restoreFocusAfterConfirm()
 	}
@@ -489,7 +490,7 @@ func (m Terminal) handleSessionLoadedMsg() (Terminal, tea.Cmd) {
 	m = m.handleMCPOverlays()
 
 	ms, cmd := m.overlays.ModelSelector().LoadModels(modelSnap.Models, modelSnap.ActiveID)
-	m.overlays.SetModelSelector(ms)
+	m.overlays = m.overlays.SetModelSelector(ms)
 	return m, cmd
 }
 
@@ -525,7 +526,7 @@ func (m Terminal) handleDisplayRefresh() (Terminal, tea.Cmd) {
 
 	modelSnap := m.out.SnapshotModels()
 	ms, cmd := m.overlays.ModelSelector().LoadModels(modelSnap.Models, modelSnap.ActiveID)
-	m.overlays.SetModelSelector(ms)
+	m.overlays = m.overlays.SetModelSelector(ms)
 	return m, cmd
 }
 
@@ -680,7 +681,7 @@ func (m Terminal) applyTheme(theme *theme.Theme) Terminal {
 	m.out.SetStyles(m.styles)
 	m.display = m.display.SetStyles(m.styles)
 	m.input = m.input.SetStyles(m.styles)
-	m.overlays.SetStyles(m.styles)
+	m.overlays = m.overlays.SetStyles(m.styles)
 	m.display = m.display.updateContent()
 	return m
 }
