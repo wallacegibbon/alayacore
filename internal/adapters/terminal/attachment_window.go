@@ -91,6 +91,7 @@ func (aw AttachmentWindow) Open() AttachmentWindow {
 	aw.FilteredListCore = aw.FilteredListCore.updateFilterInputStyles()
 	aw.ScrollIdx = 0
 	aw.SelectedIdx = 0
+	aw.selectedPath = ""
 	aw.currentDir, _ = os.Getwd()
 	aw.baseDir = aw.currentDir
 	return aw.loadDir(aw.currentDir)
@@ -267,6 +268,7 @@ func (aw AttachmentWindow) handleEnter() AttachmentWindow {
 	}
 	entry := aw.filtered[aw.SelectedIdx]
 	if entry.isDir {
+		aw.selectedPath = ""
 		aw.FilterInputFocused = true
 		aw.FilterInput = aw.FilterInput.Focus()
 		aw.FilteredListCore = aw.FilteredListCore.updateFilterInputStyles()
@@ -285,6 +287,7 @@ func (aw AttachmentWindow) handleSearchEnter() AttachmentWindow {
 	}
 	entry := aw.filtered[aw.SelectedIdx]
 	if entry.isDir {
+		aw.selectedPath = ""
 		return aw.autocompleteDir(entry.name)
 	}
 	fullPath := filepath.Join(aw.currentDir, entry.name)
