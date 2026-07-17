@@ -126,35 +126,33 @@ func (sl ScrollableListCore) RenderOverlay(baseContent, renderedList string, scr
 	return renderOverlay(baseContent, renderedList, screenWidth, screenHeight)
 }
 
-// ScrollableListHandledMsg is sent when ScrollableListCore handles a key event.
-type ScrollableListHandledMsg struct {
-	IsClose bool // true if the list was closed by this key
+// ScrollableListResult describes what happened during HandleKey.
+type ScrollableListResult struct {
+	// Handled is true if the key was consumed by list navigation.
+	Handled bool
+	// IsClose is true if the list was closed by this key (ESC/q).
+	IsClose bool
 }
 
-// Update handles key events for scrollable list navigation.
-// ItemsLen must be set before calling Update (via WithItemsLen).
-func (sl ScrollableListCore) Update(msg tea.Msg) (ScrollableListCore, tea.Cmd) {
-	key, ok := msg.(tea.KeyMsg)
-	if !ok {
-		return sl, nil
-	}
-
-	switch key.String() {
+// HandleKey processes a key event for scrolling.
+// ItemsLen must be set before calling HandleKey (via WithItemsLen).
+func (sl ScrollableListCore) HandleKey(msg tea.KeyMsg) (ScrollableListCore, ScrollableListResult) {
+	switch msg.String() {
 	case keyQ, keyEsc:
 		sl.State = ScrollableListClosed
-		return sl, func() tea.Msg { return ScrollableListHandledMsg{IsClose: true} }
+		return sl, ScrollableListResult{Handled: true, IsClose: true}
 	case keyJ, keyDown:
 		if sl.SelectedIdx < sl.ItemsLen-1 {
 			sl.SelectedIdx++
 			sl = sl.EnsureVisible()
 		}
-		return sl, func() tea.Msg { return ScrollableListHandledMsg{} }
+		return sl, ScrollableListResult{Handled: true}
 	case keyK, keyUp:
 		if sl.SelectedIdx > 0 {
 			sl.SelectedIdx--
 			sl = sl.EnsureVisible()
 		}
-		return sl, func() tea.Msg { return ScrollableListHandledMsg{} }
+		return sl, ScrollableListResult{Handled: true}
 	}
-	return sl, nil
+	return sl, ScrollableListResult{}
 }
