@@ -170,8 +170,10 @@ func (e *Editor) createTempFile() (string, error) {
 func (m Terminal) handleEditorStart(msg editorStartMsg) (Terminal, tea.Cmd) {
 	tmpFileName, err := m.editor.createTempFile()
 	if err != nil {
-		m.out.WriteError("Failed to create temp file: %v", err)
-		return m, nil
+		return m, func() tea.Msg {
+			m.out.WriteError("Failed to create temp file: %v", err)
+			return nil
+		}
 	}
 
 	cmdArgs := append([]string{tmpFileName}, msg.editorArgs...)

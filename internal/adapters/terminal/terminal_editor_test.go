@@ -159,8 +159,13 @@ func TestEditorFinishedMsgWithError(t *testing.T) {
 		Err:     fmt.Errorf("editor failed"),
 	}
 
-	model, _ := terminal.Update(msg)
+	model, cmd := terminal.Update(msg)
 	terminal = model.(Terminal)
+
+	// Execute the cmd to process the WriteError
+	if cmd != nil {
+		cmd()
+	}
 
 	if model == nil {
 		t.Fatal("Update returned nil model")

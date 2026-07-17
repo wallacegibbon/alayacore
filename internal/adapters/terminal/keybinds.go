@@ -129,9 +129,14 @@ func (m Terminal) handleThemePreview(msg themePreviewMsg) Terminal {
 func (m Terminal) handleConfirmQuit(r *ConfirmResult, fromCmd bool) (Terminal, tea.Cmd) {
 	if r.Confirmed {
 		m.quitting = true
-		m.streamInput.Close()
-		m.out.Close()
-		return m, tea.Quit
+		return m, tea.Batch(
+			func() tea.Msg {
+				m.streamInput.Close()
+				m.out.Close()
+				return nil
+			},
+			tea.Quit,
+		)
 	}
 	if fromCmd {
 		m.input = m.input.WithValue("")
@@ -620,8 +625,10 @@ func (m Terminal) handleSubmit() (Terminal, tea.Cmd) {
 
 	// If a task is running, reject without clearing input.
 	if m.inProgress {
-		m.out.WriteError("A task is already running. Wait for it to complete or cancel it.")
-		return m, nil
+		return m, func() tea.Msg {
+			m.out.WriteError("A task is already running. Wait for it to complete or cancel it.")
+			return nil
+		}
 	}
 
 	// Nothing to send

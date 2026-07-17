@@ -578,8 +578,10 @@ func (m Terminal) handleDisplayRefresh() (Terminal, tea.Cmd) {
 //   - EditorActionReloadConfig:  reload configuration after file edit
 func (m Terminal) handleEditorFinished(msg EditorFinishedMsg) (Terminal, tea.Cmd) {
 	if msg.Err != nil {
-		m.out.WriteError("Editor error: %v", msg.Err)
-		return m, nil
+		return m, func() tea.Msg {
+			m.out.WriteError("Editor error: %v", msg.Err)
+			return nil
+		}
 	}
 
 	switch msg.Action {
