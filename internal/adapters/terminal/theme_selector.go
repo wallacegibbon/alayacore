@@ -125,7 +125,8 @@ func (ts *ThemeSelector) HandleKeyMsg(msg tea.KeyMsg, themeManager *ThemeManager
 	}
 
 	// Handle navigation and close via base type
-	handled, isClose := ts.ScrollableListCore.HandleKeyMsg(msg, len(ts.themes))
+	sl, handled, isClose := ts.ScrollableListCore.HandleKeyMsg(msg, len(ts.themes))
+	ts.ScrollableListCore = sl
 	if handled {
 		if isClose {
 			// Closed without selection — close properly
