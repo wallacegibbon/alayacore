@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/llm"
@@ -12,6 +13,7 @@ import (
 	"github.com/alayacore/alayacore/internal/mcp/auth"
 	"github.com/alayacore/alayacore/internal/skills"
 	"github.com/alayacore/alayacore/internal/tools"
+	"github.com/alayacore/alayacore/internal/tools/shell"
 )
 
 // loadMCPConfigs reads mcp.conf from the config directory and parses it
@@ -110,6 +112,11 @@ func Setup(cfg *config.Settings) (*Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize skills: %w", err)
 	}
+
+	// Apply command timeout before tools are created, so that
+	// NewExecuteCommandTool() picks up the correct value for its
+	// LLM-facing description.
+	shell.DefaultCommandTimeout = time.Duration(cfg.CommandTimeout) * time.Second
 
 	agentTools, err := tools.DefaultTools(cfg.BuiltinTools)
 	if err != nil {

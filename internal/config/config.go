@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/alayacore/alayacore/internal/tools"
@@ -117,6 +118,9 @@ type Settings struct {
 	ToolConfirm   []string         // tool names requiring user confirmation
 	BuiltinTools  tools.ToolFilter // built-in tools to enable
 
+	// Command execution
+	CommandTimeout int // max duration for execute_command in seconds (default 120)
+
 	// Delta streaming
 	NoDelta bool // If true, suppress delta frames (At, Ar, Af); use complete frames only
 }
@@ -155,6 +159,8 @@ func Parse() *Settings {
 	toolConfirm := flag.String("tool-confirm", "", "Comma-separated tool `names` requiring user confirmation (e.g. execute_command,search_content)")
 	noDelta := flag.Bool("no-delta", false, "Disable delta frames (At, Ar, Af); use complete frames only")
 	flag.String("builtin-tools", "", "Comma-separated built-in tool `names` to enable (empty = no builtin tools, unspecified = all tools)")
+	commandTimeout := flag.Int("command-timeout", 120,
+		"Maximum duration in seconds for shell command execution (default 120)")
 
 	flag.Parse()
 
@@ -181,25 +187,26 @@ func Parse() *Settings {
 	}
 
 	s := &Settings{
-		ShowVersion:   *showVersion,
-		PlainIO:       *plainIO,
-		RawIO:         *rawIO,
-		DebugAPI:      *debugAPI,
-		DebugMCP:      *debugMCP,
-		ModelConfig:   filepath.Join(cp, "model.conf"),
-		RuntimeConfig: filepath.Join(cp, "runtime.conf"),
-		MCPConfigPath: filepath.Join(cp, "mcp.conf"),
-		ThemesFolder:  filepath.Join(cp, "themes"),
-		Skills:        skill.Get(),
-		Session:       *session,
-		ModelName:     *modelName,
-		Proxy:         *proxy,
-		SystemPrompt:  mergedSystemPrompt(systemPrompt),
-		MaxSteps:      *maxSteps,
-		AutoSummarize: *autoSummarize,
-		ToolConfirm:   parseToolConfirm(*toolConfirm),
-		BuiltinTools:  builtinToolsFilter,
-		NoDelta:       *noDelta,
+		ShowVersion:    *showVersion,
+		PlainIO:        *plainIO,
+		RawIO:          *rawIO,
+		DebugAPI:       *debugAPI,
+		DebugMCP:       *debugMCP,
+		ModelConfig:    filepath.Join(cp, "model.conf"),
+		RuntimeConfig:  filepath.Join(cp, "runtime.conf"),
+		MCPConfigPath:  filepath.Join(cp, "mcp.conf"),
+		ThemesFolder:   filepath.Join(cp, "themes"),
+		Skills:         skill.Get(),
+		Session:        *session,
+		ModelName:      *modelName,
+		Proxy:          *proxy,
+		SystemPrompt:   mergedSystemPrompt(systemPrompt),
+		MaxSteps:       *maxSteps,
+		AutoSummarize:  *autoSummarize,
+		ToolConfirm:    parseToolConfirm(*toolConfirm),
+		BuiltinTools:   builtinToolsFilter,
+		CommandTimeout: resolveCommandTimeout(*commandTimeout),
+		NoDelta:        *noDelta,
 	}
 
 	return s
@@ -227,6 +234,27 @@ func parseToolConfirm(raw string) []string {
 		}
 	}
 	return names
+}
+
+// resolveCommandTimeout resolves the command timeout in seconds using the
+// following precedence (highest first):
+//  1. --command-timeout CLI flag (if explicitly provided)
+//  2. ALAYACORE_COMMAND_TIMEOUT environment variable (integer seconds)
+//  3. The flag's default value (120 seconds)
+//
+// This allows users to set a persistent default via their shell profile
+// while still overriding per-invocation via --command-timeout.
+func resolveCommandTimeout(flagSec int) int {
+	if flagHasBeenVisited("command-timeout") {
+		return flagSec
+	}
+	if env := os.Getenv("ALAYACORE_COMMAND_TIMEOUT"); env != "" {
+		if sec, err := strconv.Atoi(env); err == nil && sec > 0 {
+			return sec
+		}
+		fmt.Fprintf(os.Stderr, "warning: invalid ALAYACORE_COMMAND_TIMEOUT=%q, using default\n", env)
+	}
+	return flagSec
 }
 
 // flagHasBeenVisited returns true if the named flag was explicitly set

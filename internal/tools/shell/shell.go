@@ -31,9 +31,12 @@ import (
 // DefaultCommandTimeout is the maximum duration a shell command may run
 // before being killed. Both execute_command and the LLM-facing description
 // reference this value.
-const DefaultCommandTimeout = 2 * time.Minute
+//
+// This is a package-level var so that main() / app.Setup can override it
+// from the --command-timeout CLI flag or the ALAYACORE_COMMAND_TIMEOUT
+// environment variable before tools are created.
+var DefaultCommandTimeout = 2 * time.Minute
 
-// Shell represents a command shell that can execute commands.
 type Shell struct {
 	// Name is a human-readable identifier (e.g. "bash", "PowerShell").
 	Name string
@@ -61,13 +64,13 @@ func (s *Shell) Description() string {
 	)
 }
 
-// formatDuration formats a duration in a human-readable way for LLM prompts.
+// formatDuration formats a duration in seconds for LLM prompts.
 func formatDuration(d time.Duration) string {
-	m := d.Minutes()
-	if m == 1 {
-		return "1 minute"
+	s := int(d.Seconds())
+	if s == 1 {
+		return "1 second"
 	}
-	return fmt.Sprintf("%.0f minutes", m)
+	return fmt.Sprintf("%d seconds", s)
 }
 
 // detection stores the result of the one-time shell detection.
