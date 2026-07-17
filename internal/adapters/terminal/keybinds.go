@@ -125,29 +125,6 @@ func (m Terminal) handleThemePreview(msg themePreviewMsg) Terminal {
 	return m
 }
 
-func (m Terminal) handleConfirmResult(cd ConfirmDialog, update ConfirmDialogUpdate) (Terminal, tea.Cmd) {
-	r := update.Result
-	m.overlays = m.overlays.WithConfirmOverlay(cd)
-	if r == nil {
-		return m, nil
-	}
-
-	fromCmd := m.confirmFromCommand
-	m.confirmFromCommand = false
-
-	switch r.Kind {
-	case ConfirmQuit:
-		return m.handleConfirmQuit(r, fromCmd)
-	case ConfirmCancel:
-		return m.handleConfirmCancel(r, fromCmd)
-	case ConfirmTool:
-		return m.handleConfirmTool(r, fromCmd)
-	case ConfirmMCPAuth:
-		return m.handleConfirmMCPAuth(r, fromCmd)
-	}
-	return m, nil
-}
-
 func (m Terminal) handleConfirmQuit(r *ConfirmResult, fromCmd bool) (Terminal, tea.Cmd) {
 	if r.Confirmed {
 		m.quitting = true
@@ -345,22 +322,41 @@ func (m Terminal) handleOverlayConfirm(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 		}
 		return m, m.editor.OpenForDisplay(content)
 	}
-	if cd, update := m.overlays.ConfirmOverlay().Update(msg); update.Handled {
-		return m.handleConfirmResult(cd, update)
+	cd, cmd := m.overlays.ConfirmOverlay().Update(msg)
+	m.overlays = m.overlays.WithConfirmOverlay(cd)
+	if cmd != nil {
+		// Process confirm result synchronously
+		if resultMsg := cmd(); resultMsg != nil {
+			if r, ok := resultMsg.(ConfirmResultMsg); ok {
+				return m.handleConfirmResult(r.Result)
+			}
+		}
 	}
 	return m, nil
 }
 
-// Display key handler helpers (shared between multiple keys).
-// These don't return tea.Cmd — the map type doesn't require it.
+// handleConfirmResult processes a ConfirmResult (triggered by ConfirmResultMsg).
+func (m Terminal) handleConfirmResult(r *ConfirmResult) (Terminal, tea.Cmd) {
+	if r == nil {
+		return m, nil
+	}
 
-// handleDisplayKeys handles key events when display window is focused.
-//
-// IMPORTANT: When moving the cursor, always call a scroll method
-// (EnsureCursorVisible() or ScrollCursorToTop()) BEFORE updateContent().
-// This ensures the viewport position is updated before content is
-// regenerated, preventing blank areas in the virtual rendering.
-//
+	fromCmd := m.confirmFromCommand
+	m.confirmFromCommand = false
+
+	switch r.Kind {
+	case ConfirmQuit:
+		return m.handleConfirmQuit(r, fromCmd)
+	case ConfirmCancel:
+		return m.handleConfirmCancel(r, fromCmd)
+	case ConfirmTool:
+		return m.handleConfirmTool(r, fromCmd)
+	case ConfirmMCPAuth:
+		return m.handleConfirmMCPAuth(r, fromCmd)
+	}
+	return m, nil
+}
+
 //nolint:gocyclo
 func (m Terminal) handleDisplayKeys(msg tea.KeyMsg) (Terminal, tea.Cmd, bool) {
 	switch msg.String() {
@@ -670,15 +666,3 @@ func scheduleTick() tea.Cmd {
 }
 
 // switchToSelectedModel sends a model_set command to switch to the selected model.
-func (m Terminal) switchToSelectedModel() Terminal {
-	selectedModel := m.overlays.ModelSelector().GetActiveModel()
-	if selectedModel == nil {
-		return m
-	}
-
-	// Send model_set command to session
-	if selectedModel.ID != 0 {
-		m.emitCommand(fmt.Sprintf(":model_set %d", selectedModel.ID))
-	}
-	return m
-}

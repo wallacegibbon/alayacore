@@ -202,14 +202,14 @@ type ConfirmDialogUpdate struct {
 
 // HandleKeyMsg processes a key press and updates state.
 // Returns the updated dialog and a result struct describing what happened.
-func (cd ConfirmDialog) Update(msg tea.Msg) (ConfirmDialog, ConfirmDialogUpdate) {
+func (cd ConfirmDialog) Update(msg tea.Msg) (ConfirmDialog, tea.Cmd) {
 	if !cd.IsOpen() {
-		return cd, ConfirmDialogUpdate{}
+		return cd, nil
 	}
 
 	keyMsg, ok := msg.(tea.KeyMsg)
 	if !ok {
-		return cd, ConfirmDialogUpdate{}
+		return cd, nil
 	}
 	key := keyMsg.String()
 
@@ -219,9 +219,9 @@ func (cd ConfirmDialog) Update(msg tea.Msg) (ConfirmDialog, ConfirmDialogUpdate)
 			r.CtrlGCanceled = true
 			result.canceled = true
 			result.state = FilteredListClosed
-			return result, ConfirmDialogUpdate{Handled: true, Result: r}
+			return result, func() tea.Msg { return ConfirmResultMsg{Result: r} }
 		}
-		return cd, ConfirmDialogUpdate{Handled: true}
+		return cd, nil // handled but no result
 	}
 
 	switch key {
@@ -229,13 +229,13 @@ func (cd ConfirmDialog) Update(msg tea.Msg) (ConfirmDialog, ConfirmDialogUpdate)
 		cd.confirmed = true
 		cd.state = FilteredListClosed
 		_, r := cd.buildResult()
-		return cd, ConfirmDialogUpdate{Handled: true, Result: r}
+		return cd, func() tea.Msg { return ConfirmResultMsg{Result: r} }
 
 	case keyN, keyNCapital, keyEsc:
 		cd.canceled = true
 		cd.state = FilteredListClosed
 		_, r := cd.buildResult()
-		return cd, ConfirmDialogUpdate{Handled: true, Result: r}
+		return cd, func() tea.Msg { return ConfirmResultMsg{Result: r} }
 
 	case keyCtrlG:
 		if cd.kind == ConfirmMCPAuth {
@@ -244,12 +244,12 @@ func (cd ConfirmDialog) Update(msg tea.Msg) (ConfirmDialog, ConfirmDialogUpdate)
 			result.ctrlGCanceled = true
 			result.canceled = true
 			result.state = FilteredListClosed
-			return result, ConfirmDialogUpdate{Handled: true, Result: r}
+			return result, func() tea.Msg { return ConfirmResultMsg{Result: r} }
 		}
-		return cd, ConfirmDialogUpdate{Handled: true}
+		return cd, nil // handled but no result
 	}
 
-	return cd, ConfirmDialogUpdate{Handled: true}
+	return cd, nil
 }
 
 // buildResult creates a ConfirmResult from the current state without resetting.

@@ -332,6 +332,7 @@ func (m Terminal) loadSessionCmd() tea.Cmd {
 //  4. Editor messages - external editor completion
 //  5. Focus/Blur - application focus changes
 //  6. Paste - clipboard paste
+//
 //nolint:gocyclo
 func (m Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Loading message handling — these take priority during startup.
@@ -364,6 +365,9 @@ func (m Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ReloadModelsMsg:
 		m.emitCommand(":model_load")
 		return m, nil
+
+	case ConfirmResultMsg:
+		return m.handleConfirmResult(msg.Result)
 
 	case themePreviewMsg:
 		return m.handleThemePreview(msg), nil

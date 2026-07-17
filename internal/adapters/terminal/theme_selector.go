@@ -151,7 +151,7 @@ func (ts ThemeSelector) Update(msg tea.Msg) (ThemeSelector, tea.Cmd) {
 			return ts, func() tea.Msg { return OverlayClosedMsg{} }
 		}
 		// Navigated — load preview theme
-		ts, _ = ts.getPreviewTheme()
+		ts = ts.loadPreviewTheme()
 		return ts, nil
 	}
 
@@ -159,7 +159,7 @@ func (ts ThemeSelector) Update(msg tea.Msg) (ThemeSelector, tea.Cmd) {
 	if keyStr == keyEnter {
 		if len(ts.themes) > 0 && ts.SelectedIdx >= 0 {
 			ts.State = ScrollableListClosed
-			ts, _ = ts.getPreviewTheme()
+			ts = ts.loadPreviewTheme()
 			selectedName := ts.themes[ts.SelectedIdx].Name
 			return ts, func() tea.Msg {
 				return ThemeSelectedMsg{Name: selectedName}
@@ -170,23 +170,23 @@ func (ts ThemeSelector) Update(msg tea.Msg) (ThemeSelector, tea.Cmd) {
 	return ts, nil
 }
 
-func (ts ThemeSelector) getPreviewTheme() (ThemeSelector, *theme.Theme) {
+func (ts ThemeSelector) loadPreviewTheme() ThemeSelector {
 	if ts.themeManager == nil {
-		return ts, nil
+		return ts
 	}
 
 	if len(ts.themes) == 0 || ts.SelectedIdx < 0 || ts.SelectedIdx >= len(ts.themes) {
-		return ts, nil
+		return ts
 	}
 
 	themeName := ts.themes[ts.SelectedIdx].Name
 	if themeName == ts.previewThemeName && ts.previewTheme != nil {
-		return ts, ts.previewTheme
+		return ts
 	}
 
 	ts.previewTheme = ts.themeManager.LoadTheme(themeName)
 	ts.previewThemeName = themeName
-	return ts, ts.previewTheme
+	return ts
 }
 
 // --- Rendering ---
