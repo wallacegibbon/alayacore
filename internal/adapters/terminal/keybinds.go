@@ -53,20 +53,22 @@ func (m Terminal) handleKeyMsg(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 		return m, nil
 	}
 
-	// 7. Display-specific keys when display is focused
-	if m.overlays.RestoreFocus() == focusDisplay {
-		if tm, cmd, handled := m.handleDisplayKeys(msg); handled {
-			return tm, cmd
-		}
-	}
-
-	// 8. Global shortcuts (work from any context)
+	// Global shortcuts (work from any context)
 	if tm, cmd, handled := m.handleGlobalKeys(msg); handled {
 		return tm, cmd
 	}
 
-	// 9. Fallback: pass to input field (no-op when display focused)
-	return m.handleFallback(msg)
+	// Focus-specific key handling
+	switch m.overlays.FocusedWindow() {
+	case focusDisplay:
+		return m.handleDisplayKeys(msg)
+
+	case focusInput:
+		return m.handleInputKeys(msg)
+
+	default:
+		return m, nil
+	}
 }
 
 // handleThemeSelectorKeys handles input when theme selector is open.
@@ -389,122 +391,10 @@ func (m Terminal) handleConfirmResult(r *ConfirmResult) (Terminal, tea.Cmd) {
 }
 
 //nolint:gocyclo
-func (m Terminal) handleDisplayKeys(msg tea.KeyMsg) (Terminal, tea.Cmd, bool) {
-	switch msg.String() {
-	case keyJ, keyDown:
-		m.display, _ = m.display.MoveWindowCursorDown()
-		m.display = m.display.EnsureCursorVisible()
-		m.display = m.display.updateContent()
-		return m, nil, true
-
-	case keyK, keyUp:
-		m.display, _ = m.display.MoveWindowCursorUp()
-		m.display = m.display.EnsureCursorVisible()
-		m.display = m.display.updateContent()
-		return m, nil, true
-
-	case keyCtrlD, keyPgDown:
-		if !m.display.AtBottom() {
-			m.display = m.display.MarkUserScrolled()
-			m.display = m.display.ScrollDown(max(1, m.display.GetHeight()/2))
-			m.display = m.display.updateContent()
-		}
-		return m, nil, true
-
-	case keyCtrlU, keyPgUp:
-		m.display = m.display.MarkUserScrolled()
-		m.display = m.display.ScrollUp(max(1, m.display.GetHeight()/2))
-		m.display = m.display.updateContent()
-		return m, nil, true
-
-	case keyJCapital, keyShiftDown:
-		if !m.display.AtBottom() {
-			m.display = m.display.MarkUserScrolled()
-			m.display = m.display.ScrollDown(1)
-			m.display = m.display.updateContent()
-		}
-		return m, nil, true
-
-	case keyKCapital, keyShiftUp:
-		m.display = m.display.MarkUserScrolled()
-		m.display = m.display.ScrollUp(1)
-		m.display = m.display.updateContent()
-		return m, nil, true
-
-	case keyG, keyEnd:
-		m.display = m.display.WithCursorToLastWindow()
-		m.display = m.display.GotoBottom()
-		m.display = m.display.updateContent()
-		return m, nil, true
-
-	case keyGSmall, keyHome:
-		m.display = m.display.WithWindowCursor(0)
-		m.display = m.display.GotoTop()
-		m.display = m.display.updateContent()
-		return m, nil, true
-
-	case keyH:
-		m.display, _ = m.display.MoveWindowCursorToTop()
-		m.display = m.display.EnsureCursorVisible()
-		m.display = m.display.updateContent()
-		return m, nil, true
-
-	case keyL:
-		m.display, _ = m.display.MoveWindowCursorToBottom()
-		m.display = m.display.EnsureCursorVisible()
-		m.display = m.display.updateContent()
-		return m, nil, true
-
-	case keyM:
-		m.display, _ = m.display.MoveWindowCursorToCenter()
-		m.display = m.display.EnsureCursorVisible()
-		m.display = m.display.updateContent()
-		return m, nil, true
-
-	case keyColon:
-		m = m.focusInput()
-		m.input = m.input.WithValue(keyColon)
-		m.input = m.input.CursorEnd()
-		m.display = m.display.updateContent()
-		return m, nil, true
-
-	case keySpace:
-		m.display, _ = m.display.ToggleWindowFold()
-		m.display = m.display.EnsureCursorVisible()
-		m.display = m.display.updateContent()
-		return m, nil, true
-
-	case keyF:
-		m.display, _ = m.display.MoveWindowCursorToNextUserPrompt()
-		m.display = m.display.ScrollCursorToTop()
-		m.display = m.display.updateContent()
-		return m, nil, true
-
-	case keyB:
-		m.display, _ = m.display.MoveWindowCursorToPrevUserPrompt()
-		m.display = m.display.ScrollCursorToTop()
-		m.display = m.display.updateContent()
-		return m, nil, true
-
-	case keyE:
-		content := m.display.GetCursorWindowContent()
-		if content != "" {
-			m.display = m.display.MarkUserScrolled()
-			return m, m.editor.OpenForDisplay(content), true
-		}
-		return m, nil, true
-
-	case keyCtrlF:
-		if historyID := m.display.GetCursorWindowHistoryID(); historyID > 0 {
-			m = m.focusInput()
-			m.input = m.input.WithValue(fmt.Sprintf(":fork %d ", historyID))
-			m.input = m.input.CursorEnd()
-			m.display = m.display.updateContent()
-		}
-		return m, nil, true
-	}
-
-	return m, nil, false
+func (m Terminal) handleDisplayKeys(msg tea.KeyMsg) (Terminal, tea.Cmd) {
+	var cmd tea.Cmd
+	m.display, cmd = m.display.Update(msg)
+	return m, cmd
 }
 
 // handleGlobalKeys handles global keyboard shortcuts.
@@ -584,13 +474,10 @@ func (m Terminal) handleRedraw() (Terminal, tea.Cmd) {
 	)
 }
 
-// handleFallback handles any key not consumed by display or global handlers.
-func (m Terminal) handleFallback(msg tea.KeyMsg) (Terminal, tea.Cmd) {
-	// Don't touch the input field when user is navigating the display
-	if m.overlays.RestoreFocus() != focusInput {
-		return m, nil
-	}
-
+// handleInputKeys handles keys when the input field is focused.
+// It processes submit, editor open, attachment, and clear commands,
+// then delegates unrecognized keys to PromptInput.
+func (m Terminal) handleInputKeys(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 	switch msg.String() {
 	case keyEnter:
 		return m.handleSubmit()

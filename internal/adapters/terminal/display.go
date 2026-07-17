@@ -8,6 +8,8 @@ package terminal
 //   Dependencies  — pointers to shared data (WindowBuffer, Styles).
 
 import (
+	"fmt"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/alayacore/alayacore/internal/tlv"
@@ -44,6 +46,112 @@ func NewDisplayModel(windowBuffer *WindowBuffer, styles *Styles) DisplayModel {
 
 // Init initializes the display
 func (m DisplayModel) Init() tea.Cmd { return nil }
+
+// Update handles key messages for display navigation and cursor movement.
+// Only pure display operations are handled here; cross-component actions
+// (e.g. switching focus, opening editor) are handled by Terminal.
+func (m DisplayModel) Update(msg tea.Msg) (DisplayModel, tea.Cmd) {
+	keyMsg, ok := msg.(tea.KeyMsg)
+	if !ok {
+		return m, nil
+	}
+
+	switch keyMsg.String() {
+	case keyJ, keyDown:
+		m, _ = m.MoveWindowCursorDown()
+		return m.EnsureCursorVisible().updateContent(), nil
+
+	case keyK, keyUp:
+		m, _ = m.MoveWindowCursorUp()
+		return m.EnsureCursorVisible().updateContent(), nil
+
+	case keyCtrlD, keyPgDown:
+		if !m.AtBottom() {
+			m = m.MarkUserScrolled()
+			m = m.ScrollDown(max(1, m.GetHeight()/2))
+			m = m.updateContent()
+		}
+		return m, nil
+
+	case keyCtrlU, keyPgUp:
+		m = m.MarkUserScrolled()
+		m = m.ScrollUp(max(1, m.GetHeight()/2))
+		return m.updateContent(), nil
+
+	case keyJCapital, keyShiftDown:
+		if !m.AtBottom() {
+			m = m.MarkUserScrolled()
+			m = m.ScrollDown(1)
+			m = m.updateContent()
+		}
+		return m, nil
+
+	case keyKCapital, keyShiftUp:
+		m = m.MarkUserScrolled()
+		m = m.ScrollUp(1)
+		return m.updateContent(), nil
+
+	case keyG, keyEnd:
+		m = m.WithCursorToLastWindow()
+		m = m.GotoBottom()
+		return m.updateContent(), nil
+
+	case keyGSmall, keyHome:
+		m = m.WithWindowCursor(0)
+		m = m.GotoTop()
+		return m.updateContent(), nil
+
+	case keyH:
+		m, _ = m.MoveWindowCursorToTop()
+		return m.EnsureCursorVisible().updateContent(), nil
+
+	case keyL:
+		m, _ = m.MoveWindowCursorToBottom()
+		return m.EnsureCursorVisible().updateContent(), nil
+
+	case keyM:
+		m, _ = m.MoveWindowCursorToCenter()
+		return m.EnsureCursorVisible().updateContent(), nil
+
+	case keySpace:
+		m, _ = m.ToggleWindowFold()
+		return m.EnsureCursorVisible().updateContent(), nil
+
+	case keyF:
+		m, _ = m.MoveWindowCursorToNextUserPrompt()
+		return m.ScrollCursorToTop().updateContent(), nil
+
+	case keyB:
+		m, _ = m.MoveWindowCursorToPrevUserPrompt()
+		return m.ScrollCursorToTop().updateContent(), nil
+
+	case keyE:
+		content := m.GetCursorWindowContent()
+		if content != "" {
+			m = m.MarkUserScrolled()
+			return m, func() tea.Msg {
+				return openEditorForDisplayMsg{content: content}
+			}
+		}
+		return m, nil
+
+	case keyColon:
+		return m, func() tea.Msg {
+			return focusInputWithValueMsg{value: ":"}
+		}
+
+	case keyCtrlF:
+		if historyID := m.GetCursorWindowHistoryID(); historyID > 0 {
+			return m, func() tea.Msg {
+				return focusInputWithValueMsg{value: fmt.Sprintf(":fork %d ", historyID)}
+			}
+		}
+		return m, nil
+
+	default:
+		return m, nil
+	}
+}
 
 // View renders the display
 func (m DisplayModel) View() tea.View {

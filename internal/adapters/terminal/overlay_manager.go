@@ -107,8 +107,8 @@ func (om OverlayManager) WithFocusedWindow(w string) OverlayManager {
 	return om
 }
 
-// RestoreFocus returns the previously focused window name.
-func (om OverlayManager) RestoreFocus() string {
+// FocusedWindow returns the currently focused window name ("input" or "display").
+func (om OverlayManager) FocusedWindow() string {
 	return om.focusedWindow
 }
 

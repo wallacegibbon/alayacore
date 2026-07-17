@@ -59,6 +59,19 @@ type ConfirmResultMsg struct{ Result *ConfirmResult }
 // OverlayClosedMsg is sent when any overlay is dismissed without a result.
 type OverlayClosedMsg struct{}
 
+// openEditorForDisplayMsg is sent by DisplayModel when the user presses 'e'
+// to edit the currently selected window's content in an external editor.
+type openEditorForDisplayMsg struct {
+	content string
+}
+
+// focusInputWithValueMsg is sent by DisplayModel when a display key press
+// requires switching focus to the input field and inserting a value.
+// Used by ':' (command prefix) and Ctrl-F (fork command).
+type focusInputWithValueMsg struct {
+	value string
+}
+
 // emitCommand returns a tea.Cmd that writes a user-level command to the
 // session via TLV when executed by Bubble Tea's runtime.
 // Errors are silently ignored — commands are best-effort and the
@@ -373,6 +386,15 @@ func (m Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case editorStartMsg:
 		return m.handleEditorStart(msg)
+
+	case openEditorForDisplayMsg:
+		return m, m.editor.OpenForDisplay(msg.content)
+
+	case focusInputWithValueMsg:
+		m = m.focusInput()
+		m.input = m.input.WithValue(msg.value).CursorEnd()
+		m.display = m.display.updateContent()
+		return m, nil
 
 	case EditorFinishedMsg:
 		return m.handleEditorFinished(msg)
