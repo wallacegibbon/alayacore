@@ -74,7 +74,7 @@ func (aw *AttachmentWindow) Open() {
 	aw.lastFilterValue = "\x00"
 	aw.FilterInputFocused = true
 	aw.FilterInput = aw.FilterInput.Focus()
-	aw.updateFilterInputStyles()
+	aw.FilteredListCore = aw.FilteredListCore.updateFilterInputStyles()
 	aw.ScrollIdx = 0
 	aw.SelectedIdx = 0
 	aw.currentDir, _ = os.Getwd()
@@ -88,8 +88,8 @@ func (aw *AttachmentWindow) loadDir(dir string) {
 	copy(aw.filtered, aw.entries)
 	aw.SelectedIdx = 0
 	aw.ScrollIdx = 0
-	aw.ClampSelection(len(aw.filtered))
-	aw.EnsureVisible()
+	aw.FilteredListCore = aw.FilteredListCore.ClampSelection(len(aw.filtered))
+	aw.FilteredListCore = aw.FilteredListCore.EnsureVisible()
 }
 
 func (aw *AttachmentWindow) readDir(dir string) []fileEntry {
@@ -137,16 +137,19 @@ func (aw *AttachmentWindow) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	// when handleLocalModeKeys runs afterwards.
 	inputWasFocused := aw.FilterInputFocused
 
-	handled, filterChanged, cmd := aw.FilteredListCore.HandleKeyMsg(msg, func(extraKey string) bool {
+	fl, handled, filterChanged, cmd := aw.FilteredListCore.HandleKeyMsg(msg, func(extraKey string) bool {
 		if extraKey == keyEnter {
 			return aw.handleEnter()
 		}
 		if extraKey == keyEsc {
-			aw.State = FilteredListClosed
 			return true
 		}
 		return false
 	})
+	if !aw.IsOpen() {
+		fl = fl.Close()
+	}
+	aw.FilteredListCore = fl
 
 	if handled {
 		if aw.mode == modeLocal {
@@ -190,14 +193,14 @@ func (aw *AttachmentWindow) toggleMode() {
 		aw.FilterInput.Prompt = "U "
 		aw.FilterInput = aw.FilterInput.Focus()
 		aw.FilterInputFocused = true
-		aw.updateFilterInputStyles()
+		aw.FilteredListCore = aw.FilteredListCore.updateFilterInputStyles()
 	} else {
 		aw.mode = modeLocal
 		aw.FilterInput.Prompt = "F "
 		aw.loadDir(aw.currentDir)
 		aw.FilterInput = aw.FilterInput.Focus()
 		aw.FilterInputFocused = true
-		aw.updateFilterInputStyles()
+		aw.FilteredListCore = aw.FilteredListCore.updateFilterInputStyles()
 	}
 }
 
@@ -255,7 +258,7 @@ func (aw *AttachmentWindow) handleEnter() bool {
 		// Switch to input mode and autocomplete the directory name.
 		aw.FilterInputFocused = true
 		aw.FilterInput = aw.FilterInput.Focus()
-		aw.updateFilterInputStyles()
+		aw.FilteredListCore = aw.FilteredListCore.updateFilterInputStyles()
 		aw.autocompleteDir(entry.name)
 		return true
 	}
@@ -411,9 +414,9 @@ func (aw *AttachmentWindow) updateFiltered() {
 	} else {
 		aw.SelectedIdx = 0
 	}
-	aw.ClampSelection(len(aw.filtered))
-	aw.EnsureVisible()
-	aw.ClampScroll(len(aw.filtered))
+	aw.FilteredListCore = aw.FilteredListCore.ClampSelection(len(aw.filtered))
+	aw.FilteredListCore = aw.FilteredListCore.EnsureVisible()
+	aw.FilteredListCore = aw.FilteredListCore.ClampScroll(len(aw.filtered))
 }
 
 // View renders the attachment window.
@@ -485,7 +488,7 @@ func (aw *AttachmentWindow) renderLocalBody(sb *strings.Builder, boxWidth int) {
 	innerWidth := max(0, boxWidth-BorderInnerPadding)
 
 	var content strings.Builder
-	aw.EnsureVisible()
+	aw.FilteredListCore = aw.FilteredListCore.EnsureVisible()
 	for i := aw.ScrollIdx; i < min(aw.ScrollIdx+listHeight, len(aw.filtered)); i++ {
 		e := aw.filtered[i]
 		isSelected := i == aw.SelectedIdx

@@ -46,37 +46,38 @@ type FilteredListCore struct {
 	lastFilterValue    string
 }
 
-func (fl *FilteredListCore) IsOpen() bool { return fl.State != FilteredListClosed }
+func (fl FilteredListCore) IsOpen() bool { return fl.State != FilteredListClosed }
 
 // Close closes the filtered list.
-func (fl *FilteredListCore) Close() { fl.State = FilteredListClosed }
+func (fl FilteredListCore) Close() FilteredListCore {
+	fl.State = FilteredListClosed
+	return fl
+}
 
 // SetSize updates the width and height of the filtered list.
-func (fl *FilteredListCore) SetSize(width, height int) {
+func (fl FilteredListCore) SetSize(width, height int) FilteredListCore {
 	if width > 0 {
 		fl.Width = width
 		fl.FilterInput = fl.FilterInput.SetWidth(max(0, width-InputPaddingH))
 	}
 	fl.Height = min(height-LayoutGap, SelectorMaxHeight)
+	return fl
 }
 
 // SetStyles updates the styles and re-applies them to the filter input.
-func (fl *FilteredListCore) SetStyles(styles *Styles) {
+func (fl FilteredListCore) SetStyles(styles *Styles) FilteredListCore {
 	fl.Styles = styles
-	fl.updateFilterInputStyles()
+	return fl.updateFilterInputStyles()
 }
 
 // When the app loses focus, all UI elements should be dimmed.
-func (fl *FilteredListCore) SetHasFocus(hasFocus bool) {
+func (fl FilteredListCore) SetHasFocus(hasFocus bool) FilteredListCore {
 	fl.HasFocus = hasFocus
-	fl.updateFilterInputStyles()
+	return fl.updateFilterInputStyles()
 }
 
 // updateFilterInputStyles applies current styles to the filter input.
-// The prompt (e.g. "/") uses the same color as the border so it visually
-// tracks the focus state: focused border color when editing, blurred border
-// color when the list is focused.
-func (fl *FilteredListCore) updateFilterInputStyles() {
+func (fl FilteredListCore) updateFilterInputStyles() FilteredListCore {
 	fl.FilterInput = fl.FilterInput.SetStyles(
 		inputFieldStyle{
 			Prompt:      fl.Styles.Input.Foreground(fl.Styles.BorderFocused),
@@ -90,42 +91,39 @@ func (fl *FilteredListCore) updateFilterInputStyles() {
 		},
 		fl.Styles.CursorColor,
 	)
+	return fl
 }
 
 // HandleTabKey toggles focus between the filter input and the list.
-func (fl *FilteredListCore) HandleTabKey() {
+func (fl FilteredListCore) HandleTabKey() FilteredListCore {
 	fl.FilterInputFocused = !fl.FilterInputFocused
 	if fl.FilterInputFocused {
 		fl.FilterInput = fl.FilterInput.Focus()
 	} else {
 		fl.FilterInput = fl.FilterInput.Blur()
 	}
-	fl.updateFilterInputStyles()
+	return fl.updateFilterInputStyles()
 }
 
 // HandleFilterEscape handles the escape key when the filter input is focused.
-// Returns true if the component should close.
-func (fl *FilteredListCore) HandleFilterEscape() bool {
+func (fl FilteredListCore) HandleFilterEscape() FilteredListCore {
 	fl.State = FilteredListClosed
-	return true
+	return fl
 }
 
 // HandleFilterCtrlC clears the filter input value.
-func (fl *FilteredListCore) HandleFilterCtrlC() {
+func (fl FilteredListCore) HandleFilterCtrlC() FilteredListCore {
 	fl.FilterInput = fl.FilterInput.SetValue("")
+	return fl
 }
 
 // HandleKeyMsg handles common filtered list navigation keys.
-// Returns (handled, filterChanged, cmd) where filterChanged indicates the filter
-// input value changed and should trigger a filter update, and cmd is an optional
-// tea.Cmd from the filter input.
-// Component-specific keys (like Enter) are delegated to onExtra callback.
-func (fl *FilteredListCore) HandleKeyMsg(msg tea.KeyMsg, onExtra func(string) bool) (handled bool, filterChanged bool, cmd tea.Cmd) {
+// Returns (fl, handled, filterChanged, cmd).
+func (fl FilteredListCore) HandleKeyMsg(msg tea.KeyMsg, onExtra func(string) bool) (FilteredListCore, bool, bool, tea.Cmd) {
 	key := msg.String()
 
 	if key == keyTab {
-		fl.HandleTabKey()
-		return true, false, nil
+		return fl.HandleTabKey(), true, false, nil
 	}
 
 	if fl.FilterInputFocused {
@@ -136,75 +134,72 @@ func (fl *FilteredListCore) HandleKeyMsg(msg tea.KeyMsg, onExtra func(string) bo
 }
 
 // handleFilterFocusedKey handles keys when the filter input is focused.
-func (fl *FilteredListCore) handleFilterFocusedKey(msg tea.KeyMsg, key string) (handled bool, filterChanged bool, cmd tea.Cmd) {
+func (fl FilteredListCore) handleFilterFocusedKey(msg tea.KeyMsg, key string) (FilteredListCore, bool, bool, tea.Cmd) {
 	if key == keyEsc {
 		fl.State = FilteredListClosed
-		return true, false, nil
+		return fl, true, false, nil
 	}
 
 	if key == keyCtrlC {
-		fl.HandleFilterCtrlC()
-		return true, true, nil
+		fl = fl.HandleFilterCtrlC()
+		return fl, true, true, nil
 	}
 
 	if key == keyCtrlU || key == keyCtrlD {
-		return true, false, nil
+		return fl, true, false, nil
 	}
 
 	oldValue := fl.FilterInput.Value()
+	var cmd tea.Cmd
 	fl.FilterInput, cmd = fl.FilterInput.Update(msg)
-	return true, oldValue != fl.FilterInput.Value(), cmd
+	return fl, true, oldValue != fl.FilterInput.Value(), cmd
 }
 
 // handleListFocusedKey handles keys when the list is focused.
-func (fl *FilteredListCore) handleListFocusedKey(key string, onExtra func(string) bool) (handled bool, filterChanged bool, cmd tea.Cmd) {
+func (fl FilteredListCore) handleListFocusedKey(key string, onExtra func(string) bool) (FilteredListCore, bool, bool, tea.Cmd) {
 	switch key {
 	case keyQ, keyEsc:
 		fl.State = FilteredListClosed
-		return true, false, nil
+		return fl, true, false, nil
 	case keyJ, keyDown:
-		// Navigation bounds checking is done by the embedding type
-		return true, false, nil
+		return fl, true, false, nil
 	case keyK, keyUp:
-		// Navigation bounds checking is done by the embedding type
-		return true, false, nil
+		return fl, true, false, nil
 	case keyEnter:
 		if onExtra != nil && onExtra(key) {
-			return true, false, nil
+			return fl, true, false, nil
 		}
-		return true, false, nil
+		return fl, true, false, nil
 	}
-	return false, false, nil
+	return fl, false, false, nil
 }
 
 // ClampSelection clamps the selected index to valid bounds.
-// This is the shared logic; embedding types may add their own constraints
-// (e.g. section header skipping) after calling this.
-func (fl *FilteredListCore) ClampSelection(filteredLen int) {
+func (fl FilteredListCore) ClampSelection(filteredLen int) FilteredListCore {
 	if filteredLen == 0 {
 		fl.SelectedIdx = 0
 		fl.ScrollIdx = 0
-		return
+		return fl
 	}
 	if fl.SelectedIdx >= filteredLen {
 		fl.SelectedIdx = filteredLen - 1
 	}
+	return fl
 }
 
 // EnsureVisible adjusts ScrollIdx so the selected item is visible.
-// Uses the standard behavior (no top margin): if selection is above
-// scroll, jump straight to it; if below, scroll to show it.
-func (fl *FilteredListCore) EnsureVisible() {
+func (fl FilteredListCore) EnsureVisible() FilteredListCore {
 	listHeight := SelectorListRows
 	if fl.SelectedIdx < fl.ScrollIdx {
 		fl.ScrollIdx = fl.SelectedIdx
 	} else if fl.SelectedIdx >= fl.ScrollIdx+listHeight {
 		fl.ScrollIdx = fl.SelectedIdx - listHeight + 1
 	}
+	return fl
 }
 
 // ClampScroll ensures ScrollIdx is valid for the given filtered length.
-func (fl *FilteredListCore) ClampScroll(filteredLen int) {
+func (fl FilteredListCore) ClampScroll(filteredLen int) FilteredListCore {
 	maxScroll := max(0, filteredLen-SelectorListRows)
 	if fl.ScrollIdx > maxScroll {
 		fl.ScrollIdx = maxScroll
@@ -212,10 +207,11 @@ func (fl *FilteredListCore) ClampScroll(filteredLen int) {
 	if fl.ScrollIdx < 0 {
 		fl.ScrollIdx = 0
 	}
+	return fl
 }
 
 // RenderOverlay renders the filtered list as an overlay on top of base content.
-func (fl *FilteredListCore) RenderOverlay(baseContent, renderedList string, screenWidth, screenHeight int) string {
+func (fl FilteredListCore) RenderOverlay(baseContent, renderedList string, screenWidth, screenHeight int) string {
 	if fl.State == FilteredListClosed {
 		return baseContent
 	}
@@ -223,7 +219,7 @@ func (fl *FilteredListCore) RenderOverlay(baseContent, renderedList string, scre
 }
 
 // FilterBorderColor returns the border color for the filter input based on focus state.
-func (fl *FilteredListCore) FilterBorderColor() color.Color {
+func (fl FilteredListCore) FilterBorderColor() color.Color {
 	if !fl.HasFocus || !fl.FilterInputFocused {
 		return fl.Styles.BorderBlurred
 	}
@@ -231,7 +227,7 @@ func (fl *FilteredListCore) FilterBorderColor() color.Color {
 }
 
 // ListBorderColor returns the border color for the list based on focus state.
-func (fl *FilteredListCore) ListBorderColor() color.Color {
+func (fl FilteredListCore) ListBorderColor() color.Color {
 	if !fl.HasFocus || fl.FilterInputFocused {
 		return fl.Styles.BorderBlurred
 	}

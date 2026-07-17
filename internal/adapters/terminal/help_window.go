@@ -171,7 +171,7 @@ func (hw *HelpWindow) recalculateColumnWidths() {
 
 // SetSize sets the size of the help window and recalculates column widths.
 func (hw *HelpWindow) SetSize(width, height int) {
-	hw.FilteredListCore.SetSize(width, height)
+	hw.FilteredListCore = hw.FilteredListCore.SetSize(width, height)
 	hw.recalculateColumnWidths()
 }
 
@@ -183,10 +183,15 @@ func (hw *HelpWindow) Open() {
 	hw.lastFilterValue = "\x00"
 	hw.FilterInputFocused = false
 	hw.FilterInput = hw.FilterInput.Blur()
-	hw.updateFilterInputStyles()
+	hw.FilteredListCore = hw.FilteredListCore.updateFilterInputStyles()
 	hw.ScrollIdx = 0
 	hw.updateFilteredItems()
 	hw.SelectedIdx = hw.firstSelectableIdx()
+}
+
+// Close closes the help window.
+func (hw *HelpWindow) Close() {
+	hw.FilteredListCore = hw.FilteredListCore.Close()
 }
 
 // --- Filtering ---
@@ -256,7 +261,7 @@ func (hw *HelpWindow) updateFilteredItems() {
 		}
 		if found {
 			hw.ensureVisible()
-			hw.ClampScroll(hw.filteredLen())
+			hw.FilteredListCore = hw.FilteredListCore.ClampScroll(hw.filteredLen())
 		} else {
 			// Previous item no longer in filtered list, reset to first item.
 			hw.SelectedIdx = 0
@@ -280,7 +285,7 @@ func (hw *HelpWindow) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	key := msg.String()
 
 	// Common filtered list handling (tab, esc, ctrl+c, filter input keys)
-	handled, filterChanged, cmd := hw.FilteredListCore.HandleKeyMsg(msg, func(extraKey string) bool {
+	fl, handled, filterChanged, cmd := hw.FilteredListCore.HandleKeyMsg(msg, func(extraKey string) bool {
 		// Called for Enter when list is focused
 		if extraKey == keyEnter {
 			if hw.SelectedIdx >= 0 && hw.SelectedIdx < hw.filteredLen() {
@@ -293,13 +298,16 @@ func (hw *HelpWindow) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 					} else {
 						hw.pendingCommand = item.Key
 					}
-					hw.State = FilteredListClosed
 				}
 			}
 			return true
 		}
 		return false
 	})
+	if hw.pendingCommand != "" {
+		fl = fl.Close()
+	}
+	hw.FilteredListCore = fl
 
 	if handled {
 		if filterChanged {
@@ -400,7 +408,7 @@ func (hw *HelpWindow) skipSectionHeaders() {
 
 // clampSelection ensures selectedIdx is within valid bounds.
 func (hw *HelpWindow) clampSelection() {
-	hw.ClampSelection(hw.filteredLen())
+	hw.FilteredListCore = hw.FilteredListCore.ClampSelection(hw.filteredLen())
 	hw.skipSectionHeaders()
 	hw.ensureVisible()
 }
@@ -426,7 +434,7 @@ func (hw *HelpWindow) View() tea.View {
 	}
 
 	listHeight := SelectorListRows
-	hw.ClampScroll(hw.filteredLen())
+	hw.FilteredListCore = hw.FilteredListCore.ClampScroll(hw.filteredLen())
 
 	filterBox := hw.Styles.RenderBorderedBox(hw.FilterInput.View(), hw.Width, hw.FilterBorderColor())
 

@@ -133,7 +133,7 @@ func (ms *ModelSelector) LoadModels(models []config.ModelConfig, activeID int) t
 		} else {
 			ms.SelectedIdx = savedSelectedIdx
 			ms.ScrollIdx = savedScrollIdx
-			ms.ClampSelection(len(ms.filteredModels))
+			ms.FilteredListCore = ms.FilteredListCore.ClampSelection(len(ms.filteredModels))
 			ms.selectActiveModelIfPrevDeleted(prevSelectedModelID)
 		}
 	}
@@ -197,7 +197,7 @@ func (ms *ModelSelector) Open() {
 	ms.lastFilterValue = "\x00"
 	ms.FilterInputFocused = false
 	ms.FilterInput = ms.FilterInput.Blur()
-	ms.updateFilterInputStyles()
+	ms.FilteredListCore = ms.FilteredListCore.updateFilterInputStyles()
 	ms.ScrollIdx = 0
 	ms.updateFilteredModels()
 	ms.selectActiveModel()
@@ -206,17 +206,17 @@ func (ms *ModelSelector) Open() {
 // selectActiveModel positions the cursor at the active model in the filtered list.
 func (ms *ModelSelector) selectActiveModel() {
 	if ms.activeModel == nil {
-		ms.ClampSelection(len(ms.filteredModels))
+		ms.FilteredListCore = ms.FilteredListCore.ClampSelection(len(ms.filteredModels))
 		return
 	}
 	for i, m := range ms.filteredModels {
 		if m.ID == ms.activeModel.ID {
 			ms.SelectedIdx = i
-			ms.EnsureVisible()
+			ms.FilteredListCore = ms.FilteredListCore.EnsureVisible()
 			return
 		}
 	}
-	ms.ClampSelection(len(ms.filteredModels))
+	ms.FilteredListCore = ms.FilteredListCore.ClampSelection(len(ms.filteredModels))
 }
 
 // --- Key Handling ---
@@ -229,12 +229,16 @@ func (ms *ModelSelector) HandleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	key := msg.String()
 
 	// Common filtered list handling (tab, esc, ctrl+c, filter input, j/k)
-	handled, filterChanged, cmd := ms.FilteredListCore.HandleKeyMsg(msg, func(extraKey string) bool {
+	fl, handled, filterChanged, cmd := ms.FilteredListCore.HandleKeyMsg(msg, func(extraKey string) bool {
 		if extraKey == keyEnter {
 			return ms.handleListEnter()
 		}
 		return false
 	})
+	if ms.modelJustSelected {
+		fl = fl.Close()
+	}
+	ms.FilteredListCore = fl
 
 	if handled {
 		if filterChanged && ms.FilterInputFocused {
@@ -263,7 +267,6 @@ func (ms *ModelSelector) handleListEnter() bool {
 	if len(ms.filteredModels) > 0 && ms.SelectedIdx >= 0 {
 		ms.activeModel = &ms.filteredModels[ms.SelectedIdx]
 		ms.modelJustSelected = true
-		ms.State = FilteredListClosed
 		return true
 	}
 	return false
@@ -274,7 +277,7 @@ func (ms *ModelSelector) handleSearchEnter() {
 	ms.SelectedIdx = 0
 	ms.activeModel = &ms.filteredModels[0]
 	ms.modelJustSelected = true
-	ms.State = FilteredListClosed
+	ms.FilteredListCore = ms.FilteredListCore.Close()
 }
 
 // handleListKeys handles navigation and action keys when the list is focused.
@@ -344,7 +347,7 @@ func (ms *ModelSelector) renderModelList(width int, borderColor color.Color) str
 	case len(ms.filteredModels) == 0:
 		content.WriteString(ms.Styles.System.Render("No models match your search."))
 	default:
-		ms.EnsureVisible()
+		ms.FilteredListCore = ms.FilteredListCore.EnsureVisible()
 
 		idWidth := ms.maxIDWidth()
 		nameMaxWidth, ctxColWidth, provColWidth := ms.measureColumns(listHeight, innerWidth, idWidth)
@@ -604,17 +607,17 @@ func (ms *ModelSelector) updateFilteredModels() {
 			}
 		}
 		if found {
-			ms.EnsureVisible()
-			ms.ClampScroll(len(ms.filteredModels))
+			ms.FilteredListCore = ms.FilteredListCore.EnsureVisible()
+			ms.FilteredListCore = ms.FilteredListCore.ClampScroll(len(ms.filteredModels))
 		} else {
 			// Previous item no longer in filtered list, reset to first item.
 			ms.SelectedIdx = 0
 			ms.ScrollIdx = 0
-			ms.ClampSelection(len(ms.filteredModels))
+			ms.FilteredListCore = ms.FilteredListCore.ClampSelection(len(ms.filteredModels))
 		}
 	} else {
 		ms.SelectedIdx = 0
 		ms.ScrollIdx = 0
-		ms.ClampSelection(len(ms.filteredModels))
+		ms.FilteredListCore = ms.FilteredListCore.ClampSelection(len(ms.filteredModels))
 	}
 }
