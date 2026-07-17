@@ -86,12 +86,11 @@ func (m Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 	// Check if theme was selected (Enter key)
 	if result.ThemeSelected {
 		selectedTheme := ts.GetSelectedTheme()
-		var cmd tea.Cmd
 		if selectedTheme != nil {
-			cmd = m.emitCommand(":theme_set " + selectedTheme.Name)
+			m.emitCommand(":theme_set " + selectedTheme.Name)
 		}
 		m = m.restoreFocus()
-		return m, cmd
+		return m, nil
 	}
 
 	// If selector closed without selection (ESC/q), restore original theme
@@ -197,31 +196,29 @@ func (m Terminal) handleConfirmTool(r *ConfirmResult, fromCmd bool) (Terminal, t
 	if fromCmd {
 		m.input = m.input.SetValue("")
 	}
-	cmd := m.emitCommand(":confirm " + r.ToolID + " " + action)
+	m.emitCommand(":confirm " + r.ToolID + " " + action)
 	m = m.restoreFocusAfterConfirm()
 	if nextID, nextName, nextInput, ok := m.out.GetPendingToolConfirm(); ok {
 		m = m.openConfirmTool(nextID, nextName, nextInput)
 	}
-	return m, tea.Batch(cmd, scheduleTick())
+	return m, scheduleTick()
 }
 
 func (m Terminal) handleConfirmMCPAuth(r *ConfirmResult, fromCmd bool) (Terminal, tea.Cmd) {
-	var cmds []tea.Cmd
 	switch {
 	case r.Confirmed:
 		m.startMCPAuthFlow(r.ToolID, r.ToolInput)
 	case r.CtrlGCanceled:
 		m.out.ClearMCPAuths()
-		cmds = append(cmds, m.emitCommand(":mcp_cancel"))
+		m.emitCommand(":mcp_cancel")
 	default:
 		if fromCmd {
 			m.input = m.input.SetValue("")
 		}
-		cmds = append(cmds, m.emitCommand(":mcp_auth "+r.ToolID))
+		m.emitCommand(":mcp_auth " + r.ToolID)
 	}
 	m = m.restoreFocusAfterConfirm()
-	cmds = append(cmds, scheduleTick())
-	return m, tea.Batch(cmds...)
+	return m, scheduleTick()
 }
 
 // startMCPAuthFlow starts the OAuth callback server, opens the browser,
@@ -248,10 +245,10 @@ func (m Terminal) startMCPAuthFlow(serverName, authURL string) {
 		cleanup()
 		if res.Err != nil {
 			m.out.WriteError("MCP auth callback error: %v", res.Err)
-			m.writeTLVCommand(":mcp_cancel")
+			m.emitCommand(":mcp_cancel")
 			return
 		}
-		m.writeTLVCommand(fmt.Sprintf(":mcp_auth %s %s %s",
+		m.emitCommand(fmt.Sprintf(":mcp_auth %s %s %s",
 			serverName, res.Code, redirectURI))
 	}()
 }
@@ -276,33 +273,23 @@ func (m Terminal) handleOverlayModelSelector(msg tea.KeyMsg) (Terminal, tea.Cmd)
 	ms, result := m.overlays.ModelSelector().HandleKeyMsg(msg)
 	m.overlays = m.overlays.SetModelSelector(ms)
 
-	var cmds []tea.Cmd
 	if result.ModelSelected {
-		var cmd tea.Cmd
-		m, cmd = m.switchToSelectedModel()
-		if cmd != nil {
-			cmds = append(cmds, cmd)
-		}
+		m = m.switchToSelectedModel()
 	}
 	if result.ReloadModels {
-		cmds = append(cmds, m.emitCommand(":model_load"))
-	}
-	if result.Cmd != nil {
-		cmds = append(cmds, result.Cmd)
+		m.emitCommand(":model_load")
 	}
 	if wasOpen && !ms.IsOpen() {
 		m = m.restoreFocus()
 	}
-	return m, tea.Batch(cmds...)
+	return m, result.Cmd
 }
 
 // handleMCPInitKeys handles keyboard input when the MCP init overlay is open.
 func (m Terminal) handleMCPInitKeys(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 	if msg.String() == keyCtrlG {
-		return m, tea.Batch(
-			m.emitCommand(":mcp_cancel"),
-			scheduleTick(),
-		)
+		m.emitCommand(":mcp_cancel")
+		return m, scheduleTick()
 	}
 	return m, nil
 }
@@ -688,11 +675,11 @@ func (m Terminal) handleCommand(command string) (Terminal, tea.Cmd) {
 
 // submitCommand sends a command to the session and optionally clears input.
 func (m Terminal) submitCommand(command string, clearInput bool) (Terminal, tea.Cmd) {
-	cmd := m.emitCommand(":" + command)
+	m.emitCommand(":" + command)
 	if clearInput {
 		m.input = m.input.SetValue("")
 	}
-	return m, tea.Batch(cmd, scheduleTick())
+	return m, scheduleTick()
 }
 
 // scheduleTick schedules a tick message for UI updates.
@@ -703,15 +690,15 @@ func scheduleTick() tea.Cmd {
 }
 
 // switchToSelectedModel sends a model_set command to switch to the selected model.
-func (m Terminal) switchToSelectedModel() (Terminal, tea.Cmd) {
+func (m Terminal) switchToSelectedModel() Terminal {
 	selectedModel := m.overlays.ModelSelector().GetActiveModel()
 	if selectedModel == nil {
-		return m, nil
+		return m
 	}
 
 	// Send model_set command to session
 	if selectedModel.ID != 0 {
-		return m, m.emitCommand(fmt.Sprintf(":model_set %d", selectedModel.ID))
+		m.emitCommand(fmt.Sprintf(":model_set %d", selectedModel.ID))
 	}
-	return m, nil
+	return m
 }

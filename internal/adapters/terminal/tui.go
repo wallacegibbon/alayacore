@@ -34,20 +34,12 @@ type sessionLoadingErrorMsg struct {
 	err error
 }
 
-// emitCommand returns a tea.Cmd that writes a user-level command to the
-// session via TLV when executed by Bubble Tea's runtime. Errors are silently
-// ignored — commands are best-effort and the session may close the input
-// stream at any time.
-func (m Terminal) emitCommand(cmd string) tea.Cmd {
-	return func() tea.Msg {
-		_ = tlv.WriteTLV(m.streamInput, tlv.TagUserT, cmd)
-		return nil
-	}
-}
-
-// writeTLVCommand directly writes a TLV command to the session stream.
-// Only for use outside Update (e.g. goroutines), where tea.Cmd cannot be returned.
-func (m Terminal) writeTLVCommand(cmd string) {
+// emitCommand writes a user-level command to the session via TLV.
+// Errors are silently ignored — commands are best-effort and the
+// session may close the input stream at any time.
+// This is a direct write (not a tea.Cmd) — intended for single commands
+// outside the submit path. For batch writes, use submitCmd.
+func (m Terminal) emitCommand(cmd string) {
 	_ = tlv.WriteTLV(m.streamInput, tlv.TagUserT, cmd)
 }
 
@@ -570,7 +562,7 @@ func (m Terminal) handleEditorFinished(msg EditorFinishedMsg) (Terminal, tea.Cmd
 
 	case EditorActionReloadConfig:
 		if msg.FileType == "model_config" {
-			return m, m.emitCommand(":model_load")
+			m.emitCommand(":model_load")
 		}
 		return m, nil
 
