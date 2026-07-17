@@ -74,7 +74,7 @@ func (m Terminal) addAttachment(path string) Terminal {
 	tag := tlv.TagForPath(path)
 	m.pendingAttachments = append(m.pendingAttachments, attachment{path: path, tag: tag})
 	m.input = m.input.SetAttachments(m.pendingAttachmentLabels())
-	m.updateDisplayHeight()
+	m = m.updateDisplayHeight()
 	return m
 }
 
@@ -83,7 +83,7 @@ func (m Terminal) addURLAttachment(url string) Terminal {
 	tag := tlv.TagForPath(url)
 	m.pendingAttachments = append(m.pendingAttachments, attachment{path: url, tag: tag, isURL: true})
 	m.input = m.input.SetAttachments(m.pendingAttachmentLabels())
-	m.updateDisplayHeight()
+	m = m.updateDisplayHeight()
 	return m
 }
 
@@ -91,7 +91,7 @@ func (m Terminal) addURLAttachment(url string) Terminal {
 func (m Terminal) clearAttachments() Terminal {
 	m.pendingAttachments = nil
 	m.input = m.input.SetAttachments(nil)
-	m.updateDisplayHeight()
+	m = m.updateDisplayHeight()
 	return m
 }
 
@@ -253,7 +253,7 @@ func NewTerminalWithTheme(
 	m.input = m.input.SetWidth(initialWidth)
 	m.overlays.SetSize(initialWidth, initialHeight)
 	m.overlays.SetFocusedWindow(focusInput)
-	m.updateDisplayHeight()
+	m = m.updateDisplayHeight()
 
 	return m
 }
@@ -371,7 +371,7 @@ func (m Terminal) handleWindowSize(msg tea.WindowSizeMsg) (Terminal, tea.Cmd) {
 	m.display = m.display.SetWidth(max(0, msg.Width))
 	m.input = m.input.SetWidth(max(0, msg.Width))
 	m.overlays.SetSize(msg.Width, msg.Height)
-	m.updateDisplayHeight()
+	m = m.updateDisplayHeight()
 
 	// Clamp cursor to valid bounds (windows may have been removed) but
 	// don't scroll to make it visible — the user's scroll position is
@@ -466,7 +466,7 @@ func (m Terminal) handleSessionLoadedMsg() (Terminal, tea.Cmd) {
 
 	if m.out.WindowBuffer().WindowCount() > 0 {
 		m = m.updateStatus()
-		m.updateDisplayHeight()
+		m = m.updateDisplayHeight()
 		if m.display.shouldFollow() {
 			m.display = m.display.SetCursorToLastWindow()
 		}
@@ -516,7 +516,7 @@ func (m Terminal) handleDisplayRefresh() (Terminal, tea.Cmd) {
 
 	if m.out.WindowBuffer().WindowCount() > 0 {
 		m = m.updateStatus()
-		m.updateDisplayHeight()
+		m = m.updateDisplayHeight()
 		if m.display.shouldFollow() {
 			m.display = m.display.SetCursorToLastWindow()
 		}
@@ -569,7 +569,7 @@ func (m Terminal) handleEditorFinished(msg EditorFinishedMsg) (Terminal, tea.Cmd
 
 // updateDisplayHeight updates the display viewport height based on window size
 // and current input box height (which varies when attachments are present).
-func (m Terminal) updateDisplayHeight() {
+func (m Terminal) updateDisplayHeight() Terminal {
 	// Layout from bottom up:
 	//   line H:          status bar (fixed, 1 line)
 	//   separator:       1 newline between input and status
@@ -581,6 +581,7 @@ func (m Terminal) updateDisplayHeight() {
 	inputBoxHeight := m.input.Height()
 	m.display = m.display.SetHeight(max(0, m.windowHeight-inputBoxHeight-1))
 	m.display = m.display.updateContent()
+	return m
 }
 
 // syncThemeFromSession updates the applied theme when the session reports a change.
