@@ -23,6 +23,11 @@ const (
 	modeURL
 )
 
+// AttachmentWindow is an overlay for selecting file attachments.
+//
+// All fields are Elm UI state (value types, copied on every WithXxx).
+// File system reads happen synchronously in the constructor or on directory
+// navigation, not in Update.
 type AttachmentWindow struct {
 	FilteredListCore
 

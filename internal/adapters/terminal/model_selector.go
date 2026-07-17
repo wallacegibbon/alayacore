@@ -19,6 +19,10 @@ type searchableModel struct {
 	searchStr string
 }
 
+// ModelSelector is an overlay for selecting the active model.
+//
+// All fields are Elm UI state (value types, copied on every WithXxx).
+// No external dependencies — model list is built from system info messages.
 type ModelSelector struct {
 	FilteredListCore
 

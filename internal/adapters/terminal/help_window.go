@@ -31,6 +31,10 @@ type HelpItem struct {
 }
 
 // HelpWindow manages a help overlay that displays keybindings and commands.
+// HelpWindow is an overlay showing keybindings and commands.
+//
+// All fields are Elm UI state (value types, copied on every WithXxx).
+// No external dependencies — help items are built from static definitions.
 type HelpWindow struct {
 	FilteredListCore
 

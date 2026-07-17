@@ -39,11 +39,17 @@ const (
 )
 
 // ConfirmDialog manages a floating confirmation overlay.
+// ConfirmDialog is an overlay dialog for confirming tool execution or quit.
+//
+// Field groups:
+//
+//	Elm UI state  — value types / primitives (copied on every WithXxx).
+//	Dependencies  — pointers to shared data (Styles).
 type ConfirmDialog struct {
+	// ── Elm UI state (value types, copied on every WithXxx) ─
 	state    FilteredListState
 	kind     ConfirmKind
 	hasFocus bool
-	styles   *Styles
 	Width    int
 	Height   int
 
@@ -54,10 +60,13 @@ type ConfirmDialog struct {
 	toolName  string
 	toolInput string
 
-	// Result flags — consumed by the Terminal after key handling.
+	// Result flags — consumed by Terminal after key handling.
 	confirmed     bool
 	canceled      bool
 	ctrlGCanceled bool // true when canceled via Ctrl+G (MCP auth → cancel all)
+
+	// ── Dependencies (pointer to shared data) ─
+	styles *Styles
 }
 
 // NewConfirmDialog creates a new confirm dialog.

@@ -14,19 +14,25 @@ import (
 	"github.com/alayacore/alayacore/internal/theme"
 )
 
-// OverlayManager owns all overlay components and their rendering.
+// OverlayManager owns all overlay components and their lifecycle.
+//
+// Field groups:
+//
+//	Elm UI state  — all overlay components (value types, copied on every WithXxx).
+//	Dependencies  — pointers to shared data (Styles).
+//
+// Every overlay component has WithXxx methods and uses value receivers.
 type OverlayManager struct {
+	// ── Elm UI state (value types, copied on every WithXxx) ─
 	modelSelector    ModelSelector
 	themeSelector    ThemeSelector
 	helpWindow       HelpWindow
 	confirmOverlay   ConfirmDialog
 	mcpInitOverlay   ConfirmDialog
 	attachmentWindow AttachmentWindow
+	focusedWindow    string // which window had focus before overlay opened
 
-	// Focus state — which window had focus before an overlay opened.
-	focusedWindow string
-
-	// Styles (needed for theme changes on overlays via SetStyles).
+	// ── Dependencies (pointer to shared data) ─
 	styles *Styles
 }
 

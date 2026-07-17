@@ -2,6 +2,10 @@ package terminal
 
 // DisplayModel provides a viewport over WindowBuffer content.
 // It manages scrolling, cursor navigation, and auto-follow behavior.
+//
+// Field groups:
+//   Elm UI state  — all value types / primitives (copied on WithXxx).
+//   Dependencies  — pointers to shared data (WindowBuffer, Styles).
 
 import (
 	tea "charm.land/bubbletea/v2"
@@ -9,17 +13,19 @@ import (
 	"github.com/alayacore/alayacore/internal/tlv"
 )
 
-// DisplayModel holds the viewport over WindowBuffer content.
 type DisplayModel struct {
-	scrollView     ScrollView
-	windowBuffer   *WindowBuffer
-	styles         *Styles
-	width          int
-	height         int
-	windowCursor   int
-	autoFollow     bool // true on init and after G; disabled by navigation that actually moves cursor or scrolls viewport
-	displayFocused bool
-	lastContent    string
+	// ── Elm UI state (value types, copied on every WithXxx) ─
+	scrollView     ScrollView // viewport into the window buffer content
+	width          int        // display area width
+	height         int        // display area height (viewport height)
+	windowCursor   int        // currently selected window index (-1 = none)
+	autoFollow     bool       // true on init and after G; disabled by navigation
+	displayFocused bool       // whether the display pane has input focus
+	lastContent    string     // cached last rendered output for change detection
+
+	// ── Dependencies (pointers to shared data, not copied semantically) ─
+	windowBuffer *WindowBuffer // windowed content storage (shared with OutputWriter)
+	styles       *Styles       // derived lipgloss styles (replaced on theme switch)
 }
 
 // NewDisplayModel creates a new display model

@@ -11,12 +11,21 @@ import (
 )
 
 // PromptInput handles text input.
+// PromptInput manages the text input area, including attachments display.
+//
+// Field groups:
+//
+//	Elm UI state  — value types / primitives (copied on every WithXxx).
+//	Dependencies  — pointers to shared styles.
 type PromptInput struct {
-	input       InputField
-	attachments []string // pending attachment file paths to display
-	focused     bool
-	styles      *Styles
-	width       int
+	// ── Elm UI state (value types, copied on every WithXxx) ─
+	input       InputField // wrapped input field (cursor, buffer, selection)
+	attachments []string   // pending attachment file paths to display
+	focused     bool       // whether this input is focused
+	width       int        // input field width
+
+	// ── Dependencies (pointer to shared data) ─
+	styles *Styles
 }
 
 // NewPromptInput creates a new prompt input.

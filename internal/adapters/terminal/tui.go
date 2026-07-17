@@ -172,63 +172,63 @@ const (
 //   - Model selection and switching
 //   - Theme selection and switching
 //   - Window focus management
+//
+// Terminal is the root Bubble Tea model.
+//
+// Field groups are separated by blank lines:
+//
+//	Elm UI state  — value types with WithXxx methods, copied on every Update.
+//	Dependencies  — pointer types for external services / shared singletons.
+//	Flags         — bool/int primitives that toggle behavior.
+//	Loading       — async session startup state (transient, set once).
+//
+// All Elm UI state fields use value receivers; all dependency fields use
+// pointers.  See docs/tui-architecture.md for the rationale.
 type Terminal struct {
-	// Core components
-	out         OutputWriter
-	streamInput io.WriteCloser
-	pipeReader  *io.PipeReader // read end of the input pipe; set before async loading
-	appConfig   *app.Config
-	editor      *Editor
+	// ── Elm UI state (value types, copied on every Update) ──────────────
+	display  DisplayModel   // conversation display with virtual scrolling
+	input    PromptInput    // text input, attachments, focus
+	overlays OverlayManager // overlay stack: model/theme/help/confirm/attachment
 
-	// UI components
-	display      DisplayModel
-	input        PromptInput
-	themeManager *ThemeManager
-	overlays     OverlayManager
-
-	// Status bar state (simplified - no separate struct)
+	// ── Status bar (primitive state, updated via WithXxx) ───────────────
 	statusText    string
 	statusTextDim string // dimmed version of statusText for inactive focus
 	inProgress    bool
 
-	// State
-	quitting           bool
-	confirmFromCommand bool // tracks if cancel came from :cancel command (vs Ctrl+G)
-	windowWidth        int
-	windowHeight       int
-	styles             *Styles
-	hasFocus           bool   // tracks whether the terminal has application focus
-	activeTheme        string // cached from system info updates
-	appliedTheme       string // last theme name that was visually applied (for detecting session-driven changes)
+	// ── Configuration / window size (primitives, set on resize) ─────────
+	windowWidth  int
+	windowHeight int
 
-	// Theme preview debouncing
-	themePreviewID int // ID of the current pending theme preview
+	// ── Theme tracking (string identifiers, compared on system-info) ────
+	activeTheme  string // last theme name from system info updates
+	appliedTheme string // last theme name that was visually applied
 
-	// Force-redraw counter: incremented on Ctrl-R; View() toggles an
-	// invisible SGR reset when odd so the renderer detects a changed
-	// view and performs a full repaint rather than early-returning.
-	forceRedraw uint64
+	// ── Force-redraw toggle ─────────────────────────────────────────────
+	forceRedraw uint64 // odd → append invisible SGR reset so renderer repaints
 
-	// Pending attachments for multi-modal input.
+	// ── Pending attachments (multi-modal input) ─────────────────────────
 	pendingAttachments []attachment
 
-	// pendingForceRedraw is set by handleRedraw before sending a synthetic
-	// WindowSizeMsg.  handleWindowSize consumes it; the view toggle already
-	// happened in handleRedraw, so resize()'s s.clear=true can take effect
-	// on the same flush.
-	pendingForceRedraw bool
+	// ── Flags / one-shot state ──────────────────────────────────────────
+	quitting           bool
+	confirmFromCommand bool // cancel came from :cancel command (vs Ctrl+G)
+	hasFocus           bool // terminal has application focus
+	themePreviewID     int  // debounce ID for pending theme preview
+	pendingForceRedraw bool // Ctrl-R sets this; handleWindowSize consumes it
 
-	// Async session loading state.
-	// When true, Init() kicks off the loading in a goroutine and View()
-	// renders a loading screen instead of the normal TUI.
+	// ── Dependencies (pointers to shared services, not copied semantically) ──
+	out          OutputWriter   // TLV output writer (shared, thread-safe)
+	streamInput  io.WriteCloser // TLV input writer (shared, thread-safe)
+	pipeReader   *io.PipeReader // read end of input pipe; set before async loading
+	appConfig    *app.Config    // application configuration (read-only)
+	editor       *Editor        // external editor process helper (stateless service)
+	themeManager *ThemeManager  // theme loader (reads from disk, read-only after init)
+	styles       *Styles        // derived lipgloss styles (computed once, replaced on theme switch)
+
+	// ── Async session loading (transient, set once in Init / first tick) ─
 	loading      bool
 	loadingError error
-
-	// postLoading is true after the session finishes loading but before the
-	// first tick has a chance to check whether MCP init is needed.  During
-	// this brief window the input border is blocked (rendered as an empty
-	// box) so it doesn't appear focused while the MCP init overlay may open.
-	postLoading bool
+	postLoading  bool
 }
 
 // attachment represents a pending file attachment for multi-modal input.

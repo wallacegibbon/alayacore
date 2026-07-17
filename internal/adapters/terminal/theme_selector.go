@@ -15,18 +15,22 @@ import (
 )
 
 // ThemeSelector manages theme selection UI.
+// ThemeSelector is an overlay for browsing and previewing themes.
+//
+// Field groups:
+//
+//	Elm UI state  — value types / primitives (copied on every WithXxx).
+//	Dependencies  — pointers to shared services (ThemeManager).
 type ThemeSelector struct {
 	ScrollableListCore
-	themes []theme.Info
 
-	// Preview state
-	previewTheme     *theme.Theme
-	previewThemeName string
+	// ── Elm UI state (value types, copied on every WithXxx) ─
+	themes            []theme.Info
+	previewTheme      *theme.Theme // preview theme (nil = no preview)
+	previewThemeName  string
+	originalThemeName string // theme name when opened (for cancel)
 
-	// Selection state
-	originalThemeName string // Theme name when selector was opened (for cancel)
-
-	// Dependencies
+	// ── Dependencies (pointer to shared service) ─
 	themeManager *ThemeManager // for loading preview themes
 }
 
