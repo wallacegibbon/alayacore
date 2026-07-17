@@ -19,7 +19,7 @@ func TestWindowBuffer(t *testing.T) {
 
 	t.Run("set width updates width", func(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
-		wb.SetWidth(120)
+		wb.WithWidth(120)
 		if wb.Width() != 120 {
 			t.Errorf("Width() = %d, want 120", wb.Width())
 		}

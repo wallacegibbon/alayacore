@@ -98,9 +98,9 @@ func NewTerminalOutput(styles *Styles) *outputWriter { //nolint:revive // tests 
 }
 
 // SetStyles updates the styles for the output writer
-func (to *outputWriter) SetStyles(styles *Styles) {
+func (to *outputWriter) WithStyles(styles *Styles) {
 	to.styles.Store(styles)
-	to.windowBuffer.SetStyles(styles)
+	to.windowBuffer.WithStyles(styles)
 }
 
 // Close cleans up resources (no background goroutine to stop)
@@ -657,7 +657,7 @@ func (to *outputWriter) flushUserContent() {
 
 // SetWindowWidth updates the window buffer width.
 func (to *outputWriter) SetWindowWidth(width int) {
-	to.windowBuffer.SetWidth(width)
+	to.windowBuffer.WithWidth(width)
 }
 
 // extractToolOutputDisplayText extracts display text from a tool result content JSON array.

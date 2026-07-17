@@ -34,7 +34,7 @@ func TestStatusBarShowsLastMaxStepsOnError(t *testing.T) {
 		styles:       styles,
 		hasFocus:     true,
 	}
-	terminal.overlays.SetFocusedWindow("input")
+	terminal.overlays.WithFocusedWindow("input")
 
 	// Update status
 	*terminal = terminal.updateStatus()

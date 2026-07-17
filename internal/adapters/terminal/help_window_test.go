@@ -185,11 +185,11 @@ func TestHelpWindowViewWhenOpen(t *testing.T) {
 	}
 }
 
-func TestHelpWindowSetSize(t *testing.T) {
+func TestHelpWindowWithSize(t *testing.T) {
 	styles := DefaultStyles()
 	hw := NewHelpWindow(styles)
 
-	hw = hw.SetSize(80, 30)
+	hw = hw.WithSize(80, 30)
 	if hw.Width != 80 {
 		t.Errorf("Expected width 80, got %d", hw.Width)
 	}
@@ -441,7 +441,7 @@ func TestHelpWindowFilterEmptyResult(t *testing.T) {
 	hw = hw.Open()
 
 	// Directly set filter value to test filtering logic
-	hw.FilterInput = hw.FilterInput.SetValue("zzz")
+	hw.FilterInput = hw.FilterInput.WithValue("zzz")
 	hw.lastFilterValue = "" // Force update
 	hw = hw.updateFilteredItems()
 

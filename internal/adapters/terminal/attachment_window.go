@@ -60,18 +60,18 @@ func NewAttachmentWindow(styles *Styles) AttachmentWindow {
 	return aw
 }
 
-func (aw AttachmentWindow) SetSize(width, height int) AttachmentWindow {
-	aw.FilteredListCore = aw.FilteredListCore.SetSize(width, height)
+func (aw AttachmentWindow) WithSize(width, height int) AttachmentWindow {
+	aw.FilteredListCore = aw.FilteredListCore.WithSize(width, height)
 	return aw
 }
 
-func (aw AttachmentWindow) SetStyles(styles *Styles) AttachmentWindow {
-	aw.FilteredListCore = aw.FilteredListCore.SetStyles(styles)
+func (aw AttachmentWindow) WithStyles(styles *Styles) AttachmentWindow {
+	aw.FilteredListCore = aw.FilteredListCore.WithStyles(styles)
 	return aw
 }
 
-func (aw AttachmentWindow) SetHasFocus(focused bool) AttachmentWindow {
-	aw.FilteredListCore = aw.FilteredListCore.SetHasFocus(focused)
+func (aw AttachmentWindow) WithFocus(focused bool) AttachmentWindow {
+	aw.FilteredListCore = aw.FilteredListCore.WithFocus(focused)
 	return aw
 }
 
@@ -83,7 +83,7 @@ func (aw AttachmentWindow) SelectedPath() string { return aw.selectedPath }
 func (aw AttachmentWindow) Open() AttachmentWindow {
 	aw.State = FilteredListOpen
 	aw.mode = modeLocal
-	aw.FilterInput = aw.FilterInput.SetValue("")
+	aw.FilterInput = aw.FilterInput.WithValue("")
 	aw.FilterInput.Prompt = "F "
 	aw.lastFilterValue = "\x00"
 	aw.FilterInputFocused = true
@@ -209,7 +209,7 @@ func (aw AttachmentWindow) handleLocalModeKeys(filterChanged bool, key string, i
 }
 
 func (aw AttachmentWindow) toggleMode() AttachmentWindow {
-	aw.FilterInput = aw.FilterInput.SetValue("")
+	aw.FilterInput = aw.FilterInput.WithValue("")
 	aw.lastFilterValue = "\x00"
 	if aw.mode == modeLocal {
 		aw.mode = modeURL
@@ -243,11 +243,11 @@ func (aw AttachmentWindow) autocompleteDir(dirName string) AttachmentWindow {
 	switch {
 	case strings.Contains(search, "/"):
 		prefix := search[:strings.LastIndex(search, "/")+1]
-		aw.FilterInput = aw.FilterInput.SetValue(prefix + dirName + "/")
+		aw.FilterInput = aw.FilterInput.WithValue(prefix + dirName + "/")
 	case strings.HasPrefix(search, "~"):
-		aw.FilterInput = aw.FilterInput.SetValue("~/" + dirName + "/")
+		aw.FilterInput = aw.FilterInput.WithValue("~/" + dirName + "/")
 	default:
-		aw.FilterInput = aw.FilterInput.SetValue(dirName + "/")
+		aw.FilterInput = aw.FilterInput.WithValue(dirName + "/")
 	}
 	aw.lastFilterValue = "\x00"
 	return aw.updateFiltered()

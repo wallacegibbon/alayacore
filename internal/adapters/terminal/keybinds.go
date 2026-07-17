@@ -81,7 +81,7 @@ func (m Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 	wasOpen := m.overlays.ThemeSelector().IsOpen()
 
 	ts, result := m.overlays.ThemeSelector().HandleKeyMsg(msg, m.themeManager)
-	m.overlays = m.overlays.SetThemeSelector(ts)
+	m.overlays = m.overlays.WithThemeSelector(ts)
 
 	// Check if theme was selected (Enter key)
 	if result.ThemeSelected {
@@ -142,7 +142,7 @@ func (m Terminal) handleThemePreview(msg themePreviewMsg) Terminal {
 
 func (m Terminal) handleConfirmResult(cd ConfirmDialog, update ConfirmDialogUpdate) (Terminal, tea.Cmd) {
 	r := update.Result
-	m.overlays = m.overlays.SetConfirmOverlay(cd)
+	m.overlays = m.overlays.WithConfirmOverlay(cd)
 	if r == nil {
 		return m, nil
 	}
@@ -171,7 +171,7 @@ func (m Terminal) handleConfirmQuit(r *ConfirmResult, fromCmd bool) (Terminal, t
 		return m, tea.Quit
 	}
 	if fromCmd {
-		m.input = m.input.SetValue("")
+		m.input = m.input.WithValue("")
 	}
 	m = m.restoreFocusAfterConfirm()
 	return m, nil
@@ -179,7 +179,7 @@ func (m Terminal) handleConfirmQuit(r *ConfirmResult, fromCmd bool) (Terminal, t
 
 func (m Terminal) handleConfirmCancel(r *ConfirmResult, fromCmd bool) (Terminal, tea.Cmd) {
 	if fromCmd {
-		m.input = m.input.SetValue("")
+		m.input = m.input.WithValue("")
 	}
 	m = m.restoreFocusAfterConfirm()
 	if r.Confirmed {
@@ -194,7 +194,7 @@ func (m Terminal) handleConfirmTool(r *ConfirmResult, fromCmd bool) (Terminal, t
 		action = "yes"
 	}
 	if fromCmd {
-		m.input = m.input.SetValue("")
+		m.input = m.input.WithValue("")
 	}
 	m.emitCommand(":confirm " + r.ToolID + " " + action)
 	m = m.restoreFocusAfterConfirm()
@@ -213,7 +213,7 @@ func (m Terminal) handleConfirmMCPAuth(r *ConfirmResult, fromCmd bool) (Terminal
 		m.emitCommand(":mcp_cancel")
 	default:
 		if fromCmd {
-			m.input = m.input.SetValue("")
+			m.input = m.input.WithValue("")
 		}
 		m.emitCommand(":mcp_auth " + r.ToolID)
 	}
@@ -271,7 +271,7 @@ func (m Terminal) restoreFocusAfterConfirm() Terminal {
 func (m Terminal) handleOverlayModelSelector(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 	wasOpen := m.overlays.ModelSelector().IsOpen()
 	ms, result := m.overlays.ModelSelector().HandleKeyMsg(msg)
-	m.overlays = m.overlays.SetModelSelector(ms)
+	m.overlays = m.overlays.WithModelSelector(ms)
 
 	if result.ModelSelected {
 		m = m.switchToSelectedModel()
@@ -323,7 +323,7 @@ func (m Terminal) handleSelectorOverlayKeys(msg tea.KeyMsg) (Terminal, tea.Cmd, 
 		aw := m.overlays.AttachmentWindow()
 		t := trackOverlay(aw)
 		aw, cmd := aw.HandleKeyMsg(msg)
-		m.overlays = m.overlays.SetAttachmentWindow(aw)
+		m.overlays = m.overlays.WithAttachmentWindow(aw)
 		if t.JustClosed(aw) {
 			if path := aw.SelectedPath(); path != "" {
 				if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
@@ -340,11 +340,11 @@ func (m Terminal) handleSelectorOverlayKeys(msg tea.KeyMsg) (Terminal, tea.Cmd, 
 		hw := m.overlays.HelpWindow()
 		t := trackOverlay(hw)
 		hw, result := hw.HandleKeyMsg(msg)
-		m.overlays = m.overlays.SetHelpWindow(hw)
+		m.overlays = m.overlays.WithHelpWindow(hw)
 		if t.JustClosed(hw) {
 			if result.PendingCommand != "" {
 				m = m.focusInput()
-				m.input = m.input.SetValue(result.PendingCommand + " ")
+				m.input = m.input.WithValue(result.PendingCommand + " ")
 				m.input = m.input.CursorEnd()
 				m.display = m.display.updateContent()
 				return m, nil, true
@@ -427,13 +427,13 @@ func (m Terminal) handleDisplayKeys(msg tea.KeyMsg) (Terminal, tea.Cmd, bool) {
 		return m, nil, true
 
 	case keyG, keyEnd:
-		m.display = m.display.SetCursorToLastWindow()
+		m.display = m.display.WithCursorToLastWindow()
 		m.display = m.display.GotoBottom()
 		m.display = m.display.updateContent()
 		return m, nil, true
 
 	case keyGSmall, keyHome:
-		m.display = m.display.SetWindowCursor(0)
+		m.display = m.display.WithWindowCursor(0)
 		m.display = m.display.GotoTop()
 		m.display = m.display.updateContent()
 		return m, nil, true
@@ -458,7 +458,7 @@ func (m Terminal) handleDisplayKeys(msg tea.KeyMsg) (Terminal, tea.Cmd, bool) {
 
 	case keyColon:
 		m = m.focusInput()
-		m.input = m.input.SetValue(keyColon)
+		m.input = m.input.WithValue(keyColon)
 		m.input = m.input.CursorEnd()
 		m.display = m.display.updateContent()
 		return m, nil, true
@@ -492,7 +492,7 @@ func (m Terminal) handleDisplayKeys(msg tea.KeyMsg) (Terminal, tea.Cmd, bool) {
 	case keyCtrlF:
 		if historyID := m.display.GetCursorWindowHistoryID(); historyID > 0 {
 			m = m.focusInput()
-			m.input = m.input.SetValue(fmt.Sprintf(":fork %d ", historyID))
+			m.input = m.input.WithValue(fmt.Sprintf(":fork %d ", historyID))
 			m.input = m.input.CursorEnd()
 			m.display = m.display.updateContent()
 		}
@@ -544,7 +544,7 @@ func (m Terminal) handleGlobalKeys(msg tea.KeyMsg) (Terminal, tea.Cmd, bool) {
 func (m Terminal) handleSaveKey() (Terminal, tea.Cmd) {
 	if m.appConfig.Cfg.Session == "" {
 		m = m.focusInput()
-		m.input = m.input.SetValue(":save ")
+		m.input = m.input.WithValue(":save ")
 		m.input = m.input.CursorEnd()
 		m.display = m.display.updateContent()
 		return m, nil
@@ -595,7 +595,7 @@ func (m Terminal) handleFallback(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 		m = m.openAttachmentWindow()
 		return m, nil
 	case keyCtrlC:
-		m.input = m.input.SetValue("")
+		m.input = m.input.WithValue("")
 		m = m.clearAttachments()
 		return m, nil
 	}
@@ -633,7 +633,7 @@ func (m Terminal) handleSubmit() (Terminal, tea.Cmd) {
 	attachments := m.pendingAttachments
 	writer := m.streamInput
 	out := m.out
-	m.input = m.input.SetValue("")
+	m.input = m.input.WithValue("")
 	m = m.clearAttachments()
 
 	return m, tea.Batch(
@@ -660,13 +660,13 @@ func (m Terminal) handleCommand(command string) (Terminal, tea.Cmd) {
 
 	// Suspend command - suspends the process (like Ctrl+Z)
 	if command == cmdSuspend {
-		m.input = m.input.SetValue("")
+		m.input = m.input.WithValue("")
 		return m, tea.Suspend
 	}
 
 	// Help command - opens help window locally, not sent to session
 	if command == cmdHelp {
-		m.input = m.input.SetValue("")
+		m.input = m.input.WithValue("")
 		m = m.openHelpWindow()
 		return m, nil
 	}
@@ -679,7 +679,7 @@ func (m Terminal) handleCommand(command string) (Terminal, tea.Cmd) {
 func (m Terminal) submitCommand(command string, clearInput bool) (Terminal, tea.Cmd) {
 	m.emitCommand(":" + command)
 	if clearInput {
-		m.input = m.input.SetValue("")
+		m.input = m.input.WithValue("")
 	}
 	return m, scheduleTick()
 }

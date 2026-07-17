@@ -25,7 +25,7 @@ func NewPromptInput(styles *Styles) PromptInput {
 	input.Placeholder = "Enter your prompt..."
 	input = input.Focus()
 	input.Prompt = ""
-	input = input.SetWidth(max(0, DefaultWidth-BorderInnerPadding))
+	input = input.WithWidth(max(0, DefaultWidth-BorderInnerPadding))
 
 	return PromptInput{
 		input:   input,
@@ -45,7 +45,7 @@ func (m PromptInput) Update(msg tea.Msg) (PromptInput, tea.Cmd) {
 	var cmd tea.Cmd
 	if msg, ok := msg.(tea.WindowSizeMsg); ok {
 		m.width = msg.Width
-		m.input = m.input.SetWidth(max(0, msg.Width-BorderInnerPadding))
+		m.input = m.input.WithWidth(max(0, msg.Width-BorderInnerPadding))
 	}
 	m.input, cmd = m.input.Update(msg)
 	return m, cmd
@@ -77,7 +77,7 @@ func (m PromptInput) updateInputStyles() InputField {
 	if m.input.LineCount() > 1 {
 		promptColor = m.styles.ColorWarning
 	}
-	return m.input.SetStyles(
+	return m.input.WithStyles(
 		inputFieldStyle{
 			Prompt:      lipgloss.NewStyle().Foreground(promptColor).Bold(true),
 			Text:        lipgloss.NewStyle().Bold(true),
@@ -114,20 +114,20 @@ func (m PromptInput) Value() string {
 	return m.input.Value()
 }
 
-func (m PromptInput) SetValue(value string) PromptInput {
-	m.input = m.input.SetValue(value)
+func (m PromptInput) WithValue(value string) PromptInput {
+	m.input = m.input.WithValue(value)
 	return m
 }
 
 // SetAttachments sets the pending attachment paths for display.
-func (m PromptInput) SetAttachments(paths []string) PromptInput {
+func (m PromptInput) WithAttachments(paths []string) PromptInput {
 	m.attachments = paths
 	return m
 }
 
 // Clear clears the input and attachments.
 func (m PromptInput) Clear() PromptInput {
-	m.input = m.input.SetValue("")
+	m.input = m.input.WithValue("")
 	m.attachments = nil
 	return m
 }
@@ -195,13 +195,13 @@ func (m PromptInput) RenderWithBorder(blockInput bool) string {
 	return m.styles.RenderBorderedBox(content, m.width, borderColor)
 }
 
-func (m PromptInput) SetWidth(width int) PromptInput {
+func (m PromptInput) WithWidth(width int) PromptInput {
 	m.width = width
-	m.input = m.input.SetWidth(max(0, width-BorderInnerPadding))
+	m.input = m.input.WithWidth(max(0, width-BorderInnerPadding))
 	return m
 }
 
-func (m PromptInput) SetStyles(styles *Styles) PromptInput {
+func (m PromptInput) WithStyles(styles *Styles) PromptInput {
 	m.styles = styles
 	m.input = m.updateInputStyles()
 	return m

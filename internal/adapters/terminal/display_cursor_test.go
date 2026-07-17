@@ -17,7 +17,7 @@ func TestValidateCursor_ClampsOutOfRangeCursor(t *testing.T) {
 	wb.AppendOrUpdate(tlv.TagAssistantT, "window-3", "Content 3")
 
 	// Set cursor to the middle window
-	display = display.SetWindowCursor(1)
+	display = display.WithWindowCursor(1)
 	if display.GetWindowCursor() != 1 {
 		t.Errorf("Expected cursor at 1, got %d", display.GetWindowCursor())
 	}
@@ -77,7 +77,7 @@ func TestValidateCursor_KeepsValidCursor(t *testing.T) {
 	wb.AppendOrUpdate(tlv.TagAssistantT, "window-3", "Content 3")
 
 	// Set cursor to valid position
-	display = display.SetWindowCursor(1)
+	display = display.WithWindowCursor(1)
 
 	// Validate should keep it
 	display = display.ValidateCursor()

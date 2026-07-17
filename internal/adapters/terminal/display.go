@@ -44,9 +44,9 @@ func (m DisplayModel) View() tea.View {
 	return tea.NewView(m.scrollView.View())
 }
 
-func (m DisplayModel) SetHeight(height int) DisplayModel {
+func (m DisplayModel) WithHeight(height int) DisplayModel {
 	m.height = height
-	m.scrollView = m.scrollView.SetHeight(max(0, height))
+	m.scrollView = m.scrollView.WithHeight(max(0, height))
 	return m
 }
 
@@ -54,18 +54,18 @@ func (m DisplayModel) GetHeight() int {
 	return m.scrollView.Height()
 }
 
-func (m DisplayModel) SetWidth(width int) DisplayModel {
+func (m DisplayModel) WithWidth(width int) DisplayModel {
 	m.width = width
-	m.scrollView = m.scrollView.SetWidth(max(0, width))
+	m.scrollView = m.scrollView.WithWidth(max(0, width))
 	return m
 }
 
-func (m DisplayModel) SetDisplayFocused(focused bool) DisplayModel {
+func (m DisplayModel) WithDisplayFocused(focused bool) DisplayModel {
 	m.displayFocused = focused
 	return m
 }
 
-func (m DisplayModel) SetStyles(styles *Styles) DisplayModel {
+func (m DisplayModel) WithStyles(styles *Styles) DisplayModel {
 	m.styles = styles
 	return m
 }
@@ -104,7 +104,7 @@ func (m DisplayModel) updateContent() DisplayModel {
 	}
 	m.lastContent = newContent
 
-	m.scrollView = m.scrollView.SetContent(newContent)
+	m.scrollView = m.scrollView.WithContent(newContent)
 
 	if m.autoFollow {
 		m.scrollView = m.scrollView.GotoBottom()
@@ -186,7 +186,7 @@ func (m DisplayModel) clearCursor() DisplayModel {
 
 // If the index points to an invisible window, the nearest visible window is chosen instead.
 // Disables auto-follow only if the cursor actually moves; only G re-enables it.
-func (m DisplayModel) SetWindowCursor(index int) DisplayModel {
+func (m DisplayModel) WithWindowCursor(index int) DisplayModel {
 	if index < 0 || m.windowBuffer.WindowCount() == 0 {
 		return m.clearCursor()
 	}
@@ -293,10 +293,10 @@ func (m DisplayModel) EnsureCursorVisible() DisplayModel {
 
 	if endLine <= viewportTop {
 		// Entirely above — show the bottom edge
-		m.scrollView = m.scrollView.SetYOffset(max(0, endLine-m.scrollView.Height()))
+		m.scrollView = m.scrollView.WithYOffset(max(0, endLine-m.scrollView.Height()))
 	} else if startLine >= viewportBottom {
 		// Entirely below — show the top edge
-		m.scrollView = m.scrollView.SetYOffset(startLine)
+		m.scrollView = m.scrollView.WithYOffset(startLine)
 	}
 	return m
 }
@@ -310,7 +310,7 @@ func (m DisplayModel) ScrollCursorToTop() DisplayModel {
 		return m
 	}
 	startLine, _ := m.windowBuffer.GetWindowLineRange(m.windowCursor)
-	m.scrollView = m.scrollView.SetYOffset(startLine)
+	m.scrollView = m.scrollView.WithYOffset(startLine)
 	return m
 }
 
@@ -346,7 +346,7 @@ func (m DisplayModel) ClampCursor() DisplayModel {
 	return m
 }
 
-func (m DisplayModel) SetCursorToLastWindow() DisplayModel {
+func (m DisplayModel) WithCursorToLastWindow() DisplayModel {
 	i := m.windowBuffer.LastVisibleIndex()
 	if i >= 0 {
 		m.windowCursor = i

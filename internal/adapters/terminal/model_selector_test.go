@@ -128,7 +128,7 @@ func TestModelSelectorCtrlCClearsSearch(t *testing.T) {
 		{ModelConfig: config.ModelConfig{Name: "OpenAI GPT-4", ProtocolType: "openai", ModelName: "gpt-4"}},
 		{ModelConfig: config.ModelConfig{Name: "Zhipu / GLM-5", ProtocolType: "anthropic", ModelName: "glm-5"}},
 	}
-	ms = ms.SetModels(models)
+	ms = ms.WithModels(models)
 	ms = ms.Open()
 
 	// Focus the search input first (simulates user pressing Tab to focus search)
@@ -137,7 +137,7 @@ func TestModelSelectorCtrlCClearsSearch(t *testing.T) {
 	ms.updateFilterInputStyles()
 
 	// Type in search input
-	ms.FilterInput = ms.FilterInput.SetValue("gpt4")
+	ms.FilterInput = ms.FilterInput.WithValue("gpt4")
 	ms = ms.updateFilteredModels()
 
 	if ms.FilterInput.Value() != "gpt4" {
@@ -173,7 +173,7 @@ func TestModelSelectorSetModelsUpdatesFilteredModels(t *testing.T) {
 		{ModelConfig: config.ModelConfig{Name: "OpenAI GPT-4", ProtocolType: "openai", ModelName: "gpt-4"}},
 		{ModelConfig: config.ModelConfig{Name: "Zhipu / GLM-5", ProtocolType: "anthropic", ModelName: "glm-5"}},
 	}
-	ms = ms.SetModels(models)
+	ms = ms.WithModels(models)
 	ms = ms.Open()
 
 	// Verify filteredModels is set
@@ -182,7 +182,7 @@ func TestModelSelectorSetModelsUpdatesFilteredModels(t *testing.T) {
 	}
 
 	// Simulate user typing a search (so lastSearchValue is set)
-	ms.FilterInput = ms.FilterInput.SetValue("gpt")
+	ms.FilterInput = ms.FilterInput.WithValue("gpt")
 	ms = ms.updateFilteredModels()
 
 	// Verify filtered models are now filtered
@@ -200,7 +200,7 @@ func TestModelSelectorSetModelsUpdatesFilteredModels(t *testing.T) {
 		{ModelConfig: config.ModelConfig{Name: "OpenAI GPT-4", ProtocolType: "openai", ModelName: "gpt-4"}},
 		{ModelConfig: config.ModelConfig{Name: "Claude 3.5", ProtocolType: "anthropic", ModelName: "claude-3.5"}},
 	}
-	ms = ms.SetModels(newModels)
+	ms = ms.WithModels(newModels)
 
 	// After SetModels, filteredModels should be updated with the new models
 	// The search "gpt" should now match both GPT-4o and GPT-4
@@ -209,7 +209,7 @@ func TestModelSelectorSetModelsUpdatesFilteredModels(t *testing.T) {
 	}
 
 	// Clear search and verify all 3 models are shown
-	ms.FilterInput = ms.FilterInput.SetValue("")
+	ms.FilterInput = ms.FilterInput.WithValue("")
 	ms = ms.updateFilteredModels()
 	if len(ms.filteredModels) != 3 {
 		t.Errorf("Expected 3 filtered models after clearing search, got %d", len(ms.filteredModels))

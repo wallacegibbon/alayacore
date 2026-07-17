@@ -548,19 +548,19 @@ func (m InputField) CursorEnd() InputField {
 	return m.ensureCursorVisible()
 }
 
-func (m InputField) SetValue(s string) InputField {
+func (m InputField) WithValue(s string) InputField {
 	m.value = []rune(s)
 	m.pos = len(m.value)
 	m.goalCol = -1
 	return m.ensureCursorVisible()
 }
 
-func (m InputField) SetWidth(w int) InputField {
+func (m InputField) WithWidth(w int) InputField {
 	m.width = max(0, w)
 	return m.ensureCursorVisible()
 }
 
-func (m InputField) SetStyles(focused, blurred inputFieldStyle, cursorColor color.Color) InputField {
+func (m InputField) WithStyles(focused, blurred inputFieldStyle, cursorColor color.Color) InputField {
 	m.styleFocused = focused
 	m.styleBlurred = blurred
 	m.cursorColor = cursorColor

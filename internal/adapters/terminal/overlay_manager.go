@@ -56,13 +56,13 @@ func NewOverlayManager(
 // ============================================================================
 
 // SetSize updates the size of all overlay components.
-func (om OverlayManager) SetSize(width, height int) OverlayManager {
-	om.modelSelector = om.modelSelector.SetSize(width, height)
-	om.themeSelector = om.themeSelector.SetSize(width, height)
-	om.helpWindow = om.helpWindow.SetSize(width, height)
-	om.confirmOverlay = om.confirmOverlay.SetSize(width, height)
-	om.mcpInitOverlay = om.mcpInitOverlay.SetSize(width, height)
-	om.attachmentWindow = om.attachmentWindow.SetSize(width, height)
+func (om OverlayManager) WithSize(width, height int) OverlayManager {
+	om.modelSelector = om.modelSelector.WithSize(width, height)
+	om.themeSelector = om.themeSelector.WithSize(width, height)
+	om.helpWindow = om.helpWindow.WithSize(width, height)
+	om.confirmOverlay = om.confirmOverlay.WithSize(width, height)
+	om.mcpInitOverlay = om.mcpInitOverlay.WithSize(width, height)
+	om.attachmentWindow = om.attachmentWindow.WithSize(width, height)
 	return om
 }
 
@@ -71,13 +71,13 @@ func (om OverlayManager) SetSize(width, height int) OverlayManager {
 // ============================================================================
 
 // SetStyles updates the styles on all overlay components.
-func (om OverlayManager) SetStyles(styles *Styles) OverlayManager {
+func (om OverlayManager) WithStyles(styles *Styles) OverlayManager {
 	om.styles = styles
-	om.modelSelector = om.modelSelector.SetStyles(styles)
-	om.themeSelector = om.themeSelector.SetStyles(styles)
-	om.helpWindow = om.helpWindow.SetStyles(styles)
-	om.confirmOverlay = om.confirmOverlay.SetStyles(styles)
-	om.attachmentWindow = om.attachmentWindow.SetStyles(styles)
+	om.modelSelector = om.modelSelector.WithStyles(styles)
+	om.themeSelector = om.themeSelector.WithStyles(styles)
+	om.helpWindow = om.helpWindow.WithStyles(styles)
+	om.confirmOverlay = om.confirmOverlay.WithStyles(styles)
+	om.attachmentWindow = om.attachmentWindow.WithStyles(styles)
 	return om
 }
 
@@ -86,17 +86,17 @@ func (om OverlayManager) SetStyles(styles *Styles) OverlayManager {
 // ============================================================================
 
 // SetFocused updates the focus state on all overlay components.
-func (om OverlayManager) SetFocused(focused bool) OverlayManager {
-	om.modelSelector = om.modelSelector.SetHasFocus(focused)
-	om.themeSelector = om.themeSelector.SetHasFocus(focused)
-	om.helpWindow = om.helpWindow.SetHasFocus(focused)
-	om.confirmOverlay = om.confirmOverlay.SetHasFocus(focused)
-	om.attachmentWindow = om.attachmentWindow.SetHasFocus(focused)
+func (om OverlayManager) WithFocus(focused bool) OverlayManager {
+	om.modelSelector = om.modelSelector.WithFocus(focused)
+	om.themeSelector = om.themeSelector.WithFocus(focused)
+	om.helpWindow = om.helpWindow.WithFocus(focused)
+	om.confirmOverlay = om.confirmOverlay.WithFocus(focused)
+	om.attachmentWindow = om.attachmentWindow.WithFocus(focused)
 	return om
 }
 
 // SetFocusedWindow records which window had focus before an overlay opened.
-func (om OverlayManager) SetFocusedWindow(w string) OverlayManager {
+func (om OverlayManager) WithFocusedWindow(w string) OverlayManager {
 	om.focusedWindow = w
 	return om
 }
@@ -144,7 +144,7 @@ func (om OverlayManager) IsMCPInitOpen() bool {
 func (om OverlayManager) ModelSelector() ModelSelector { return om.modelSelector }
 
 // SetModelSelector replaces the model selector component.
-func (om OverlayManager) SetModelSelector(ms ModelSelector) OverlayManager {
+func (om OverlayManager) WithModelSelector(ms ModelSelector) OverlayManager {
 	om.modelSelector = ms
 	return om
 }
@@ -153,7 +153,7 @@ func (om OverlayManager) SetModelSelector(ms ModelSelector) OverlayManager {
 func (om OverlayManager) ThemeSelector() ThemeSelector { return om.themeSelector }
 
 // SetThemeSelector replaces the theme selector component.
-func (om OverlayManager) SetThemeSelector(ts ThemeSelector) OverlayManager {
+func (om OverlayManager) WithThemeSelector(ts ThemeSelector) OverlayManager {
 	om.themeSelector = ts
 	return om
 }
@@ -162,7 +162,7 @@ func (om OverlayManager) SetThemeSelector(ts ThemeSelector) OverlayManager {
 func (om OverlayManager) HelpWindow() HelpWindow { return om.helpWindow }
 
 // SetHelpWindow replaces the help window component.
-func (om OverlayManager) SetHelpWindow(hw HelpWindow) OverlayManager {
+func (om OverlayManager) WithHelpWindow(hw HelpWindow) OverlayManager {
 	om.helpWindow = hw
 	return om
 }
@@ -171,7 +171,7 @@ func (om OverlayManager) SetHelpWindow(hw HelpWindow) OverlayManager {
 func (om OverlayManager) AttachmentWindow() AttachmentWindow { return om.attachmentWindow }
 
 // SetAttachmentWindow replaces the attachment window component.
-func (om OverlayManager) SetAttachmentWindow(aw AttachmentWindow) OverlayManager {
+func (om OverlayManager) WithAttachmentWindow(aw AttachmentWindow) OverlayManager {
 	om.attachmentWindow = aw
 	return om
 }
@@ -180,7 +180,7 @@ func (om OverlayManager) SetAttachmentWindow(aw AttachmentWindow) OverlayManager
 func (om OverlayManager) ConfirmOverlay() ConfirmDialog { return om.confirmOverlay }
 
 // SetConfirmOverlay replaces the confirm dialog component.
-func (om OverlayManager) SetConfirmOverlay(cd ConfirmDialog) OverlayManager {
+func (om OverlayManager) WithConfirmOverlay(cd ConfirmDialog) OverlayManager {
 	om.confirmOverlay = cd
 	return om
 }
@@ -189,7 +189,7 @@ func (om OverlayManager) SetConfirmOverlay(cd ConfirmDialog) OverlayManager {
 func (om OverlayManager) MCPInitOverlay() ConfirmDialog { return om.mcpInitOverlay }
 
 // SetMCPInitOverlay replaces the MCP init overlay component.
-func (om OverlayManager) SetMCPInitOverlay(cd ConfirmDialog) OverlayManager {
+func (om OverlayManager) WithMCPInitOverlay(cd ConfirmDialog) OverlayManager {
 	om.mcpInitOverlay = cd
 	return om
 }

@@ -41,18 +41,18 @@ func NewThemeSelector(styles *Styles) ThemeSelector {
 
 // --- State Management ---
 
-func (ts ThemeSelector) SetSize(width, height int) ThemeSelector {
-	ts.ScrollableListCore = ts.ScrollableListCore.SetSize(width, height)
+func (ts ThemeSelector) WithSize(width, height int) ThemeSelector {
+	ts.ScrollableListCore = ts.ScrollableListCore.WithSize(width, height)
 	return ts
 }
 
-func (ts ThemeSelector) SetStyles(styles *Styles) ThemeSelector {
-	ts.ScrollableListCore = ts.ScrollableListCore.SetStyles(styles)
+func (ts ThemeSelector) WithStyles(styles *Styles) ThemeSelector {
+	ts.ScrollableListCore = ts.ScrollableListCore.WithStyles(styles)
 	return ts
 }
 
-func (ts ThemeSelector) SetHasFocus(focused bool) ThemeSelector {
-	ts.ScrollableListCore = ts.ScrollableListCore.SetHasFocus(focused)
+func (ts ThemeSelector) WithFocus(focused bool) ThemeSelector {
+	ts.ScrollableListCore = ts.ScrollableListCore.WithFocus(focused)
 	return ts
 }
 

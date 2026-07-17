@@ -48,7 +48,7 @@ func newFilterInput(placeholder string) InputField {
 	input := NewInputField()
 	input.Placeholder = placeholder
 	input.Prompt = "/ "
-	input = input.SetWidth(50)
+	input = input.WithWidth(50)
 	return input
 }
 
@@ -61,7 +61,7 @@ func (ms ModelSelector) GetActiveModel() *config.ModelConfig {
 	return &ms.activeModel.ModelConfig
 }
 
-func (ms ModelSelector) SetActiveModel(m *searchableModel) ModelSelector {
+func (ms ModelSelector) WithActiveModel(m *searchableModel) ModelSelector {
 	ms.activeModel = m
 	return ms
 }
@@ -74,7 +74,7 @@ func (ms ModelSelector) GetModels() []config.ModelConfig {
 	return result
 }
 
-func (ms ModelSelector) SetModels(models []searchableModel) ModelSelector {
+func (ms ModelSelector) WithModels(models []searchableModel) ModelSelector {
 	ms.models = models
 	for i := range ms.models {
 		ms.models[i].searchStr = buildSearchStr(&ms.models[i])
@@ -160,24 +160,24 @@ func (ms ModelSelector) selectActiveModelIfPrevDeleted(prevSelectedModelID int) 
 
 // --- Open / Close ---
 
-func (ms ModelSelector) SetSize(width, height int) ModelSelector {
-	ms.FilteredListCore = ms.FilteredListCore.SetSize(width, height)
+func (ms ModelSelector) WithSize(width, height int) ModelSelector {
+	ms.FilteredListCore = ms.FilteredListCore.WithSize(width, height)
 	return ms
 }
 
-func (ms ModelSelector) SetStyles(styles *Styles) ModelSelector {
-	ms.FilteredListCore = ms.FilteredListCore.SetStyles(styles)
+func (ms ModelSelector) WithStyles(styles *Styles) ModelSelector {
+	ms.FilteredListCore = ms.FilteredListCore.WithStyles(styles)
 	return ms
 }
 
-func (ms ModelSelector) SetHasFocus(focused bool) ModelSelector {
-	ms.FilteredListCore = ms.FilteredListCore.SetHasFocus(focused)
+func (ms ModelSelector) WithFocus(focused bool) ModelSelector {
+	ms.FilteredListCore = ms.FilteredListCore.WithFocus(focused)
 	return ms
 }
 
 func (ms ModelSelector) Open() ModelSelector {
 	ms.State = FilteredListOpen
-	ms.FilterInput = ms.FilterInput.SetValue("")
+	ms.FilterInput = ms.FilterInput.WithValue("")
 	ms.lastFilterValue = "\x00"
 	ms.FilterInputFocused = false
 	ms.FilterInput = ms.FilterInput.Blur()

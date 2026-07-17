@@ -139,24 +139,24 @@ func (hw HelpWindow) recalculateColumnWidths() HelpWindow {
 	return hw
 }
 
-func (hw HelpWindow) SetSize(width, height int) HelpWindow {
-	hw.FilteredListCore = hw.FilteredListCore.SetSize(width, height)
+func (hw HelpWindow) WithSize(width, height int) HelpWindow {
+	hw.FilteredListCore = hw.FilteredListCore.WithSize(width, height)
 	return hw.recalculateColumnWidths()
 }
 
-func (hw HelpWindow) SetStyles(styles *Styles) HelpWindow {
-	hw.FilteredListCore = hw.FilteredListCore.SetStyles(styles)
+func (hw HelpWindow) WithStyles(styles *Styles) HelpWindow {
+	hw.FilteredListCore = hw.FilteredListCore.WithStyles(styles)
 	return hw.recalculateColumnWidths()
 }
 
-func (hw HelpWindow) SetHasFocus(focused bool) HelpWindow {
-	hw.FilteredListCore = hw.FilteredListCore.SetHasFocus(focused)
+func (hw HelpWindow) WithFocus(focused bool) HelpWindow {
+	hw.FilteredListCore = hw.FilteredListCore.WithFocus(focused)
 	return hw
 }
 
 func (hw HelpWindow) Open() HelpWindow {
 	hw.State = FilteredListOpen
-	hw.FilterInput = hw.FilterInput.SetValue("")
+	hw.FilterInput = hw.FilterInput.WithValue("")
 	hw.lastFilterValue = "\x00"
 	hw.FilterInputFocused = false
 	hw.FilterInput = hw.FilterInput.Blur()

@@ -61,7 +61,7 @@ type OutputWriter interface {
 
 	// Configuration
 	SetWindowWidth(width int)
-	SetStyles(styles *Styles)
+	WithStyles(styles *Styles)
 
 	// Snapshots (replaces many individual getters)
 	SnapshotStatus() StatusSnapshot

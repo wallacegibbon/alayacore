@@ -48,20 +48,20 @@ func (sl ScrollableListCore) IsOpen() bool { return sl.State != ScrollableListCl
 func (sl ScrollableListCore) Close() ScrollableListCore { sl.State = ScrollableListClosed; return sl }
 
 // SetStyles updates the styles.
-func (sl ScrollableListCore) SetStyles(styles *Styles) ScrollableListCore {
+func (sl ScrollableListCore) WithStyles(styles *Styles) ScrollableListCore {
 	sl.Styles = styles
 	return sl
 }
 
 // When the app loses focus, all UI elements should be dimmed.
-func (sl ScrollableListCore) SetHasFocus(hasFocus bool) ScrollableListCore {
+func (sl ScrollableListCore) WithFocus(hasFocus bool) ScrollableListCore {
 	sl.HasFocus = hasFocus
 	return sl
 }
 
 // SetSize updates the width and height of the scrollable list.
 // Height is clamped to prevent the overlay from exceeding the available space.
-func (sl ScrollableListCore) SetSize(width, height int) ScrollableListCore {
+func (sl ScrollableListCore) WithSize(width, height int) ScrollableListCore {
 	if width > 0 {
 		sl.Width = width
 	}

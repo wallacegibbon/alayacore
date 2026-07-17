@@ -55,30 +55,30 @@ func (fl FilteredListCore) Close() FilteredListCore {
 }
 
 // SetSize updates the width and height of the filtered list.
-func (fl FilteredListCore) SetSize(width, height int) FilteredListCore {
+func (fl FilteredListCore) WithSize(width, height int) FilteredListCore {
 	if width > 0 {
 		fl.Width = width
-		fl.FilterInput = fl.FilterInput.SetWidth(max(0, width-InputPaddingH))
+		fl.FilterInput = fl.FilterInput.WithWidth(max(0, width-InputPaddingH))
 	}
 	fl.Height = min(height-LayoutGap, SelectorMaxHeight)
 	return fl
 }
 
 // SetStyles updates the styles and re-applies them to the filter input.
-func (fl FilteredListCore) SetStyles(styles *Styles) FilteredListCore {
+func (fl FilteredListCore) WithStyles(styles *Styles) FilteredListCore {
 	fl.Styles = styles
 	return fl.updateFilterInputStyles()
 }
 
 // When the app loses focus, all UI elements should be dimmed.
-func (fl FilteredListCore) SetHasFocus(hasFocus bool) FilteredListCore {
+func (fl FilteredListCore) WithFocus(hasFocus bool) FilteredListCore {
 	fl.HasFocus = hasFocus
 	return fl.updateFilterInputStyles()
 }
 
 // updateFilterInputStyles applies current styles to the filter input.
 func (fl FilteredListCore) updateFilterInputStyles() FilteredListCore {
-	fl.FilterInput = fl.FilterInput.SetStyles(
+	fl.FilterInput = fl.FilterInput.WithStyles(
 		inputFieldStyle{
 			Prompt:      fl.Styles.Input.Foreground(fl.Styles.BorderFocused),
 			Text:        fl.Styles.Text,
@@ -113,7 +113,7 @@ func (fl FilteredListCore) HandleFilterEscape() FilteredListCore {
 
 // HandleFilterCtrlC clears the filter input value.
 func (fl FilteredListCore) HandleFilterCtrlC() FilteredListCore {
-	fl.FilterInput = fl.FilterInput.SetValue("")
+	fl.FilterInput = fl.FilterInput.WithValue("")
 	return fl
 }
 

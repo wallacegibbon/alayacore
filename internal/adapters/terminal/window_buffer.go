@@ -64,7 +64,7 @@ func NewWindowBuffer(width int, styles *Styles) *WindowBuffer {
 }
 
 // SetWidth updates the window width (called on terminal resize).
-func (wb *WindowBuffer) SetWidth(width int) {
+func (wb *WindowBuffer) WithWidth(width int) {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 	if wb.width != width {
@@ -85,7 +85,7 @@ func (wb *WindowBuffer) Width() int {
 }
 
 // SetStyles updates the styles for the window buffer.
-func (wb *WindowBuffer) SetStyles(styles *Styles) {
+func (wb *WindowBuffer) WithStyles(styles *Styles) {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 	wb.styles = styles

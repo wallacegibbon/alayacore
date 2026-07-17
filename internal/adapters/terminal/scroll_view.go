@@ -33,13 +33,13 @@ func NewScrollView(width, height int) ScrollView {
 }
 
 // SetWidth sets the viewport width (unused in rendering, kept for API compat).
-func (m ScrollView) SetWidth(w int) ScrollView {
+func (m ScrollView) WithWidth(w int) ScrollView {
 	m.width = max(0, w)
 	return m
 }
 
 // SetHeight sets the viewport height.
-func (m ScrollView) SetHeight(h int) ScrollView {
+func (m ScrollView) WithHeight(h int) ScrollView {
 	m.height = max(0, h)
 	return m.clampYOffset()
 }
@@ -50,7 +50,7 @@ func (m ScrollView) Height() int {
 }
 
 // SetContent sets the content to display.
-func (m ScrollView) SetContent(s string) ScrollView {
+func (m ScrollView) WithContent(s string) ScrollView {
 	m.content = s
 	m.lines = strings.Split(s, "\n")
 	return m.clampYOffset()
@@ -62,7 +62,7 @@ func (m ScrollView) YOffset() int {
 }
 
 // SetYOffset sets the vertical scroll position.
-func (m ScrollView) SetYOffset(y int) ScrollView {
+func (m ScrollView) WithYOffset(y int) ScrollView {
 	m.yOffset = max(0, y)
 	return m.clampYOffset()
 }

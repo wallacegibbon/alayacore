@@ -8,7 +8,7 @@ import (
 
 func TestInputFieldInsertion(t *testing.T) {
 	f := NewInputField()
-	f.SetWidth(20)
+	f.WithWidth(20)
 
 	// Simulate real app flow: call Update with tea.KeyPressMsg
 	// passed as tea.Msg interface, the way updateFromMsg does it.
@@ -47,7 +47,7 @@ func TestInputFieldInsertion(t *testing.T) {
 
 func TestInputFieldBackspace(t *testing.T) {
 	f := NewInputField()
-	f.SetWidth(20)
+	f.WithWidth(20)
 
 	f, _ = f.Update(tea.KeyPressMsg{Text: "a", Code: 'a'})
 	f, _ = f.Update(tea.KeyPressMsg{Text: "b", Code: 'b'})
@@ -67,7 +67,7 @@ func TestInputFieldBackspace(t *testing.T) {
 
 func TestInputFieldCJKInsertion(t *testing.T) {
 	f := NewInputField()
-	f.SetWidth(20)
+	f.WithWidth(20)
 
 	var msg tea.Msg = tea.KeyPressMsg{Text: "你", Code: '你'}
 	f, _ = f.Update(msg)
@@ -93,7 +93,7 @@ func TestInputFieldCJKInsertion(t *testing.T) {
 // was returning cursorIdx=0 because the second loop corrupted startIdx.
 func TestInputFieldViewCursorPosition(t *testing.T) {
 	f := NewInputField()
-	f.SetWidth(20)
+	f.WithWidth(20)
 	f.Focus() // needed to initialize cursorRender
 
 	// Type "hello" through Update calls

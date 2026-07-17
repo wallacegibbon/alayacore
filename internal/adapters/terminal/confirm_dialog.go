@@ -66,13 +66,13 @@ func NewConfirmDialog(styles *Styles) ConfirmDialog {
 }
 
 // SetStyles updates the styles used for rendering.
-func (cd ConfirmDialog) SetStyles(styles *Styles) ConfirmDialog {
+func (cd ConfirmDialog) WithStyles(styles *Styles) ConfirmDialog {
 	cd.styles = styles
 	return cd
 }
 
 // SetHasFocus sets the focus state for styling.
-func (cd ConfirmDialog) SetHasFocus(focused bool) ConfirmDialog {
+func (cd ConfirmDialog) WithFocus(focused bool) ConfirmDialog {
 	cd.hasFocus = focused
 	return cd
 }
@@ -93,7 +93,7 @@ func (cd ConfirmDialog) IsCtrlGCanceled() bool { return cd.ctrlGCanceled }
 func (cd ConfirmDialog) ToolID() string { return cd.toolID }
 
 // SetSize updates the terminal dimensions for responsive sizing.
-func (cd ConfirmDialog) SetSize(width, height int) ConfirmDialog {
+func (cd ConfirmDialog) WithSize(width, height int) ConfirmDialog {
 	if width > 0 {
 		cd.Width = width
 	}

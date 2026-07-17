@@ -76,7 +76,7 @@ func submitCmd(w io.WriteCloser, out OutputWriter, attachments []attachment, pro
 func (m Terminal) addAttachment(path string) Terminal {
 	tag := tlv.TagForPath(path)
 	m.pendingAttachments = append(m.pendingAttachments, attachment{path: path, tag: tag})
-	m.input = m.input.SetAttachments(m.pendingAttachmentLabels())
+	m.input = m.input.WithAttachments(m.pendingAttachmentLabels())
 	m = m.updateDisplayHeight()
 	return m
 }
@@ -85,7 +85,7 @@ func (m Terminal) addAttachment(path string) Terminal {
 func (m Terminal) addURLAttachment(url string) Terminal {
 	tag := tlv.TagForPath(url)
 	m.pendingAttachments = append(m.pendingAttachments, attachment{path: url, tag: tag, isURL: true})
-	m.input = m.input.SetAttachments(m.pendingAttachmentLabels())
+	m.input = m.input.WithAttachments(m.pendingAttachmentLabels())
 	m = m.updateDisplayHeight()
 	return m
 }
@@ -93,7 +93,7 @@ func (m Terminal) addURLAttachment(url string) Terminal {
 // clearAttachments clears all pending attachments.
 func (m Terminal) clearAttachments() Terminal {
 	m.pendingAttachments = nil
-	m.input = m.input.SetAttachments(nil)
+	m.input = m.input.WithAttachments(nil)
 	m = m.updateDisplayHeight()
 	return m
 }
@@ -252,10 +252,10 @@ func NewTerminalWithTheme(
 	}
 
 	// Initialize component widths
-	m.display = m.display.SetWidth(initialWidth)
-	m.input = m.input.SetWidth(initialWidth)
-	m.overlays = m.overlays.SetSize(initialWidth, initialHeight)
-	m.overlays = m.overlays.SetFocusedWindow(focusInput)
+	m.display = m.display.WithWidth(initialWidth)
+	m.input = m.input.WithWidth(initialWidth)
+	m.overlays = m.overlays.WithSize(initialWidth, initialHeight)
+	m.overlays = m.overlays.WithFocusedWindow(focusInput)
 	m = m.updateDisplayHeight()
 
 	return m
@@ -346,7 +346,7 @@ func (m Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.overlays.AttachmentWindow().IsOpen() {
 			aw := m.overlays.AttachmentWindow()
 			aw, _ = aw.Update(msg)
-			m.overlays = m.overlays.SetAttachmentWindow(aw)
+			m.overlays = m.overlays.WithAttachmentWindow(aw)
 		} else {
 			var cmd tea.Cmd
 			m.input, cmd = m.input.Update(msg)
@@ -371,9 +371,9 @@ func (m Terminal) handleWindowSize(msg tea.WindowSizeMsg) Terminal {
 
 	// Update all components
 	m.out.SetWindowWidth(max(0, msg.Width))
-	m.display = m.display.SetWidth(max(0, msg.Width))
-	m.input = m.input.SetWidth(max(0, msg.Width))
-	m.overlays = m.overlays.SetSize(msg.Width, msg.Height)
+	m.display = m.display.WithWidth(max(0, msg.Width))
+	m.input = m.input.WithWidth(max(0, msg.Width))
+	m.overlays = m.overlays.WithSize(msg.Width, msg.Height)
 	m = m.updateDisplayHeight()
 
 	// Clamp cursor to valid bounds (windows may have been removed) but
@@ -472,7 +472,7 @@ func (m Terminal) handleSessionLoadedMsg() (Terminal, tea.Cmd) {
 		m = m.updateStatus()
 		m = m.updateDisplayHeight()
 		if m.display.shouldFollow() {
-			m.display = m.display.SetCursorToLastWindow()
+			m.display = m.display.WithCursorToLastWindow()
 		}
 		m.display = m.display.updateContent()
 	}
@@ -493,7 +493,7 @@ func (m Terminal) handleSessionLoadedMsg() (Terminal, tea.Cmd) {
 	m = m.handleMCPOverlays()
 
 	ms, cmd := m.overlays.ModelSelector().LoadModels(modelSnap.Models, modelSnap.ActiveID)
-	m.overlays = m.overlays.SetModelSelector(ms)
+	m.overlays = m.overlays.WithModelSelector(ms)
 	return m, cmd
 }
 
@@ -522,14 +522,14 @@ func (m Terminal) handleDisplayRefresh() (Terminal, tea.Cmd) {
 		m = m.updateStatus()
 		m = m.updateDisplayHeight()
 		if m.display.shouldFollow() {
-			m.display = m.display.SetCursorToLastWindow()
+			m.display = m.display.WithCursorToLastWindow()
 		}
 		m.display = m.display.updateContent()
 	}
 
 	modelSnap := m.out.SnapshotModels()
 	ms, cmd := m.overlays.ModelSelector().LoadModels(modelSnap.Models, modelSnap.ActiveID)
-	m.overlays = m.overlays.SetModelSelector(ms)
+	m.overlays = m.overlays.WithModelSelector(ms)
 	return m, cmd
 }
 
@@ -554,7 +554,7 @@ func (m Terminal) handleEditorFinished(msg EditorFinishedMsg) Terminal {
 		if msg.Content != "" {
 			// Strip trailing newlines that text editors add by default.
 			content := strings.TrimRight(msg.Content, "\n")
-			m.input = m.input.SetValue(content)
+			m.input = m.input.WithValue(content)
 			m.input = m.input.CursorEnd()
 			m = m.focusInput()
 		}
@@ -583,7 +583,7 @@ func (m Terminal) updateDisplayHeight() Terminal {
 	//
 	// Total = display + inputBox + statusBar = H
 	inputBoxHeight := m.input.Height()
-	m.display = m.display.SetHeight(max(0, m.windowHeight-inputBoxHeight-1))
+	m.display = m.display.WithHeight(max(0, m.windowHeight-inputBoxHeight-1))
 	m.display = m.display.updateContent()
 	return m
 }
@@ -681,10 +681,10 @@ var _ tea.Model = Terminal{}
 
 func (m Terminal) applyTheme(theme *theme.Theme) Terminal {
 	m.styles = NewStyles(theme)
-	m.out.SetStyles(m.styles)
-	m.display = m.display.SetStyles(m.styles)
-	m.input = m.input.SetStyles(m.styles)
-	m.overlays = m.overlays.SetStyles(m.styles)
+	m.out.WithStyles(m.styles)
+	m.display = m.display.WithStyles(m.styles)
+	m.input = m.input.WithStyles(m.styles)
+	m.overlays = m.overlays.WithStyles(m.styles)
 	m.display = m.display.updateContent()
 	return m
 }
