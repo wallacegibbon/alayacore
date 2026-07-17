@@ -78,53 +78,37 @@ func (m Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 		return m, nil
 	}
 
-	// Track if selector was open before handling key
 	wasOpen := m.overlays.ThemeSelector().IsOpen()
 
-	ts, result := m.overlays.ThemeSelector().Update(msg)
+	ts, cmd := m.overlays.ThemeSelector().Update(msg)
 	m.overlays = m.overlays.WithThemeSelector(ts)
 
-	// Check if theme was selected (Enter key)
-	if result.ThemeSelected {
-		selectedTheme := ts.GetSelectedTheme()
-		if selectedTheme != nil {
-			m.emitCommand(":theme_set " + selectedTheme.Name)
-		}
-		m = m.restoreFocus()
-		return m, nil
-	}
-
-	// If selector closed without selection (ESC/q), restore original theme
+	// If closed without selection, restore original theme
 	if wasOpen && !ts.IsOpen() {
 		originalThemeName := ts.GetOriginalThemeName()
 		originalTheme := m.themeManager.LoadTheme(originalThemeName)
 		m = m.applyTheme(originalTheme)
 		m = m.restoreFocus()
-		return m, nil
+		return m, cmd
 	}
 
-	// Apply preview theme if changed
-	if result.PreviewTheme != nil {
-		// For navigation keys, delay theme application to keep cursor responsive
+	// Apply preview theme on navigation
+	previewTheme := ts.GetPreviewTheme()
+	if previewTheme != nil {
 		key := msg.String()
+		// Debounce rapid navigation
 		if key == keyJ || key == keyK || key == keyUp || key == keyDown {
-			// Increment the ID to invalidate any pending preview
 			m.themePreviewID++
-			// Capture the current ID to check if this preview is still valid
 			id := m.themePreviewID
-			theme := result.PreviewTheme
-
-			// Return a command that will apply the theme after a delay
-			// This allows the cursor to update immediately
-			return m, tea.Tick(ThemePreviewDebounce, func(_ time.Time) tea.Msg {
-				return themePreviewMsg{theme: theme, id: id}
-			})
+			p := previewTheme
+			return m, tea.Batch(cmd, tea.Tick(ThemePreviewDebounce, func(_ time.Time) tea.Msg {
+				return themePreviewMsg{theme: p, id: id}
+			}))
 		}
-		// Apply immediately for other keys
-		m = m.applyTheme(result.PreviewTheme)
+		m = m.applyTheme(previewTheme)
 	}
 
-	return m, nil
+	return m, cmd
 }
 
 // themePreviewMsg is sent when a theme preview should be applied
@@ -271,19 +255,12 @@ func (m Terminal) restoreFocusAfterConfirm() Terminal {
 // handleOverlayModelSelector handles keyboard input when the model selector is open.
 func (m Terminal) handleOverlayModelSelector(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 	wasOpen := m.overlays.ModelSelector().IsOpen()
-	ms, result := m.overlays.ModelSelector().Update(msg)
+	ms, cmd := m.overlays.ModelSelector().Update(msg)
 	m.overlays = m.overlays.WithModelSelector(ms)
-
-	if result.ModelSelected {
-		m = m.switchToSelectedModel()
-	}
-	if result.ReloadModels {
-		m.emitCommand(":model_load")
-	}
 	if wasOpen && !ms.IsOpen() {
 		m = m.restoreFocus()
 	}
-	return m, result.Cmd
+	return m, cmd
 }
 
 // handleMCPInitKeys handles keyboard input when the MCP init overlay is open.

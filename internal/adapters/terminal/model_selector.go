@@ -213,38 +213,29 @@ type ModelSelectorUpdate struct {
 // --- Key Handling ---
 
 //nolint:gocyclo
-func (ms ModelSelector) Update(msg tea.Msg) (ModelSelector, ModelSelectorUpdate) {
+func (ms ModelSelector) Update(msg tea.Msg) (ModelSelector, tea.Cmd) {
 	if ms.State == FilteredListClosed {
-		return ms, ModelSelectorUpdate{}
+		return ms, nil
 	}
 
 	keyMsg, ok := msg.(tea.KeyMsg)
 	if !ok {
-		return ms, ModelSelectorUpdate{}
+		return ms, nil
 	}
 	key := keyMsg.String()
 
 	fl, result := ms.FilteredListCore.Update(msg)
 	ms.FilteredListCore = fl
 
-	update := ModelSelectorUpdate{Cmd: result.Cmd}
-
-	modelSelected := false
-
 	// Handle Enter selection in the list.
 	if key == keyEnter && result.Handled && !fl.FilterInputFocused {
 		if len(ms.filteredModels) > 0 && fl.SelectedIdx >= 0 {
 			ms.activeModel = &ms.filteredModels[fl.SelectedIdx]
-			modelSelected = true
 			fl = fl.Close()
+			ms.FilteredListCore = fl
+			return ms, func() tea.Msg { return ModelSelectedMsg{ID: ms.activeModel.ID} }
 		}
 	}
-
-	if modelSelected {
-		update.ModelSelected = true
-	}
-
-	ms.FilteredListCore = fl
 
 	if result.Handled {
 		if result.FilterChanged && ms.FilterInputFocused {
@@ -255,20 +246,20 @@ func (ms ModelSelector) Update(msg tea.Msg) (ModelSelector, ModelSelectorUpdate)
 		}
 		if ms.FilterInputFocused && key == keyEnter && len(ms.filteredModels) > 0 {
 			ms = ms.handleSearchEnter()
-			update.ModelSelected = true
+			ms.FilteredListCore = fl.Close()
+			return ms, func() tea.Msg { return ModelSelectedMsg{ID: ms.activeModel.ID} }
 		}
-		return ms, update
+		return ms, nil
 	}
 
 	if !ms.FilterInputFocused {
 		ms = ms.handleListKeys(key)
 	}
 	if ms.reloadModels {
-		update.ReloadModels = true
 		ms.reloadModels = false
+		return ms, func() tea.Msg { return ReloadModelsMsg{} }
 	}
-
-	return ms, update
+	return ms, nil
 }
 
 func (ms ModelSelector) handleSearchEnter() ModelSelector {

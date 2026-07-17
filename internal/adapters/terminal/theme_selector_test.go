@@ -23,18 +23,15 @@ func TestThemeSelectorCancelRestoresOriginalTheme(t *testing.T) {
 		t.Errorf("Expected original theme 'theme-dark', got '%s'", ts.GetOriginalThemeName())
 	}
 
-	ts, result := ts.Update(tea.KeyPressMsg(tea.Key{Code: 'j'}))
+	ts, _ = ts.Update(tea.KeyPressMsg(tea.Key{Code: 'j'}))
 
 	selected := ts.GetSelectedTheme()
 	if selected == nil || selected.Name != "theme-light" {
 		t.Errorf("Expected selected theme 'theme-light', got '%v'", selected)
 	}
 
-	ts, result = ts.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEsc}))
+	ts, _ = ts.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEsc}))
 
-	if !result.Closed {
-		t.Errorf("Expected ESC to close the selector")
-	}
 	if ts.IsOpen() {
 		t.Errorf("Expected theme selector to be closed after ESC")
 	}
@@ -56,11 +53,8 @@ func TestThemeSelectorEnterSavesTheme(t *testing.T) {
 
 	ts, _ = ts.Update(tea.KeyPressMsg(tea.Key{Code: 'j'}))
 
-	ts, result := ts.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	ts, _ = ts.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 
-	if !result.ThemeSelected {
-		t.Errorf("Expected theme to be selected after Enter")
-	}
 	if ts.IsOpen() {
 		t.Errorf("Expected theme selector to be closed after Enter")
 	}

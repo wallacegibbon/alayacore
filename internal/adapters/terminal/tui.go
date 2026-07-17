@@ -34,6 +34,31 @@ type sessionLoadingErrorMsg struct {
 	err error
 }
 
+// ============================================================================
+// Overlay Result Messages
+// ============================================================================
+
+// ThemeSelectedMsg is sent when the user selects a theme.
+type ThemeSelectedMsg struct{ Name string }
+
+// ModelSelectedMsg is sent when the user selects a model.
+type ModelSelectedMsg struct{ ID int }
+
+// ReloadModelsMsg is sent when the user requests a model reload.
+type ReloadModelsMsg struct{}
+
+// HelpCmdMsg is sent when the user selects a command from the help window.
+type HelpCmdMsg struct{ Command string }
+
+// AttachmentSelectedMsg is sent when the user selects a file or URL to attach.
+type AttachmentSelectedMsg struct{ Path string }
+
+// ConfirmResultMsg is sent when a confirm dialog produces a result.
+type ConfirmResultMsg struct{ Result *ConfirmResult }
+
+// OverlayClosedMsg is sent when any overlay is dismissed without a result.
+type OverlayClosedMsg struct{}
+
 // emitCommand writes a user-level command to the session via TLV.
 // Errors are silently ignored — commands are best-effort and the
 // session may close the input stream at any time.
@@ -307,6 +332,7 @@ func (m Terminal) loadSessionCmd() tea.Cmd {
 //  4. Editor messages - external editor completion
 //  5. Focus/Blur - application focus changes
 //  6. Paste - clipboard paste
+//nolint:gocyclo
 func (m Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Loading message handling — these take priority during startup.
 	switch msg := msg.(type) {
@@ -326,6 +352,18 @@ func (m Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tickMsg:
 		return m.handleTick()
+
+	case ThemeSelectedMsg:
+		m.emitCommand(":theme_set " + msg.Name)
+		return m, nil
+
+	case ModelSelectedMsg:
+		m.emitCommand(fmt.Sprintf(":model_set %d", msg.ID))
+		return m, nil
+
+	case ReloadModelsMsg:
+		m.emitCommand(":model_load")
+		return m, nil
 
 	case themePreviewMsg:
 		return m.handleThemePreview(msg), nil
