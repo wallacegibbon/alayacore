@@ -20,14 +20,14 @@ type PromptInput struct {
 }
 
 // NewPromptInput creates a new prompt input.
-func NewPromptInput(styles *Styles) *PromptInput {
+func NewPromptInput(styles *Styles) PromptInput {
 	input := NewInputField()
 	input.Placeholder = "Enter your prompt..."
 	input = input.Focus()
 	input.Prompt = ""
 	input = input.SetWidth(max(0, DefaultWidth-BorderInnerPadding))
 
-	return &PromptInput{
+	return PromptInput{
 		input:   input,
 		focused: true,
 		styles:  styles,
@@ -41,7 +41,7 @@ func (m PromptInput) Init() tea.Cmd {
 }
 
 // Update handles messages for the prompt input.
-func (m *PromptInput) Update(msg tea.Msg) (*PromptInput, tea.Cmd) {
+func (m PromptInput) Update(msg tea.Msg) (PromptInput, tea.Cmd) {
 	var cmd tea.Cmd
 	if msg, ok := msg.(tea.WindowSizeMsg); ok {
 		m.width = msg.Width
@@ -93,15 +93,17 @@ func (m PromptInput) updateInputStyles() InputField {
 }
 
 // Focus sets focus on the input.
-func (m *PromptInput) Focus() {
+func (m PromptInput) Focus() PromptInput {
 	m.focused = true
 	m.input = m.input.Focus()
+	return m
 }
 
 // Blur removes focus from the input.
-func (m *PromptInput) Blur() {
+func (m PromptInput) Blur() PromptInput {
 	m.focused = false
 	m.input = m.input.Blur()
+	return m
 }
 
 func (m PromptInput) IsFocused() bool {
@@ -112,19 +114,22 @@ func (m PromptInput) Value() string {
 	return m.input.Value()
 }
 
-func (m *PromptInput) SetValue(value string) {
+func (m PromptInput) SetValue(value string) PromptInput {
 	m.input = m.input.SetValue(value)
+	return m
 }
 
 // SetAttachments sets the pending attachment paths for display.
-func (m *PromptInput) SetAttachments(paths []string) {
+func (m PromptInput) SetAttachments(paths []string) PromptInput {
 	m.attachments = paths
+	return m
 }
 
 // Clear clears the input and attachments.
-func (m *PromptInput) Clear() {
+func (m PromptInput) Clear() PromptInput {
 	m.input = m.input.SetValue("")
 	m.attachments = nil
+	return m
 }
 
 // Attachments returns the current attachment paths.
@@ -190,19 +195,22 @@ func (m PromptInput) RenderWithBorder(blockInput bool) string {
 	return m.styles.RenderBorderedBox(content, m.width, borderColor)
 }
 
-func (m *PromptInput) SetWidth(width int) {
+func (m PromptInput) SetWidth(width int) PromptInput {
 	m.width = width
 	m.input = m.input.SetWidth(max(0, width-BorderInnerPadding))
+	return m
 }
 
-func (m *PromptInput) SetStyles(styles *Styles) {
+func (m PromptInput) SetStyles(styles *Styles) PromptInput {
 	m.styles = styles
 	m.input = m.updateInputStyles()
+	return m
 }
 
 // CursorEnd moves cursor to end.
-func (m *PromptInput) CursorEnd() {
+func (m PromptInput) CursorEnd() PromptInput {
 	m.input = m.input.CursorEnd()
+	return m
 }
 
 // CursorPos returns the cursor position (in runes) within the input field.

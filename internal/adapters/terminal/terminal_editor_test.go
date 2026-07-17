@@ -38,7 +38,7 @@ func TestCtrlOOpensEditor(t *testing.T) {
 
 func TestCtrlOWithExistingContent(t *testing.T) {
 	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
-	terminal.input.SetValue("existing input text")
+	terminal.input = terminal.input.SetValue("existing input text")
 
 	msg := tea.KeyPressMsg(tea.Key{
 		Code: 'o',
@@ -146,7 +146,7 @@ func TestEditorFinishedMsgMultiline(t *testing.T) {
 
 func TestEditorFinishedMsgWithError(t *testing.T) {
 	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
-	terminal.input.SetValue("original content")
+	terminal.input = terminal.input.SetValue("original content")
 
 	msg := EditorFinishedMsg{
 		Action:  EditorActionSubmit,
@@ -275,7 +275,7 @@ func TestWrapContentPreservesANSI(t *testing.T) {
 
 func TestCtrlCClearsInput(t *testing.T) {
 	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
-	terminal.input.SetValue("test input text")
+	terminal.input = terminal.input.SetValue("test input text")
 
 	// Press Ctrl+C while in input window
 	terminal.focusInput()
@@ -301,7 +301,7 @@ func TestCtrlCClearsInput(t *testing.T) {
 
 func TestCtrlCInDisplayWindow(t *testing.T) {
 	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
-	terminal.input.SetValue("test input text")
+	terminal.input = terminal.input.SetValue("test input text")
 
 	// Press Ctrl+C while in display window
 	terminal.focusDisplay()
@@ -327,7 +327,7 @@ func TestCtrlCInDisplayWindow(t *testing.T) {
 
 func TestCtrlGTriggersCancel(t *testing.T) {
 	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
-	terminal.input.SetValue("test input text")
+	terminal.input = terminal.input.SetValue("test input text")
 
 	// Press Ctrl+G (should work regardless of focus)
 	terminal.focusInput()
@@ -374,7 +374,7 @@ func TestCtrlGTriggersCancel(t *testing.T) {
 
 func TestCtrlUClearsInput(t *testing.T) {
 	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
-	terminal.input.SetValue("test input text")
+	terminal.input = terminal.input.SetValue("test input text")
 
 	// Press Ctrl+U while in input window
 	terminal.focusInput()
@@ -686,7 +686,7 @@ func TestEKeyDoesNothingInInputWindow(t *testing.T) {
 
 func TestDisplayEditorFinishedDoesNotPopulateInput(t *testing.T) {
 	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
-	terminal.input.SetValue("original input")
+	terminal.input = terminal.input.SetValue("original input")
 
 	// Simulate display editor finishing (user viewed content, then quit)
 	msg := EditorFinishedMsg{Action: EditorActionNone, Err: nil}
@@ -705,7 +705,7 @@ func TestDisplayEditorFinishedDoesNotPopulateInput(t *testing.T) {
 
 func TestDisplayEditorFinishedWithError(t *testing.T) {
 	terminal := NewTerminalWithTheme(NewTerminalOutput(DefaultStyles()), nopWriteCloser{}, nil, 80, 24, theme.DefaultTheme(), nil, "theme-dark")
-	terminal.input.SetValue("original input")
+	terminal.input = terminal.input.SetValue("original input")
 
 	// Simulate display editor finishing with error
 	msg := EditorFinishedMsg{Action: EditorActionNone, Err: fmt.Errorf("editor failed")}

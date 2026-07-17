@@ -73,7 +73,7 @@ func (m *Terminal) emitAttachments() {
 func (m *Terminal) addAttachment(path string) {
 	tag := tlv.TagForPath(path)
 	m.pendingAttachments = append(m.pendingAttachments, attachment{path: path, tag: tag})
-	m.input.SetAttachments(m.pendingAttachmentLabels())
+	m.input = m.input.SetAttachments(m.pendingAttachmentLabels())
 	m.updateDisplayHeight()
 }
 
@@ -81,14 +81,14 @@ func (m *Terminal) addAttachment(path string) {
 func (m *Terminal) addURLAttachment(url string) {
 	tag := tlv.TagForPath(url)
 	m.pendingAttachments = append(m.pendingAttachments, attachment{path: url, tag: tag, isURL: true})
-	m.input.SetAttachments(m.pendingAttachmentLabels())
+	m.input = m.input.SetAttachments(m.pendingAttachmentLabels())
 	m.updateDisplayHeight()
 }
 
 // clearAttachments clears all pending attachments.
 func (m *Terminal) clearAttachments() {
 	m.pendingAttachments = nil
-	m.input.SetAttachments(nil)
+	m.input = m.input.SetAttachments(nil)
 	m.updateDisplayHeight()
 }
 
@@ -149,7 +149,7 @@ type Terminal struct {
 
 	// UI components
 	display      DisplayModel
-	input        *PromptInput
+	input        PromptInput
 	themeManager *ThemeManager
 	overlays     *OverlayManager
 
@@ -247,7 +247,7 @@ func NewTerminalWithTheme(
 
 	// Initialize component widths
 	m.display.SetWidth(initialWidth)
-	m.input.SetWidth(initialWidth)
+	m.input = m.input.SetWidth(initialWidth)
 	m.overlays.SetSize(initialWidth, initialHeight)
 	m.overlays.SetFocusedWindow(focusInput)
 	m.updateDisplayHeight()
@@ -364,7 +364,7 @@ func (m *Terminal) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 	// Update all components
 	m.out.SetWindowWidth(max(0, msg.Width))
 	m.display.SetWidth(max(0, msg.Width))
-	m.input.SetWidth(max(0, msg.Width))
+	m.input = m.input.SetWidth(max(0, msg.Width))
 	m.overlays.SetSize(msg.Width, msg.Height)
 	m.updateDisplayHeight()
 
@@ -433,7 +433,7 @@ func (m *Terminal) handleMCPOverlays() {
 		// MCP init overlay just opened — blur input so its border renders
 		// as blurred (empty box) rather than focused but unreachable.
 		if action.InitOverlayActive && !wasOpen {
-			m.input.Blur()
+			m.input = m.input.Blur()
 		}
 		m.display.updateContent()
 	}
@@ -478,7 +478,7 @@ func (m *Terminal) handleSessionLoadedMsg() (tea.Model, tea.Cmd) {
 	// Blur the input and try to open MCP init overlay immediately.
 	// The input stays blurred (rendered as empty box) until the first
 	// tick determines whether MCP init is needed.
-	m.input.Blur()
+	m.input = m.input.Blur()
 	m.handleMCPOverlays()
 
 	return m, m.overlays.ModelSelector().LoadModels(modelSnap.Models, modelSnap.ActiveID)
@@ -539,8 +539,8 @@ func (m *Terminal) handleEditorFinished(msg EditorFinishedMsg) (tea.Model, tea.C
 		if msg.Content != "" {
 			// Strip trailing newlines that text editors add by default.
 			content := strings.TrimRight(msg.Content, "\n")
-			m.input.SetValue(content)
-			m.input.CursorEnd()
+			m.input = m.input.SetValue(content)
+			m.input = m.input.CursorEnd()
 			m.focusInput()
 		}
 		return m, nil
@@ -666,7 +666,7 @@ func (m *Terminal) applyTheme(theme *theme.Theme) {
 	m.styles = NewStyles(theme)
 	m.out.SetStyles(m.styles)
 	m.display.SetStyles(m.styles)
-	m.input.SetStyles(m.styles)
+	m.input = m.input.SetStyles(m.styles)
 	m.overlays.SetStyles(m.styles)
 	m.display.updateContent()
 }

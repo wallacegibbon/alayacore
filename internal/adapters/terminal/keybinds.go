@@ -175,7 +175,7 @@ func (m *Terminal) handleConfirmQuit(r *ConfirmResult, fromCmd bool) (tea.Model,
 		return m, tea.Quit
 	}
 	if fromCmd {
-		m.input.SetValue("")
+		m.input = m.input.SetValue("")
 	}
 	m.restoreFocusAfterConfirm()
 	return m, nil
@@ -183,7 +183,7 @@ func (m *Terminal) handleConfirmQuit(r *ConfirmResult, fromCmd bool) (tea.Model,
 
 func (m *Terminal) handleConfirmCancel(r *ConfirmResult, fromCmd bool) (tea.Model, tea.Cmd) {
 	if fromCmd {
-		m.input.SetValue("")
+		m.input = m.input.SetValue("")
 	}
 	m.restoreFocusAfterConfirm()
 	if r.Confirmed {
@@ -198,7 +198,7 @@ func (m *Terminal) handleConfirmTool(r *ConfirmResult, fromCmd bool) (tea.Model,
 		action = "yes"
 	}
 	if fromCmd {
-		m.input.SetValue("")
+		m.input = m.input.SetValue("")
 	}
 	m.emitCommand(":confirm " + r.ToolID + " " + action)
 	m.restoreFocusAfterConfirm()
@@ -217,7 +217,7 @@ func (m *Terminal) handleConfirmMCPAuth(r *ConfirmResult, fromCmd bool) (tea.Mod
 		m.emitCommand(":mcp_cancel")
 	default:
 		if fromCmd {
-			m.input.SetValue("")
+			m.input = m.input.SetValue("")
 		}
 		m.emitCommand(":mcp_auth " + r.ToolID)
 	}
@@ -335,8 +335,8 @@ func (m *Terminal) handleSelectorOverlayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 		if t.JustClosed(m.overlays.HelpWindow()) {
 			if pending := m.overlays.HelpWindow().ConsumePendingCommand(); pending != "" {
 				m.focusInput()
-				m.input.SetValue(pending + " ")
-				m.input.CursorEnd()
+				m.input = m.input.SetValue(pending + " ")
+				m.input = m.input.CursorEnd()
 				m.display.updateContent()
 				return nil, true
 			}
@@ -452,8 +452,8 @@ func handleDisplayKeyM(m *Terminal) tea.Cmd {
 
 func handleDisplayKeyColon(m *Terminal) tea.Cmd {
 	m.focusInput()
-	m.input.SetValue(keyColon)
-	m.input.CursorEnd()
+	m.input = m.input.SetValue(keyColon)
+	m.input = m.input.CursorEnd()
 	m.display.updateContent()
 	return nil
 }
@@ -494,8 +494,8 @@ func handleDisplayKeyE(m *Terminal) tea.Cmd {
 func handleDisplayKeyCtrlF(m *Terminal) tea.Cmd {
 	if historyID := m.display.GetCursorWindowHistoryID(); historyID > 0 {
 		m.focusInput()
-		m.input.SetValue(fmt.Sprintf(":fork %d ", historyID))
-		m.input.CursorEnd()
+		m.input = m.input.SetValue(fmt.Sprintf(":fork %d ", historyID))
+		m.input = m.input.CursorEnd()
 		m.display.updateContent()
 	}
 	return nil
@@ -587,8 +587,8 @@ func (m *Terminal) handleGlobalKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 func (m *Terminal) handleSaveKey() tea.Cmd {
 	if m.appConfig.Cfg.Session == "" {
 		m.focusInput()
-		m.input.SetValue(":save ")
-		m.input.CursorEnd()
+		m.input = m.input.SetValue(":save ")
+		m.input = m.input.CursorEnd()
 		m.display.updateContent()
 		return nil
 	}
@@ -638,7 +638,7 @@ func (m *Terminal) handleFallback(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.openAttachmentWindow()
 		return m, nil
 	case keyCtrlC:
-		m.input.SetValue("")
+		m.input = m.input.SetValue("")
 		m.clearAttachments()
 		return m, nil
 	}
@@ -680,7 +680,7 @@ func (m *Terminal) handleSubmit() tea.Cmd {
 	m.emitUE()
 
 	// Clear everything
-	m.input.SetValue("")
+	m.input = m.input.SetValue("")
 	m.clearAttachments()
 
 	return scheduleTick()
@@ -704,13 +704,13 @@ func (m *Terminal) handleCommand(command string) tea.Cmd {
 
 	// Suspend command - suspends the process (like Ctrl+Z)
 	if command == cmdSuspend {
-		m.input.SetValue("")
+		m.input = m.input.SetValue("")
 		return tea.Suspend
 	}
 
 	// Help command - opens help window locally, not sent to session
 	if command == cmdHelp {
-		m.input.SetValue("")
+		m.input = m.input.SetValue("")
 		m.openHelpWindow()
 		return nil
 	}
@@ -723,7 +723,7 @@ func (m *Terminal) handleCommand(command string) tea.Cmd {
 func (m *Terminal) submitCommand(command string, clearInput bool) tea.Cmd {
 	m.emitCommand(":" + command)
 	if clearInput {
-		m.input.SetValue("")
+		m.input = m.input.SetValue("")
 	}
 	return scheduleTick()
 }
