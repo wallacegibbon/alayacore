@@ -264,7 +264,7 @@ func (m *Terminal) startMCPAuthFlow(serverName, authURL string) {
 func (m *Terminal) restoreFocusAfterConfirm() {
 	if m.overlays.ModelSelector().IsOpen() || m.overlays.ThemeSelector().IsOpen() ||
 		m.overlays.HelpWindow().IsOpen() || m.overlays.IsMCPInitOpen() {
-		m.display.updateContent()
+		m.display = m.display.updateContent()
 		return
 	}
 	m.restoreFocus()
@@ -337,7 +337,7 @@ func (m *Terminal) handleSelectorOverlayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 				m.focusInput()
 				m.input = m.input.SetValue(pending + " ")
 				m.input = m.input.CursorEnd()
-				m.display.updateContent()
+				m.display = m.display.updateContent()
 				return nil, true
 			}
 			m.restoreFocus()
@@ -368,57 +368,61 @@ func (m *Terminal) handleOverlayConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // These don't return tea.Cmd — the map type doesn't require it.
 
 func moveWindowCursorDown(m *Terminal) {
-	if m.display.MoveWindowCursorDown() {
-		m.display.EnsureCursorVisible()
-		m.display.updateContent()
+	var moved bool
+	m.display, moved = m.display.MoveWindowCursorDown()
+	if moved {
+		m.display = m.display.EnsureCursorVisible()
+		m.display = m.display.updateContent()
 	}
 }
 
 func moveWindowCursorUp(m *Terminal) {
-	if m.display.MoveWindowCursorUp() {
-		m.display.EnsureCursorVisible()
-		m.display.updateContent()
+	var moved bool
+	m.display, moved = m.display.MoveWindowCursorUp()
+	if moved {
+		m.display = m.display.EnsureCursorVisible()
+		m.display = m.display.updateContent()
 	}
 }
 
 func scrollDownLine(m *Terminal) {
 	if !m.display.AtBottom() {
-		m.display.MarkUserScrolled()
-		m.display.ScrollDown(1)
-		m.display.updateContent()
+		m.display = m.display.MarkUserScrolled()
+		m.display = m.display.ScrollDown(1)
+		m.display = m.display.updateContent()
 	}
 }
 
 func scrollUpLine(m *Terminal) {
-	m.display.MarkUserScrolled()
-	m.display.ScrollUp(1)
-	m.display.updateContent()
+	m.display = m.display.MarkUserScrolled()
+	m.display = m.display.ScrollUp(1)
+	m.display = m.display.updateContent()
 }
 
 func scrollDownHalf(m *Terminal) {
 	if !m.display.AtBottom() {
-		m.display.MarkUserScrolled()
-		m.display.ScrollDown(max(1, m.display.GetHeight()/2))
-		m.display.updateContent()
+		m.display = m.display.MarkUserScrolled()
+		m.display = m.display.ScrollDown(max(1, m.display.GetHeight()/2))
+		m.display = m.display.updateContent()
 	}
 }
 
 func scrollUpHalf(m *Terminal) {
-	m.display.MarkUserScrolled()
-	m.display.ScrollUp(max(1, m.display.GetHeight()/2))
-	m.display.updateContent()
+	m.display = m.display.MarkUserScrolled()
+	m.display = m.display.ScrollUp(max(1, m.display.GetHeight()/2))
+	m.display = m.display.updateContent()
 }
 
 func gotoBottom(m *Terminal) {
-	m.display.SetCursorToLastWindow()
-	m.display.GotoBottom()
-	m.display.updateContent()
+	m.display = m.display.SetCursorToLastWindow()
+	m.display = m.display.GotoBottom()
+	m.display = m.display.updateContent()
 }
 
 func gotoTop(m *Terminal) {
-	m.display.SetWindowCursor(0)
-	m.display.GotoTop()
-	m.display.updateContent()
+	m.display = m.display.SetWindowCursor(0)
+	m.display = m.display.GotoTop()
+	m.display = m.display.updateContent()
 }
 
 // DisplayKeyHandler handles a display key event and returns an optional tea.Cmd.
@@ -427,25 +431,31 @@ type DisplayKeyHandler func(*Terminal) tea.Cmd
 // ---------- display key handler implementations ----------
 
 func handleDisplayKeyH(m *Terminal) tea.Cmd {
-	if m.display.MoveWindowCursorToTop() {
-		m.display.EnsureCursorVisible()
-		m.display.updateContent()
+	var moved bool
+	m.display, moved = m.display.MoveWindowCursorToTop()
+	if moved {
+		m.display = m.display.EnsureCursorVisible()
+		m.display = m.display.updateContent()
 	}
 	return nil
 }
 
 func handleDisplayKeyL(m *Terminal) tea.Cmd {
-	if m.display.MoveWindowCursorToBottom() {
-		m.display.EnsureCursorVisible()
-		m.display.updateContent()
+	var moved bool
+	m.display, moved = m.display.MoveWindowCursorToBottom()
+	if moved {
+		m.display = m.display.EnsureCursorVisible()
+		m.display = m.display.updateContent()
 	}
 	return nil
 }
 
 func handleDisplayKeyM(m *Terminal) tea.Cmd {
-	if m.display.MoveWindowCursorToCenter() {
-		m.display.EnsureCursorVisible()
-		m.display.updateContent()
+	var moved bool
+	m.display, moved = m.display.MoveWindowCursorToCenter()
+	if moved {
+		m.display = m.display.EnsureCursorVisible()
+		m.display = m.display.updateContent()
 	}
 	return nil
 }
@@ -454,30 +464,36 @@ func handleDisplayKeyColon(m *Terminal) tea.Cmd {
 	m.focusInput()
 	m.input = m.input.SetValue(keyColon)
 	m.input = m.input.CursorEnd()
-	m.display.updateContent()
+	m.display = m.display.updateContent()
 	return nil
 }
 
 func handleDisplayKeySpace(m *Terminal) tea.Cmd {
-	if m.display.ToggleWindowFold() {
-		m.display.EnsureCursorVisible()
-		m.display.updateContent()
+	var toggled bool
+	m.display, toggled = m.display.ToggleWindowFold()
+	if toggled {
+		m.display = m.display.EnsureCursorVisible()
+		m.display = m.display.updateContent()
 	}
 	return nil
 }
 
 func handleDisplayKeyF(m *Terminal) tea.Cmd {
-	if m.display.MoveWindowCursorToNextUserPrompt() {
-		m.display.ScrollCursorToTop()
-		m.display.updateContent()
+	var moved bool
+	m.display, moved = m.display.MoveWindowCursorToNextUserPrompt()
+	if moved {
+		m.display = m.display.ScrollCursorToTop()
+		m.display = m.display.updateContent()
 	}
 	return nil
 }
 
 func handleDisplayKeyB(m *Terminal) tea.Cmd {
-	if m.display.MoveWindowCursorToPrevUserPrompt() {
-		m.display.ScrollCursorToTop()
-		m.display.updateContent()
+	var moved bool
+	m.display, moved = m.display.MoveWindowCursorToPrevUserPrompt()
+	if moved {
+		m.display = m.display.ScrollCursorToTop()
+		m.display = m.display.updateContent()
 	}
 	return nil
 }
@@ -485,7 +501,7 @@ func handleDisplayKeyB(m *Terminal) tea.Cmd {
 func handleDisplayKeyE(m *Terminal) tea.Cmd {
 	content := m.display.GetCursorWindowContent()
 	if content != "" {
-		m.display.MarkUserScrolled()
+		m.display = m.display.MarkUserScrolled()
 		return m.editor.OpenForDisplay(content)
 	}
 	return nil
@@ -496,7 +512,7 @@ func handleDisplayKeyCtrlF(m *Terminal) tea.Cmd {
 		m.focusInput()
 		m.input = m.input.SetValue(fmt.Sprintf(":fork %d ", historyID))
 		m.input = m.input.CursorEnd()
-		m.display.updateContent()
+		m.display = m.display.updateContent()
 	}
 	return nil
 }
@@ -589,7 +605,7 @@ func (m *Terminal) handleSaveKey() tea.Cmd {
 		m.focusInput()
 		m.input = m.input.SetValue(":save ")
 		m.input = m.input.CursorEnd()
-		m.display.updateContent()
+		m.display = m.display.updateContent()
 		return nil
 	}
 	return m.submitCommand("save", false)
@@ -610,8 +626,8 @@ func (m *Terminal) handleSaveKey() tea.Cmd {
 // redraw that covers every content cell.
 func (m *Terminal) handleRedraw() tea.Cmd {
 	m.forceRedraw++
-	m.display.ForceContentDirty()
-	m.display.updateContent()
+	m.display = m.display.ForceContentDirty()
+	m.display = m.display.updateContent()
 
 	m.pendingForceRedraw = true
 	return tea.Batch(

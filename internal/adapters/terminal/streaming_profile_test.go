@@ -76,14 +76,14 @@ func TestStreamingProfile(t *testing.T) {
 	// Set up viewport
 	wb.SetViewportPosition(0, 30)
 	dm := NewDisplayModel(wb, styles)
-	dm.SetHeight(30)
-	dm.SetWidth(80)
-	dm.SetDisplayFocused(true)
+	dm = dm.SetHeight(30)
+	dm = dm.SetWidth(80)
+	dm = dm.SetDisplayFocused(true)
 
 	// Create streaming window
 	historyID := "stream"
 	wb.AppendOrUpdate("AT", historyID, "")
-	dm.updateContent()
+	dm = dm.updateContent()
 
 	// Profile streaming
 	totalUpdates := 0
@@ -99,7 +99,7 @@ func TestStreamingProfile(t *testing.T) {
 		wb.AppendOrUpdate("AT", historyID, fmt.Sprintf(" word%d", i))
 
 		// This is what handleTick does
-		dm.updateContent()
+		dm = dm.updateContent()
 
 		elapsed := time.Since(start)
 		totalTime += elapsed
@@ -147,14 +147,14 @@ func TestStreamingProfileLongContent(t *testing.T) {
 
 	wb.SetViewportPosition(0, 30)
 	dm := NewDisplayModel(wb, styles)
-	dm.SetHeight(30)
-	dm.SetWidth(80)
-	dm.SetDisplayFocused(true)
+	dm = dm.SetHeight(30)
+	dm = dm.SetWidth(80)
+	dm = dm.SetDisplayFocused(true)
 
 	// Start with long content
 	historyID := "stream"
 	wb.AppendOrUpdate("AT", historyID, strings.Repeat("This is a line that will wrap. ", 20))
-	dm.updateContent()
+	dm = dm.updateContent()
 
 	// Profile 50 updates with growing content
 	totalTime := time.Duration(0)
@@ -163,7 +163,7 @@ func TestStreamingProfileLongContent(t *testing.T) {
 	for i := 0; i < 50; i++ {
 		start := time.Now()
 		wb.AppendOrUpdate("AT", historyID, " more streaming text here")
-		dm.updateContent()
+		dm = dm.updateContent()
 		elapsed := time.Since(start)
 		totalTime += elapsed
 		times = append(times, elapsed)
@@ -202,10 +202,10 @@ func TestCursorMovementProfile(t *testing.T) {
 
 	wb.SetViewportPosition(0, 30)
 	dm := NewDisplayModel(wb, styles)
-	dm.SetHeight(30)
-	dm.SetWidth(80)
-	dm.SetDisplayFocused(true)
-	dm.updateContent()
+	dm = dm.SetHeight(30)
+	dm = dm.SetWidth(80)
+	dm = dm.SetDisplayFocused(true)
+	dm = dm.updateContent()
 
 	// Profile cursor movement through all windows
 	totalTime := time.Duration(0)
@@ -213,9 +213,9 @@ func TestCursorMovementProfile(t *testing.T) {
 
 	for i := 0; i < 100; i++ {
 		start := time.Now()
-		dm.SetWindowCursor(i)
-		dm.EnsureCursorVisible()
-		dm.updateContent()
+		dm = dm.SetWindowCursor(i)
+		dm = dm.EnsureCursorVisible()
+		dm = dm.updateContent()
 		elapsed := time.Since(start)
 		totalTime += elapsed
 		times = append(times, elapsed)
@@ -254,9 +254,9 @@ func TestUpdateContentSkipRate(t *testing.T) {
 
 	wb.AppendOrUpdate("AT", "msg0", "Content")
 	dm := NewDisplayModel(wb, styles)
-	dm.SetHeight(30)
-	dm.SetWidth(80)
-	dm.updateContent()
+	dm = dm.SetHeight(30)
+	dm = dm.SetWidth(80)
+	dm = dm.updateContent()
 
 	skipped := 0
 	total := 100
@@ -264,7 +264,7 @@ func TestUpdateContentSkipRate(t *testing.T) {
 	// Call updateContent without changing anything
 	for i := 0; i < total; i++ {
 		before := dm.lastContent
-		dm.updateContent()
+		dm = dm.updateContent()
 		if dm.lastContent == before {
 			skipped++
 		}
@@ -293,13 +293,13 @@ func TestRealisticStreamingWithTiming(t *testing.T) {
 
 	wb.SetViewportPosition(0, 30)
 	dm := NewDisplayModel(wb, styles)
-	dm.SetHeight(30)
-	dm.SetWidth(80)
-	dm.SetDisplayFocused(true)
+	dm = dm.SetHeight(30)
+	dm = dm.SetWidth(80)
+	dm = dm.SetDisplayFocused(true)
 
 	historyID := "stream"
 	wb.AppendOrUpdate("AT", historyID, "")
-	dm.updateContent()
+	dm = dm.updateContent()
 
 	// Simulate realistic word-by-word streaming at 50ms intervals
 	// (which is faster than actual LLM output)
@@ -314,7 +314,7 @@ func TestRealisticStreamingWithTiming(t *testing.T) {
 
 		// Measure render time
 		start := time.Now()
-		dm.updateContent()
+		dm = dm.updateContent()
 		renderTime := time.Since(start)
 
 		totalRenderTime += renderTime
@@ -359,14 +359,14 @@ func TestVeryLongContentStreaming(t *testing.T) {
 
 	wb.SetViewportPosition(0, 30)
 	dm := NewDisplayModel(wb, styles)
-	dm.SetHeight(30)
-	dm.SetWidth(80)
-	dm.SetDisplayFocused(true)
+	dm = dm.SetHeight(30)
+	dm = dm.SetWidth(80)
+	dm = dm.SetDisplayFocused(true)
 
 	historyID := "stream"
 	// Start with already long content
 	wb.AppendOrUpdate("AT", historyID, strings.Repeat("Initial content line that is reasonably long. ", 20))
-	dm.updateContent()
+	dm = dm.updateContent()
 
 	// Simulate streaming more content
 	totalRenderTime := time.Duration(0)
@@ -376,7 +376,7 @@ func TestVeryLongContentStreaming(t *testing.T) {
 		wb.AppendOrUpdate("AT", historyID, fmt.Sprintf(" Additional sentence number %d here.", i))
 
 		start := time.Now()
-		dm.updateContent()
+		dm = dm.updateContent()
 		elapsed := time.Since(start)
 
 		totalRenderTime += elapsed
@@ -424,13 +424,13 @@ func TestWorstCaseStreaming(t *testing.T) {
 
 	wb.SetViewportPosition(0, 30)
 	dm := NewDisplayModel(wb, styles)
-	dm.SetHeight(30)
-	dm.SetWidth(80)
-	dm.SetDisplayFocused(true)
+	dm = dm.SetHeight(30)
+	dm = dm.SetWidth(80)
+	dm = dm.SetDisplayFocused(true)
 
 	historyID := "stream"
 	wb.AppendOrUpdate("AT", historyID, "")
-	dm.updateContent()
+	dm = dm.updateContent()
 
 	// Worst case: 1000 updates as fast as possible
 	const updates = 1000
@@ -442,7 +442,7 @@ func TestWorstCaseStreaming(t *testing.T) {
 	for i := 0; i < updates; i++ {
 		renderStart := time.Now()
 		wb.AppendOrUpdate("AT", historyID, fmt.Sprintf(" w%d", i))
-		dm.updateContent()
+		dm = dm.updateContent()
 		renderTime := time.Since(renderStart)
 		totalRenderTime += renderTime
 

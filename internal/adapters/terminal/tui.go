@@ -246,7 +246,7 @@ func NewTerminalWithTheme(
 	}
 
 	// Initialize component widths
-	m.display.SetWidth(initialWidth)
+	m.display = m.display.SetWidth(initialWidth)
 	m.input = m.input.SetWidth(initialWidth)
 	m.overlays.SetSize(initialWidth, initialHeight)
 	m.overlays.SetFocusedWindow(focusInput)
@@ -363,7 +363,7 @@ func (m *Terminal) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 
 	// Update all components
 	m.out.SetWindowWidth(max(0, msg.Width))
-	m.display.SetWidth(max(0, msg.Width))
+	m.display = m.display.SetWidth(max(0, msg.Width))
 	m.input = m.input.SetWidth(max(0, msg.Width))
 	m.overlays.SetSize(msg.Width, msg.Height)
 	m.updateDisplayHeight()
@@ -371,7 +371,7 @@ func (m *Terminal) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 	// Clamp cursor to valid bounds (windows may have been removed) but
 	// don't scroll to make it visible — the user's scroll position is
 	// preserved across resizes and suspend/resume cycles.
-	m.display.ClampCursor()
+	m.display = m.display.ClampCursor()
 
 	// If this is a synthetic resize triggered by Ctrl-R, consume the flag.
 	// The view toggle already happened in handleRedraw, and resize() just
@@ -382,7 +382,7 @@ func (m *Terminal) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) 
 	}
 
 	// Re-render display content with new width (windowBuffer was marked dirty by SetWindowWidth)
-	m.display.updateContent()
+	m.display = m.display.updateContent()
 
 	return m, nil
 }
@@ -435,7 +435,7 @@ func (m *Terminal) handleMCPOverlays() {
 		if action.InitOverlayActive && !wasOpen {
 			m.input = m.input.Blur()
 		}
-		m.display.updateContent()
+		m.display = m.display.updateContent()
 	}
 }
 
@@ -461,9 +461,9 @@ func (m *Terminal) handleSessionLoadedMsg() (tea.Model, tea.Cmd) {
 		m.updateStatus()
 		m.updateDisplayHeight()
 		if m.display.shouldFollow() {
-			m.display.SetCursorToLastWindow()
+			m.display = m.display.SetCursorToLastWindow()
 		}
-		m.display.updateContent()
+		m.display = m.display.updateContent()
 	}
 
 	// Sync theme from the now-loaded session state.
@@ -509,9 +509,9 @@ func (m *Terminal) handleDisplayRefresh() tea.Cmd {
 		m.updateStatus()
 		m.updateDisplayHeight()
 		if m.display.shouldFollow() {
-			m.display.SetCursorToLastWindow()
+			m.display = m.display.SetCursorToLastWindow()
 		}
-		m.display.updateContent()
+		m.display = m.display.updateContent()
 	}
 
 	modelSnap := m.out.SnapshotModels()
@@ -568,8 +568,8 @@ func (m *Terminal) updateDisplayHeight() {
 	//
 	// Total = display + inputBox + statusBar = H
 	inputBoxHeight := m.input.Height()
-	m.display.SetHeight(max(0, m.windowHeight-inputBoxHeight-1))
-	m.display.updateContent()
+	m.display = m.display.SetHeight(max(0, m.windowHeight-inputBoxHeight-1))
+	m.display = m.display.updateContent()
 }
 
 // updateStatus updates the status bar state from the output writer.
@@ -665,8 +665,8 @@ var _ tea.Model = (*Terminal)(nil)
 func (m *Terminal) applyTheme(theme *theme.Theme) {
 	m.styles = NewStyles(theme)
 	m.out.SetStyles(m.styles)
-	m.display.SetStyles(m.styles)
+	m.display = m.display.SetStyles(m.styles)
 	m.input = m.input.SetStyles(m.styles)
 	m.overlays.SetStyles(m.styles)
-	m.display.updateContent()
+	m.display = m.display.updateContent()
 }

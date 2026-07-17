@@ -620,7 +620,7 @@ func TestEKeyOpensDisplayWindowInEditor(t *testing.T) {
 	terminal.out.WindowBuffer().AppendOrUpdate(tlv.TagAssistantT, "test1", "Hello from display")
 
 	// Set cursor to first window
-	terminal.display.SetWindowCursor(0)
+	terminal.display = terminal.display.SetWindowCursor(0)
 
 	// Press 'e' key in display window
 	msg := tea.KeyPressMsg(tea.Key{Code: 'e'})
@@ -642,7 +642,7 @@ func TestEKeyDoesNothingWithNoWindow(t *testing.T) {
 	terminal.focusDisplay()
 
 	// No windows in buffer
-	terminal.display.SetWindowCursor(-1)
+	terminal.display = terminal.display.SetWindowCursor(-1)
 
 	// Press 'e' key in display window
 	msg := tea.KeyPressMsg(tea.Key{Code: 'e'})

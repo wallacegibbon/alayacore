@@ -182,18 +182,18 @@ func BenchmarkVirtualRenderingCursorMovement(b *testing.B) {
 	_ = wb.GetTotalLines()
 
 	dm := NewDisplayModel(wb, styles)
-	dm.SetHeight(30)
-	dm.SetWidth(80)
-	dm.SetDisplayFocused(true)
-	dm.updateContent()
+	dm = dm.SetHeight(30)
+	dm = dm.SetWidth(80)
+	dm = dm.SetDisplayFocused(true)
+	dm = dm.updateContent()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Simulate moving cursor through all windows
 		for j := 0; j < 100; j++ {
-			dm.SetWindowCursor(j)
-			dm.EnsureCursorVisible()
-			dm.updateContent()
+			dm = dm.SetWindowCursor(j)
+			dm = dm.EnsureCursorVisible()
+			dm = dm.updateContent()
 		}
 	}
 }
@@ -215,17 +215,17 @@ func BenchmarkVirtualRenderingCursorMovementSingle(b *testing.B) {
 	_ = wb.GetTotalLines()
 
 	dm := NewDisplayModel(wb, styles)
-	dm.SetHeight(30)
-	dm.SetWidth(80)
-	dm.SetDisplayFocused(true)
-	dm.updateContent()
+	dm = dm.SetHeight(30)
+	dm = dm.SetWidth(80)
+	dm = dm.SetDisplayFocused(true)
+	dm = dm.updateContent()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Single cursor move (realistic user action)
-		dm.SetWindowCursor(i % 100)
-		dm.EnsureCursorVisible()
-		dm.updateContent()
+		dm = dm.SetWindowCursor(i % 100)
+		dm = dm.EnsureCursorVisible()
+		dm = dm.updateContent()
 	}
 }
 
@@ -763,20 +763,20 @@ func BenchmarkVirtualRenderingScroll(b *testing.B) {
 	_ = wb.GetTotalLines()
 
 	dm := NewDisplayModel(wb, styles)
-	dm.SetHeight(30)
-	dm.SetWidth(80)
-	dm.updateContent()
+	dm = dm.SetHeight(30)
+	dm = dm.SetWidth(80)
+	dm = dm.updateContent()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Scroll through content
 		for j := 0; j < 100; j++ {
-			dm.ScrollDown(1)
-			dm.updateContent()
+			dm = dm.ScrollDown(1)
+			dm = dm.updateContent()
 		}
 		for j := 0; j < 100; j++ {
-			dm.ScrollUp(1)
-			dm.updateContent()
+			dm = dm.ScrollUp(1)
+			dm = dm.updateContent()
 		}
 	}
 }

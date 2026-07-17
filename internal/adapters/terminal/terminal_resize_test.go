@@ -23,7 +23,7 @@ func TestTerminalResizeCursorValidation(t *testing.T) {
 	output.windowBuffer.AppendOrUpdate(tlv.TagAssistantT, "window-3", "Content 3")
 
 	// Set cursor to the middle window
-	terminal.display.SetWindowCursor(1)
+	terminal.display = terminal.display.SetWindowCursor(1)
 	if terminal.display.GetWindowCursor() != 1 {
 		t.Errorf("Expected cursor at 1, got %d", terminal.display.GetWindowCursor())
 	}
@@ -98,7 +98,7 @@ func TestTerminalResizeUpdatesDisplayContent(t *testing.T) {
 	output.windowBuffer.AppendOrUpdate(tlv.TagAssistantT, "window-1", longContent)
 
 	// Get the initial view
-	terminal.display.updateContent()
+	terminal.display = terminal.display.updateContent()
 	initialView := terminal.display.View()
 	initialContent := initialView.Content
 

@@ -20,33 +20,33 @@ func TestEnsureCursorVisible_OversizedWindowDoesNotOscillate(t *testing.T) {
 	wb.AppendOrUpdate(tlv.TagAssistantT, "window-2", strings.Repeat("line\n", 100))
 
 	// Set viewport height to 50 (smaller than window-2 which is ~100 lines)
-	display.SetHeight(50)
-	display.updateContent()
+	display = display.SetHeight(50)
+	display = display.updateContent()
 
 	// Place cursor on the oversized last window
-	display.SetWindowCursor(1)
+	display = display.SetWindowCursor(1)
 
 	// Simulate pressing "L" (MoveWindowCursorToBottom + EnsureCursorVisible + updateContent)
 	// The first press scrolls to make the window visible
-	display.MoveWindowCursorToBottom()
-	display.EnsureCursorVisible()
-	display.updateContent()
+	display, _ = display.MoveWindowCursorToBottom()
+	display = display.EnsureCursorVisible()
+	display = display.updateContent()
 
 	yOffsetAfterFirst := display.scrollView.YOffset()
 	t.Logf("YOffset after 1st L: %d", yOffsetAfterFirst)
 
 	// Press "L" a second time — should NOT change the YOffset
-	display.MoveWindowCursorToBottom()
-	display.EnsureCursorVisible()
-	display.updateContent()
+	display, _ = display.MoveWindowCursorToBottom()
+	display = display.EnsureCursorVisible()
+	display = display.updateContent()
 
 	yOffsetAfterSecond := display.scrollView.YOffset()
 	t.Logf("YOffset after 2nd L: %d", yOffsetAfterSecond)
 
 	// Press "L" a third time — must stay stable
-	display.MoveWindowCursorToBottom()
-	display.EnsureCursorVisible()
-	display.updateContent()
+	display, _ = display.MoveWindowCursorToBottom()
+	display = display.EnsureCursorVisible()
+	display = display.updateContent()
 
 	yOffsetAfterThird := display.scrollView.YOffset()
 	t.Logf("YOffset after 3rd L: %d", yOffsetAfterThird)
@@ -69,21 +69,21 @@ func TestEnsureCursorVisible_OversizedWindowScrollsWhenOffScreen(t *testing.T) {
 	wb.AppendOrUpdate(tlv.TagAssistantT, "window-1", strings.Repeat("line\n", 100))
 	wb.AppendOrUpdate(tlv.TagAssistantT, "window-2", "Tail")
 
-	display.SetHeight(50)
-	display.updateContent()
+	display = display.SetHeight(50)
+	display = display.updateContent()
 
-	display.SetWindowCursor(0)
+	display = display.SetWindowCursor(0)
 
 	// Scroll to the very bottom so window-0 is entirely above the viewport
 	display.scrollView.GotoBottom()
-	display.updateContent()
+	display = display.updateContent()
 
 	yOffsetBefore := display.scrollView.YOffset()
 	t.Logf("YOffset before (at bottom): %d", yOffsetBefore)
 
 	// Now ensure the oversized window is visible — it's entirely above,
 	// so it should scroll to show its bottom edge
-	display.EnsureCursorVisible()
+	display = display.EnsureCursorVisible()
 
 	yOffsetAfter := display.scrollView.YOffset()
 	t.Logf("YOffset after EnsureCursorVisible: %d", yOffsetAfter)
@@ -113,12 +113,12 @@ func TestEnsureCursorVisible_PartiallyVisibleWindowNotMoved(t *testing.T) {
 			strings.Repeat("line\n", 5))
 	}
 
-	display.SetHeight(20) // viewport shows 20 lines
-	display.updateContent()
+	display = display.SetHeight(20) // viewport shows 20 lines
+	display = display.updateContent()
 
 	// Use window index 10 — NOT the last window, so autoFollow won't
 	// force the viewport to the bottom.
-	display.SetWindowCursor(10) // disables autoFollow
+	display = display.SetWindowCursor(10) // disables autoFollow
 
 	startLine, endLine := wb.GetWindowLineRange(10)
 	t.Logf("Window 10: lines %d-%d", startLine, endLine)
@@ -130,7 +130,7 @@ func TestEnsureCursorVisible_PartiallyVisibleWindowNotMoved(t *testing.T) {
 	yOffsetBefore := display.scrollView.YOffset()
 	t.Logf("YOffset before: %d (viewport %d-%d)", yOffsetBefore, yOffsetBefore, yOffsetBefore+20)
 
-	display.EnsureCursorVisible()
+	display = display.EnsureCursorVisible()
 
 	yOffsetAfter := display.scrollView.YOffset()
 	t.Logf("YOffset after: %d", yOffsetAfter)
@@ -152,11 +152,11 @@ func TestEnsureCursorVisible_OffScreenWindowScrolls(t *testing.T) {
 			strings.Repeat("line\n", 5))
 	}
 
-	display.SetHeight(20)
-	display.updateContent()
+	display = display.SetHeight(20)
+	display = display.updateContent()
 
 	// Use window index 10 — NOT the last window to avoid autoFollow
-	display.SetWindowCursor(10)
+	display = display.SetWindowCursor(10)
 
 	// Start at top — window 10 is entirely below viewport
 	display.scrollView.SetYOffset(0)
@@ -164,7 +164,7 @@ func TestEnsureCursorVisible_OffScreenWindowScrolls(t *testing.T) {
 	yOffsetBefore := display.scrollView.YOffset()
 	t.Logf("YOffset before: %d", yOffsetBefore)
 
-	display.EnsureCursorVisible()
+	display = display.EnsureCursorVisible()
 
 	yOffsetAfter := display.scrollView.YOffset()
 	t.Logf("YOffset after: %d", yOffsetAfter)
@@ -193,17 +193,17 @@ func TestEnsureCursorVisible_EntirelyAboveScrolls(t *testing.T) {
 			strings.Repeat("line\n", 5))
 	}
 
-	display.SetHeight(20)
-	display.updateContent()
+	display = display.SetHeight(20)
+	display = display.updateContent()
 
 	// Use window index 3 — NOT the last window
-	display.SetWindowCursor(3)
+	display = display.SetWindowCursor(3)
 
 	// Scroll to bottom so the window is entirely above the viewport
 	display.scrollView.GotoBottom()
-	display.updateContent()
+	display = display.updateContent()
 
-	display.EnsureCursorVisible()
+	display = display.EnsureCursorVisible()
 
 	_, endLine := wb.GetWindowLineRange(3)
 	vpTop := display.scrollView.YOffset()
@@ -225,14 +225,14 @@ func TestAutoFollow_OnlyGEnables(t *testing.T) {
 	wb.AppendOrUpdate(tlv.TagAssistantT, "w2", strings.Repeat("line\n", 5))
 	wb.AppendOrUpdate(tlv.TagAssistantT, "w3", strings.Repeat("line\n", 5))
 
-	display.SetHeight(10)
-	display.updateContent()
+	display = display.SetHeight(10)
+	display = display.updateContent()
 
 	// Start: autoFollow is true by default (SetCursorToLastWindow from init)
 	// Simulate G: enables auto-follow
-	display.SetCursorToLastWindow()
-	display.GotoBottom()
-	display.updateContent()
+	display = display.SetCursorToLastWindow()
+	display = display.GotoBottom()
+	display = display.updateContent()
 
 	if !display.autoFollow {
 		t.Fatal("expected autoFollow=true after G")
@@ -241,9 +241,9 @@ func TestAutoFollow_OnlyGEnables(t *testing.T) {
 	t.Logf("After G: YOffset=%d, autoFollow=%v", yOffsetAtBottom, display.autoFollow)
 
 	// Now navigate up with k — disables auto-follow
-	display.MoveWindowCursorUp()
-	display.EnsureCursorVisible()
-	display.updateContent()
+	display, _ = display.MoveWindowCursorUp()
+	display = display.EnsureCursorVisible()
+	display = display.updateContent()
 
 	if display.autoFollow {
 		t.Fatal("expected autoFollow=false after k")
@@ -251,7 +251,7 @@ func TestAutoFollow_OnlyGEnables(t *testing.T) {
 
 	// Simulate new content arriving — viewport should NOT jump to bottom
 	wb.AppendOrUpdate(tlv.TagAssistantT, "w3", strings.Repeat("line\n", 20))
-	display.updateContent()
+	display = display.updateContent()
 
 	if display.scrollView.YOffset() != yOffsetAtBottom {
 		t.Errorf("viewport moved after new content while autoFollow=false (YOffset changed from %d to %d)",
@@ -259,9 +259,9 @@ func TestAutoFollow_OnlyGEnables(t *testing.T) {
 	}
 
 	// Now press G again — re-enables auto-follow
-	display.SetCursorToLastWindow()
-	display.GotoBottom()
-	display.updateContent()
+	display = display.SetCursorToLastWindow()
+	display = display.GotoBottom()
+	display = display.updateContent()
 
 	if !display.autoFollow {
 		t.Fatal("expected autoFollow=true after second G")
@@ -271,7 +271,7 @@ func TestAutoFollow_OnlyGEnables(t *testing.T) {
 
 	// More new content — should follow to bottom
 	wb.AppendOrUpdate(tlv.TagAssistantT, "w3", strings.Repeat("line\n", 50))
-	display.updateContent()
+	display = display.updateContent()
 
 	yOffsetFinal := display.scrollView.YOffset()
 	t.Logf("After new content (following): YOffset=%d", yOffsetFinal)
@@ -300,13 +300,13 @@ func TestAutoFollow_JNoOpWhenNewWindowBetweenTicks(t *testing.T) {
 	wb.AppendOrUpdate(tlv.TagAssistantT, "w2", strings.Repeat("line\n", 5))
 	wb.AppendOrUpdate(tlv.TagAssistantT, "w3", strings.Repeat("line\n", 5))
 
-	display.SetHeight(20)
-	display.updateContent()
+	display = display.SetHeight(20)
+	display = display.updateContent()
 
 	// Simulate G: cursor at last window, auto-follow enabled.
-	display.SetCursorToLastWindow()
-	display.GotoBottom()
-	display.updateContent()
+	display = display.SetCursorToLastWindow()
+	display = display.GotoBottom()
+	display = display.updateContent()
 
 	if !display.autoFollow {
 		t.Fatal("expected autoFollow=true after G")
@@ -315,7 +315,8 @@ func TestAutoFollow_JNoOpWhenNewWindowBetweenTicks(t *testing.T) {
 	t.Logf("After G: cursor=%d, autoFollow=%v", cursorBefore, display.autoFollow)
 
 	// Press j while at the last window — should be a no-op.
-	moved := display.MoveWindowCursorDown()
+	var moved bool
+	display, moved = display.MoveWindowCursorDown()
 	if moved {
 		t.Fatal("j at last window with autoFollow should be a no-op")
 	}
@@ -329,7 +330,7 @@ func TestAutoFollow_JNoOpWhenNewWindowBetweenTicks(t *testing.T) {
 	// Before the fix, pressing j here would move cursor to index 3 and
 	// disable auto-follow.
 
-	moved = display.MoveWindowCursorDown()
+	display, moved = display.MoveWindowCursorDown()
 	if moved {
 		t.Errorf("j with autoFollow should be no-op even after new window; cursor=%d, windowCount=%d",
 			display.GetWindowCursor(), wb.WindowCount())
@@ -342,7 +343,7 @@ func TestAutoFollow_JNoOpWhenNewWindowBetweenTicks(t *testing.T) {
 	}
 
 	// L (MoveWindowCursorToBottom) should also be a no-op while auto-following.
-	moved = display.MoveWindowCursorToBottom()
+	display, moved = display.MoveWindowCursorToBottom()
 	if moved {
 		t.Errorf("L with autoFollow should be no-op; cursor=%d", display.GetWindowCursor())
 	}
@@ -352,9 +353,9 @@ func TestAutoFollow_JNoOpWhenNewWindowBetweenTicks(t *testing.T) {
 
 	// Now simulate the tick handler: SetCursorToLastWindow advances cursor
 	// to the new last window and keeps auto-follow.
-	display.SetCursorToLastWindow()
-	display.GotoBottom()
-	display.updateContent()
+	display = display.SetCursorToLastWindow()
+	display = display.GotoBottom()
+	display = display.updateContent()
 
 	if display.GetWindowCursor() != 3 {
 		t.Errorf("after tick, cursor should be at last window (3), got %d", display.GetWindowCursor())
@@ -379,13 +380,13 @@ func TestScrollCursorToTop_PositionsWindowAtTop(t *testing.T) {
 			strings.Repeat("line\n", 5))
 	}
 
-	display.SetHeight(20)
-	display.updateContent()
+	display = display.SetHeight(20)
+	display = display.updateContent()
 
 	// Place cursor on window 8 (near the end) and bring it into view
-	display.SetWindowCursor(8)
-	display.EnsureCursorVisible()
-	display.updateContent()
+	display = display.SetWindowCursor(8)
+	display = display.EnsureCursorVisible()
+	display = display.updateContent()
 
 	// Verify the window is visible but NOT necessarily at the top
 	startLine, _ := wb.GetWindowLineRange(8)
@@ -393,8 +394,8 @@ func TestScrollCursorToTop_PositionsWindowAtTop(t *testing.T) {
 	t.Logf("Before ScrollCursorToTop: startLine=%d, viewportTop=%d", startLine, viewportTop)
 
 	// Now use ScrollCursorToTop — should position the window at the top
-	display.ScrollCursorToTop()
-	display.updateContent()
+	display = display.ScrollCursorToTop()
+	display = display.updateContent()
 
 	newViewportTop := display.scrollView.YOffset()
 	t.Logf("After ScrollCursorToTop: startLine=%d, viewportTop=%d", startLine, newViewportTop)
@@ -418,13 +419,13 @@ func TestScrollCursorToTop_PartiallyVisibleWindowMovesToTop(t *testing.T) {
 			strings.Repeat("line\n", 5))
 	}
 
-	display.SetHeight(20)
-	display.updateContent()
+	display = display.SetHeight(20)
+	display = display.updateContent()
 
 	// Set cursor to a window and ensure it's visible (but not at top)
-	display.SetWindowCursor(5)
-	display.EnsureCursorVisible()
-	display.updateContent()
+	display = display.SetWindowCursor(5)
+	display = display.EnsureCursorVisible()
+	display = display.updateContent()
 
 	startLine5, endLine5 := wb.GetWindowLineRange(5)
 	t.Logf("Window 5: lines %d-%d", startLine5, endLine5)
@@ -432,14 +433,14 @@ func TestScrollCursorToTop_PartiallyVisibleWindowMovesToTop(t *testing.T) {
 	// Position viewport so window 5 is partially visible at the bottom
 	viewportHeight := display.GetHeight()
 	display.scrollView.SetYOffset(startLine5 - 2) // window starts 2 lines above viewport bottom
-	display.updateContent()
+	display = display.updateContent()
 
 	viewportTopBefore := display.scrollView.YOffset()
 	t.Logf("Before: viewport=%d-%d, window starts at %d",
 		viewportTopBefore, viewportTopBefore+viewportHeight, startLine5)
 
 	// EnsureCursorVisible would NOT scroll (window is partially visible)
-	display.EnsureCursorVisible()
+	display = display.EnsureCursorVisible()
 	viewportTopAfterEnsure := display.scrollView.YOffset()
 	if viewportTopAfterEnsure != viewportTopBefore {
 		t.Fatalf("EnsureCursorVisible should not have scrolled (it did: %d -> %d)",
@@ -447,7 +448,7 @@ func TestScrollCursorToTop_PartiallyVisibleWindowMovesToTop(t *testing.T) {
 	}
 
 	// ScrollCursorToTop SHOULD scroll to put window at top
-	display.ScrollCursorToTop()
+	display = display.ScrollCursorToTop()
 	viewportTopAfterScroll := display.scrollView.YOffset()
 	t.Logf("After ScrollCursorToTop: viewportTop=%d, expected=%d", viewportTopAfterScroll, startLine5)
 
@@ -463,12 +464,12 @@ func TestScrollCursorToTop_NoCursorDoesNothing(t *testing.T) {
 	display := NewDisplayModel(wb, DefaultStyles())
 
 	wb.AppendOrUpdate(tlv.TagUserT, "window-1", "hello")
-	display.SetHeight(10)
-	display.updateContent()
+	display = display.SetHeight(10)
+	display = display.updateContent()
 
 	// No cursor set (-1 is the default)
 	yOffsetBefore := display.scrollView.YOffset()
-	display.ScrollCursorToTop()
+	display = display.ScrollCursorToTop()
 	yOffsetAfter := display.scrollView.YOffset()
 
 	if yOffsetBefore != yOffsetAfter {
@@ -488,18 +489,18 @@ func TestScrollCursorToTop_AlreadyAtTopIsStable(t *testing.T) {
 			strings.Repeat("line\n", 5))
 	}
 
-	display.SetHeight(20)
-	display.updateContent()
+	display = display.SetHeight(20)
+	display = display.updateContent()
 
-	display.SetWindowCursor(2)
-	display.ScrollCursorToTop()
-	display.updateContent()
+	display = display.SetWindowCursor(2)
+	display = display.ScrollCursorToTop()
+	display = display.updateContent()
 
 	yOffset1 := display.scrollView.YOffset()
 
 	// Call again — should be stable
-	display.ScrollCursorToTop()
-	display.updateContent()
+	display = display.ScrollCursorToTop()
+	display = display.updateContent()
 
 	yOffset2 := display.scrollView.YOffset()
 	if yOffset1 != yOffset2 {
