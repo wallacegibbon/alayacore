@@ -175,6 +175,15 @@ func (hw *HelpWindow) SetSize(width, height int) {
 	hw.recalculateColumnWidths()
 }
 
+func (hw *HelpWindow) SetStyles(styles *Styles) {
+	hw.FilteredListCore = hw.FilteredListCore.SetStyles(styles)
+	hw.recalculateColumnWidths()
+}
+
+func (hw *HelpWindow) SetHasFocus(focused bool) {
+	hw.FilteredListCore = hw.FilteredListCore.SetHasFocus(focused)
+}
+
 // --- Open / Close ---
 
 func (hw *HelpWindow) Open() {

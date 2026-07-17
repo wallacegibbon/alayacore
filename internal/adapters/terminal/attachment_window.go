@@ -65,6 +65,19 @@ func (aw *AttachmentWindow) SetOnAdd(fn func(path string)) {
 	aw.onAdd = fn
 }
 
+// SetSize updates the width and height of the attachment window.
+func (aw *AttachmentWindow) SetSize(width, height int) {
+	aw.FilteredListCore = aw.FilteredListCore.SetSize(width, height)
+}
+
+func (aw *AttachmentWindow) SetStyles(styles *Styles) {
+	aw.FilteredListCore = aw.FilteredListCore.SetStyles(styles)
+}
+
+func (aw *AttachmentWindow) SetHasFocus(focused bool) {
+	aw.FilteredListCore = aw.FilteredListCore.SetHasFocus(focused)
+}
+
 // Open opens the attachment window and loads the current directory.
 func (aw *AttachmentWindow) Open() {
 	aw.State = FilteredListOpen

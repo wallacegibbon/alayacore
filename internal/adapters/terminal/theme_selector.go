@@ -42,6 +42,18 @@ func NewThemeSelector(styles *Styles) *ThemeSelector {
 
 // --- State Management ---
 
+func (ts *ThemeSelector) SetSize(width, height int) {
+	ts.ScrollableListCore = ts.ScrollableListCore.SetSize(width, height)
+}
+
+func (ts *ThemeSelector) SetStyles(styles *Styles) {
+	ts.ScrollableListCore = ts.ScrollableListCore.SetStyles(styles)
+}
+
+func (ts *ThemeSelector) SetHasFocus(focused bool) {
+	ts.ScrollableListCore = ts.ScrollableListCore.SetHasFocus(focused)
+}
+
 func (ts *ThemeSelector) Open(themes []theme.Info, activeTheme string) {
 	ts.themes = themes
 	ts.State = ScrollableListOpen

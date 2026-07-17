@@ -191,6 +191,18 @@ func (ms *ModelSelector) ConsumeReloadModels() bool {
 
 // --- Open / Close ---
 
+func (ms *ModelSelector) SetSize(width, height int) {
+	ms.FilteredListCore = ms.FilteredListCore.SetSize(width, height)
+}
+
+func (ms *ModelSelector) SetStyles(styles *Styles) {
+	ms.FilteredListCore = ms.FilteredListCore.SetStyles(styles)
+}
+
+func (ms *ModelSelector) SetHasFocus(focused bool) {
+	ms.FilteredListCore = ms.FilteredListCore.SetHasFocus(focused)
+}
+
 func (ms *ModelSelector) Open() {
 	ms.State = FilteredListOpen
 	ms.FilterInput = ms.FilterInput.SetValue("")
