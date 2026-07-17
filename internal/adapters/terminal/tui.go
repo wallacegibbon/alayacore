@@ -70,12 +70,6 @@ func (m Terminal) emitCommand(cmd string) tea.Cmd {
 	}
 }
 
-// emitCommandNow directly writes a TLV command without going through tea.Cmd.
-// Only for use outside Update (goroutines, Init), where tea.Cmd cannot be returned.
-func (m Terminal) emitCommandNow(cmd string) {
-	_ = tlv.WriteTLV(m.streamInput, tlv.TagUserT, cmd)
-}
-
 // submitCmd returns a tea.Cmd that sends staged content (attachments + text)
 // as a complete user message via TLV. Runs outside Update when executed by
 // Bubble Tea's runtime.

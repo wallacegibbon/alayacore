@@ -14,6 +14,7 @@ import (
 
 	"github.com/alayacore/alayacore/internal/platform"
 	"github.com/alayacore/alayacore/internal/theme"
+	"github.com/alayacore/alayacore/internal/tlv"
 )
 
 // ============================================================================
@@ -169,25 +170,34 @@ func (m Terminal) handleConfirmTool(r *ConfirmResult, fromCmd bool) (Terminal, t
 func (m Terminal) handleConfirmMCPAuth(r *ConfirmResult, fromCmd bool) (Terminal, tea.Cmd) {
 	switch {
 	case r.Confirmed:
-		m.startMCPAuthFlow(r.ToolID, r.ToolInput)
+		m = m.restoreFocusAfterConfirm()
+		return m, tea.Batch(
+			m.startMCPAuthFlow(r.ToolID, r.ToolInput),
+			scheduleTick(),
+		)
 	case r.CtrlGCanceled:
 		m.out.ClearMCPAuths()
-		cmd := m.emitCommand(":mcp_cancel")
-		return m, cmd
+		m = m.restoreFocusAfterConfirm()
+		return m, tea.Batch(
+			m.emitCommand(":mcp_cancel"),
+			scheduleTick(),
+		)
 	default:
 		if fromCmd {
 			m.input = m.input.WithValue("")
 		}
-		cmd := m.emitCommand(":mcp_auth " + r.ToolID)
-		return m, cmd
+		m = m.restoreFocusAfterConfirm()
+		return m, tea.Batch(
+			m.emitCommand(":mcp_auth "+r.ToolID),
+			scheduleTick(),
+		)
 	}
-	m = m.restoreFocusAfterConfirm()
-	return m, scheduleTick()
 }
 
 // startMCPAuthFlow starts the OAuth callback server, opens the browser,
-// and waits for the authorization code in a background goroutine.
-func (m Terminal) startMCPAuthFlow(serverName, authURL string) {
+// and waits for the authorization code. All I/O runs inside the returned
+// tea.Cmd, which Bubble Tea executes in a goroutine (does not block Update).
+func (m Terminal) startMCPAuthFlow(serverName, authURL string) tea.Cmd {
 	state := platform.RandomState()
 
 	resultCh, redirectURI, cleanup := platform.StartCallbackServer("127.0.0.1:0", state, serverName)
@@ -197,24 +207,25 @@ func (m Terminal) startMCPAuthFlow(serverName, authURL string) {
 	filledURL = strings.ReplaceAll(filledURL, "{{redirect_uri}}", encodedRedirect)
 	filledURL = strings.ReplaceAll(filledURL, "{{state}}", state)
 
-	m.out.WriteNotify(fmt.Sprintf("Authorizing %s. If your browser doesn't open, open this URL:\n%s",
-		serverName, filledURL))
+	return func() tea.Msg {
+		m.out.WriteNotify(fmt.Sprintf("Authorizing %s. If your browser doesn't open, open this URL:\n%s",
+			serverName, filledURL))
 
-	if err := platform.OpenURL(filledURL); err != nil {
-		m.out.WriteError("Failed to open browser: %v", err)
-	}
+		if err := platform.OpenURL(filledURL); err != nil {
+			m.out.WriteError("Failed to open browser: %v", err)
+		}
 
-	go func() {
 		res := <-resultCh
 		cleanup()
 		if res.Err != nil {
 			m.out.WriteError("MCP auth callback error: %v", res.Err)
-			m.emitCommandNow(":mcp_cancel")
-			return
+			_ = tlv.WriteTLV(m.streamInput, tlv.TagUserT, ":mcp_cancel")
+			return nil
 		}
-		m.emitCommandNow(fmt.Sprintf(":mcp_auth %s %s %s",
-			serverName, res.Code, redirectURI))
-	}()
+		_ = tlv.WriteTLV(m.streamInput, tlv.TagUserT,
+			fmt.Sprintf(":mcp_auth %s %s %s", serverName, res.Code, redirectURI))
+		return nil
+	}
 }
 
 // restoreFocusAfterConfirm restores input/display focus only if no overlay
