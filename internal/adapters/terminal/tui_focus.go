@@ -25,14 +25,14 @@ func (m *Terminal) toggleFocus() {
 func (m *Terminal) focusInput() {
 	m.overlays.SetFocusedWindow(focusInput)
 	m.display.SetDisplayFocused(false)
-	m.input.Focus()
+	m.input = m.input.Focus()
 }
 
 // focusDisplay switches focus to the display window.
 func (m *Terminal) focusDisplay() {
 	m.overlays.SetFocusedWindow(focusDisplay)
 	m.display.SetDisplayFocused(true)
-	m.input.Blur()
+	m.input = m.input.Blur()
 	if m.display.GetWindowCursor() < 0 {
 		m.display.SetCursorToLastWindow()
 	}
@@ -42,7 +42,7 @@ func (m *Terminal) focusDisplay() {
 func (m *Terminal) openModelSelector() {
 	m.overlays.SetFocusedWindow(m.overlays.RestoreFocus())
 	m.overlays.OpenModelSelector()
-	m.input.Blur()
+	m.input = m.input.Blur()
 	m.display.SetDisplayFocused(false)
 	m.display.updateContent()
 }
@@ -65,7 +65,7 @@ func (m *Terminal) openThemeSelector() {
 	}
 	m.overlays.SetFocusedWindow(m.overlays.RestoreFocus())
 	m.overlays.OpenThemeSelector(m.themeManager.GetThemes(), m.activeTheme)
-	m.input.Blur()
+	m.input = m.input.Blur()
 	m.display.SetDisplayFocused(false)
 	m.display.updateContent()
 }
@@ -74,7 +74,7 @@ func (m *Terminal) openThemeSelector() {
 func (m *Terminal) openHelpWindow() {
 	m.overlays.SetFocusedWindow(m.overlays.RestoreFocus())
 	m.overlays.OpenHelpWindow()
-	m.input.Blur()
+	m.input = m.input.Blur()
 	m.display.SetDisplayFocused(false)
 	m.display.updateContent()
 }
@@ -89,7 +89,7 @@ func (m *Terminal) openAttachmentWindow() {
 			m.addAttachment(item)
 		}
 	})
-	m.input.Blur()
+	m.input = m.input.Blur()
 	m.display.SetDisplayFocused(false)
 	m.display.updateContent()
 }
@@ -98,7 +98,7 @@ func (m *Terminal) openAttachmentWindow() {
 func (m *Terminal) openConfirmQuit() {
 	m.overlays.SetFocusedWindow(m.overlays.RestoreFocus())
 	m.overlays.OpenConfirmQuit()
-	m.input.Blur()
+	m.input = m.input.Blur()
 	m.display.SetDisplayFocused(false)
 	m.display.updateContent()
 }
@@ -107,7 +107,7 @@ func (m *Terminal) openConfirmQuit() {
 func (m *Terminal) openConfirmCancel() {
 	m.overlays.SetFocusedWindow(m.overlays.RestoreFocus())
 	m.overlays.OpenConfirmCancel()
-	m.input.Blur()
+	m.input = m.input.Blur()
 	m.display.SetDisplayFocused(false)
 	m.display.updateContent()
 }
@@ -116,7 +116,7 @@ func (m *Terminal) openConfirmCancel() {
 func (m *Terminal) openConfirmTool(id, toolName, toolInput string) {
 	m.overlays.SetFocusedWindow(m.overlays.RestoreFocus())
 	m.overlays.OpenConfirmTool(id, toolName, toolInput)
-	m.input.Blur()
+	m.input = m.input.Blur()
 	m.display.SetDisplayFocused(false)
 	m.display.updateContent()
 }
@@ -125,7 +125,7 @@ func (m *Terminal) openConfirmTool(id, toolName, toolInput string) {
 func (m *Terminal) handleBlur() (tea.Model, tea.Cmd) {
 	m.hasFocus = false
 	m.display.SetDisplayFocused(false)
-	m.input.Blur()
+	m.input = m.input.Blur()
 	m.overlays.SetFocused(false)
 	m.display.updateContent()
 	return m, nil
