@@ -159,8 +159,8 @@ func TestModelSelectorCtrlCClearsSearch(t *testing.T) {
 	}
 
 	// Cmd should be nil (no action)
-	if cmd != nil {
-		t.Errorf("Ctrl+C should not return a command, got %v", cmd)
+	if cmd.Cmd != nil {
+		t.Errorf("Ctrl+C should not return a command, got %v", cmd.Cmd)
 	}
 }
 

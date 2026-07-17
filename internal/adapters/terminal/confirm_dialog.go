@@ -193,45 +193,71 @@ func (cd ConfirmDialog) Close() ConfirmDialog {
 
 // ---- Key Handling ----
 
+// ConfirmDialogUpdate captures the outcome of a HandleKeyMsg call.
+type ConfirmDialogUpdate struct {
+	Handled bool
+	Result  *ConfirmResult // non-nil when dialog committed a result (confirmed/canceled)
+}
+
 // HandleKeyMsg processes a key press and updates state.
-// Returns the updated dialog and whether the key was consumed.
-func (cd ConfirmDialog) HandleKeyMsg(msg tea.KeyMsg) (ConfirmDialog, bool) {
+// Returns the updated dialog and a result struct describing what happened.
+func (cd ConfirmDialog) HandleKeyMsg(msg tea.KeyMsg) (ConfirmDialog, ConfirmDialogUpdate) {
 	if !cd.IsOpen() {
-		return cd, false
+		return cd, ConfirmDialogUpdate{}
 	}
 
 	key := msg.String()
 
 	if cd.kind == ConfirmMCPInit {
 		if key == keyCtrlG {
+			cd, r := cd.buildResult()
+			r.CtrlGCanceled = true
 			cd.canceled = true
 			cd.state = FilteredListClosed
+			return cd, ConfirmDialogUpdate{Handled: true, Result: r}
 		}
-		return cd, true
+		return cd, ConfirmDialogUpdate{Handled: true}
 	}
 
 	switch key {
 	case keyY, keyYCapital:
 		cd.confirmed = true
 		cd.state = FilteredListClosed
-		return cd, true
+		_, r := cd.buildResult()
+		return cd, ConfirmDialogUpdate{Handled: true, Result: r}
 
 	case keyN, keyNCapital, keyEsc:
 		cd.canceled = true
 		cd.state = FilteredListClosed
-		return cd, true
+		_, r := cd.buildResult()
+		return cd, ConfirmDialogUpdate{Handled: true, Result: r}
 
 	case keyCtrlG:
 		if cd.kind == ConfirmMCPAuth {
+			cd, r := cd.buildResult()
+			r.CtrlGCanceled = true
 			cd.ctrlGCanceled = true
 			cd.canceled = true
 			cd.state = FilteredListClosed
-			return cd, true
+			return cd, ConfirmDialogUpdate{Handled: true, Result: r}
 		}
-		return cd, true
+		return cd, ConfirmDialogUpdate{Handled: true}
 	}
 
-	return cd, true
+	return cd, ConfirmDialogUpdate{Handled: true}
+}
+
+// buildResult creates a ConfirmResult from the current state without resetting.
+func (cd ConfirmDialog) buildResult() (ConfirmDialog, *ConfirmResult) {
+	r := &ConfirmResult{
+		Kind:          cd.kind,
+		Confirmed:     cd.confirmed,
+		Canceled:      cd.canceled,
+		ToolID:        cd.toolID,
+		ToolInput:     cd.toolInput,
+		CtrlGCanceled: cd.ctrlGCanceled,
+	}
+	return cd, r
 }
 
 // ConfirmResult captures the complete result of a confirm dialog interaction.
@@ -244,25 +270,6 @@ type ConfirmResult struct {
 	CtrlGCanceled bool
 }
 
-// ConsumeResult returns the result of the dialog interaction and resets
-// the dialog to its closed state. Returns nil if no result is pending.
-func (cd ConfirmDialog) ConsumeResult() (ConfirmDialog, *ConfirmResult) {
-	if !cd.confirmed && !cd.canceled {
-		return cd, nil
-	}
-
-	r := &ConfirmResult{
-		Kind:          cd.kind,
-		Confirmed:     cd.confirmed,
-		Canceled:      cd.canceled,
-		ToolID:        cd.toolID,
-		ToolInput:     cd.toolInput,
-		CtrlGCanceled: cd.ctrlGCanceled,
-	}
-
-	cd = cd.Close()
-	return cd, r
-}
 
 // ---- Rendering ----
 

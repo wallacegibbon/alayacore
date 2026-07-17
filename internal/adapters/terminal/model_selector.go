@@ -161,7 +161,7 @@ func (ms ModelSelector) selectActiveModelIfPrevDeleted(prevSelectedModelID int) 
 
 // --- Action Consumption ---
 
-func (ms ModelSelector) ConsumeModelSelected() (ModelSelector, bool) {
+func (ms ModelSelector) ConsumeModelSelected_DELETED() (ModelSelector, bool) {
 	if ms.modelJustSelected {
 		ms.modelJustSelected = false
 		return ms, true
@@ -169,7 +169,7 @@ func (ms ModelSelector) ConsumeModelSelected() (ModelSelector, bool) {
 	return ms, false
 }
 
-func (ms ModelSelector) ConsumeReloadModels() (ModelSelector, bool) {
+func (ms ModelSelector) ConsumeReloadModels_DELETED() (ModelSelector, bool) {
 	if ms.reloadModels {
 		ms.reloadModels = false
 		return ms, true
@@ -222,30 +222,40 @@ func (ms ModelSelector) selectActiveModel() ModelSelector {
 	return ms
 }
 
+// ModelSelectorUpdate captures the outcome of a HandleKeyMsg call.
+type ModelSelectorUpdate struct {
+	Cmd           tea.Cmd
+	ModelSelected bool
+	ReloadModels  bool
+}
+
 // --- Key Handling ---
 
-func (ms ModelSelector) HandleKeyMsg(msg tea.KeyMsg) (ModelSelector, tea.Cmd) {
+func (ms ModelSelector) HandleKeyMsg(msg tea.KeyMsg) (ModelSelector, ModelSelectorUpdate) {
 	if ms.State == FilteredListClosed {
-		return ms, nil
+		return ms, ModelSelectorUpdate{}
 	}
 
 	key := msg.String()
 
 	fl, handled, filterChanged, cmd := ms.FilteredListCore.HandleKeyMsg(msg, func(extraKey string) bool {
-		// Callback handles Enter key usage by the core.
-		// Selection logic runs after HandleKeyMsg to avoid
-		// closure capture issues with value types.
 		return extraKey == keyEnter
 	})
 
-	// Handle Enter selection in the list: react after GetFilteredListCore returns.
+	update := ModelSelectorUpdate{Cmd: cmd}
+
+	// Handle Enter selection in the list.
 	if key == keyEnter && handled && !fl.FilterInputFocused {
-		// Check the condition that handleListEnter would check
 		if len(ms.filteredModels) > 0 && fl.SelectedIdx >= 0 {
 			ms.activeModel = &ms.filteredModels[fl.SelectedIdx]
 			ms.modelJustSelected = true
 			fl = fl.Close()
 		}
+	}
+
+	if ms.modelJustSelected {
+		update.ModelSelected = true
+		ms.modelJustSelected = false
 	}
 
 	ms.FilteredListCore = fl
@@ -259,15 +269,20 @@ func (ms ModelSelector) HandleKeyMsg(msg tea.KeyMsg) (ModelSelector, tea.Cmd) {
 		}
 		if ms.FilterInputFocused && key == keyEnter && len(ms.filteredModels) > 0 {
 			ms = ms.handleSearchEnter()
+			update.ModelSelected = true
 		}
-		return ms, cmd
+		return ms, update
 	}
 
 	if !ms.FilterInputFocused {
 		ms = ms.handleListKeys(key)
 	}
+	if ms.reloadModels {
+		update.ReloadModels = true
+		ms.reloadModels = false
+	}
 
-	return ms, nil
+	return ms, update
 }
 
 func (ms ModelSelector) handleListEnter() (ModelSelector, bool) {

@@ -80,21 +80,13 @@ func (m *Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	// Track if selector was open before handling key
 	wasOpen := m.overlays.ThemeSelector().IsOpen()
 
-	ts, previewTheme, handled := m.overlays.ThemeSelector().HandleKeyMsg(msg, m.themeManager)
+	ts, result := m.overlays.ThemeSelector().HandleKeyMsg(msg, m.themeManager)
 	m.overlays.SetThemeSelector(ts)
-	if !handled {
-		return m, nil
-	}
 
 	// Check if theme was selected (Enter key)
-	ts, themeSelected := ts.ConsumeThemeSelected()
-	m.overlays.SetThemeSelector(ts)
-	if themeSelected {
+	if result.ThemeSelected {
 		selectedTheme := ts.GetSelectedTheme()
 		if selectedTheme != nil {
-			// Send theme_set command to session via TLV
-			// The session will persist the theme and the terminal will apply
-			// it visually when it receives the updated theme message.
 			m.emitCommand(":theme_set " + selectedTheme.Name)
 		}
 		m.restoreFocus()
@@ -111,7 +103,7 @@ func (m *Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	}
 
 	// Apply preview theme if changed
-	if previewTheme != nil {
+	if result.PreviewTheme != nil {
 		// For navigation keys, delay theme application to keep cursor responsive
 		key := msg.String()
 		if key == keyJ || key == keyK || key == keyUp || key == keyDown {
@@ -119,7 +111,7 @@ func (m *Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 			m.themePreviewID++
 			// Capture the current ID to check if this preview is still valid
 			id := m.themePreviewID
-			theme := previewTheme
+			theme := result.PreviewTheme
 
 			// Return a command that will apply the theme after a delay
 			// This allows the cursor to update immediately
@@ -128,7 +120,7 @@ func (m *Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 			})
 		}
 		// Apply immediately for other keys
-		m.applyTheme(previewTheme)
+		m.applyTheme(result.PreviewTheme)
 	}
 
 	return m, nil
@@ -148,8 +140,8 @@ func (m *Terminal) handleThemePreview(msg themePreviewMsg) (tea.Model, tea.Cmd) 
 	return m, nil
 }
 
-func (m *Terminal) handleConfirmResult() (tea.Model, tea.Cmd) {
-	cd, r := m.overlays.ConfirmOverlay().ConsumeResult()
+func (m *Terminal) handleConfirmResult(cd ConfirmDialog, update ConfirmDialogUpdate) (tea.Model, tea.Cmd) {
+	r := update.Result
 	m.overlays.SetConfirmOverlay(cd)
 	if r == nil {
 		return m, nil
@@ -277,25 +269,19 @@ func (m *Terminal) restoreFocusAfterConfirm() {
 // handleOverlayModelSelector handles keyboard input when the model selector is open.
 func (m *Terminal) handleOverlayModelSelector(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	wasOpen := m.overlays.ModelSelector().IsOpen()
-	ms, cmd := m.overlays.ModelSelector().HandleKeyMsg(msg)
+	ms, result := m.overlays.ModelSelector().HandleKeyMsg(msg)
 	m.overlays.SetModelSelector(ms)
 
-	ms, modelSelected := ms.ConsumeModelSelected()
-	m.overlays.SetModelSelector(ms)
-	if modelSelected {
+	if result.ModelSelected {
 		m.switchToSelectedModel()
 	}
-
-	ms, reloadModels := ms.ConsumeReloadModels()
-	m.overlays.SetModelSelector(ms)
-	if reloadModels {
+	if result.ReloadModels {
 		m.emitCommand(":model_load")
 	}
-
 	if wasOpen && !ms.IsOpen() {
 		m.restoreFocus()
 	}
-	return m, cmd
+	return m, result.Cmd
 }
 
 // handleMCPInitKeys handles keyboard input when the MCP init overlay is open.
@@ -345,21 +331,19 @@ func (m *Terminal) handleSelectorOverlayKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 	if m.overlays.HelpWindow().IsOpen() {
 		hw := m.overlays.HelpWindow()
 		t := trackOverlay(hw)
-		hw, cmd := hw.HandleKeyMsg(msg)
+		hw, result := hw.HandleKeyMsg(msg)
 		m.overlays.SetHelpWindow(hw)
 		if t.JustClosed(hw) {
-			hw, pending := hw.ConsumePendingCommand()
-			m.overlays.SetHelpWindow(hw)
-			if pending != "" {
+			if result.PendingCommand != "" {
 				m.focusInput()
-				m.input = m.input.SetValue(pending + " ")
+				m.input = m.input.SetValue(result.PendingCommand + " ")
 				m.input = m.input.CursorEnd()
 				m.display = m.display.updateContent()
 				return nil, true
 			}
 			m.restoreFocus()
 		}
-		return cmd, true
+		return result.Cmd, true
 	}
 	return nil, false
 }
@@ -375,9 +359,8 @@ func (m *Terminal) handleOverlayConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, m.editor.OpenForDisplay(content)
 	}
-	if cd, handled := m.overlays.ConfirmOverlay().HandleKeyMsg(msg); handled {
-		m.overlays.SetConfirmOverlay(cd)
-		return m.handleConfirmResult()
+	if cd, update := m.overlays.ConfirmOverlay().HandleKeyMsg(msg); update.Handled {
+		return m.handleConfirmResult(cd, update)
 	}
 	return m, nil
 }

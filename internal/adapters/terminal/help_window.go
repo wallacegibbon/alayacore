@@ -245,7 +245,13 @@ func (hw HelpWindow) filteredLen() int {
 	return len(hw.filteredItems)
 }
 
-func (hw HelpWindow) HandleKeyMsg(msg tea.KeyMsg) (HelpWindow, tea.Cmd) {
+// HelpWindowUpdate captures the outcome of a HandleKeyMsg call.
+type HelpWindowUpdate struct {
+	Cmd            tea.Cmd
+	PendingCommand string // non-empty when a command was selected
+}
+
+func (hw HelpWindow) HandleKeyMsg(msg tea.KeyMsg) (HelpWindow, HelpWindowUpdate) {
 	key := msg.String()
 
 	fl, handled, filterChanged, cmd := hw.FilteredListCore.HandleKeyMsg(msg, func(extraKey string) bool {
@@ -265,7 +271,12 @@ func (hw HelpWindow) HandleKeyMsg(msg tea.KeyMsg) (HelpWindow, tea.Cmd) {
 		}
 		return false
 	})
+
+	update := HelpWindowUpdate{Cmd: cmd}
+
 	if hw.pendingCommand != "" {
+		update.PendingCommand = hw.pendingCommand
+		hw.pendingCommand = ""
 		fl = fl.Close()
 	}
 	hw.FilteredListCore = fl
@@ -284,15 +295,9 @@ func (hw HelpWindow) HandleKeyMsg(msg tea.KeyMsg) (HelpWindow, tea.Cmd) {
 				hw = hw.moveUp()
 			}
 		}
-		return hw, cmd
+		return hw, update
 	}
-	return hw, nil
-}
-
-func (hw HelpWindow) ConsumePendingCommand() (HelpWindow, string) {
-	cmd := hw.pendingCommand
-	hw.pendingCommand = ""
-	return hw, cmd
+	return hw, update
 }
 
 func (hw HelpWindow) handleTabToList() HelpWindow { return hw }
