@@ -119,7 +119,7 @@ func (fl FilteredListCore) HandleFilterCtrlC() FilteredListCore {
 
 // HandleKeyMsg handles common filtered list navigation keys.
 // Returns (fl, handled, filterChanged, cmd).
-func (fl FilteredListCore) HandleKeyMsg(msg tea.KeyMsg, onExtra func(string) bool) (FilteredListCore, bool, bool, tea.Cmd) {
+func (fl FilteredListCore) Update(msg tea.KeyMsg, onExtra func(string) bool) (FilteredListCore, bool, bool, tea.Cmd) {
 	key := msg.String()
 
 	if key == keyTab {

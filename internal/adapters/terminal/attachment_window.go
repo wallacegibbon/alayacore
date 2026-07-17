@@ -131,7 +131,7 @@ func (aw AttachmentWindow) readDir(dir string) []fileEntry {
 func (aw AttachmentWindow) Update(msg tea.Msg) (AttachmentWindow, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		return aw.HandleKeyMsg(msg)
+		return aw.updateForKeyMsg(msg)
 	case tea.PasteMsg:
 		if !aw.FilterInputFocused {
 			return aw, nil
@@ -145,7 +145,7 @@ func (aw AttachmentWindow) Update(msg tea.Msg) (AttachmentWindow, tea.Cmd) {
 	return aw, nil
 }
 
-func (aw AttachmentWindow) HandleKeyMsg(msg tea.KeyMsg) (AttachmentWindow, tea.Cmd) {
+func (aw AttachmentWindow) updateForKeyMsg(msg tea.KeyMsg) (AttachmentWindow, tea.Cmd) {
 	if aw.State == FilteredListClosed {
 		return aw, nil
 	}
@@ -163,7 +163,7 @@ func (aw AttachmentWindow) HandleKeyMsg(msg tea.KeyMsg) (AttachmentWindow, tea.C
 
 	inputWasFocused := aw.FilterInputFocused
 
-	fl, handled, filterChanged, cmd := aw.FilteredListCore.HandleKeyMsg(msg, func(extraKey string) bool {
+	fl, handled, filterChanged, cmd := aw.FilteredListCore.Update(msg, func(extraKey string) bool {
 		return extraKey == keyEnter || extraKey == keyEsc
 	})
 

@@ -213,14 +213,14 @@ type ModelSelectorUpdate struct {
 // --- Key Handling ---
 
 //nolint:gocyclo
-func (ms ModelSelector) HandleKeyMsg(msg tea.KeyMsg) (ModelSelector, ModelSelectorUpdate) {
+func (ms ModelSelector) Update(msg tea.KeyMsg) (ModelSelector, ModelSelectorUpdate) {
 	if ms.State == FilteredListClosed {
 		return ms, ModelSelectorUpdate{}
 	}
 
 	key := msg.String()
 
-	fl, handled, filterChanged, cmd := ms.FilteredListCore.HandleKeyMsg(msg, func(extraKey string) bool {
+	fl, handled, filterChanged, cmd := ms.FilteredListCore.Update(msg, func(extraKey string) bool {
 		return extraKey == keyEnter
 	})
 

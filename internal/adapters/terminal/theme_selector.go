@@ -120,7 +120,7 @@ func (ts ThemeSelector) View() tea.View {
 
 // --- Key Handling ---
 
-func (ts ThemeSelector) HandleKeyMsg(msg tea.KeyMsg, themeManager *ThemeManager) (ThemeSelector, ThemeSelectorUpdate) {
+func (ts ThemeSelector) Update(msg tea.KeyMsg, themeManager *ThemeManager) (ThemeSelector, ThemeSelectorUpdate) {
 	if ts.State == ScrollableListClosed {
 		return ts, ThemeSelectorUpdate{}
 	}
@@ -135,7 +135,7 @@ func (ts ThemeSelector) HandleKeyMsg(msg tea.KeyMsg, themeManager *ThemeManager)
 	var previewTheme *theme.Theme
 
 	// Handle navigation and close via base type
-	sl, handled, isClose := ts.ScrollableListCore.HandleKeyMsg(msg, len(ts.themes))
+	sl, handled, isClose := ts.ScrollableListCore.Update(msg, len(ts.themes))
 	ts.ScrollableListCore = sl
 	if handled {
 		if isClose {

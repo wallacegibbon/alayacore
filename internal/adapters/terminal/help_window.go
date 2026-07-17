@@ -252,10 +252,10 @@ type HelpWindowUpdate struct {
 }
 
 //nolint:gocyclo
-func (hw HelpWindow) HandleKeyMsg(msg tea.KeyMsg) (HelpWindow, HelpWindowUpdate) {
+func (hw HelpWindow) Update(msg tea.KeyMsg) (HelpWindow, HelpWindowUpdate) {
 	key := msg.String()
 
-	fl, handled, filterChanged, cmd := hw.FilteredListCore.HandleKeyMsg(msg, func(extraKey string) bool {
+	fl, handled, filterChanged, cmd := hw.FilteredListCore.Update(msg, func(extraKey string) bool {
 		if extraKey == keyEnter {
 			if hw.SelectedIdx >= 0 && hw.SelectedIdx < hw.filteredLen() {
 				item := hw.filteredItems[hw.SelectedIdx]

@@ -36,19 +36,19 @@ func TestHelpWindowNavigation(t *testing.T) {
 	}
 
 	// Move down
-	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'j'}))
+	hw, _ = hw.Update(tea.KeyPressMsg(tea.Key{Code: 'j'}))
 	if hw.SelectedIdx != 2 {
 		t.Errorf("Expected selectedIdx to be 2 after j, got %d", hw.SelectedIdx)
 	}
 
 	// Move down again
-	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'j'}))
+	hw, _ = hw.Update(tea.KeyPressMsg(tea.Key{Code: 'j'}))
 	if hw.SelectedIdx != 3 {
 		t.Errorf("Expected selectedIdx to be 3 after second j, got %d", hw.SelectedIdx)
 	}
 
 	// Move up
-	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'k'}))
+	hw, _ = hw.Update(tea.KeyPressMsg(tea.Key{Code: 'k'}))
 	if hw.SelectedIdx != 2 {
 		t.Errorf("Expected selectedIdx to be 2 after k, got %d", hw.SelectedIdx)
 	}
@@ -73,13 +73,13 @@ func TestHelpWindowSkipsSectionHeaders(t *testing.T) {
 	}
 
 	// Move down should skip header at index 2 and land on index 3
-	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'j'}))
+	hw, _ = hw.Update(tea.KeyPressMsg(tea.Key{Code: 'j'}))
 	if hw.SelectedIdx != 3 {
 		t.Errorf("Expected selectedIdx to be 3 (skipping header), got %d", hw.SelectedIdx)
 	}
 
 	// Move up should skip header at index 2 and land on index 1
-	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'k'}))
+	hw, _ = hw.Update(tea.KeyPressMsg(tea.Key{Code: 'k'}))
 	if hw.SelectedIdx != 1 {
 		t.Errorf("Expected selectedIdx to be 1 (skipping header up), got %d", hw.SelectedIdx)
 	}
@@ -102,19 +102,19 @@ func TestHelpWindowNavigationBoundary(t *testing.T) {
 	}
 
 	// Move up at top - should stay at 1
-	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'k'}))
+	hw, _ = hw.Update(tea.KeyPressMsg(tea.Key{Code: 'k'}))
 	if hw.SelectedIdx != 1 {
 		t.Errorf("Expected selectedIdx to stay at 1 at top, got %d", hw.SelectedIdx)
 	}
 
 	// Move down to last item
-	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'j'}))
+	hw, _ = hw.Update(tea.KeyPressMsg(tea.Key{Code: 'j'}))
 	if hw.SelectedIdx != 2 {
 		t.Errorf("Expected selectedIdx to be 2, got %d", hw.SelectedIdx)
 	}
 
 	// Move down at bottom - should stay at 2
-	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'j'}))
+	hw, _ = hw.Update(tea.KeyPressMsg(tea.Key{Code: 'j'}))
 	if hw.SelectedIdx != 2 {
 		t.Errorf("Expected selectedIdx to stay at 2 at bottom, got %d", hw.SelectedIdx)
 	}
@@ -126,7 +126,7 @@ func TestHelpWindowCloseKeys(t *testing.T) {
 	// Test 'q' key
 	hw := NewHelpWindow(styles)
 	hw = hw.Open()
-	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'q'}))
+	hw, _ = hw.Update(tea.KeyPressMsg(tea.Key{Code: 'q'}))
 	if hw.IsOpen() {
 		t.Error("Help window should be closed after pressing q")
 	}
@@ -134,7 +134,7 @@ func TestHelpWindowCloseKeys(t *testing.T) {
 	// Test 'esc' key
 	hw = NewHelpWindow(styles)
 	hw = hw.Open()
-	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyEsc}))
+	hw, _ = hw.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEsc}))
 	if hw.IsOpen() {
 		t.Error("Help window should be closed after pressing esc")
 	}
@@ -259,7 +259,7 @@ func TestHelpWindowEnterOnCommand(t *testing.T) {
 	}
 
 	// Press Enter on :quit
-	hw, result := hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	hw, result := hw.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 
 	// Window should be closed
 	if hw.IsOpen() {
@@ -287,7 +287,7 @@ func TestHelpWindowEnterOnCommandStripsArgs(t *testing.T) {
 	hw = hw.Open()
 
 	// Press Enter on :continue — should produce ":continue"
-	hw, result := hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	hw, result := hw.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	if result.PendingCommand != ":continue" {
 		t.Errorf("Expected pending command ':continue', got %q", result.PendingCommand)
 	}
@@ -295,7 +295,7 @@ func TestHelpWindowEnterOnCommandStripsArgs(t *testing.T) {
 	// Re-open and test :theme_set <name> — should produce ":theme_set"
 	hw = hw.Open()
 	hw = hw.moveDown()
-	hw, result = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	hw, result = hw.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	if result.PendingCommand != ":theme_set" {
 		t.Errorf("Expected pending command ':theme_set', got %q", result.PendingCommand)
 	}
@@ -304,7 +304,7 @@ func TestHelpWindowEnterOnCommandStripsArgs(t *testing.T) {
 	hw = hw.Open()
 	hw = hw.moveDown()
 	hw = hw.moveDown()
-	hw, result = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	hw, result = hw.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	if result.PendingCommand != ":confirm" {
 		t.Errorf("Expected pending command ':confirm', got %q", result.PendingCommand)
 	}
@@ -323,7 +323,7 @@ func TestHelpWindowEnterOnKeyBinding(t *testing.T) {
 	hw = hw.Open()
 
 	// Press Enter on Ctrl+H (not a :command)
-	hw, result := hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	hw, result := hw.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 
 	// Window should stay open - Enter on non-command does nothing
 	if !hw.IsOpen() {
@@ -350,10 +350,10 @@ func TestHelpWindowFilter(t *testing.T) {
 	// Type "quit" into filter
 	hw.FilterInputFocused = true
 	hw.FilterInput = hw.FilterInput.Focus()
-	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'q'}))
-	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'u'}))
-	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'i'}))
-	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 't'}))
+	hw, _ = hw.Update(tea.KeyPressMsg(tea.Key{Code: 'q'}))
+	hw, _ = hw.Update(tea.KeyPressMsg(tea.Key{Code: 'u'}))
+	hw, _ = hw.Update(tea.KeyPressMsg(tea.Key{Code: 'i'}))
+	hw, _ = hw.Update(tea.KeyPressMsg(tea.Key{Code: 't'}))
 
 	// Should have filtered items (section header + :quit)
 	if hw.filteredLen() == 0 {
@@ -373,7 +373,7 @@ func TestHelpWindowFilter(t *testing.T) {
 	}
 
 	// Clear filter with ctrl+c
-	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'c', Mod: tea.ModCtrl}))
+	hw, _ = hw.Update(tea.KeyPressMsg(tea.Key{Code: 'c', Mod: tea.ModCtrl}))
 	if hw.filteredLen() != totalItems {
 		t.Errorf("Expected all items after clear, got %d", hw.filteredLen())
 	}
@@ -387,10 +387,10 @@ func TestHelpWindowFilterSectionHeaders(t *testing.T) {
 	// Filter for "Ctrl" - should only show Global Shortcuts section (has Ctrl+ entries)
 	hw.FilterInputFocused = true
 	hw.FilterInput = hw.FilterInput.Focus()
-	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'C'}))
-	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 't'}))
-	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'r'}))
-	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'l'}))
+	hw, _ = hw.Update(tea.KeyPressMsg(tea.Key{Code: 'C'}))
+	hw, _ = hw.Update(tea.KeyPressMsg(tea.Key{Code: 't'}))
+	hw, _ = hw.Update(tea.KeyPressMsg(tea.Key{Code: 'r'}))
+	hw, _ = hw.Update(tea.KeyPressMsg(tea.Key{Code: 'l'}))
 
 	// Should include Global Shortcuts section header
 	hasGlobalShortcuts := false
@@ -423,13 +423,13 @@ func TestHelpWindowTabToggle(t *testing.T) {
 	}
 
 	// Tab to filter
-	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
+	hw, _ = hw.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
 	if !hw.FilterInputFocused {
 		t.Error("Expected filter focused after Tab")
 	}
 
 	// Tab back to list
-	hw, _ = hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
+	hw, _ = hw.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
 	if hw.FilterInputFocused {
 		t.Error("Expected list focused after second Tab")
 	}

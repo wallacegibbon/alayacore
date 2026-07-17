@@ -123,7 +123,7 @@ func (sl ScrollableListCore) RenderOverlay(baseContent, renderedList string, scr
 // Returns (handled, isClose). If handled is false, the caller should
 // check component-specific keys. If isClose is true, the list was closed.
 // itemsLen is the number of items in the list (for bounds checking).
-func (sl ScrollableListCore) HandleKeyMsg(msg tea.KeyMsg, itemsLen int) (ScrollableListCore, bool, bool) {
+func (sl ScrollableListCore) Update(msg tea.KeyMsg, itemsLen int) (ScrollableListCore, bool, bool) {
 	switch msg.String() {
 	case keyQ, keyEsc:
 		sl.State = ScrollableListClosed

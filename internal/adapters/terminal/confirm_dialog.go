@@ -201,7 +201,7 @@ type ConfirmDialogUpdate struct {
 
 // HandleKeyMsg processes a key press and updates state.
 // Returns the updated dialog and a result struct describing what happened.
-func (cd ConfirmDialog) HandleKeyMsg(msg tea.KeyMsg) (ConfirmDialog, ConfirmDialogUpdate) {
+func (cd ConfirmDialog) Update(msg tea.KeyMsg) (ConfirmDialog, ConfirmDialogUpdate) {
 	if !cd.IsOpen() {
 		return cd, ConfirmDialogUpdate{}
 	}

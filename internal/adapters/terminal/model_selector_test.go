@@ -146,7 +146,7 @@ func TestModelSelectorCtrlCClearsSearch(t *testing.T) {
 
 	// Press Ctrl+C
 	msg := tea.KeyPressMsg(tea.Key{Code: 'c', Mod: tea.ModCtrl})
-	ms, cmd := ms.HandleKeyMsg(msg)
+	ms, cmd := ms.Update(msg)
 
 	// Check that search input is cleared
 	if ms.FilterInput.Value() != "" {

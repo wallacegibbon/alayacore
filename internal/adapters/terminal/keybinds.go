@@ -80,7 +80,7 @@ func (m Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 	// Track if selector was open before handling key
 	wasOpen := m.overlays.ThemeSelector().IsOpen()
 
-	ts, result := m.overlays.ThemeSelector().HandleKeyMsg(msg, m.themeManager)
+	ts, result := m.overlays.ThemeSelector().Update(msg, m.themeManager)
 	m.overlays = m.overlays.WithThemeSelector(ts)
 
 	// Check if theme was selected (Enter key)
@@ -270,7 +270,7 @@ func (m Terminal) restoreFocusAfterConfirm() Terminal {
 // handleOverlayModelSelector handles keyboard input when the model selector is open.
 func (m Terminal) handleOverlayModelSelector(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 	wasOpen := m.overlays.ModelSelector().IsOpen()
-	ms, result := m.overlays.ModelSelector().HandleKeyMsg(msg)
+	ms, result := m.overlays.ModelSelector().Update(msg)
 	m.overlays = m.overlays.WithModelSelector(ms)
 
 	if result.ModelSelected {
@@ -322,7 +322,7 @@ func (m Terminal) handleSelectorOverlayKeys(msg tea.KeyMsg) (Terminal, tea.Cmd, 
 	if m.overlays.AttachmentWindow().IsOpen() {
 		aw := m.overlays.AttachmentWindow()
 		t := trackOverlay(aw)
-		aw, cmd := aw.HandleKeyMsg(msg)
+		aw, cmd := aw.Update(msg)
 		m.overlays = m.overlays.WithAttachmentWindow(aw)
 		if t.JustClosed(aw) {
 			if path := aw.SelectedPath(); path != "" {
@@ -339,7 +339,7 @@ func (m Terminal) handleSelectorOverlayKeys(msg tea.KeyMsg) (Terminal, tea.Cmd, 
 	if m.overlays.HelpWindow().IsOpen() {
 		hw := m.overlays.HelpWindow()
 		t := trackOverlay(hw)
-		hw, result := hw.HandleKeyMsg(msg)
+		hw, result := hw.Update(msg)
 		m.overlays = m.overlays.WithHelpWindow(hw)
 		if t.JustClosed(hw) {
 			if result.PendingCommand != "" {
@@ -367,7 +367,7 @@ func (m Terminal) handleOverlayConfirm(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 		}
 		return m, m.editor.OpenForDisplay(content)
 	}
-	if cd, update := m.overlays.ConfirmOverlay().HandleKeyMsg(msg); update.Handled {
+	if cd, update := m.overlays.ConfirmOverlay().Update(msg); update.Handled {
 		return m.handleConfirmResult(cd, update)
 	}
 	return m, nil
