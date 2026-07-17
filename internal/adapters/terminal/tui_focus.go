@@ -1,8 +1,10 @@
 package terminal
 
-// Focus management: input/display focus switching, blur/focus handling.
+// Focus management: input/display focus switching, blur/focus handling, paste.
 //
 // Extracted from tui.go.
+
+import tea "charm.land/bubbletea/v2"
 
 // toggleFocus switches between display and input windows.
 func (m Terminal) toggleFocus() Terminal {
@@ -153,4 +155,17 @@ func (m Terminal) handleFocus() Terminal {
 	}
 	m.display = m.display.updateContent()
 	return m
+}
+
+// handlePaste handles clipboard paste events.
+func (m Terminal) handlePaste(msg tea.PasteMsg) (Terminal, tea.Cmd) {
+	if m.overlays.AttachmentWindow().IsOpen() {
+		aw := m.overlays.AttachmentWindow()
+		aw, _ = aw.Update(msg)
+		m.overlays = m.overlays.WithAttachmentWindow(aw)
+		return m, nil
+	}
+	var cmd tea.Cmd
+	m.input, cmd = m.input.Update(msg)
+	return m, cmd
 }

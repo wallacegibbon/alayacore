@@ -385,16 +385,7 @@ func (m Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleFocus(), nil
 
 	case tea.PasteMsg:
-		if m.overlays.AttachmentWindow().IsOpen() {
-			aw := m.overlays.AttachmentWindow()
-			aw, _ = aw.Update(msg)
-			m.overlays = m.overlays.WithAttachmentWindow(aw)
-		} else {
-			var cmd tea.Cmd
-			m.input, cmd = m.input.Update(msg)
-			return m, cmd
-		}
-		return m, nil
+		return m.handlePaste(msg)
 
 	default:
 		fmt.Fprintf(os.Stderr, "terminal: unhandled message type %T\n", msg)
