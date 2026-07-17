@@ -179,10 +179,10 @@ func (hw *HelpWindow) SetSize(width, height int) {
 
 func (hw *HelpWindow) Open() {
 	hw.State = FilteredListOpen
-	hw.FilterInput.SetValue("")
+	hw.FilterInput = hw.FilterInput.SetValue("")
 	hw.lastFilterValue = "\x00"
 	hw.FilterInputFocused = false
-	hw.FilterInput.Blur()
+	hw.FilterInput = hw.FilterInput.Blur()
 	hw.updateFilterInputStyles()
 	hw.ScrollIdx = 0
 	hw.updateFilteredItems()

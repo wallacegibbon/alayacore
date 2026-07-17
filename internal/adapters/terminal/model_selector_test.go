@@ -133,11 +133,11 @@ func TestModelSelectorCtrlCClearsSearch(t *testing.T) {
 
 	// Focus the search input first (simulates user pressing Tab to focus search)
 	ms.FilterInputFocused = true
-	ms.FilterInput.Focus()
+	ms.FilterInput = ms.FilterInput.Focus()
 	ms.updateFilterInputStyles()
 
 	// Type in search input
-	ms.FilterInput.SetValue("gpt4")
+	ms.FilterInput = ms.FilterInput.SetValue("gpt4")
 	ms.updateFilteredModels()
 
 	if ms.FilterInput.Value() != "gpt4" {
@@ -182,7 +182,7 @@ func TestModelSelectorSetModelsUpdatesFilteredModels(t *testing.T) {
 	}
 
 	// Simulate user typing a search (so lastSearchValue is set)
-	ms.FilterInput.SetValue("gpt")
+	ms.FilterInput = ms.FilterInput.SetValue("gpt")
 	ms.updateFilteredModels()
 
 	// Verify filtered models are now filtered
@@ -209,7 +209,7 @@ func TestModelSelectorSetModelsUpdatesFilteredModels(t *testing.T) {
 	}
 
 	// Clear search and verify all 3 models are shown
-	ms.FilterInput.SetValue("")
+	ms.FilterInput = ms.FilterInput.SetValue("")
 	ms.updateFilteredModels()
 	if len(ms.filteredModels) != 3 {
 		t.Errorf("Expected 3 filtered models after clearing search, got %d", len(ms.filteredModels))

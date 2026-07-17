@@ -41,7 +41,7 @@ type FilteredListCore struct {
 	Styles      *Styles
 	HasFocus    bool
 
-	FilterInput        *InputField
+	FilterInput        InputField
 	FilterInputFocused bool
 	lastFilterValue    string
 }
@@ -55,7 +55,7 @@ func (fl *FilteredListCore) Close() { fl.State = FilteredListClosed }
 func (fl *FilteredListCore) SetSize(width, height int) {
 	if width > 0 {
 		fl.Width = width
-		fl.FilterInput.SetWidth(max(0, width-InputPaddingH))
+		fl.FilterInput = fl.FilterInput.SetWidth(max(0, width-InputPaddingH))
 	}
 	fl.Height = min(height-LayoutGap, SelectorMaxHeight)
 }
@@ -77,7 +77,7 @@ func (fl *FilteredListCore) SetHasFocus(hasFocus bool) {
 // tracks the focus state: focused border color when editing, blurred border
 // color when the list is focused.
 func (fl *FilteredListCore) updateFilterInputStyles() {
-	fl.FilterInput.SetStyles(
+	fl.FilterInput = fl.FilterInput.SetStyles(
 		inputFieldStyle{
 			Prompt:      fl.Styles.Input.Foreground(fl.Styles.BorderFocused),
 			Text:        fl.Styles.Text,
@@ -96,9 +96,9 @@ func (fl *FilteredListCore) updateFilterInputStyles() {
 func (fl *FilteredListCore) HandleTabKey() {
 	fl.FilterInputFocused = !fl.FilterInputFocused
 	if fl.FilterInputFocused {
-		fl.FilterInput.Focus()
+		fl.FilterInput = fl.FilterInput.Focus()
 	} else {
-		fl.FilterInput.Blur()
+		fl.FilterInput = fl.FilterInput.Blur()
 	}
 	fl.updateFilterInputStyles()
 }
@@ -112,7 +112,7 @@ func (fl *FilteredListCore) HandleFilterEscape() bool {
 
 // HandleFilterCtrlC clears the filter input value.
 func (fl *FilteredListCore) HandleFilterCtrlC() {
-	fl.FilterInput.SetValue("")
+	fl.FilterInput = fl.FilterInput.SetValue("")
 }
 
 // HandleKeyMsg handles common filtered list navigation keys.

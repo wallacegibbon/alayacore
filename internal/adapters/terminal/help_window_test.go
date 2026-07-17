@@ -359,7 +359,7 @@ func TestHelpWindowFilter(t *testing.T) {
 
 	// Type "quit" into filter
 	hw.FilterInputFocused = true
-	hw.FilterInput.Focus()
+	hw.FilterInput = hw.FilterInput.Focus()
 	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'q'}))
 	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'u'}))
 	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'i'}))
@@ -396,7 +396,7 @@ func TestHelpWindowFilterSectionHeaders(t *testing.T) {
 
 	// Filter for "Ctrl" - should only show Global Shortcuts section (has Ctrl+ entries)
 	hw.FilterInputFocused = true
-	hw.FilterInput.Focus()
+	hw.FilterInput = hw.FilterInput.Focus()
 	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'C'}))
 	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 't'}))
 	hw.HandleKeyMsg(tea.KeyPressMsg(tea.Key{Code: 'r'}))
@@ -451,7 +451,7 @@ func TestHelpWindowFilterEmptyResult(t *testing.T) {
 	hw.Open()
 
 	// Directly set filter value to test filtering logic
-	hw.FilterInput.SetValue("zzz")
+	hw.FilterInput = hw.FilterInput.SetValue("zzz")
 	hw.lastFilterValue = "" // Force update
 	hw.updateFilteredItems()
 

@@ -50,11 +50,11 @@ func NewModelSelector(styles *Styles) *ModelSelector {
 }
 
 // newFilterInput creates a shared InputField for filtering.
-func newFilterInput(placeholder string) *InputField {
+func newFilterInput(placeholder string) InputField {
 	input := NewInputField()
 	input.Placeholder = placeholder
 	input.Prompt = "/ "
-	input.SetWidth(50)
+	input = input.SetWidth(50)
 	return input
 }
 
@@ -193,10 +193,10 @@ func (ms *ModelSelector) ConsumeReloadModels() bool {
 
 func (ms *ModelSelector) Open() {
 	ms.State = FilteredListOpen
-	ms.FilterInput.SetValue("")
+	ms.FilterInput = ms.FilterInput.SetValue("")
 	ms.lastFilterValue = "\x00"
 	ms.FilterInputFocused = false
-	ms.FilterInput.Blur()
+	ms.FilterInput = ms.FilterInput.Blur()
 	ms.updateFilterInputStyles()
 	ms.ScrollIdx = 0
 	ms.updateFilteredModels()

@@ -69,11 +69,11 @@ func (aw *AttachmentWindow) SetOnAdd(fn func(path string)) {
 func (aw *AttachmentWindow) Open() {
 	aw.State = FilteredListOpen
 	aw.mode = modeLocal
-	aw.FilterInput.SetValue("")
+	aw.FilterInput = aw.FilterInput.SetValue("")
 	aw.FilterInput.Prompt = "F "
 	aw.lastFilterValue = "\x00"
 	aw.FilterInputFocused = true
-	aw.FilterInput.Focus()
+	aw.FilterInput = aw.FilterInput.Focus()
 	aw.updateFilterInputStyles()
 	aw.ScrollIdx = 0
 	aw.SelectedIdx = 0
@@ -183,19 +183,19 @@ func (aw *AttachmentWindow) handleLocalModeKeys(filterChanged bool, key string, 
 }
 
 func (aw *AttachmentWindow) toggleMode() {
-	aw.FilterInput.SetValue("")
+	aw.FilterInput = aw.FilterInput.SetValue("")
 	aw.lastFilterValue = "\x00"
 	if aw.mode == modeLocal {
 		aw.mode = modeURL
 		aw.FilterInput.Prompt = "U "
-		aw.FilterInput.Focus()
+		aw.FilterInput = aw.FilterInput.Focus()
 		aw.FilterInputFocused = true
 		aw.updateFilterInputStyles()
 	} else {
 		aw.mode = modeLocal
 		aw.FilterInput.Prompt = "F "
 		aw.loadDir(aw.currentDir)
-		aw.FilterInput.Focus()
+		aw.FilterInput = aw.FilterInput.Focus()
 		aw.FilterInputFocused = true
 		aw.updateFilterInputStyles()
 	}
@@ -235,11 +235,11 @@ func (aw *AttachmentWindow) autocompleteDir(dirName string) {
 	switch {
 	case strings.Contains(search, "/"):
 		prefix := search[:strings.LastIndex(search, "/")+1]
-		aw.FilterInput.SetValue(prefix + dirName + "/")
+		aw.FilterInput = aw.FilterInput.SetValue(prefix + dirName + "/")
 	case strings.HasPrefix(search, "~"):
-		aw.FilterInput.SetValue("~/" + dirName + "/")
+		aw.FilterInput = aw.FilterInput.SetValue("~/" + dirName + "/")
 	default:
-		aw.FilterInput.SetValue(dirName + "/")
+		aw.FilterInput = aw.FilterInput.SetValue(dirName + "/")
 	}
 	aw.lastFilterValue = "\x00"
 	aw.updateFiltered()
@@ -254,7 +254,7 @@ func (aw *AttachmentWindow) handleEnter() bool {
 	if entry.isDir {
 		// Switch to input mode and autocomplete the directory name.
 		aw.FilterInputFocused = true
-		aw.FilterInput.Focus()
+		aw.FilterInput = aw.FilterInput.Focus()
 		aw.updateFilterInputStyles()
 		aw.autocompleteDir(entry.name)
 		return true

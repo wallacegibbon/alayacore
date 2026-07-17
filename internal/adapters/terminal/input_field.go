@@ -31,8 +31,6 @@ type InputField struct {
 	styleFocused inputFieldStyle
 	styleBlurred inputFieldStyle
 	cursorColor  color.Color
-	cursorRender func(string) string
-	promptRender func() string
 }
 
 type inputFieldStyle struct {
@@ -42,8 +40,8 @@ type inputFieldStyle struct {
 }
 
 // NewInputField creates a new InputField with default settings.
-func NewInputField() *InputField {
-	return &InputField{
+func NewInputField() InputField {
+	return InputField{
 		width:   20,
 		Prompt:  "> ",
 		focused: true,
@@ -52,10 +50,10 @@ func NewInputField() *InputField {
 }
 
 // Init implements tea.Model.
-func (m *InputField) Init() tea.Cmd { return nil }
+func (m InputField) Init() tea.Cmd { return nil }
 
 // Update implements tea.Model.
-func (m *InputField) Update(msg tea.Msg) (*InputField, tea.Cmd) {
+func (m InputField) Update(msg tea.Msg) (InputField, tea.Cmd) {
 	if !m.focused {
 		return m, nil
 	}
@@ -63,22 +61,25 @@ func (m *InputField) Update(msg tea.Msg) (*InputField, tea.Cmd) {
 	case tea.KeyMsg:
 		return m.handleKeyMsg(msg)
 	case tea.PasteMsg:
-		m.handlePaste(msg)
-		return m, nil
+		return m.handlePaste(msg), nil
 	}
 	return m, nil
 }
 
-func (m *InputField) handleKeyMsg(msg tea.KeyMsg) (*InputField, tea.Cmd) {
+func (m InputField) handleKeyMsg(msg tea.KeyMsg) (InputField, tea.Cmd) {
 	key := msg.String()
 
-	if m.handleMovement(key) {
+	var handled bool
+	m, handled = m.handleMovement(key)
+	if handled {
 		return m, nil
 	}
-	if m.handleDeletion(key) {
+	m, handled = m.handleDeletion(key)
+	if handled {
 		return m, nil
 	}
-	if m.handleInsertion(key) {
+	m, handled = m.handleInsertion(key)
+	if handled {
 		return m, nil
 	}
 
@@ -86,47 +87,50 @@ func (m *InputField) handleKeyMsg(msg tea.KeyMsg) (*InputField, tea.Cmd) {
 }
 
 // handleMovement returns true if the key was a cursor movement.
-func (m *InputField) handleMovement(key string) bool {
+func (m InputField) handleMovement(key string) (InputField, bool) {
 	switch {
 	case key == "left":
-		m.moveLeft()
+		m = m.moveLeft()
 	case key == "right":
-		m.moveRight()
+		m = m.moveRight()
 	case key == "up":
-		if !m.moveLineUp() {
-			return true
+		var ok bool
+		m, ok = m.moveLineUp()
+		if !ok {
+			return m, true
 		}
 	case key == "down":
-		if !m.moveLineDown() {
-			return true
+		var ok bool
+		m, ok = m.moveLineDown()
+		if !ok {
+			return m, true
 		}
 	case key == "home":
 		m.pos = m.lineStart(m.pos)
 		m.offset = 0
 		m.goalCol = -1
-		return true
+		return m.ensureCursorVisible(), true
 	case key == "end":
 		m.pos = m.lineEnd(m.pos)
 		m.goalCol = -1
+		return m.ensureCursorVisible(), true
 	default:
-		return false
+		return m, false
 	}
-	m.ensureCursorVisible()
-	return true
+	return m.ensureCursorVisible(), true
 }
 
 // handleDeletion returns true if the key was a deletion action.
-func (m *InputField) handleDeletion(key string) bool {
+func (m InputField) handleDeletion(key string) (InputField, bool) {
 	switch {
 	case key == "backspace":
-		m.deleteBackward()
+		m = m.deleteBackward()
 	case key == "delete":
-		m.deleteForward()
+		m = m.deleteForward()
 	default:
-		return false
+		return m, false
 	}
-	m.ensureCursorVisible()
-	return true
+	return m.ensureCursorVisible(), true
 }
 
 // handleInsertion returns true if the key was a character or space insertion.
@@ -134,31 +138,29 @@ func (m *InputField) handleDeletion(key string) bool {
 // key as "space" (not " "), so it can't go through printableRune's single-rune
 // check. The filtering policy is the same as handlePaste: both ultimately use
 // isPrintableRune to accept/reject control characters.
-func (m *InputField) handleInsertion(key string) bool {
+func (m InputField) handleInsertion(key string) (InputField, bool) {
 	if key == "space" {
 		m.value = slices.Insert(m.value, m.pos, ' ')
 		m.pos++
 		m.goalCol = -1
-		m.ensureCursorVisible()
-		return true
+		return m.ensureCursorVisible(), true
 	}
 	if r, ok := printableRune(key); ok {
 		m.value = slices.Insert(m.value, m.pos, r)
 		m.pos++
 		m.goalCol = -1
-		m.ensureCursorVisible()
-		return true
+		return m.ensureCursorVisible(), true
 	}
-	return false
+	return m, false
 }
 
 // handlePaste inserts pasted text at the cursor position.
 // Control characters are filtered out, except for newlines which are
 // allowed to support multi-line paste.
-func (m *InputField) handlePaste(msg tea.PasteMsg) {
+func (m InputField) handlePaste(msg tea.PasteMsg) InputField {
 	runes := []rune(msg.Content)
 	if len(runes) == 0 {
-		return
+		return m
 	}
 	// Normalize line endings: handle \r\n and \r.
 	normalized := make([]rune, 0, len(runes))
@@ -183,7 +185,7 @@ func (m *InputField) handlePaste(msg tea.PasteMsg) {
 		}
 	}
 	if len(filtered) == 0 {
-		return
+		return m
 	}
 	// Trim trailing newlines (matches editor behavior — terminals often
 	// add a trailing newline on paste).
@@ -191,17 +193,17 @@ func (m *InputField) handlePaste(msg tea.PasteMsg) {
 		filtered = filtered[:len(filtered)-1]
 	}
 	if len(filtered) == 0 {
-		return
+		return m
 	}
 	m.value = slices.Insert(m.value, m.pos, filtered...)
 	m.pos += len(filtered)
 	m.goalCol = -1
-	m.ensureCursorVisible()
+	return m.ensureCursorVisible()
 }
 
-func (m *InputField) ensureCursorVisible() {
+func (m InputField) ensureCursorVisible() InputField {
 	if m.width <= 0 {
-		return
+		return m
 	}
 	lineStart, lineEnd := m.currentLine(m.pos)
 	lineWidth := runesWidth(m.value[lineStart:lineEnd])
@@ -209,7 +211,7 @@ func (m *InputField) ensureCursorVisible() {
 	// If the entire line fits within the viewport, no scrolling needed.
 	if lineWidth <= m.width {
 		m.offset = 0
-		return
+		return m
 	}
 
 	relPos := m.pos - lineStart // cursor position within current line
@@ -224,10 +226,11 @@ func (m *InputField) ensureCursorVisible() {
 			m.offset = 0
 		}
 	}
+	return m
 }
 
 // View implements tea.Model.
-func (m *InputField) View() string {
+func (m InputField) View() string {
 	// Clamp pos to valid range as a safety measure.
 	if m.pos < 0 {
 		m.pos = 0
@@ -283,9 +286,20 @@ func (m *InputField) View() string {
 	return m.promptRender() + v
 }
 
+// cursorRender renders a character with the cursor background color.
+func (m InputField) cursorRender(s string) string {
+	return lipgloss.NewStyle().Background(m.cursorColor).Render(s)
+}
+
+// promptRender renders the prompt string.
+func (m InputField) promptRender() string {
+	styles := m.activeStyle()
+	return styles.Prompt.Inline(true).Render(m.Prompt)
+}
+
 // buildVisibleText returns the visible portion of the current line as runes
 // and the cursor's character index within them.
-func (m *InputField) buildVisibleText() (visible []rune, cursorIdx int) {
+func (m InputField) buildVisibleText() (visible []rune, cursorIdx int) {
 	if len(m.value) == 0 {
 		return nil, 0
 	}
@@ -330,7 +344,7 @@ func (m *InputField) buildVisibleText() (visible []rune, cursorIdx int) {
 	return vis, cursorChars
 }
 
-func (m *InputField) placeholderView() string {
+func (m InputField) placeholderView() string {
 	styles := m.activeStyle()
 	var v string
 	if m.focused {
@@ -354,33 +368,33 @@ func (m *InputField) placeholderView() string {
 	return m.promptRender() + v
 }
 
-func (m *InputField) activeStyle() inputFieldStyle {
+func (m InputField) activeStyle() inputFieldStyle {
 	if m.focused {
 		return m.styleFocused
 	}
 	return m.styleBlurred
 }
 
-func (m *InputField) Focus() {
+func (m InputField) Focus() InputField {
 	m.focused = true
-	m.rebuildRenderFuncs()
+	return m
 }
 
-func (m *InputField) Blur() {
+func (m InputField) Blur() InputField {
 	m.focused = false
-	m.rebuildRenderFuncs()
+	return m
 }
 
-func (m *InputField) IsFocused() bool { return m.focused }
+func (m InputField) IsFocused() bool { return m.focused }
 
-func (m *InputField) Value() string { return string(m.value) }
+func (m InputField) Value() string { return string(m.value) }
 
 // CursorPos returns the cursor position (in runes) within the current value.
-func (m *InputField) CursorPos() int { return m.pos }
+func (m InputField) CursorPos() int { return m.pos }
 
 // currentLine returns the start and end indices (exclusive) of the line
 // containing the given position. An empty line (just \n) has start == end.
-func (m *InputField) currentLine(pos int) (start, end int) {
+func (m InputField) currentLine(pos int) (start, end int) {
 	if len(m.value) == 0 {
 		return 0, 0
 	}
@@ -404,7 +418,7 @@ func (m *InputField) currentLine(pos int) (start, end int) {
 }
 
 // LineCount returns the number of lines in the value.
-func (m *InputField) LineCount() int {
+func (m InputField) LineCount() int {
 	if len(m.value) == 0 {
 		return 1 // one empty line
 	}
@@ -418,89 +432,92 @@ func (m *InputField) LineCount() int {
 }
 
 // lineStart returns the start index of the line containing pos.
-func (m *InputField) lineStart(pos int) int {
+func (m InputField) lineStart(pos int) int {
 	s, _ := m.currentLine(pos)
 	return s
 }
 
 // lineEnd returns the end index (exclusive) of the line containing pos.
-func (m *InputField) lineEnd(pos int) int {
+func (m InputField) lineEnd(pos int) int {
 	_, e := m.currentLine(pos)
 	return e
 }
 
 // ensureGoalColumn sets goalCol from the current cursor column if not set.
-func (m *InputField) ensureGoalColumn() {
+func (m InputField) ensureGoalColumn() InputField {
 	if m.goalCol >= 0 {
-		return
+		return m
 	}
 	ls := m.lineStart(m.pos)
 	m.goalCol = runesWidth(m.value[ls:m.pos])
+	return m
 }
 
 // moveLeft moves the cursor one position left.
 // Stops at the start of a line (no wrapping to previous line).
-func (m *InputField) moveLeft() {
+func (m InputField) moveLeft() InputField {
 	if m.pos <= 0 {
-		return
+		return m
 	}
 	if m.pos <= m.lineStart(m.pos) {
-		return // at start of line, don't wrap
+		return m // at start of line, don't wrap
 	}
 	m.pos--
 	m.goalCol = -1
+	return m
 }
 
 // moveRight moves the cursor one position right.
 // Stops at the end of a line (no wrapping to next line).
-func (m *InputField) moveRight() {
+func (m InputField) moveRight() InputField {
 	if m.pos >= len(m.value) {
-		return
+		return m
 	}
 	if m.pos >= m.lineEnd(m.pos) {
-		return // at end of line, don't wrap
+		return m // at end of line, don't wrap
 	}
 	m.pos++
 	m.goalCol = -1
+	return m
 }
 
 // moveLineUp moves the cursor up one line, maintaining the column position.
 // Returns false if already on the first line.
-func (m *InputField) moveLineUp() bool {
+func (m InputField) moveLineUp() (InputField, bool) {
 	ls := m.lineStart(m.pos)
 	if ls == 0 {
-		return false
+		return m, false
 	}
-	m.ensureGoalColumn()
+	m = m.ensureGoalColumn()
 	prevEnd := ls - 1 // position of the \n at end of previous line
 	prevStart := m.lineStart(prevEnd)
 	prevLen := runesWidth(m.value[prevStart:prevEnd])
 	target := min(m.goalCol, prevLen)
 	m.pos = prevStart + runeIndexAtWidth(m.value[prevStart:prevEnd], target)
-	return true
+	return m, true
 }
 
 // moveLineDown moves the cursor down one line, maintaining the column position.
 // Returns false if already on the last line.
-func (m *InputField) moveLineDown() bool {
+func (m InputField) moveLineDown() (InputField, bool) {
 	le := m.lineEnd(m.pos)
 	if le >= len(m.value) {
-		return false
+		return m, false
 	}
-	m.ensureGoalColumn()
+	m = m.ensureGoalColumn()
 	nextStart := le + 1
 	nextEnd := m.lineEnd(nextStart)
 	nextLen := runesWidth(m.value[nextStart:nextEnd])
 	target := min(m.goalCol, nextLen)
 	m.pos = nextStart + runeIndexAtWidth(m.value[nextStart:nextEnd], target)
-	return true
+	return m, true
 }
 
 // deleteBackward deletes the character before the cursor (backspace).
 // At the start of a line, it joins with the previous line by removing the \n.
-func (m *InputField) deleteBackward() {
+func (m InputField) deleteBackward() InputField {
 	if m.pos <= 0 {
-		return
+		return m
 	}
 	if m.value[m.pos-1] == '\n' {
 		ls := m.lineStart(m.pos)
@@ -511,48 +528,43 @@ func (m *InputField) deleteBackward() {
 		m.pos--
 	}
 	m.goalCol = -1
+	return m
 }
 
 // deleteForward deletes the character at the cursor (delete key).
 // At the end of a line, it joins with the next line by removing the \n.
-func (m *InputField) deleteForward() {
+func (m InputField) deleteForward() InputField {
 	if m.pos >= len(m.value) {
-		return
+		return m
 	}
 	m.value = slices.Delete(m.value, m.pos, m.pos+1)
 	m.goalCol = -1
+	return m
 }
 
-func (m *InputField) CursorEnd() {
+func (m InputField) CursorEnd() InputField {
 	m.pos = len(m.value)
 	m.goalCol = -1
-	m.ensureCursorVisible()
+	return m.ensureCursorVisible()
 }
 
-func (m *InputField) SetValue(s string) {
+func (m InputField) SetValue(s string) InputField {
 	m.value = []rune(s)
 	m.pos = len(m.value)
 	m.goalCol = -1
-	m.ensureCursorVisible()
+	return m.ensureCursorVisible()
 }
 
-func (m *InputField) SetWidth(w int) {
+func (m InputField) SetWidth(w int) InputField {
 	m.width = max(0, w)
-	m.ensureCursorVisible()
+	return m.ensureCursorVisible()
 }
 
-func (m *InputField) SetStyles(focused, blurred inputFieldStyle, cursorColor color.Color) {
+func (m InputField) SetStyles(focused, blurred inputFieldStyle, cursorColor color.Color) InputField {
 	m.styleFocused = focused
 	m.styleBlurred = blurred
 	m.cursorColor = cursorColor
-	m.rebuildRenderFuncs()
-}
-
-func (m *InputField) rebuildRenderFuncs() {
-	styles := m.activeStyle()
-	cursorBG := lipgloss.NewStyle().Background(m.cursorColor)
-	m.cursorRender = func(s string) string { return cursorBG.Render(s) }
-	m.promptRender = func() string { return styles.Prompt.Inline(true).Render(m.Prompt) }
+	return m
 }
 
 // ============================================================================

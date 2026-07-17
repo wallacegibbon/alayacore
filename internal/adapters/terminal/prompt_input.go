@@ -12,7 +12,7 @@ import (
 
 // PromptInput handles text input.
 type PromptInput struct {
-	input       *InputField
+	input       InputField
 	attachments []string // pending attachment file paths to display
 	focused     bool
 	styles      *Styles
@@ -23,9 +23,9 @@ type PromptInput struct {
 func NewPromptInput(styles *Styles) *PromptInput {
 	input := NewInputField()
 	input.Placeholder = "Enter your prompt..."
-	input.Focus()
+	input = input.Focus()
 	input.Prompt = ""
-	input.SetWidth(max(0, DefaultWidth-BorderInnerPadding)) // only border + padding
+	input = input.SetWidth(max(0, DefaultWidth-BorderInnerPadding))
 
 	return &PromptInput{
 		input:   input,
@@ -45,7 +45,7 @@ func (m *PromptInput) Update(msg tea.Msg) (*PromptInput, tea.Cmd) {
 	var cmd tea.Cmd
 	if msg, ok := msg.(tea.WindowSizeMsg); ok {
 		m.width = msg.Width
-		m.input.SetWidth(max(0, msg.Width-BorderInnerPadding))
+		m.input = m.input.SetWidth(max(0, msg.Width-BorderInnerPadding))
 	}
 	m.input, cmd = m.input.Update(msg)
 	return m, cmd
@@ -53,8 +53,8 @@ func (m *PromptInput) Update(msg tea.Msg) (*PromptInput, tea.Cmd) {
 
 // View renders the input field, with attachments above if present.
 func (m PromptInput) View() tea.View {
-	m.updateInputStyles()
-	content := m.input.View()
+	input := m.updateInputStyles()
+	content := input.View()
 	if len(m.attachments) > 0 {
 		innerWidth := max(0, m.width-BorderInnerPadding)
 		styledMedia := wrapLabels(m.attachments, innerWidth, m.styles.Attachment)
@@ -71,13 +71,13 @@ func (m PromptInput) View() tea.View {
 }
 
 // updateInputStyles updates the text input styles based on current theme.
-func (m PromptInput) updateInputStyles() {
+func (m PromptInput) updateInputStyles() InputField {
 	// Use warning color when there are multiple lines as a brighter visual cue.
 	promptColor := m.styles.ColorAccent
 	if m.input.LineCount() > 1 {
 		promptColor = m.styles.ColorWarning
 	}
-	m.input.SetStyles(
+	return m.input.SetStyles(
 		inputFieldStyle{
 			Prompt:      lipgloss.NewStyle().Foreground(promptColor).Bold(true),
 			Text:        lipgloss.NewStyle().Bold(true),
@@ -95,13 +95,13 @@ func (m PromptInput) updateInputStyles() {
 // Focus sets focus on the input.
 func (m *PromptInput) Focus() {
 	m.focused = true
-	m.input.Focus()
+	m.input = m.input.Focus()
 }
 
 // Blur removes focus from the input.
 func (m *PromptInput) Blur() {
 	m.focused = false
-	m.input.Blur()
+	m.input = m.input.Blur()
 }
 
 func (m PromptInput) IsFocused() bool {
@@ -113,7 +113,7 @@ func (m PromptInput) Value() string {
 }
 
 func (m *PromptInput) SetValue(value string) {
-	m.input.SetValue(value)
+	m.input = m.input.SetValue(value)
 }
 
 // SetAttachments sets the pending attachment paths for display.
@@ -123,7 +123,7 @@ func (m *PromptInput) SetAttachments(paths []string) {
 
 // Clear clears the input and attachments.
 func (m *PromptInput) Clear() {
-	m.input.SetValue("")
+	m.input = m.input.SetValue("")
 	m.attachments = nil
 }
 
@@ -165,7 +165,7 @@ func (m PromptInput) RenderWithBorder(blockInput bool) string {
 	}
 
 	// Set input styles based on focus state
-	m.updateInputStyles()
+	input := m.updateInputStyles()
 
 	if blockInput {
 		return m.styles.RenderBorderedBox("", m.width, borderColor)
@@ -181,10 +181,10 @@ func (m PromptInput) RenderWithBorder(blockInput bool) string {
 		sb.WriteString("\n")
 		sb.WriteString(separator)
 		sb.WriteString("\n")
-		sb.WriteString(m.input.View())
+		sb.WriteString(input.View())
 		content = sb.String()
 	} else {
-		content = m.input.View()
+		content = input.View()
 	}
 
 	return m.styles.RenderBorderedBox(content, m.width, borderColor)
@@ -192,17 +192,17 @@ func (m PromptInput) RenderWithBorder(blockInput bool) string {
 
 func (m *PromptInput) SetWidth(width int) {
 	m.width = width
-	m.input.SetWidth(max(0, width-BorderInnerPadding)) // only border + padding
+	m.input = m.input.SetWidth(max(0, width-BorderInnerPadding))
 }
 
 func (m *PromptInput) SetStyles(styles *Styles) {
 	m.styles = styles
-	m.updateInputStyles()
+	m.input = m.updateInputStyles()
 }
 
 // CursorEnd moves cursor to end.
 func (m *PromptInput) CursorEnd() {
-	m.input.CursorEnd()
+	m.input = m.input.CursorEnd()
 }
 
 // CursorPos returns the cursor position (in runes) within the input field.
