@@ -134,8 +134,10 @@ func (m Terminal) handleEditorStart(msg editorStartMsg) (Terminal, tea.Cmd) {
 	tmpFileName, err := m.editor.createTempFile()
 	if err != nil {
 		return m, func() tea.Msg {
-			m.out.WriteError("Failed to create temp file: %v", err)
-			return nil
+			return displayErrorMsg{
+				format: "Failed to create temp file: %v",
+				args:   []any{err},
+			}
 		}
 	}
 

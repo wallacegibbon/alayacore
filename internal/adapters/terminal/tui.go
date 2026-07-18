@@ -59,6 +59,19 @@ type ConfirmResultMsg struct{ Result *ConfirmResult }
 // OverlayClosedMsg is sent when any overlay is dismissed without a result.
 type OverlayClosedMsg struct{}
 
+// displayErrorMsg carries an error message to be written to the display output
+// via Terminal.Update, ensuring all OutputWriter mutations happen on the event loop.
+type displayErrorMsg struct {
+	format string
+	args   []any
+}
+
+// displayNotifyMsg carries a notification message to be written to the display
+// output via Terminal.Update.
+type displayNotifyMsg struct {
+	message string
+}
+
 // openEditorForDisplayMsg is sent by DisplayModel when the user presses 'e'
 // to edit the currently selected window's content in an external editor.
 type openEditorForDisplayMsg struct {
@@ -91,9 +104,11 @@ func (m Terminal) emitCommand(cmd string) tea.Cmd {
 
 // submitCmd returns a tea.Cmd that sends staged content (attachments + text)
 // as a complete user message via TLV. Runs outside Update when executed by
-// Bubble Tea's runtime.
-func submitCmd(w io.WriteCloser, out OutputWriter, attachments []attachment, prompt string) tea.Cmd {
+// Bubble Tea's runtime. Errors reading attachments are returned as
+// displayErrorMsg so the event loop handles the display write.
+func submitCmd(w io.WriteCloser, attachments []attachment, prompt string) tea.Cmd {
 	return func() tea.Msg {
+		var errs []string
 		for _, a := range attachments {
 			var value string
 			if a.isURL {
@@ -101,7 +116,7 @@ func submitCmd(w io.WriteCloser, out OutputWriter, attachments []attachment, pro
 			} else {
 				data, err := os.ReadFile(a.path)
 				if err != nil {
-					out.WriteError("Failed to read attachment: %s", err)
+					errs = append(errs, fmt.Sprintf("Failed to read attachment: %s", err))
 					continue
 				}
 				mime := tlv.MimeTypeForPath(a.path)
@@ -114,6 +129,12 @@ func submitCmd(w io.WriteCloser, out OutputWriter, attachments []attachment, pro
 			_ = tlv.WriteTLV(w, tlv.TagUserT, prompt)
 		}
 		_ = tlv.WriteTLV(w, tlv.TagUserEnd, "")
+
+		if len(errs) > 0 {
+			return displayErrorMsg{
+				format: strings.Join(errs, "\n"),
+			}
+		}
 		return nil
 	}
 }
@@ -310,20 +331,29 @@ func NewTerminalWithTheme(
 // Init starts the periodic tick loop for processing session updates.
 // When loading is true, it also kicks off async session loading.
 func (m Terminal) Init() tea.Cmd {
-	// Display any buffered init errors from initialization
+	var cmds []tea.Cmd
+
+	// Display any buffered init errors via messages so OutputWriter
+	// mutations go through Terminal.Update like all other display writes.
 	if m.themeManager != nil {
 		if errs := m.themeManager.GetInitErrors(); len(errs) > 0 {
 			for _, e := range errs {
-				m.out.WriteError("%s", e.Message)
+				err := e // capture
+				cmds = append(cmds, func() tea.Msg {
+					return displayErrorMsg{
+						format: "%s",
+						args:   []any{err.Message},
+					}
+				})
 			}
 		}
 	}
 
-	cmds := []tea.Cmd{
+	cmds = append(cmds,
 		tea.Tick(TickInterval, func(_ time.Time) tea.Msg {
 			return tickMsg{}
 		}),
-	}
+	)
 
 	// If in loading mode, kick off async session loading.
 	if m.loading {
@@ -404,6 +434,14 @@ func (m Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case openEditorForPromptMsg:
 		return m, m.editor.Open(msg.content)
+
+	case displayErrorMsg:
+		m.out.WriteError(msg.format, msg.args...)
+		return m, nil
+
+	case displayNotifyMsg:
+		m.out.WriteNotify(msg.message)
+		return m, nil
 
 	case EditorFinishedMsg:
 		return m.handleEditorFinished(msg)
@@ -602,8 +640,10 @@ func (m Terminal) handleDisplayRefresh() (Terminal, tea.Cmd) {
 func (m Terminal) handleEditorFinished(msg EditorFinishedMsg) (Terminal, tea.Cmd) {
 	if msg.Err != nil {
 		return m, func() tea.Msg {
-			m.out.WriteError("Editor error: %v", msg.Err)
-			return nil
+			return displayErrorMsg{
+				format: "Editor error: %v",
+				args:   []any{msg.Err},
+			}
 		}
 	}
 

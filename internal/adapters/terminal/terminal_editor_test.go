@@ -160,11 +160,17 @@ func TestEditorFinishedMsgWithError(t *testing.T) {
 	}
 
 	model, cmd := terminal.Update(msg)
-	terminal = model.(Terminal)
 
-	// Execute the cmd to process the WriteError
+	// Execute the cmd to get the displayErrorMsg
 	if cmd != nil {
-		cmd()
+		// cmd() returns a displayErrorMsg; feed it back through Update
+		// so the error write happens on the event loop (consistent with
+		// real runtime behavior).
+		result := cmd()
+		if result != nil {
+			model, _ = model.Update(result)
+			terminal = model.(Terminal)
+		}
 	}
 
 	if model == nil {

@@ -205,6 +205,10 @@ func (m Terminal) handleConfirmMCPAuth(r *ConfirmResult, fromCmd bool) (Terminal
 // and returns a tea.Cmd that waits for the authorization code.
 // The callback server is started synchronously (needed before the Cmd);
 // all user-facing I/O (notification, browser, TLV writes) runs in the Cmd.
+//
+// Uses tea.Sequence to split into phases so all display output (notify/error)
+// flows through messages handled by Terminal.Update rather than direct calls
+// to m.out from inside a goroutine.
 func (m Terminal) startMCPAuthFlow(serverName, authURL string) tea.Cmd {
 	state := platform.RandomState()
 
@@ -215,25 +219,43 @@ func (m Terminal) startMCPAuthFlow(serverName, authURL string) tea.Cmd {
 	filledURL = strings.ReplaceAll(filledURL, "{{redirect_uri}}", encodedRedirect)
 	filledURL = strings.ReplaceAll(filledURL, "{{state}}", state)
 
-	return func() tea.Msg {
-		m.out.WriteNotify(fmt.Sprintf("Authorizing %s. If your browser doesn't open, open this URL:\n%s",
-			serverName, filledURL))
+	// Capture streamInput for TLV writes in phase 2 (it's a pointer, safe to capture)
+	streamInput := m.streamInput
 
-		if err := platform.OpenURL(filledURL); err != nil {
-			m.out.WriteError("Failed to open browser: %v", err)
-		}
-
-		res := <-resultCh
-		cleanup()
-		if res.Err != nil {
-			m.out.WriteError("MCP auth callback error: %v", res.Err)
-			_ = tlv.WriteTLV(m.streamInput, tlv.TagUserT, ":mcp_cancel")
+	return tea.Sequence(
+		// Phase 1: Notify user and try to open browser
+		func() tea.Msg {
+			return displayNotifyMsg{
+				message: fmt.Sprintf("Authorizing %s. If your browser doesn't open, open this URL:\n%s",
+					serverName, filledURL),
+			}
+		},
+		// Phase 2: Open browser, report error if any
+		func() tea.Msg {
+			if err := platform.OpenURL(filledURL); err != nil {
+				return displayErrorMsg{
+					format: "Failed to open browser: %v",
+					args:   []any{err},
+				}
+			}
 			return nil
-		}
-		_ = tlv.WriteTLV(m.streamInput, tlv.TagUserT,
-			fmt.Sprintf(":mcp_auth %s %s %s", serverName, res.Code, redirectURI))
-		return nil
-	}
+		},
+		// Phase 3: Wait for OAuth callback
+		func() tea.Msg {
+			res := <-resultCh
+			cleanup()
+			if res.Err != nil {
+				_ = tlv.WriteTLV(streamInput, tlv.TagUserT, ":mcp_cancel")
+				return displayErrorMsg{
+					format: "MCP auth callback error: %v",
+					args:   []any{res.Err},
+				}
+			}
+			_ = tlv.WriteTLV(streamInput, tlv.TagUserT,
+				fmt.Sprintf(":mcp_auth %s %s %s", serverName, res.Code, redirectURI))
+			return nil
+		},
+	)
 }
 
 // restoreFocusAfterConfirm restores input/display focus only if no overlay
@@ -512,8 +534,9 @@ func (m Terminal) handleSubmit() (Terminal, tea.Cmd) {
 	// If a task is running, reject without clearing input.
 	if m.inProgress {
 		return m, func() tea.Msg {
-			m.out.WriteError("A task is already running. Wait for it to complete or cancel it.")
-			return nil
+			return displayErrorMsg{
+				format: "A task is already running. Wait for it to complete or cancel it.",
+			}
 		}
 	}
 
@@ -525,12 +548,11 @@ func (m Terminal) handleSubmit() (Terminal, tea.Cmd) {
 	// Capture resources, clear state, return Cmd for I/O
 	attachments := m.pendingAttachments
 	writer := m.streamInput
-	out := m.out
 	m.input = m.input.WithValue("")
 	m = m.clearAttachments()
 
 	return m, tea.Batch(
-		submitCmd(writer, out, attachments, prompt),
+		submitCmd(writer, attachments, prompt),
 		scheduleTick(),
 	)
 }
