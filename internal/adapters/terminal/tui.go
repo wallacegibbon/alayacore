@@ -248,7 +248,7 @@ type Terminal struct {
 	// ── Transient state (set once or infrequently, not Elm-copied semantically) ─
 	quitting           bool // terminal is shutting down
 	confirmFromCommand bool // cancel came from :cancel command (vs Ctrl+G)
-	hasFocus           bool // terminal has application focus
+	hasFocus           bool // terminal has OS-level application focus
 	themePreviewID     int  // debounce ID for pending theme preview
 	pendingForceRedraw bool // Ctrl-R sets this; handleWindowSize consumes it
 
