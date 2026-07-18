@@ -721,8 +721,8 @@ func (m Terminal) View() tea.View {
 
 	// Input area — empty bordered box (blurred) while MCP init or
 	// post-loading is in progress, same as confirm overlay behavior.
-	sb.WriteString(m.input.RenderWithBorder(
-		m.isConfirmOpen() || m.isMCPInitOpen() || m.postLoading))
+	m.input = m.input.WithBlocked(m.isConfirmOpen() || m.isMCPInitOpen() || m.postLoading)
+	sb.WriteString(m.input.View().Content)
 	sb.WriteString("\n")
 
 	// Status bar (simplified - just render directly)

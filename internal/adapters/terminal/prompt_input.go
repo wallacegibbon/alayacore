@@ -23,6 +23,7 @@ type PromptInput struct {
 	attachments []string   // pending attachment file paths to display
 	focused     bool       // whether this input is focused
 	width       int        // input field width
+	blocked     bool       // when true, View renders empty bordered box
 
 	// ── Dependencies (pointer to shared data) ─
 	styles *Styles
@@ -65,8 +66,21 @@ func (m PromptInput) Update(msg tea.Msg) (PromptInput, tea.Cmd) {
 	return m, cmd
 }
 
-// View renders the input field, with attachments above if present.
+// View renders the input field with border, attachments above if present.
+// When blocked is true, renders an empty bordered box (used when an overlay
+// covers the input area).
 func (m PromptInput) View() tea.View {
+	borderColor := m.styles.BorderFocused
+	if !m.focused {
+		borderColor = m.styles.BorderBlurred
+	} else if m.input.LineCount() > 1 {
+		borderColor = m.styles.ColorWarning
+	}
+
+	if m.blocked {
+		return tea.NewView(m.styles.RenderBorderedBox("", m.width, borderColor))
+	}
+
 	input := m.updateInputStyles()
 	content := input.View()
 	if len(m.attachments) > 0 {
@@ -79,9 +93,9 @@ func (m PromptInput) View() tea.View {
 		sb.WriteString(separator)
 		sb.WriteString("\n")
 		sb.WriteString(content)
-		return tea.NewView(sb.String())
+		return tea.NewView(m.styles.RenderBorderedBox(sb.String(), m.width, borderColor))
 	}
-	return tea.NewView(content)
+	return tea.NewView(m.styles.RenderBorderedBox(content, m.width, borderColor))
 }
 
 // updateInputStyles updates the text input styles based on current theme.
@@ -169,44 +183,12 @@ func (m Terminal) OpenEditor() tea.Cmd {
 	return m.editor.Open(m.input.Value())
 }
 
-// RenderWithBorder renders the input with a border.
-// When blockInput is true, renders an empty bordered box (visually indicating
-// that input is blocked by an overlay) instead of the active input field.
-// Shows attachment list above the text input when present.
-// When the input has multiple lines, the border uses warning color as a
-// brighter visual cue.
-func (m PromptInput) RenderWithBorder(blockInput bool) string {
-	borderColor := m.styles.BorderFocused
-	if !m.focused {
-		borderColor = m.styles.BorderBlurred
-	} else if m.input.LineCount() > 1 {
-		borderColor = m.styles.ColorWarning
-	}
-
-	// Set input styles based on focus state
-	input := m.updateInputStyles()
-
-	if blockInput {
-		return m.styles.RenderBorderedBox("", m.width, borderColor)
-	}
-
-	var content string
-	if len(m.attachments) > 0 {
-		innerWidth := max(0, m.width-BorderInnerPadding)
-		styledMedia := wrapLabels(m.attachments, innerWidth, m.styles.Attachment)
-		separator := m.styles.System.Width(innerWidth).Render(Separator)
-		var sb strings.Builder
-		sb.WriteString(styledMedia)
-		sb.WriteString("\n")
-		sb.WriteString(separator)
-		sb.WriteString("\n")
-		sb.WriteString(input.View())
-		content = sb.String()
-	} else {
-		content = input.View()
-	}
-
-	return m.styles.RenderBorderedBox(content, m.width, borderColor)
+// WithBlocked marks the input as blocked (covered by an overlay).
+// When blocked, View() renders an empty bordered box instead of the
+// input content.
+func (m PromptInput) WithBlocked(blocked bool) PromptInput {
+	m.blocked = blocked
+	return m
 }
 
 func (m PromptInput) WithWidth(width int) PromptInput {

@@ -118,9 +118,9 @@ in its own Update switch.
 |--------------|------|--------|
 | `emitCommand` (TLV write) | `tea.Cmd` | Always in Update context |
 | `submitCmd` (batch TLV writes) | `tea.Cmd` | Multiple writes, one unit |
-| `startMCPAuthFlow` (OAuth) | `tea.Cmd` | Blocking wait, must be async |
-| `WriteError` (in Update) | `tea.Cmd` | Notification, can be deferred 1 frame |
-| `WriteError` (in Init) | Direct write | Not in Update, cannot return Cmd |
+| `startMCPAuthFlow` (OAuth) | `tea.Sequence` | Multi-phase: notify → open browser → wait for callback |
+| `displayErrorMsg` / `displayNotifyMsg` | `tea.Cmd` → `Terminal.Update` handler | Routes all `WriteError`/`WriteNotify` through the event loop |
+| `WriteError` (in Init) | `tea.Batch` of `displayErrorMsg` Cmds | Now goes through Update like all other display writes |
 | `StartCallbackServer` | Direct write in Update | Unavoidable — Cmd needs resultCh |
 
 Principle: All I/O in Update goes through `tea.Cmd`. Exceptions are operations
