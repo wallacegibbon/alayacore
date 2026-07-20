@@ -127,10 +127,26 @@ func (aw AttachmentWindow) readDir(dir string) []fileEntry {
 		result = append(result, fileEntry{
 			name:      name,
 			nameLower: strings.ToLower(name),
-			isDir:     e.IsDir(),
+			isDir:     isDirEntry(dir, e),
 		})
 	}
 	return result
+}
+
+// isDirEntry returns true if e is a directory or a symlink pointing to a directory.
+// os.DirEntry.IsDir() returns false for symlinks even if the target is a directory,
+// so we need to follow them explicitly.
+func isDirEntry(dir string, e os.DirEntry) bool {
+	if e.IsDir() {
+		return true
+	}
+	if e.Type()&os.ModeSymlink != 0 {
+		info, err := os.Stat(filepath.Join(dir, e.Name()))
+		if err == nil && info.IsDir() {
+			return true
+		}
+	}
+	return false
 }
 
 // Update handles all messages for the attachment window: key events and paste.
