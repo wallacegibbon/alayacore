@@ -103,10 +103,6 @@ func (ms ModelSelector) LoadModels(models []config.ModelConfig, activeID int) (M
 
 	savedSelectedIdx := ms.SelectedIdx
 	savedScrollIdx := ms.ScrollIdx
-	var prevSelectedModelID int
-	if savedSelectedIdx >= 0 && savedSelectedIdx < len(ms.filteredModels) {
-		prevSelectedModelID = ms.filteredModels[savedSelectedIdx].ID
-	}
 	shouldPreserveSelection := ms.State != FilteredListClosed
 
 	for i, m := range models {
@@ -116,23 +112,15 @@ func (ms ModelSelector) LoadModels(models []config.ModelConfig, activeID int) (M
 		}
 		if m.ID == activeID {
 			ms.activeModel = &ms.models[i]
-			if !shouldPreserveSelection {
-				ms.SelectedIdx = i
-			}
 		}
 	}
 
 	ms.lastFilterValue = "\x00"
 	ms = ms.updateFilteredModels()
-	if shouldPreserveSelection {
-		if prevModelCount == 0 {
-			ms = ms.selectActiveModel()
-		} else {
-			ms.SelectedIdx = savedSelectedIdx
-			ms.ScrollIdx = savedScrollIdx
-			ms.FilteredListCore = ms.FilteredListCore.ClampSelection(len(ms.filteredModels))
-			ms = ms.selectActiveModelIfPrevDeleted(prevSelectedModelID)
-		}
+	if shouldPreserveSelection && prevModelCount > 0 {
+		ms.SelectedIdx = savedSelectedIdx
+		ms.ScrollIdx = savedScrollIdx
+		ms.FilteredListCore = ms.FilteredListCore.ClampSelection(len(ms.filteredModels))
 	}
 	return ms, func() tea.Msg { return nil }
 }
@@ -147,18 +135,6 @@ func (ms ModelSelector) modelsUnchangedSinceLastLoad(models []config.ModelConfig
 		}
 	}
 	return true
-}
-
-func (ms ModelSelector) selectActiveModelIfPrevDeleted(prevSelectedModelID int) ModelSelector {
-	if prevSelectedModelID <= 0 {
-		return ms
-	}
-	for _, m := range ms.filteredModels {
-		if m.ID == prevSelectedModelID {
-			return ms
-		}
-	}
-	return ms.selectActiveModel()
 }
 
 // --- Open / Close ---
@@ -187,22 +163,6 @@ func (ms ModelSelector) Open() ModelSelector {
 	ms.FilteredListCore = ms.FilteredListCore.updateFilterInputStyles()
 	ms.ScrollIdx = 0
 	ms = ms.updateFilteredModels()
-	return ms.selectActiveModel()
-}
-
-func (ms ModelSelector) selectActiveModel() ModelSelector {
-	if ms.activeModel == nil {
-		ms.FilteredListCore = ms.FilteredListCore.ClampSelection(len(ms.filteredModels))
-		return ms
-	}
-	for i, m := range ms.filteredModels {
-		if m.ID == ms.activeModel.ID {
-			ms.SelectedIdx = i
-			ms.FilteredListCore = ms.FilteredListCore.EnsureVisible()
-			return ms
-		}
-	}
-	ms.FilteredListCore = ms.FilteredListCore.ClampSelection(len(ms.filteredModels))
 	return ms
 }
 

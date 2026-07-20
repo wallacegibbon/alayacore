@@ -216,76 +216,6 @@ func TestModelSelectorSetModelsUpdatesFilteredModels(t *testing.T) {
 	}
 }
 
-func TestModelSelectorLoadModelsBeforeOpen(t *testing.T) {
-	styles := DefaultStyles()
-	ms := NewModelSelector(styles)
-
-	// Simulate the output having models (loaded during session creation)
-	// but the model selector hasn't received them yet.
-	models := []config.ModelConfig{
-		{ID: 1, Name: "Model A", ProtocolType: "openai", ModelName: "model-a"},
-		{ID: 2, Name: "Model B", ProtocolType: "anthropic", ModelName: "model-b"},
-		{ID: 3, Name: "Model C", ProtocolType: "anthropic", ModelName: "model-c"},
-	}
-
-	// Load models first (models arrive via tick loop before the selector opens)
-	ms, _ = ms.LoadModels(models, 3) // Model C is active
-
-	// Then open (simulates Ctrl+L)
-	ms = ms.Open()
-
-	// The cursor should be at the active model (Model C, index 2)
-	if ms.SelectedIdx != 2 {
-		t.Errorf("Expected selectedIdx=2 (active model), got %d", ms.SelectedIdx)
-	}
-	if ms.activeModel == nil {
-		t.Fatal("Expected activeModel to be set")
-	}
-	if ms.activeModel.Name != "Model C" {
-		t.Errorf("Expected activeModel.Name='Model C', got %q", ms.activeModel.Name)
-	}
-}
-
-func TestModelSelectorOpenBeforeLoadModelsThenTick(t *testing.T) {
-	styles := DefaultStyles()
-	ms := NewModelSelector(styles)
-
-	// Simulate the race: selector opens with no models loaded yet
-	ms = ms.Open()
-
-	// Verify selector is open but empty
-	if !ms.IsOpen() {
-		t.Fatal("Expected selector to be open")
-	}
-	if len(ms.filteredModels) != 0 {
-		t.Fatalf("Expected 0 filtered models, got %d", len(ms.filteredModels))
-	}
-
-	// Now simulate the first tick loading models from output
-	models := []config.ModelConfig{
-		{ID: 1, Name: "Model A", ProtocolType: "openai", ModelName: "model-a"},
-		{ID: 2, Name: "Model B", ProtocolType: "anthropic", ModelName: "model-b"},
-		{ID: 3, Name: "Model C", ProtocolType: "anthropic", ModelName: "model-c"},
-	}
-	ms, _ = ms.LoadModels(models, 3) // Model C is active
-
-	// activeModel should be set correctly
-	if ms.activeModel == nil {
-		t.Fatal("Expected activeModel to be set after LoadModels")
-	}
-	if ms.activeModel.Name != "Model C" {
-		t.Errorf("Expected activeModel.Name='Model C', got %q", ms.activeModel.Name)
-	}
-	// filteredModels should have all models
-	if len(ms.filteredModels) != 3 {
-		t.Fatalf("Expected 3 filtered models, got %d", len(ms.filteredModels))
-	}
-	// Cursor should be positioned at the active model, not stuck at index 0
-	if ms.SelectedIdx != 2 {
-		t.Errorf("Expected selectedIdx=2 (active Model C), got %d", ms.SelectedIdx)
-	}
-}
-
 func TestModelSelectorLoadModelsPreservesSelection(t *testing.T) {
 	styles := DefaultStyles()
 	ms := NewModelSelector(styles)
@@ -298,8 +228,14 @@ func TestModelSelectorLoadModelsPreservesSelection(t *testing.T) {
 	ms, _ = ms.LoadModels(models, 1) // Model A is active
 	ms = ms.Open()
 
-	// Select second model (simulates user navigating with j/k)
-	ms.SelectedIdx = 1
+	// Simulate user pressing Tab to focus the list, then navigating to Model B (index 1)
+	ms.FilteredListCore = ms.HandleTabKey() // now FilterInputFocused=false, list is focused
+	ms = ms.handleListKeys(keyDown)
+
+	// Verify we selected Model B
+	if ms.SelectedIdx != 1 {
+		t.Fatalf("Expected selectedIdx=1 after navigating down, got %d", ms.SelectedIdx)
+	}
 
 	// Reload models (simulating Ctrl+R — user-triggered reload)
 	// The selection should be preserved when selector is open and models already existed
