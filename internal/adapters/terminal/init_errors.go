@@ -33,13 +33,6 @@ func (ec *InitErrorCollector) GetAndClear() []InitError {
 	return errs
 }
 
-// AddInitErrorf adds an error to the collector (nil-safe).
-func AddInitErrorf(ec *InitErrorCollector, format string, args ...any) {
-	if ec != nil {
-		ec.Addf(format, args...)
-	}
-}
-
 // HasInitErrors checks if there are any errors.
 func (ec *InitErrorCollector) HasInitErrors() bool {
 	return len(ec.errors) > 0

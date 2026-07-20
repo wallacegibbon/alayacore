@@ -9,8 +9,8 @@ func TestInitErrorCollector(t *testing.T) {
 	ec := &InitErrorCollector{}
 
 	// Test adding errors (no trailing \n)
-	AddInitErrorf(ec, "Test error %d", 1)
-	AddInitErrorf(ec, "Another error")
+	ec.Addf("Test error %d", 1)
+	ec.Addf("Another error")
 
 	errs := ec.GetAndClear()
 	if len(errs) != 2 {
@@ -55,9 +55,4 @@ func TestInitErrorCollectorHasInitErrors(t *testing.T) {
 	if ec.HasInitErrors() {
 		t.Error("Expected no errors after GetAndClear")
 	}
-}
-
-func TestAddInitErrorfNilSafe(t *testing.T) {
-	// Should not panic with nil collector
-	AddInitErrorf(nil, "test %d", 1)
 }

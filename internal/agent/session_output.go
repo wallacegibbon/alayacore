@@ -19,12 +19,10 @@ package agent
 // or from atomic fields — no mutex needed.
 
 import (
-	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
 
-	"github.com/alayacore/alayacore/internal/llm"
 	"github.com/alayacore/alayacore/internal/protocol"
 	"github.com/alayacore/alayacore/internal/theme"
 	"github.com/alayacore/alayacore/internal/tlv"
@@ -90,22 +88,6 @@ func (s *Session) writeNotify(msg string) {
 
 func (s *Session) writeNotifyf(format string, args ...any) {
 	s.writeNotify(fmt.Sprintf(format, args...))
-}
-
-func (s *Session) writeToolInput(input json.RawMessage, id string) {
-	data, err := marshalToolInputData(id, "", input)
-	if err != nil {
-		return
-	}
-	s.writeTLV(tlv.TagAssistantF, string(data))
-}
-
-func (s *Session) writeToolOutput(id string, contents []llm.ContentPart, isError bool) {
-	data, err := marshalToolOutputData(id, contents, isError)
-	if err != nil {
-		return
-	}
-	s.writeTLV(tlv.TagUserF, string(data))
 }
 
 // ============================================================================

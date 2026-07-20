@@ -119,7 +119,3 @@ func NewStyles(t *theme.Theme) *Styles {
 		FoldIndicator: t.FoldIndicator,
 	}
 }
-
-func DefaultStyles() *Styles {
-	return NewStyles(theme.DefaultTheme())
-}
