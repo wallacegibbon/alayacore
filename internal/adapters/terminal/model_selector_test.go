@@ -301,7 +301,7 @@ func TestModelSelectorLoadModelsPreservesSelection(t *testing.T) {
 	// Select second model (simulates user navigating with j/k)
 	ms.SelectedIdx = 1
 
-	// Reload models (simulating 'r' key — user-triggered reload)
+	// Reload models (simulating Ctrl+R — user-triggered reload)
 	// The selection should be preserved when selector is open and models already existed
 	newModels := []config.ModelConfig{
 		{ID: 1, Name: "Model A", ProtocolType: "openai", ModelName: "model-a"},

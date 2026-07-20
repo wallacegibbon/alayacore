@@ -40,7 +40,7 @@ type sessionState struct {
 
 	// MCP init status — tracks the initialization phase.
 	// Values: "" (no MCP), "connecting", "connected", "failed",
-	// "auth_confirm", "auth_running", "done".
+	// "auth_required", "auth_running", "done".
 	mcpStatus string
 
 	// Per-server init progress.
@@ -171,7 +171,7 @@ func (s *sessionState) updateVideoConfig(fps, res int) {
 
 // updateMCPProgress atomically updates MCP init progress.
 // Called when the session sends an "mcp" system message with
-// status "connecting", "connected", "failed", "auth_confirm",
+// status "connecting", "connected", "failed", "auth_required",
 // or "auth_running".
 func (s *sessionState) updateMCPProgress(status, server string) {
 	s.mu.Lock()

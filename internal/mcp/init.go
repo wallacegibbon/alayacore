@@ -11,7 +11,7 @@ package mcp
 //
 // The session drives the flow by:
 //  1. Reading events from Events() channel
-//  2. For "auth_confirm" events: showing a dialog, sending result via mcp_confirm
+//  2. For "auth_required" events: showing a dialog, sending result via mcp_confirm
 //  3. For Ctrl+G: calling init.Cancel()
 //  4. For "done"/"canceled" event: applying final results or cleaning up
 //
@@ -116,7 +116,7 @@ const (
 	InitConnecting  InitEventType = "connecting"
 	InitConnected   InitEventType = "connected"
 	InitFailed      InitEventType = "failed"
-	InitAuthConfirm InitEventType = "auth_confirm"
+	InitAuthConfirm InitEventType = "auth_required"
 	InitAuthRunning InitEventType = "auth_running"
 	InitDone        InitEventType = "done"
 	InitCanceled    InitEventType = "canceled"
@@ -125,7 +125,7 @@ const (
 type InitEvent struct {
 	Type   InitEventType
 	Server string
-	URL    string // set for "auth_confirm"
+	URL    string // set for "auth_required"
 	Error  string // set for "failed"
 
 	// Set for "done" — fully converted results
@@ -213,7 +213,7 @@ func (init *Init) Cancel() {
 
 // registerAuthCodeCh creates a buffered auth code channel for a server
 // and registers it in the map. The channel is created BEFORE sending
-// the "auth_confirm" event to avoid races with SendAuthCodeResult().
+// the "auth_required" event to avoid races with SendAuthCodeResult().
 func (init *Init) registerAuthCodeCh(server string) chan authCodeResult {
 	ch := make(chan authCodeResult, 1)
 	init.mu.Lock()

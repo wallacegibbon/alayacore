@@ -23,7 +23,7 @@ See `internal/llm/agent.go` → `Stream()`, `streamEvents()`, and `handleStreame
 
 ## Confirmation
 
-`ToolNeedsConfirm` filters which tools need user approval. When a tool needs confirmation, `OnToolConfirm` is called **per tool** and returns a per-tool channel. The tool's goroutine blocks on this channel. The session stores the channel in a map keyed by tool call ID. When the user responds via `:confirm <id> yes|no`, the session looks up the channel in the map and writes the response, unblocking the goroutine which then executes the tool.
+`ToolNeedsConfirm` filters which tools need user approval. When a tool needs confirmation, `OnToolConfirm` is called **per tool** and returns a per-tool channel. The tool's goroutine blocks on this channel. The session stores the channel in a map keyed by tool call ID. When the user responds via `:tool_confirm <id>` or `:tool_decline <id>`, the session looks up the channel in the map and writes the response, unblocking the goroutine which then executes the tool.
 
 Each tool has its own confirm channel (buffered, capacity 1), following the same pattern used by MCP OAuth confirmation. This keeps the tool lifecycle continuous — no artificial segmentation between streaming, confirmation collection, and execution.
 

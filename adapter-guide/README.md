@@ -504,7 +504,7 @@ UF-execute-command-failed.bin  UF \x00 15 \x00 {"id":"t5","output":[{"text":"com
 | `error` | `text` (string) | `SM-error.bin` |
 | `notify` | `text` (string) | `SM-notify.bin` |
 | `tool_confirm` | `id` (string), `allowed` (bool, opt — present only in adapter→agent response) | `SM-tool-confirm.bin` |
-| `mcp` | `status` (string: one of `connecting`, `auth_confirm`, `auth_running`, `connected`, `failed`, `done`), `server` (string, opt), `url` (string, opt — set for `auth_confirm`; may contain `{{redirect_uri}}` and `{{state}}` placeholders), `error` (string, opt — set for `failed`) | `SM-mcp-connecting.bin`, `SM-mcp-auth-confirm.bin`, `SM-mcp-auth-running.bin`, `SM-mcp-connected.bin`, `SM-mcp-failed.bin`, `SM-mcp-done.bin` |
+| `mcp` | `status` (string: one of `connecting`, `auth_required`, `auth_running`, `connected`, `failed`, `done`), `server` (string, opt), `url` (string, opt — set for `auth_required`; may contain `{{redirect_uri}}` and `{{state}}` placeholders), `error` (string, opt — set for `failed`) | `SM-mcp-connecting.bin`, `SM-mcp-auth-required.bin`, `SM-mcp-auth-running.bin`, `SM-mcp-connected.bin`, `SM-mcp-failed.bin`, `SM-mcp-done.bin` |
 
 Complete wire values:
 
@@ -522,7 +522,7 @@ SM-error.bin                   {"type":"error","data":{"text":"something broke"}
 SM-notify.bin                  {"type":"notify","data":{"text":"all good"}}
 SM-tool-confirm.bin            {"type":"tool_confirm","data":{"id":"t1"}}
 SM-mcp-connecting.bin          {"type":"mcp","data":{"status":"connecting","server":"github"}}
-SM-mcp-auth-confirm.bin        {"type":"mcp","data":{"status":"auth_confirm","server":"github","url":"https://github.com/login/oauth/authorize?...redirect_uri={{redirect_uri}}&state={{state}}"}}
+SM-mcp-auth-required.bin        {"type":"mcp","data":{"status":"auth_required","server":"github","url":"https://github.com/login/oauth/authorize?...redirect_uri={{redirect_uri}}&state={{state}}"}}
 SM-mcp-auth-running.bin        {"type":"mcp","data":{"status":"auth_running","server":"github"}}
 SM-mcp-connected.bin           {"type":"mcp","data":{"status":"connected","server":"github"}}
 SM-mcp-failed.bin              {"type":"mcp","data":{"status":"failed","server":"github","error":"connection timeout"}}
@@ -545,13 +545,13 @@ with either `:tool_confirm <id>` or `:tool_decline <id>`:
 
 ### MCP Initialization & OAuth
 
-When the agent sends `SM-mcp-auth-confirm.bin`, the adapter must open the
+When the agent sends `SM-mcp-auth-required.bin`, the adapter must open the
 authorization URL in a browser, start a local callback server to capture
 the OAuth code, then respond with the code:
 
 | SM Received | Adapter Action | UT Response |
 |-------------|----------------|-------------|
-| `{"type":"mcp","data":{"status":"auth_confirm","server":"github","url":"https://..."}}` | Open browser to `url` (with `{{redirect_uri}}`/`{{state}}` replaced), start callback server | `:mcp_confirm github <code> <redirect_uri>` |
+| `{"type":"mcp","data":{"status":"auth_required","server":"github","url":"https://..."}}` | Open browser to `url` (with `{{redirect_uri}}`/`{{state}}` replaced), start callback server | `:mcp_confirm github <code> <redirect_uri>` |
 | User declines or flow fails | Send decline command | `:mcp_decline github` |
 | User cancels entire init | Send cancel command | `:mcp_cancel` |
 

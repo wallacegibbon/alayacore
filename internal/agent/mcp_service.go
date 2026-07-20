@@ -137,7 +137,7 @@ func (m *MCPService) HandleEvent(evt *mcp.InitEvent) *MCPEventResult {
 	case mcp.InitAuthConfirm:
 		return &MCPEventResult{
 			SystemMsg: &MCPMsgData{
-				Status: "auth_confirm",
+				Status: "auth_required",
 				Server: evt.Server,
 				URL:    evt.URL,
 			},
