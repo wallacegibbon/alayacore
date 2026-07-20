@@ -8,5 +8,4 @@ alayacore-*.log
 .obsidian/
 .playwright-cli/
 REFACTOR.md
-STATE.md
 TODO.md

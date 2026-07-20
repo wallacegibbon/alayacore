@@ -11,8 +11,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/alayacore/alayacore/internal/debug"
 )
 
 // ============================================================================
@@ -433,7 +431,7 @@ func TestHTTPTransport_DebugLogging(t *testing.T) {
 
 	tr := NewHTTPTransport(srv.URL(), true)
 	defer tr.Close()
-	t.Cleanup(func() { debug.CleanupDebugWriter(tr.debugWriter) })
+	t.Cleanup(func() { tr.debugWriter.Close() })
 
 	ctx := context.Background()
 	_, err := tr.SendReceive(ctx, jsonrpcRequest{

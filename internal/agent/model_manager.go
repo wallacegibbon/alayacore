@@ -209,7 +209,6 @@ func validateModel(m config.ModelConfig) []string {
 	return errs
 }
 
-
 func (mm *ModelManager) HasModels() bool {
 	return len(mm.models) > 0
 }
@@ -218,7 +217,6 @@ func (mm *ModelManager) HasModels() bool {
 func (mm *ModelManager) HasRejected() bool {
 	return mm.hasRejected
 }
-
 
 // GetModels returns all models with full details (including API keys).
 func (mm *ModelManager) GetModels() []config.ModelConfig {

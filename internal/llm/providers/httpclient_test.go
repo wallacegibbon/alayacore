@@ -26,7 +26,7 @@ func TestNewHTTPClient(t *testing.T) {
 	if transport.Writer == nil {
 		t.Error("expected non-nil Writer")
 	} else {
-		t.Cleanup(func() { debug.CleanupDebugWriter(transport.Writer) })
+		t.Cleanup(func() { transport.Writer.(io.Closer).Close() })
 	}
 
 	if transport.Transport == nil {
@@ -53,7 +53,7 @@ func TestNewHTTPClientWithProxyAndDebug(t *testing.T) {
 	if transport.Writer == nil {
 		t.Error("expected non-nil Writer on debug transport")
 	} else {
-		t.Cleanup(func() { debug.CleanupDebugWriter(transport.Writer) })
+		t.Cleanup(func() { transport.Writer.(io.Closer).Close() })
 	}
 
 	innerTransport, ok := transport.Transport.(*http.Transport)
@@ -228,5 +228,5 @@ func TestNewDebugWriter_NotNil(t *testing.T) {
 	if w == nil {
 		t.Fatal("NewDebugWriter returned nil")
 	}
-	debug.CleanupDebugWriter(w)
+	w.Close()
 }

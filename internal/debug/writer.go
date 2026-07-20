@@ -4,15 +4,22 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 )
 
-// NewDebugWriter creates a new debug log file with the given base name.
+// NewDebugWriter creates a new debug log file inside a dedicated
+// alayacore-debug directory under the system temp directory.
 // It tries <baseName>-0.log, -1.log, ..., -999.log with O_EXCL so that
-// concurrent processes never collide. Falls back to stderr if all slots
-// are taken or the filesystem is unwritable.
+// concurrent processes never collide.
+// Falls back to stderr if all slots are taken or the filesystem is unwritable.
 func NewDebugWriter(baseName string) io.WriteCloser {
+	dir := filepath.Join(os.TempDir(), "alayacore")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return os.Stderr
+	}
+
 	for i := 0; i < 1000; i++ {
-		logName := fmt.Sprintf("%s-%d.log", baseName, i)
+		logName := filepath.Join(dir, fmt.Sprintf("%s-%d.log", baseName, i))
 		f, err := os.OpenFile(logName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
 		if err == nil {
 			fmt.Fprintf(f, "Debug log started: %s\n", logName)
@@ -21,16 +28,4 @@ func NewDebugWriter(baseName string) io.WriteCloser {
 	}
 
 	return os.Stderr // *os.File implements io.WriteCloser
-}
-
-// CleanupDebugWriter closes and removes a debug log file created by NewDebugWriter.
-func CleanupDebugWriter(w io.Writer) {
-	if f, ok := w.(*os.File); ok && f != os.Stderr {
-		name := f.Name()
-		f.Close()
-		os.Remove(name)
-	}
-	if c, ok := w.(io.Closer); ok {
-		c.Close()
-	}
 }
