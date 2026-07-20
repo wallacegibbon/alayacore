@@ -161,12 +161,13 @@ func (hw HelpWindow) Open() HelpWindow {
 	hw.State = FilteredListOpen
 	hw.FilterInput = hw.FilterInput.WithValue("")
 	hw.lastFilterValue = "\x00"
-	hw.FilterInputFocused = false
-	hw.FilterInput = hw.FilterInput.Blur()
+	hw.FilterInputFocused = true
+	hw.FilterInput = hw.FilterInput.Focus()
 	hw.FilteredListCore = hw.FilteredListCore.updateFilterInputStyles()
 	hw.ScrollIdx = 0
 	hw = hw.updateFilteredItems()
 	hw.SelectedIdx = hw.firstSelectableIdx()
+	hw.ScrollIdx = 0
 	return hw
 }
 
@@ -273,6 +274,21 @@ func (hw HelpWindow) Update(msg tea.Msg) (HelpWindow, tea.Cmd) {
 				} else {
 					pendingCmd = item.Key
 				}
+			}
+		}
+	}
+
+	// When search is focused, Enter selects the first filtered command
+	if key == keyEnter && result.Handled && fl.FilterInputFocused && hw.filteredLen() > 0 {
+		for _, item := range hw.filteredItems {
+			if !item.IsSection && item.Type == HelpItemCommand {
+				parts := strings.Fields(item.Key)
+				if len(parts) > 0 {
+					pendingCmd = parts[0]
+				} else {
+					pendingCmd = item.Key
+				}
+				break
 			}
 		}
 	}
@@ -389,7 +405,7 @@ func (hw HelpWindow) View() tea.View {
 	} else {
 		endIdx := min(hw.ScrollIdx+listHeight, hw.filteredLen())
 		for i := hw.ScrollIdx; i < endIdx; i++ {
-			lines = append(lines, hw.renderItem(hw.filteredItems[i], i == hw.SelectedIdx && !hw.FilterInputFocused))
+			lines = append(lines, hw.renderItem(hw.filteredItems[i], i == hw.SelectedIdx))
 		}
 	}
 

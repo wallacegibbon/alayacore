@@ -30,6 +30,9 @@ func TestHelpWindowNavigation(t *testing.T) {
 	hw := NewHelpWindow(styles)
 	hw = hw.Open()
 
+	// Initially search box is focused; Tab to list to navigate
+	hw, _ = hw.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
+
 	// First selectable item should be index 1 (index 0 is a section header)
 	if hw.SelectedIdx != 1 {
 		t.Errorf("Expected selectedIdx to be 1 (first non-header), got %d", hw.SelectedIdx)
@@ -67,6 +70,9 @@ func TestHelpWindowSkipsSectionHeaders(t *testing.T) {
 	}
 	hw = hw.Open()
 
+	// Tab to list
+	hw, _ = hw.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
+
 	// Should start at index 1 (first non-header)
 	if hw.SelectedIdx != 1 {
 		t.Errorf("Expected selectedIdx to be 1, got %d", hw.SelectedIdx)
@@ -96,6 +102,9 @@ func TestHelpWindowNavigationBoundary(t *testing.T) {
 	}
 	hw = hw.Open()
 
+	// Tab to list
+	hw, _ = hw.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
+
 	// Start at index 1
 	if hw.SelectedIdx != 1 {
 		t.Errorf("Expected selectedIdx to be 1, got %d", hw.SelectedIdx)
@@ -123,15 +132,16 @@ func TestHelpWindowNavigationBoundary(t *testing.T) {
 func TestHelpWindowCloseKeys(t *testing.T) {
 	styles := DefaultStyles()
 
-	// Test 'q' key
+	// Test 'q' key (Tab to list first, then q)
 	hw := NewHelpWindow(styles)
 	hw = hw.Open()
+	hw, _ = hw.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
 	hw, _ = hw.Update(tea.KeyPressMsg(tea.Key{Code: 'q'}))
 	if hw.IsOpen() {
-		t.Error("Help window should be closed after pressing q")
+		t.Error("Help window should be closed after pressing q (while list is focused)")
 	}
 
-	// Test 'esc' key
+	// Test 'esc' key (works regardless of focus)
 	hw = NewHelpWindow(styles)
 	hw = hw.Open()
 	hw, _ = hw.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEsc}))
@@ -178,7 +188,8 @@ func TestHelpWindowViewWhenOpen(t *testing.T) {
 		t.Error("View should contain ':continue' command")
 	}
 
-	// RenderOverlay should contain navigation help text
+	// Tab to list, then RenderOverlay should contain navigation help text
+	hw, _ = hw.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
 	overlay := hw.RenderOverlay("base", 80, 24)
 	if !containsStr(overlay, "j/k: navigate") {
 		t.Error("RenderOverlay should contain navigation help text")
@@ -253,6 +264,8 @@ func TestHelpWindowEnterOnCommand(t *testing.T) {
 		{ID: 3, Key: ":save", Description: "Save session", Type: HelpItemCommand},
 	}
 	hw = hw.Open()
+	// Tab to list first (search is initially focused)
+	hw, _ = hw.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
 	// Should start at index 1 (first non-header)
 	if hw.SelectedIdx != 1 {
 		t.Fatalf("Expected selectedIdx to be 1, got %d", hw.SelectedIdx)
@@ -294,9 +307,11 @@ func TestHelpWindowEnterOnCommandStripsArgs(t *testing.T) {
 	}
 	hw = hw.Open()
 
-	// Helper to extract command from cmd
+	// Helper to extract command from cmd (must Tab to list first)
 	getCmd := func(hw HelpWindow) string {
-		hw2, cmd := hw.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+		// Open returns with search focused; Tab to list
+		hw2, _ := hw.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
+		hw2, cmd := hw2.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 		_ = hw2
 		if cmd == nil {
 			return ""
@@ -437,21 +452,21 @@ func TestHelpWindowTabToggle(t *testing.T) {
 	hw := NewHelpWindow(styles)
 	hw = hw.Open()
 
-	// Initially list is focused
-	if hw.FilterInputFocused {
-		t.Error("Expected list focused initially")
+	// Initially search box is focused
+	if !hw.FilterInputFocused {
+		t.Error("Expected search box focused initially")
 	}
 
-	// Tab to filter
+	// Tab to list
+	hw, _ = hw.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
+	if hw.FilterInputFocused {
+		t.Error("Expected list focused after Tab")
+	}
+
+	// Tab back to search
 	hw, _ = hw.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
 	if !hw.FilterInputFocused {
-		t.Error("Expected filter focused after Tab")
-	}
-
-	// Tab back to list
-	hw, _ = hw.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
-	if hw.FilterInputFocused {
-		t.Error("Expected list focused after second Tab")
+		t.Error("Expected search focused after second Tab")
 	}
 }
 

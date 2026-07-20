@@ -183,8 +183,8 @@ func (ms ModelSelector) Open() ModelSelector {
 	ms.State = FilteredListOpen
 	ms.FilterInput = ms.FilterInput.WithValue("")
 	ms.lastFilterValue = "\x00"
-	ms.FilterInputFocused = false
-	ms.FilterInput = ms.FilterInput.Blur()
+	ms.FilterInputFocused = true
+	ms.FilterInput = ms.FilterInput.Focus()
 	ms.FilteredListCore = ms.FilteredListCore.updateFilterInputStyles()
 	ms.ScrollIdx = 0
 	ms = ms.updateFilteredModels()
@@ -406,7 +406,7 @@ func (ms ModelSelector) measureColumns(listHeight, innerWidth, idWidth int) (nam
 
 func (ms ModelSelector) renderModelRow(i, idWidth, nameMaxWidth, ctxColWidth, provColWidth int) string {
 	m := ms.filteredModels[i]
-	isSelected := i == ms.SelectedIdx && !ms.FilterInputFocused
+	isSelected := i == ms.SelectedIdx
 
 	idxStr := fmt.Sprintf("%0*d", idWidth, m.ID)
 	leftRaw := "  " + idxStr
