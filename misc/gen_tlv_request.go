@@ -20,7 +20,7 @@ func loadMedia(path string) (tag string, dataURI string, err error) {
 	mime := tlv.MimeTypeForPath(path)
 	b64 := base64.StdEncoding.EncodeToString(data)
 	dataURI = fmt.Sprintf("data:%s;base64,%s", mime, b64)
-	tag = tlv.TagForMIME(mime)
+	tag = tlv.TagForPath(path)
 
 	return tag, dataURI, nil
 }

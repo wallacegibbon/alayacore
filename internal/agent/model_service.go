@@ -62,9 +62,6 @@ func NewModelService(manager *ModelManager, runtimeMgr *RuntimeManager) *ModelSe
 // Agent returns the current agent, or nil if not initialized.
 func (ms *ModelService) Agent() *llm.Agent { return ms.agent }
 
-// Provider returns the current provider, or nil if not initialized.
-func (ms *ModelService) Provider() llm.Provider { return ms.provider }
-
 // ContextLimit returns the context limit (0 = unlimited).
 func (ms *ModelService) ContextLimit() int64 { return ms.contextLimit }
 

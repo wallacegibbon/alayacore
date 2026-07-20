@@ -44,22 +44,6 @@ func TagForPath(path string) string {
 	}
 }
 
-// TagForMIME returns the TLV tag for a MIME type string.
-func TagForMIME(mime string) string {
-	switch {
-	case strings.HasPrefix(mime, "image/"):
-		return TagUserI
-	case strings.HasPrefix(mime, "video/"):
-		return TagUserV
-	case strings.HasPrefix(mime, "audio/"):
-		return TagUserA
-	case strings.HasPrefix(mime, "application/"), strings.HasPrefix(mime, "text/"):
-		return TagUserD
-	default:
-		return TagUserI
-	}
-}
-
 // MediaLabel returns the display label for a media tag.
 //
 // Use only single-codepoint emoji (see package doc.go for details).

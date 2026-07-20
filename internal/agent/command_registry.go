@@ -81,23 +81,6 @@ func (cr *CommandRegistry) Lookup(name string) (*Command, bool) {
 	return &cmd, true
 }
 
-// Names returns all registered command names (for help display, etc.).
-func (cr *CommandRegistry) Names() []string {
-	names := make([]string, 0, len(cr.commands))
-	for name := range cr.commands {
-		names = append(names, name)
-	}
-	return names
-}
-
-// Register adds a command to the registry. Panics on duplicate name.
-func (cr *CommandRegistry) Register(cmd Command) {
-	if _, ok := cr.commands[cmd.Name]; ok {
-		panic("command already registered: " + cmd.Name)
-	}
-	cr.commands[cmd.Name] = cmd
-}
-
 // LookupCommand is a package-level shorthand for the default registry.
 func LookupCommand(name string) (*Command, bool) {
 	return defaultCommandRegistry.Lookup(name)

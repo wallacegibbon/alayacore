@@ -34,7 +34,7 @@ func TestTextWithToolCalls(t *testing.T) {
 
 	// Create provider
 	provider, err := providers.NewOpenAI(providers.BaseConfig{
-		APIKey: "test-key",
+		APIKey:  "test-key",
 		BaseURL: server.URL,
 	})
 	if err != nil {

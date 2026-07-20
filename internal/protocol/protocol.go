@@ -56,13 +56,6 @@ func ParseSystemMsg(value string) (SystemMsgEnvelope, error) {
 	return env, nil
 }
 
-// ParseSystemMsgType extracts just the type from a TagSystemMsg value.
-// Returns the type string and whether parsing succeeded.
-func ParseSystemMsgType(value string) (string, bool) {
-	env, err := ParseSystemMsg(value)
-	return env.Type, err == nil
-}
-
 // WriteSystemMsg marshals msg as a TagSystemMsg TLV frame.
 func WriteSystemMsg(w io.Writer, msg SystemMsg) error {
 	data, err := json.Marshal(msg)
