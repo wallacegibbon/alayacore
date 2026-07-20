@@ -156,12 +156,14 @@ func (a *AdapterV20251125) CancelByNotification() bool { return true }
 
 // ServerRequestHandler handles a server-to-client request on an SSE stream
 // (ping in 2025-11-25). Responds to ping, rejects unknown methods.
-func (a *AdapterV20251125) ServerRequestHandler(id requestID, method string) {
+// Uses the provided ctx (tied to transport lifetime) for the outbound HTTP POST.
+func (a *AdapterV20251125) ServerRequestHandler(ctx context.Context, id requestID, method string) {
 	if a.httpClient == nil || a.endpointURL == "" {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// Cap to 10s but respect transport shutdown via ctx.
+	reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	resp := jsonrpcResponse{
@@ -179,7 +181,7 @@ func (a *AdapterV20251125) ServerRequestHandler(id requestID, method string) {
 		return
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", a.endpointURL, strings.NewReader(string(data)))
+	httpReq, err := http.NewRequestWithContext(reqCtx, "POST", a.endpointURL, strings.NewReader(string(data)))
 	if err != nil {
 		return
 	}
@@ -255,7 +257,7 @@ func (a *AdapterV20251125) OnTransportReady(ctx context.Context, transport *HTTP
 }
 
 // OnClose terminates the session and cleans up the GET stream.
-func (a *AdapterV20251125) OnClose() {
+func (a *AdapterV20251125) OnClose(ctx context.Context) {
 	a.getSSEMu.Lock()
 	defer a.getSSEMu.Unlock()
 
@@ -269,20 +271,20 @@ func (a *AdapterV20251125) OnClose() {
 	}
 	close(a.getSSEClosed)
 
-	a.sendSessionDelete()
+	a.sendSessionDelete(ctx)
 }
 
 // sendSessionDelete sends an HTTP DELETE to terminate the session.
 // Best-effort — errors are ignored per spec (server may return 405).
-func (a *AdapterV20251125) sendSessionDelete() {
+func (a *AdapterV20251125) sendSessionDelete(ctx context.Context) {
 	if a.sessionID == "" || a.httpClient == nil {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	reqCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, a.endpointURL, nil)
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodDelete, a.endpointURL, nil)
 	if err != nil {
 		return
 	}

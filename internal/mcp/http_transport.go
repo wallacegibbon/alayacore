@@ -290,18 +290,24 @@ func (t *HTTPTransport) StartGETStream(ctx context.Context) (func(), error) {
 	go func() {
 		defer close(closed)
 		defer sr.Close()
+
+		// Context tied to transport lifetime: canceled when Close() is called.
+		loopCtx, loopCancel := context.WithCancel(context.Background())
+		defer loopCancel()
+		go func() { <-t.done; loopCancel() }()
+
 		var srh ServerRequestHandler
 		if t.adapter != nil {
 			srh = t.adapter.ServerRequestHandler
 		}
-		t.readSSELoop(sr, srh, t.notificationHandler)
+		t.readSSELoop(loopCtx, sr, srh, t.notificationHandler)
 	}()
 
 	return func() { sr.Close(); <-closed }, nil
 }
 
 // readSSELoop reads SSE events from a stream and dispatches them.
-func (t *HTTPTransport) readSSELoop(sr *sseReadCloser, handler ServerRequestHandler, notifHandler NotificationHandler) {
+func (t *HTTPTransport) readSSELoop(ctx context.Context, sr *sseReadCloser, handler ServerRequestHandler, notifHandler NotificationHandler) {
 	for {
 		eventType, data, err := sr.readEvent()
 		if err != nil {
@@ -315,7 +321,7 @@ func (t *HTTPTransport) readSSELoop(sr *sseReadCloser, handler ServerRequestHand
 
 		switch eventType {
 		case "message":
-			if err := parseAndDispatchJSONRPC([]byte(data), t.pending, &t.pendingMu, t.debugWriter, handler, notifHandler); err != nil {
+			if err := parseAndDispatchJSONRPC(ctx, []byte(data), t.pending, &t.pendingMu, t.debugWriter, handler, notifHandler); err != nil {
 				if t.debugWriter != nil {
 					fmt.Fprintf(t.debugWriter, "MCP HTTP: malformed message: %v\n", err)
 				}
@@ -467,11 +473,17 @@ func (t *HTTPTransport) readSSEResponse(ctx context.Context, resp *http.Response
 	readDone := make(chan struct{})
 	go func() {
 		defer close(readDone)
+
+		// Context tied to transport lifetime: canceled when Close() is called.
+		loopCtx, loopCancel := context.WithCancel(context.Background())
+		defer loopCancel()
+		go func() { <-t.done; loopCancel() }()
+
 		var srh ServerRequestHandler
 		if t.adapter != nil {
 			srh = t.adapter.ServerRequestHandler
 		}
-		t.readSSELoop(sr, srh, t.notificationHandler)
+		t.readSSELoop(loopCtx, sr, srh, t.notificationHandler)
 	}()
 
 	select {

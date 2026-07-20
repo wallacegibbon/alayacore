@@ -289,7 +289,7 @@ func (a *AdapterV20260728) CancelByNotification() bool { return false }
 
 // ServerRequestHandler is a no-op — 2026-07-28 has no server-to-client
 // requests on SSE streams (MRTR replaces them).
-func (a *AdapterV20260728) ServerRequestHandler(_ requestID, _ string) {}
+func (a *AdapterV20260728) ServerRequestHandler(_ context.Context, _ requestID, _ string) {}
 
 // OnTransportReady is a no-op — 2026-07-28 has no GET stream.
 func (a *AdapterV20260728) OnTransportReady(_ context.Context, _ *HTTPTransport) error {
@@ -297,4 +297,4 @@ func (a *AdapterV20260728) OnTransportReady(_ context.Context, _ *HTTPTransport)
 }
 
 // OnClose is a no-op — 2026-07-28 has no session to terminate.
-func (a *AdapterV20260728) OnClose() {}
+func (a *AdapterV20260728) OnClose(_ context.Context) {}

@@ -96,7 +96,7 @@ func dispatchResponse(resp jsonrpcResponse, pending map[requestID]chan<- jsonrpc
 // In 2026-07-28+, servers do not send JSON-RPC requests (they use MRTR
 // InputRequiredResult instead). The handler should respond to the request
 // using the transport's Send method.
-type ServerRequestHandler func(id requestID, method string)
+type ServerRequestHandler func(ctx context.Context, id requestID, method string)
 
 // NotificationHandler is a callback for handling server-to-client notifications.
 // These are JSON-RPC notifications (no ID) sent by the server (e.g.
@@ -110,7 +110,7 @@ type NotificationHandler func(method string)
 // Batch responses are not supported (MCP uses single-response only).
 // Server-to-client requests are detected and forwarded to handleServerReq.
 // Server-to-client notifications (no ID) are forwarded to handleNotification.
-func parseAndDispatchJSONRPC(data []byte, pending map[requestID]chan<- jsonrpcResponse, mu sync.Locker, debugWriter io.Writer, handleServerReq ServerRequestHandler, handleNotification NotificationHandler) error {
+func parseAndDispatchJSONRPC(ctx context.Context, data []byte, pending map[requestID]chan<- jsonrpcResponse, mu sync.Locker, debugWriter io.Writer, handleServerReq ServerRequestHandler, handleNotification NotificationHandler) error {
 	// Check for server-to-client requests first.
 	// A JSON-RPC request has a "method" field and an "id" field.
 	var reqFields struct {
@@ -119,7 +119,7 @@ func parseAndDispatchJSONRPC(data []byte, pending map[requestID]chan<- jsonrpcRe
 	}
 	if err := json.Unmarshal(data, &reqFields); err == nil && reqFields.Method != "" {
 		if reqFields.ID != "" && handleServerReq != nil {
-			handleServerReq(reqFields.ID, reqFields.Method)
+			handleServerReq(ctx, reqFields.ID, reqFields.Method)
 		} else if handleNotification != nil {
 			handleNotification(reqFields.Method)
 		}

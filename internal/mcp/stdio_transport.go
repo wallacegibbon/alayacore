@@ -109,9 +109,14 @@ func NewStdioTransport(command string, args []string, env map[string]string, ena
 func (t *StdioTransport) readLoop() {
 	defer t.readerWg.Done()
 
+	// Context tied to transport lifetime: canceled when Close() is called.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() { <-t.done; cancel() }()
+
 	for t.scanner.Scan() {
 		data := t.scanner.Bytes()
-		if err := parseAndDispatchJSONRPC(data, t.pending, &t.pendingMu, t.debugWriter, t.handleServerRequest, t.notificationHandler); err != nil {
+		if err := parseAndDispatchJSONRPC(ctx, data, t.pending, &t.pendingMu, t.debugWriter, t.handleServerRequest, t.notificationHandler); err != nil {
 			if t.debugWriter != nil {
 				fmt.Fprintf(t.debugWriter, "MCP: malformed response line (len=%d): %v\n",
 					len(data), err)
@@ -130,7 +135,7 @@ func (t *StdioTransport) readLoop() {
 
 // handleServerRequest handles a JSON-RPC request from the server (e.g. ping).
 // Responses are sent back through the transport.
-func (t *StdioTransport) handleServerRequest(id requestID, method string) {
+func (t *StdioTransport) handleServerRequest(_ context.Context, id requestID, method string) {
 	switch method {
 	case methodPing:
 		// Respond with empty result.

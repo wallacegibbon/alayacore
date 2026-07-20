@@ -357,8 +357,11 @@ func (c *Client) Close() error {
 		close(ch)
 
 		// Notify adapter before closing transport.
+		// Use a short timeout for best-effort cleanup (e.g. session DELETE).
 		if c.adapter != nil {
-			c.adapter.OnClose()
+			cleanupCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			c.adapter.OnClose(cleanupCtx)
 		}
 
 		if tp := c.loadTransport(); tp != nil {
@@ -630,7 +633,11 @@ func (c *Client) sendRequest(ctx context.Context, method string, params any) (js
 			// request stream to close). On HTTP, only send if the protocol
 			// version uses notification-based cancellation.
 			if _, isHTTP := tp.(*HTTPTransport); !isHTTP || c.adapter.CancelByNotification() {
-				c.sendCanceledNotification(id, err)
+				// Use a fresh context with timeout: the request ctx is already
+				// canceled (that's why we're here), so we need a live context.
+				notifyCtx, notifyCancel := context.WithTimeout(context.Background(), 2*time.Second)
+				defer notifyCancel()
+				c.sendCanceledNotification(notifyCtx, id, err)
 			}
 		}
 		return nil, err
@@ -654,14 +661,15 @@ func (c *Client) validateResult(method string, result json.RawMessage) error {
 }
 
 // sendCanceledNotification sends a cancellation notification to the server.
-func (c *Client) sendCanceledNotification(id requestID, cause error) {
+// Uses the provided ctx (typically the client's request context) for timeout
+// and cancellation. The ctx should NOT be the canceled request context itself
+// (which triggered this call) — the caller passes a context with a short
+// timeout derived from the client's lifecycle.
+func (c *Client) sendCanceledNotification(ctx context.Context, id requestID, cause error) {
 	reason := "request canceled"
 	if errors.Is(cause, context.DeadlineExceeded) {
 		reason = "timeout"
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
 
 	_ = c.sendNotification(ctx, methodNotificationsCanceled, CanceledNotificationParams{
 		RequestID: id,

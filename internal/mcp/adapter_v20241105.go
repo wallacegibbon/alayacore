@@ -113,7 +113,7 @@ func (a *AdapterV20241105) CancelByNotification() bool { return true }
 
 // ServerRequestHandler is a no-op — 2024-11-05 does not support HTTP transport
 // in this implementation, so this callback is never invoked.
-func (a *AdapterV20241105) ServerRequestHandler(_ requestID, _ string) {}
+func (a *AdapterV20241105) ServerRequestHandler(_ context.Context, _ requestID, _ string) {}
 
 // EnrichRequest is a no-op — 2024-11-05 does not require any HTTP headers
 // (no MCP-Protocol-Version, no MCP-Session-Id, no Mcp-* headers).
@@ -134,4 +134,4 @@ func (a *AdapterV20241105) OnTransportReady(_ context.Context, _ *HTTPTransport)
 
 // OnClose is a no-op — 2024-11-05 has no session or GET stream to clean up
 // when used over stdio transport.
-func (a *AdapterV20241105) OnClose() {}
+func (a *AdapterV20241105) OnClose(_ context.Context) {}

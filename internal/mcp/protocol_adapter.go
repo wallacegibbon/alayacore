@@ -32,8 +32,10 @@ type Adapter interface {
 	CancelByNotification() bool
 
 	// OnClose is called when the client is shutting down.
-	// The adapter can clean up version-specific resources.
-	OnClose()
+	// The ctx carries a short timeout for best-effort cleanup
+	// (e.g. sending session DELETE). Implementations should respect
+	// ctx cancellation and not block beyond the timeout.
+	OnClose(ctx context.Context)
 }
 
 // HTTPAdapter extends Adapter with HTTP transport-specific hooks.
@@ -61,7 +63,10 @@ type HTTPAdapter interface {
 	// ServerRequestHandler handles a JSON-RPC request from the server on
 	// an SSE stream. 2025-11-25 responds to ping; 2026-07-28 has no
 	// server-to-client requests and is a no-op.
-	ServerRequestHandler(id requestID, method string)
+	// The ctx is tied to the transport's lifetime — it is canceled when
+	// the transport is closed, so implementations should use it for
+	// outbound requests (e.g. responding to ping).
+	ServerRequestHandler(ctx context.Context, id requestID, method string)
 
 	// SetToolHeaderMappings feeds the adapter tool header mappings from the
 	// last ListTools response, used for Mcp-Param-{Name} header injection
