@@ -135,8 +135,7 @@ func (m Terminal) handleEditorStart(msg editorStartMsg) (Terminal, tea.Cmd) {
 	if err != nil {
 		return m, func() tea.Msg {
 			return displayErrorMsg{
-				format: "Failed to create temp file: %v",
-				args:   []any{err},
+				message: fmt.Sprintf("Failed to create temp file: %v", err),
 			}
 		}
 	}

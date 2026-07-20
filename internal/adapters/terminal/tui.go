@@ -62,8 +62,7 @@ type OverlayClosedMsg struct{}
 // displayErrorMsg carries an error message to be written to the display output
 // via Terminal.Update, ensuring all OutputWriter mutations happen on the event loop.
 type displayErrorMsg struct {
-	format string
-	args   []any
+	message string
 }
 
 // displayNotifyMsg carries a notification message to be written to the display
@@ -132,7 +131,7 @@ func submitCmd(w io.WriteCloser, attachments []attachment, prompt string) tea.Cm
 
 		if len(errs) > 0 {
 			return displayErrorMsg{
-				format: strings.Join(errs, "\n"),
+				message: strings.Join(errs, "\n"),
 			}
 		}
 		return nil
@@ -341,8 +340,7 @@ func (m Terminal) Init() tea.Cmd {
 				err := e // capture
 				cmds = append(cmds, func() tea.Msg {
 					return displayErrorMsg{
-						format: "%s",
-						args:   []any{err.Message},
+						message: err.Message,
 					}
 				})
 			}
@@ -436,7 +434,7 @@ func (m Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.editor.Open(msg.content)
 
 	case displayErrorMsg:
-		m.out.WriteError(msg.format, msg.args...)
+		m.out.WriteError(msg.message)
 		return m, nil
 
 	case displayNotifyMsg:
@@ -641,8 +639,7 @@ func (m Terminal) handleEditorFinished(msg EditorFinishedMsg) (Terminal, tea.Cmd
 	if msg.Err != nil {
 		return m, func() tea.Msg {
 			return displayErrorMsg{
-				format: "Editor error: %v",
-				args:   []any{msg.Err},
+				message: fmt.Sprintf("Editor error: %v", msg.Err),
 			}
 		}
 	}

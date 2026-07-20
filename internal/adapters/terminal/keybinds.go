@@ -234,8 +234,7 @@ func (m Terminal) startMCPAuthFlow(serverName, authURL string) tea.Cmd {
 		func() tea.Msg {
 			if err := platform.OpenURL(filledURL); err != nil {
 				return displayErrorMsg{
-					format: "Failed to open browser: %v",
-					args:   []any{err},
+					message: fmt.Sprintf("Failed to open browser: %v", err),
 				}
 			}
 			return nil
@@ -247,8 +246,7 @@ func (m Terminal) startMCPAuthFlow(serverName, authURL string) tea.Cmd {
 			if res.Err != nil {
 				_ = tlv.WriteTLV(streamInput, tlv.TagUserT, ":mcp_cancel")
 				return displayErrorMsg{
-					format: "MCP auth callback error: %v",
-					args:   []any{res.Err},
+					message: fmt.Sprintf("MCP auth callback error: %v", res.Err),
 				}
 			}
 			_ = tlv.WriteTLV(streamInput, tlv.TagUserT,
@@ -535,7 +533,7 @@ func (m Terminal) handleSubmit() (Terminal, tea.Cmd) {
 	if m.inProgress {
 		return m, func() tea.Msg {
 			return displayErrorMsg{
-				format: "A task is already running. Wait for it to complete or cancel it.",
+				message: "A task is already running. Wait for it to complete or cancel it.",
 			}
 		}
 	}

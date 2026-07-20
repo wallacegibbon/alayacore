@@ -68,7 +68,7 @@ type OutputWriter interface {
 	SnapshotModels() ModelSnapshot
 
 	// Output methods
-	WriteError(format string, args ...any)
+	WriteError(msg string)
 	WriteNotify(msg string)
 
 	// Confirm dialog support
