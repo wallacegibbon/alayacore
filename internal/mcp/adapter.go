@@ -32,37 +32,6 @@ func ToolsToAgentTools(serverTools map[string][]Tool, manager *Manager) []llm.To
 	return result
 }
 
-// ResourcesToAgentTools creates a read_resource tool for each server that
-// advertised resource capability. The tool allows the LLM to read arbitrary
-// resources by URI.
-func ResourcesToAgentTools(clients []*Client, manager *Manager) []llm.Tool {
-	result := make([]llm.Tool, 0, len(clients))
-	for _, c := range clients {
-		if c.State() != StateReady || !c.HasResources() {
-			continue
-		}
-		serverName := c.Name()
-		tool := newReadResourceTool(serverName, manager)
-		result = append(result, tool)
-	}
-	return result
-}
-
-// PromptsToAgentTools creates a get_prompt tool for each server that
-// advertised prompt capability.
-func PromptsToAgentTools(clients []*Client, manager *Manager) []llm.Tool {
-	result := make([]llm.Tool, 0, len(clients))
-	for _, c := range clients {
-		if c.State() != StateReady || !c.HasPrompts() {
-			continue
-		}
-		serverName := c.Name()
-		tool := newGetPromptTool(serverName, manager)
-		result = append(result, tool)
-	}
-	return result
-}
-
 // adaptTool converts a single MCP tool to an llm.Tool.
 // Returns a zero-value Tool and an error if the tool has an invalid schema.
 func adaptTool(serverName string, tool Tool, manager *Manager) (llm.Tool, error) {
