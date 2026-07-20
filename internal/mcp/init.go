@@ -11,7 +11,7 @@ package mcp
 //
 // The session drives the flow by:
 //  1. Reading events from Events() channel
-//  2. For "auth_confirm" events: showing a dialog, sending result via mcp_auth
+//  2. For "auth_confirm" events: showing a dialog, sending result via mcp_confirm
 //  3. For Ctrl+G: calling init.Cancel()
 //  4. For "done"/"canceled" event: applying final results or cleaning up
 //

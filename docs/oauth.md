@@ -281,14 +281,14 @@ values for arrays and maps.
 On restart, tokens are loaded from disk. If the stored token is
 expired, it is refreshed automatically without user interaction.
 
-## The `:mcp_auth` Command
+## The `:mcp_confirm` Command
 
 In the **Terminal (TUI)** adapter, when a server requires OAuth
 authorization, a confirmation dialog is displayed. The user can:
 
 - **Accept**: Press Enter — opens the browser to the authorization URL
-- **Decline**: Press Esc — skips the server
-- **Manual**: Type `:mcp_auth <server> <code> <redirect_uri>` to
+- **Decline**: Press Esc — sends `:mcp_decline <server>` to skip the server
+- **Manual**: Type `:mcp_confirm <server> <code> <redirect_uri>` to
   provide an authorization code obtained out-of-band
 
 In the **PlainIO** adapter, the authorization URL is printed to
@@ -296,7 +296,7 @@ stdout. The user must manually open the URL in a browser, copy the
 authorization code from the redirect, and type:
 
 ```
-:mcp_auth github <code> <redirect_uri>
+:mcp_confirm github <code> <redirect_uri>
 ```
 
 If the URL contains `{{redirect_uri}}` and `{{state}}` placeholders,

@@ -514,15 +514,13 @@ func (s *Session) handleMCPCancel() {
 	}
 }
 
-// handleMCPAuth handles the :mcp_auth command.
+// handleMCPConfirm handles the :mcp_confirm command.
 //
-// Usage: :mcp_auth <server>                       → decline
-//
-//	:mcp_auth <server> <code> <redirect_uri> → confirm + auth code
-func (s *Session) handleMCPAuth(_ context.Context, args string) {
+// Usage: :mcp_confirm <server> <code> <redirect_uri>
+func (s *Session) handleMCPConfirm(_ context.Context, args string) {
 	fields := strings.Fields(args)
-	if len(fields) < 1 {
-		s.writeError("usage: :mcp_auth <server> [<code> <redirect_uri>]")
+	if len(fields) < 3 {
+		s.writeError("usage: :mcp_confirm <server> <code> <redirect_uri>")
 		return
 	}
 	if !s.mcpService.HasInit() {
@@ -535,25 +533,37 @@ func (s *Session) handleMCPAuth(_ context.Context, args string) {
 	}
 
 	server := fields[0]
-	if len(fields) == 1 {
-		// Just server name → decline
-		if s.mcpService.SendAuthCodeResult(server, "", "") {
-			s.writeNotifyf("MCP authorization for %q declined.", server)
-		} else {
-			s.writeError(fmt.Sprintf("No pending authorization for MCP server %q.", server))
-		}
-		return
-	}
-
-	if len(fields) < 3 {
-		s.writeError("usage: :mcp_auth <server> [<code> <redirect_uri>]")
-		return
-	}
 	code := fields[1]
 	redirectURI := fields[2]
 	if s.mcpService.SendAuthCodeResult(server, code, redirectURI) {
 		s.writeNotifyf("MCP auth code received for %q.", server)
 	} else {
 		s.writeError(fmt.Sprintf("No pending auth for MCP server %q.", server))
+	}
+}
+
+// handleMCPDecline handles the :mcp_decline command.
+//
+// Usage: :mcp_decline <server>
+func (s *Session) handleMCPDecline(args string) {
+	fields := strings.Fields(args)
+	if len(fields) < 1 {
+		s.writeError("usage: :mcp_decline <server>")
+		return
+	}
+	if !s.mcpService.HasInit() {
+		s.writeError("No MCP servers configured.")
+		return
+	}
+	if s.mcpService.IsReady() {
+		s.writeError("MCP initialization is not in progress.")
+		return
+	}
+
+	server := fields[0]
+	if s.mcpService.SendAuthCodeResult(server, "", "") {
+		s.writeNotifyf("MCP authorization for %q declined.", server)
+	} else {
+		s.writeError(fmt.Sprintf("No pending authorization for MCP server %q.", server))
 	}
 }

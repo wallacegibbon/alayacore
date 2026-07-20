@@ -85,7 +85,7 @@ type runState struct {
 
 	// mcpService drives the entire MCP initialization lifecycle.
 	// The run() goroutine reads from its Events() channel and reacts:
-	//   "auth_confirm" → shows dialog, sends :mcp_auth <code>|no
+	//   "auth_confirm" → shows dialog, sends :mcp_confirm <code> <redirect_uri>
 	//   "done"         → applies tools, marks MCP ready
 	mcpService *MCPService
 }

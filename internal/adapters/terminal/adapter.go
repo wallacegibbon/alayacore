@@ -37,7 +37,7 @@ func NewAdapter(cfg *app.Config) *Adapter {
 // while the session is loaded asynchronously. This avoids the long
 // "blank terminal" delay between pressing Enter and seeing the TUI.
 func (a *Adapter) Start() int {
-	// Note: OAuth MCP authorization is handled via the :mcp_auth command
+	// Note: OAuth MCP authorization is handled via the :mcp_confirm command
 	// in the TUI, not synchronously before startup.
 
 	// Create theme manager

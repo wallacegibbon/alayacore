@@ -24,7 +24,8 @@ const (
 	CommandNameConfirm     = "confirm"
 	CommandNameFork        = "fork"
 	CommandNameVideoConfig = "video_config"
-	CommandNameMCPAuth     = "mcp_auth"
+	CommandNameMCPConfirm  = "mcp_confirm"
+	CommandNameMCPDecline  = "mcp_decline"
 	CommandNameMCPSkip     = "mcp_cancel"
 )
 
@@ -126,8 +127,10 @@ var defaultCommandDefs = []Command{
 		func(s *Session, _ context.Context, args string) { s.handleFork(args) }},
 	{CommandNameVideoConfig, "Set video FPS and resolution", "<fps> <0|1>", CmdIdle,
 		func(s *Session, _ context.Context, args string) { s.handleVideoConfig(args) }},
-	{CommandNameMCPAuth, "Authorize or decline MCP OAuth server", "<server> [<code> <redirect_uri>]", CmdIdle,
-		func(s *Session, ctx context.Context, args string) { s.handleMCPAuth(ctx, args) }},
+	{CommandNameMCPConfirm, "Confirm MCP OAuth authorization with auth code", "<server> <code> <redirect_uri>", CmdIdle,
+		func(s *Session, ctx context.Context, args string) { s.handleMCPConfirm(ctx, args) }},
+	{CommandNameMCPDecline, "Decline MCP OAuth authorization", "<server>", CmdIdle,
+		func(s *Session, _ context.Context, args string) { s.handleMCPDecline(args) }},
 	{CommandNameMCPSkip, "Cancel MCP initialization", "", CmdImmediate,
 		func(s *Session, _ context.Context, _ string) { s.handleMCPCancel() }},
 }

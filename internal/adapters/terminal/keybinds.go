@@ -195,7 +195,7 @@ func (m Terminal) handleConfirmMCPAuth(r *ConfirmResult, fromCmd bool) (Terminal
 		}
 		m = m.restoreFocusAfterConfirm()
 		return m, tea.Batch(
-			m.emitCommand(":mcp_auth "+r.ToolID),
+			m.emitCommand(":mcp_decline "+r.ToolID),
 			scheduleTick(),
 		)
 	}
@@ -252,7 +252,7 @@ func (m Terminal) startMCPAuthFlow(serverName, authURL string) tea.Cmd {
 				}
 			}
 			_ = tlv.WriteTLV(streamInput, tlv.TagUserT,
-				fmt.Sprintf(":mcp_auth %s %s %s", serverName, res.Code, redirectURI))
+				fmt.Sprintf(":mcp_confirm %s %s %s", serverName, res.Code, redirectURI))
 			return nil
 		},
 	)
