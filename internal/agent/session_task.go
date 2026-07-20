@@ -178,11 +178,11 @@ func (s *Session) writeTLVWithID(tag string, historyID uint64, data string) {
 //   - On SM write failure: removes the map entry and sends false
 //
 // The caller (agent goroutine) blocks on the returned channel until the
-// user responds via :confirm command, which writes to the channel via
-// handleConfirmCommand.
+// user responds via :tool_confirm / :tool_decline command, which writes
+// to the channel via handleToolConfirmCmd / handleToolDeclineCmd.
 func (s *Session) handleToolConfirm(req llm.ToolConfirmRequest) <-chan bool {
-	// Buffer 1 is sufficient: only handleConfirmCommand writes to the
-	// channel in the normal flow, and the error path below only sends
+	// Buffer 1 is sufficient: only the confirm/decline command handlers write
+	// to the channel in the normal flow, and the error path below only sends
 	// when the channel hasn't been consumed yet.
 	ch := make(chan bool, 1)
 

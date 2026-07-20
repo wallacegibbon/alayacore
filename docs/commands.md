@@ -16,8 +16,9 @@ Commands fall into three categories:
 | `:save [filename]` | Save session. Uses `--session` path if no filename given. |
 | `:reason [0\|1\|2]` | Set reasoning level (0=off, 1=normal, 2=max). Default: 1 |
 | `:theme_set <name>` | Switch to a different theme |
-| `:confirm <id> yes\|no` | Confirm or deny a pending tool execution |
 | `:fork <id> <filename>` | Fork session — save all content up to a history ID to a file |
+| `:tool_decline <id>` | Decline a pending tool execution |
+| `:mcp_cancel` | Cancel MCP server initialization |
 
 ## Idle Commands
 
@@ -25,6 +26,9 @@ These commands are rejected with an error if a task is currently running:
 
 | Command | Action |
 |---------|--------|
+| `:tool_confirm <id>` | Confirm a pending tool execution |
+| `:mcp_confirm <server> <code> <redirect_uri>` | Confirm MCP OAuth authorization with auth code |
+| `:mcp_decline <server>` | Decline MCP OAuth authorization |
 | `:model_set <id>` | Switch to a model by numeric ID |
 | `:model_load` | Reload model configs from the config file |
 | `:model_sync` | Apply edited model config (sent by UI, not user-facing) |

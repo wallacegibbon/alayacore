@@ -76,7 +76,7 @@ stdin EOF ──▶ inputPump closes inputMsgCh ──▶ run() detects closed c
 ```
 
 **State ownership:**
-- The input pump goroutine is a pure TLV parser. It reads frames from the input stream, builds inputMsg values, and sends them to `run()` via `inputMsgCh`. It has zero knowledge of commands and never touches session state — not even for `:cancel` or `:confirm`. All command dispatch, cancellation, and output writing happens in `run()`.
+- The input pump goroutine is a pure TLV parser. It reads frames from the input stream, builds inputMsg values, and sends them to `run()` via `inputMsgCh`. It has zero knowledge of commands and never touches session state — not even for `:cancel` or `:tool_confirm`. All command dispatch, cancellation, and output writing happens in `run()`.
 - `sendSystemInfo` runs only in the `run()` goroutine; the task goroutine sends state mutations via `taskEventCh` which trigger broadcasts.
 
 **Gotcha — everything is in run():** There is no "fast path" in the input pump for latency-critical commands. The `inputMsgCh` buffer is cap 100 but each message is processed in microseconds — the input channel drains orders of magnitude faster than a human can type or an LLM can stream. If you're tempted to add a special case to the input pump, ask: is the latency measurable? If not, keep it in `run()` where it belongs.

@@ -303,7 +303,7 @@ func TestHelpWindowEnterOnCommandStripsArgs(t *testing.T) {
 		{ID: 1, IsSection: true, Description: "Commands"},
 		{ID: 2, Key: ":continue", Description: "Retry last prompt", Type: HelpItemCommand},
 		{ID: 3, Key: ":theme_set <name>", Description: "Switch theme by name", Type: HelpItemCommand},
-		{ID: 4, Key: ":confirm <id> <yes|no>", Description: "Confirm or deny pending tool", Type: HelpItemCommand},
+		{ID: 4, Key: ":tool_confirm <id>", Description: "Confirm pending tool execution", Type: HelpItemCommand},
 	}
 	hw = hw.Open()
 
@@ -336,12 +336,12 @@ func TestHelpWindowEnterOnCommandStripsArgs(t *testing.T) {
 		t.Errorf("Expected pending command ':theme_set', got %q", cmd)
 	}
 
-	// Re-open and test :confirm <id> <yes|no> — should produce ":confirm"
+	// Re-open and test :tool_confirm <id> — should produce ":tool_confirm"
 	hw = hw.Open()
 	hw = hw.moveDown()
 	hw = hw.moveDown()
-	if cmd := getCmd(hw); cmd != ":confirm" {
-		t.Errorf("Expected pending command ':confirm', got %q", cmd)
+	if cmd := getCmd(hw); cmd != ":tool_confirm" {
+		t.Errorf("Expected pending command ':tool_confirm', got %q", cmd)
 	}
 }
 

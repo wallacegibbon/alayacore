@@ -159,14 +159,14 @@ func (m Terminal) handleConfirmCancel(r *ConfirmResult, fromCmd bool) (Terminal,
 }
 
 func (m Terminal) handleConfirmTool(r *ConfirmResult, fromCmd bool) (Terminal, tea.Cmd) {
-	action := "no"
+	cmdName := ":tool_decline"
 	if r.Confirmed {
-		action = "yes"
+		cmdName = ":tool_confirm"
 	}
 	if fromCmd {
 		m.input = m.input.WithValue("")
 	}
-	cmd := m.emitCommand(":confirm " + r.ToolID + " " + action)
+	cmd := m.emitCommand(cmdName + " " + r.ToolID)
 	m = m.restoreFocusAfterConfirm()
 	if nextID, nextName, nextInput, ok := m.out.GetPendingToolConfirm(); ok {
 		m = m.openConfirmTool(nextID, nextName, nextInput)

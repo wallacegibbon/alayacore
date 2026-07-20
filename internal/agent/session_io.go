@@ -6,7 +6,7 @@ package agent
 // handleInputMsg.  The input pump is a pure TLV parser — it has no
 // knowledge of command names and never touches session state.
 // This keeps the design simple: one goroutine owns everything,
-// no split-path exceptions for :cancel / :confirm / etc.
+// no split-path exceptions for :cancel / :tool_confirm / etc.
 
 import (
 	"context"
@@ -361,29 +361,30 @@ func (s *Session) handleFork(args string) {
 	s.writeNotifyf("Session forked to %s (up to content ID %d)", path, id)
 }
 
-// handleConfirmCommand processes a `:confirm <id> yes|no` command.
-// It looks up the per-tool confirmation channel and writes the
-// user's decision. Called from the run() goroutine via the command registry.
-func (s *Session) handleConfirmCommand(args string) {
+// handleToolConfirmCmd processes a `:tool_confirm <id>` command.
+// It looks up the per-tool confirmation channel and allows the tool.
+func (s *Session) handleToolConfirmCmd(args string) {
 	fields := strings.Fields(args)
-	if len(fields) != 2 {
-		s.writeError("usage: :confirm <id> yes|no")
+	if len(fields) != 1 {
+		s.writeError("usage: :tool_confirm <id>")
 		return
 	}
+	s.resolveToolConfirm(fields[0], true)
+}
 
-	id := fields[0]
-
-	var allowed bool
-	switch fields[1] {
-	case "yes":
-		allowed = true
-	case "no":
-		allowed = false
-	default:
-		s.writeError("usage: :confirm <id> yes|no")
+// handleToolDeclineCmd processes a `:tool_decline <id>` command.
+// It looks up the per-tool confirmation channel and denies the tool.
+func (s *Session) handleToolDeclineCmd(args string) {
+	fields := strings.Fields(args)
+	if len(fields) != 1 {
+		s.writeError("usage: :tool_decline <id>")
 		return
 	}
+	s.resolveToolConfirm(fields[0], false)
+}
 
+// resolveToolConfirm looks up the confirmation channel and sends the decision.
+func (s *Session) resolveToolConfirm(id string, allowed bool) {
 	s.confirmMu.Lock()
 	ch, ok := s.confirmChs[id]
 	delete(s.confirmChs, id)

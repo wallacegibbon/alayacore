@@ -21,7 +21,8 @@ const (
 	CommandNameModelSync   = "model_sync"
 	CommandNameReason      = "reason"
 	CommandNameThemeSet    = "theme_set"
-	CommandNameConfirm     = "confirm"
+	CommandNameToolConfirm = "tool_confirm"
+	CommandNameToolDecline = "tool_decline"
 	CommandNameFork        = "fork"
 	CommandNameVideoConfig = "video_config"
 	CommandNameMCPConfirm  = "mcp_confirm"
@@ -121,8 +122,10 @@ var defaultCommandDefs = []Command{
 		func(s *Session, _ context.Context, args string) { s.handleReason(args) }},
 	{CommandNameThemeSet, "Set the active theme", "<name>", CmdImmediate,
 		func(s *Session, _ context.Context, args string) { s.handleThemeSet(args) }},
-	{CommandNameConfirm, "Confirm or deny a pending tool execution", "yes|no", CmdImmediate,
-		func(s *Session, _ context.Context, args string) { s.handleConfirmCommand(args) }},
+	{CommandNameToolConfirm, "Confirm a pending tool execution", "<id>", CmdImmediate,
+		func(s *Session, _ context.Context, args string) { s.handleToolConfirmCmd(args) }},
+	{CommandNameToolDecline, "Decline a pending tool execution", "<id>", CmdImmediate,
+		func(s *Session, _ context.Context, args string) { s.handleToolDeclineCmd(args) }},
 	{CommandNameFork, "Fork session up to content ID and save to file", "<id> <filename>", CmdImmediate,
 		func(s *Session, _ context.Context, args string) { s.handleFork(args) }},
 	{CommandNameVideoConfig, "Set video FPS and resolution", "<fps> <0|1>", CmdIdle,
