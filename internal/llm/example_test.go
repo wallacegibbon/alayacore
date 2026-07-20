@@ -43,7 +43,7 @@ func Example_usage() {
 	})
 
 	// Stream with callbacks
-	contents := llm.NewUserContent("Hello!")
+	contents := []llm.ContentPart{&llm.TextPart{Text: "Hello!"}}
 
 	result, err := agent.Stream(context.Background(), contents, llm.StreamCallbacks{
 		OnTextDelta: func(delta string, _ uint64) error {

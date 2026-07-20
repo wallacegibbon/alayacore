@@ -74,7 +74,7 @@ func TestFullIntegration(t *testing.T) {
 	})
 
 	// 4. Create conversation
-	contents := llm.NewUserContent("Hello!")
+	contents := []llm.ContentPart{&llm.TextPart{Text: "Hello!"}}
 
 	// 5. Stream with callbacks
 	result, err := agent.Stream(context.Background(), contents, llm.StreamCallbacks{

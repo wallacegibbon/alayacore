@@ -51,13 +51,6 @@ func ParseDataURI(uri string) (mediaType, data string, ok bool) {
 	return mediaType, rest[len(b64Prefix):], true
 }
 
-// NewUserContent creates user content parts
-func NewUserContent(text string) []ContentPart {
-	return []ContentPart{
-		&TextPart{Text: text},
-	}
-}
-
 // ToolBuilder helps build tool definitions
 type ToolBuilder struct {
 	tool Tool

@@ -209,13 +209,6 @@ func validateModel(m config.ModelConfig) []string {
 	return errs
 }
 
-// Reload reloads models from the config file
-func (mm *ModelManager) Reload() error {
-	if mm.filePath == "" {
-		return fmt.Errorf("model: no config file path set")
-	}
-	return mm.LoadFromFile(mm.filePath)
-}
 
 func (mm *ModelManager) HasModels() bool {
 	return len(mm.models) > 0
@@ -226,13 +219,6 @@ func (mm *ModelManager) HasRejected() bool {
 	return mm.hasRejected
 }
 
-// AddModel adds a new model to the runtime list (does NOT persist to file)
-func (mm *ModelManager) AddModel(m config.ModelConfig) int {
-	m.ID = mm.nextID
-	mm.nextID++
-	mm.models = append(mm.models, m)
-	return m.ID
-}
 
 // GetModels returns all models with full details (including API keys).
 func (mm *ModelManager) GetModels() []config.ModelConfig {
@@ -341,10 +327,6 @@ func (mm *ModelManager) GetActiveID() int {
 
 func (mm *ModelManager) GetFilePath() string {
 	return mm.filePath
-}
-
-func (mm *ModelManager) ModelCount() int {
-	return len(mm.models)
 }
 
 func (mm *ModelManager) FindModelByName(name string) int {
