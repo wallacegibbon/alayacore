@@ -184,14 +184,6 @@ func (hw HelpWindow) updateFilteredItems() HelpWindow {
 	}
 	hw.lastFilterValue = filter
 
-	var prevItemID = -1
-	if hw.SelectedIdx >= 0 && hw.SelectedIdx < hw.filteredLen() {
-		item := hw.filteredItems[hw.SelectedIdx]
-		if !item.IsSection {
-			prevItemID = item.ID
-		}
-	}
-
 	if filter == "" {
 		hw.filteredItems = hw.items
 	} else {
@@ -223,26 +215,8 @@ func (hw HelpWindow) updateFilteredItems() HelpWindow {
 		hw.filteredItems = result
 	}
 
-	if prevItemID >= 0 {
-		found := false
-		for i, item := range hw.filteredItems {
-			if item.ID == prevItemID {
-				hw.SelectedIdx = i
-				found = true
-				break
-			}
-		}
-		if found {
-			hw = hw.ensureVisible()
-			hw.FilteredListCore = hw.FilteredListCore.ClampScroll(hw.filteredLen())
-		} else {
-			hw.SelectedIdx = 0
-			hw = hw.clampSelection()
-		}
-	} else {
-		hw.SelectedIdx = 0
-		hw = hw.clampSelection()
-	}
+	hw.SelectedIdx = 0
+	hw = hw.clampSelection()
 	return hw
 }
 

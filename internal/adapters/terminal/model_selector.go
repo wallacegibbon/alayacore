@@ -505,7 +505,7 @@ func (ms ModelSelector) updateFilteredModels() ModelSelector {
 	}
 
 	var prevSelectedID = -1
-	if ms.SelectedIdx >= 0 && ms.SelectedIdx < len(ms.filteredModels) {
+	if !ms.FilterInputFocused && ms.SelectedIdx >= 0 && ms.SelectedIdx < len(ms.filteredModels) {
 		prevSelectedID = ms.filteredModels[ms.SelectedIdx].ID
 	}
 
