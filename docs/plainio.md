@@ -41,6 +41,8 @@ All output is plain text with no ANSI escape codes:
 | Notifications | `[message]` |
 | Tool confirmations | `[tool_confirm: allow tool "id" to run?]` |
 
+Respond with `:tool_confirm <id>` to allow or `:tool_decline <id>` to deny.
+
 A blank line separates messages of different types.
 
 ## Session Persistence
