@@ -30,7 +30,6 @@ type ModelSelector struct {
 	filteredModels []searchableModel
 
 	activeModel    *searchableModel
-	reloadModels   bool
 	lastModelCount int
 }
 
@@ -226,6 +225,11 @@ func (ms ModelSelector) Update(msg tea.Msg) (ModelSelector, tea.Cmd) {
 	fl, result := ms.FilteredListCore.HandleKey(keyMsg)
 	ms.FilteredListCore = fl
 
+	// Handle Ctrl+R reload regardless of focus
+	if key == keyCtrlR {
+		return ms, func() tea.Msg { return ReloadModelsMsg{} }
+	}
+
 	// Handle Enter selection in the list.
 	if key == keyEnter && result.Handled && !fl.FilterInputFocused {
 		if len(ms.filteredModels) > 0 && fl.SelectedIdx >= 0 {
@@ -254,10 +258,6 @@ func (ms ModelSelector) Update(msg tea.Msg) (ModelSelector, tea.Cmd) {
 	if !ms.FilterInputFocused {
 		ms = ms.handleListKeys(key)
 	}
-	if ms.reloadModels {
-		ms.reloadModels = false
-		return ms, func() tea.Msg { return ReloadModelsMsg{} }
-	}
 	return ms, nil
 }
 
@@ -278,8 +278,6 @@ func (ms ModelSelector) handleListKeys(key string) ModelSelector {
 		if ms.SelectedIdx > 0 {
 			ms.SelectedIdx--
 		}
-	case keyR:
-		ms.reloadModels = true
 	}
 	return ms
 }
@@ -310,9 +308,9 @@ func (ms ModelSelector) renderList() string {
 	helpStyle := lipgloss.NewStyle().Background(ms.Styles.ColorDim).Foreground(ms.Styles.ColorMuted)
 	var help string
 	if ms.FilterInputFocused {
-		help = "  tab: list │ enter: select │ esc: close"
+		help = "  tab: list │ ctrl+r: reload │ enter: select │ esc: close"
 	} else {
-		help = "  tab: search │ j/k: navigate │ r: reload │ enter: select │ q/esc: close"
+		help = "  tab: search │ j/k: navigate │ ctrl+r: reload │ enter: select │ q/esc: close"
 	}
 	sb.WriteString("\n")
 	sb.WriteString(helpStyle.Render(fmt.Sprintf("%-*s", boxWidth, help)))
