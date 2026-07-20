@@ -12,9 +12,9 @@ import (
 // Example_usage demonstrates basic usage
 func Example_usage() {
 	// Create Anthropic provider
-	provider, err := providers.NewAnthropic(
-		providers.WithAPIKey("your-api-key"),
-	)
+	provider, err := providers.NewAnthropic(providers.BaseConfig{
+		APIKey: "your-api-key",
+	})
 	if err != nil {
 		panic(err)
 	}

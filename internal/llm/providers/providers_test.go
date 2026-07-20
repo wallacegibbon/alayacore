@@ -73,10 +73,10 @@ func TestAnthropicProvider(t *testing.T) {
 	defer server.Close()
 
 	// Create provider
-	provider, err := providers.NewAnthropic(
-		providers.WithAPIKey("test-key"),
-		providers.WithBaseURL(server.URL),
-	)
+	provider, err := providers.NewAnthropic(providers.BaseConfig{
+		APIKey: "test-key",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatalf("Failed to create provider: %v", err)
 	}
@@ -141,10 +141,10 @@ func TestOpenAIProvider(t *testing.T) {
 	defer server.Close()
 
 	// Create provider
-	provider, err := providers.NewOpenAI(
-		providers.WithOpenAIAPIKey("test-key"),
-		providers.WithOpenAIBaseURL(server.URL),
-	)
+	provider, err := providers.NewOpenAI(providers.BaseConfig{
+		APIKey: "test-key",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatalf("Failed to create provider: %v", err)
 	}
@@ -203,10 +203,10 @@ func TestToolCallStreaming(t *testing.T) {
 		fmt.Fprint(w, "data: [DONE]\n\n")
 	})
 
-	provider, err := providers.NewOpenAI(
-		providers.WithOpenAIAPIKey("test"),
-		providers.WithOpenAIBaseURL(server.URL),
-	)
+	provider, err := providers.NewOpenAI(providers.BaseConfig{
+		APIKey: "test",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -266,10 +266,10 @@ func TestToolCallStreamingChunked(t *testing.T) {
 		fmt.Fprint(w, "data: [DONE]\n\n")
 	})
 
-	provider, err := providers.NewOpenAI(
-		providers.WithOpenAIAPIKey("test"),
-		providers.WithOpenAIBaseURL(server.URL),
-	)
+	provider, err := providers.NewOpenAI(providers.BaseConfig{
+		APIKey: "test",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -333,10 +333,10 @@ func TestToolCallStreamingWithNullArguments(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider, err := providers.NewOpenAI(
-		providers.WithOpenAIAPIKey("test"),
-		providers.WithOpenAIBaseURL(server.URL),
-	)
+	provider, err := providers.NewOpenAI(providers.BaseConfig{
+		APIKey: "test",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -390,10 +390,10 @@ func TestAnthropicToolCallStreaming(t *testing.T) {
 		fmt.Fprint(w, "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
 	})
 
-	provider, err := providers.NewAnthropic(
-		providers.WithAPIKey("test"),
-		providers.WithBaseURL(server.URL),
-	)
+	provider, err := providers.NewAnthropic(providers.BaseConfig{
+		APIKey: "test",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -472,10 +472,10 @@ func TestToolInputStartEventOpenAI(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider, err := providers.NewOpenAI(
-		providers.WithOpenAIAPIKey("test"),
-		providers.WithOpenAIBaseURL(server.URL),
-	)
+	provider, err := providers.NewOpenAI(providers.BaseConfig{
+		APIKey: "test",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -529,10 +529,10 @@ func TestToolInputStartEventAnthropic(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider, err := providers.NewAnthropic(
-		providers.WithAPIKey("test"),
-		providers.WithBaseURL(server.URL),
-	)
+	provider, err := providers.NewAnthropic(providers.BaseConfig{
+		APIKey: "test",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -580,10 +580,10 @@ func TestAnthropicReasoningStreaming(t *testing.T) {
 		fmt.Fprint(w, "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
 	})
 
-	provider, err := providers.NewAnthropic(
-		providers.WithAPIKey("test"),
-		providers.WithBaseURL(server.URL),
-	)
+	provider, err := providers.NewAnthropic(providers.BaseConfig{
+		APIKey: "test",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -662,10 +662,10 @@ func TestAnthropicThinkingOmittedMode(t *testing.T) {
 		fmt.Fprint(w, "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
 	})
 
-	provider, err := providers.NewAnthropic(
-		providers.WithAPIKey("test"),
-		providers.WithBaseURL(server.URL),
-	)
+	provider, err := providers.NewAnthropic(providers.BaseConfig{
+		APIKey: "test",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -709,10 +709,10 @@ func TestAnthropicAPIError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider, err := providers.NewAnthropic(
-		providers.WithAPIKey("invalid-key"),
-		providers.WithBaseURL(server.URL),
-	)
+	provider, err := providers.NewAnthropic(providers.BaseConfig{
+		APIKey: "invalid-key",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -737,10 +737,10 @@ func TestAnthropicRefusalStopReason(t *testing.T) {
 		fmt.Fprint(w, "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"refusal\"}}\n\n")
 	})
 
-	provider, err := providers.NewAnthropic(
-		providers.WithAPIKey("test-key"),
-		providers.WithBaseURL(server.URL),
-	)
+	provider, err := providers.NewAnthropic(providers.BaseConfig{
+		APIKey: "test-key",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -777,10 +777,10 @@ func TestAnthropicUnknownStopReason(t *testing.T) {
 		fmt.Fprint(w, "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"unknown_reason\"}}\n\n")
 	})
 
-	provider, err := providers.NewAnthropic(
-		providers.WithAPIKey("test-key"),
-		providers.WithBaseURL(server.URL),
-	)
+	provider, err := providers.NewAnthropic(providers.BaseConfig{
+		APIKey: "test-key",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -823,10 +823,10 @@ func TestAnthropicValidStopReasons(t *testing.T) {
 				fmt.Fprint(w, "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
 			})
 
-			provider, err := providers.NewAnthropic(
-				providers.WithAPIKey("test-key"),
-				providers.WithBaseURL(server.URL),
-			)
+			provider, err := providers.NewAnthropic(providers.BaseConfig{
+		APIKey: "test-key",
+		BaseURL: server.URL,
+	})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -874,10 +874,10 @@ func TestOpenAIContentFilter(t *testing.T) {
 		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"\"},\"finish_reason\":\"content_filter\"}]}\n\n")
 	})
 
-	provider, err := providers.NewOpenAI(
-		providers.WithOpenAIAPIKey("test-key"),
-		providers.WithOpenAIBaseURL(server.URL),
-	)
+	provider, err := providers.NewOpenAI(providers.BaseConfig{
+		APIKey: "test-key",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -909,10 +909,10 @@ func TestOpenAILengthFinishReason(t *testing.T) {
 		fmt.Fprint(w, "data: [DONE]\n\n")
 	})
 
-	provider, err := providers.NewOpenAI(
-		providers.WithOpenAIAPIKey("test-key"),
-		providers.WithOpenAIBaseURL(server.URL),
-	)
+	provider, err := providers.NewOpenAI(providers.BaseConfig{
+		APIKey: "test-key",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -957,10 +957,10 @@ func TestOpenAIAPIError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider, err := providers.NewOpenAI(
-		providers.WithOpenAIAPIKey("test-key"),
-		providers.WithOpenAIBaseURL(server.URL),
-	)
+	provider, err := providers.NewOpenAI(providers.BaseConfig{
+		APIKey: "test-key",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -982,10 +982,10 @@ func TestOpenAINetworkError(t *testing.T) {
 		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"\"},\"finish_reason\":\"network_error\"}]}\n\n")
 	})
 
-	provider, err := providers.NewOpenAI(
-		providers.WithOpenAIAPIKey("test-key"),
-		providers.WithOpenAIBaseURL(server.URL),
-	)
+	provider, err := providers.NewOpenAI(providers.BaseConfig{
+		APIKey: "test-key",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1044,10 +1044,10 @@ func TestOpenAIWithSystemPrompt(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider, err := providers.NewOpenAI(
-		providers.WithOpenAIAPIKey("test-key"),
-		providers.WithOpenAIBaseURL(server.URL),
-	)
+	provider, err := providers.NewOpenAI(providers.BaseConfig{
+		APIKey: "test-key",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1097,10 +1097,10 @@ func TestAnthropicWithTools(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider, err := providers.NewAnthropic(
-		providers.WithAPIKey("test-key"),
-		providers.WithBaseURL(server.URL),
-	)
+	provider, err := providers.NewAnthropic(providers.BaseConfig{
+		APIKey: "test-key",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1144,10 +1144,10 @@ func TestOpenAIWithReasoning(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider, err := providers.NewOpenAI(
-		providers.WithOpenAIAPIKey("test"),
-		providers.WithOpenAIBaseURL(server.URL),
-	)
+	provider, err := providers.NewOpenAI(providers.BaseConfig{
+		APIKey: "test",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1262,10 +1262,10 @@ func TestOpenAITextWithToolCallsConversion(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider, err := providers.NewOpenAI(
-		providers.WithOpenAIAPIKey("test"),
-		providers.WithOpenAIBaseURL(server.URL),
-	)
+	provider, err := providers.NewOpenAI(providers.BaseConfig{
+		APIKey: "test",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1349,10 +1349,10 @@ func TestAnthropicToolResultMessageFormat(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider, err := providers.NewAnthropic(
-		providers.WithAPIKey("test-key"),
-		providers.WithBaseURL(server.URL),
-	)
+	provider, err := providers.NewAnthropic(providers.BaseConfig{
+		APIKey: "test-key",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1395,10 +1395,10 @@ func TestAnthropicMultiToolCall(t *testing.T) {
 		fmt.Fprint(w, "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
 	})
 
-	provider, err := providers.NewAnthropic(
-		providers.WithAPIKey("test-key"),
-		providers.WithBaseURL(server.URL),
-	)
+	provider, err := providers.NewAnthropic(providers.BaseConfig{
+		APIKey: "test-key",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1491,10 +1491,10 @@ func TestOpenAIToolResultMessageFormat(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider, err := providers.NewOpenAI(
-		providers.WithOpenAIAPIKey("test-key"),
-		providers.WithOpenAIBaseURL(server.URL),
-	)
+	provider, err := providers.NewOpenAI(providers.BaseConfig{
+		APIKey: "test-key",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1595,10 +1595,10 @@ func TestOpenAIMultiToolResultMessageFormat(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider, err := providers.NewOpenAI(
-		providers.WithOpenAIAPIKey("test-key"),
-		providers.WithOpenAIBaseURL(server.URL),
-	)
+	provider, err := providers.NewOpenAI(providers.BaseConfig{
+		APIKey: "test-key",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1675,10 +1675,10 @@ func TestAnthropicToolResultError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider, err := providers.NewAnthropic(
-		providers.WithAPIKey("test-key"),
-		providers.WithBaseURL(server.URL),
-	)
+	provider, err := providers.NewAnthropic(providers.BaseConfig{
+		APIKey: "test-key",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1727,10 +1727,10 @@ func TestAnthropicOutputConfigOff(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider, err := providers.NewAnthropic(
-		providers.WithAPIKey("test-key"),
-		providers.WithBaseURL(server.URL),
-	)
+	provider, err := providers.NewAnthropic(providers.BaseConfig{
+		APIKey: "test-key",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1782,10 +1782,10 @@ func TestAnthropicOutputConfigNormal(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider, err := providers.NewAnthropic(
-		providers.WithAPIKey("test-key"),
-		providers.WithBaseURL(server.URL),
-	)
+	provider, err := providers.NewAnthropic(providers.BaseConfig{
+		APIKey: "test-key",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1839,10 +1839,10 @@ func TestAnthropicOutputConfigMax(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider, err := providers.NewAnthropic(
-		providers.WithAPIKey("test-key"),
-		providers.WithBaseURL(server.URL),
-	)
+	provider, err := providers.NewAnthropic(providers.BaseConfig{
+		APIKey: "test-key",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1897,10 +1897,10 @@ func TestOpenAIReasoningEffortOff(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider, err := providers.NewOpenAI(
-		providers.WithOpenAIAPIKey("test-key"),
-		providers.WithOpenAIBaseURL(server.URL),
-	)
+	provider, err := providers.NewOpenAI(providers.BaseConfig{
+		APIKey: "test-key",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1949,10 +1949,10 @@ func TestOpenAIReasoningEffortNormal(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider, err := providers.NewOpenAI(
-		providers.WithOpenAIAPIKey("test-key"),
-		providers.WithOpenAIBaseURL(server.URL),
-	)
+	provider, err := providers.NewOpenAI(providers.BaseConfig{
+		APIKey: "test-key",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2004,10 +2004,10 @@ func TestOpenAIReasoningEffortMax(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider, err := providers.NewOpenAI(
-		providers.WithOpenAIAPIKey("test-key"),
-		providers.WithOpenAIBaseURL(server.URL),
-	)
+	provider, err := providers.NewOpenAI(providers.BaseConfig{
+		APIKey: "test-key",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

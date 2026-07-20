@@ -40,7 +40,6 @@ import (
 	"fmt"
 	"io"
 	"iter"
-	"net/http"
 	"sort"
 	"strings"
 
@@ -121,12 +120,9 @@ type OpenAIProvider struct {
 	baseProvider
 }
 
-// OpenAIOption configures the provider (kept for test ergonomics).
-type OpenAIOption func(*OpenAIProvider)
-
-// NewOpenAIWithConfig creates an OpenAI provider from a BaseConfig.
+// NewOpenAI creates an OpenAI provider from a BaseConfig.
 // This is the primary constructor used by the provider factory.
-func NewOpenAIWithConfig(cfg BaseConfig) (*OpenAIProvider, error) {
+func NewOpenAI(cfg BaseConfig) (*OpenAIProvider, error) {
 	if cfg.BaseURL == "" {
 		cfg.BaseURL = "https://api.openai.com/v1"
 	}
@@ -136,49 +132,6 @@ func NewOpenAIWithConfig(cfg BaseConfig) (*OpenAIProvider, error) {
 		return nil, fmt.Errorf("API key is required")
 	}
 	return p, nil
-}
-
-func NewOpenAI(opts ...OpenAIOption) (*OpenAIProvider, error) {
-	p := &OpenAIProvider{}
-	p.setBaseConfig(BaseConfig{}, "gpt-4o")
-	p.baseURL = "https://api.openai.com/v1"
-	for _, opt := range opts {
-		opt(p)
-	}
-	if p.apiKey == "" {
-		return nil, fmt.Errorf("API key is required")
-	}
-	return p, nil
-}
-
-func WithOpenAIAPIKey(key string) OpenAIOption {
-	return func(p *OpenAIProvider) {
-		p.apiKey = key
-	}
-}
-
-func WithOpenAIBaseURL(url string) OpenAIOption {
-	return func(p *OpenAIProvider) {
-		p.baseURL = strings.TrimSuffix(url, "/")
-	}
-}
-
-func WithOpenAIHTTPClient(client *http.Client) OpenAIOption {
-	return func(p *OpenAIProvider) {
-		p.client = client
-	}
-}
-
-func WithOpenAIModel(model string) OpenAIOption {
-	return func(p *OpenAIProvider) {
-		p.model = model
-	}
-}
-
-func WithOpenAIMaxTokens(tokens int) OpenAIOption {
-	return func(p *OpenAIProvider) {
-		p.maxTokens = tokens
-	}
 }
 
 // SetReasoningLevel sets the reasoning level for OpenAI.

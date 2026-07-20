@@ -33,10 +33,10 @@ func TestTextWithToolCalls(t *testing.T) {
 	defer server.Close()
 
 	// Create provider
-	provider, err := providers.NewOpenAI(
-		providers.WithOpenAIAPIKey("test-key"),
-		providers.WithOpenAIBaseURL(server.URL),
-	)
+	provider, err := providers.NewOpenAI(providers.BaseConfig{
+		APIKey: "test-key",
+		BaseURL: server.URL,
+	})
 	if err != nil {
 		t.Fatalf("Failed to create provider: %v", err)
 	}

@@ -32,9 +32,9 @@ func NewProvider(config ProviderConfig) (llm.Provider, error) {
 
 	switch strings.ToLower(config.Type) {
 	case "anthropic":
-		return providers.NewAnthropicWithConfig(cfg)
+		return providers.NewAnthropic(cfg)
 	case "openai":
-		return providers.NewOpenAIWithConfig(cfg)
+		return providers.NewOpenAI(cfg)
 	default:
 		return nil, fmt.Errorf("provider: unknown provider type: %s", config.Type)
 	}

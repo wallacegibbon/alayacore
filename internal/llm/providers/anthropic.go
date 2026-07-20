@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io"
 	"iter"
-	"net/http"
 	"sort"
 	"strings"
 
@@ -201,12 +200,9 @@ type AnthropicProvider struct {
 	baseProvider
 }
 
-// AnthropicOption configures the provider (kept for test ergonomics).
-type AnthropicOption func(*AnthropicProvider)
-
-// NewAnthropicWithConfig creates an Anthropic provider from a BaseConfig.
+// NewAnthropic creates an Anthropic provider from a BaseConfig.
 // This is the primary constructor used by the provider factory.
-func NewAnthropicWithConfig(cfg BaseConfig) (*AnthropicProvider, error) {
+func NewAnthropic(cfg BaseConfig) (*AnthropicProvider, error) {
 	if cfg.BaseURL == "" {
 		cfg.BaseURL = "https://api.anthropic.com"
 	}
@@ -216,49 +212,6 @@ func NewAnthropicWithConfig(cfg BaseConfig) (*AnthropicProvider, error) {
 		return nil, fmt.Errorf("API key is required")
 	}
 	return p, nil
-}
-
-func NewAnthropic(opts ...AnthropicOption) (*AnthropicProvider, error) {
-	p := &AnthropicProvider{}
-	p.setBaseConfig(BaseConfig{}, "claude-3-5-sonnet-20241022")
-	p.baseURL = "https://api.anthropic.com"
-	for _, opt := range opts {
-		opt(p)
-	}
-	if p.apiKey == "" {
-		return nil, fmt.Errorf("API key is required")
-	}
-	return p, nil
-}
-
-func WithAPIKey(key string) AnthropicOption {
-	return func(p *AnthropicProvider) {
-		p.apiKey = key
-	}
-}
-
-func WithBaseURL(url string) AnthropicOption {
-	return func(p *AnthropicProvider) {
-		p.baseURL = strings.TrimSuffix(url, "/")
-	}
-}
-
-func WithHTTPClient(client *http.Client) AnthropicOption {
-	return func(p *AnthropicProvider) {
-		p.client = client
-	}
-}
-
-func WithAnthropicModel(model string) AnthropicOption {
-	return func(p *AnthropicProvider) {
-		p.model = model
-	}
-}
-
-func WithMaxTokens(tokens int) AnthropicOption {
-	return func(p *AnthropicProvider) {
-		p.maxTokens = tokens
-	}
 }
 
 // SetReasoningLevel sets the reasoning level for Anthropic.
