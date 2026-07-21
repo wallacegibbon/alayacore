@@ -105,6 +105,7 @@ func (s *Session) doAutoSummarize(ctx context.Context, contents []llm.ContentPar
 	// Echo the summarization prompt to output, same as
 	// handleUserPrompt does for a normal prompt, but call processPrompt
 	// directly to avoid mutual recursion.
+	beforeLen := len(contents)
 	promptPart := &llm.TextPart{Text: summarizePrompt}
 	id := s.histIncAndGet()
 	promptPart.SetHistoryID(id)
@@ -114,38 +115,34 @@ func (s *Session) doAutoSummarize(ctx context.Context, contents []llm.ContentPar
 		s.writeTLV(tag, tlv.WrapID(strconv.FormatUint(id, 10), val))
 	}
 
-	beforeLen := len(contents)
 	fullContents, outputTokens, err := s.processPrompt(ctx, contents)
-	if err == nil {
-		return s.buildSummary(fullContents, beforeLen, outputTokens)
+	if err != nil {
+		s.writeError(err.Error())
+		return contents
 	}
 
-	s.writeError(err.Error())
-	if len(fullContents) > 0 {
-		return fullContents
+	result, err := s.buildSummary(fullContents[beforeLen:], outputTokens)
+	if err != nil {
+		s.writeNotify(err.Error())
+		return contents[:beforeLen]
 	}
-	return contents
+	return result
 }
 
-// buildSummary extracts assistant response parts from the LLM output,
-// rebuilds contents as a "Continue" user message + filtered summary,
-// and updates context tokens. Shared between doAutoSummarize and
-// runSummarize.
-func (s *Session) buildSummary(fullContents []llm.ContentPart, beforeLen int, outputTokens int64) []llm.ContentPart {
-	var summaryParts []llm.ContentPart
-	for _, part := range fullContents[beforeLen:] {
-		if part.GetRole() != llm.RoleAssistant {
-			continue
-		}
-		switch part.(type) {
-		case *llm.ReasoningPart:
-			continue
-		default:
-			summaryParts = append(summaryParts, part)
-		}
+// buildSummary extracts the last assistant TextPart from the LLM output
+// and rebuilds it as a "Continue" user message + summary text.
+// Shared between doAutoSummarize and runSummarize.
+// Returns an error if the response has no assistant text.
+func (s *Session) buildSummary(response []llm.ContentPart, outputTokens int64) ([]llm.ContentPart, error) {
+	if len(response) == 0 {
+		return nil, fmt.Errorf("summarization produced no content")
+	}
+	tp, ok := response[len(response)-1].(*llm.TextPart)
+	if !ok || tp.Role != llm.RoleAssistant || tp.Text == "" {
+		return nil, fmt.Errorf("summarization produced no text")
 	}
 
-	contents := make([]llm.ContentPart, 0, 1+len(summaryParts))
+	contents := make([]llm.ContentPart, 0, 2)
 	continueID := s.histIncAndGet()
 	contents = append(contents, &llm.TextPart{
 		Text: "Continue",
@@ -154,17 +151,19 @@ func (s *Session) buildSummary(fullContents []llm.ContentPart, beforeLen int, ou
 			Role:      llm.RoleUser,
 		},
 	})
-	for _, part := range summaryParts {
-		part.UpdateContentPartMeta(s.histIncAndGet(), llm.RoleAssistant)
-		contents = append(contents, part)
-	}
-
+	summaryID := s.histIncAndGet()
+	contents = append(contents, &llm.TextPart{
+		Text: tp.Text,
+		ContentPartMeta: llm.ContentPartMeta{
+			HistoryID: summaryID,
+			Role:      llm.RoleAssistant,
+		},
+	})
 	if outputTokens > 0 {
 		s.sendEvent(SetContextTokensEvent{Tokens: outputTokens})
 	}
-
 	s.writeNotify("Summarized conversation")
-	return contents
+	return contents, nil
 }
 
 // ============================================================================
@@ -489,10 +488,29 @@ func (s *Session) runSummarize(ctx context.Context, taskContent []llm.ContentPar
 	s.writeNotify("Summarizing conversation...")
 
 	beforeLen := len(contents)
-	promptParts := []llm.ContentPart{&llm.TextPart{Text: summarizePrompt}}
-	fullContents, outputTokens := s.handleUserPrompt(ctx, contents, promptParts)
+	promptPart := &llm.TextPart{Text: summarizePrompt}
+	id := s.histIncAndGet()
+	promptPart.SetHistoryID(id)
+	promptPart.SetRole(llm.RoleUser)
+	contents = append(contents, promptPart)
+	if tag, val, err := contentPartToTLV(promptPart); err == nil && tag != "" {
+		s.writeTLV(tag, tlv.WrapID(strconv.FormatUint(id, 10), val))
+	}
 
-	contents = s.buildSummary(fullContents, beforeLen, outputTokens)
+	fullContents, outputTokens, err := s.processPrompt(ctx, contents)
+	if err != nil {
+		s.writeError(err.Error())
+		contents = contents[:beforeLen]
+		return
+	}
+
+	result, err := s.buildSummary(fullContents[beforeLen:], outputTokens)
+	if err != nil {
+		s.writeNotify(err.Error())
+		contents = contents[:beforeLen]
+		return
+	}
+	contents = result
 
 	if ctx.Err() == context.Canceled {
 		contents = s.appendCancelMessage(contents)

@@ -125,22 +125,15 @@ func TestHandleUserPromptPreservesPartialResultsOnError(t *testing.T) {
 }
 
 func TestDoAutoSummarizePreservesContentsOnError(t *testing.T) {
-	// Provider succeeds for step 1 (with tool call, so loop continues),
-	// then fails on step 2. This gives doAutoSummarize a non-nil
-	// fullContents from OnStepFinish when it hits the error path.
+	// Summarization failed immediately (no successful step).
 	provider := &mockProviderStepFail{
 		responses: []stepResponse{
-			{text: "partial summary", toolCalls: []llm.ToolInputPart{{ID: "s1", Name: "t", Input: []byte(`{}`)}}},
-			{failErr: errors.New("provider failed on step 2")},
+			{failErr: errors.New("provider failed on summarization")},
 		},
 	}
 	agent := llm.NewAgent(llm.AgentConfig{
 		Provider: provider,
-		Tools: []llm.Tool{{
-			Definition: llm.ToolDefinition{Name: "t", Description: "test", Schema: []byte(`{"type":"object"}`)},
-			Execute:    func(_ context.Context, _ json.RawMessage) ([]llm.ContentPart, error) { return nil, nil },
-		}},
-		MaxSteps: 10,
+		MaxSteps: 1,
 	})
 	session := &Session{
 		sessionConfig: sessionConfig{
@@ -160,15 +153,180 @@ func TestDoAutoSummarizePreservesContentsOnError(t *testing.T) {
 	}
 	result := session.doAutoSummarize(context.Background(), contents)
 
-	// Must contain the step 1 content (partial summary).
-	hasPartialSummary := false
-	for _, p := range result {
-		if tp, ok := p.(*llm.TextPart); ok && tp.Role == llm.RoleAssistant && tp.Text == "partial summary" {
-			hasPartialSummary = true
-		}
+	if len(result) == 0 {
+		t.Fatal("doAutoSummarize returned empty on error")
 	}
-	if !hasPartialSummary {
-		t.Fatal("CRITICAL BUG: doAutoSummarize lost step 1 content on error — " +
-			"if len(fullContents) > 0 check may have been removed")
+	if tp, ok := result[0].(*llm.TextPart); !ok || tp.Text != "existing content" {
+		t.Errorf("expected original content preserved, got %v", result[0])
+	}
+}
+
+func TestDoAutoSummarizeBuildSummaryFails(t *testing.T) {
+	// processPrompt succeeds (step 1 tool calls → loop continues,
+	// step 2 empty → no tool calls → loop exits with success).
+	// The response has no text, so buildSummary returns an error.
+	provider := &mockProviderStepFail{
+		responses: []stepResponse{
+			{toolCalls: []llm.ToolInputPart{{ID: "s1", Name: "t", Input: []byte(`{}`)}}},
+			{}, // empty step — no text, no tool calls
+		},
+	}
+	agent := llm.NewAgent(llm.AgentConfig{
+		Provider: provider,
+		Tools: []llm.Tool{{
+			Definition: llm.ToolDefinition{Name: "t", Description: "test", Schema: []byte(`{"type":"object"}`)},
+			Execute:    func(_ context.Context, _ json.RawMessage) ([]llm.ContentPart, error) { return nil, nil },
+		}},
+		MaxSteps: 5,
+	})
+	session := &Session{
+		sessionConfig: sessionConfig{
+			modelService:  &ModelService{agent: agent},
+			SessionConfig: SessionConfig{NoDelta: true},
+		},
+		sharedState: sharedState{
+			histCounter:  400,
+			outputBroken: atomic.Bool{},
+		},
+		runState: runState{
+			taskEventCh: make(chan TaskEvent, 20),
+		},
+	}
+	contents := []llm.ContentPart{
+		&llm.TextPart{Text: "original", ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}},
+	}
+	result := session.doAutoSummarize(context.Background(), contents)
+
+	// buildSummary failed (no text) — original history must be preserved.
+	if len(result) != 1 {
+		t.Fatalf("expected 1 part (original history), got %d", len(result))
+	}
+	if tp, ok := result[0].(*llm.TextPart); !ok || tp.Text != "original" {
+		t.Errorf("expected original content preserved, got %v", result[0])
+	}
+}
+
+// ============================================================================
+// Unit tests for buildSummary
+// ============================================================================
+
+func TestBuildSummaryWithText(t *testing.T) {
+	session := &Session{
+		sharedState: sharedState{histCounter: 100},
+		runState:    runState{taskEventCh: make(chan TaskEvent, 10)},
+	}
+
+	// Simulate: [original history] + [summarize prompt] + [assistant summary text]
+	fullContents := []llm.ContentPart{
+		&llm.TextPart{Text: "user msg", ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}},
+		&llm.TextPart{Text: "assistant msg", ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant}},
+		&llm.TextPart{Text: summarizePrompt, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}},
+		&llm.TextPart{Text: "This is the summary.", ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant}},
+	}
+	beforeLen := 2
+
+	result, err := session.buildSummary(fullContents[beforeLen:], 50)
+	if err != nil {
+		t.Fatalf("buildSummary failed: %v", err)
+	}
+
+	// Result should be: "Continue" (user) + "This is the summary." (assistant)
+	if len(result) != 2 {
+		t.Fatalf("expected 2 parts (Continue + summary), got %d", len(result))
+	}
+	if tp, ok := result[0].(*llm.TextPart); !ok || tp.Text != "Continue" || tp.Role != llm.RoleUser {
+		t.Errorf("first part should be Continue user message, got %T %+v", result[0], result[0])
+	}
+	if tp, ok := result[1].(*llm.TextPart); !ok || tp.Text != "This is the summary." || tp.Role != llm.RoleAssistant {
+		t.Errorf("second part should be summary text, got %T %+v", result[1], result[1])
+	}
+}
+
+func TestBuildSummaryNoText(t *testing.T) {
+	session := &Session{
+		sharedState: sharedState{histCounter: 200},
+		runState:    runState{taskEventCh: make(chan TaskEvent, 10)},
+	}
+
+	// Only tool calls, no TextPart — should return original history unchanged.
+	// Original content: 2 parts before beforeLen
+	original := []llm.ContentPart{
+		&llm.TextPart{Text: "user msg", ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}},
+		&llm.TextPart{Text: "assistant msg", ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant}},
+	}
+	fullContents := make([]llm.ContentPart, len(original)+2)
+	copy(fullContents, original)
+	fullContents[len(original)] = &llm.TextPart{Text: summarizePrompt, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}}
+	fullContents[len(original)+1] = &llm.ToolInputPart{ID: "c1", Name: "t", Input: []byte(`{}`), ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant}}
+	beforeLen := 2
+
+	_, err := session.buildSummary(fullContents[beforeLen:], 0)
+	if err == nil {
+		t.Fatal("buildSummary should return error when last part is not text")
+	}
+}
+
+func TestBuildSummaryLastPartNotText(t *testing.T) {
+	session := &Session{
+		sharedState: sharedState{histCounter: 300},
+		runState:    runState{taskEventCh: make(chan TaskEvent, 10)},
+	}
+
+	// Last part is a tool call, not text — summarization failed,
+	// even though there's text earlier in the response.
+	original := []llm.ContentPart{
+		&llm.TextPart{Text: "user msg", ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}},
+		&llm.TextPart{Text: "assistant msg", ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant}},
+	}
+	fullContents := make([]llm.ContentPart, len(original)+4)
+	copy(fullContents, original)
+	fullContents[len(original)] = &llm.TextPart{Text: summarizePrompt, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}}
+	fullContents[len(original)+1] = &llm.TextPart{Text: "Some summary.", ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant}}
+	fullContents[len(original)+2] = &llm.ToolInputPart{ID: "c1", Name: "t", Input: []byte(`{}`), ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant}}
+	fullContents[len(original)+3] = &llm.ToolInputPart{ID: "c2", Name: "t", Input: []byte(`{}`), ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant}}
+	beforeLen := 2
+
+	_, err := session.buildSummary(fullContents[beforeLen:], 0)
+	if err == nil {
+		t.Fatal("buildSummary should return error when last part is tool call")
+	}
+}
+
+func TestBuildSummaryEmptyText(t *testing.T) {
+	session := &Session{
+		sharedState: sharedState{histCounter: 400},
+		runState:    runState{taskEventCh: make(chan TaskEvent, 10)},
+	}
+
+	// TextPart with empty text — should be treated as no text.
+	original := []llm.ContentPart{
+		&llm.TextPart{Text: "existing", ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}},
+	}
+	fullContents := make([]llm.ContentPart, len(original)+2)
+	copy(fullContents, original)
+	fullContents[len(original)] = &llm.TextPart{Text: summarizePrompt, ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}}
+	fullContents[len(original)+1] = &llm.TextPart{Text: "", ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant}}
+	beforeLen := 1
+
+	_, err := session.buildSummary(fullContents[beforeLen:], 0)
+	if err == nil {
+		t.Fatal("buildSummary should return error when last text is empty")
+	}
+}
+
+func TestBuildSummaryEmptyResponse(t *testing.T) {
+	session := &Session{
+		sharedState: sharedState{histCounter: 500},
+		runState:    runState{taskEventCh: make(chan TaskEvent, 10)},
+	}
+
+	_, err := session.buildSummary(nil, 0)
+	if err == nil {
+		t.Fatal("buildSummary should return error on nil response")
+	}
+
+	_, err = session.buildSummary([]llm.ContentPart{}, 0)
+	if err == nil {
+		t.Fatal("buildSummary should return error on empty response")
 	}
 }
