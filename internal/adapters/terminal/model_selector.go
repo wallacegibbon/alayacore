@@ -453,7 +453,7 @@ func (ms ModelSelector) RenderOverlay(baseContent string, screenWidth, screenHei
 	if ms.State == FilteredListClosed {
 		return baseContent
 	}
-	return renderOverlay(baseContent, ms.View().Content, screenWidth, screenHeight)
+	return renderOverlay(baseContent, ms.View().Content, screenWidth, screenHeight, 0)
 }
 
 func (ms ModelSelector) updateFilteredModels() ModelSelector {

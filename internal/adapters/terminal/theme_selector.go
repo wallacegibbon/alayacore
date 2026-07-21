@@ -234,5 +234,5 @@ func (ts ThemeSelector) RenderOverlay(baseContent string, screenWidth, screenHei
 	if ts.State == ScrollableListClosed {
 		return baseContent
 	}
-	return renderOverlay(baseContent, ts.View().Content, screenWidth, screenHeight)
+	return renderOverlay(baseContent, ts.View().Content, screenWidth, screenHeight, 0)
 }

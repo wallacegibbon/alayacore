@@ -221,7 +221,7 @@ func (fl FilteredListCore) RenderOverlay(baseContent, renderedList string, scree
 	if fl.State == FilteredListClosed {
 		return baseContent
 	}
-	return renderOverlay(baseContent, renderedList, screenWidth, screenHeight)
+	return renderOverlay(baseContent, renderedList, screenWidth, screenHeight, 0)
 }
 
 // FilterBorderColor returns the border color for the filter input based on focus state.

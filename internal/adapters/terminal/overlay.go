@@ -25,8 +25,8 @@ func (t overlayCloseTracker) JustClosed(ov interface{ IsOpen() bool }) bool {
 }
 
 // renderOverlay positions a content box centered horizontally, with its bottom
-// edge aligned at a consistent vertical position.
-func renderOverlay(baseContent string, box string, screenWidth, screenHeight int) string {
+// edge aligned at a consistent vertical position, plus a yOffset adjustment.
+func renderOverlay(baseContent string, box string, screenWidth, screenHeight int, yOffset int) string {
 	boxWidth := lipgloss.Width(box)
 	boxHeight := lipgloss.Height(box)
 
@@ -36,6 +36,7 @@ func renderOverlay(baseContent string, box string, screenWidth, screenHeight int
 	// Align the bottom of all overlays at 60% down the terminal
 	bottomY := screenHeight * 3 / 5
 	y := max(0, bottomY-boxHeight)
+	y = max(0, y+yOffset)
 
 	c := lipgloss.NewCompositor(
 		lipgloss.NewLayer(baseContent),

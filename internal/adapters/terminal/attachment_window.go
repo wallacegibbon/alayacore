@@ -523,5 +523,5 @@ func (aw AttachmentWindow) RenderOverlay(baseContent string, screenWidth, screen
 	if aw.State == FilteredListClosed {
 		return baseContent
 	}
-	return renderOverlay(baseContent, aw.View().Content, screenWidth, screenHeight)
+	return renderOverlay(baseContent, aw.View().Content, screenWidth, screenHeight, 0)
 }

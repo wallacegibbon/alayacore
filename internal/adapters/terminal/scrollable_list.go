@@ -123,7 +123,7 @@ func (sl ScrollableListCore) RenderOverlay(baseContent, renderedList string, scr
 	if sl.State == ScrollableListClosed {
 		return baseContent
 	}
-	return renderOverlay(baseContent, renderedList, screenWidth, screenHeight)
+	return renderOverlay(baseContent, renderedList, screenWidth, screenHeight, 0)
 }
 
 // ScrollableListResult describes what happened during HandleKey.

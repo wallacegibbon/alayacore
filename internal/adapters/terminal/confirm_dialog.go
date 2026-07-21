@@ -305,7 +305,7 @@ func (cd ConfirmDialog) View() tea.View {
 	}
 	content := strings.Join(msgLines, "\n")
 	box := cd.styles.RenderBorderedBox(content, cd.Width, cd.styles.ColorWarning, ConfirmContentRows)
-	return tea.NewView("\n" + box + "\n")
+	return tea.NewView(box)
 }
 
 // buildContentLines returns the display lines for the dialog content.
@@ -447,5 +447,7 @@ func (cd ConfirmDialog) RenderOverlay(baseContent string, screenWidth, screenHei
 	if !cd.IsOpen() {
 		return baseContent
 	}
-	return renderOverlay(baseContent, cd.View().Content, screenWidth, screenHeight)
+	// Shift up by 1 line to compensate for confirm's compact content
+	// (no filter bar or list, unlike other overlays).
+	return renderOverlay(baseContent, cd.View().Content, screenWidth, screenHeight, -1)
 }

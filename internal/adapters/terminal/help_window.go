@@ -451,5 +451,5 @@ func (hw HelpWindow) RenderOverlay(baseContent string, screenWidth, screenHeight
 	if hw.State == FilteredListClosed {
 		return baseContent
 	}
-	return renderOverlay(baseContent, hw.View().Content, screenWidth, screenHeight)
+	return renderOverlay(baseContent, hw.View().Content, screenWidth, screenHeight, 0)
 }
