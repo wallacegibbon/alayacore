@@ -57,12 +57,15 @@ func (s *Session) handleUserPrompt(ctx context.Context, contents []llm.ContentPa
 	}
 
 	fullContents, outputTokens, err := s.processPrompt(ctx, contents)
-	if err != nil {
-		s.writeError(err.Error())
-		return contents, 0
+	if err == nil {
+		return fullContents, outputTokens
 	}
 
-	return fullContents, outputTokens
+	s.writeError(err.Error())
+	if len(fullContents) > 0 {
+		return fullContents, outputTokens
+	}
+	return contents, 0
 }
 
 // shouldAutoSummarize returns true when auto-summarization is enabled and
@@ -113,12 +116,15 @@ func (s *Session) doAutoSummarize(ctx context.Context, contents []llm.ContentPar
 
 	beforeLen := len(contents)
 	fullContents, outputTokens, err := s.processPrompt(ctx, contents)
-	if err != nil {
-		s.writeError(err.Error())
-		return contents
+	if err == nil {
+		return s.buildSummary(fullContents, beforeLen, outputTokens)
 	}
 
-	return s.buildSummary(fullContents, beforeLen, outputTokens)
+	s.writeError(err.Error())
+	if len(fullContents) > 0 {
+		return fullContents
+	}
+	return contents
 }
 
 // buildSummary extracts assistant response parts from the LLM output,
@@ -343,7 +349,7 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.ContentPart) 
 	_, err := s.Agent().Stream(ctx, history, callbacks)
 
 	if err != nil {
-		return fullContents, 0, err
+		return fullContents, outputTokens, err
 	}
 
 	return fullContents, outputTokens, nil
