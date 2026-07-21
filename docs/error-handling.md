@@ -89,11 +89,11 @@ The agent detects truncation in `streamEvents` and checks for it in `Stream()`. 
 ```go
 // In streamEvents:
 case StepCompleteEvent:
-    stepMessage = e.Message
-    stepUsage = e.Usage
-    if e.StopReason == "max_tokens" || e.StopReason == "length" {
-        truncated = true
-    }
+	stepMessage = e.Message
+	stepUsage = e.Usage
+	if e.StopReason == "max_tokens" || e.StopReason == "length" {
+		truncated = true
+	}
 ```
 
 ## Error Recovery

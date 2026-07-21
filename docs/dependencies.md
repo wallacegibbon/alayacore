@@ -54,8 +54,8 @@ Handles width measurement, truncation, and line-breaking on **text that already 
 
 ```go
 func wrapContent(s string, width int) string {
-    s = ansi.Hardwrap(s, width, true)  // hard-break at width
-    // ...
+	s = ansi.Hardwrap(s, width, true)  // hard-break at width
+	// ...
 }
 ```
 
@@ -106,12 +106,12 @@ Provides `RuneWidth(r rune) int`: returns the number of terminal columns a singl
 ```go
 // input_field.go — buildVisibleText
 for cells, i := 0, 0; i < len(m.value); i++ {
-    w := rw.RuneWidth(m.value[i])  // ← per-rune width needed
-    if cells >= m.offset {
-        startIdx = i
-        break
-    }
-    cells += w
+	w := rw.RuneWidth(m.value[i])  // ← per-rune width needed
+	if cells >= m.offset {
+		startIdx = i
+		break
+	}
+	cells += w
 }
 ```
 

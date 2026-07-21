@@ -26,10 +26,10 @@ Context tracking is handled by the `handleTaskEvent` method in `session_loop.go`
 
 ```go
 case StepFinishEvent:
-    newContext := e.InputTokens + e.OutputTokens + e.CacheReadTokens + e.CacheCreationTokens
-    if newContext > 0 {
-        s.ContextTokens = newContext
-    }
+	newContext := e.InputTokens + e.OutputTokens + e.CacheReadTokens + e.CacheCreationTokens
+	if newContext > 0 {
+		s.ContextTokens = newContext
+	}
 ```
 
 Note: `StepFinishEvent` carries only token usage metadata. The final message
@@ -122,7 +122,7 @@ Both are sent by the same goroutine sequentially, and the FIFO channel guarantee
 ## Related
 
 - `shouldAutoSummarize()` — triggers when `ContextTokens >= ContextLimit * 65%` (only when `--auto-summarize` is enabled)
-- `runSummarize()` (in `session_task.go`) — appends the summary prompt to Messages, calls `handleUserPrompt`, then replaces conversation history with the summary and resets `ContextTokens` to the summary's output token count via `SetContextTokensEvent`
+- `runSummarize()` (in `session_task.go`) — sends the summarize prompt via `summarizeContents` → `processPrompt`, then replaces conversation history with the summary and resets `ContextTokens` to the summary's output token count via `SetContextTokensEvent`
 - `SetContextTokensEvent` — a dedicated task event that sets `ContextTokens` to the correct value after summarization, overriding the stale value from the preceding `StepFinishEvent`
 - `applyModelContextLimit()` — sets `ContextLimit` from the active model's config
 - `SessionMeta.ContextTokens` — persisted to session file frontmatter so the status bar shows the correct context usage immediately after loading a session

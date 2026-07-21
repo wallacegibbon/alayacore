@@ -47,35 +47,33 @@ Compare the three representations for the same assistant message:
 ```go
 // Domain (llm/types.go) — flat array of ContentPart interfaces
 []ContentPart{
-    &ReasoningPart{Text:"Let me think...", ContentPartMeta: {Role: "assistant"}},
-    &TextPart{Text:"The answer is 42", ContentPartMeta: {Role: "assistant"}},
-    &ToolInputPart{ID:"call_abc", Name:"read_file",
-                   Input: json.RawMessage(`{"path":"/tmp/foo"}`),
-                   ContentPartMeta: {Role: "assistant"}},
+	&ReasoningPart{Text:"Let me think...", ContentPartMeta: {Role: "assistant"}},
+	&TextPart{Text:"The answer is 42", ContentPartMeta: {Role: "assistant"}},
+	&ToolInputPart{ID:"call_abc", Name:"read_file", Input: json.RawMessage(`{"path":"/tmp/foo"}`), ContentPartMeta: {Role: "assistant"}},
 }
 ```
 
 ```go
 // Anthropic wire (anthropic.go) — array of concrete blocks, nearly 1:1
 anthropicMessage{
-    Role: "assistant",
-    Content: []anthropicContentBlock{
-        {Type:"thinking", Thinking: &"Let me think..."},
-        {Type:"text", Text: "The answer is 42"},
-        {Type:"tool_use", ID:"call_abc", Name:"read_file", Input: {"path":"/tmp/foo"}},
-    },
+	Role: "assistant",
+	Content: []anthropicContentBlock{
+		{Type:"thinking", Thinking: &"Let me think..."},
+		{Type:"text", Text: "The answer is 42"},
+		{Type:"tool_use", ID:"call_abc", Name:"read_file", Input: {"path":"/tmp/foo"}},
+	},
 }
 ```
 
 ```go
 // OpenAI wire (openai.go) — THREE separate top-level fields
 openAIMessage{
-    Role:             "assistant",
-    ReasoningContent: &"Let me think...",
-    Content:          "The answer is 42",
-    ToolCalls: []openAIToolCall{
-        {ID:"call_abc", Function: {Name:"read_file", Arguments:"{\"path\":\"/tmp/foo\"}"}},
-    },
+	Role:             "assistant",
+	ReasoningContent: &"Let me think...",
+	Content:          "The answer is 42",
+	ToolCalls: []openAIToolCall{
+		{ID:"call_abc", Function: {Name:"read_file", Arguments:"{\"path\":\"/tmp/foo\"}"}},
+	},
 }
 ```
 
@@ -86,18 +84,18 @@ The Anthropic adapter is a **direct 1:1 mapping** — each `ContentPart` becomes
 ```go
 // Anthropic — simple type switch, one block per ContentPart
 for _, part := range msg.Contents {
-    switch v := part.(type) {
-    case llm.TextPart:
-        → {Type:"text", Text: v.Text}
-    case llm.ReasoningPart:
-        → {Type:"thinking", Thinking: &v.Text}
-    case llm.ToolInputPart:
-        → {Type:"tool_use", ID: v.ID, Name: v.Name, Input: v.Input}
-    case llm.ToolOutputPart:
-        → {Type:"tool_result", ToolUseID: v.ID, Output: [...], IsError: v.IsError}
-        // Output is an array of content blocks (text, image, etc.)
-        // Single text block uses string shorthand for backward compat
-    }
+	switch v := part.(type) {
+	case llm.TextPart:
+		→ {Type:"text", Text: v.Text}
+	case llm.ReasoningPart:
+		→ {Type:"thinking", Thinking: &v.Text}
+	case llm.ToolInputPart:
+		→ {Type:"tool_use", ID: v.ID, Name: v.Name, Input: v.Input}
+	case llm.ToolOutputPart:
+		→ {Type:"tool_result", ToolUseID: v.ID, Output: [...], IsError: v.IsError}
+	// Output is an array of content blocks (text, image, etc.)
+	// Single text block uses string shorthand for backward compat
+	}
 }
 ```
 
@@ -161,13 +159,13 @@ ReasoningDeltaEvent{Delta: " about this"}
 
 // Final message:
 Message{
-    Role: "assistant",
-    Content: []ContentPart{
-        ReasoningPart{
-            Type: "reasoning",
-            Text: "Let me think... about this",
-        },
-    },
+	Role: "assistant",
+	Content: []ContentPart{
+		ReasoningPart{
+			Type: "reasoning",
+			Text: "Let me think... about this",
+		},
+	},
 }
 ```
 
@@ -208,18 +206,18 @@ ToolInputStartEvent{ID: "call_abc", Name: "read_file"}
 
 // Stream event at completion (after all args received):
 ToolInputPart{
-    ID: "call_abc",
-    Name:   "read_file",
-    Input:      json.RawMessage(`{"path":"/tmp/foo"}`),
+	ID:    "call_abc",
+	Name:  "read_file",
+	Input: json.RawMessage(`{"path":"/tmp/foo"}`),
 }
 
 // Final content (flat []ContentPart — no Message wrapper):
 []ContentPart{
-    &ToolInputPart{
-        ID: "call_abc",
-        Name:   "read_file",
-        Input:      json.RawMessage(`{"path":"/tmp/foo"}`),
-    },
+	&ToolInputPart{
+		ID:    "call_abc",
+		Name:  "read_file",
+		Input: json.RawMessage(`{"path":"/tmp/foo"}`),
+	},
 }
 ```
 
@@ -252,16 +250,17 @@ ReasoningDeltaEvent{Delta: " to check"}
 // (no more ReasoningDelta or ToolInputStart — just args accumulating)
 
 ToolInputPart{
-    ID: "call_abc",
-    Name:   "read_file",
-    Input:      json.RawMessage(`{"path":"/tmp/foo"}`),
+	ID:    "call_abc",
+	Name:  "read_file",
+	Input: json.RawMessage(`{"path":"/tmp/foo"}`),
 }
 
 // Final content — both parts in flat []ContentPart:
 []ContentPart{
-    &ReasoningPart{Text: "Read file to check"},
-    &ToolInputPart{ID: "call_abc", Name: "read_file",
-        Input: json.RawMessage(`{"path":"/tmp/foo"}`)},
+	&ReasoningPart{Text: "Read file to check"},
+	&ToolInputPart{ID: "call_abc", Name: "read_file",
+		Input: json.RawMessage(`{"path":"/tmp/foo"}`)
+	},
 }
 ```
 
@@ -275,12 +274,12 @@ ToolInputPart{
 ```go
 // Flat []ContentPart — there is no Message wrapper struct
 []ContentPart{
-    &ReasoningPart{Text: "Let me read the file"},
-    &ToolInputPart{
-        ID: "call_abc",
-        Name:   "read_file",
-        Input:      json.RawMessage(`{"path":"/tmp/foo"}`),
-    },
+	&ReasoningPart{Text: "Let me read the file"},
+	&ToolInputPart{
+		ID:    "call_abc",
+		Name:  "read_file",
+		Input: json.RawMessage(`{"path":"/tmp/foo"}`),
+	},
 }
 ```
 
@@ -318,10 +317,10 @@ ToolInputPart{
 ```go
 // Flat []ContentPart — there is no Message wrapper struct
 []ContentPart{
-    &TextPart{Text: "Describe this multimedia"},
-    &ImagePart{URI: "data:image/jpeg;base64,/9j/4AAQ..."},
-    &AudioPart{URI: "data:audio/wav;base64,UklGR..."},
-    &VideoPart{URI: "data:video/mp4;base64,AAAA..."},
+	&TextPart{Text: "Describe this multimedia"},
+	&ImagePart{URI: "data:image/jpeg;base64,/9j/4AAQ..."},
+	&AudioPart{URI: "data:audio/wav;base64,UklGR..."},
+	&VideoPart{URI: "data:video/mp4;base64,AAAA..."},
 }
 ```
 
@@ -374,15 +373,15 @@ ToolInputPart{
 
 ```
 openAIStreamState {
-    textBuilder       strings.Builder                ← "content" delta chunks
-    reasoningBuilder  strings.Builder                ← "reasoning_content" delta chunks
-    toolAccumulators  map[int]*openAIToolAccumulator ← tool calls keyed by index
+	textBuilder       strings.Builder                ← "content" delta chunks
+	reasoningBuilder  strings.Builder                ← "reasoning_content" delta chunks
+	toolAccumulators  map[int]*openAIToolAccumulator ← tool calls keyed by index
 }
 
 openAIToolAccumulator {
-    id   string          ← tool call id
-    name string          ← function name
-    args strings.Builder ← accumulated arguments fragments
+	id   string          ← tool call id
+	name string          ← function name
+	args strings.Builder ← accumulated arguments fragments
 }
 ```
 
@@ -392,14 +391,14 @@ All three accumulate simultaneously during streaming. At `StepCompleteEvent`, th
 
 ```
 blockAccumulator {
-    blockType string              // "text" | "thinking" | "tool_use"
-    buffer    strings.Builder     // text, thinking, or tool_use partial_json
-    id, name string
+	blockType string              // "text" | "thinking" | "tool_use"
+	buffer    strings.Builder     // text, thinking, or tool_use partial_json
+	id, name string
 }
 
 anthropicStreamState {
-    contentParts  map[int]ContentPart          ← finished blocks by index
-    blocks        map[int]*blockAccumulator    ← in-progress blocks by index
+	contentParts  map[int]ContentPart          ← finished blocks by index
+	blocks        map[int]*blockAccumulator    ← in-progress blocks by index
 }
 ```
 

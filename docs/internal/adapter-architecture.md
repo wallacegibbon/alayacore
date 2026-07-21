@@ -100,16 +100,15 @@ User types prompt
     → Emit TLV(UT, prompt), TLV(UE)
       → inputPump reads TLV, stages content, flushes on UE
         → runTask() (task goroutine)
-          → handleUserPrompt()
-            → processPrompt()
-              → Agent.Stream()
-                → Delta callbacks emit TLV(At), TLV(Ar), TLV(Af) (streaming deltas)
-                → Complete callbacks emit TLV(AT), TLV(AR), TLV(AF) (authoritative)
-                → Tool output callbacks emit TLV(UF)
-                  → OutputWriter parses TLV
-                    → WindowBuffer.AppendOrUpdate()
-                      → DisplayModel.View()
-                        → Terminal renders output
+          → processPrompt()
+            → Agent.Stream()
+              → Delta callbacks emit TLV(At), TLV(Ar), TLV(Af) (streaming deltas)
+              → Complete callbacks emit TLV(AT), TLV(AR), TLV(AF) (authoritative)
+              → Tool output callbacks emit TLV(UF)
+                → OutputWriter parses TLV
+                  → WindowBuffer.AppendOrUpdate()
+                    → DisplayModel.View()
+                      → Terminal renders output
 ```
 
 ### Tool Execution Flow

@@ -31,43 +31,6 @@ const (
 	AutoSummarizePctBase = 100
 )
 
-// ============================================================================
-// User Prompt
-// ============================================================================
-
-// handleUserPrompt echoes the user prompt to output, appends it to
-// contents, then runs the agent loop.
-//
-// parts is the combined user content (media parts + optional text part).
-// For media-only messages, there is no text part — only media parts.
-func (s *Session) handleUserPrompt(ctx context.Context, contents []llm.ContentPart, parts []llm.ContentPart) ([]llm.ContentPart, int64) {
-	if s.shouldAutoSummarize() {
-		contents = s.doAutoSummarize(ctx, contents)
-	}
-
-	// Assign history IDs, append to contents, and echo to output.
-	for _, part := range parts {
-		id := s.histIncAndGet()
-		part.SetHistoryID(id)
-		part.SetRole(llm.RoleUser)
-		contents = append(contents, part)
-		if tag, val, err := contentPartToTLV(part); err == nil && tag != "" {
-			s.writeTLV(tag, tlv.WrapID(strconv.FormatUint(id, 10), val))
-		}
-	}
-
-	fullContents, outputTokens, err := s.processPrompt(ctx, contents)
-	if err == nil {
-		return fullContents, outputTokens
-	}
-
-	s.writeError(err.Error())
-	if len(fullContents) > 0 {
-		return fullContents, outputTokens
-	}
-	return contents, 0
-}
-
 // shouldAutoSummarize returns true when auto-summarization is enabled and
 // the current context tokens exceed AutoSummarizeThreshold of the configured limit.
 func (s *Session) shouldAutoSummarize() bool {
@@ -92,59 +55,44 @@ func (s *Session) summarizeBackup(contents []llm.ContentPart) {
 	}
 }
 
-// doAutoSummarize logs a notification and triggers summarization.
-func (s *Session) doAutoSummarize(ctx context.Context, contents []llm.ContentPart) []llm.ContentPart {
-	limit := s.ContextLimit
-	usage := float64(s.ContextTokens) * AutoSummarizePctBase / float64(limit)
-	s.writeNotifyf("Context usage at %d/%d tokens (%.0f%%). Auto-summarizing...",
-		s.ContextTokens, limit, usage)
-
-	s.summarizeBackup(contents)
-	s.writeNotify("Summarizing conversation...")
-
-	// Echo the summarization prompt to output, same as
-	// handleUserPrompt does for a normal prompt, but call processPrompt
-	// directly to avoid mutual recursion.
-	beforeLen := len(contents)
+// summarizeContents appends the summarize prompt, calls processPrompt,
+// and formats the response as a "Continue" + summary conversation.
+// On any failure, returns the original contents (without the prompt).
+func (s *Session) summarizeContents(ctx context.Context, contents []llm.ContentPart) ([]llm.ContentPart, error) {
+	// Build and append the summarize prompt, assigning a history ID
+	// so the adapter can track it in the UI.
 	promptPart := &llm.TextPart{Text: summarizePrompt}
 	id := s.histIncAndGet()
 	promptPart.SetHistoryID(id)
 	promptPart.SetRole(llm.RoleUser)
-	contents = append(contents, promptPart)
 	if tag, val, err := contentPartToTLV(promptPart); err == nil && tag != "" {
 		s.writeTLV(tag, tlv.WrapID(strconv.FormatUint(id, 10), val))
 	}
 
-	fullContents, outputTokens, err := s.processPrompt(ctx, contents)
+	// Send the conversation (with the prompt) to the LLM.
+	promptContents := append(contents, promptPart) //nolint:gocritic // intentional — keep contents unchanged
+	fullContents, outputTokens, err := s.processPrompt(ctx, promptContents)
 	if err != nil {
-		s.writeError(err.Error())
-		return contents
+		return contents, err
 	}
 
-	result, err := s.buildSummary(fullContents[beforeLen:], outputTokens)
-	if err != nil {
-		s.writeNotify(err.Error())
-		return contents[:beforeLen]
-	}
-	return result
-}
-
-// buildSummary extracts the last assistant TextPart from the LLM output
-// and rebuilds it as a "Continue" user message + summary text.
-// Shared between doAutoSummarize and runSummarize.
-// Returns an error if the response has no assistant text.
-func (s *Session) buildSummary(response []llm.ContentPart, outputTokens int64) ([]llm.ContentPart, error) {
+	// The LLM response must end with assistant text. If it's empty, a tool
+	// call, reasoning, or empty text, summarization didn't produce a valid
+	// result — keep the original history.
+	response := fullContents[len(contents):]
 	if len(response) == 0 {
-		return nil, fmt.Errorf("summarization produced no content")
+		return contents, fmt.Errorf("summarization produced no content")
 	}
 	tp, ok := response[len(response)-1].(*llm.TextPart)
 	if !ok || tp.Role != llm.RoleAssistant || tp.Text == "" {
-		return nil, fmt.Errorf("summarization produced no text")
+		return contents, fmt.Errorf("summarization produced no text")
 	}
 
-	contents := make([]llm.ContentPart, 0, 2)
+	// Build the summarized conversation: a "Continue" user message
+	// followed by the summary text.
+	result := make([]llm.ContentPart, 0, 2)
 	continueID := s.histIncAndGet()
-	contents = append(contents, &llm.TextPart{
+	result = append(result, &llm.TextPart{
 		Text: "Continue",
 		ContentPartMeta: llm.ContentPartMeta{
 			HistoryID: continueID,
@@ -152,7 +100,7 @@ func (s *Session) buildSummary(response []llm.ContentPart, outputTokens int64) (
 		},
 	})
 	summaryID := s.histIncAndGet()
-	contents = append(contents, &llm.TextPart{
+	result = append(result, &llm.TextPart{
 		Text: tp.Text,
 		ContentPartMeta: llm.ContentPartMeta{
 			HistoryID: summaryID,
@@ -163,7 +111,26 @@ func (s *Session) buildSummary(response []llm.ContentPart, outputTokens int64) (
 		s.sendEvent(SetContextTokensEvent{Tokens: outputTokens})
 	}
 	s.writeNotify("Summarized conversation")
-	return contents, nil
+	return result, nil
+}
+
+// doAutoSummarize logs a notification and triggers summarization.
+// Called synchronously from runTask when the context is near
+// the token limit — must complete before the user's prompt is processed.
+func (s *Session) doAutoSummarize(ctx context.Context, contents []llm.ContentPart) []llm.ContentPart {
+	limit := s.ContextLimit
+	usage := float64(s.ContextTokens) * AutoSummarizePctBase / float64(limit)
+	s.writeNotifyf("Context usage at %d/%d tokens (%.0f%%). Auto-summarizing...",
+		s.ContextTokens, limit, usage)
+
+	s.summarizeBackup(contents)
+	s.writeNotify("Summarizing conversation...")
+
+	result, err := s.summarizeContents(ctx, contents)
+	if err != nil {
+		s.writeNotify(err.Error())
+	}
+	return result
 }
 
 // ============================================================================
@@ -423,6 +390,35 @@ func cleanIncompleteToolInputs(contents []llm.ContentPart) []llm.ContentPart {
 	return filtered
 }
 
+// ============================================================================
+// Task goroutines — runTask, runContinue, runSummarize
+//
+// These three functions are the entry points for task goroutines, each started
+// by handlePrompt / :continue / :summarize respectively. They all call
+// processPrompt (which blocks on the LLM) and therefore run in their own
+// goroutine to keep the main event loop responsive.
+//
+// Relationships:
+//
+//   runTask        — normal prompt. Appends user parts to history, calls
+//                    processPrompt. If the context was near the token limit,
+//                    it synchronously runs doAutoSummarize first to free space.
+//
+//   runContinue    — retry last prompt. If the last response was assistant
+//                    (canceled mid-stream), appends "Continue" and resends.
+//                    Otherwise (user/tool message), resends the history as-is.
+//
+//   runSummarize   — :summarize command. Calls summarizeContents which appends
+//                    the summarize prompt, calls processPrompt, then replaces
+//                    the conversation with a summary.
+//
+// The key difference: doAutoSummarize (called from runTask) is synchronous —
+// it must complete before the user's new prompt can be processed, because
+// it needs to free token space first. runSummarize runs as an independent
+// task goroutine because :summarize is an explicit user command, not a
+// precondition for another operation.
+// ============================================================================
+
 // runTask executes a prompt in its own goroutine.
 func (s *Session) runTask(ctx context.Context, taskContent []llm.ContentPart, parts []llm.ContentPart) {
 	contents := taskContent
@@ -431,7 +427,28 @@ func (s *Session) runTask(ctx context.Context, taskContent []llm.ContentPart, pa
 		s.taskResultCh <- contents
 	}()
 
-	contents, _ = s.handleUserPrompt(ctx, contents, parts)
+	if s.shouldAutoSummarize() {
+		contents = s.doAutoSummarize(ctx, contents)
+	}
+
+	// Assign history IDs, append to contents, and echo to output.
+	for _, part := range parts {
+		id := s.histIncAndGet()
+		part.SetHistoryID(id)
+		part.SetRole(llm.RoleUser)
+		contents = append(contents, part)
+		if tag, val, err := contentPartToTLV(part); err == nil && tag != "" {
+			s.writeTLV(tag, tlv.WrapID(strconv.FormatUint(id, 10), val))
+		}
+	}
+
+	fullContents, _, err := s.processPrompt(ctx, contents)
+	if err != nil {
+		s.writeError(err.Error())
+	}
+	if len(fullContents) > 0 {
+		contents = fullContents
+	}
 
 	if ctx.Err() == context.Canceled {
 		contents = s.appendCancelMessage(contents)
@@ -457,16 +474,21 @@ func (s *Session) runContinue(ctx context.Context, taskContent []llm.ContentPart
 	if lastPart.GetRole() == llm.RoleAssistant {
 		// Assistant message — LLM was interrupted mid-response.
 		// Append "Continue" as a user message to tell it to pick up where it left off.
-		contents, _ = s.handleUserPrompt(ctx, contents, []llm.ContentPart{
-			&llm.TextPart{Text: "Continue"},
-		})
-	} else {
-		// User or tool message — resend the conversation as-is.
-		s.writeNotify("Resending...")
-		fullContents, _, err := s.processPrompt(ctx, contents)
-		if err != nil {
-			s.writeError(err.Error())
+		part := &llm.TextPart{Text: "Continue"}
+		id := s.histIncAndGet()
+		part.SetHistoryID(id)
+		part.SetRole(llm.RoleUser)
+		contents = append(contents, part)
+		if tag, val, err := contentPartToTLV(part); err == nil && tag != "" {
+			s.writeTLV(tag, tlv.WrapID(strconv.FormatUint(id, 10), val))
 		}
+	}
+
+	fullContents, _, err := s.processPrompt(ctx, contents)
+	if err != nil {
+		s.writeError(err.Error())
+	}
+	if len(fullContents) > 0 {
 		contents = fullContents
 	}
 
@@ -487,30 +509,11 @@ func (s *Session) runSummarize(ctx context.Context, taskContent []llm.ContentPar
 	s.summarizeBackup(contents)
 	s.writeNotify("Summarizing conversation...")
 
-	beforeLen := len(contents)
-	promptPart := &llm.TextPart{Text: summarizePrompt}
-	id := s.histIncAndGet()
-	promptPart.SetHistoryID(id)
-	promptPart.SetRole(llm.RoleUser)
-	contents = append(contents, promptPart)
-	if tag, val, err := contentPartToTLV(promptPart); err == nil && tag != "" {
-		s.writeTLV(tag, tlv.WrapID(strconv.FormatUint(id, 10), val))
-	}
-
-	fullContents, outputTokens, err := s.processPrompt(ctx, contents)
+	contents, err := s.summarizeContents(ctx, contents)
 	if err != nil {
 		s.writeError(err.Error())
-		contents = contents[:beforeLen]
 		return
 	}
-
-	result, err := s.buildSummary(fullContents[beforeLen:], outputTokens)
-	if err != nil {
-		s.writeNotify(err.Error())
-		contents = contents[:beforeLen]
-		return
-	}
-	contents = result
 
 	if ctx.Err() == context.Canceled {
 		contents = s.appendCancelMessage(contents)
