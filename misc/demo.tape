@@ -37,12 +37,9 @@ Sleep 1s
 
 Ctrl+L
 Sleep 1s
-Type "j"
-Sleep 500ms
-Type "k"
-Sleep 500ms
-Type "q"
-Sleep 500ms
+Type "deepflash"
+Sleep 1s
+Enter
 
 # ── Task ────────────────────────────────────────────────────────────
 
@@ -53,9 +50,7 @@ Sleep 5s
 # ── Choose Theme ────────────────────────────────────────────────────
 Ctrl+P
 Sleep 1s
-Type "j"
-Sleep 200ms
-Type "j"
+Type "panda"
 Sleep 1s
 Enter
 
@@ -73,9 +68,7 @@ Sleep 500ms
 # ── Restore Theme ────────────────────────────────────────────────────
 Ctrl+P
 Sleep 500ms
-Type "k"
-Sleep 200ms
-Type "k"
+Type "dark"
 Sleep 500ms
 Enter
 

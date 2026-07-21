@@ -73,24 +73,21 @@ func (m Terminal) handleKeyMsg(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 
 // handleThemeSelectorKeys handles input when theme selector is open.
 func (m Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (Terminal, tea.Cmd) {
-	// Check if it's a reload request
-	if msg.String() == keyR && m.themeManager != nil {
-		m.themeManager.ReloadThemes()
-		ts := m.themeSelector.Open(m.themeManager.GetThemes(), m.activeTheme, m.themeManager)
-		m.themeSelector = ts
-		return m, nil
-	}
-
 	wasOpen := m.themeSelector.IsOpen()
 
 	ts, cmd := m.themeSelector.Update(msg)
 	m.themeSelector = ts
 
-	// If closed without selection, restore original theme
+	// If closed without selection, restore original theme from cached data.
 	if wasOpen && !ts.IsOpen() {
 		originalThemeName := ts.GetOriginalThemeName()
-		originalTheme := m.themeManager.LoadTheme(originalThemeName)
-		m = m.applyTheme(originalTheme)
+		snap := m.out.SnapshotStatus()
+		for _, t := range snap.CachedThemes {
+			if t.Name == originalThemeName && t.Theme != nil {
+				m = m.applyTheme(t.Theme)
+				break
+			}
+		}
 		m = m.restoreFocus()
 		return m, cmd
 	}

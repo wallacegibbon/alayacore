@@ -23,29 +23,6 @@ func NewThemeManager(themesFolder string) *ThemeManager {
 	return &ThemeManager{inner: inner, ec: ec}
 }
 
-// ReloadThemes reloads the list of available themes.
-func (tm *ThemeManager) ReloadThemes() {
-	tm.inner.ReloadThemes()
-}
-
-func (tm *ThemeManager) GetThemes() []theme.Info {
-	return tm.inner.GetThemes()
-}
-
-func (tm *ThemeManager) GetThemesFolder() string {
-	return tm.inner.GetThemesFolder()
-}
-
-// LoadTheme loads a theme by name, falling back to default on failure.
-func (tm *ThemeManager) LoadTheme(name string) *theme.Theme {
-	return tm.inner.LoadTheme(name)
-}
-
-// ThemeExists checks if a theme with the given name exists.
-func (tm *ThemeManager) ThemeExists(name string) bool {
-	return tm.inner.ThemeExists(name)
-}
-
 // GetInitErrors returns all collected init errors and clears the buffer.
 func (tm *ThemeManager) GetInitErrors() []InitError {
 	// Merge theme.Manager parse errors into the init error collector.

@@ -11,18 +11,20 @@ func TestThemeSelectorCancelRestoresOriginalTheme(t *testing.T) {
 	styles := NewStyles(theme.DefaultTheme())
 	ts := NewThemeSelector(styles)
 
-	themes := []theme.Info{
-		{Name: "theme-dark", Path: "/path/to/theme-dark.conf"},
-		{Name: "theme-light", Path: "/path/to/theme-light.conf"},
-		{Name: "theme-custom", Path: "/path/to/theme-custom.conf"},
+	themes := []ThemeEntry{
+		{Name: "theme-dark"},
+		{Name: "theme-light"},
+		{Name: "theme-custom"},
 	}
 
-	ts = ts.Open(themes, "theme-dark", nil)
+	ts = ts.Open(themes, "theme-dark")
 
 	if ts.GetOriginalThemeName() != "theme-dark" {
 		t.Errorf("Expected original theme 'theme-dark', got '%s'", ts.GetOriginalThemeName())
 	}
 
+	// Tab to switch focus from filter to list, then navigate down.
+	ts, _ = ts.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
 	ts, _ = ts.Update(tea.KeyPressMsg(tea.Key{Code: 'j'}))
 
 	selected := ts.GetSelectedTheme()
@@ -44,13 +46,15 @@ func TestThemeSelectorEnterSavesTheme(t *testing.T) {
 	styles := NewStyles(theme.DefaultTheme())
 	ts := NewThemeSelector(styles)
 
-	themes := []theme.Info{
-		{Name: "theme-dark", Path: "/path/to/theme-dark.conf"},
-		{Name: "theme-light", Path: "/path/to/theme-light.conf"},
+	themes := []ThemeEntry{
+		{Name: "theme-dark"},
+		{Name: "theme-light"},
 	}
 
-	ts = ts.Open(themes, "theme-dark", nil)
+	ts = ts.Open(themes, "theme-dark")
 
+	// Tab to switch focus from filter to list, then navigate down.
+	ts, _ = ts.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
 	ts, _ = ts.Update(tea.KeyPressMsg(tea.Key{Code: 'j'}))
 
 	ts, _ = ts.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))

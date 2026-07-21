@@ -40,6 +40,9 @@ type StatusSnapshot struct {
 	MCPStatus  string
 	MCPServer  string   // current server being connected/authorized
 	MCPServers []string // full list of servers currently being initialized
+
+	// CachedThemes holds the full list of themes received from the session.
+	CachedThemes []ThemeEntry
 }
 
 // ModelSnapshot holds a consistent point-in-time view of model state.

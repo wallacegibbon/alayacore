@@ -292,6 +292,7 @@ func (s *sessionState) snapshotStatus() StatusSnapshot {
 		MCPStatus:       s.mcpStatus,
 		MCPServer:       s.mcpServer,
 		MCPServers:      append([]string(nil), s.mcpServers...),
+		CachedThemes:    append([]ThemeEntry(nil), s.cachedThemeList...),
 	}
 }
 

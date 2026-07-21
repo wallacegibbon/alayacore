@@ -410,7 +410,10 @@ func (hw HelpWindow) View() tea.View {
 	}
 	helpBar := helpStyle.Render(fmt.Sprintf("%-*s", hw.Width, help))
 
-	return tea.NewView(title + "\n" + filterBox + "\n" + listBox + "\n" + helpBar)
+	countStr := fmt.Sprintf("%d items", hw.filteredLen())
+	infoLine := hw.Styles.System.Render(countStr)
+
+	return tea.NewView(title + "\n" + filterBox + "\n" + infoLine + "\n" + listBox + "\n" + helpBar)
 }
 
 func (hw HelpWindow) renderItem(item HelpItem, selected bool) string {

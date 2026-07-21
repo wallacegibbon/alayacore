@@ -692,9 +692,6 @@ func (m Terminal) syncThemeFromSession(sessionTheme string, themeData *theme.The
 	}
 	if themeData != nil {
 		m = m.applyTheme(themeData)
-	} else if m.themeManager != nil {
-		t := m.themeManager.LoadTheme(sessionTheme)
-		m = m.applyTheme(t)
 	}
 	m.appliedTheme = sessionTheme
 	return m

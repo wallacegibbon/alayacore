@@ -446,13 +446,6 @@ func (aw AttachmentWindow) render() string {
 	sb.WriteString(titleStyle.Render(fmt.Sprintf("%-*s", aw.Width, "  Attachments")))
 	sb.WriteString("\n")
 
-	modeText := "Local"
-	if aw.mode == modeURL {
-		modeText = "URL"
-	}
-	sb.WriteString(aw.Styles.System.Render(fmt.Sprintf("  Mode: %s  (Ctrl+A to switch)", modeText)))
-	sb.WriteString("\n")
-
 	searchBox := aw.Styles.RenderBorderedBox(aw.FilterInput.View(), aw.Width, aw.FilterBorderColor())
 	sb.WriteString(searchBox)
 	sb.WriteString("\n")
@@ -460,7 +453,7 @@ func (aw AttachmentWindow) render() string {
 	boxWidth := lipgloss.Width(searchBox)
 
 	if aw.mode == modeURL {
-		aw.renderURLBody(&sb)
+		aw.renderURLBody(&sb, boxWidth)
 	} else {
 		aw.renderLocalBody(&sb, boxWidth)
 	}
@@ -481,9 +474,10 @@ func (aw AttachmentWindow) render() string {
 	return sb.String()
 }
 
-func (aw AttachmentWindow) renderURLBody(sb *strings.Builder) {
-	sb.WriteString(aw.Styles.System.Render("  Enter a URL to attach (e.g. https://example.com/image.jpg)"))
-	sb.WriteString("\n")
+func (aw AttachmentWindow) renderURLBody(sb *strings.Builder, _ int) {
+	sb.WriteString(aw.Styles.System.Render("Enter a URL to attach (e.g. https://example.com/image.jpg)"))
+	// Pad to match local mode height (currentDir + file list box).
+	sb.WriteString(strings.Repeat("\n", 10))
 }
 
 func (aw AttachmentWindow) renderLocalBody(sb *strings.Builder, boxWidth int) {

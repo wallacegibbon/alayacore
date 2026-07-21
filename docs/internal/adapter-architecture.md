@@ -59,8 +59,8 @@ The session persists the active theme via `RuntimeManager` and communicates it t
 Theme changes flow through the session to keep a single source of truth:
 
 1. `:theme_set <name>` (typed by user) or theme selector confirm both send the command to the session
-2. Session persists the theme name via `RuntimeManager.SetActiveTheme()` and broadcasts the updated theme via a `TagSystemMsg` TLV message (`{"type":"theme","data":{"name":"..."}}`)
-3. The terminal detects the theme change in `updateStatus()` and calls `applyTheme()` to load the theme file and update all UI component styles
+2. Session persists the theme name via `RuntimeManager.SetActiveTheme()` and broadcasts the updated theme via a `TagSystemMsg` TLV message (`{"type":"theme","data":{"name":"...","theme":{...}}}`)
+3. The terminal detects the theme change in `updateStatus()` and calls `applyTheme()` with the full theme data from the TLV message, updating all UI component styles
 
 This ensures both paths converge: the theme selector's live preview still applies themes directly for responsiveness, but the final commit always goes through the session.
 

@@ -1,11 +1,12 @@
 package terminal
 
 // ThemeSelector provides a UI for selecting themes from a theme folder.
-// It displays a list of available themes and allows the user to preview
-// and select themes in real-time.
+// It displays a searchable list of available themes and allows the user
+// to preview and select themes in real-time.
 
 import (
 	"fmt"
+	"image/color"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -20,28 +21,30 @@ import (
 // Field groups:
 //
 //	Elm UI state  — value types / primitives (copied on every WithXxx).
-//	Dependencies  — pointers to shared services (ThemeManager).
+//	Dependencies  — pointers to shared styles.
 type ThemeSelector struct {
-	ScrollableListCore
+	FilteredListCore
 
 	// ── Elm UI state (value types, copied on every WithXxx) ─
-	themes            []theme.Info
+	themes            []ThemeEntry
+	filteredThemes    []ThemeEntry
 	previewTheme      *theme.Theme // preview theme (nil = no preview)
 	previewThemeName  string
 	originalThemeName string // theme name when opened (for cancel)
-
-	// ── Dependencies (pointer to shared service) ─
-	themeManager *ThemeManager // for loading preview themes
 }
 
 // NewThemeSelector creates a new theme selector.
 func NewThemeSelector(styles *Styles) ThemeSelector {
+	input := newFilterInput("Search themes...")
 	ts := ThemeSelector{
-		themes: []theme.Info{},
+		themes:         []ThemeEntry{},
+		filteredThemes: []ThemeEntry{},
 	}
 	ts.Width = 60
 	ts.Height = 20
 	ts.HasFocus = true
+	ts.FilterInput = input
+	ts.lastFilterValue = "\x00"
 	ts.Styles = styles
 	return ts
 }
@@ -49,62 +52,73 @@ func NewThemeSelector(styles *Styles) ThemeSelector {
 // --- State Management ---
 
 func (ts ThemeSelector) WithSize(width, height int) ThemeSelector {
-	ts.ScrollableListCore = ts.ScrollableListCore.WithSize(width, height)
+	ts.FilteredListCore = ts.FilteredListCore.WithSize(width, height)
 	return ts
 }
 
 func (ts ThemeSelector) WithStyles(styles *Styles) ThemeSelector {
-	ts.ScrollableListCore = ts.ScrollableListCore.WithStyles(styles)
+	ts.FilteredListCore = ts.FilteredListCore.WithStyles(styles)
 	return ts
 }
 
 func (ts ThemeSelector) WithFocus(focused bool) ThemeSelector {
-	ts.ScrollableListCore = ts.ScrollableListCore.WithFocus(focused)
+	ts.FilteredListCore = ts.FilteredListCore.WithFocus(focused)
 	return ts
 }
 
-func (ts ThemeSelector) Open(themes []theme.Info, activeTheme string, themeManager *ThemeManager) ThemeSelector {
+func (ts ThemeSelector) Open(themes []ThemeEntry, activeTheme string) ThemeSelector {
 	ts.themes = themes
-	ts.themeManager = themeManager
-	ts.State = ScrollableListOpen
+	ts.State = FilteredListOpen
+	ts.FilterInput = ts.FilterInput.WithValue("")
+	ts.lastFilterValue = "\x00"
+	ts.FilterInputFocused = true
+	ts.FilterInput = ts.FilterInput.Focus()
+	ts.FilteredListCore = ts.FilteredListCore.updateFilterInputStyles()
 	ts.ScrollIdx = 0
 	ts.SelectedIdx = 0
 	ts.originalThemeName = activeTheme
 	ts.previewTheme = nil
 	ts.previewThemeName = ""
 
-	for i, t := range ts.themes {
-		if t.Name == activeTheme {
-			ts.SelectedIdx = i
-			break
-		}
-	}
-
-	ts.ScrollableListCore = ts.EnsureVisible()
+	ts = ts.updateFilteredThemes()
+	ts = ts.selectThemeByName(activeTheme)
 	return ts
 }
 
 func (ts ThemeSelector) Close() ThemeSelector {
-	ts.State = ScrollableListClosed
+	ts.State = FilteredListClosed
 	ts.previewTheme = nil
 	ts.previewThemeName = ""
 	return ts
 }
 
+// selectThemeByName sets the selection to the theme with the given name.
+func (ts ThemeSelector) selectThemeByName(name string) ThemeSelector {
+	if name == "" {
+		return ts
+	}
+	for i, t := range ts.filteredThemes {
+		if t.Name == name {
+			ts.SelectedIdx = i
+			ts.FilteredListCore = ts.FilteredListCore.EnsureVisible()
+			break
+		}
+	}
+	return ts
+}
+
 // --- Theme Management ---
 
-func (ts ThemeSelector) GetSelectedTheme() *theme.Info {
-	if len(ts.themes) == 0 || ts.SelectedIdx < 0 || ts.SelectedIdx >= len(ts.themes) {
+func (ts ThemeSelector) GetSelectedTheme() *ThemeEntry {
+	if len(ts.filteredThemes) == 0 || ts.SelectedIdx < 0 || ts.SelectedIdx >= len(ts.filteredThemes) {
 		return nil
 	}
-	return &ts.themes[ts.SelectedIdx]
+	return &ts.filteredThemes[ts.SelectedIdx]
 }
 
 func (ts ThemeSelector) GetPreviewTheme() *theme.Theme {
 	return ts.previewTheme
 }
-
-// ThemeSelectorUpdate captures the outcome of a HandleKeyMsg call.
 
 func (ts ThemeSelector) GetOriginalThemeName() string {
 	return ts.originalThemeName
@@ -115,7 +129,7 @@ func (ts ThemeSelector) GetOriginalThemeName() string {
 func (ts ThemeSelector) Init() tea.Cmd { return nil }
 
 func (ts ThemeSelector) View() tea.View {
-	if ts.State == ScrollableListClosed {
+	if ts.State == FilteredListClosed {
 		return tea.NewView("")
 	}
 	return tea.NewView(ts.renderList())
@@ -123,8 +137,9 @@ func (ts ThemeSelector) View() tea.View {
 
 // --- Key Handling ---
 
+//nolint:gocyclo
 func (ts ThemeSelector) Update(msg tea.Msg) (ThemeSelector, tea.Cmd) {
-	if ts.State == ScrollableListClosed {
+	if ts.State == FilteredListClosed {
 		return ts, nil
 	}
 
@@ -132,59 +147,111 @@ func (ts ThemeSelector) Update(msg tea.Msg) (ThemeSelector, tea.Cmd) {
 	if !ok {
 		return ts, nil
 	}
-	keyStr := keyMsg.String()
+	key := keyMsg.String()
 
-	// Handle 'r' for reload
-	if keyStr == keyR {
-		return ts, nil
-	}
+	fl, result := ts.FilteredListCore.HandleKey(keyMsg)
+	ts.FilteredListCore = fl
 
-	// Handle navigation and close via base type
-	ts.ScrollableListCore = ts.ScrollableListCore.WithItemsLen(len(ts.themes))
-	sl, result := ts.ScrollableListCore.HandleKey(keyMsg)
-	ts.ScrollableListCore = sl
 	if result.Handled {
-		if result.IsClose {
-			ts = ts.Close()
-			return ts, func() tea.Msg { return OverlayClosedMsg{} }
+		// Close overlay.
+		if !fl.FilterInputFocused && (key == keyQ || key == keyEsc) {
+			return ts.Close(), func() tea.Msg { return OverlayClosedMsg{} }
 		}
-		// Navigated — load preview theme
-		ts = ts.loadPreviewTheme()
+
+		// Enter on list: select theme.
+		if key == keyEnter && !fl.FilterInputFocused {
+			if sel := ts.GetSelectedTheme(); sel != nil {
+				ts = ts.loadPreviewTheme()
+				ts.State = FilteredListClosed
+				return ts, func() tea.Msg { return ThemeSelectedMsg{Name: sel.Name} }
+			}
+		}
+
+		// Enter on filter: select first matched theme.
+		if key == keyEnter && fl.FilterInputFocused && len(ts.filteredThemes) > 0 {
+			ts.SelectedIdx = 0
+			sel := ts.filteredThemes[0]
+			ts = ts.loadPreviewTheme()
+			ts.State = FilteredListClosed
+			return ts, func() tea.Msg { return ThemeSelectedMsg{Name: sel.Name} }
+		}
+
+		// Filter changed: update filtered list.
+		if result.FilterChanged && ts.FilterInputFocused {
+			ts = ts.updateFilteredThemes()
+		}
+
+		// List navigation: load preview.
+		if !ts.FilterInputFocused {
+			ts = ts.handleListKeys(key)
+		}
+
 		return ts, nil
 	}
 
-	// Handle Enter for selection
-	if keyStr == keyEnter {
-		if len(ts.themes) > 0 && ts.SelectedIdx >= 0 {
-			ts.State = ScrollableListClosed
+	if !ts.FilterInputFocused {
+		ts = ts.handleListKeys(key)
+	}
+	return ts, nil
+}
+
+func (ts ThemeSelector) handleListKeys(key string) ThemeSelector {
+	switch key {
+	case keyJ, keyDown:
+		if ts.SelectedIdx < len(ts.filteredThemes)-1 {
+			ts.SelectedIdx++
 			ts = ts.loadPreviewTheme()
-			selectedName := ts.themes[ts.SelectedIdx].Name
-			return ts, func() tea.Msg {
-				return ThemeSelectedMsg{Name: selectedName}
+		}
+	case keyK, keyUp:
+		if ts.SelectedIdx > 0 {
+			ts.SelectedIdx--
+			ts = ts.loadPreviewTheme()
+		}
+	}
+	return ts
+}
+
+func (ts ThemeSelector) loadPreviewTheme() ThemeSelector {
+	if len(ts.filteredThemes) == 0 || ts.SelectedIdx < 0 || ts.SelectedIdx >= len(ts.filteredThemes) {
+		return ts
+	}
+
+	entry := ts.filteredThemes[ts.SelectedIdx]
+	if entry.Name == ts.previewThemeName && ts.previewTheme != nil {
+		return ts
+	}
+
+	ts.previewTheme = entry.Theme
+	ts.previewThemeName = entry.Name
+	return ts
+}
+
+// --- Filtering ---
+
+func (ts ThemeSelector) updateFilteredThemes() ThemeSelector {
+	search := ts.FilterInput.Value()
+	if search == ts.lastFilterValue {
+		return ts
+	}
+	ts.lastFilterValue = search
+
+	if search == "" {
+		ts.filteredThemes = make([]ThemeEntry, len(ts.themes))
+		copy(ts.filteredThemes, ts.themes)
+	} else {
+		term := strings.ToLower(search)
+		ts.filteredThemes = ts.filteredThemes[:0]
+		for _, t := range ts.themes {
+			if FuzzyMatch(term, strings.ToLower(t.Name)) {
+				ts.filteredThemes = append(ts.filteredThemes, t)
 			}
 		}
 	}
 
-	return ts, nil
-}
-
-func (ts ThemeSelector) loadPreviewTheme() ThemeSelector {
-	if ts.themeManager == nil {
-		return ts
-	}
-
-	if len(ts.themes) == 0 || ts.SelectedIdx < 0 || ts.SelectedIdx >= len(ts.themes) {
-		return ts
-	}
-
-	themeName := ts.themes[ts.SelectedIdx].Name
-	if themeName == ts.previewThemeName && ts.previewTheme != nil {
-		return ts
-	}
-
-	ts.previewTheme = ts.themeManager.LoadTheme(themeName)
-	ts.previewThemeName = themeName
-	return ts
+	ts.SelectedIdx = 0
+	ts.ScrollIdx = 0
+	ts.FilteredListCore = ts.FilteredListCore.ClampSelection(len(ts.filteredThemes))
+	return ts.loadPreviewTheme()
 }
 
 // --- Rendering ---
@@ -196,42 +263,70 @@ func (ts ThemeSelector) renderList() string {
 	sb.WriteString(titleStyle.Render(fmt.Sprintf("%-*s", ts.Width, "  Theme Selector")))
 	sb.WriteString("\n")
 
-	listHeight := SelectorListRows
-	innerWidth := max(0, ts.Width-BorderInnerPadding)
-	var lines []string
+	filterBox := ts.Styles.RenderBorderedBox(ts.FilterInput.View(), ts.Width, ts.FilterBorderColor())
+	sb.WriteString(filterBox)
+	sb.WriteString("\n")
 
-	ts.ScrollableListCore = ts.ScrollableListCore.EnsureVisible()
-	for i := ts.ScrollIdx; i < min(ts.ScrollIdx+listHeight, len(ts.themes)); i++ {
-		t := ts.themes[i]
-		nameMaxWidth := max(0, innerWidth-2)
-		themeName := t.Name
-		if nameMaxWidth > 0 {
-			themeName = truncateWithSuffix(themeName, nameMaxWidth)
-		}
-		if i == ts.SelectedIdx {
-			lines = append(lines, ts.Styles.Prompt.Render("> ")+ts.Styles.Text.Render(themeName))
-		} else {
-			lines = append(lines, ts.Styles.System.Render("  "+themeName))
-		}
-	}
-	for len(lines) < listHeight {
-		lines = append(lines, "")
-	}
+	sb.WriteString(ts.Styles.System.Render("Current: "))
+	sb.WriteString(ts.Styles.Text.Render(ts.originalThemeName))
+	sb.WriteString("\n")
 
-	content := strings.Join(lines, "\n")
-	borderColor := ts.ListBorderColor()
-	sb.WriteString(ts.Styles.RenderBorderedBox(content, ts.Width, borderColor, listHeight))
+	listBorderColor := ts.ListBorderColor()
+	sb.WriteString(ts.renderThemeList(lipgloss.Width(filterBox), listBorderColor))
 
 	helpStyle := lipgloss.NewStyle().Background(ts.Styles.ColorDim).Foreground(ts.Styles.ColorMuted)
+	var help string
+	if ts.FilterInputFocused {
+		help = "  tab: list │ enter: select │ esc: close"
+	} else {
+		help = "  tab: search │ j/k: navigate │ enter: select │ q/esc: close"
+	}
 	sb.WriteString("\n")
-	sb.WriteString(helpStyle.Render(fmt.Sprintf("%-*s", ts.Width, "  j/k: navigate │ r: reload │ enter: select │ q/esc: close")))
+	sb.WriteString(helpStyle.Render(fmt.Sprintf("%-*s", ts.Width, help)))
 
 	return sb.String()
 }
 
+func (ts ThemeSelector) renderThemeList(width int, borderColor color.Color) string {
+	var content strings.Builder
+	listHeight := SelectorListRows
+	innerWidth := max(0, width-BorderInnerPadding)
+
+	switch {
+	case len(ts.filteredThemes) == 0:
+		content.WriteString(ts.Styles.System.Render("No themes match your search."))
+	default:
+		// Ensure selected item is visible.
+		if ts.SelectedIdx < ts.ScrollIdx {
+			ts.ScrollIdx = ts.SelectedIdx
+		} else if ts.SelectedIdx >= ts.ScrollIdx+listHeight {
+			ts.ScrollIdx = ts.SelectedIdx - listHeight + 1
+		}
+		for i := ts.ScrollIdx; i < min(ts.ScrollIdx+listHeight, len(ts.filteredThemes)); i++ {
+			t := ts.filteredThemes[i]
+			nameMaxWidth := max(0, innerWidth-2)
+			themeName := t.Name
+			if nameMaxWidth > 0 {
+				themeName = truncateWithSuffix(themeName, nameMaxWidth)
+			}
+			if i == ts.SelectedIdx {
+				content.WriteString(ts.Styles.Prompt.Render("> "))
+				content.WriteString(ts.Styles.Text.Render(themeName))
+			} else {
+				content.WriteString(ts.Styles.System.Render("  " + themeName))
+			}
+			if i < min(ts.ScrollIdx+listHeight, len(ts.filteredThemes))-1 {
+				content.WriteString("\n")
+			}
+		}
+	}
+
+	return ts.Styles.RenderBorderedBox(content.String(), width, borderColor, listHeight)
+}
+
 // RenderOverlay renders the theme selector as an overlay on top of base content.
 func (ts ThemeSelector) RenderOverlay(baseContent string, screenWidth, screenHeight int) string {
-	if ts.State == ScrollableListClosed {
+	if ts.State == FilteredListClosed {
 		return baseContent
 	}
 	return renderOverlay(baseContent, ts.View().Content, screenWidth, screenHeight, 0)

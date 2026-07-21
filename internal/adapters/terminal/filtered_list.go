@@ -1,7 +1,7 @@
 package terminal
 
 // FilteredListCore provides shared filtering, navigation, and overlay rendering
-// for selector-style UI components (ModelSelector, HelpWindow).
+// for selector-style UI components (ModelSelector, HelpWindow, ThemeSelector).
 //
 // Both components follow the same pattern:
 //   - Text input for filtering
@@ -103,12 +103,6 @@ func (fl FilteredListCore) HandleTabKey() FilteredListCore {
 		fl.FilterInput = fl.FilterInput.Blur()
 	}
 	return fl.updateFilterInputStyles()
-}
-
-// HandleFilterEscape handles the escape key when the filter input is focused.
-func (fl FilteredListCore) HandleFilterEscape() FilteredListCore {
-	fl.State = FilteredListClosed
-	return fl
 }
 
 // HandleFilterCtrlC clears the filter input value.

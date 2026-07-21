@@ -67,13 +67,12 @@ Terminal (value type, root model)
 │   └── InputField        Update(msg tea.Msg) → (InputField,       tea.Cmd)
 │
 ├── Code reuse units (pure functions, no tea.Cmd):
-│   ├── FilteredListCore  HandleKey(msg tea.KeyMsg) → (Self, FilteredListResult)
-│   └── ScrollableListCore HandleKey(msg tea.KeyMsg) → (Self, ScrollableListResult)
+│   └── FilteredListCore  HandleKey(msg tea.KeyMsg) → (Self, FilteredListResult)
 │
 └── External systems (via interfaces/pointers):
     ├── out         OutputWriter    (session output, shared mutable)
     ├── streamInput io.WriteCloser  (TLV pipe to session)
-    └── themeManager *ThemeManager  (theme file cache)
+    └── themeManager *ThemeManager  (theme load errors at startup)
 
 ```
 
@@ -84,7 +83,7 @@ Terminal (value type, root model)
 - Communicate with Terminal via messages (ThemeSelectedMsg, etc.)
 - All have `Update(msg tea.Msg) → (Self, tea.Cmd)`
 
-### Code Reuse Units (FilteredListCore, ScrollableListCore)
+### Code Reuse Units (FilteredListCore)
 - Cannot exist independently — embedded into components
 - Have `HandleKey(msg tea.KeyMsg) → (Self, Result)` — no tea.Cmd
 - Used for continuous UI operations (scrolling, filtering) where
