@@ -83,7 +83,7 @@ func TestWindowBuffer(t *testing.T) {
 
 	t.Run("get all returns empty for empty buffer", func(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
-		content := wb.GetAll(-1)
+		content := wb.GetAll(-1, false)
 		if content != "" {
 			t.Errorf("GetAll() = %q, want empty", content)
 		}
@@ -92,7 +92,7 @@ func TestWindowBuffer(t *testing.T) {
 	t.Run("get all returns content", func(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
 		wb.AppendOrUpdate(tlv.TagAssistantT, "window-1", "Hello")
-		content := wb.GetAll(-1)
+		content := wb.GetAll(-1, false)
 		if content == "" {
 			t.Error("GetAll() should not be empty")
 		}
@@ -165,7 +165,7 @@ func TestWindowBufferDiff(t *testing.T) {
 		}
 
 		// Render and check that it folds
-		rendered := wb.GetAll(-1)
+		rendered := wb.GetAll(-1, false)
 		renderedLines := strings.Split(rendered, "\n")
 
 		// Should fold to ~5 lines of content (header + first + separator + last 3)
@@ -201,7 +201,7 @@ func TestWindowBufferDiff(t *testing.T) {
 		wb.ToggleFold(0)
 
 		// Render and check that it shows all lines
-		rendered := wb.GetAll(-1)
+		rendered := wb.GetAll(-1, false)
 
 		// Should show all 10 lines with - prefix
 		removeCount := strings.Count(rendered, "- ")
@@ -227,7 +227,7 @@ func TestWindowBufferDiff(t *testing.T) {
 		// Unfold to see all lines
 		wb.ToggleFold(0)
 
-		rendered := wb.GetAll(-1)
+		rendered := wb.GetAll(-1, false)
 
 		// Check that unchanged lines have space prefix
 		if !strings.Contains(rendered, "  unchanged line 1") {
@@ -273,7 +273,7 @@ func TestWindowBufferDiff(t *testing.T) {
 		wb.HandleToolInputEvent(protocol.ToolInputData{ID: "diff-1", Name: "edit_file", Input: json.RawMessage(content.String())}, 0)
 
 		// First render - should be folded (Folded=true)
-		rendered1 := wb.GetAll(-1)
+		rendered1 := wb.GetAll(-1, false)
 		removeCount1 := strings.Count(rendered1, "- ")
 		if removeCount1 >= 10 {
 			t.Errorf("Folded diff should fold lines, found %d - prefixes", removeCount1)
@@ -283,7 +283,7 @@ func TestWindowBufferDiff(t *testing.T) {
 		wb.ToggleFold(0)
 
 		// Second render - should be expanded (Folded=false)
-		rendered2 := wb.GetAll(-1)
+		rendered2 := wb.GetAll(-1, false)
 		removeCount2 := strings.Count(rendered2, "- ")
 		if removeCount2 != 20 {
 			t.Errorf("Unfolded diff should show all 20 lines with - prefix, found %d", removeCount2)
@@ -293,7 +293,7 @@ func TestWindowBufferDiff(t *testing.T) {
 		wb.ToggleFold(0)
 
 		// Third render - should be folded again
-		rendered3 := wb.GetAll(-1)
+		rendered3 := wb.GetAll(-1, false)
 		removeCount3 := strings.Count(rendered3, "- ")
 		if removeCount3 >= 10 {
 			t.Errorf("Re-folded diff should fold lines again, found %d - prefixes", removeCount3)
@@ -430,7 +430,7 @@ func TestWindowBufferVisibility(t *testing.T) {
 		wb.AppendOrUpdate(tlv.TagAssistantT, "delta-3", "  ")    // Not visible
 		wb.AppendOrUpdate(tlv.TagAssistantT, "delta-4", "World") // Visible
 
-		rendered := wb.GetAll(-1)
+		rendered := wb.GetAll(-1, false)
 
 		// Should contain Hello and World, but not placeholders for invisible windows
 		if !strings.Contains(rendered, "Hello") {
@@ -461,7 +461,7 @@ func TestWindowBufferVisibility(t *testing.T) {
 		}
 
 		// The invisible window should have 0 line height
-		wb.ensureLineHeights()
+		wb.ensureLineHeights(false)
 		if wb.lineHeights[1] != 0 {
 			t.Errorf("Invisible window lineHeight = %d, want 0", wb.lineHeights[1])
 		}

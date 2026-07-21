@@ -64,6 +64,7 @@ type borderCache struct {
 	valid     bool
 	width     int
 	folded    bool
+	blocked   bool   // cached blocked state (different → cache miss)
 	rendered  string // full output with border
 	inner     string // inner content (for cursor border swap)
 	lineCount int
@@ -270,18 +271,32 @@ func (w *Window) RawDelta() string {
 }
 
 // Render returns the window with border, using cache if valid.
-func (w *Window) Render(width int, isCursor bool, styles *Styles, borderStyle, cursorStyle lipgloss.Style) string {
+// When blocked is true, the content is rendered with dimmed colors.
+func (w *Window) Render(width int, isCursor bool, styles *Styles, borderStyle, cursorStyle lipgloss.Style, blocked bool) string {
 	// User messages use the same border color as focused input box
 	if _, ok := w.renderer.(*userRenderer); ok {
 		borderStyle = borderStyle.BorderForeground(styles.BorderFocused)
 	}
 
 	// Validate cache
-	if w.border.valid && w.border.width == width && w.border.folded == w.Folded {
+	if w.border.valid && w.border.width == width && w.border.folded == w.Folded && w.border.blocked == blocked {
 		if isCursor {
 			return cursorStyle.Width(width).Render(w.border.inner)
 		}
 		return w.border.rendered
+	}
+
+	// Invalidate renderer cache when blocked state changes, so BuildInner
+	// does a full re-styled render with the new (dimmed or normal) styles.
+	if w.border.valid && w.border.blocked != blocked && w.renderer != nil {
+		w.renderer.Invalidate()
+	}
+
+	// Use dimmed styles and border when blocked
+	if blocked {
+		styles = styles.Dimmed()
+		borderStyle = borderStyle.BorderForeground(styles.ColorDim)
+		cursorStyle = cursorStyle.BorderForeground(styles.ColorDim)
 	}
 
 	// Cache miss — rebuild from renderer
@@ -298,6 +313,7 @@ func (w *Window) Render(width int, isCursor bool, styles *Styles, borderStyle, c
 	w.border.lineCount = lineCount
 	w.border.width = width
 	w.border.folded = w.Folded
+	w.border.blocked = blocked
 	w.border.valid = true
 
 	if isCursor {

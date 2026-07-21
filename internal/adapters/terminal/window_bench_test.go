@@ -7,6 +7,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 
+	"github.com/alayacore/alayacore/internal/protocol"
 	"github.com/alayacore/alayacore/internal/theme"
 )
 
@@ -130,7 +131,7 @@ func BenchmarkWindowBufferGetAll(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = wb.GetAll(-1)
+		_ = wb.GetAll(-1, false)
 	}
 }
 
@@ -160,7 +161,7 @@ func BenchmarkWindowBufferDeltaWithGetAll(b *testing.B) {
 
 		// Full render cycle
 		_ = wb.GetTotalLines()
-		_ = wb.GetAll(-1)
+		_ = wb.GetAll(-1, false)
 	}
 }
 
@@ -254,14 +255,14 @@ func BenchmarkStreamingUpdateWithIncremental(b *testing.B) {
 
 	// Pre-render to populate wrappedLines cache
 	_ = wb.GetTotalLines()
-	_ = wb.GetAll(-1)
+	_ = wb.GetAll(-1, false)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Simulate streaming delta - this should use incremental wrapping
 		wb.AppendOrUpdate("AT", historyID, " more")
 		_ = wb.GetTotalLines()
-		_ = wb.GetAll(-1)
+		_ = wb.GetAll(-1, false)
 	}
 }
 
@@ -285,7 +286,7 @@ func BenchmarkStreamingUpdateWithoutIncremental(b *testing.B) {
 	historyID := "stream-current"
 	wb.AppendOrUpdate("AT", historyID, "Starting...")
 	_ = wb.GetTotalLines()
-	_ = wb.GetAll(-1)
+	_ = wb.GetAll(-1, false)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -298,7 +299,7 @@ func BenchmarkStreamingUpdateWithoutIncremental(b *testing.B) {
 
 		wb.AppendOrUpdate("AT", historyID, " more")
 		_ = wb.GetTotalLines()
-		_ = wb.GetAll(-1)
+		_ = wb.GetAll(-1, false)
 	}
 }
 
@@ -484,7 +485,7 @@ func BenchmarkDirectAppend(b *testing.B) {
 	// Initial render to populate cache
 	w.Render(80, false, styles,
 		lipgloss.NewStyle().Border(lipgloss.RoundedBorder()),
-		lipgloss.NewStyle())
+		lipgloss.NewStyle(), false)
 
 	fmt.Printf("Initial: wrappedLines=%d, contentLen=%d, styles=%v\n",
 		0, len(w.RawContent()), w.styles != nil)
@@ -494,7 +495,7 @@ func BenchmarkDirectAppend(b *testing.B) {
 		w.AppendContent(" more")
 		_ = w.Render(80, false, styles,
 			lipgloss.NewStyle().Border(lipgloss.RoundedBorder()),
-			lipgloss.NewStyle())
+			lipgloss.NewStyle(), false)
 	}
 }
 
@@ -506,7 +507,7 @@ func BenchmarkDirectAppendNoStyles(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
 	w.Render(80, false, styles,
 		lipgloss.NewStyle().Border(lipgloss.RoundedBorder()),
-		lipgloss.NewStyle())
+		lipgloss.NewStyle(), false)
 
 	fmt.Printf("Initial (no styles): wrappedLines=%d\n", 0)
 
@@ -515,7 +516,7 @@ func BenchmarkDirectAppendNoStyles(b *testing.B) {
 		w.AppendContent(" more")
 		_ = w.Render(80, false, styles,
 			lipgloss.NewStyle().Border(lipgloss.RoundedBorder()),
-			lipgloss.NewStyle())
+			lipgloss.NewStyle(), false)
 	}
 }
 
@@ -528,7 +529,7 @@ func BenchmarkDirectAppendDebug(_ *testing.B) {
 	// Initial render
 	w.Render(80, false, styles,
 		lipgloss.NewStyle().Border(lipgloss.RoundedBorder()),
-		lipgloss.NewStyle())
+		lipgloss.NewStyle(), false)
 
 	fmt.Printf("Initial: wrappedLines=%d, cache.width=%d, width-4=%d\n",
 		0, 0, 0-4)
@@ -544,7 +545,7 @@ func BenchmarkDirectAppendDebug(_ *testing.B) {
 
 		_ = w.Render(80, false, styles,
 			lipgloss.NewStyle().Border(lipgloss.RoundedBorder()),
-			lipgloss.NewStyle())
+			lipgloss.NewStyle(), false)
 		fmt.Printf("After Render %d: wrappedLines=%d, cache.valid=%v\n",
 			i+1, 0, false)
 	}
@@ -559,7 +560,7 @@ func BenchmarkRenderAfterAppend(b *testing.B) {
 	// Initial render to populate cache
 	w.Render(80, false, styles,
 		lipgloss.NewStyle().Border(lipgloss.RoundedBorder()),
-		lipgloss.NewStyle())
+		lipgloss.NewStyle(), false)
 
 	fmt.Printf("Initial: wrappedLines=%d, cache.valid=%v, cache.width=%d\n",
 		0, false, 0)
@@ -572,7 +573,7 @@ func BenchmarkRenderAfterAppend(b *testing.B) {
 
 		_ = w.Render(80, false, styles,
 			lipgloss.NewStyle().Border(lipgloss.RoundedBorder()),
-			lipgloss.NewStyle())
+			lipgloss.NewStyle(), false)
 	}
 }
 
@@ -585,7 +586,7 @@ func BenchmarkFullRebuildAfterAppend(b *testing.B) {
 	// Initial render
 	w.Render(80, false, styles,
 		lipgloss.NewStyle().Border(lipgloss.RoundedBorder()),
-		lipgloss.NewStyle())
+		lipgloss.NewStyle(), false)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -596,7 +597,7 @@ func BenchmarkFullRebuildAfterAppend(b *testing.B) {
 
 		_ = w.Render(80, false, styles,
 			lipgloss.NewStyle().Border(lipgloss.RoundedBorder()),
-			lipgloss.NewStyle())
+			lipgloss.NewStyle(), false)
 	}
 }
 
@@ -622,7 +623,7 @@ func BenchmarkStreamingUpdateWithVirtualRendering(b *testing.B) {
 		// Simulate delta to last window (which is outside viewport)
 		wb.AppendOrUpdate("AT", "msg99", " more")
 		_ = wb.GetTotalLines()
-		_ = wb.GetAll(-1)
+		_ = wb.GetAll(-1, false)
 	}
 }
 
@@ -646,7 +647,7 @@ func BenchmarkStreamingUpdateWithoutVirtualRendering(b *testing.B) {
 		// Simulate delta to last window
 		wb.AppendOrUpdate("AT", "msg99", " more")
 		_ = wb.GetTotalLines()
-		_ = wb.GetAll(-1)
+		_ = wb.GetAll(-1, false)
 	}
 }
 
@@ -668,7 +669,7 @@ func BenchmarkGetAllWithVirtual(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = wb.GetAll(-1)
+		_ = wb.GetAll(-1, false)
 	}
 }
 
@@ -688,7 +689,7 @@ func BenchmarkGetAllWithoutVirtual(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = wb.GetAll(-1)
+		_ = wb.GetAll(-1, false)
 	}
 }
 
@@ -920,7 +921,7 @@ func BenchmarkAppendVsFullWrap_LongContent(b *testing.B) {
 		wb := NewWindowBuffer(80, styles)
 		wb.AppendOrUpdate("AT", "stream", longContent)
 		wb.GetTotalLines()
-		wb.GetAll(-1) // pre-render to populate wrappedLines
+		wb.GetAll(-1, false) // pre-render to populate wrappedLines
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
@@ -933,7 +934,7 @@ func BenchmarkAppendVsFullWrap_LongContent(b *testing.B) {
 		wb := NewWindowBuffer(80, styles)
 		wb.AppendOrUpdate("AT", "stream", longContent)
 		wb.GetTotalLines()
-		wb.GetAll(-1)
+		wb.GetAll(-1, false)
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
@@ -944,4 +945,81 @@ func BenchmarkAppendVsFullWrap_LongContent(b *testing.B) {
 			wb.GetTotalLines()
 		}
 	})
+}
+
+// ============================================================================
+// Dimmed rendering benchmarks
+// ============================================================================
+
+// BenchmarkStylesDimmed measures the cost of creating a dimmed Styles copy.
+func BenchmarkStylesDimmed(b *testing.B) {
+	styles := NewStyles(theme.DefaultTheme())
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = styles.Dimmed()
+	}
+}
+
+// BenchmarkGetAllDimmed compares GetAll with blocked=false vs blocked=true.
+func BenchmarkGetAllDimmed(b *testing.B) {
+	styles := NewStyles(theme.DefaultTheme())
+	wb := NewWindowBuffer(80, styles)
+
+	// Create 20 windows (mix of AT, UT, AF types)
+	for i := 0; i < 10; i++ {
+		id := fmt.Sprintf("at-%d", i)
+		wb.AppendOrUpdate("AT", id, "This is assistant text content that will be styled and wrapped. "+
+			"It contains enough words to trigger wrapping across multiple lines for testing.")
+	}
+	for i := 0; i < 5; i++ {
+		id := fmt.Sprintf("ut-%d", i)
+		wb.AppendOrUpdate("UT", id, "User message with some content.")
+	}
+	for i := 0; i < 5; i++ {
+		id := fmt.Sprintf("af-%d", i)
+		wb.HandleToolInputEvent(protocol.ToolInputData{
+			ID:    id,
+			Name:  "read_file",
+			Input: []byte("/path/to/some/file.txt"),
+		}, uint64(i))
+	}
+
+	wb.SetViewportPosition(0, 30)
+	_ = wb.GetTotalLines()
+
+	b.Run("normal", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_ = wb.GetAll(-1, false)
+		}
+	})
+
+	b.Run("dimmed", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_ = wb.GetAll(-1, true)
+		}
+	})
+}
+
+// BenchmarkRenderBlockedTransition measures the cost of switching blocked state
+// (invalidate renderer cache + re-render with dimmed styles).
+func BenchmarkRenderBlockedTransition(b *testing.B) {
+	styles := NewStyles(theme.DefaultTheme())
+	wb := NewWindowBuffer(80, styles)
+
+	// Create 20 windows with cached render
+	for i := 0; i < 20; i++ {
+		id := fmt.Sprintf("msg-%d", i)
+		wb.AppendOrUpdate("AT", id, strings.Repeat("Message content line.\n", 3))
+	}
+
+	// Pre-render with normal styles
+	_ = wb.GetAll(-1, false)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		// Toggle blocked: normal → dimmed
+		_ = wb.GetAll(-1, true)
+		// Toggle back: dimmed → normal
+		_ = wb.GetAll(-1, false)
+	}
 }

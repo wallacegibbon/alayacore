@@ -263,6 +263,7 @@ func (m Terminal) startMCPAuthFlow(serverName, authURL string) tea.Cmd {
 func (m Terminal) restoreFocusAfterConfirm() Terminal {
 	if m.modelSelector.IsOpen() || m.themeSelector.IsOpen() ||
 		m.helpWindow.IsOpen() || m.mcpInitOverlay.IsOpen() {
+		m.display = m.display.WithBlocked(m.isBlocked() || !m.hasFocus)
 		m.display = m.display.updateContent()
 		return m
 	}

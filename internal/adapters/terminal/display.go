@@ -23,6 +23,7 @@ type DisplayModel struct {
 	windowCursor   int        // currently selected window index (-1 = none)
 	autoFollow     bool       // true on init and after G; disabled by navigation
 	displayFocused bool       // whether the display pane has input focus
+	blocked        bool       // true when overlay active or app unfocused (dim rendering)
 	lastContent    string     // cached last rendered output for change detection
 
 	// ── Dependencies (pointers to shared data, not copied semantically) ─
@@ -41,6 +42,7 @@ func NewDisplayModel(windowBuffer *WindowBuffer, styles *Styles) DisplayModel {
 		windowCursor:   -1,
 		autoFollow:     true,
 		displayFocused: false,
+		blocked:        false,
 	}
 }
 
@@ -181,6 +183,13 @@ func (m DisplayModel) WithDisplayFocused(focused bool) DisplayModel {
 	return m
 }
 
+// WithBlocked marks the display as blocked (covered by an overlay or app unfocused).
+// When blocked, subsequent updateContent calls render with dimmed colors.
+func (m DisplayModel) WithBlocked(blocked bool) DisplayModel {
+	m.blocked = blocked
+	return m
+}
+
 func (m DisplayModel) WithStyles(styles *Styles) DisplayModel {
 	m.styles = styles
 	return m
@@ -197,7 +206,8 @@ func (m DisplayModel) YOffset() int {
 	return m.scrollView.YOffset()
 }
 
-// updateContent updates the viewport content from the window buffer
+// updateContent updates the viewport content from the window buffer.
+// Uses m.blocked to determine whether to render with dimmed colors.
 func (m DisplayModel) updateContent() DisplayModel {
 	cursorIndex := -1
 	if m.displayFocused {
@@ -214,7 +224,7 @@ func (m DisplayModel) updateContent() DisplayModel {
 
 	m.windowBuffer.SetViewportPosition(targetYOffset, viewportHeight)
 
-	newContent := m.windowBuffer.GetAll(cursorIndex)
+	newContent := m.windowBuffer.GetAll(cursorIndex, m.blocked)
 	if newContent == m.lastContent {
 		return m
 	}

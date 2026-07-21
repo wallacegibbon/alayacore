@@ -44,8 +44,6 @@ func NewPromptInput(styles *Styles) PromptInput {
 		width:   DefaultWidth,
 	}
 }
-
-// Init initializes the prompt input.
 func (m PromptInput) Init() tea.Cmd {
 	return nil
 }
@@ -67,8 +65,7 @@ func (m PromptInput) Update(msg tea.Msg) (PromptInput, tea.Cmd) {
 }
 
 // View renders the input field with border, attachments above if present.
-// When blocked is true, renders an empty bordered box (used when an overlay
-// covers the input area).
+// When blocked is true, content is dimmed (overlay or focus loss).
 func (m PromptInput) View() tea.View {
 	borderColor := m.styles.BorderFocused
 	if !m.focused {
@@ -78,15 +75,21 @@ func (m PromptInput) View() tea.View {
 	}
 
 	if m.blocked {
-		return tea.NewView(m.styles.RenderBorderedBox("", m.width, borderColor))
+		borderColor = m.styles.ColorDim
 	}
 
 	input := m.updateInputStyles()
 	content := input.View()
 	if len(m.attachments) > 0 {
 		innerWidth := max(0, m.width-BorderInnerPadding)
-		styledMedia := wrapLabels(m.attachments, innerWidth, m.styles.Attachment)
-		separator := m.styles.System.Width(innerWidth).Render(Separator)
+		attachmentStyle := m.styles.Attachment
+		systemStyle := m.styles.System
+		if m.blocked {
+			attachmentStyle = attachmentStyle.Foreground(m.styles.ColorDim)
+			systemStyle = systemStyle.Foreground(m.styles.ColorDim)
+		}
+		styledMedia := wrapLabels(m.attachments, innerWidth, attachmentStyle)
+		separator := systemStyle.Width(innerWidth).Render(Separator)
 		var sb strings.Builder
 		sb.WriteString(styledMedia)
 		sb.WriteString("\n")
@@ -94,6 +97,9 @@ func (m PromptInput) View() tea.View {
 		sb.WriteString("\n")
 		sb.WriteString(content)
 		return tea.NewView(m.styles.RenderBorderedBox(sb.String(), m.width, borderColor))
+	}
+	if m.blocked {
+		content = m.styles.Input.Foreground(m.styles.ColorDim).Render(content)
 	}
 	return tea.NewView(m.styles.RenderBorderedBox(content, m.width, borderColor))
 }

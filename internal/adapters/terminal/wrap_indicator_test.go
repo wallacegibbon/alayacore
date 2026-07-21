@@ -20,7 +20,7 @@ func TestFoldIndicator(t *testing.T) {
 	wb.WindowAt(0).Folded = true
 
 	// Render the window
-	rendered := wb.GetAll(-1)
+	rendered := wb.GetAll(-1, false)
 
 	// Should contain the horizontal rule separator (full row)
 	if !strings.Contains(rendered, DefaultStyles().FoldIndicator) {
@@ -50,7 +50,7 @@ func TestFoldIndicatorColor(t *testing.T) {
 	wb.HandleToolInputEvent(protocol.ToolInputData{ID: "diff123", Name: "edit_file", Input: json.RawMessage(content.String())}, 0)
 
 	// Render the folded diff
-	rendered := wb.GetAll(-1)
+	rendered := wb.GetAll(-1, false)
 
 	// Should contain horizontal rule separator
 	if !strings.Contains(rendered, DefaultStyles().FoldIndicator) {

@@ -134,7 +134,7 @@ func TestWindowRenderCaching(t *testing.T) {
 	borderStyle := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(styles.ColorDim).Padding(0, 1)
 	cursorStyle := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(styles.BorderCursor).Padding(0, 1)
 
-	_ = w.Render(80, false, styles, borderStyle, cursorStyle)
+	_ = w.Render(80, false, styles, borderStyle, cursorStyle, false)
 
 	// Cache should be valid
 	if !w.border.valid {
@@ -142,8 +142,8 @@ func TestWindowRenderCaching(t *testing.T) {
 	}
 
 	// Render again - should use cache
-	rendered1 := w.Render(80, false, styles, borderStyle, cursorStyle)
-	rendered2 := w.Render(80, false, styles, borderStyle, cursorStyle)
+	rendered1 := w.Render(80, false, styles, borderStyle, cursorStyle, false)
+	rendered2 := w.Render(80, false, styles, borderStyle, cursorStyle, false)
 
 	if rendered1 != rendered2 {
 		t.Error("expected same result from cached render")
@@ -161,7 +161,7 @@ func TestWindowRenderCacheInvalidation(t *testing.T) {
 	borderStyle := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(styles.ColorDim).Padding(0, 1)
 	cursorStyle := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(styles.BorderCursor).Padding(0, 1)
 
-	_ = w.Render(80, false, styles, borderStyle, cursorStyle)
+	_ = w.Render(80, false, styles, borderStyle, cursorStyle, false)
 
 	// Cache should be valid
 	if !w.border.valid {
@@ -177,7 +177,7 @@ func TestWindowRenderCacheInvalidation(t *testing.T) {
 	}
 
 	// Render again — should use cached output, not re-wrap from scratch
-	rendered := w.Render(80, false, styles, borderStyle, cursorStyle)
+	rendered := w.Render(80, false, styles, borderStyle, cursorStyle, false)
 
 	// Render should contain the styled content
 	if !strings.Contains(rendered, "Hello") {

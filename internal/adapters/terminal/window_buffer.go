@@ -420,6 +420,9 @@ func (wb *WindowBuffer) GetWindowContent(windowIndex int) string {
 
 // ensureLineHeights rebuilds line heights if dirty.
 // Supports incremental update when only one window changed.
+// blocked is passed through to Window.Render for cache coherency (line counts
+// are unaffected by dimming, but the cache entry must match what renderVirtual
+// will request).
 //
 // During incremental updates, UpdateLineCountFast is tried first (fast path using
 // len(wrappedLines) from TryLineCount). If the cache is stale, full Render is used
@@ -427,7 +430,7 @@ func (wb *WindowBuffer) GetWindowContent(windowIndex int) string {
 // GetAll → renderVirtual, which needs the content for the viewport.
 // This avoids an O(n) render in ensureLineHeights that would be immediately
 // overwritten by renderVirtual's own w.Render() call.
-func (wb *WindowBuffer) ensureLineHeights() {
+func (wb *WindowBuffer) ensureLineHeights(blocked bool) {
 	if !wb.dirty && len(wb.lineHeights) == len(wb.windows) {
 		return
 	}
@@ -449,7 +452,7 @@ func (wb *WindowBuffer) ensureLineHeights() {
 				wb.lineHeights[wb.dirtyIndex] = lc
 				wb.totalLines += lc - oldHeight
 			} else {
-				w.Render(wb.width, false, wb.styles, wb.borderStyle, wb.cursorStyle)
+				w.Render(wb.width, false, wb.styles, wb.borderStyle, wb.cursorStyle, blocked)
 				oldHeight := wb.lineHeights[wb.dirtyIndex]
 				newHeight := w.LineCount()
 				wb.lineHeights[wb.dirtyIndex] = newHeight
@@ -467,7 +470,7 @@ func (wb *WindowBuffer) ensureLineHeights() {
 		for i, w := range wb.windows {
 			// Only render and count lines for visible windows
 			if w.Visible {
-				w.Render(wb.width, false, wb.styles, wb.borderStyle, wb.cursorStyle)
+				w.Render(wb.width, false, wb.styles, wb.borderStyle, wb.cursorStyle, blocked)
 				wb.lineHeights[i] = w.LineCount()
 				wb.totalLines += wb.lineHeights[i]
 			} else {
@@ -481,14 +484,14 @@ func (wb *WindowBuffer) ensureLineHeights() {
 }
 
 // Returns (0, 0) if windowIndex is out of bounds.
-// IMPORTANT: This calls ensureLineHeights() to guarantee accurate positions,
+// IMPORTANT: This calls ensureLineHeights to guarantee accurate positions,
 // since line heights may be stale after content updates.
 func (wb *WindowBuffer) GetWindowLineRange(windowIndex int) (start, end int) {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 
 	// Ensure line heights are current before calculating
-	wb.ensureLineHeights()
+	wb.ensureLineHeights(false)
 
 	if windowIndex < 0 || windowIndex >= len(wb.lineHeights) {
 		return 0, 0
@@ -503,7 +506,7 @@ func (wb *WindowBuffer) GetWindowLineRange(windowIndex int) (start, end int) {
 func (wb *WindowBuffer) GetTotalLines() int {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
-	wb.ensureLineHeights()
+	wb.ensureLineHeights(false)
 	return wb.totalLines
 }
 
@@ -523,7 +526,7 @@ func (wb *WindowBuffer) GetTotalLines() int {
 func (wb *WindowBuffer) ForEachVisible(start int, fn func(i int, w *Window) bool) bool {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
-	wb.ensureLineHeights()
+	wb.ensureLineHeights(false)
 
 	for i, w := range wb.windows {
 		if i >= start && w.Visible && !fn(i, w) {
@@ -538,7 +541,7 @@ func (wb *WindowBuffer) ForEachVisible(start int, fn func(i int, w *Window) bool
 func (wb *WindowBuffer) ForEachVisibleBackward(start int, fn func(i int, w *Window) bool) bool {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
-	wb.ensureLineHeights()
+	wb.ensureLineHeights(false)
 
 	if start >= len(wb.windows) {
 		start = len(wb.windows) - 1
@@ -564,7 +567,7 @@ func (wb *WindowBuffer) ForEachVisibleBackward(start int, fn func(i int, w *Wind
 func (wb *WindowBuffer) ForEachVisibleRanged(fn func(i int, startLine, endLine int) bool) bool {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
-	wb.ensureLineHeights()
+	wb.ensureLineHeights(false)
 
 	pos := 0
 	for i, w := range wb.windows {
@@ -584,7 +587,7 @@ func (wb *WindowBuffer) ForEachVisibleRanged(fn func(i int, startLine, endLine i
 func (wb *WindowBuffer) ForEachVisibleBackwardRanged(fn func(i int, startLine, endLine int) bool) bool {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
-	wb.ensureLineHeights()
+	wb.ensureLineHeights(false)
 
 	// Pass 1: compute total lines
 	total := 0
@@ -671,7 +674,7 @@ func (wb *WindowBuffer) SetViewportPosition(yOffset, height int) {
 }
 
 // GetAll returns rendered windows, using virtual rendering if viewport is set.
-func (wb *WindowBuffer) GetAll(cursorIndex int) string {
+func (wb *WindowBuffer) GetAll(cursorIndex int, blocked bool) string {
 	wb.mu.Lock()
 	defer wb.mu.Unlock()
 
@@ -679,20 +682,20 @@ func (wb *WindowBuffer) GetAll(cursorIndex int) string {
 		return ""
 	}
 
-	// Ensure line heights are current
-	wb.ensureLineHeights()
+	// Ensure line heights are current (pass blocked for cache coherency)
+	wb.ensureLineHeights(blocked)
 
 	// Use virtual rendering if viewport is set
 	if wb.viewportHeight > 0 {
-		return wb.renderVirtual(cursorIndex)
+		return wb.renderVirtual(cursorIndex, blocked)
 	}
 
 	// Full render
-	return wb.renderAll(cursorIndex)
+	return wb.renderAll(cursorIndex, blocked)
 }
 
 // renderVirtual renders only visible windows (with buffer)
-func (wb *WindowBuffer) renderVirtual(cursorIndex int) string {
+func (wb *WindowBuffer) renderVirtual(cursorIndex int, blocked bool) string {
 	// Calculate visible range with buffer
 	bufferLines := wb.viewportHeight
 	if bufferLines < 10 {
@@ -724,7 +727,7 @@ func (wb *WindowBuffer) renderVirtual(cursorIndex int) string {
 
 		if i >= startWindow && i <= endWindow {
 			// Render actual content
-			sb.WriteString(wb.windows[i].Render(wb.width, cursorIndex == i, wb.styles, wb.borderStyle, wb.cursorStyle))
+			sb.WriteString(wb.windows[i].Render(wb.width, cursorIndex == i, wb.styles, wb.borderStyle, wb.cursorStyle, blocked))
 		} else {
 			// Render placeholder (blank lines)
 			for j := 0; j < wb.lineHeights[i]; j++ {
@@ -740,7 +743,7 @@ func (wb *WindowBuffer) renderVirtual(cursorIndex int) string {
 }
 
 // renderAll renders all visible windows
-func (wb *WindowBuffer) renderAll(cursorIndex int) string {
+func (wb *WindowBuffer) renderAll(cursorIndex int, blocked bool) string {
 	var sb strings.Builder
 	firstWritten := false
 	for i, w := range wb.windows {
@@ -752,7 +755,7 @@ func (wb *WindowBuffer) renderAll(cursorIndex int) string {
 		if firstWritten {
 			sb.WriteString("\n")
 		}
-		sb.WriteString(w.Render(wb.width, cursorIndex == i, wb.styles, wb.borderStyle, wb.cursorStyle))
+		sb.WriteString(w.Render(wb.width, cursorIndex == i, wb.styles, wb.borderStyle, wb.cursorStyle, blocked))
 		firstWritten = true
 	}
 	return sb.String()

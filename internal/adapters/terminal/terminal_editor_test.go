@@ -181,7 +181,7 @@ func TestEditorFinishedMsgWithError(t *testing.T) {
 		t.Errorf("Input should remain unchanged on error, got '%s'", terminal.input.Value())
 	}
 
-	displayContent := terminal.out.WindowBuffer().GetAll(-1)
+	displayContent := terminal.out.WindowBuffer().GetAll(-1, false)
 	if displayContent == "" {
 		t.Error("Expected error message in display")
 	}
@@ -480,7 +480,7 @@ func TestWindowBufferRendering(t *testing.T) {
 	// Add a window with some content
 	wb.AppendOrUpdate(tlv.TagAssistantT, "test1", "Hello world")
 	// Get rendered output
-	rendered := wb.GetAll(-1)
+	rendered := wb.GetAll(-1, false)
 	// Check that border characters appear (rounded border)
 	if !strings.Contains(rendered, "╭") || !strings.Contains(rendered, "╮") ||
 		!strings.Contains(rendered, "╰") || !strings.Contains(rendered, "╯") {
@@ -493,7 +493,7 @@ func TestWindowBufferRendering(t *testing.T) {
 	// Check width constraint: count lines? Not needed.
 	// Add another window and ensure ordering
 	wb.AppendOrUpdate(tlv.TagAssistantR, "test2", "Reasoning content")
-	rendered2 := wb.GetAll(-1)
+	rendered2 := wb.GetAll(-1, false)
 	// Should have two windows separated by newline
 	// Count border top lines? Simpler: ensure both contents appear
 	if !strings.Contains(rendered2, "Hello world") || !strings.Contains(rendered2, "Reasoning content") {
@@ -578,7 +578,7 @@ func TestWindowBufferWidth(t *testing.T) {
 	const totalWidth = 50
 	wb := NewWindowBuffer(totalWidth, DefaultStyles())
 	wb.AppendOrUpdate(tlv.TagAssistantT, "test", "Hello")
-	rendered := wb.GetAll(-1)
+	rendered := wb.GetAll(-1, false)
 	// Find first line (top border)
 	lines := strings.Split(rendered, "\n")
 	if len(lines) == 0 {
@@ -615,7 +615,7 @@ func TestWindowBufferWidthMatchesInput(t *testing.T) {
 			wb := NewWindowBuffer(inputTotalWidth, DefaultStyles())
 			// Create a window
 			wb.AppendOrUpdate(tlv.TagAssistantT, "test", "Content")
-			rendered := wb.GetAll(-1)
+			rendered := wb.GetAll(-1, false)
 			// Extract top border line
 			lines := strings.Split(rendered, "\n")
 			if len(lines) == 0 {

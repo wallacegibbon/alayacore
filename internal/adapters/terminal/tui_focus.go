@@ -40,6 +40,7 @@ func (m Terminal) focusDisplay() Terminal {
 func (m Terminal) openModelSelector() Terminal {
 	m.modelSelector = m.modelSelector.Open()
 	m.input = m.input.Blur()
+	m.display = m.display.WithBlocked(true)
 	m.display = m.display.WithDisplayFocused(false)
 	m.display = m.display.updateContent()
 	return m
@@ -47,6 +48,8 @@ func (m Terminal) openModelSelector() Terminal {
 
 // restoreFocus restores focus to the previously focused window after an overlay closes.
 func (m Terminal) restoreFocus() Terminal {
+	// Sync blocked state — overlay just closed, so isBlocked() is likely false now.
+	m.display = m.display.WithBlocked(m.isBlocked() || !m.hasFocus)
 	if m.focusedWindow == focusDisplay {
 		m = m.focusDisplay()
 	} else {
@@ -63,6 +66,7 @@ func (m Terminal) openThemeSelector() Terminal {
 	}
 	m.themeSelector = m.themeSelector.Open(m.themeManager.GetThemes(), m.activeTheme, m.themeManager)
 	m.input = m.input.Blur()
+	m.display = m.display.WithBlocked(true)
 	m.display = m.display.WithDisplayFocused(false)
 	m.display = m.display.updateContent()
 	return m
@@ -72,6 +76,7 @@ func (m Terminal) openThemeSelector() Terminal {
 func (m Terminal) openHelpWindow() Terminal {
 	m.helpWindow = m.helpWindow.Open()
 	m.input = m.input.Blur()
+	m.display = m.display.WithBlocked(true)
 	m.display = m.display.WithDisplayFocused(false)
 	m.display = m.display.updateContent()
 	return m
@@ -81,6 +86,7 @@ func (m Terminal) openHelpWindow() Terminal {
 func (m Terminal) openAttachmentWindow() Terminal {
 	m.attachmentWindow = m.attachmentWindow.Open()
 	m.input = m.input.Blur()
+	m.display = m.display.WithBlocked(true)
 	m.display = m.display.WithDisplayFocused(false)
 	m.display = m.display.updateContent()
 	return m
@@ -90,6 +96,7 @@ func (m Terminal) openAttachmentWindow() Terminal {
 func (m Terminal) openConfirmQuit() Terminal {
 	m.confirmOverlay = m.confirmOverlay.OpenQuit()
 	m.input = m.input.Blur()
+	m.display = m.display.WithBlocked(true)
 	m.display = m.display.WithDisplayFocused(false)
 	m.display = m.display.updateContent()
 	return m
@@ -99,6 +106,7 @@ func (m Terminal) openConfirmQuit() Terminal {
 func (m Terminal) openConfirmCancel() Terminal {
 	m.confirmOverlay = m.confirmOverlay.OpenCancel()
 	m.input = m.input.Blur()
+	m.display = m.display.WithBlocked(true)
 	m.display = m.display.WithDisplayFocused(false)
 	m.display = m.display.updateContent()
 	return m
@@ -108,6 +116,7 @@ func (m Terminal) openConfirmCancel() Terminal {
 func (m Terminal) openConfirmTool(id, toolName, toolInput string) Terminal {
 	m.confirmOverlay = m.confirmOverlay.OpenTool(id, toolName, toolInput)
 	m.input = m.input.Blur()
+	m.display = m.display.WithBlocked(true)
 	m.display = m.display.WithDisplayFocused(false)
 	m.display = m.display.updateContent()
 	return m
@@ -116,6 +125,7 @@ func (m Terminal) openConfirmTool(id, toolName, toolInput string) Terminal {
 // handleBlur handles loss of application focus.
 func (m Terminal) handleBlur() Terminal {
 	m.hasFocus = false
+	m.display = m.display.WithBlocked(true)
 	m.display = m.display.WithDisplayFocused(false)
 	m.input = m.input.Blur()
 	m.modelSelector = m.modelSelector.WithFocus(false)
@@ -130,6 +140,7 @@ func (m Terminal) handleBlur() Terminal {
 // handleFocus handles gain of application focus.
 func (m Terminal) handleFocus() Terminal {
 	m.hasFocus = true
+	m.display = m.display.WithBlocked(m.isBlocked())
 	m.modelSelector = m.modelSelector.WithFocus(true)
 	m.themeSelector = m.themeSelector.WithFocus(true)
 	m.helpWindow = m.helpWindow.WithFocus(true)

@@ -384,6 +384,9 @@ func (m Terminal) loadSessionCmd() tea.Cmd {
 //
 //nolint:gocyclo
 func (m Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Sync display dim state at the start of every update cycle.
+	m.display = m.display.WithBlocked(m.isBlocked() || !m.hasFocus)
+
 	// Loading message handling — these take priority during startup.
 	switch msg := msg.(type) {
 	case sessionLoadedMsg:
@@ -542,6 +545,7 @@ func (m Terminal) handleMCPOverlays() Terminal {
 		if action.InitOverlayActive && !wasOpen {
 			m.input = m.input.Blur()
 		}
+		m.display = m.display.WithBlocked(true)
 		m.display = m.display.updateContent()
 	}
 	return m
@@ -716,9 +720,9 @@ func (m Terminal) View() tea.View {
 	sb.WriteString(m.display.View().Content)
 	sb.WriteString("\n")
 
-	// Input area — empty bordered box (blurred) while MCP init or
-	// post-loading is in progress, same as confirm overlay behavior.
-	m.input = m.input.WithBlocked(m.isConfirmOpen() || m.isMCPInitOpen() || m.postLoading)
+	// Input area — empty bordered box (blurred) while blocked by overlays
+	// or when the app loses focus. The border is already dimmed via Blur().
+	m.input = m.input.WithBlocked(m.isBlocked() || !m.hasFocus || m.postLoading)
 	sb.WriteString(m.input.View().Content)
 	sb.WriteString("\n")
 
@@ -804,16 +808,6 @@ func (m Terminal) isBlocked() bool {
 	return m.modelSelector.IsOpen() || m.themeSelector.IsOpen() ||
 		m.helpWindow.IsOpen() || m.attachmentWindow.IsOpen() ||
 		m.confirmOverlay.IsOpen() || m.mcpInitOverlay.IsOpen()
-}
-
-// isConfirmOpen returns true if the confirm dialog is open.
-func (m Terminal) isConfirmOpen() bool {
-	return m.confirmOverlay.IsOpen()
-}
-
-// isMCPInitOpen returns true if the MCP init overlay is open.
-func (m Terminal) isMCPInitOpen() bool {
-	return m.mcpInitOverlay.IsOpen()
 }
 
 // handleMCPProgress manages all MCP overlay state.

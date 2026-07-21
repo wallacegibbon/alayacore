@@ -23,7 +23,7 @@ func TestIncrementalPathIsUsed(t *testing.T) {
 
 	// First render populates wrappedLines in the textRenderer
 	_ = wb.GetTotalLines()
-	_ = wb.GetAll(-1)
+	_ = wb.GetAll(-1, false)
 
 	// Find the window and verify the renderer is a textRenderer
 	idx, ok := wb.idIndex["stream"]

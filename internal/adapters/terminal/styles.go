@@ -63,7 +63,6 @@ type Styles struct {
 	FoldIndicator string
 }
 
-// RenderBorderedBox renders content with consistent border, padding, and width.
 // This ensures all bordered boxes (input, model selector, input field) have the same width.
 // The width calculation is: borderStyle.Padding(0, 1).Render(innerStyle.Width(width-4).Render(content))
 func (s *Styles) RenderBorderedBox(content string, width int, borderColor color.Color, height ...int) string {
@@ -117,5 +116,50 @@ func NewStyles(t *theme.Theme) *Styles {
 		CursorColor:  lipgloss.Color(t.Cursor),
 
 		FoldIndicator: t.FoldIndicator,
+	}
+}
+
+// Dimmed returns a copy of Styles with all foreground colors replaced by
+// ColorDim. Used to render content in a dimmed visual state when overlays
+// are active. Preserves non-color attributes (bold, italic, border style, etc.).
+func (s *Styles) Dimmed() *Styles {
+	if s == nil {
+		return nil
+	}
+	return &Styles{
+		// Output text styles — all foreground → ColorDim
+		Text:        s.Text.Foreground(s.ColorDim),
+		UserInput:   s.UserInput.Foreground(s.ColorDim),
+		Tool:        s.Tool.Foreground(s.ColorDim),
+		ToolContent: s.ToolContent.Foreground(s.ColorDim),
+		Reasoning:   s.Reasoning.Foreground(s.ColorDim),
+		Error:       s.Error.Foreground(s.ColorDim),
+		System:      s.System.Foreground(s.ColorDim),
+		Prompt:      s.Prompt.Foreground(s.ColorDim),
+		Attachment:  s.Attachment.Foreground(s.ColorDim),
+		DiffRemove:  s.DiffRemove.Foreground(s.ColorDim),
+		DiffAdd:     s.DiffAdd.Foreground(s.ColorDim),
+
+		// Display styles
+		Input:       s.Input.Foreground(s.ColorDim),
+		Status:      s.Status.Foreground(s.ColorDim),
+		Separator:   s.Separator.Foreground(s.ColorDim),
+		Confirm:     s.Confirm.Foreground(s.ColorDim),
+		InputBorder: s.InputBorder,
+
+		// Colors — unchanged (used as dynamic color references)
+		BorderFocused: s.ColorDim,
+		BorderBlurred: s.ColorDim,
+		BorderCursor:  s.ColorDim,
+
+		ColorAccent:  s.ColorDim,
+		ColorDim:     s.ColorDim,
+		ColorMuted:   s.ColorDim,
+		ColorWarning: s.ColorDim,
+		ColorError:   s.ColorDim,
+		ColorSuccess: s.ColorDim,
+		CursorColor:  s.ColorDim,
+
+		FoldIndicator: s.FoldIndicator,
 	}
 }
