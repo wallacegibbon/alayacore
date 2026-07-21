@@ -92,20 +92,15 @@ func (m Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 		return m, cmd
 	}
 
-	// Apply preview theme on navigation
+	// Apply preview theme with debounce on any navigation or filter change.
 	previewTheme := ts.GetPreviewTheme()
 	if previewTheme != nil {
-		key := msg.String()
-		// Debounce rapid navigation
-		if key == keyJ || key == keyK || key == keyUp || key == keyDown {
-			m.themePreviewID++
-			id := m.themePreviewID
-			p := previewTheme
-			return m, tea.Batch(cmd, tea.Tick(ThemePreviewDebounce, func(_ time.Time) tea.Msg {
-				return themePreviewMsg{theme: p, id: id}
-			}))
-		}
-		m = m.applyTheme(previewTheme)
+		m.themePreviewID++
+		id := m.themePreviewID
+		p := previewTheme
+		return m, tea.Batch(cmd, tea.Tick(ThemePreviewDebounce, func(_ time.Time) tea.Msg {
+			return themePreviewMsg{theme: p, id: id}
+		}))
 	}
 
 	return m, cmd
