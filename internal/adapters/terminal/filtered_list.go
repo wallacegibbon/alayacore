@@ -70,7 +70,7 @@ func (fl FilteredListCore) WithStyles(styles *Styles) FilteredListCore {
 	return fl.updateFilterInputStyles()
 }
 
-// When the app loses focus, all UI elements should be dimmed.
+// Set list focus state for visual styling.
 func (fl FilteredListCore) WithFocus(hasFocus bool) FilteredListCore {
 	fl.HasFocus = hasFocus
 	return fl.updateFilterInputStyles()

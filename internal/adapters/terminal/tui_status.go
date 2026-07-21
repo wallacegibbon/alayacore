@@ -28,10 +28,9 @@ func statusStepsSegment(lastMaxSteps int, taskError bool, lastCurrentStep int, i
 }
 
 // renderStatusBar renders the status bar line.
-// Status bar is dimmed when the application loses OS focus
-// or an overlay is active.
+// Status bar is dimmed when an overlay is active.
 func (m Terminal) renderStatusBar() string {
-	active := m.hasFocus && !m.isBlocked()
+	active := !m.isBlocked()
 
 	var indicator string
 	if m.inProgress {

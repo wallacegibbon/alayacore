@@ -23,7 +23,7 @@ type DisplayModel struct {
 	windowCursor   int        // currently selected window index (-1 = none)
 	autoFollow     bool       // true on init and after G; disabled by navigation
 	displayFocused bool       // whether the display pane has input focus
-	blocked        bool       // true when overlay active or app unfocused (dim rendering)
+	blocked        bool       // true when an overlay is active (dim rendering)
 	lastContent    string     // cached last rendered output for change detection
 
 	// ── Dependencies (pointers to shared data, not copied semantically) ─
@@ -183,7 +183,7 @@ func (m DisplayModel) WithDisplayFocused(focused bool) DisplayModel {
 	return m
 }
 
-// WithBlocked marks the display as blocked (covered by an overlay or app unfocused).
+// WithBlocked marks the display as blocked (covered by an overlay).
 // When blocked, subsequent updateContent calls render with dimmed colors.
 func (m DisplayModel) WithBlocked(blocked bool) DisplayModel {
 	m.blocked = blocked

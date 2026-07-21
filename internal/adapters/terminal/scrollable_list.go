@@ -60,7 +60,7 @@ func (sl ScrollableListCore) WithStyles(styles *Styles) ScrollableListCore {
 	return sl
 }
 
-// When the app loses focus, all UI elements should be dimmed.
+// Set list focus state for visual styling.
 func (sl ScrollableListCore) WithFocus(hasFocus bool) ScrollableListCore {
 	sl.HasFocus = hasFocus
 	return sl

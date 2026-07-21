@@ -49,7 +49,7 @@ func (m Terminal) openModelSelector() Terminal {
 // restoreFocus restores focus to the previously focused window after an overlay closes.
 func (m Terminal) restoreFocus() Terminal {
 	// Sync blocked state — overlay just closed, so isBlocked() is likely false now.
-	m.display = m.display.WithBlocked(m.isBlocked() || !m.hasFocus)
+	m.display = m.display.WithBlocked(m.isBlocked())
 	if m.focusedWindow == focusDisplay {
 		m = m.focusDisplay()
 	} else {
@@ -125,7 +125,7 @@ func (m Terminal) openConfirmTool(id, toolName, toolInput string) Terminal {
 // handleBlur handles loss of application focus.
 func (m Terminal) handleBlur() Terminal {
 	m.hasFocus = false
-	m.display = m.display.WithBlocked(true)
+	m.display = m.display.WithBlocked(m.isBlocked())
 	m.display = m.display.WithDisplayFocused(false)
 	m.input = m.input.Blur()
 	m.modelSelector = m.modelSelector.WithFocus(false)

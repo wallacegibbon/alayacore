@@ -23,7 +23,7 @@ type PromptInput struct {
 	attachments []string   // pending attachment file paths to display
 	focused     bool       // whether this input is focused
 	width       int        // input field width
-	blocked     bool       // when true, View renders empty bordered box
+	blocked     bool       // when true, content is dimmed (overlay active)
 
 	// ── Dependencies (pointer to shared data) ─
 	styles *Styles
@@ -65,7 +65,7 @@ func (m PromptInput) Update(msg tea.Msg) (PromptInput, tea.Cmd) {
 }
 
 // View renders the input field with border, attachments above if present.
-// When blocked is true, content is dimmed (overlay or focus loss).
+// When blocked is true, content is dimmed (overlay active).
 func (m PromptInput) View() tea.View {
 	borderColor := m.styles.BorderFocused
 	if !m.focused {
@@ -190,8 +190,7 @@ func (m Terminal) OpenEditor() tea.Cmd {
 }
 
 // WithBlocked marks the input as blocked (covered by an overlay).
-// When blocked, View() renders an empty bordered box instead of the
-// input content.
+// When blocked, View() dims the content instead of showing it at full brightness.
 func (m PromptInput) WithBlocked(blocked bool) PromptInput {
 	m.blocked = blocked
 	return m

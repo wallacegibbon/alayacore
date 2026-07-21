@@ -385,7 +385,7 @@ func (m Terminal) loadSessionCmd() tea.Cmd {
 //nolint:gocyclo
 func (m Terminal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Sync display dim state at the start of every update cycle.
-	m.display = m.display.WithBlocked(m.isBlocked() || !m.hasFocus)
+	m.display = m.display.WithBlocked(m.isBlocked())
 
 	// Loading message handling — these take priority during startup.
 	switch msg := msg.(type) {
@@ -720,9 +720,8 @@ func (m Terminal) View() tea.View {
 	sb.WriteString(m.display.View().Content)
 	sb.WriteString("\n")
 
-	// Input area — empty bordered box (blurred) while blocked by overlays
-	// or when the app loses focus. The border is already dimmed via Blur().
-	m.input = m.input.WithBlocked(m.isBlocked() || !m.hasFocus || m.postLoading)
+	// Input area — dimmed when blocked by overlays (border is already dimmed via Blur()).
+	m.input = m.input.WithBlocked(m.isBlocked() || m.postLoading)
 	sb.WriteString(m.input.View().Content)
 	sb.WriteString("\n")
 
