@@ -245,11 +245,13 @@ type Terminal struct {
 	pendingAttachments []attachment     // pending file attachments for multi-modal input
 
 	// ── Transient state (set once or infrequently, not Elm-copied semantically) ─
-	quitting           bool // terminal is shutting down
-	confirmFromCommand bool // cancel came from :cancel command (vs Ctrl+G)
-	hasFocus           bool // terminal has OS-level application focus
-	themePreviewID     int  // debounce ID for pending theme preview
-	pendingForceRedraw bool // Ctrl-R sets this; handleWindowSize consumes it
+	quitting              bool         // terminal is shutting down
+	confirmFromCommand    bool         // cancel came from :cancel command (vs Ctrl+G)
+	hasFocus              bool         // terminal has OS-level application focus
+	themePreviewID        int          // debounce ID for pending theme preview
+	previewAppliedTheme   *theme.Theme // last theme data applied by a preview (nil = none)
+	selectorOriginalTheme *theme.Theme // theme data active when selector opened
+	pendingForceRedraw    bool         // Ctrl-R sets this; handleWindowSize consumes it
 
 	// ── Dependencies (pointer types, shared, not copied semantically) ──
 	out          OutputWriter   // TLV output writer (shared, thread-safe)

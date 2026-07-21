@@ -62,7 +62,9 @@ Theme changes flow through the session to keep a single source of truth:
 2. Session persists the theme name via `RuntimeManager.SetActiveTheme()` and broadcasts the updated theme via a `TagSystemMsg` TLV message (`{"type":"theme","data":{"name":"...","theme":{...}}}`)
 3. The terminal detects the theme change in `updateStatus()` and calls `applyTheme()` with the full theme data from the TLV message, updating all UI component styles
 
-This ensures both paths converge: the theme selector's live preview still applies themes directly for responsiveness, but the final commit always goes through the session.
+This ensures both paths converge: the theme selector's live preview applies
+themes via a debounced tick for smooth navigation, but the final commit
+always goes through the session.
 
 ## TLV Protocol
 

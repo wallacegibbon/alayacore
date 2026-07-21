@@ -82,6 +82,7 @@ func (ts ThemeSelector) Open(themes []ThemeEntry, activeTheme string) ThemeSelec
 
 	ts = ts.updateFilteredThemes()
 	ts = ts.selectThemeByName(activeTheme)
+	ts = ts.loadPreviewTheme()
 	return ts
 }
 
@@ -176,9 +177,10 @@ func (ts ThemeSelector) Update(msg tea.Msg) (ThemeSelector, tea.Cmd) {
 			return ts, func() tea.Msg { return ThemeSelectedMsg{Name: sel.Name} }
 		}
 
-		// Filter changed: update filtered list.
+		// Filter changed: update filtered list and load preview for first result.
 		if result.FilterChanged && ts.FilterInputFocused {
 			ts = ts.updateFilteredThemes()
+			ts = ts.loadPreviewTheme()
 		}
 
 		// List navigation: load preview.
@@ -251,7 +253,7 @@ func (ts ThemeSelector) updateFilteredThemes() ThemeSelector {
 	ts.SelectedIdx = 0
 	ts.ScrollIdx = 0
 	ts.FilteredListCore = ts.FilteredListCore.ClampSelection(len(ts.filteredThemes))
-	return ts.loadPreviewTheme()
+	return ts
 }
 
 // --- Rendering ---

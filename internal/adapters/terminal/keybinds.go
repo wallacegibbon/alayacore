@@ -78,15 +78,24 @@ func (m Terminal) handleThemeSelectorKeys(msg tea.KeyMsg) (Terminal, tea.Cmd) {
 	ts, cmd := m.themeSelector.Update(msg)
 	m.themeSelector = ts
 
-	// If closed without selection, restore original theme from cached data.
+	// If closed — restore original theme on cancel, or apply selected theme.
 	if wasOpen && !ts.IsOpen() {
-		originalThemeName := ts.GetOriginalThemeName()
-		snap := m.out.SnapshotStatus()
-		for _, t := range snap.CachedThemes {
-			if t.Name == originalThemeName && t.Theme != nil {
-				m = m.applyTheme(t.Theme)
-				break
+		key := msg.String()
+		if key == keyQ || key == keyEsc {
+			// Cancel: restore original theme if a different theme was previewed.
+			lastApplied := m.previewAppliedTheme
+			m.previewAppliedTheme = nil
+			if lastApplied != nil && lastApplied != m.selectorOriginalTheme {
+				originalThemeName := ts.GetOriginalThemeName()
+				snap := m.out.SnapshotStatus()
+				for _, t := range snap.CachedThemes {
+					if t.Name == originalThemeName && t.Theme != nil {
+						m = m.applyTheme(t.Theme)
+						break
+					}
+				}
 			}
+			m.selectorOriginalTheme = nil
 		}
 		m = m.restoreFocus()
 		return m, cmd
@@ -116,6 +125,7 @@ func (m Terminal) handleThemePreview(msg themePreviewMsg) Terminal {
 	// Only apply if this preview is still the current one (debouncing)
 	if msg.id == m.themePreviewID {
 		m = m.applyTheme(msg.theme)
+		m.previewAppliedTheme = msg.theme
 	}
 	return m
 }

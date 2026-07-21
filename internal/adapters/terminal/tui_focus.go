@@ -66,6 +66,15 @@ func (m Terminal) openThemeSelector() Terminal {
 	}
 	snap := m.out.SnapshotStatus()
 	m.themeSelector = m.themeSelector.Open(snap.CachedThemes, m.activeTheme)
+	m.selectorOriginalTheme = nil
+	m.previewAppliedTheme = nil
+	for _, t := range snap.CachedThemes {
+		if t.Name == m.activeTheme && t.Theme != nil {
+			m.selectorOriginalTheme = t.Theme
+			m.previewAppliedTheme = t.Theme
+			break
+		}
+	}
 	m.input = m.input.Blur()
 	m.display = m.display.WithBlocked(true)
 	m.display = m.display.WithDisplayFocused(false)
