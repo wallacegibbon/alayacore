@@ -264,6 +264,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 
 	s.initToolConfirmSet(cfg.ToolConfirmTools)
 	s.modelService.ResolveActiveModel()
+	s.modelService.SetReasoningLevel(data.ReasoningLevel)
 
 	// Set up MCP service (manages init lifecycle).
 	s.mcpService = NewMCPService(cfg.MCPInit, s.Output)
