@@ -171,7 +171,7 @@ func LoadOrNewSession(cfg SessionConfig) (*Session, string, error) {
 	if loadErr == nil {
 		s := RestoreFromSession(cfg, data)
 		if replayErr := s.replayContentsToAdapter(); replayErr != nil {
-			s.modelService.SetInitError(replayErr)
+			s.modelService.initError = replayErr
 		}
 		return s, cfg.SessionFile, nil
 	}
@@ -194,8 +194,9 @@ func NewSession(cfg SessionConfig) *Session {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	modelService := NewModelService(NewModelManager(cfg.ModelConfigPath), NewRuntimeManager(cfg.RuntimeConfigPath))
-	modelService.SetOverrideModel(cfg.OverrideActiveModel)
-	modelService.SetDebugProxy(cfg.DebugLogDir, cfg.ProxyURL)
+	modelService.overrideModel = cfg.OverrideActiveModel
+	modelService.proxyURL = cfg.ProxyURL
+	modelService.debugDir = cfg.DebugLogDir
 
 	s := &Session{
 		sessionConfig: sessionConfig{
@@ -220,7 +221,7 @@ func NewSession(cfg SessionConfig) *Session {
 	s.modelService.ResolveActiveModel()
 
 	if model := s.modelService.ActiveModel(); model != nil {
-		s.ContextLimit = s.modelService.ContextLimit()
+		s.ContextLimit = s.modelService.contextLimit
 	}
 
 	// Set up MCP service (manages init lifecycle).
@@ -236,9 +237,10 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	modelService := NewModelService(NewModelManager(cfg.ModelConfigPath), NewRuntimeManager(cfg.RuntimeConfigPath))
-	modelService.SetSessionMetaModel(data.ActiveModel)
-	modelService.SetOverrideModel(cfg.OverrideActiveModel)
-	modelService.SetDebugProxy(cfg.DebugLogDir, cfg.ProxyURL)
+	modelService.sessionMetaModel = data.ActiveModel
+	modelService.overrideModel = cfg.OverrideActiveModel
+	modelService.proxyURL = cfg.ProxyURL
+	modelService.debugDir = cfg.DebugLogDir
 
 	s := &Session{
 		sessionConfig: sessionConfig{
@@ -272,7 +274,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 	// Apply context limit from the resolved model so the status bar
 	// can show "tokens/limit (pct%)" immediately, before any API call.
 	if model := s.modelService.ActiveModel(); model != nil {
-		s.ContextLimit = s.modelService.ContextLimit()
+		s.ContextLimit = s.modelService.contextLimit
 	}
 
 	s.sendSystemInfo(SystemInfoAll)

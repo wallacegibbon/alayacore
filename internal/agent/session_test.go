@@ -407,7 +407,7 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 		APIKey:       "test-key",
 		ModelName:    "test-model",
 	}
-	session.modelService.ModelManager().models = append(session.modelService.ModelManager().models, testModel)
+	session.modelService.manager.models = append(session.modelService.manager.models, testModel)
 
 	// Test 1: model_set should work when no task is running.
 	// Dispatch through handleInputMsg (the real entry point) so the

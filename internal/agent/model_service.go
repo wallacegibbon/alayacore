@@ -58,18 +58,6 @@ func NewModelService(manager *ModelManager, runtimeMgr *RuntimeManager) *ModelSe
 // Accessors (safe from task goroutine — written before task starts)
 // ============================================================================
 
-// Agent returns the current agent, or nil if not initialized.
-func (ms *ModelService) Agent() *llm.Agent { return ms.agent }
-
-// ContextLimit returns the context limit (0 = unlimited).
-func (ms *ModelService) ContextLimit() int64 { return ms.contextLimit }
-
-// InitError returns any fatal initialization error (e.g. --model not found).
-func (ms *ModelService) InitError() error { return ms.initError }
-
-// SetInitError sets a fatal initialization error (e.g. corrupt session file replay).
-func (ms *ModelService) SetInitError(err error) { ms.initError = err }
-
 // ActiveModelName returns the active model's display name, or "".
 func (ms *ModelService) ActiveModelName() string {
 	if ms.manager == nil {
@@ -109,12 +97,6 @@ func (ms *ModelService) ModelConfigPath() string {
 	}
 	return ms.manager.GetFilePath()
 }
-
-// ModelManager returns the underlying ModelManager.
-func (ms *ModelService) ModelManager() *ModelManager { return ms.manager }
-
-// RuntimeManager returns the underlying RuntimeManager.
-func (ms *ModelService) RuntimeManager() *RuntimeManager { return ms.runtimeMgr }
 
 // GetLoadErrors returns model config parse/validation errors.
 func (ms *ModelService) GetLoadErrors() []string {
@@ -178,18 +160,6 @@ func (ms *ModelService) setActiveFromCliFlag() {
 	}
 }
 
-// SetSessionMetaModel stores the model name from a loaded session file.
-// Applied during ResolveActiveModel().
-func (ms *ModelService) SetSessionMetaModel(name string) {
-	ms.sessionMetaModel = name
-}
-
-// SetOverrideModel stores the --model CLI flag override.
-// Applied during ResolveActiveModel().
-func (ms *ModelService) SetOverrideModel(name string) {
-	ms.overrideModel = name
-}
-
 // ============================================================================
 // Model Switching
 // ============================================================================
@@ -251,21 +221,6 @@ func (ms *ModelService) SetVideoConfig(fps int, resolution int) {
 	if ms.provider != nil {
 		ms.provider.SetVideoConfig(fps, resolution)
 	}
-}
-
-// ReasoningLevel returns the current reasoning level.
-func (ms *ModelService) ReasoningLevel() int { return ms.reasoningLevel }
-
-// VideoFPS returns the current video FPS setting.
-func (ms *ModelService) VideoFPS() int { return ms.videoFPS }
-
-// VideoRes returns the current video resolution setting.
-func (ms *ModelService) VideoRes() int { return ms.videoRes }
-
-// SetDebugProxy stores debug/proxy settings for later provider creation.
-func (ms *ModelService) SetDebugProxy(debugDir, proxyURL string) {
-	ms.debugDir = debugDir
-	ms.proxyURL = proxyURL
 }
 
 // ============================================================================

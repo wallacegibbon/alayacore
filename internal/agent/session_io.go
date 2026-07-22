@@ -278,7 +278,7 @@ func (s *Session) handleInputMsg(msg inputMsg) {
 // ============================================================================
 
 func (s *Session) handleModelSet(args string) {
-	mm := s.modelService.ModelManager()
+	mm := s.modelService.manager
 	if mm == nil {
 		s.writeError("model manager not initialized")
 		return
@@ -309,8 +309,8 @@ func (s *Session) handleModelSet(args string) {
 	// preference in-memory (saved to the session file on :save), while
 	// sessions without one write to the global runtime.conf.
 	if s.SessionFile != "" {
-		s.modelService.SetSessionMetaModel(model.Name)
-	} else if rm := s.modelService.RuntimeManager(); rm != nil {
+		s.modelService.sessionMetaModel = model.Name
+	} else if rm := s.modelService.runtimeMgr; rm != nil {
 		if err := rm.SetActiveModel(model.Name); err != nil {
 			s.writeNotifyf("Failed to persist model switch: %v", err)
 		}
@@ -323,7 +323,7 @@ func (s *Session) handleModelSet(args string) {
 }
 
 func (s *Session) handleModelLoad() {
-	mm := s.modelService.ModelManager()
+	mm := s.modelService.manager
 	if mm == nil {
 		s.writeError("model manager not initialized")
 		return
@@ -364,7 +364,7 @@ func (s *Session) handleModelLoad() {
 // editor session. The JSON is received as a single string (cut on first
 // space), so string values with spaces (e.g. model names) are preserved.
 func (s *Session) handleModelSync(args string) {
-	mm := s.modelService.ModelManager()
+	mm := s.modelService.manager
 	if mm == nil {
 		s.writeError("model manager not initialized")
 		return
@@ -461,8 +461,8 @@ func (s *Session) handleThemeSet(args string) {
 		}
 	}
 
-	if s.modelService.RuntimeManager() != nil {
-		if err := s.modelService.RuntimeManager().SetActiveTheme(name); err != nil {
+	if s.modelService.runtimeMgr != nil {
+		if err := s.modelService.runtimeMgr.SetActiveTheme(name); err != nil {
 			s.writeNotifyf("Failed to persist theme switch: %v", err)
 		}
 	}

@@ -22,7 +22,7 @@ func (s *Session) SwitchModel(modelConfig *config.ModelConfig) error {
 		return err
 	}
 	// Sync back context limit from the service.
-	s.ContextLimit = s.modelService.ContextLimit()
+	s.ContextLimit = s.modelService.contextLimit
 	s.sendSystemInfo(SystemInfoModel)
 	return nil
 }
@@ -30,7 +30,7 @@ func (s *Session) SwitchModel(modelConfig *config.ModelConfig) error {
 // InitError returns a non-nil error if session construction encountered a
 // fatal problem (e.g. --model specified a non-existent model).
 func (s *Session) InitError() error {
-	return s.modelService.InitError()
+	return s.modelService.initError
 }
 
 func (s *Session) activeModelName() string {
@@ -45,7 +45,7 @@ func (s *Session) RuntimeManager() *RuntimeManager {
 	if s.modelService == nil {
 		return nil
 	}
-	return s.modelService.RuntimeManager()
+	return s.modelService.runtimeMgr
 }
 
 func (s *Session) ensureAgentInitialized() error {
@@ -73,4 +73,4 @@ func (s *Session) SetVideoConfig(fps int, resolution int) {
 // ============================================================================
 
 // Agent returns the current LLM agent. Called from the task goroutine.
-func (s *Session) Agent() *llm.Agent { return s.modelService.Agent() }
+func (s *Session) Agent() *llm.Agent { return s.modelService.agent }

@@ -143,7 +143,7 @@ func (s *Session) sendModelMsg() {
 	s.writeSystemMsg(ModelMsg{
 		ActiveModelID:   ms.ActiveModelID(),
 		ActiveModelName: ms.ActiveModelName(),
-		ContextLimit:    ms.ContextLimit(),
+		ContextLimit:    ms.contextLimit,
 	})
 }
 
@@ -159,7 +159,7 @@ func (s *Session) sendModelListMsg() {
 }
 
 func (s *Session) sendThemeMsg() {
-	rm := s.modelService.RuntimeManager()
+	rm := s.modelService.runtimeMgr
 	if rm == nil {
 		return
 	}
@@ -205,9 +205,9 @@ func (s *Session) sendThemeListMsg() {
 }
 
 func (s *Session) sendReasoningMsg() {
-	s.writeSystemMsg(ReasoningMsg{Level: s.modelService.ReasoningLevel()})
+	s.writeSystemMsg(ReasoningMsg{Level: s.modelService.reasoningLevel})
 }
 
 func (s *Session) sendVideoConfigMsg() {
-	s.writeSystemMsg(VideoConfigMsg{FPS: s.modelService.VideoFPS(), Res: s.modelService.VideoRes()})
+	s.writeSystemMsg(VideoConfigMsg{FPS: s.modelService.videoFPS, Res: s.modelService.videoRes})
 }

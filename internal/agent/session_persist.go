@@ -29,9 +29,9 @@ func (s *Session) saveContentToFile(path string, contents []llm.ContentPart) err
 	videoFPS := 0
 	videoRes := 0
 	if s.modelService != nil {
-		reasoningLevel = s.modelService.ReasoningLevel()
-		videoFPS = s.modelService.VideoFPS()
-		videoRes = s.modelService.VideoRes()
+		reasoningLevel = s.modelService.reasoningLevel
+		videoFPS = s.modelService.videoFPS
+		videoRes = s.modelService.videoRes
 	}
 	meta := SessionMeta{
 		CreatedAt:      s.CreatedAt,
