@@ -9,7 +9,6 @@ package agent
 
 import (
 	"fmt"
-	"net/http"
 
 	"github.com/alayacore/alayacore/internal/config"
 	"github.com/alayacore/alayacore/internal/llm"
@@ -42,7 +41,7 @@ type ModelService struct {
 	contextLimit int64
 
 	// Configuration passed through from Session for agent creation
-	debugAPI bool
+	debugDir string
 	proxyURL string
 }
 
@@ -264,8 +263,8 @@ func (ms *ModelService) VideoFPS() int { return ms.videoFPS }
 func (ms *ModelService) VideoRes() int { return ms.videoRes }
 
 // SetDebugProxy stores debug/proxy settings for later provider creation.
-func (ms *ModelService) SetDebugProxy(debugAPI bool, proxyURL string) {
-	ms.debugAPI = debugAPI
+func (ms *ModelService) SetDebugProxy(debugDir, proxyURL string) {
+	ms.debugDir = debugDir
 	ms.proxyURL = proxyURL
 }
 
@@ -279,7 +278,7 @@ func (ms *ModelService) createProviderAndAgent(
 	systemPrompt, extraSystemPrompt string,
 	maxSteps int,
 ) (llm.Provider, *llm.Agent, error) {
-	provider, err := createProviderFromConfig(modelConfig, ms.debugAPI, ms.proxyURL)
+	provider, err := createProviderFromConfig(modelConfig, ms.debugDir, ms.proxyURL)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -297,20 +296,10 @@ func (ms *ModelService) createProviderAndAgent(
 // Package-level helper
 // ============================================================================
 
-func createProviderFromConfig(modelCfg *config.ModelConfig, debugAPI bool, proxyURL string) (llm.Provider, error) {
-	var client *http.Client
-	var err error
-	if proxyURL != "" {
-		if debugAPI {
-			client, err = providers.NewHTTPClientWithProxyAndDebug(proxyURL)
-		} else {
-			client, err = providers.NewHTTPClientWithProxy(proxyURL)
-		}
-		if err != nil {
-			return nil, fmt.Errorf("provider: failed to create HTTP client with proxy: %w", err)
-		}
-	} else if debugAPI {
-		client = providers.NewHTTPClient()
+func createProviderFromConfig(modelCfg *config.ModelConfig, debugDir, proxyURL string) (llm.Provider, error) {
+	client, err := providers.NewHTTPClient(proxyURL, debugDir)
+	if err != nil {
+		return nil, fmt.Errorf("provider: failed to create HTTP client: %w", err)
 	}
 
 	return factory.NewProvider(factory.ProviderConfig{

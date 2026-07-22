@@ -12,7 +12,10 @@ import (
 )
 
 func TestNewHTTPClient(t *testing.T) {
-	client := NewHTTPClient()
+	client, err := NewHTTPClient("", t.TempDir())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if client == nil {
 		t.Fatal("NewHTTPClient returned nil")
 		return
@@ -35,7 +38,7 @@ func TestNewHTTPClient(t *testing.T) {
 }
 
 func TestNewHTTPClientWithProxyAndDebug(t *testing.T) {
-	client, err := NewHTTPClientWithProxyAndDebug("http://127.0.0.1:7890")
+	client, err := NewHTTPClient("http://127.0.0.1:7890", t.TempDir())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 		return
@@ -66,7 +69,7 @@ func TestNewHTTPClientWithProxyAndDebug(t *testing.T) {
 }
 
 func TestNewHTTPClientWithProxyAndDebug_InvalidProxy(t *testing.T) {
-	_, err := NewHTTPClientWithProxyAndDebug("://invalid")
+	_, err := NewHTTPClient("://invalid", "")
 	if err == nil {
 		t.Fatal("expected error for invalid proxy URL, got nil")
 	}
@@ -224,7 +227,7 @@ func (m *mockRoundTripper) RoundTrip(_ *http.Request) (*http.Response, error) {
 }
 
 func TestNewDebugWriter_NotNil(t *testing.T) {
-	w := debug.NewDebugWriter("alayacore-debug-api-test")
+	w := debug.NewDebugWriter(t.TempDir(), "alayacore-debug-api-test")
 	if w == nil {
 		t.Fatal("NewDebugWriter returned nil")
 	}

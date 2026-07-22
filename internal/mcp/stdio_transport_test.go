@@ -201,7 +201,7 @@ func runMCPServer() {
 // newStdioTestTransport creates a StdioTransport backed by the test binary
 // itself as the subprocess. Additional environment variables can be passed
 // to configure the test server behavior.
-func newStdioTestTransport(t *testing.T, extraEnv map[string]string, debug bool) *StdioTransport {
+func newStdioTestTransport(t *testing.T, extraEnv map[string]string, debugDir string) *StdioTransport {
 	t.Helper()
 
 	// Build environment for the test server subprocess.
@@ -216,7 +216,7 @@ func newStdioTestTransport(t *testing.T, extraEnv map[string]string, debug bool)
 		os.Args[0],
 		[]string{"-test.run=^TestStdioTransport$"},
 		env,
-		debug,
+		debugDir,
 	)
 	if err != nil {
 		t.Fatalf("NewStdioTransport() error = %v", err)
@@ -255,7 +255,7 @@ func TestStdioTransport_SendReceive(t *testing.T) {
 		return // skip when running as test server
 	}
 
-	transport := newStdioTestTransport(t, nil, false)
+	transport := newStdioTestTransport(t, nil, "")
 	waitForReady(t, transport)
 
 	ctx := context.Background()
@@ -284,7 +284,7 @@ func TestStdioTransport_SendReceive_Error(t *testing.T) {
 		return
 	}
 
-	transport := newStdioTestTransport(t, nil, false)
+	transport := newStdioTestTransport(t, nil, "")
 	waitForReady(t, transport)
 
 	ctx := context.Background()
@@ -314,7 +314,7 @@ func TestStdioTransport_Send_Notification(t *testing.T) {
 		return
 	}
 
-	transport := newStdioTestTransport(t, nil, false)
+	transport := newStdioTestTransport(t, nil, "")
 	waitForReady(t, transport)
 
 	err := transport.Send(context.Background(), jsonrpcRequest{
@@ -335,7 +335,7 @@ func TestStdioTransport_SendReceive_WithNotification(t *testing.T) {
 	}
 
 	// Mix notifications and requests — notifications should not interfere.
-	transport := newStdioTestTransport(t, nil, false)
+	transport := newStdioTestTransport(t, nil, "")
 	waitForReady(t, transport)
 
 	ctx := context.Background()
@@ -373,7 +373,7 @@ func TestStdioTransport_Close(t *testing.T) {
 		return
 	}
 
-	transport := newStdioTestTransport(t, nil, false)
+	transport := newStdioTestTransport(t, nil, "")
 	waitForReady(t, transport)
 
 	// Close should not block or error.
@@ -412,7 +412,7 @@ func TestStdioTransport_ContextCancellation(t *testing.T) {
 
 	transport := newStdioTestTransport(t, map[string]string{
 		"MCP_TEST_SERVER_DELAY_MS": "5000", // Server delays 5s
-	}, false)
+	}, "")
 	waitForReady(t, transport)
 
 	// Create a context that cancels quickly.
@@ -439,7 +439,7 @@ func TestStdioTransport_ServerPing(t *testing.T) {
 
 	// The s2c/ prefix tells the test server to send a server-to-client
 	// ping request before responding to the original request.
-	transport := newStdioTestTransport(t, nil, false)
+	transport := newStdioTestTransport(t, nil, "")
 	waitForReady(t, transport)
 
 	ctx := context.Background()
@@ -466,7 +466,7 @@ func TestStdioTransport_MultipleConcurrentRequests(t *testing.T) {
 		return
 	}
 
-	transport := newStdioTestTransport(t, nil, false)
+	transport := newStdioTestTransport(t, nil, "")
 	waitForReady(t, transport)
 
 	// Send 5 concurrent requests.
@@ -517,7 +517,7 @@ func TestStdioTransport_DebugLogging(t *testing.T) {
 	}
 
 	// Debug mode should not crash.
-	transport := newStdioTestTransport(t, nil, true)
+	transport := newStdioTestTransport(t, nil, t.TempDir())
 	waitForReady(t, transport)
 	t.Cleanup(func() { transport.debugWriter.Close() })
 
@@ -554,7 +554,7 @@ func TestStdioTransport_DoneOnClose(t *testing.T) {
 		return
 	}
 
-	transport := newStdioTestTransport(t, nil, false)
+	transport := newStdioTestTransport(t, nil, "")
 	waitForReady(t, transport)
 
 	transport.Close()
@@ -574,7 +574,7 @@ func TestStdioTransport_DoneOnProcessExit(t *testing.T) {
 
 	transport := newStdioTestTransport(t, map[string]string{
 		"MCP_TEST_SERVER_WAIT_EOF": "1",
-	}, false)
+	}, "")
 	waitForReady(t, transport)
 
 	// Close stdin to trigger server exit → then readLoop should exit
@@ -598,7 +598,7 @@ func TestStdioTransport_SendReceive_InvalidJSON(t *testing.T) {
 	// method starts with "malformed/". The readLoop should log a warning
 	// and continue without crashing. The pending channel should eventually
 	// be cleaned up when the transport is closed.
-	transport := newStdioTestTransport(t, nil, false)
+	transport := newStdioTestTransport(t, nil, "")
 	waitForReady(t, transport)
 
 	// Register a pending request.
@@ -643,7 +643,7 @@ func TestStdioTransport_ProcessExitDuringSendReceive(t *testing.T) {
 	// Use wait-eof mode so the server doesn't exit until stdin is closed.
 	transport := newStdioTestTransport(t, map[string]string{
 		"MCP_TEST_SERVER_WAIT_EOF": "1",
-	}, false)
+	}, "")
 	waitForReady(t, transport)
 
 	// Register a pending request.
@@ -675,7 +675,7 @@ func TestStdioTransport_EnvironmentVariables(t *testing.T) {
 	// Verify that environment variables are passed to the subprocess.
 	transport := newStdioTestTransport(t, map[string]string{
 		"MCP_TEST_CUSTOM_VAR": "custom_value",
-	}, false)
+	}, "")
 	waitForReady(t, transport)
 
 	// The test server inherits the environment. We can verify by checking
@@ -709,7 +709,7 @@ func TestStdioTransport_SendReceive_WithCustomError(t *testing.T) {
 		return
 	}
 
-	transport := newStdioTestTransport(t, nil, false)
+	transport := newStdioTestTransport(t, nil, "")
 	waitForReady(t, transport)
 
 	// "error/custom" triggers a custom error code -32000 in the test server.

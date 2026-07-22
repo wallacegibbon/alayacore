@@ -195,7 +195,7 @@ func NewSession(cfg SessionConfig) *Session {
 
 	modelService := NewModelService(NewModelManager(cfg.ModelConfigPath), NewRuntimeManager(cfg.RuntimeConfigPath))
 	modelService.SetOverrideModel(cfg.OverrideActiveModel)
-	modelService.SetDebugProxy(cfg.DebugAPI, cfg.ProxyURL)
+	modelService.SetDebugProxy(cfg.DebugLogDir, cfg.ProxyURL)
 
 	s := &Session{
 		sessionConfig: sessionConfig{
@@ -238,7 +238,7 @@ func RestoreFromSession(cfg SessionConfig, data *SessionData) *Session {
 	modelService := NewModelService(NewModelManager(cfg.ModelConfigPath), NewRuntimeManager(cfg.RuntimeConfigPath))
 	modelService.SetSessionMetaModel(data.ActiveModel)
 	modelService.SetOverrideModel(cfg.OverrideActiveModel)
-	modelService.SetDebugProxy(cfg.DebugAPI, cfg.ProxyURL)
+	modelService.SetDebugProxy(cfg.DebugLogDir, cfg.ProxyURL)
 
 	s := &Session{
 		sessionConfig: sessionConfig{

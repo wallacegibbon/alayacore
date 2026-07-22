@@ -21,11 +21,7 @@ func TestSearchContentBasicSearch(t *testing.T) {
 		t.Skip("rg not available on system")
 	}
 
-	tmpDir, err := os.MkdirTemp("", "alayacore-rg-test-")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	testFile := filepath.Join(tmpDir, "test.txt")
 	content := "hello world\nfoo bar\nhello again\n"
@@ -51,11 +47,7 @@ func TestSearchContentNoMatches(t *testing.T) {
 		t.Skip("rg not available on system")
 	}
 
-	tmpDir, err := os.MkdirTemp("", "alayacore-rg-test-")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	testFile := filepath.Join(tmpDir, "test.txt")
 	if err := os.WriteFile(testFile, []byte("hello world\n"), 0644); err != nil {
@@ -92,11 +84,7 @@ func TestSearchContentFileTypeFilter(t *testing.T) {
 		t.Skip("rg not available on system")
 	}
 
-	tmpDir, err := os.MkdirTemp("", "alayacore-rg-test-")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	goFile := filepath.Join(tmpDir, "test.go")
 	if err := os.WriteFile(goFile, []byte("package main\nfunc test() {}\n"), 0644); err != nil {
@@ -127,11 +115,7 @@ func TestSearchContentIgnoreCase(t *testing.T) {
 		t.Skip("rg not available on system")
 	}
 
-	tmpDir, err := os.MkdirTemp("", "alayacore-rg-test-")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	testFile := filepath.Join(tmpDir, "test.txt")
 	if err := os.WriteFile(testFile, []byte("Hello World\n"), 0644); err != nil {
@@ -169,11 +153,7 @@ func TestSearchContentMaxLinesGlobal(t *testing.T) {
 		t.Skip("rg not available on system")
 	}
 
-	tmpDir, err := os.MkdirTemp("", "alayacore-rg-test-")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	for f := 0; f < 5; f++ {
 		var content string
@@ -207,11 +187,7 @@ func TestSearchContentPatternLooksLikeFlag(t *testing.T) {
 		t.Skip("rg not available on system")
 	}
 
-	tmpDir, err := os.MkdirTemp("", "alayacore-rg-test-")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	testFile := filepath.Join(tmpDir, "test.txt")
 	if err := os.WriteFile(testFile, []byte("--skill\n--help\nnormal text\n"), 0644); err != nil {

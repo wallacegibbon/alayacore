@@ -123,7 +123,7 @@ and their tools are discovered at startup.
 
 | Flag | Description |
 |------|-------------|
-| `--debug-mcp` | Log raw JSON-RPC messages to `alayacore-debug-mcp-N.log` |
+| `--debug-log` | Debug log directory (`. = CWD, or any path). Enables both JSON-RPC and API debug logging. |
 
 ## Tool Naming
 
@@ -210,10 +210,11 @@ Agent Loop
 
 ## Debugging
 
-Use `--debug-mcp` to log all JSON-RPC messages:
+Use `--debug-log` to log all JSON-RPC messages:
 
 ```bash
-alayacore --debug-mcp
+alayacore --debug-log=.         # write to current directory
+alayacore --debug-log=/tmp      # write to /tmp
 ```
 
 This creates `alayacore-debug-mcp-N.log` (N = 0, 1, 2, ...) in the current

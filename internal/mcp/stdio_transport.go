@@ -35,14 +35,15 @@ type StdioTransport struct {
 	pendingMu sync.Mutex
 	readerWg  sync.WaitGroup
 
-	debugWriter io.WriteCloser // non-nil when --debug-mcp is enabled; logs raw JSON-RCP
+	debugWriter io.WriteCloser // non-nil when --debug-log is enabled; logs raw JSON-RCP
 
 	// Notification handler for server-to-client notifications.
 	notificationHandler NotificationHandler
 }
 
 // NewStdioTransport creates a stdio transport that spawns the given command.
-func NewStdioTransport(command string, args []string, env map[string]string, enableDebug bool) (*StdioTransport, error) {
+// debugDir "" = no debug logging; "." = write to CWD.
+func NewStdioTransport(command string, args []string, env map[string]string, debugDir string) (*StdioTransport, error) {
 	cmd := exec.Command(command, args...)
 
 	stdin, err := cmd.StdinPipe()
@@ -83,8 +84,8 @@ func NewStdioTransport(command string, args []string, env map[string]string, ena
 	}
 
 	// Initialize debug writer if requested.
-	if enableDebug {
-		t.debugWriter = debug.NewDebugWriter("alayacore-debug-mcp")
+	if debugDir != "" {
+		t.debugWriter = debug.NewDebugWriter(debugDir, "alayacore-debug-mcp")
 		if t.debugWriter != nil {
 			fmt.Fprintf(t.debugWriter, "MCP debug log started for: %s %v\n", command, args)
 		}

@@ -3,7 +3,7 @@ package providers
 // DebugTransport and debug-enabled HTTP client factories.
 //
 // DebugTransport wraps an http.RoundTripper to log requests and responses
-// to a writer (file or stderr). Used when --debug-api is enabled.
+// to a writer (file or stderr). Used when --debug-log is enabled.
 
 import (
 	"bytes"
@@ -208,29 +208,38 @@ func (t *DebugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return resp, nil
 }
 
-// NewHTTPClient creates a new HTTP client with debug logging enabled.
-// Each call creates its own independent log file.
-func NewHTTPClient() *http.Client {
-	return &http.Client{
-		Transport: &DebugTransport{
-			Transport: http.DefaultTransport,
-			Writer:    debug.NewDebugWriter("alayacore-debug-api"),
-		},
-	}
-}
+// NewHTTPClient creates an HTTP client with optional proxy and debug logging.
+//
+//   - proxyURL: "" = no proxy; otherwise HTTP/HTTPS/SOCKS5 proxy URL.
+//   - debugDir: "" = no debug logging; "." = write debug logs to CWD; any other
+//     writable path (e.g. t.TempDir() in tests).
+//
+// Returns nil when both proxyURL and debugDir are empty (caller should use
+// http.DefaultClient).
+func NewHTTPClient(proxyURL, debugDir string) (*http.Client, error) {
+	var transport http.RoundTripper
 
-// NewHTTPClientWithProxyAndDebug creates an HTTP client with both proxy and debug logging.
-// Each call creates its own independent log file.
-func NewHTTPClientWithProxyAndDebug(proxyURL string) (*http.Client, error) {
-	client, err := NewHTTPClientWithProxy(proxyURL)
-	if err != nil {
-		return nil, err
-	}
-
-	client.Transport = &DebugTransport{
-		Transport: client.Transport,
-		Writer:    debug.NewDebugWriter("alayacore-debug-api"),
+	if proxyURL != "" {
+		client, err := NewHTTPClientWithProxy(proxyURL)
+		if err != nil {
+			return nil, err
+		}
+		transport = client.Transport
 	}
 
-	return client, nil
+	if debugDir != "" {
+		if transport == nil {
+			transport = http.DefaultTransport
+		}
+		transport = &DebugTransport{
+			Transport: transport,
+			Writer:    debug.NewDebugWriter(debugDir, "alayacore-debug-api"),
+		}
+	}
+
+	if transport == nil {
+		return nil, nil
+	}
+
+	return &http.Client{Transport: transport}, nil
 }

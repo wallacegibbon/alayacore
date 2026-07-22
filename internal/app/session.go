@@ -49,7 +49,7 @@ func StartSession(cfg *Config, output io.Writer, input io.Reader) (*agentpkg.Ses
 		SystemPrompt:        cfg.SystemPrompt,
 		ExtraSystemPrompt:   cfg.ExtraSystemPrompt,
 		MaxSteps:            cfg.MaxSteps,
-		DebugAPI:            cfg.Cfg.DebugAPI,
+		DebugLogDir:         cfg.Cfg.DebugLogDir,
 		AutoSummarize:       cfg.Cfg.AutoSummarize,
 		ProxyURL:            cfg.Cfg.Proxy,
 		SkillsMgr:           cfg.SkillsMgr,

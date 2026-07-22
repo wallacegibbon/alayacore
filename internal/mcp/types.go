@@ -587,7 +587,7 @@ type ServerConfig struct {
 	TokenStore auth.TokenStore
 
 	// Debug enables logging of raw JSON-RPC messages to a file.
-	Debug bool
+	DebugDir string // "" = disabled (when flag not set), "." = write to CWD (set by --debug-log)
 
 	// ProtoVersion forces a specific MCP protocol version.
 	// Must be set to "2024-11-05", "2025-03-26", "2025-06-18",

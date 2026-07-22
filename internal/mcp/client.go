@@ -180,7 +180,7 @@ func (c *Client) Connect(ctx context.Context) error {
 	if ht, ok := transport.(*HTTPTransport); ok {
 		if ha, ok := c.adapter.(HTTPAdapter); ok {
 			if err := ha.OnTransportReady(ctx, ht); err != nil {
-				if c.config.Debug {
+				if c.config.DebugDir != "" {
 					if dw := ht.DebugWriter(); dw != nil {
 						fmt.Fprintf(dw, "MCP: OnTransportReady failed for %q: %v\n", c.config.Name, err)
 					}
@@ -383,13 +383,13 @@ func (c *Client) Done() <-chan struct{} {
 func (c *Client) createTransport() (Transport, error) {
 	switch {
 	case c.config.Command != "":
-		t, err := NewStdioTransport(c.config.Command, c.config.Args, c.config.Env, c.config.Debug)
+		t, err := NewStdioTransport(c.config.Command, c.config.Args, c.config.Env, c.config.DebugDir)
 		if err != nil {
 			return nil, fmt.Errorf("%w", err)
 		}
 		return t, nil
 	case c.config.URL != "":
-		return NewHTTPTransport(c.config.URL, c.config.Debug), nil
+		return NewHTTPTransport(c.config.URL, c.config.DebugDir), nil
 	default:
 		return nil, fmt.Errorf("no command or URL specified")
 	}

@@ -162,8 +162,8 @@ type SessionConfig struct {
 	ToolConfirmTools  []string // tool names requiring user confirmation (empty = no confirmation)
 
 	// Feature flags
-	DebugAPI      bool
-	AutoSummarize int // 0 = disabled, 1-100 = enabled with this threshold percentage
+	DebugLogDir   string // "" = disabled (when flag not set), "." = write to CWD, or any path
+	AutoSummarize int    // 0 = disabled, 1-100 = enabled with this threshold percentage
 	ProxyURL      string
 	NoTheme       bool // If true, skip all theme loading, detection, and broadcasting
 	NoDelta       bool // If true, suppress delta frames (At, Ar, Af); use complete frames only

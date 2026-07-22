@@ -8,11 +8,7 @@ import (
 
 func TestRuntimeManager(t *testing.T) {
 	// Create a temporary directory for testing
-	tmpDir, err := os.MkdirTemp("", "alayacore-runtime-test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	runtimePath := filepath.Join(tmpDir, "runtime.conf")
 
@@ -23,7 +19,7 @@ func TestRuntimeManager(t *testing.T) {
 	}
 
 	// Test setting active model
-	err = rm.SetActiveModel("Test Model")
+	err := rm.SetActiveModel("Test Model")
 	if err != nil {
 		t.Errorf("Failed to set active model: %v", err)
 	}
@@ -103,11 +99,7 @@ func TestFormatRuntimeConfig(t *testing.T) {
 
 func TestRuntimeManagerCreatesFileOnLoad(t *testing.T) {
 	// Create a temporary directory for testing
-	tmpDir, err := os.MkdirTemp("", "alayacore-runtime-test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	runtimePath := filepath.Join(tmpDir, "runtime.conf")
 

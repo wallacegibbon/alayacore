@@ -123,9 +123,10 @@ func (s *sseReadCloser) Close() error {
 }
 
 // NewHTTPTransport creates a new HTTP transport.
+// debugDir "" = no debug logging; "." = write to CWD.
 // It does NOT connect immediately; the first Send/SendReceive will POST
 // to the endpoint.
-func NewHTTPTransport(endpointURL string, enableDebug bool) *HTTPTransport {
+func NewHTTPTransport(endpointURL string, debugDir string) *HTTPTransport {
 	t := &HTTPTransport{
 		endpointURL: endpointURL,
 		httpClient: &http.Client{
@@ -135,8 +136,8 @@ func NewHTTPTransport(endpointURL string, enableDebug bool) *HTTPTransport {
 		done:    make(chan struct{}),
 	}
 
-	if enableDebug {
-		t.debugWriter = debug.NewDebugWriter("alayacore-debug-mcp")
+	if debugDir != "" {
+		t.debugWriter = debug.NewDebugWriter(debugDir, "alayacore-debug-mcp")
 		if t.debugWriter != nil {
 			fmt.Fprintf(t.debugWriter, "MCP HTTP debug log started for: %s\n", endpointURL)
 		}

@@ -7,13 +7,11 @@ import (
 	"path/filepath"
 )
 
-// NewDebugWriter creates a new debug log file inside a dedicated
-// alayacore-debug directory under the system temp directory.
+// NewDebugWriter creates a new debug log file in the given directory.
 // It tries <baseName>-0.log, -1.log, ..., -999.log with O_EXCL so that
 // concurrent processes never collide.
 // Falls back to stderr if all slots are taken or the filesystem is unwritable.
-func NewDebugWriter(baseName string) io.WriteCloser {
-	dir := filepath.Join(os.TempDir(), "alayacore")
+func NewDebugWriter(dir, baseName string) io.WriteCloser {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return os.Stderr
 	}

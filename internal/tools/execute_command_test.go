@@ -91,11 +91,7 @@ func TestExecuteCommandTimeout(t *testing.T) {
 }
 
 func TestExecuteCommandWorkingDir(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "alayacore-test-")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	originalWd, _ := os.Getwd()
 	if err := os.Chdir(tmpDir); err != nil {
