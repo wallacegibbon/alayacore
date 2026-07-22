@@ -197,6 +197,14 @@ func (s *Session) resolveToolConfirm(id string, allowed bool) {
 // prepareTask checks preconditions and creates a cancellable context for
 // a new task. Returns ok=false if setup failed (caller should return immediately).
 func (s *Session) prepareTask() (ctx context.Context, ok bool) {
+	// Before MCP is ready, the tool list is incomplete. Sending an LLM
+	// request would produce a response without MCP tools, and the
+	// subsequent agent reset (when MCP init completes) would invalidate provider's cache
+	if s.mcpService != nil && !s.mcpService.IsReady() {
+		s.writeError("MCP servers are still initializing or OAuth authorization is pending. " +
+			"Please wait for initialization to complete.")
+		return nil, false
+	}
 	if s.activeTask != nil {
 		s.writeError("A task is already running. Wait for it to complete or cancel it.")
 		return nil, false
@@ -214,12 +222,6 @@ func (s *Session) prepareTask() (ctx context.Context, ok bool) {
 func (s *Session) handleInputMsg(msg inputMsg) {
 	if msg.err != nil {
 		s.writeError(msg.err.Error())
-		return
-	}
-
-	if s.mcpService != nil && !s.mcpService.IsReady() {
-		s.writeError("MCP servers are still initializing or OAuth authorization is pending. " +
-			"Please wait for initialization to complete.")
 		return
 	}
 
