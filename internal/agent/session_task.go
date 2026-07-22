@@ -21,40 +21,6 @@ import (
 	"github.com/alayacore/alayacore/internal/tlv"
 )
 
-// Auto-summarization threshold constants.
-const (
-	// AutoSummarizeThreshold is the context usage percentage at which
-	// auto-summarization is triggered (65% of context limit).
-	AutoSummarizeThreshold = 65
-
-	// AutoSummarizePctBase is the base for percentage calculations (100%).
-	AutoSummarizePctBase = 100
-)
-
-// shouldAutoSummarize returns true when auto-summarization is enabled and
-// the current context tokens exceed AutoSummarizeThreshold of the configured limit.
-func (s *Session) shouldAutoSummarize() bool {
-	limit := s.ContextLimit
-	return s.AutoSummarize && limit > 0 && s.ContextTokens > 0 &&
-		s.ContextTokens >= limit*AutoSummarizeThreshold/AutoSummarizePctBase
-}
-
-// summarizeBackup saves a timestamped backup of the current session contents
-// before summarization. Silently skips if no session file is configured.
-func (s *Session) summarizeBackup(contents []llm.ContentPart) {
-	if s.SessionFile == "" {
-		return
-	}
-	ext := filepath.Ext(s.SessionFile)
-	base := strings.TrimSuffix(s.SessionFile, ext)
-	backupPath := fmt.Sprintf("%s-%s%s", base, time.Now().Format("20060102150405"), ext)
-	if err := s.saveContentToFile(backupPath, contents); err != nil {
-		s.writeNotifyf("Failed to create pre-summarize backup: %v", err)
-	} else {
-		s.writeNotifyf("Pre-summarize backup saved to %s", backupPath)
-	}
-}
-
 // summarizeContents appends the summarize prompt, calls processPrompt,
 // and formats the response as a "Continue" + summary conversation.
 // On any failure, returns the original contents (without the prompt).
@@ -114,12 +80,36 @@ func (s *Session) summarizeContents(ctx context.Context, contents []llm.ContentP
 	return result, nil
 }
 
+// shouldAutoSummarize returns true when auto-summarization is enabled and
+// the current context tokens exceed s.AutoSummarizeThreshold of the configured limit.
+func (s *Session) shouldAutoSummarize() bool {
+	limit := s.ContextLimit
+	return s.AutoSummarize && limit > 0 && s.ContextTokens > 0 &&
+		s.ContextTokens >= limit*int64(s.AutoSummarizeThreshold)/100
+}
+
+// summarizeBackup saves a timestamped backup of the current session contents
+// before summarization. Silently skips if no session file is configured.
+func (s *Session) summarizeBackup(contents []llm.ContentPart) {
+	if s.SessionFile == "" {
+		return
+	}
+	ext := filepath.Ext(s.SessionFile)
+	base := strings.TrimSuffix(s.SessionFile, ext)
+	backupPath := fmt.Sprintf("%s-%s%s", base, time.Now().Format("20060102150405"), ext)
+	if err := s.saveContentToFile(backupPath, contents); err != nil {
+		s.writeNotifyf("Failed to create pre-summarize backup: %v", err)
+	} else {
+		s.writeNotifyf("Pre-summarize backup saved to %s", backupPath)
+	}
+}
+
 // doAutoSummarize logs a notification and triggers summarization.
 // Called synchronously from runTask when the context is near
 // the token limit — must complete before the user's prompt is processed.
 func (s *Session) doAutoSummarize(ctx context.Context, contents []llm.ContentPart) []llm.ContentPart {
 	limit := s.ContextLimit
-	usage := float64(s.ContextTokens) * AutoSummarizePctBase / float64(limit)
+	usage := float64(s.ContextTokens) * 100 / float64(limit)
 	s.writeNotifyf("Context usage at %d/%d tokens (%.0f%%). Auto-summarizing...",
 		s.ContextTokens, limit, usage)
 
@@ -283,7 +273,12 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.ContentPart) 
 
 	onStepFinish := func(contents []llm.ContentPart, usage llm.Usage) error {
 		fullContents = cleanIncompleteToolInputs(contents)
-		s.sendEvent(usageToStepFinishEvent(usage))
+		s.sendEvent(StepFinishEvent{
+			InputTokens:         usage.InputTokens,
+			OutputTokens:        usage.OutputTokens,
+			CacheReadTokens:     usage.CacheReadTokens,
+			CacheCreationTokens: usage.CacheCreationTokens,
+		})
 		outputTokens += usage.OutputTokens
 		return nil
 	}
@@ -319,16 +314,6 @@ func (s *Session) processPrompt(ctx context.Context, history []llm.ContentPart) 
 	}
 
 	return fullContents, outputTokens, nil
-}
-
-// usageToStepFinishEvent converts an llm.Usage to a StepFinishEvent.
-func usageToStepFinishEvent(usage llm.Usage) StepFinishEvent {
-	return StepFinishEvent{
-		InputTokens:         usage.InputTokens,
-		OutputTokens:        usage.OutputTokens,
-		CacheReadTokens:     usage.CacheReadTokens,
-		CacheCreationTokens: usage.CacheCreationTokens,
-	}
 }
 
 // cleanIncompleteToolInputs removes orphaned tool uses from the end of

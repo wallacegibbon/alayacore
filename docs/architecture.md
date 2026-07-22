@@ -89,7 +89,7 @@ stdin EOF ──▶ inputPump closes inputMsgCh ──▶ run() detects closed c
 - **Auto-save** — Always enabled when `--session` is specified. The session is saved after each step completes. Redundant writes are skipped when message count and content are unchanged.
 - **Manual save** — `:save [file]` or `Ctrl+S` at any time (TUI mode).
 - **Load** — On startup, AlayaCore starts a new empty session unless you specify `--session` to load an existing one.
-- **Auto-summarize** — When `--auto-summarize` is enabled and `context_limit` is set, AlayaCore automatically triggers `:summarize` when context reaches 65% of the limit.
+- **Auto-summarize** — When `--auto-summarize` is enabled and `context_limit` is set, AlayaCore automatically triggers `:summarize` when context reaches the configured percentage of the limit (default 65%, configurable via `--auto-summarize-threshold`).
 
 Session files use a key-value frontmatter + binary TLV body format. The frontmatter uses `---` delimiters with simple `key: value` lines (parsed by `config.ParseKeyValue`). The body contains TLV-encoded conversation data (messages, tool calls, tool results) written directly as binary TLV records after the frontmatter.
 

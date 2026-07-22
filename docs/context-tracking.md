@@ -7,7 +7,7 @@ How AlayaCore tracks conversation context size across LLM API calls and provider
 `ContextTokens` in `Session` tracks the current conversation's total context size (input + output + cache) as reported by the LLM provider. It is used for:
 
 - Displaying context usage in the status bar (e.g. `2.1K/128K 1.7%`)
-- Triggering auto-summarization when context exceeds 65% of `context_limit`
+- Triggering auto-summarization when context exceeds the configured percentage of `context_limit` (default 65%, configurable via `--auto-summarize-threshold`)
 
 ## Data Flow
 
@@ -121,7 +121,7 @@ Both are sent by the same goroutine sequentially, and the FIFO channel guarantee
 
 ## Related
 
-- `shouldAutoSummarize()` — triggers when `ContextTokens >= ContextLimit * 65%` (only when `--auto-summarize` is enabled)
+- `shouldAutoSummarize()` — triggers when `ContextTokens >= ContextLimit * threshold / 100` (threshold defaults to 65, configurable via `--auto-summarize-threshold`; only when `--auto-summarize` is enabled)
 - `runSummarize()` (in `session_task.go`) — sends the summarize prompt via `summarizeContents` → `processPrompt`, then replaces conversation history with the summary and resets `ContextTokens` to the summary's output token count via `SetContextTokensEvent`
 - `SetContextTokensEvent` — a dedicated task event that sets `ContextTokens` to the correct value after summarization, overriding the stale value from the preceding `StepFinishEvent`
 - `applyModelContextLimit()` — sets `ContextLimit` from the active model's config

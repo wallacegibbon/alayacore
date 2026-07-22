@@ -25,34 +25,6 @@ import (
 // Command Handling
 // ============================================================================
 
-func (s *Session) cancelTask() {
-	if s.activeTask != nil {
-		if s.cancelRunningTask() {
-			return
-		}
-	}
-	s.writeError("nothing to cancel")
-}
-
-func (s *Session) saveSession(args string) {
-	var path string
-	if args == "" {
-		if s.SessionFile == "" {
-			s.writeError("no session file set")
-			return
-		}
-		path = s.SessionFile
-	} else {
-		path = config.ExpandPath(args)
-	}
-
-	if err := s.saveContentToFile(path, s.Contents); err != nil {
-		s.writeError(fmt.Sprintf("save: failed to save session: %v", err))
-	} else {
-		s.writeNotifyf("Session saved to %s", path)
-	}
-}
-
 func (s *Session) handleModelSet(args string) {
 	mm := s.modelService.ModelManager()
 	if mm == nil {
@@ -567,4 +539,32 @@ func (s *Session) handleMCPDecline(args string) {
 	} else {
 		s.writeError(fmt.Sprintf("No pending authorization for MCP server %q.", server))
 	}
+}
+
+func (s *Session) saveSession(args string) {
+	var path string
+	if args == "" {
+		if s.SessionFile == "" {
+			s.writeError("no session file set")
+			return
+		}
+		path = s.SessionFile
+	} else {
+		path = config.ExpandPath(args)
+	}
+
+	if err := s.saveContentToFile(path, s.Contents); err != nil {
+		s.writeError(fmt.Sprintf("save: failed to save session: %v", err))
+	} else {
+		s.writeNotifyf("Session saved to %s", path)
+	}
+}
+
+func (s *Session) cancelTask() {
+	if s.activeTask != nil {
+		if s.cancelRunningTask() {
+			return
+		}
+	}
+	s.writeError("nothing to cancel")
 }

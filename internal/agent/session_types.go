@@ -162,11 +162,12 @@ type SessionConfig struct {
 	ToolConfirmTools  []string // tool names requiring user confirmation (empty = no confirmation)
 
 	// Feature flags
-	DebugAPI      bool
-	AutoSummarize bool
-	ProxyURL      string
-	NoTheme       bool // If true, skip all theme loading, detection, and broadcasting
-	NoDelta       bool // If true, suppress delta frames (At, Ar, Af); use complete frames only
+	DebugAPI               bool
+	AutoSummarize          bool
+	AutoSummarizeThreshold int // percentage of context limit that triggers summarization (default 65)
+	ProxyURL               string
+	NoTheme                bool // If true, skip all theme loading, detection, and broadcasting
+	NoDelta                bool // If true, suppress delta frames (At, Ar, Af); use complete frames only
 
 	// External dependencies
 	SkillsMgr *skills.Manager
