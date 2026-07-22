@@ -5,7 +5,7 @@
 //
 //   - Prompt execution and task management
 //   - Model interaction and streaming
-//   - Context management and auto-summarization (opt-in via --auto-summarize flag)
+//   - Context management and auto-summarization (--auto-summarize=threshold)
 //   - Command processing (:save, :model_set, :model_load, etc.)
 //   - Session persistence (save/load conversations)
 //

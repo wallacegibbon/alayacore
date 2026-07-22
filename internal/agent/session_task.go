@@ -81,11 +81,11 @@ func (s *Session) summarizeContents(ctx context.Context, contents []llm.ContentP
 }
 
 // shouldAutoSummarize returns true when auto-summarization is enabled and
-// the current context tokens exceed s.AutoSummarizeThreshold of the configured limit.
+// the current context tokens exceed s.AutoSummarize of the configured limit.
 func (s *Session) shouldAutoSummarize() bool {
 	limit := s.ContextLimit
-	return s.AutoSummarize && limit > 0 && s.ContextTokens > 0 &&
-		s.ContextTokens >= limit*int64(s.AutoSummarizeThreshold)/100
+	return s.AutoSummarize > 0 && limit > 0 && s.ContextTokens > 0 &&
+		s.ContextTokens >= limit*int64(s.AutoSummarize)/100
 }
 
 // summarizeBackup saves a timestamped backup of the current session contents

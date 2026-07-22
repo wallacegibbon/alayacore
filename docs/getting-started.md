@@ -56,7 +56,7 @@ export ALAYACORE_SHELL=zsh
 | `--session` | *(none)* | Path to session file for loading/saving conversations |
 | `--proxy` | *(none)* | Proxy URL. Supports `http://`, `https://`, and `socks5://` schemes |
 | `--max-steps` | `0` (no limit) | Maximum number of agent loop iterations per prompt. When set to 0 (the default), the agent loops until the model produces a final response. Exceeding this limit raises an error and reports an error — use `:continue` to retry. |
-| `--auto-summarize` | `false` | Automatically summarize when context exceeds the threshold of `context_limit` (default 65%, configurable via `--auto-summarize-threshold`) |
+| `--auto-summarize` | `0` (disabled) | Enable auto-summarization at given threshold percentage (e.g. `--auto-summarize=65`, 0 = disabled) |
 | `--tool-confirm` | *(none)* | Comma-separated tool `names` that require user confirmation before execution (e.g. `--tool-confirm execute_command,search_content`) |
 | `--builtin-tools` | *(all)* | Comma-separated built-in tool `names` to enable. Empty (`--builtin-tools=`) disables all built-in tools. Unspecified means all tools enabled. |
 | `--no-delta` | `false` | Disable delta frames (At, Ar, Af); use complete frames only. Reduces wire overhead when the adapter does not need streaming previews. |

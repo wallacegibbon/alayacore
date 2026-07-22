@@ -112,12 +112,11 @@ type Settings struct {
 	Proxy string
 
 	// Agent behavior
-	SystemPrompt           string
-	MaxSteps               int
-	AutoSummarize          bool
-	AutoSummarizeThreshold int              // percentage of context limit that triggers summarization (default 65)
-	ToolConfirm            []string         // tool names requiring user confirmation
-	BuiltinTools           tools.ToolFilter // built-in tools to enable
+	SystemPrompt  string
+	MaxSteps      int
+	AutoSummarize int              // 0 = disabled, 1-100 = enabled with this threshold percentage
+	ToolConfirm   []string         // tool names requiring user confirmation
+	BuiltinTools  tools.ToolFilter // built-in tools to enable
 
 	// Command execution
 	CommandTimeout int // max duration for execute_command in seconds (default 120)
@@ -156,8 +155,7 @@ func Parse() *Settings {
 	systemPrompt := &stringSlice{}
 	flag.Var(systemPrompt, "system", "Extra `system-prompt` (can be specified multiple times, will be appended to default)")
 	maxSteps := flag.Int("max-steps", DefaultMaxSteps, "Maximum agent loop steps (0 = no limit)")
-	autoSummarize := flag.Bool("auto-summarize", false, "Automatically summarize conversation when context exceeds threshold of limit")
-	autoSummarizeThreshold := flag.Int("auto-summarize-threshold", 65, "Context usage percentage that triggers auto-summarization (default 65%)")
+	autoSummarize := flag.Int("auto-summarize", 0, "Enable auto-summarization at given threshold percentage (e.g. --auto-summarize=65, 0 = disabled)")
 	toolConfirm := flag.String("tool-confirm", "", "Comma-separated tool `names` requiring user confirmation (e.g. execute_command,search_content)")
 	noDelta := flag.Bool("no-delta", false, "Disable delta frames (At, Ar, Af); use complete frames only")
 	flag.String("builtin-tools", "", "Comma-separated built-in tool `names` to enable (empty = no builtin tools, unspecified = all tools)")
@@ -189,27 +187,26 @@ func Parse() *Settings {
 	}
 
 	s := &Settings{
-		ShowVersion:            *showVersion,
-		PlainIO:                *plainIO,
-		RawIO:                  *rawIO,
-		DebugAPI:               *debugAPI,
-		DebugMCP:               *debugMCP,
-		ModelConfig:            filepath.Join(cp, "model.conf"),
-		RuntimeConfig:          filepath.Join(cp, "runtime.conf"),
-		MCPConfigPath:          filepath.Join(cp, "mcp.conf"),
-		ThemesFolder:           filepath.Join(cp, "themes"),
-		Skills:                 skill.Get(),
-		Session:                *session,
-		ModelName:              *modelName,
-		Proxy:                  *proxy,
-		SystemPrompt:           mergedSystemPrompt(systemPrompt),
-		MaxSteps:               *maxSteps,
-		AutoSummarize:          *autoSummarize,
-		AutoSummarizeThreshold: *autoSummarizeThreshold,
-		ToolConfirm:            parseToolConfirm(*toolConfirm),
-		BuiltinTools:           builtinToolsFilter,
-		CommandTimeout:         resolveCommandTimeout(*commandTimeout),
-		NoDelta:                *noDelta,
+		ShowVersion:    *showVersion,
+		PlainIO:        *plainIO,
+		RawIO:          *rawIO,
+		DebugAPI:       *debugAPI,
+		DebugMCP:       *debugMCP,
+		ModelConfig:    filepath.Join(cp, "model.conf"),
+		RuntimeConfig:  filepath.Join(cp, "runtime.conf"),
+		MCPConfigPath:  filepath.Join(cp, "mcp.conf"),
+		ThemesFolder:   filepath.Join(cp, "themes"),
+		Skills:         skill.Get(),
+		Session:        *session,
+		ModelName:      *modelName,
+		Proxy:          *proxy,
+		SystemPrompt:   mergedSystemPrompt(systemPrompt),
+		MaxSteps:       *maxSteps,
+		AutoSummarize:  *autoSummarize,
+		ToolConfirm:    parseToolConfirm(*toolConfirm),
+		BuiltinTools:   builtinToolsFilter,
+		CommandTimeout: resolveCommandTimeout(*commandTimeout),
+		NoDelta:        *noDelta,
 	}
 
 	return s
