@@ -105,7 +105,7 @@ func (s *Session) summarizeBackup(contents []llm.ContentPart) {
 }
 
 // doAutoSummarize logs a notification and triggers summarization.
-// Called synchronously from runTask when the context is near
+// Called synchronously from runTaskNormal when the context is near
 // the token limit — must complete before the user's prompt is processed.
 func (s *Session) doAutoSummarize(ctx context.Context, contents []llm.ContentPart) []llm.ContentPart {
 	limit := s.ContextLimit
@@ -376,37 +376,38 @@ func cleanIncompleteToolInputs(contents []llm.ContentPart) []llm.ContentPart {
 }
 
 // ============================================================================
-// Task goroutines — runTask, runContinue, runSummarize
+// Task goroutines — runTaskNormal, runTaskContinue, runTaskSummarize
 //
 // These three functions are the entry points for task goroutines, each started
-// by handlePrompt / :continue / :summarize respectively. They all call
-// processPrompt (which blocks on the LLM) and therefore run in their own
-// goroutine to keep the main event loop responsive.
+// by prepareTask (called from handleInputMsg) for normal prompts, :continue,
+// They all call processPrompt (which blocks on the LLM) and therefore run in
+// their own goroutine to keep the main event loop responsive.
 //
 // Relationships:
 //
-//   runTask        — normal prompt. Appends user parts to history, calls
-//                    processPrompt. If the context was near the token limit,
-//                    it synchronously runs doAutoSummarize first to free space.
+//   runTaskNormal     — normal prompt. Appends user parts to history, calls
+//                       processPrompt. If the context was near the token limit,
+//                       it synchronously runs doAutoSummarize first to free space.
 //
-//   runContinue    — retry last prompt. If the last response was assistant
-//                    (canceled mid-stream), appends "Continue" and resends.
-//                    Otherwise (user/tool message), resends the history as-is.
+//   runTaskContinue   — retry last prompt. If the last response was assistant
+//                       (canceled mid-stream), appends "Continue" and resends.
+//                       Otherwise (user/tool message), resends the history as-is.
 //
-//   runSummarize   — :summarize command. Calls summarizeContents which appends
-//                    the summarize prompt, calls processPrompt, then replaces
-//                    the conversation with a summary.
+//   runTaskSummarize  — :summarize command. Calls summarizeContents which appends
+//                       the summarize prompt, calls processPrompt, then replaces
+//                       the conversation with a summary.
 //
-// The key difference: doAutoSummarize (called from runTask) is synchronous —
-// it must complete before the user's new prompt can be processed, because
-// it needs to free token space first. runSummarize runs as an independent
+// The key difference: doAutoSummarize (called from runTaskNormal) is synchronous
+// — it must complete before the user's new prompt can be processed, because
+// it needs to free token space first. runTaskSummarize runs as an independent
 // task goroutine because :summarize is an explicit user command, not a
 // precondition for another operation.
 // ============================================================================
 
-// runTask executes a prompt in its own goroutine.
-func (s *Session) runTask(ctx context.Context, taskContent []llm.ContentPart, parts []llm.ContentPart) {
-	contents := taskContent
+// runTaskNormal executes a normal prompt in its own goroutine.
+func (s *Session) runTaskNormal(ctx context.Context, parts []llm.ContentPart) {
+	contents := make([]llm.ContentPart, len(s.Contents))
+	copy(contents, s.Contents)
 
 	defer func() {
 		s.taskResultCh <- contents
@@ -440,11 +441,12 @@ func (s *Session) runTask(ctx context.Context, taskContent []llm.ContentPart, pa
 	}
 }
 
-// runContinue constructs a "Continue" user prompt and processes it as
+// runTaskContinue constructs a "Continue" user prompt and processes it as
 // a normal user message.  If the last message was from the assistant,
 // a "Continue" text is appended; otherwise the last prompt is resent.
-func (s *Session) runContinue(ctx context.Context, taskContent []llm.ContentPart) {
-	contents := taskContent
+func (s *Session) runTaskContinue(ctx context.Context) {
+	contents := make([]llm.ContentPart, len(s.Contents))
+	copy(contents, s.Contents)
 
 	defer func() {
 		s.taskResultCh <- contents
@@ -482,10 +484,11 @@ func (s *Session) runContinue(ctx context.Context, taskContent []llm.ContentPart
 	}
 }
 
-// runSummarize constructs a summarization prompt and processes it.
+// runTaskSummarize constructs a summarization prompt and processes it.
 // After the LLM responds, the conversation is replaced with a summary.
-func (s *Session) runSummarize(ctx context.Context, taskContent []llm.ContentPart) {
-	contents := taskContent
+func (s *Session) runTaskSummarize(ctx context.Context) {
+	contents := make([]llm.ContentPart, len(s.Contents))
+	copy(contents, s.Contents)
 
 	defer func() {
 		s.taskResultCh <- contents

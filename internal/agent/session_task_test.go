@@ -99,13 +99,13 @@ func TestRunTaskPreservesPartialResultsOnError(t *testing.T) {
 			taskEventCh: make(chan TaskEvent, 20),
 		},
 	}
-	// runTask sends results to taskResultCh — read it.
+	// runTaskNormal sends results to taskResultCh — read it.
 	session.taskResultCh = make(chan []llm.ContentPart, 1)
-	prev := []llm.ContentPart{
+	session.Contents = []llm.ContentPart{
 		&llm.TextPart{Text: "hi", ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}},
 		&llm.TextPart{Text: "hello", ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleAssistant}},
 	}
-	session.runTask(context.Background(), prev, []llm.ContentPart{
+	session.runTaskNormal(context.Background(), []llm.ContentPart{
 		&llm.TextPart{Text: "do it"},
 	})
 	result := <-session.taskResultCh

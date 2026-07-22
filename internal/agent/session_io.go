@@ -22,7 +22,257 @@ import (
 )
 
 // ============================================================================
-// Command Handling
+// Input pump — inputMsg, inputPump, handleInputFrame
+//
+// The input pump runs in its own goroutine, reading TLV frames from the
+// input stream and dispatching parsed messages (inputMsg) to the run()
+// goroutine via inputMsgCh. It has no knowledge of command names and
+// never touches session state — all command handling lives in run().
+// ============================================================================
+
+// inputMsg carries a parsed input message from the I/O pump to run().
+//
+// For prompt messages:
+//   - contentParts holds the combined message (media parts + optional text part)
+//   - isCmd is false, cmd is empty
+//
+// For command messages:
+//   - cmd holds the command text (without ':' prefix)
+//   - contentParts is nil, isCmd is true
+type inputMsg struct {
+	contentParts []llm.ContentPart // combined user content (media + text)
+	cmd          string            // command text for commands, empty for prompts
+	isCmd        bool              // true when cmd is set
+	err          error             // non-nil when the input pump hit a validation error
+}
+
+// inputPump runs in its own goroutine.  It reads TLV frames from the
+// input stream, builds inputMsg values, and sends them to inputMsgCh.
+// It does NOT interpret commands or access session state — all of
+// that lives in the run() goroutine.
+func (s *Session) inputPump() {
+	var staged []llm.ContentPart
+
+	for {
+		tag, value, err := tlv.ReadTLV(s.Input)
+		if err != nil {
+			if len(staged) > 0 {
+				s.inputMsgCh <- inputMsg{contentParts: staged}
+			}
+			close(s.inputMsgCh)
+			return
+		}
+		staged = s.handleInputFrame(tag, value, staged)
+	}
+}
+
+// handleInputFrame processes a single TLV frame from the input stream.
+// Returns the updated staged content (nil when staged content has been
+// consumed by UE or discarded by an error). Media tags (UI/UV/UA/UD)
+// and regular text (UT without ':') are staged until UE or EOF.
+// Command text (UT starting with ':') is sent immediately without staging.
+func (s *Session) handleInputFrame(tag, value string, staged []llm.ContentPart) []llm.ContentPart {
+	switch tag {
+	case tlv.TagUserI:
+		return append(staged, &llm.ImagePart{URI: value})
+	case tlv.TagUserV:
+		return append(staged, &llm.VideoPart{URI: value})
+	case tlv.TagUserA:
+		return append(staged, &llm.AudioPart{URI: value})
+	case tlv.TagUserD:
+		return append(staged, &llm.DocumentPart{URI: value})
+	case tlv.TagUserT:
+		if len(value) > 0 && value[0] == ':' {
+			if len(staged) > 0 {
+				s.inputMsgCh <- inputMsg{err: fmt.Errorf("command can not be sent with staged content")}
+				return nil
+			}
+			s.inputMsgCh <- inputMsg{isCmd: true, cmd: value[1:]}
+			return staged
+		}
+		if value != "" {
+			return append(staged, &llm.TextPart{Text: value})
+		}
+		return staged
+	case tlv.TagUserEnd:
+		if len(staged) > 0 {
+			s.inputMsgCh <- inputMsg{contentParts: staged}
+		}
+		return nil
+	default:
+		s.inputMsgCh <- inputMsg{err: fmt.Errorf("invalid input tag: %s", tag)}
+		return nil
+	}
+}
+
+// ============================================================================
+// Registered command handlers — handleFork, handleToolConfirm/Decline
+//
+// These are registered via LookupCommand and dispatched by handleInputMsg
+// according to their CmdImmediate / CmdIdle policy.
+// ============================================================================
+
+// handleFork saves all content from the start of the session up to (and
+// including) the content identified by history ID to a session file.
+// Usage: :fork <history_id> <filename>
+func (s *Session) handleFork(args string) {
+	fields := strings.Fields(args)
+	if len(fields) < 2 {
+		s.writeError("usage: :fork <history_id> <filename>")
+		return
+	}
+
+	id, err := strconv.ParseUint(fields[0], 10, 64)
+	if err != nil {
+		s.writeError(fmt.Sprintf("invalid history ID: %s", fields[0]))
+		return
+	}
+
+	// Find the index of the content with this history ID.
+	var endIdx = -1
+	for i, part := range s.Contents {
+		if part.GetHistoryID() == id {
+			endIdx = i
+			break
+		}
+	}
+	if endIdx < 0 {
+		s.writeError(fmt.Sprintf("no content found with history ID %d", id))
+		return
+	}
+
+	path := config.ExpandPath(fields[1])
+	if err := s.saveContentToFile(path, s.Contents[:endIdx+1]); err != nil {
+		s.writeError(fmt.Sprintf("failed to fork: %v", err))
+		return
+	}
+	s.writeNotifyf("Session forked to %s (up to content ID %d)", path, id)
+}
+
+// handleToolConfirmCmd processes a `:tool_confirm <id>` command.
+// It looks up the per-tool confirmation channel and allows the tool.
+func (s *Session) handleToolConfirmCmd(args string) {
+	fields := strings.Fields(args)
+	if len(fields) != 1 {
+		s.writeError("usage: :tool_confirm <id>")
+		return
+	}
+	s.resolveToolConfirm(fields[0], true)
+}
+
+// handleToolDeclineCmd processes a `:tool_decline <id>` command.
+// It looks up the per-tool confirmation channel and denies the tool.
+func (s *Session) handleToolDeclineCmd(args string) {
+	fields := strings.Fields(args)
+	if len(fields) != 1 {
+		s.writeError("usage: :tool_decline <id>")
+		return
+	}
+	s.resolveToolConfirm(fields[0], false)
+}
+
+// resolveToolConfirm looks up the confirmation channel and sends the decision.
+func (s *Session) resolveToolConfirm(id string, allowed bool) {
+	s.confirmMu.Lock()
+	ch, ok := s.confirmChs[id]
+	delete(s.confirmChs, id)
+	s.confirmMu.Unlock()
+
+	if !ok {
+		s.writeError("No pending tool confirmation for " + id)
+		return
+	}
+
+	ch <- allowed
+}
+
+// ============================================================================
+// Command dispatch — handleInputMsg
+//
+// handleInputMsg is the central dispatcher for all incoming messages. It
+// runs in the run() goroutine and routes each inputMsg to the appropriate
+// handler based on whether it's a command or a regular prompt.
+// ============================================================================
+
+// prepareTask checks preconditions and creates a cancellable context for
+// a new task. Returns ok=false if setup failed (caller should return immediately).
+func (s *Session) prepareTask() (ctx context.Context, ok bool) {
+	if s.activeTask != nil {
+		s.writeError("A task is already running. Wait for it to complete or cancel it.")
+		return nil, false
+	}
+	if err := s.ensureAgentInitialized(); err != nil {
+		s.writeError(err.Error())
+		return nil, false
+	}
+	taskCtx, taskCancel := context.WithCancel(s.sessionCtx)
+	s.activeTask = &taskHandle{cancel: taskCancel, step: 0}
+	return taskCtx, true
+}
+
+// handleInputMsg processes a parsed input message. Called from run() goroutine.
+func (s *Session) handleInputMsg(msg inputMsg) {
+	if msg.err != nil {
+		s.writeError(msg.err.Error())
+		return
+	}
+
+	if s.mcpService != nil && !s.mcpService.IsReady() {
+		s.writeError("MCP servers are still initializing or OAuth authorization is pending. " +
+			"Please wait for initialization to complete.")
+		return
+	}
+
+	if !msg.isCmd {
+		if ctx, ok := s.prepareTask(); ok {
+			go s.runTaskNormal(ctx, msg.contentParts)
+		}
+		return
+	}
+
+	// Command dispatch: split on first space only.
+	// Each handler parses the args string as appropriate for its command.
+	name, args, _ := strings.Cut(msg.cmd, " ")
+	if name == "" {
+		s.writeError("empty command")
+		return
+	}
+
+	// Registry commands.
+	if cmdDef, ok := LookupCommand(name); ok {
+		switch cmdDef.Policy {
+		case CmdImmediate:
+			cmdDef.Handler(s, s.sessionCtx, args)
+		case CmdIdle:
+			if s.activeTask != nil {
+				s.writeError("Cannot run this command while a task is in progress. Please wait or cancel the current task.")
+				return
+			}
+			cmdDef.Handler(s, s.sessionCtx, args)
+		}
+		return
+	}
+
+	// Task commands — :continue and :summarize run in their own goroutine.
+	switch name {
+	case CommandNameContinue:
+		if ctx, ok := s.prepareTask(); ok {
+			go s.runTaskContinue(ctx)
+		}
+	case CommandNameSummarize:
+		if ctx, ok := s.prepareTask(); ok {
+			go s.runTaskSummarize(ctx)
+		}
+	default:
+		s.writeError(fmt.Sprintf("unknown command: %s", name))
+	}
+}
+
+// ============================================================================
+// Model commands — handleModelSet, handleModelLoad, handleModelSync
+//
+// These commands manage model configuration: switching the active model,
+// reloading from file, and syncing from an adapter editor session.
 // ============================================================================
 
 func (s *Session) handleModelSet(args string) {
@@ -143,6 +393,13 @@ func (s *Session) handleModelSync(args string) {
 	s.sendModelListMsg()
 }
 
+// ============================================================================
+// Configuration commands — handleReason, handleVideoConfig, handleThemeSet
+//
+// These commands let the user adjust session-level settings such as
+// reasoning effort, video encoding parameters, and the active theme.
+// ============================================================================
+
 func (s *Session) handleReason(args string) {
 	if args == "" {
 		s.writeError("usage: :reason [0|1|2]  (0=off, 1=normal, 2=max)")
@@ -210,268 +467,12 @@ func (s *Session) handleThemeSet(args string) {
 	s.sendSystemInfo(SystemInfoTheme)
 }
 
-// resendPrompt resends the conversation history to the LLM.
-// This is called by handleContinue (no args) to resend the failed prompt.
-//
-// Three cases based on the role of the last content part:
-//  1. User prompt → re-send history as-is (the previous API call never produced a response).
-//  2. Tool result → re-send history as-is. Tool results are functionally
-//     equivalent to a user turn, so the LLM can respond directly.
-//  3. Assistant message → the API partially succeeded or was canceled.
-//     A "Continue" user message is appended so the model picks up where it left off.
 // ============================================================================
-
-// inputMsg carries a parsed input message from the I/O pump to run().
+// MCP commands — handleMCPCancel, handleMCPConfirm, handleMCPDecline
 //
-// For prompt messages:
-//   - contentParts holds the combined message (media parts + optional text part)
-//   - isCmd is false, cmd is empty
-//
-// For command messages:
-//   - cmd holds the command text (without ':' prefix)
-//   - contentParts is nil, isCmd is true
-type inputMsg struct {
-	contentParts []llm.ContentPart // combined user content (media + text)
-	cmd          string            // command text for commands, empty for prompts
-	isCmd        bool              // true when cmd is set
-	err          error             // non-nil when the input pump hit a validation error
-}
-
-// inputPump runs in its own goroutine.  It reads TLV frames from the
-// input stream, builds inputMsg values, and sends them to inputMsgCh.
-// It does NOT interpret commands or access session state — all of
-// that lives in the run() goroutine.
-func (s *Session) inputPump() {
-	var staged []llm.ContentPart
-
-	for {
-		tag, value, err := tlv.ReadTLV(s.Input)
-		if err != nil {
-			if len(staged) > 0 {
-				s.inputMsgCh <- inputMsg{contentParts: staged}
-			}
-			close(s.inputMsgCh)
-			return
-		}
-		staged = s.handleInputFrame(tag, value, staged)
-	}
-}
-
-// handleInputFrame processes a single TLV frame from the input stream.
-// Returns the updated staged content (nil when staged content has been
-// consumed by UE or discarded by an error). Media tags (UI/UV/UA/UD)
-// and regular text (UT without ':') are staged until UE or EOF.
-// Command text (UT starting with ':') is sent immediately without staging.
-func (s *Session) handleInputFrame(tag, value string, staged []llm.ContentPart) []llm.ContentPart {
-	switch tag {
-	case tlv.TagUserI:
-		return append(staged, &llm.ImagePart{URI: value})
-	case tlv.TagUserV:
-		return append(staged, &llm.VideoPart{URI: value})
-	case tlv.TagUserA:
-		return append(staged, &llm.AudioPart{URI: value})
-	case tlv.TagUserD:
-		return append(staged, &llm.DocumentPart{URI: value})
-	case tlv.TagUserT:
-		if len(value) > 0 && value[0] == ':' {
-			if len(staged) > 0 {
-				s.inputMsgCh <- inputMsg{err: fmt.Errorf("command can not be sent with staged content")}
-				return nil
-			}
-			s.inputMsgCh <- inputMsg{isCmd: true, cmd: value[1:]}
-			return staged
-		}
-		if value != "" {
-			return append(staged, &llm.TextPart{Text: value})
-		}
-		return staged
-	case tlv.TagUserEnd:
-		if len(staged) > 0 {
-			s.inputMsgCh <- inputMsg{contentParts: staged}
-		}
-		return nil
-	default:
-		s.inputMsgCh <- inputMsg{err: fmt.Errorf("invalid input tag: %s", tag)}
-		return nil
-	}
-}
-
-// handleFork saves all content from the start of the session up to (and
-// including) the content identified by history ID to a session file.
-// Usage: :fork <history_id> <filename>
-func (s *Session) handleFork(args string) {
-	fields := strings.Fields(args)
-	if len(fields) < 2 {
-		s.writeError("usage: :fork <history_id> <filename>")
-		return
-	}
-
-	id, err := strconv.ParseUint(fields[0], 10, 64)
-	if err != nil {
-		s.writeError(fmt.Sprintf("invalid history ID: %s", fields[0]))
-		return
-	}
-
-	// Find the index of the content with this history ID.
-	var endIdx = -1
-	for i, part := range s.Contents {
-		if part.GetHistoryID() == id {
-			endIdx = i
-			break
-		}
-	}
-	if endIdx < 0 {
-		s.writeError(fmt.Sprintf("no content found with history ID %d", id))
-		return
-	}
-
-	path := config.ExpandPath(fields[1])
-	if err := s.saveContentToFile(path, s.Contents[:endIdx+1]); err != nil {
-		s.writeError(fmt.Sprintf("failed to fork: %v", err))
-		return
-	}
-	s.writeNotifyf("Session forked to %s (up to content ID %d)", path, id)
-}
-
-// handleToolConfirmCmd processes a `:tool_confirm <id>` command.
-// It looks up the per-tool confirmation channel and allows the tool.
-func (s *Session) handleToolConfirmCmd(args string) {
-	fields := strings.Fields(args)
-	if len(fields) != 1 {
-		s.writeError("usage: :tool_confirm <id>")
-		return
-	}
-	s.resolveToolConfirm(fields[0], true)
-}
-
-// handleToolDeclineCmd processes a `:tool_decline <id>` command.
-// It looks up the per-tool confirmation channel and denies the tool.
-func (s *Session) handleToolDeclineCmd(args string) {
-	fields := strings.Fields(args)
-	if len(fields) != 1 {
-		s.writeError("usage: :tool_decline <id>")
-		return
-	}
-	s.resolveToolConfirm(fields[0], false)
-}
-
-// resolveToolConfirm looks up the confirmation channel and sends the decision.
-func (s *Session) resolveToolConfirm(id string, allowed bool) {
-	s.confirmMu.Lock()
-	ch, ok := s.confirmChs[id]
-	delete(s.confirmChs, id)
-	s.confirmMu.Unlock()
-
-	if !ok {
-		s.writeError("No pending tool confirmation for " + id)
-		return
-	}
-
-	ch <- allowed
-}
-
-// startTaskContinue starts a task goroutine for :continue.
-func (s *Session) startTaskContinue() {
-	if s.activeTask != nil {
-		s.writeError("Cannot run command while a task is running. Please wait or cancel first.")
-		return
-	}
-	if err := s.ensureAgentInitialized(); err != nil {
-		s.writeError(err.Error())
-		return
-	}
-	taskContent := make([]llm.ContentPart, len(s.Contents))
-	copy(taskContent, s.Contents)
-	taskCtx, taskCancel := context.WithCancel(s.sessionCtx)
-	s.activeTask = &taskHandle{cancel: taskCancel, step: 0}
-	go s.runContinue(taskCtx, taskContent)
-}
-
-// startTaskSummarize starts a task goroutine for :summarize.
-func (s *Session) startTaskSummarize() {
-	if s.activeTask != nil {
-		s.writeError("Cannot run command while a task is running. Please wait or cancel first.")
-		return
-	}
-	if err := s.ensureAgentInitialized(); err != nil {
-		s.writeError(err.Error())
-		return
-	}
-	taskContent := make([]llm.ContentPart, len(s.Contents))
-	copy(taskContent, s.Contents)
-	taskCtx, taskCancel := context.WithCancel(s.sessionCtx)
-	s.activeTask = &taskHandle{cancel: taskCancel, step: 0}
-	go s.runSummarize(taskCtx, taskContent)
-}
-
-// handleInputMsg processes a parsed input message. Called from run() goroutine.
-func (s *Session) handleInputMsg(msg inputMsg) {
-	if msg.err != nil {
-		s.writeError(msg.err.Error())
-		return
-	}
-
-	if !msg.isCmd {
-		s.handlePrompt(msg.contentParts)
-		return
-	}
-
-	// Command dispatch: split on first space only.
-	// Each handler parses the args string as appropriate for its command.
-	name, args, _ := strings.Cut(msg.cmd, " ")
-	if name == "" {
-		s.writeError("empty command")
-		return
-	}
-
-	// Registry commands.
-	if cmdDef, ok := LookupCommand(name); ok {
-		switch cmdDef.Policy {
-		case CmdImmediate:
-			cmdDef.Handler(s, s.sessionCtx, args)
-		case CmdIdle:
-			if s.activeTask != nil {
-				s.writeError("Cannot run this command while a task is in progress. Please wait or cancel the current task.")
-				return
-			}
-			cmdDef.Handler(s, s.sessionCtx, args)
-		}
-		return
-	}
-
-	// Task commands — :continue and :summarize run in their own goroutine.
-	switch name {
-	case CommandNameContinue:
-		s.startTaskContinue()
-	case CommandNameSummarize:
-		s.startTaskSummarize()
-	default:
-		s.writeError(fmt.Sprintf("unknown command: %s", name))
-	}
-}
-
-// Called from handleInputMsg when the input is not a command.
-func (s *Session) handlePrompt(contentParts []llm.ContentPart) {
-	if s.activeTask != nil {
-		s.writeError("A task is already running. Wait for it to complete or cancel it.")
-		return
-	}
-	// Wait for MCP initialization to complete before accepting prompts.
-	if !s.mcpService.IsReady() {
-		s.writeError("MCP servers are still initializing or OAuth authorization is pending. " +
-			"Please wait for initialization to complete.")
-		return
-	}
-	if err := s.ensureAgentInitialized(); err != nil {
-		s.writeError(err.Error())
-		return
-	}
-	taskContent := make([]llm.ContentPart, len(s.Contents))
-	copy(taskContent, s.Contents)
-	taskCtx, taskCancel := context.WithCancel(s.sessionCtx)
-	s.activeTask = &taskHandle{cancel: taskCancel, step: 0}
-	go s.runTask(taskCtx, taskContent, contentParts)
-}
+// These commands manage MCP server lifecycle: cancel initialization,
+// confirm an OAuth authorization code, or decline an authorization request.
+// ============================================================================
 
 // handleMCPCancel handles the :mcp_cancel command.
 // Called when the user presses Ctrl+G (init overlay or globally) or types
@@ -540,6 +541,13 @@ func (s *Session) handleMCPDecline(args string) {
 		s.writeError(fmt.Sprintf("No pending authorization for MCP server %q.", server))
 	}
 }
+
+// ============================================================================
+// Session management — saveSession, cancelTask
+//
+// saveSession persists the current conversation to a file.
+// cancelTask aborts the currently running task (if any).
+// ============================================================================
 
 func (s *Session) saveSession(args string) {
 	var path string
