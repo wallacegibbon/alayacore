@@ -201,7 +201,7 @@ func (r *userRenderer) BuildInner(width int, _ bool, styles *Styles) (string, in
 				textBlock.WriteString(styles.System.Render(Separator))
 				textBlock.WriteString("\n")
 			}
-			textBlock.WriteString(styles.UserInput.Render(trimmed))
+			textBlock.WriteString(styleMultiline(trimmed, styles.UserInput))
 			firstText = false
 		}
 
@@ -380,12 +380,7 @@ func styleByTag(tag, content string, styles *Styles, _ string) string {
 	case tlv.TagUserI, tlv.TagUserV, tlv.TagUserA, tlv.TagUserD:
 		return styleMultiline(content, styles.Attachment)
 	case tlv.TagUserT:
-		// User text without media is styled by userRenderer directly
-		// This path is for fallback only (e.g. replayed content)
-		if content == "" {
-			return ""
-		}
-		return styles.UserInput.Render(content)
+		return styleMultiline(content, styles.UserInput)
 	case TagWindowSE:
 		return styleMultiline(content, styles.Error)
 	case TagWindowSN:
