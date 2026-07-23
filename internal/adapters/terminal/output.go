@@ -540,7 +540,7 @@ func (to *outputWriter) handleSystemMCP(data json.RawMessage) {
 	case "auth_required":
 		if msg.Server != "" {
 			to.status.updateMCPProgress("auth_required", msg.Server)
-			to.status.setMCPAuthPending(msg.Server, msg.URL)
+			to.status.addMCPAuthPending(msg.Server, msg.URL)
 		}
 	case "auth_running":
 		to.status.updateMCPProgress(msg.Status, msg.Server)
@@ -568,7 +568,7 @@ func (to *outputWriter) handleSystemToolConfirm(data json.RawMessage) {
 		toolInput = info.Input
 	}
 	// Store pending state for the Terminal's confirm overlay.
-	to.status.setToolConfirmPending(m.ID, toolName, toolInput)
+	to.status.addToolConfirmPending(m.ID, toolName, toolInput)
 }
 
 // GetPendingToolConfirm returns any pending tool confirmation and clears it.

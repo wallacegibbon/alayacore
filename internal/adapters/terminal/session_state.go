@@ -51,6 +51,11 @@ type sessionState struct {
 	// The Terminal tick handler pops them to open confirm dialogs one at a time.
 	pendingMCPAuths []mcpAuthPending
 
+	// Pending tool confirms — set by handleSystemToolConfirm, consumed by
+	// the Terminal tick handler to open the confirm overlay.
+	// Stored as a queue so multiple confirms arriving at once aren't lost.
+	pendingToolConfirms []toolConfirmPending
+
 	// Model fields
 	models          []config.ModelConfig
 	activeModelID   int
@@ -62,11 +67,6 @@ type sessionState struct {
 	activeTheme     string
 	activeThemeData *theme.Theme
 	cachedThemeList []ThemeEntry
-
-	// Pending tool confirms — set by handleSystemToolConfirm, consumed by
-	// the Terminal tick handler to open the confirm overlay.
-	// Stored as a queue so multiple confirms arriving at once aren't lost.
-	pendingToolConfirms []toolConfirmPending
 }
 
 // toolConfirmPending holds a single pending tool confirmation.
@@ -206,9 +206,9 @@ func (s *sessionState) updateMCPProgress(status, server string) {
 	s.mu.Unlock()
 }
 
-// setMCPAuthPending appends a pending MCP auth confirmation to the queue.
+// addMCPAuthPending appends a pending MCP auth confirmation to the queue.
 // Consumed by takeMCPAuthPending in the Terminal tick handler.
-func (s *sessionState) setMCPAuthPending(server, url string) {
+func (s *sessionState) addMCPAuthPending(server, url string) {
 	s.mu.Lock()
 	s.pendingMCPAuths = append(s.pendingMCPAuths, mcpAuthPending{server: server, url: url})
 	s.mu.Unlock()
@@ -249,8 +249,8 @@ func (s *sessionState) takeMCPDone() bool {
 	return true
 }
 
-// setToolConfirmPending appends a pending tool confirmation request.
-func (s *sessionState) setToolConfirmPending(id, toolName, toolInput string) {
+// addToolConfirmPending appends a pending tool confirmation request.
+func (s *sessionState) addToolConfirmPending(id, toolName, toolInput string) {
 	s.mu.Lock()
 	s.pendingToolConfirms = append(s.pendingToolConfirms, toolConfirmPending{
 		ID: id, Name: toolName, Input: toolInput,

@@ -132,6 +132,15 @@ func (m Terminal) openConfirmTool(id, toolName, toolInput string) Terminal {
 	return m
 }
 
+func (m Terminal) openConfirmMCPAuth(server, url string) Terminal {
+	m.confirmOverlay = m.confirmOverlay.OpenMCPAuth(server, url)
+	m.input = m.input.Blur()
+	m.display = m.display.WithBlocked(true)
+	m.display = m.display.WithDisplayFocused(false)
+	m.display = m.display.updateContent()
+	return m
+}
+
 // handleBlur handles loss of application focus.
 func (m Terminal) handleBlur() Terminal {
 	m.hasFocus = false

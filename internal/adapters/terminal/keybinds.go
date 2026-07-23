@@ -161,14 +161,17 @@ func (m Terminal) handleConfirmCancel(r *ConfirmResult, fromCmd bool) (Terminal,
 }
 
 func (m Terminal) handleConfirmTool(r *ConfirmResult, fromCmd bool) (Terminal, tea.Cmd) {
-	cmdName := ":tool_decline"
-	if r.Confirmed {
-		cmdName = ":tool_confirm"
-	}
 	if fromCmd {
 		m.input = m.input.WithValue("")
 	}
-	cmd := m.emitCommand(cmdName + " " + r.ToolID)
+
+	var cmd tea.Cmd
+	if r.Confirmed {
+		cmd = m.emitCommand(":tool_confirm " + r.ToolID)
+	} else {
+		cmd = m.emitCommand(":tool_decline " + r.ToolID)
+	}
+
 	m = m.restoreFocusAfterConfirm()
 	if nextID, nextName, nextInput, ok := m.out.GetPendingToolConfirm(); ok {
 		m = m.openConfirmTool(nextID, nextName, nextInput)
@@ -177,30 +180,26 @@ func (m Terminal) handleConfirmTool(r *ConfirmResult, fromCmd bool) (Terminal, t
 }
 
 func (m Terminal) handleConfirmMCPAuth(r *ConfirmResult, fromCmd bool) (Terminal, tea.Cmd) {
+	if fromCmd {
+		m.input = m.input.WithValue("")
+	}
+
+	var cmd tea.Cmd
 	switch {
 	case r.Confirmed:
-		m = m.restoreFocusAfterConfirm()
-		return m, tea.Batch(
-			m.startMCPAuthFlow(r.ToolID, r.ToolInput),
-			scheduleTick(),
-		)
+		cmd = m.startMCPAuthFlow(r.ToolID, r.ToolInput)
 	case r.CtrlGCanceled:
 		m.out.ClearMCPAuths()
-		m = m.restoreFocusAfterConfirm()
-		return m, tea.Batch(
-			m.emitCommand(":mcp_cancel"),
-			scheduleTick(),
-		)
+		cmd = m.emitCommand(":mcp_cancel")
 	default:
-		if fromCmd {
-			m.input = m.input.WithValue("")
-		}
-		m = m.restoreFocusAfterConfirm()
-		return m, tea.Batch(
-			m.emitCommand(":mcp_decline "+r.ToolID),
-			scheduleTick(),
-		)
+		cmd = m.emitCommand(":mcp_decline " + r.ToolID)
 	}
+
+	m = m.restoreFocusAfterConfirm()
+	if nextServer, nextURL, ok := m.out.GetPendingMCPAuth(); ok {
+		m = m.openConfirmMCPAuth(nextServer, nextURL)
+	}
+	return m, tea.Batch(cmd, scheduleTick())
 }
 
 // startMCPAuthFlow starts the OAuth callback server, opens the browser,
