@@ -311,6 +311,21 @@ func attachToolResults(record, results []ContentPart, dropUnanswered bool) ([]Co
 // stopped — and those declare nothing to anyone.
 func (a *streamAssembler) empty() bool { return len(a.touched) == 0 }
 
+// toolBlocks returns the tool blocks this step opened, in the order the stream
+// opened them: one entry per call an adapter was told about, whether or not its
+// arguments ever finished. It is what settlement iterates — parts() deliberately
+// omits a call the stream never completed, while the adapter already has a window
+// for it, and that window is exactly what must not be left running.
+func (a *streamAssembler) toolBlocks() []*assembledBlock {
+	out := make([]*assembledBlock, 0, len(a.touched))
+	for _, b := range a.touched {
+		if b.kind == toolBlockKind {
+			out = append(out, b)
+		}
+	}
+	return out
+}
+
 func (a *streamAssembler) parts() []ContentPart {
 	out := make([]ContentPart, 0, len(a.touched))
 	emit := func(b *assembledBlock) {

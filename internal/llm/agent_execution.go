@@ -265,9 +265,9 @@ func (a *Agent) callTool(ctx context.Context, tc *ToolInputPart, historyID uint6
 // ok=false reports a call that never executed (canceled while awaiting
 // confirmation), and such a call must stay out of history: an assistant
 // tool_use without the tool_result that answers it is a conversation the next
-// request cannot build (see gotcha 3). The output part is still built for the
-// display, because the AF frame already opened a tool window that needs a UF
-// frame to settle it.
+// request cannot build (see gotcha 3). The window the call opened is not left
+// to this function either — the step settles every call it leaves without a
+// result (settleUnansweredToolCalls), so a path that runs nothing owes no frame.
 func (a *Agent) runToolCall(ctx context.Context, tc *ToolInputPart, historyID uint64, callbacks StreamCallbacks) (ContentPart, bool) {
 	if callbacks.ToolNeedsConfirm == nil || !callbacks.ToolNeedsConfirm(tc.Name) {
 		return a.executeTool(ctx, tc, callbacks, historyID), true
@@ -283,13 +283,9 @@ func (a *Agent) runToolCall(ctx context.Context, tc *ToolInputPart, historyID ui
 		// Canceled while waiting for confirmation — the tool never executed, so
 		// it must NOT enter the salvaged history (it would look as if it ran and
 		// failed; both collectors bail on the same cancellation, so no result can
-		// deadlock either of them). But the AF start frame already created the
-		// tool window in the UI, which would otherwise stay stuck spinning with
-		// no UF frame to settle it. newToolOutput fires the OnToolOutput callback
-		// (UF isError → ✗) as a display-only frame; the returned part is
-		// deliberately discarded so the tool stays out of history.
-		_ = newToolOutput(callbacks, tc.ID, nil,
-			errors.New("tool execution canceled while awaiting confirmation"), historyID)
+		// deadlock either of them). Nothing is returned for the display either:
+		// the step is over, and the settlement it runs on the way out answers
+		// every call it leaves without a result (settleUnansweredToolCalls).
 		return nil, false
 	}
 }

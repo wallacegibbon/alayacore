@@ -545,6 +545,14 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 	// hands calls to it, and the collection below asks it to finish.
 	runner := a.newToolRunner(callbacks, resultCh, &toolWg)
 
+	// Every tool window this step opened is settled here, whatever the step did:
+	// the frame that opened it was the step's to send, so the frame that closes
+	// it is too. Registered before the salvage below so it runs after it (defers
+	// are LIFO), where the drain has already collected every result a tool
+	// goroutine managed to deliver — the difference between a call that answered
+	// and one that never will.
+	defer func() { settleUnansweredToolCalls(callbacks, assembler, results) }()
+
 	defer func() {
 		// A panic in the loop below is a bug, and a bug is not a reason to take
 		// the user's content with it: what they watched stream in is already in
@@ -569,7 +577,8 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 		// are left out by the forgiving policy below, because an assistant
 		// tool_use without its tool_result is a conversation the next request
 		// cannot build.
-		contributed, pairErr := attachToolResults(assembler.parts(), collectResults(results, resultCh), true)
+		results = collectResults(results, resultCh)
+		contributed, pairErr := attachToolResults(assembler.parts(), results, true)
 		if pairErr != nil {
 			return
 		}
@@ -745,6 +754,48 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 	stepContents = reordered
 
 	return stepContents, stepUsage, truncated, nil
+}
+
+// errToolCallIncomplete is what the window of a call that never finished shows.
+// It states the only thing the step knows for certain: no result is coming.
+var errToolCallIncomplete = errors.New("tool call did not complete")
+
+// settleUnansweredToolCalls closes the tool windows this step opened and left
+// without a result, so none of them is left spinning.
+//
+// A window is opened by the first frame about a call and closed by the frame that
+// answers it (UF). Whatever ends a step — a provider stream cut mid-answer, a
+// cancel, a panic in a tool — one shape reaches the adapter as a window with
+// nothing behind it: a call whose arguments never finished streaming (no part, so
+// no result can ever arrive), a call serial mode queued and never ran, a call
+// canceled while awaiting confirmation, a call whose tool panicked. On screen
+// they are one bug: a spinner turning for a tool that is not running,
+// indistinguishable from one that is, and it keeps turning until the task ends.
+//
+// So the obligation is the step's, and it is stated once, here, rather than at
+// each path that can end one: every call a step announced is either answered or
+// settled by the time the step returns. The frame is display-only — the part it
+// returns is discarded — because a call that never completed must stay out of
+// history, where an assistant tool_use without the tool_result answering it is a
+// conversation the next request cannot build. It settles a window the adapter
+// already holds, so it goes out through the same callback that would have
+// answered the call: a caller with no OnToolOutput has no windows either.
+func settleUnansweredToolCalls(callbacks StreamCallbacks, assembler *streamAssembler, results []ContentPart) {
+	if callbacks.OnToolOutput == nil {
+		return
+	}
+	answered := make(map[string]bool, len(results))
+	for _, r := range results {
+		if tr, ok := r.(*ToolOutputPart); ok {
+			answered[tr.ID] = true
+		}
+	}
+	for _, b := range assembler.toolBlocks() {
+		if answered[b.id] {
+			continue
+		}
+		_ = newToolOutput(callbacks, b.id, nil, errToolCallIncomplete, b.histID)
+	}
 }
 
 // genHistoryID numbers a part that was not streamed — a tool result, which the

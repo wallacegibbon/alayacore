@@ -350,6 +350,14 @@ the next step cannot build. The model may therefore re-issue such a call, and a
 tool that had already begun its work may run twice — the exposure `:continue` has
 always had, unchanged by being automatic.
 
+Dropping it from history does not leave it on screen, either: the step settles
+every tool window it opened and left without a result as it ends, so a call cut
+off mid-arguments turns ✗ with `tool call did not complete` instead of spinning
+until the task ends — the spinner stops turning before the resume is even
+announced, which is the same settlement a canceled confirmation or a panicking
+tool gets (`llm.settleUnansweredToolCalls`, and
+[tui.md](tui.md#tool-status-indicator) for what the window shows).
+
 **Bounds.** The resume budget is `maxRetries` consecutive resumes, cleared by a
 step that lands, so a long task that loses the network once every few steps is not
 penalized for it. A continuation is also a step, and spends the step budget as

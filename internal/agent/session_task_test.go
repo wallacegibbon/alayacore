@@ -341,6 +341,126 @@ func (p *cutStreamProvider) StreamMessages(_ context.Context, history []llm.Cont
 
 func (p *cutStreamProvider) SetReasoningConfigs(_ map[int]json.RawMessage) {}
 
+// partialToolCutProvider streams a tool call and then loses the connection while
+// its arguments are still arriving — the shape that leaves a tool window open on
+// the adapter's screen with nothing behind it. The next call answers in text.
+//
+// Nothing of the cut step is recorded (the call never completed, so it cannot
+// become a part), which is why the continuation is the same request: there is no
+// assistant part for a "Continue" to follow.
+type partialToolCutProvider struct {
+	calls int
+}
+
+func (p *partialToolCutProvider) StreamMessages(_ context.Context, _ []llm.ContentPart, _ []llm.ToolDefinition, _, _ string) (iter.Seq2[llm.StreamEvent, error], error) {
+	p.calls++
+	cut := p.calls == 1
+	return func(yield func(llm.StreamEvent, error) bool) {
+		if cut {
+			if !yield(llm.ToolInputStartEvent{ID: "call_1", Name: "edit_file", Key: "block:0", Position: 1}, nil) {
+				return
+			}
+			if !yield(llm.ToolInputDeltaEvent{ID: "call_1", Delta: `{"path":"/tmp/x","old`, Key: "block:0"}, nil) {
+				return
+			}
+			yield(nil, io.ErrUnexpectedEOF)
+			return
+		}
+		if !yield(llm.TextDeltaEvent{Delta: "carried on", Key: "block:0"}, nil) {
+			return
+		}
+		if !yield(llm.TextCompleteEvent{Key: "block:0"}, nil) {
+			return
+		}
+		yield(llm.StepCompleteEvent{Usage: llm.Usage{InputTokens: 10, OutputTokens: 5}}, nil)
+	}, nil
+}
+
+func (p *partialToolCutProvider) SetReasoningConfigs(_ map[int]json.RawMessage) {}
+
+// A step cut while a tool call was still streaming leaves a window on the
+// adapter's screen that no result can ever answer. The step settles it on the way
+// out — before the retry notice explains the wait, so what the user reads above
+// that notice is a finished window, not a spinner that may still be running.
+func TestRunTaskSettlesAHalfStreamedToolCall(t *testing.T) {
+	provider := &partialToolCutProvider{}
+	agent := llm.NewAgent(llm.AgentConfig{Provider: provider, MaxSteps: 10})
+	out := &syncOutput{}
+	session := &Session{
+		sessionConfig: sessionConfig{
+			modelService:  testModelService(agent, nil, 0),
+			SessionConfig: SessionConfig{NoDelta: true, Output: out},
+		},
+		sharedState: sharedState{histCounter: 500, outputBroken: atomic.Bool{}},
+		runState:    runState{taskEventCh: make(chan taskEvent, 20)},
+	}
+	session.Contents = []llm.ContentPart{
+		&llm.TextPart{Text: "hi", ContentPartMeta: llm.ContentPartMeta{Role: llm.RoleUser}},
+	}
+
+	runOneTask(t, session, []llm.ContentPart{&llm.TextPart{Text: "do it"}})
+
+	if provider.calls != 2 {
+		t.Fatalf("provider calls = %d, want 2 (the cut step, then its continuation)", provider.calls)
+	}
+
+	// One UF frame for call_1, an error carrying the settlement sentence: the
+	// window the AF start opened is closed by it.
+	var settled []protocol.ToolOutputData
+	settleAt, notifyAt := -1, -1
+	frame := 0
+	r := strings.NewReader(out.String())
+	for {
+		tag, value, err := wiretest.NextFrame(r)
+		if err != nil {
+			break
+		}
+		switch tag {
+		case wire.TagUserF:
+			var d protocol.ToolOutputData
+			if json.Unmarshal([]byte(value), &d) == nil && d.CallID == "call_1" {
+				settled = append(settled, d)
+				if settleAt < 0 {
+					settleAt = frame
+				}
+			}
+		case wire.TagSystemMsg:
+			env, err := protocol.ParseSystemMsg(value)
+			if err == nil && env.Type == string(protocol.MsgTypeNotify) && notifyAt < 0 {
+				notifyAt = frame
+			}
+		}
+		frame++
+	}
+	if len(settled) != 1 {
+		t.Fatalf("UF frames for call_1 = %d, want 1 (the settlement)", len(settled))
+	}
+	if !settled[0].IsError {
+		t.Error("the settlement frame is not marked as an error; the window would not show ✗")
+	}
+	var text string
+	for _, item := range settled[0].Output {
+		text += item.Text
+	}
+	if !strings.Contains(text, "tool call did not complete") {
+		t.Errorf("settlement text = %q, want it to say the call did not complete", text)
+	}
+	if settleAt < 0 || notifyAt < 0 {
+		t.Fatalf("frames = %d and notify at %d; both must be present", settleAt, notifyAt)
+	}
+	if settleAt > notifyAt {
+		t.Errorf("settlement frame at %d, retry notice at %d: the window must be settled before the notice explains the wait",
+			settleAt, notifyAt)
+	}
+	// The half-streamed call cannot be replayed, so it is not in the history the
+	// continuation was built from.
+	for _, p := range session.Contents {
+		if tc, ok := p.(*llm.ToolInputPart); ok {
+			t.Errorf("history holds tool call %q, want none: its arguments never finished", tc.ID)
+		}
+	}
+}
+
 // smTexts returns the text of every SM frame of one type in captured output, in
 // write order.
 func smTexts(t *testing.T, out, msgType string) []string {

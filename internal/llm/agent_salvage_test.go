@@ -138,12 +138,12 @@ func TestStreamSalvagesExecutedToolsOnCancel(t *testing.T) {
 		t.Errorf("gotContents[1] = %#v, want ToolOutputPart c1 with tool role", gotContents[1])
 	}
 
-	// The canceled confirmation tool must fire a display-only UF error
-	// frame (so its UI window settles instead of spinning forever), while
-	// staying out of the salvaged history (asserted above: 2 parts, c1
-	// pair only). c1's normal result frame is also recorded.
+	// c2 never ran, so it stays out of the salvaged history (asserted above: 2
+	// parts, c1 pair only) — and its window does not spin either: the step
+	// settles it on the way out, with the explanation it gives every call it
+	// leaves without a result. c1's normal result frame is also recorded.
 	if len(outputEvents) != 2 {
-		t.Fatalf("OnToolOutput fired %d times, want 2 (c1 result + c2 cancel frame)", len(outputEvents))
+		t.Fatalf("OnToolOutput fired %d times, want 2 (c1 result + c2 settlement)", len(outputEvents))
 	}
 	var c2Event *struct {
 		id  string
@@ -161,8 +161,8 @@ func TestStreamSalvagesExecutedToolsOnCancel(t *testing.T) {
 	if c2Event == nil {
 		t.Fatal("no OnToolOutput frame for the canceled confirmation tool c2")
 	}
-	if c2Event.err == nil || !strings.Contains(c2Event.err.Error(), "canceled") {
-		t.Errorf("c2 OnToolOutput error = %v, want a cancellation error", c2Event.err)
+	if c2Event.err == nil || !strings.Contains(c2Event.err.Error(), "did not complete") {
+		t.Errorf("c2 OnToolOutput error = %v, want the settlement explanation", c2Event.err)
 	}
 }
 

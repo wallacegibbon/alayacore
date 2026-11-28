@@ -187,3 +187,43 @@ func TestTaskCompletionDoesNotDisturbSettledTools(t *testing.T) {
 func containsToolLabel(content, label string) bool {
 	return strings.Contains(content, label)
 }
+
+// TestUnansweredToolSettlesFromItsFrame is the mid-task counterpart of the safety
+// net above: a call cut off mid-arguments never gets a result, so the step that
+// opened it settles its window with an error frame as it ends
+// (llm.settleUnansweredToolCalls).
+//
+// The adapter needs nothing of its own for that — the frame that answers a call is
+// also the frame that settles it — and the window must reach the same ✗ as any
+// other failure. That is also what stops the animation: the tick refresh only
+// invalidates executing windows, so one left in Pending keeps the terminal
+// repainting for the rest of the task.
+func TestUnansweredToolSettlesFromItsFrame(t *testing.T) {
+	out := NewTerminalOutput(DefaultStyles())
+	wb := out.WindowBuffer()
+
+	// Only the streaming delta arrived: the arguments never completed, so the
+	// window exists without a tool input.
+	wb.HandleToolInputDelta("call_1", "edit_file", `{"path":"/tmp/x","old`, 7)
+	if !wb.InvalidateRunningToolSpinners() {
+		t.Fatal("a half-streamed call is animating; the tick refresh must see it")
+	}
+
+	// The settlement the step writes on its way out: a UF frame with an error
+	// and no result behind it.
+	wb.HandleToolOutput("call_1", "tool call did not complete", true, 7)
+
+	rendered := stripANSI(wb.GetAll(-1, false))
+	if !containsToolLabel(rendered, "TOOL CALL ✗") {
+		t.Errorf("settled call must show TOOL CALL ✗, got %q", rendered)
+	}
+	// The folded row keeps the arguments that did arrive, and the explanation is
+	// the window's body (what unfolding shows).
+	body := stripANSI(wb.RenderWindowContent(wb.WindowAt(0), 76))
+	if !strings.Contains(body, "tool call did not complete") {
+		t.Errorf("settled window must show the explanation, got %q", body)
+	}
+	if wb.InvalidateRunningToolSpinners() {
+		t.Error("a settled call must not keep the spinner refresh alive")
+	}
+}

@@ -40,9 +40,10 @@ func boomTool() []Tool {
 // conversation with it, which is the one thing the agent's own recover refuses to
 // allow.
 //
-// The panic must not become a tool result, either: a result is model-visible text
-// that history keeps and every later request re-sends. Hence the assertion on
-// OnToolOutput below — no result is produced at all, so none can carry a stack.
+// The panic must not become a tool result either: a result is model-visible text
+// that history keeps and every later request re-sends. The frame asserted below
+// is not one — it is the step's settlement of a window it leaves without a
+// result, so it carries one sentence and no stack, and history stays free of it.
 func TestToolPanicEndsTheStepNotTheProcess(t *testing.T) {
 	for _, mode := range []struct {
 		name   string
@@ -54,7 +55,7 @@ func TestToolPanicEndsTheStepNotTheProcess(t *testing.T) {
 		t.Run(mode.name, func(t *testing.T) {
 			var (
 				finished []ContentPart
-				outputs  int
+				settled  []string
 			)
 			agent := NewAgent(AgentConfig{
 				Provider:        panickingProvider(),
@@ -68,8 +69,14 @@ func TestToolPanicEndsTheStepNotTheProcess(t *testing.T) {
 					finished = contents
 					return nil
 				},
-				OnToolOutput: func(string, []ContentPart, error, uint64) error {
-					outputs++
+				OnToolOutput: func(_ string, contents []ContentPart, _ error, _ uint64) error {
+					var text strings.Builder
+					for _, p := range contents {
+						if tp, ok := p.(*TextPart); ok {
+							text.WriteString(tp.Text)
+						}
+					}
+					settled = append(settled, text.String())
 					return nil
 				},
 			})
@@ -84,8 +91,11 @@ func TestToolPanicEndsTheStepNotTheProcess(t *testing.T) {
 					t.Errorf("error = %v, want it to contain %q", err, want)
 				}
 			}
-			if outputs != 0 {
-				t.Errorf("OnToolOutput ran %d times, want 0: a panic produces no result", outputs)
+			// The window must not be left spinning, and what it is told must be the
+			// settlement sentence — a stack would be re-sent by every later request
+			// if it ever reached history.
+			if len(settled) != 1 || settled[0] != errToolCallIncomplete.Error() {
+				t.Errorf("tool frames = %q, want exactly the settlement sentence %q", settled, errToolCallIncomplete.Error())
 			}
 
 			// The step's other content is not the panic's to take: the text that

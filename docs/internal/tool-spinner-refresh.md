@@ -92,25 +92,51 @@ If the idle scan (31ns/tick) ever matters, replace it with an
 sites in `window.go` / `window_buffer.go` — not before profile data
 demands it.
 
-## Safety net: task-completion settlement
+## Safety net: step-boundary settlement
 
-`InvalidateRunningToolSpinners` keeps the spinner alive, but nothing in
-the tick path can settle a window whose result frame never arrives. The
-known abnormal paths were fixed individually (malformed tool input →
-AF frame with the raw bytes prefix-marked as `malformed tool input: …`,
-the tool then fails parsing; canceled confirmation → display-only UF
-error frame), but any future path that creates a tool window without a
-UF frame would leave it spinning forever.
+`InvalidateRunningToolSpinners` keeps the spinner alive, but nothing in the tick
+path can settle a window whose result frame never arrives. That settlement has
+two layers, and the first one is the reason a failed step cannot leave animation
+running for the rest of the task.
 
-`WindowBuffer.SettleUnfinishedTools()` is the systematic backstop: when
-the task completion frame arrives (`in_progress` true→false, detected by
+### The step settles the calls it opened
+
+A tool window is opened by the first frame about a call (`AF` start or `Af`
+delta) and answered by the frame that closes it (`UF`). Every step therefore owes
+one answer per call it announced, and it pays that debt before it returns:
+`llm.settleUnansweredToolCalls` runs as `streamEvents` unwinds, and fires a
+display-only `UF` error frame (`tool call did not complete`) for every call the
+step leaves without a result. The part it returns is discarded, so the call never
+enters history — a call that never completed cannot be replayed.
+
+Four shapes arrive there, and they are one rule rather than four fixes:
+
+| Shape | Why no result exists |
+|---|---|
+| arguments cut off mid-stream | the call never became a part, so nothing can run |
+| serial mode, stream died before `finish` | the queue never ran |
+| canceled while awaiting confirmation | `runToolCall` runs nothing |
+| the tool panicked | the stack is the step's error, not a result |
+
+The rule is stated once, where the calls are known, instead of at each path that
+can end a step — which is what makes it hold for a path added later. The frame
+lands before the caller hears anything about the failure, so a cut stream's
+window shows ✗ before the retry notice that explains the wait.
+
+### The task-completion backstop
+
+A `UF` frame can also be lost entirely — a malformed input frame, a dropped
+write, an adapter restart mid-task — and no step-level rule can answer a frame
+that never arrived. `WindowBuffer.SettleUnfinishedTools()` covers that: when the
+task completion frame arrives (`in_progress` true→false, detected by
 `sessionState.updateTask`'s completion edge and handled in
-`outputWriter.handleSystemTask`), every tool window still in the running
-states (`ToolStatusNone`/`ToolStatusPending`) is settled to
-`ToolStatusError` (✗) with an explanation when it has no output.
+`outputWriter.handleSystemTask`), every tool window still in the running states
+(`ToolStatusNone`/`ToolStatusPending`) is settled to `ToolStatusError` (✗) with an
+explanation when it has no output.
 
-This is safe by construction: on normal paths every tool settles via its
-UF frame before the task frame is written (`toolWg.Wait` precedes
-`handleTaskDone`), so the settlement only ever touches genuine
-stragglers. It is also the single place to fix if a new abnormal path
-appears — no per-path "remember to emit a settling frame" discipline.
+This is safe by construction: on normal paths every tool settles via its `UF`
+frame before the task frame is written (`toolWg.Wait` precedes `handleTaskDone`),
+so the settlement only ever touches genuine stragglers. What it cannot do is
+anything mid-task, which is why it is the second layer and not the first: a
+resumed step leaves the task running, and a spinner the task frame never reaches
+turns for the rest of the session.
