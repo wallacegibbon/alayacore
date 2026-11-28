@@ -246,11 +246,54 @@ provider rate limited the request (status 429) — retrying in 1s (retry 1/3)
 provider connection failed — retrying in 1s (retry 1/3)
 provider stream ended early — retrying in 1s (retry 1/3)
 provider stream was cut off — retrying in 1s (retry 1/3)
+provider answered nothing — retrying in 1s (retry 1/3)
 ```
 
 If every retry is exhausted, the ordinary failed-step path reports the final
 failure as it always has. Because the retry lives in the session/agent layer,
 all four adapters inherit it. The last line is the one the next section is about.
+
+### A Step That Answered Nothing
+
+A provider can report a step as finished and have nothing in it. The loop ends a
+task when a step carries no tool call, and such a step carries none — so without
+this rule the task landed as a **success** with no content, no error and nothing
+to diagnose. That is what a local model server that is switched off looks like
+from here: it answers 200 with an empty message instead of refusing the
+connection, and the task simply ended.
+
+Answering is **text or a tool call**. Reasoning alone is not an answer: it says
+what the model thought, not what it told the user, and an assistant message
+carrying neither `content` nor `tool_calls` is the shape providers reject
+(`Invalid assistant message: content or tool_calls must be set` — see
+`openai_reasoning_only_test.go`). Both shapes are one failure, `llm.ErrNoAnswer`,
+and both are **resumed** ([A Cut Stream Is Resumed, Not Re-sent](#a-cut-stream-is-resumed-not-re-sent)),
+because a model that answered nothing is a hiccup far more often than a verdict:
+a server reloading its model, a generation dropped by the slot, an immediate EOS
+from a quantized sample. A user is not sitting there to type `:continue`, so the
+task survives the hiccup or the failure is reported — it is not handed back.
+
+What separates the two shapes is not the error but the **next request**, and that
+is a fact about the history, not about the answer:
+
+| The step | Continuation |
+|---|---|
+| recorded nothing at all | the identical request again: nothing ends on an assistant part, so the caller's rule adds nothing |
+| recorded reasoning, no answer | the request plus `Continue`: a request may not end on an assistant message |
+
+What the continuation carries is the caller's, because the history is — and it is the
+same rule `:continue` follows (`Session.stepUserParts`), not a second copy of it. So
+there is one value and one recovery, and a caller without that hook is not resumed:
+it gets `llm.ErrNoAnswer` and answers it its own way, which for a summarize is its
+"ask once more" ([context-tracking.md](context-tracking.md#when-the-model-writes-no-summary-text)).
+
+The check sits where the step's record is built, not at the loop's "no tool call
+means done" test, so a step that answered nothing never becomes a step: no stats,
+no step-finish, no usage counted. **Truncation is decided first**: a reply that
+stopped on `length` reports `ErrResponseTruncated`, because that names why it
+stopped and outranks its having no answer. The budget is the same `maxRetries`
+consecutive resumes a cut stream gets, and when it is spent the task fails with
+`provider answered nothing` — the sentence the notices already used.
 
 ### A Cut Stream Is Resumed, Not Re-sent
 
@@ -414,6 +457,9 @@ Automatic retry is tested in `internal/llm/retry_test.go`,
 | `TestAgentResumeSendsWhatTheCallerAllows` | The agent never invents the continuation's trailing part: a salvage ending on the tool result the model asked for is sent as it stands |
 | `TestAgentDoesNotRetryStreamThatDiedWithAnOpenToolCall` | The same shape with no caller to resume for: surfaced, never re-sent |
 | `TestAgentResumeStopsWhenTheBudgetIsSpent` | A step that keeps being cut spends the resume budget and reports the provider's error unchanged |
+| `TestAgentResumesEmptyStep` | A step the provider reported as finished with nothing in it is resumed by the agent alone — no caller hook — with the identical request, announced as `provider answered nothing` |
+| `TestAgentResumesStepThatOnlyReasoned` | Reasoning with no answer is resumed through the caller's boundary: the thinking stays in the record once, and the continuation's request ends on `Continue` |
+| `TestTruncatedStepWithNothingInItReportsTheLimit` | `length` with nothing in it reports `ErrResponseTruncated`, not the missing answer |
 | `TestAgentResumeCannotOutrunTheStepBudget` | A continuation spends a step like any other: on the last step the task reports the stream's error rather than `ErrMaxStepsExceeded` |
 | `TestAgentResumeCanceledDuringBackoff` | A cancel during the resume's wait stops before the next request (`context.Canceled`) |
 | `TestAgentDoesNotResumeAfterACallbackFailure` | An adapter write that failed is not the provider's doing, and no continuation is attempted — the gate is the marker, not "content arrived" |

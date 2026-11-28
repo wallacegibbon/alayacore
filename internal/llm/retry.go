@@ -261,6 +261,10 @@ const reasonStreamEndedEarly = "provider stream ended early"
 // they watched stays, and the task carries on from it.
 const reasonStreamCut = "provider stream was cut off"
 
+// reasonNoAnswer is the notice for a step that finished with no answer, and the
+// message of ErrNoAnswer, so the user sees one sentence either way.
+const reasonNoAnswer = "provider answered nothing"
+
 // retryReason renders a short, user-facing reason for a retry notice.
 func retryReason(err error) string {
 	// A stream that died before delivering anything. Not "connection failed":
@@ -275,6 +279,9 @@ func retryReason(err error) string {
 	var cut *streamCutError
 	if errors.As(err, &cut) {
 		return reasonStreamCut
+	}
+	if errors.Is(err, ErrNoAnswer) {
+		return reasonNoAnswer
 	}
 	var apiErr *APIError
 	if errors.As(err, &apiErr) {

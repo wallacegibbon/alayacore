@@ -178,6 +178,39 @@ Three corollaries:
   the reader who wants the number runs the command. Say what is true of the
   design and let the number be derived.
 
+### The code states; a comment is where the code cannot speak
+
+A comment earns its place by saying something the code **cannot**: why this order
+is load-bearing, why two identical-looking branches mean different things, why a
+step that a reader expects is deliberately absent. Where the names and the shape
+already carry the meaning, a comment is a second copy of the answer — and a second
+copy drifts. The drift is the worse failure of the two: a missing explanation
+leaves a reader looking, while a stale one is read as authoritative and sends the
+next change the wrong way. A comment that disagrees with the code beside it is a
+defect in its own right, fixed in the same change, and no tool here reaches it —
+`misc/check-docs.sh` sees a file name, a flag and a link, not a claim.
+
+So the questions to ask of a comment, in this order: does the code already say
+this? if not, is this one line or a `docs/` page (see "One fact, one home")? and
+only then, does it explain something a reader could not recover from the code at
+all?
+
+Four shapes that never earn their place, because each is a restatement rather than
+a fact:
+
+- the next line in English — `// increment the counter` above `counter++`;
+- the narration of a change — what this used to be is the commit message's, and a
+  comment kept for it describes code that no longer exists;
+- a second copy of an argument that lives in `docs/`, where it has room and a link
+  target;
+- an explanation of **absent** code. A paragraph beside a gap is read by nobody and
+  re-read by no one; the test that pins the absence, or the `docs/` page that
+  argues it, is where that fact has a home.
+
+The budget is the point: comment length is paid for by the reader of every future
+change, and the comments that survive are the ones carrying something the code
+could not.
+
 ### One concept, one name
 
 [Vocabulary](vocabulary.md) names each concept the tree talks about — task,

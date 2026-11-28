@@ -482,6 +482,131 @@ func (c *resumeCaller) onBeforeSend(contents []ContentPart) ([]ContentPart, erro
 	return append(contents, &TextPart{Text: "Continue", ContentPartMeta: ContentPartMeta{Role: RoleUser}}), nil
 }
 
+// An empty step is continued by the caller's own rule, which adds nothing when the
+// history does not end on an assistant part: the continuation is the same request.
+func TestAgentResumesEmptyStep(t *testing.T) {
+	fastRetries(t)
+	p := &streamScriptProvider{script: []streamScript{{events: []StreamEvent{StepCompleteEvent{}}}}}
+	agent := NewAgent(AgentConfig{Provider: p, MaxSteps: 3})
+	caller := &resumeCaller{}
+
+	result, err := agent.Stream(context.Background(), userText(), StreamCallbacks{
+		OnRetry:      p.onRetry,
+		OnStepStart:  p.onStepStart,
+		OnBeforeSend: caller.onBeforeSend,
+	})
+	if err != nil {
+		t.Fatalf("Stream error = %v, want the continuation to recover", err)
+	}
+	if p.calls != 2 {
+		t.Fatalf("provider calls = %d, want 2 (the empty step, then its continuation)", p.calls)
+	}
+	if len(p.notices) != 1 {
+		t.Fatalf("retry notices = %d, want 1", len(p.notices))
+	}
+	if got := p.notices[0].Reason; got != "provider answered nothing" {
+		t.Errorf("notice Reason = %q, want %q", got, "provider answered nothing")
+	}
+	first, second := caller.requests[0], caller.requests[1]
+	if len(first) != len(second) {
+		t.Fatalf("continuation request has %d parts, want the original %d", len(second), len(first))
+	}
+	if result == nil || len(result.Contents) == 0 {
+		t.Fatal("expected the answer the continuation produced")
+	}
+}
+
+// A model that never answers spends the budget and is reported.
+func TestAgentEmptyStepBudgetEndsTheTask(t *testing.T) {
+	fastRetries(t)
+	empty := streamScript{events: []StreamEvent{StepCompleteEvent{}}}
+	p := &streamScriptProvider{script: []streamScript{empty, empty, empty, empty, empty}}
+	// A continuation is a step, so the step bound caps resumes too.
+	agent := NewAgent(AgentConfig{Provider: p, MaxSteps: 5})
+
+	_, err := agent.Stream(context.Background(), userText(), StreamCallbacks{
+		OnRetry:      p.onRetry,
+		OnBeforeSend: (&resumeCaller{}).onBeforeSend,
+	})
+	if !errors.Is(err, ErrNoAnswer) {
+		t.Fatalf("Stream error = %v, want ErrNoAnswer", err)
+	}
+	if p.calls != 4 {
+		t.Fatalf("provider calls = %d, want 4 (1 attempt + 3 resumes)", p.calls)
+	}
+	if len(p.notices) != 3 {
+		t.Fatalf("retry notices = %d, want 3", len(p.notices))
+	}
+	if got := err.Error(); got != "provider answered nothing" {
+		t.Errorf("reported error = %q, want the notice wording", got)
+	}
+}
+
+// Reasoning with no answer: resumed through the caller's boundary, thinking kept once.
+func TestAgentResumesStepThatOnlyReasoned(t *testing.T) {
+	fastRetries(t)
+	thought := streamScript{events: []StreamEvent{
+		ReasoningDeltaEvent{Delta: "thinking it over", Key: "reasoning"},
+		ReasoningCompleteEvent{Key: "reasoning"},
+		StepCompleteEvent{},
+	}}
+	p := &streamScriptProvider{script: []streamScript{thought}}
+	agent := NewAgent(AgentConfig{Provider: p, MaxSteps: 3})
+	caller := &resumeCaller{}
+
+	result, err := agent.Stream(context.Background(), userText(), StreamCallbacks{
+		OnRetry:      p.onRetry,
+		OnStepStart:  p.onStepStart,
+		OnBeforeSend: caller.onBeforeSend,
+	})
+	if err != nil {
+		t.Fatalf("Stream error = %v, want the continuation to finish the task", err)
+	}
+	if p.calls != 2 || p.stepStarts != 2 {
+		t.Fatalf("calls = %d, step starts = %d; want 2 and 2 (the thought-only step, then its continuation)", p.calls, p.stepStarts)
+	}
+	sent := p.requests[1]
+	last := sent[len(sent)-1]
+	if tp, ok := last.(*TextPart); !ok || tp.Text != "Continue" || last.GetRole() != RoleUser {
+		t.Fatalf("continuation ends with %#v, want the caller's Continue", last)
+	}
+	reasoning := 0
+	text := false
+	for _, part := range result.Contents {
+		switch v := part.(type) {
+		case *ReasoningPart:
+			reasoning++
+			if v.Text != "thinking it over" {
+				t.Errorf("reasoning = %q, want the one that streamed", v.Text)
+			}
+		case *TextPart:
+			if v.Text == "hello" {
+				text = true
+			}
+		}
+	}
+	if reasoning != 1 || !text {
+		t.Fatalf("record must hold the thinking once and the answer beside it; reasoning=%d answer=%v", reasoning, text)
+	}
+}
+
+// Truncation outranks having no answer.
+func TestTruncatedStepWithNothingInItReportsTheLimit(t *testing.T) {
+	fastRetries(t)
+	p := &streamScriptProvider{script: []streamScript{{events: []StreamEvent{
+		StepCompleteEvent{StopReason: "length"},
+	}}}}
+	agent := NewAgent(AgentConfig{Provider: p, MaxSteps: 3})
+
+	_, err := agent.Stream(context.Background(), userText(), StreamCallbacks{OnBeforeSend: (&resumeCaller{}).onBeforeSend})
+	if !errors.Is(err, ErrResponseTruncated) {
+		t.Fatalf("Stream error = %v, want ErrResponseTruncated", err)
+	}
+	if p.calls != 1 {
+		t.Fatalf("provider calls = %d, want 1: a truncated reply is resumed from nothing, not re-sent", p.calls)
+	}
+}
+
 // A stream that dies after delivering content cannot be re-sent — what streamed
 // is on the adapter's screen and in history — so it is resumed instead: the
 // salvage stays, the caller's boundary ends the next request on a user part, and

@@ -99,6 +99,7 @@ func TestIsRetryable(t *testing.T) {
 		// rather than by luck — a cut wrapping a *url.Error would otherwise be
 		// accepted by the transport rule below.
 		{"cut stream", &streamCutError{err: &url.Error{Op: "Post", URL: "http://x/v1", Err: io.EOF}}, false},
+		{"no answer", ErrNoAnswer, false},
 		{"plain error", errors.New("boom"), false},
 	}
 	for _, tc := range cases {
@@ -128,6 +129,7 @@ func TestRetryReason(t *testing.T) {
 		{&url.Error{Op: "Post", URL: "http://x/v1", Err: io.EOF}, "provider connection failed"},
 		{&streamBreakError{err: io.EOF}, "provider stream ended early"},
 		{&streamCutError{err: io.ErrUnexpectedEOF}, "provider stream was cut off"},
+		{ErrNoAnswer, "provider answered nothing"},
 		{timeoutErr{}, "provider connection failed"},
 	}
 	for _, tc := range cases {

@@ -1301,8 +1301,9 @@ func TestOpenAIReasoningField(t *testing.T) {
 		{
 			name:          "explicit name is exclusive, alias ignored",
 			field:         "reasoning",
-			deltas:        []string{`{"reasoning":"from-reasoning","reasoning_content":"from-reasoning_content"}`},
+			deltas:        []string{`{"reasoning":"from-reasoning","reasoning_content":"from-reasoning_content"}`, `{"content":"Answer."}`},
 			wantReasoning: "from-reasoning",
+			wantText:      "Answer.",
 		},
 		{
 			name:          "configured name absent yields no reasoning event",

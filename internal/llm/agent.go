@@ -61,6 +61,11 @@ var ErrMaxStepsExceeded = errors.New("agent loop exceeded maximum steps")
 // due to hitting the output token limit (max_tokens / length).
 var ErrResponseTruncated = errors.New("response truncated: hit output token limit")
 
+// ErrNoAnswer is returned when a step the provider reported as finished holds no
+// answer: no text and no tool call — reasoning alone is the shape providers reject
+// (`content or tool_calls must be set`). The step is resumed, not re-sent.
+var ErrNoAnswer = errors.New(reasonNoAnswer)
+
 // Tool represents an executable tool
 type Tool struct {
 	Definition ToolDefinition
@@ -405,42 +410,24 @@ func (a *Agent) sendWithRetry(ctx context.Context, contents []ContentPart, callb
 	}
 }
 
-// resumeStep decides what to do with a step whose stream was **cut**: it ended
-// with an error after it had already recorded content (streamCutError). It returns
-// nil when the step loop should go on with the continuation, and the error the
-// task ends with when it should not.
+// resumeStep finishes a step that delivered content and stopped: a stream cut by an
+// error (streamCutError), or a model that reasoned and stopped without answering
+// (ErrNoAnswer). The content is on the adapter's screen and in history, so it cannot
+// be re-sent — the step is continued instead, the user's own `:continue`.
 //
-// A cut step cannot be repaired by sending the request again — what streamed is on
-// the adapter's screen and in history, so a re-send would duplicate it — but it can
-// be *finished*: the salvage stays, and the model is asked to carry on from it.
-// That is the user's own `:continue` performed for them, which is why it needs no
-// classification of the error, and the argument for doing it automatically is the
-// one docs/error-handling.md → "A Cut Stream Is Resumed, Not Re-sent" makes.
+// What the continuation carries is the caller's, because the history is: whether a
+// trailing "Continue" is added is the same rule `:continue` follows, and it already
+// lives with the history (Session.stepUserParts). So a caller without that hook is
+// not resumed — it gets the error and answers it its own way.
 //
-// Two conditions keep it honest rather than merely convenient:
-//
-//   - The caller must own the history the next request is built from
-//     (OnBeforeSend). A continuation ends on what the model already said, and a
-//     request may not end there: Anthropic rejects one (that shape is prefill,
-//     and its current models answer a 400), and a model that still accepts one
-//     reads it as "keep writing this message" instead of "carry on with the
-//     task". So it needs a trailing user part, and the session's `stepUserParts`
-//     appends the same `Continue` a compaction uses, numbered and echoed like any
-//     other part added at a boundary. A prompt whose caller has no such hook (a
-//     summarize call) is not resumed and keeps its existing retry.
-//   - The user must not have cut it. sendWithRetry reports a cancellation as the
-//     cancellation before a resume is considered at all, so a canceled task does
-//     not reach the wait; the check below is the backstop for a cancel that lands
-//     after that point.
-//
-// The budget is maxRetries consecutive resumes, counted by the caller and cleared
-// by a step that lands; a continuation is also a step, so it spends the step budget
-// as one. The wait is retryDelay's backoff, announced before it through OnRetry
-// (words the user did not type have to be explained where they appear) and
-// interruptible, so :cancel ends it immediately.
+// The budget is maxRetries consecutive resumes, cleared by a step that lands, and a
+// continuation spends the step budget as one.
 func (a *Agent) resumeStep(ctx context.Context, step, resumes int, err error, callbacks StreamCallbacks) error {
 	var cut *streamCutError
-	if !errors.As(err, &cut) || callbacks.OnBeforeSend == nil {
+	if !errors.As(err, &cut) && !errors.Is(err, ErrNoAnswer) {
+		return err
+	}
+	if callbacks.OnBeforeSend == nil {
 		return err
 	}
 	if resumes >= maxRetries || step >= a.config.MaxSteps {
@@ -725,6 +712,10 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 			if e.StopReason == "max_tokens" || e.StopReason == "length" {
 				truncated = true
 			}
+			// Truncation outranks this: it says why the reply stopped.
+			if !truncated && !answered(stepContents) {
+				return nil, Usage{}, false, ErrNoAnswer
+			}
 			// Stream ended: capture the round-trip duration (request →
 			// stream end, TTFT included). Tool execution happens after
 			// this event (parallel goroutines collected below), so tool
@@ -769,6 +760,18 @@ func genHistoryID(callbacks StreamCallbacks) uint64 {
 		return callbacks.IDGen()
 	}
 	return 0
+}
+
+// answered reports whether a step said anything to the user: text, or a tool call,
+// never reasoning alone (see ErrNoAnswer).
+func answered(contents []ContentPart) bool {
+	for _, p := range contents {
+		switch p.(type) {
+		case *TextPart, *ToolInputPart:
+			return true
+		}
+	}
+	return false
 }
 
 // hasToolInputs reports whether a step's record contains a tool call, which is

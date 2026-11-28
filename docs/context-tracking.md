@@ -166,11 +166,18 @@ task writes the compacted history — the same one the model is running on.
 ### When the model writes no summary text
 
 A summarize is answered by the same model that drives the task, so it can end
-without text — reasoning its way to "now write it" and stopping, or an empty
-completion. The summarize asks **once more**: the original request, with one
+without text — reasoning its way to "now write it" and stopping there. The
+summarize asks **once more**: the original request, with one
 user part (`summarizeRetryPrompt`) saying the last reply carried no summary text
 and asking for the text, with no tools. One retry, not a loop; a second textless
 reply fails the summarize and the task ends as described under Limits.
+
+That "wrote no text" reply is a step with no answer, which no task may end on
+either (docs/error-handling.md → "A Step That Answered Nothing"). The agent reports
+it as `llm.ErrNoAnswer` and does not re-send it; continuing a step is the caller's
+move, and this call has no hook to make the next request well-formed. So the error
+arrives at once, and the summarize answers it with the retry below — the corrective
+prompt is this call's own `:continue`.
 
 The failed attempt's response is deliberately **not** carried. The summarize
 runs near the window's ceiling, and putting that response back would make the

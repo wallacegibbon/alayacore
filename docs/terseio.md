@@ -46,10 +46,14 @@ at all never reaches a task; it fails at startup with exit code `1`.
 
 Empty stdin produces no prompt and exits `0` with empty output.
 
-If the final assistant message contains **no text** (e.g. reasoning-only or
-tool-call-only), stdout is empty — an intermediate text from an earlier
-message is never printed as if it were the answer. Use the exit code and the
-session file to diagnose such cases.
+If the final assistant message contains **no text**, stdout is empty — an
+intermediate text from an earlier message is never printed as if it were the
+answer. A task does not end on such a message either: a step that answered nothing
+is a failure, reported (and, where the caller can resume it, continued) rather than
+landing as a silence — see
+[error-handling.md](error-handling.md#a-step-that-answered-nothing). Use the exit
+code and the session file to diagnose the remaining case, a task whose answer was
+already delivered in an earlier step.
 
 ## Commands
 

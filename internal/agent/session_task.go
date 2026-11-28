@@ -9,6 +9,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -685,6 +686,23 @@ func cleanIncompleteToolInputs(contents []llm.ContentPart) []llm.ContentPart {
 // threshold exists to prevent (docs/context-tracking.md → "Limits").
 const summarizeRetryPrompt = "Your previous reply contained no summary text. Write the summary now: the sections requested above, in full, as text. Do not call tools."
 
+// summarizeAnswer sends one summarize request and reports what came back: its
+// text, whether it carried any, and the tokens the step reported. A reply with no
+// text and a reply with no answer at all (llm.ErrNoAnswer) are the same answer to
+// this question, and the caller's corrective retry is what both of them get.
+// Any other failure is returned.
+func (s *Session) summarizeAnswer(ctx context.Context, history []llm.ContentPart) (string, int64, bool, error) {
+	full, tokens, err := s.processPrompt(ctx, history, summarizeCall)
+	if errors.Is(err, llm.ErrNoAnswer) {
+		return "", tokens, false, nil
+	}
+	if err != nil {
+		return "", tokens, false, err
+	}
+	text, ok := summaryText(full[len(history):])
+	return text, tokens, ok, nil
+}
+
 // summarizeContents appends the summarize prompt, calls processPrompt,
 // and formats the response as a summary request + the assistant's summary.
 // On any failure, returns the original contents (without the prompt).
@@ -708,28 +726,15 @@ func (s *Session) summarizeContents(ctx context.Context, contents []llm.ContentP
 	promptContents := make([]llm.ContentPart, len(contents), len(contents)+1)
 	copy(promptContents, contents)
 	promptContents = append(promptContents, promptPart)
-	fullContents, outputTokens, err := s.processPrompt(ctx, promptContents, summarizeCall)
+	text, outputTokens, ok, err := s.summarizeAnswer(ctx, promptContents)
 	if err != nil {
 		return contents, err
 	}
-
-	response := fullContents[len(contents):]
-	text, ok := summaryText(response)
 	if !ok {
-		// The summarize is answered by the same model that drives the task, so
-		// it can end without text: reasoning its way to "now write it" and
-		// stopping there, or an empty completion. Ask once more — one retry,
-		// not a loop, because every attempt is the whole conversation and a
-		// model that refuses the text twice will refuse it a third time.
-		//
-		// The retry is the original request — the conversation and the summarize
-		// prompt — plus a user part asking for the text. The failed attempt's
-		// response is deliberately not carried: the summarize runs near the
-		// window's ceiling, so putting that response back would make the retry
-		// larger than the request that just fit (docs/context-tracking.md →
-		// "Limits"). The cost is that the model thinks again, and a tool the
-		// failed attempt ran is not carried either; the retry forbids tools,
-		// which is what keeps it from running one again.
+		// The summarize is answered by the same model that drives the task, so it
+		// can end without text. One corrective retry, not a loop, and the failed
+		// attempt's response is not carried — see docs/context-tracking.md →
+		// "When the model writes no summary text".
 		s.writeNotify("Summarization produced no text; retrying once")
 		retryPart := &llm.TextPart{Text: summarizeRetryPrompt}
 		retryPart.SetHistoryID(s.histIncAndGet())
@@ -737,11 +742,10 @@ func (s *Session) summarizeContents(ctx context.Context, contents []llm.ContentP
 		retryContents := make([]llm.ContentPart, len(promptContents), len(promptContents)+1)
 		copy(retryContents, promptContents)
 		retryContents = append(retryContents, retryPart)
-		fullContents, outputTokens, err = s.processPrompt(ctx, retryContents, summarizeCall)
+		text, outputTokens, ok, err = s.summarizeAnswer(ctx, retryContents)
 		if err != nil {
 			return contents, err
 		}
-		text, ok = summaryText(fullContents[len(contents):])
 	}
 	if !ok {
 		return contents, fmt.Errorf("summarization produced no text")
