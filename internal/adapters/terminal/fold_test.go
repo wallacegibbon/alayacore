@@ -8,13 +8,10 @@ func TestSpaceKeyTogglesFold(t *testing.T) {
 	terminal := testTUI()
 	terminal = terminal.focusDisplay()
 
-	// Add a window with content that can be folded
 	terminal.out.WindowBuffer().AppendOrUpdate(tagAssistantText, "test1", "Hello world")
 
-	// Set cursor to first window
 	terminal.display = terminal.display.WithWindowCursor(0)
 
-	// Verify window is not folded initially
 	windows := terminal.out.WindowBuffer().AllWindows()
 	if len(windows) == 0 {
 		t.Fatal("No windows created")
@@ -56,10 +53,8 @@ func TestSpaceKeyDoesNothingInInputWindow(t *testing.T) {
 	terminal := testTUI()
 	terminal = terminal.focusPrompt()
 
-	// Add a window with content
 	terminal.out.WindowBuffer().AppendOrUpdate(tagAssistantText, "test1", "Hello world")
 
-	// Press Space key while in input window
 	msg := KeyPressMsg(Key{Code: ' '})
 
 	model, cmd := terminal.Update(msg)
@@ -68,7 +63,6 @@ func TestSpaceKeyDoesNothingInInputWindow(t *testing.T) {
 		t.Fatal("Update returned nil model")
 	}
 
-	// Should not emit any command
 	if cmd != nil {
 		t.Errorf("Space key in input window should not emit command, got %v", cmd)
 	}

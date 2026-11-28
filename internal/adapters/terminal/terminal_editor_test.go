@@ -338,7 +338,6 @@ func TestColorizeToolMultiline(t *testing.T) {
 }
 
 func TestWrapContentPreservesANSI(t *testing.T) {
-	// Create a styled line with ANSI escape sequences (dimmed reasoning style)
 	style := NewStyle().Foreground(Color("#585b70")).Italic(true)
 	styledText := style.Render("This is a long line of reasoning text that should wrap when width is limited.")
 
@@ -357,11 +356,9 @@ func TestWrapContentPreservesANSI(t *testing.T) {
 				if !strings.Contains(line, "\x1b[") {
 					t.Errorf("Line %d missing ANSI escape sequence after wrapping at width %d: %q", i, width, line)
 				}
-				// Ensure each line starts with escape sequence (style prefix)
 				if !strings.HasPrefix(line, "\x1b[") {
 					t.Errorf("Line %d does not start with ANSI escape sequence: %q", i, line)
 				}
-				// Ensure each line ends with reset sequence (\x1b[0m or \x1b[m)
 				if !strings.HasSuffix(line, "\x1b[0m") && !strings.HasSuffix(line, "\x1b[m") {
 					t.Errorf("Line %d does not end with reset sequence: %q", i, line)
 				}
@@ -536,17 +533,14 @@ func TestPromptLineEditingKeys(t *testing.T) {
 
 func TestWindowBufferDeltaRouting(t *testing.T) {
 	out := NewTerminalOutput(DefaultStyles())
-	// Write assistant text delta with history ID
 	err := wire.WriteFrame(out, wire.TagAssistantXDelta, wiretest.AssistantTextDelta("1", "Hello"))
 	if err != nil {
 		t.Fatalf("WriteFrame failed: %v", err)
 	}
-	// Write another delta with same history ID
 	err = wire.WriteFrame(out, wire.TagAssistantXDelta, wiretest.AssistantTextDelta("1", " world"))
 	if err != nil {
 		t.Fatalf("WriteFrame failed: %v", err)
 	}
-	// Write different history ID
 	err = wire.WriteFrame(out, wire.TagAssistantXDelta, wiretest.AssistantTextDelta("2", "Another"))
 	if err != nil {
 		t.Fatalf("WriteFrame failed: %v", err)
@@ -554,12 +548,10 @@ func TestWindowBufferDeltaRouting(t *testing.T) {
 	// Flush pending deltas so windows are created in the buffer.
 	out.FlushPendingDeltas()
 	out.DrainDirty()
-	// Check window count
 	windows := out.windowBuffer.AllWindows()
 	if len(windows) != 2 {
 		t.Errorf("Expected 2 windows, got %d", len(windows))
 	}
-	// Find window with latest first delta (ID "1")
 	var win1 *Window
 	for _, w := range windows {
 		if w.ID == "1" {
@@ -576,7 +568,6 @@ func TestWindowBufferDeltaRouting(t *testing.T) {
 	if !strings.Contains(win1.RawContent(), "Hello") || !strings.Contains(win1.RawContent(), "world") {
 		t.Errorf("Window content missing expected parts, got: %q", win1.RawContent())
 	}
-	// Check window with ID "2" exists
 	var win2 *Window
 	for _, w := range windows {
 		if w.ID == "2" {
@@ -591,28 +582,21 @@ func TestWindowBufferDeltaRouting(t *testing.T) {
 
 func TestWindowBufferRendering(t *testing.T) {
 	wb := NewWindowBuffer(30, DefaultStyles())
-	// Add a window with some content
 	wb.AppendOrUpdate(tagAssistantText, "test1", "Hello world")
-	// Get rendered output
 	rendered := wb.GetAll(-1, false)
 	// Check that the window's own line appears — marker, label, timestamp.
 	if !strings.HasPrefix(stripANSI(rendered), "- ASSISTANT") {
 		t.Errorf("Rendered output missing the window's own line: %q", rendered)
 	}
-	// Check that content appears inside
 	if !strings.Contains(rendered, "Hello world") {
 		t.Errorf("Content not found in rendered output: %q", rendered)
 	}
-	// Check width constraint: count lines? Not needed.
-	// Add another window and ensure ordering
 	wb.AppendOrUpdate(tagAssistantReasoning, "test2", "Reasoning")
 	rendered2 := wb.GetAll(-1, false)
 	// Should have two windows separated by newline
-	// Count the windows' own lines? Simpler: ensure both contents appear
 	if !strings.Contains(rendered2, "Hello world") || !strings.Contains(rendered2, "Reasoning") {
 		t.Errorf("Both window contents not found: %q", rendered2)
 	}
-	// Ensure ordering: first window appears before second
 	idx1 := strings.Index(rendered2, "Hello world")
 	idx2 := strings.Index(rendered2, "Reasoning")
 	if idx1 == -1 || idx2 == -1 || idx1 >= idx2 {
@@ -622,22 +606,18 @@ func TestWindowBufferRendering(t *testing.T) {
 
 func TestWindowBufferNonDeltaMessages(t *testing.T) {
 	out := NewTerminalOutput(DefaultStyles())
-	// Write a non-delta message (error)
 	err := protocol.WriteSystemMsg(out, protocol.ErrorMsg{Text: "Something went wrong"})
 	if err != nil {
 		t.Fatalf("WriteSystemMsg failed: %v", err)
 	}
-	// Write another non-delta (notify)
 	err = protocol.WriteSystemMsg(out, protocol.NotifyMsg{Text: "Notification"})
 	if err != nil {
 		t.Fatalf("WriteSystemMsg failed: %v", err)
 	}
-	// Check that two separate windows were created
 	windows := out.windowBuffer.AllWindows()
 	if len(windows) != 2 {
 		t.Errorf("Expected 2 windows for non-delta messages, got %d", len(windows))
 	}
-	// Ensure they have different generated IDs
 	if windows[0].ID == windows[1].ID {
 		t.Errorf("Non-delta windows should have different IDs: %s", windows[0].ID)
 	}
@@ -677,7 +657,6 @@ func TestWindowBufferEdgeCases(t *testing.T) {
 	if len(windows) != 2 {
 		t.Errorf("Expected 2 windows, got %d", len(windows))
 	}
-	// Check ordering: first delta, second error
 	if windows[0].RawTag() != tagAssistantText {
 		t.Errorf("First window tag mismatch, got %s", windows[0].RawTag())
 	}
@@ -720,7 +699,6 @@ func TestWindowBufferWidthMatchesInput(t *testing.T) {
 			inputTotalWidth := terminalWidth
 			// Window buffer width should be same as input total width
 			wb := NewWindowBuffer(inputTotalWidth, DefaultStyles())
-			// Create a window
 			wb.AppendOrUpdate(tagAssistantText, "test", "Content")
 			rendered := wb.GetAll(-1, false)
 			// The opening line is line 0 and the content follows it.
@@ -748,10 +726,8 @@ func TestCtrlOOpensDisplayWindowInEditor(t *testing.T) {
 	terminal := testTUI()
 	terminal = terminal.focusDisplay()
 
-	// Add a window with content
 	terminal.out.WindowBuffer().AppendOrUpdate(tagAssistantText, "test1", "Hello from display")
 
-	// Set cursor to first window
 	terminal.display = terminal.display.WithWindowCursor(0)
 
 	// ^O in the display opens the window under the pointer.

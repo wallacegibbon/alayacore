@@ -18,7 +18,6 @@ func TestFileTokenStore_SaveAndLoad(t *testing.T) {
 		Scopes:       []string{"read", "write"},
 	}
 
-	// Save
 	if err := store.SaveToken("test-server", token); err != nil {
 		t.Fatalf("SaveToken() error = %v", err)
 	}
@@ -29,7 +28,6 @@ func TestFileTokenStore_SaveAndLoad(t *testing.T) {
 		t.Fatalf("expected 1 file, got %d", len(entries))
 	}
 
-	// Load
 	loaded, err := store.LoadToken("test-server")
 	if err != nil {
 		t.Fatalf("LoadToken() error = %v", err)
@@ -151,7 +149,6 @@ func TestFileTokenStore_Overwrite(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Load should return token2
 	loaded, err := store.LoadToken("test")
 	if err != nil {
 		t.Fatal(err)
@@ -204,7 +201,6 @@ func TestFileTokenStore_NonExpiringToken(t *testing.T) {
 		t.Errorf("non-expiring token should not have expires_at field, got: %s", data)
 	}
 
-	// Load and verify
 	loaded, err := store.LoadToken("test-server")
 	if err != nil {
 		t.Fatalf("LoadToken() error = %v", err)

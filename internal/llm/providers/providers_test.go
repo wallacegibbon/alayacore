@@ -42,7 +42,6 @@ func newMockSSEServer(t *testing.T, writeFn func(w io.Writer)) *httptest.Server 
 }
 
 func TestAnthropicProvider(t *testing.T) {
-	// Create mock server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Verify request
 		if r.Header.Get("x-api-key") != "test-key" {
@@ -52,7 +51,6 @@ func TestAnthropicProvider(t *testing.T) {
 			t.Error("Missing anthropic version")
 		}
 
-		// Send SSE stream
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
 
@@ -61,23 +59,18 @@ func TestAnthropicProvider(t *testing.T) {
 			t.Fatal("Cannot flush")
 		}
 
-		// Send message_start with initial usage
 		fmt.Fprint(w, "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_123\",\"role\":\"assistant\",\"content\":[],\"usage\":{\"input_tokens\":10,\"output_tokens\":1}}}\n\n")
-		// Send text delta
 		fmt.Fprint(w, "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n")
 		fmt.Fprint(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Hello\"}}\n\n")
 		fmt.Fprint(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\" world\"}}\n\n")
 		fmt.Fprint(w, "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n")
-		// Send message_delta with updated output_tokens
 		fmt.Fprint(w, "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":15}}\n\n")
-		// Send message_stop with final usage
 		fmt.Fprint(w, "event: message_stop\ndata: {\"type\":\"message_stop\",\"usage\":{\"input_tokens\":10,\"output_tokens\":15}}\n\n")
 
 		flusher.Flush()
 	}))
 	defer server.Close()
 
-	// Create provider
 	provider, err := providers.NewAnthropic(providers.BaseConfig{
 		APIKey:  "test-key",
 		BaseURL: server.URL,
@@ -94,7 +87,6 @@ func TestAnthropicProvider(t *testing.T) {
 		t.Fatalf("Failed to stream: %v", err)
 	}
 
-	// Collect events
 	var textReceived string
 	var usageReceived *llm.Usage
 
@@ -119,14 +111,12 @@ func TestAnthropicProvider(t *testing.T) {
 }
 
 func TestOpenAIProvider(t *testing.T) {
-	// Create mock server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Verify request
 		if r.Header.Get("Authorization") != "Bearer test-key" {
 			t.Error("Missing API key")
 		}
 
-		// Send SSE stream
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
 
@@ -135,7 +125,6 @@ func TestOpenAIProvider(t *testing.T) {
 			t.Fatal("Cannot flush")
 		}
 
-		// Send chunks
 		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"Hello\"},\"finish_reason\":null}]}\n\n")
 		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\" there\"},\"finish_reason\":null}]}\n\n")
 		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"!\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":5,\"completion_tokens\":3}}\n\n")
@@ -145,7 +134,6 @@ func TestOpenAIProvider(t *testing.T) {
 	}))
 	defer server.Close()
 
-	// Create provider
 	provider, err := providers.NewOpenAI(providers.BaseConfig{
 		APIKey:  "test-key",
 		BaseURL: server.URL,
@@ -162,7 +150,6 @@ func TestOpenAIProvider(t *testing.T) {
 		t.Fatalf("Failed to stream: %v", err)
 	}
 
-	// Collect events
 	var textReceived string
 
 	for event := range events {
@@ -436,14 +423,10 @@ func TestToolCallStreamingWithNullArguments(t *testing.T) {
 func TestAnthropicToolCallStreaming(t *testing.T) {
 	// Test that tool calls are properly streamed from Anthropic
 	server := newMockSSEServer(t, func(w io.Writer) {
-		// Send tool call start
 		fmt.Fprint(w, "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_123\",\"name\":\"get_weather\"}}\n\n")
-		// Send tool input delta
 		fmt.Fprint(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"location\\\":\\\"\"}}\n\n")
 		fmt.Fprint(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"San Francisco\\\"}\"}}\n\n")
-		// Send tool call stop
 		fmt.Fprint(w, "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n")
-		// Send message stop
 		fmt.Fprint(w, "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"tool_use\"},\"usage\":{\"input_tokens\":50,\"output_tokens\":20}}\n\n")
 		fmt.Fprint(w, "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
 	})
@@ -478,7 +461,6 @@ func TestAnthropicToolCallStreaming(t *testing.T) {
 		t.Errorf("Expected tool call ID 'toolu_123', got '%s'", toolCalls[0].ID)
 	}
 
-	// Check the input JSON
 	var input map[string]string
 	if err := json.Unmarshal(toolCalls[0].Input, &input); err != nil {
 		t.Fatalf("Failed to parse tool input: %v", err)
@@ -487,7 +469,6 @@ func TestAnthropicToolCallStreaming(t *testing.T) {
 		t.Errorf("Expected location 'San Francisco', got '%s'", input["location"])
 	}
 
-	// Check step complete
 	if stepComplete == nil {
 		t.Fatal("Expected StepCompleteEvent")
 	}
@@ -615,7 +596,6 @@ func TestToolInputStartEventAnthropic(t *testing.T) {
 func TestAnthropicReasoningStreaming(t *testing.T) {
 	// Test that reasoning/thinking content is properly streamed
 	server := newMockSSEServer(t, func(w io.Writer) {
-		// Send thinking block
 		fmt.Fprint(w, "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\"}}\n\n")
 		fmt.Fprint(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"Let me think...\"}}\n\n")
 		fmt.Fprint(w, "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n")
@@ -668,7 +648,6 @@ func TestAnthropicReasoningStreaming(t *testing.T) {
 		t.Fatal("Expected StepCompleteEvent")
 	}
 
-	// Check the recorded task includes both reasoning and text
 	msg := stepRecord(t, provider)
 	if len(msg) != 2 {
 		t.Fatalf("Expected 2 content parts, got %d", len(msg))
@@ -773,12 +752,9 @@ func TestAnthropicAPIError(t *testing.T) {
 func TestAnthropicRefusalStopReason(t *testing.T) {
 	// Test Anthropic refusal stop reason handling
 	server := newMockSSEServer(t, func(w io.Writer) {
-		// Send message_start
 		fmt.Fprint(w, "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_123\",\"role\":\"assistant\",\"content\":[]}}\n\n")
-		// Send text content
 		fmt.Fprint(w, "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n")
 		fmt.Fprint(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"I cannot\"}}\n\n")
-		// Send refusal stop reason
 		fmt.Fprint(w, "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"refusal\"}}\n\n")
 	})
 
@@ -797,7 +773,6 @@ func TestAnthropicRefusalStopReason(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Collect events - should get an error
 	var gotError bool
 	for _, iterErr := range events {
 		if iterErr != nil {
@@ -813,12 +788,9 @@ func TestAnthropicRefusalStopReason(t *testing.T) {
 func TestAnthropicUnknownStopReason(t *testing.T) {
 	// Test Anthropic unknown stop reason handling
 	server := newMockSSEServer(t, func(w io.Writer) {
-		// Send message_start
 		fmt.Fprint(w, "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_123\",\"role\":\"assistant\",\"content\":[]}}\n\n")
-		// Send text content
 		fmt.Fprint(w, "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n")
 		fmt.Fprint(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Some text\"}}\n\n")
-		// Send unknown stop reason
 		fmt.Fprint(w, "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"unknown_reason\"}}\n\n")
 	})
 
@@ -837,7 +809,6 @@ func TestAnthropicUnknownStopReason(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Collect events - should get an error
 	var gotError bool
 	for _, iterErr := range events {
 		if iterErr != nil {
@@ -857,13 +828,10 @@ func TestAnthropicValidStopReasons(t *testing.T) {
 	for _, reason := range validReasons {
 		t.Run(reason, func(t *testing.T) {
 			server := newMockSSEServer(t, func(w io.Writer) {
-				// Send message_start
 				fmt.Fprint(w, "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_123\",\"role\":\"assistant\",\"content\":[]}}\n\n")
-				// Send text content
 				fmt.Fprint(w, "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n")
 				fmt.Fprint(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Response\"}}\n\n")
 				fmt.Fprint(w, "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n")
-				// Send valid stop reason
 				fmt.Fprintf(w, "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"%s\"},\"usage\":{\"output_tokens\":10}}\n\n", reason)
 				fmt.Fprint(w, "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
 			})
@@ -883,7 +851,6 @@ func TestAnthropicValidStopReasons(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			// Collect events - should NOT get an error
 			var gotError bool
 			var gotStepComplete bool
 			var gotStopReason string
@@ -913,7 +880,6 @@ func TestAnthropicValidStopReasons(t *testing.T) {
 func TestOpenAIContentFilter(t *testing.T) {
 	// Test OpenAI content_filter finish reason handling
 	server := newMockSSEServer(t, func(w io.Writer) {
-		// Send partial content
 		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"Some content\"}}]}\n\n")
 		// Then content_filter
 		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"\"},\"finish_reason\":\"content_filter\"}]}\n\n")
@@ -934,7 +900,6 @@ func TestOpenAIContentFilter(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Collect events - should get an error
 	var gotError bool
 	for _, iterErr := range events {
 		if iterErr != nil {
@@ -969,7 +934,6 @@ func TestOpenAILengthFinishReason(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Collect events - should NOT get an error at provider level
 	var gotError bool
 	var gotStepComplete bool
 	var gotStopReason string
@@ -1021,7 +985,6 @@ func TestOpenAIAPIError(t *testing.T) {
 func TestOpenAINetworkError(t *testing.T) {
 	// Test OpenAI network_error finish reason handling
 	server := newMockSSEServer(t, func(w io.Writer) {
-		// Send some content first
 		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"Partial\"}}]}\n\n")
 		// Then send network_error
 		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"\"},\"finish_reason\":\"network_error\"}]}\n\n")
@@ -1042,7 +1005,6 @@ func TestOpenAINetworkError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Collect events - should get an error
 	var gotError bool
 	for _, iterErr := range events {
 		if iterErr != nil {
@@ -1178,7 +1140,6 @@ func TestOpenAIWithReasoning(t *testing.T) {
 
 		flusher, _ := w.(http.Flusher)
 
-		// Send reasoning content first
 		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"Analyzing...\"}}]}\n\n")
 		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\" computing...\"}}]}\n\n")
 		// Then regular content
@@ -1613,7 +1574,6 @@ func TestOpenAITextWithToolCallsConversion(t *testing.T) {
 			t.Fatal("Expected messages array")
 		}
 
-		// Find the assistant message with tool calls (should be second message)
 		var assistantMsg map[string]any
 		for _, msg := range messages {
 			m, ok := msg.(map[string]any)
@@ -1645,7 +1605,6 @@ func TestOpenAITextWithToolCallsConversion(t *testing.T) {
 			t.Error("Expected tool_calls to be present")
 		}
 
-		// Send minimal response
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"Done.\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":5}}\n\n")
@@ -1807,7 +1766,6 @@ func TestAnthropicMultiToolCall(t *testing.T) {
 		t.Fatalf("Expected 2 tool calls, got %d", len(toolCalls))
 	}
 
-	// Check first tool call
 	if toolCalls[0].ID != "tool-1" {
 		t.Errorf("Expected tool call ID 'tool-1', got '%s'", toolCalls[0].ID)
 	}
@@ -1815,7 +1773,6 @@ func TestAnthropicMultiToolCall(t *testing.T) {
 		t.Errorf("Expected tool name 'get_weather', got '%s'", toolCalls[0].Name)
 	}
 
-	// Check second tool call
 	if toolCalls[1].ID != "tool-2" {
 		t.Errorf("Expected tool call ID 'tool-2', got '%s'", toolCalls[1].ID)
 	}

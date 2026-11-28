@@ -46,7 +46,6 @@ func NewReadFileTool() llm.Tool {
 func sniffMedia(file *os.File, path string) (mimeType string, ok bool) {
 	ext := strings.ToLower(filepath.Ext(path))
 
-	// Get extension-based MIME
 	var extMime string
 	if ext != "" {
 		extMime = mime.TypeByExtension(ext)

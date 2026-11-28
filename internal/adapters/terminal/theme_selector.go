@@ -161,7 +161,6 @@ func (ts ThemeSelector) Update(msg Msg) (ThemeSelector, []Result) {
 	ts.FilteredListCore = fl
 
 	if result.Handled {
-		// Close overlay.
 		if !fl.FilterInputFocused && key == keyEsc {
 			return ts.Close(), nil
 		}
@@ -300,7 +299,6 @@ func (ts ThemeSelector) renderThemeList(width int) string {
 	case len(ts.filteredThemes) == 0:
 		content.WriteString(ts.Styles.System.Render("No themes match your search."))
 	default:
-		// Ensure selected item is visible.
 		if ts.SelectedIdx < ts.ScrollIdx {
 			ts.ScrollIdx = ts.SelectedIdx
 		} else if ts.SelectedIdx >= ts.ScrollIdx+listHeight {

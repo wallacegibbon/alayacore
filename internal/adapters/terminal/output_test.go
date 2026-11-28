@@ -172,10 +172,8 @@ func TestToolDeltaWithNameResolution(t *testing.T) {
 	out := NewTerminalOutput(NewStyles(theme.DefaultTheme()))
 	out.SetScreenWidth(80)
 
-	// Write an AF start frame to create the window with tool name.
 	writeAFStart(out, "1", "call_456", "read_file")
 
-	// Write Af deltas.
 	writeAf(out, "1", "call_456", `{"path":"/tmp/`)
 	writeAf(out, "1", "call_456", `foo.txt"}`)
 
@@ -422,7 +420,6 @@ func TestDrainDirtyIsPureQuery(t *testing.T) {
 	out := NewTerminalOutput(NewStyles(theme.DefaultTheme()))
 	out.SetScreenWidth(80)
 
-	// Write a non-delta frame to set dirty.
 	var buf strings.Builder
 	buf.Write(frameBytes(wire.TagUserF, wiretest.ToolOutputLegacy("1", `{"id":"call_1","content":[],"is_error":false}`)))
 	_, err := out.Write([]byte(buf.String()))
@@ -464,7 +461,6 @@ func TestDrainDirtyIsPureQuery(t *testing.T) {
 // ============================================================================
 
 func TestDeltaCoalescingThroughWrite(t *testing.T) {
-	// Write encoded deltas through the Write() -> processBuffer() path.
 	out := NewTerminalOutput(NewStyles(theme.DefaultTheme()))
 	out.SetScreenWidth(80)
 

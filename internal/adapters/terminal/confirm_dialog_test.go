@@ -349,9 +349,7 @@ func TestConfirmDialogRunUpdateThenCloseLeavesNoResidue(t *testing.T) {
 		return applyFrame(grid, s.out.(*bytes.Buffer).String(), W)
 	}
 
-	// Open with run A.
 	grid := render(mk(descA).RenderOverlay(base, W, H)+anchor, nil)
-	// Update to run B — wrapped run text changed mid-open.
 	grid = render(mk(descB).RenderOverlay(base, W, H)+anchor, grid)
 	joined := ""
 	for r := 3; r <= 12; r++ {
@@ -360,7 +358,6 @@ func TestConfirmDialogRunUpdateThenCloseLeavesNoResidue(t *testing.T) {
 	if !strings.Contains(joined, "server-beta-") || strings.Contains(joined, "server-alpha-") {
 		t.Errorf("dialog content not updated to run B:\n%s", joined)
 	}
-	// Close — both rows of the run must be restored to base.
 	grid = render(base+anchor, grid)
 	for r := 3; r <= 12; r++ {
 		if got := lineAt(grid, r); got != strings.Repeat("B", W) {

@@ -64,13 +64,11 @@ func DefaultTools(filter ToolFilter) ([]llm.Tool, error) {
 		return nil, nil
 	}
 
-	// Build a set of valid tool names.
 	valid := make(map[string]bool, len(BuiltinTools))
 	for _, reg := range BuiltinTools {
 		valid[reg.Name] = true
 	}
 
-	// Check for unknown tool names.
 	var unknown []string
 	for _, name := range filter.Selected {
 		if !valid[name] {
@@ -86,7 +84,6 @@ func DefaultTools(filter ToolFilter) ([]llm.Tool, error) {
 			strings.Join(unknown, ", "), strings.Join(known, ", "))
 	}
 
-	// Build the enabled set.
 	enabled := make(map[string]bool, len(filter.Selected))
 	for _, name := range filter.Selected {
 		enabled[name] = true

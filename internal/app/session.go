@@ -73,12 +73,10 @@ func StartSession(cfg *Config, output io.Writer, input io.Reader) (*agentpkg.Ses
 	// all models are rejected.
 	if msgs := session.GetLoadErrors(); len(msgs) > 0 {
 		for _, m := range msgs {
-			// Send to adapter as system error messages for TUI/plainio display
 			_ = protocol.WriteSystemMsg(output, protocol.ErrorMsg{Text: m})
 		}
 	}
 
-	// Collect runtime config parse errors (typos in runtime.conf).
 	for _, w := range session.GetRuntimeLoadErrors() {
 		_ = protocol.WriteSystemMsg(output, protocol.ErrorMsg{Text: w})
 	}
@@ -95,12 +93,10 @@ func StartSession(cfg *Config, output io.Writer, input io.Reader) (*agentpkg.Ses
 		_ = protocol.WriteSystemMsg(output, protocol.NotifyMsg{Text: n})
 	}
 
-	// Check if we have any models available.
 	if !session.HasModels() {
 		return nil, nil, fmt.Errorf("%s", agentpkg.NoModelsErrorMessage(session.ModelConfigPath(), session.HasRejected()))
 	}
 
-	// Start the session's run() goroutine.
 	session.Start()
 
 	return session, pipeWriter, nil

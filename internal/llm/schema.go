@@ -38,7 +38,6 @@ const (
 
 // inferSchemaType maps Go types to JSON schema types
 func inferSchemaType(t reflect.Type) string {
-	// Handle pointer types
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}

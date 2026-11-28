@@ -90,7 +90,6 @@ func TestThemePreviewStaleTickIgnoredAfterCancel(t *testing.T) {
 	})
 	ow.status.updateTheme("theme-dark", original)
 
-	// Open the selector (Ctrl+T).
 	m, cmd := terminal.Update(KeyPressMsg(Key{Code: 't', Mod: ModCtrl}))
 	if cmd != nil {
 		t.Fatalf("open selector returned a Cmd: %T", cmd)

@@ -82,7 +82,6 @@ func ParseKeyValue(content string, target any) []ParseError {
 	v = v.Elem()
 	t := v.Type()
 
-	// Build map from config tag names to field indices
 	tagToField := make(map[string]int)
 	for i := 0; i < t.NumField(); i++ {
 		tag := t.Field(i).Tag.Get("config")
@@ -100,7 +99,6 @@ func ParseKeyValue(content string, target any) []ParseError {
 	// reported instead of silently overwriting the first occurrence.
 	seenKeys := make(map[string]bool)
 
-	// Parse lines
 	for line := range strings.SplitSeq(content, "\n") {
 		if lineErrs := parseLine(line, tagToField, seenKeys, v); len(lineErrs) > 0 {
 			errs = append(errs, lineErrs...)
@@ -124,7 +122,6 @@ func parseLine(line string, tagToField map[string]int, seenKeys map[string]bool,
 		return []ParseError{*perr}
 	}
 
-	// Look up field by tag
 	fieldIdx, ok := tagToField[key]
 	if !ok {
 		return []ParseError{{Key: key, Value: value, Err: "unknown config key"}}
@@ -145,7 +142,6 @@ func parseLine(line string, tagToField map[string]int, seenKeys map[string]bool,
 // parseKeyValueLine splits a config line into a key and value. The key
 // must match validKeyPattern; the value is trimmed and unquoted.
 func parseKeyValueLine(line string) (key, value string, perr *ParseError) {
-	// Find the first colon to separate key and value
 	colonIdx := strings.IndexByte(line, ':')
 	if colonIdx == -1 {
 		return "", "", &ParseError{

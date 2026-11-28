@@ -86,7 +86,6 @@ func runMCPServer() {
 			continue
 		}
 
-		// Parse the incoming JSON-RPC message.
 		var msg struct {
 			JSONRPC string          `json:"jsonrpc"`
 			ID      requestID       `json:"id"`
@@ -200,7 +199,6 @@ func runMCPServer() {
 		// If method starts with "s2c/", the server sends a request to the
 		// client before responding to the original request.
 		if strings.HasPrefix(msg.Method, "s2c/") {
-			// Send a ping request to the client.
 			serverReq := jsonrpcRequest{
 				JSONRPC: "2.0",
 				ID:      requestID("srv-ping"),
@@ -295,7 +293,6 @@ func runMCPServer() {
 func newStdioTestTransport(t *testing.T, extraEnv map[string]string, debugDir string) *StdioTransport {
 	t.Helper()
 
-	// Build environment for the test server subprocess.
 	env := map[string]string{
 		"MCP_TEST_SERVER": "1",
 	}
@@ -452,7 +449,6 @@ func TestStdioTransport_SendReceive_WithNotification(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Send a notification first.
 	err := transport.Send(ctx, jsonrpcRequest{
 		JSONRPC: "2.0",
 		Method:  "notifications/initialized",
@@ -488,7 +484,6 @@ func TestStdioTransport_Close(t *testing.T) {
 	transport := newStdioTestTransport(t, nil, "")
 	waitForReady(t, transport)
 
-	// Close should not block or error.
 	if err := transport.Close(); err != nil {
 		t.Errorf("Close() error = %v", err)
 	}
@@ -527,7 +522,6 @@ func TestStdioTransport_ContextCancellation(t *testing.T) {
 	}, "")
 	waitForReady(t, transport)
 
-	// Create a context that cancels quickly.
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 
@@ -581,7 +575,6 @@ func TestStdioTransport_MultipleConcurrentRequests(t *testing.T) {
 	transport := newStdioTestTransport(t, nil, "")
 	waitForReady(t, transport)
 
-	// Send 5 concurrent requests.
 	const numRequests = 5
 	var wg sync.WaitGroup
 	errs := make([]error, numRequests)

@@ -308,19 +308,16 @@ func TestStatusBarTruncatedSeparatorStyled(t *testing.T) {
 func TestIncrementalWrapVisual(t *testing.T) {
 	width := 80
 
-	// Start with initial content
 	lines := wrapVisualLines("Hello", width)
 	if len(lines) != 1 {
 		t.Errorf("Expected 1 row, got %d", len(lines))
 	}
 
-	// Append to same row (no newline)
 	lines = appendDeltaToVisualLines(lines, " world", width)
 	if len(lines) != 1 {
 		t.Errorf("Expected 1 row, got %d", len(lines))
 	}
 
-	// Append with newline
 	lines = appendDeltaToVisualLines(lines, "\nNew line", width)
 	if len(lines) != 2 {
 		t.Errorf("Expected 2 rows, got %d", len(lines))
@@ -335,7 +332,6 @@ func TestIncrementalWrapVisual(t *testing.T) {
 func TestWindowRenderCaching(t *testing.T) {
 	wb := NewWindowBuffer(80, DefaultStyles())
 
-	// Add content
 	wb.AppendOrUpdate("assistant", "test", "Hello world")
 	w := wb.WindowAt(0)
 
@@ -361,7 +357,6 @@ func TestWindowRenderCaching(t *testing.T) {
 func TestWindowRenderCacheInvalidation(t *testing.T) {
 	wb := NewWindowBuffer(80, DefaultStyles())
 
-	// Add content and render
 	wb.AppendOrUpdate("assistant", "test", "Hello")
 	w := wb.WindowAt(0)
 
@@ -374,7 +369,6 @@ func TestWindowRenderCacheInvalidation(t *testing.T) {
 		t.Error("expected cache to be valid after render")
 	}
 
-	// Append more content to verify streaming accumulation
 	w.AppendContent(" world")
 
 	// Content should include both parts — AppendFromFrame accumulates deltas

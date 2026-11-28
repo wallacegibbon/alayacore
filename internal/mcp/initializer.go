@@ -286,7 +286,6 @@ func (in *Initializer) run(ctx context.Context) {
 		}(c)
 	}
 
-	// Collect all results, but don't block on shutdown.
 	results := make(map[string]serverResult, n)
 	for i := 0; i < n; i++ {
 		select {
@@ -429,7 +428,6 @@ func (in *Initializer) runOAuthForServer(ctx context.Context, c *Client, meta *a
 	// code that was already delivered.
 	authCodeCh := in.registerAuthCodeCh(c.Name())
 
-	// Send URL template to adapter and wait for result.
 	in.sendEvent(InitEvent{
 		Type:   InitAuthConfirm,
 		Server: c.Name(),

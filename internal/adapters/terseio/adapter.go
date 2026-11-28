@@ -73,7 +73,6 @@ func (a *Adapter) Start() int {
 	output.onMCPConnected = flow.Connected
 	output.onMCPDone = flow.Abort
 
-	// Load session.
 	session, inputWriter, err := app.StartSession(a.Config, output, nil)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -138,7 +137,6 @@ func (a *Adapter) Start() int {
 		}
 	}()
 
-	// Wait for EOF (Ctrl-D), error, or session completion.
 	code := 0
 	select {
 	case code = <-exitCh:

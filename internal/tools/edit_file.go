@@ -177,7 +177,6 @@ func (s *editSession) commit() error {
 	// and some filesystems reject Sync.
 	_ = s.tempFile.Sync()
 
-	// Close both files before rename to release all OS handles.
 	if err := s.tempFile.Close(); err != nil {
 		return fmt.Errorf("failed to close temp file: %w", err)
 	}

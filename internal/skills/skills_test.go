@@ -130,16 +130,13 @@ func TestValidateName(t *testing.T) {
 }
 
 func TestSkillDiscovery(t *testing.T) {
-	// Create temp skill directory
 	tmpDir := t.TempDir()
 
-	// Create a skill directory
 	skillDir := filepath.Join(tmpDir, "test-skill")
 	if err := os.Mkdir(skillDir, 0755); err != nil {
 		t.Fatalf("Failed to create skill dir: %v", err)
 	}
 
-	// Create SKILL.md
 	skillFile := filepath.Join(skillDir, "SKILL.md")
 	skillContent := `---
 name: test-skill
@@ -300,7 +297,6 @@ description: Second skill from directory 2
 func TestMultipleSkillPathsFirstMissing(t *testing.T) {
 	missingDir := filepath.Join(t.TempDir(), "nonexistent")
 
-	// Create a real skill directory
 	tmpDir := t.TempDir()
 	skillDir := filepath.Join(tmpDir, "skill-two")
 	if err := os.Mkdir(skillDir, 0755); err != nil {

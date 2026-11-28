@@ -410,7 +410,6 @@ func TestAgentMultiToolLoopRealAPI(t *testing.T) {
 		},
 	}
 
-	// Create agent
 	agent := llm.NewAgent(llm.AgentConfig{
 		Provider:     provider,
 		Tools:        []llm.Tool{counterTool},

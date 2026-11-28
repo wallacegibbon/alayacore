@@ -149,7 +149,6 @@ func (m *Manager) discoverSkills() {
 				m.loadErrors = append(m.loadErrors, fmt.Sprintf("%s: %s", skillFile, p))
 			}
 			if err != nil {
-				// Skip invalid skills but record the error
 				m.loadErrors = append(m.loadErrors, fmt.Sprintf("failed to load skill %s from %s: %v", entry.Name(), skillDir, err))
 				continue
 			}

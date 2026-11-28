@@ -9,7 +9,6 @@ import (
 )
 
 func TestEditFile(t *testing.T) {
-	// Create a temporary directory for test files
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test.txt")
 

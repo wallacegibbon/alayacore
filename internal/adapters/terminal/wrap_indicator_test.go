@@ -16,8 +16,7 @@ const familyEmoji = "\U0001F468\u200D\U0001F469\u200D\U0001F467\u200D\U0001F466"
 func TestFoldedToolLine(t *testing.T) {
 	wb := NewWindowBuffer(80, DefaultStyles())
 
-	// Create a tool window with VERY long content that would wrap to many
-	// lines if unfolded. The folded form must be a single truncated line.
+	// Folded, this must be a single truncated line.
 	longContent := strings.Repeat("This is a test sentence that will wrap. ", 12)
 	wb.HandleToolInputEvent(protocol.ToolInputData{CallID: "tool123", Name: "test_tool", Input: json.RawMessage(longContent)}, 0)
 
@@ -65,7 +64,6 @@ func TestFoldedToolTruncatesToWidth(t *testing.T) {
 func TestFoldedDiffLine(t *testing.T) {
 	wb := NewWindowBuffer(80, DefaultStyles())
 
-	// Create a diff window with many lines
 	var content strings.Builder
 	content.WriteString("edit_file: test.txt\n")
 	for i := 0; i < 20; i++ {

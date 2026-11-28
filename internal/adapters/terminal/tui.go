@@ -565,7 +565,6 @@ func (m Terminal) handleScreenSize(msg ScreenSizeMsg) Terminal {
 	m.screenWidth = msg.Width
 	m.screenHeight = msg.Height
 
-	// Update all components
 	m.out.SetScreenWidth(max(0, msg.Width))
 	m.promptBox = m.promptBox.WithWidth(max(0, msg.Width))
 	m = m.updateComponentSizes(msg.Width, msg.Height)

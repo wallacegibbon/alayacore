@@ -150,7 +150,6 @@ func (m Terminal) handleEditorStart(msg editorStartMsg) (Terminal, Cmd) {
 	return m, ExecProcess(cmd, func(err error) Msg {
 		defer os.Remove(tmpFileName)
 
-		// Build the result message
 		result := EditorFinishedMsg{
 			Err:    err,
 			Action: msg.action,

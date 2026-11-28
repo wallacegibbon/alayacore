@@ -991,9 +991,7 @@ func (m DisplayModel) findWindowContainingLine(line int) int {
 func (m DisplayModel) findClosestVisibleWindow(viewportTop, viewportBottom, viewportCenter int) int {
 	bestWindow := -1
 	bestDistance := -1
-
 	m.windowBuffer.ForEachVisibleRanged(func(i int, startLine, endLine int) bool {
-		// Skip windows entirely outside the viewport
 		if startLine >= viewportBottom || endLine <= viewportTop {
 			return true
 		}

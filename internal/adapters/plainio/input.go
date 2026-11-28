@@ -55,7 +55,6 @@ func readPrompts(input io.Writer, reader io.Reader) error {
 			return err
 		}
 
-		// Check if line ends with backslash (escaped newline)
 		trimmed := strings.TrimRight(line, "\r\n")
 		if strings.HasSuffix(trimmed, "\\") {
 			prompt.WriteString(trimmed[:len(trimmed)-1])
@@ -63,7 +62,6 @@ func readPrompts(input io.Writer, reader io.Reader) error {
 			continue
 		}
 
-		// Complete prompt: accumulated + current line
 		prompt.WriteString(trimmed)
 		text := prompt.String()
 		prompt.Reset()

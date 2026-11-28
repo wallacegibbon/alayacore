@@ -183,7 +183,6 @@ func TestKeyParserIncomplete(t *testing.T) {
 	if !p.HasPending() {
 		t.Fatal("expected pending bytes")
 	}
-	// Complete the sequence: ESC [ A → up.
 	msgs = p.Parse([]byte("[A"))
 	if len(msgs) != 1 || msgs[0].(KeyPressMsg).String() != "up" {
 		t.Fatalf("expected up, got %#v", msgs)

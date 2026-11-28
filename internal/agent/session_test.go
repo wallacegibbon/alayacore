@@ -32,7 +32,6 @@ func TestSaveAndLoadSession(t *testing.T) {
 	tmpDir := t.TempDir()
 	sessionPath := filepath.Join(tmpDir, "test-session.alaya")
 
-	// Create a minimal session for testing
 	session := &Session{
 		runState: runState{},
 		sessionConfig: sessionConfig{
@@ -43,17 +42,14 @@ func TestSaveAndLoadSession(t *testing.T) {
 		},
 	}
 
-	// Save session
 	if err := session.saveContentToFile(sessionPath, session.Contents); err != nil {
 		t.Fatalf("saveContentToFile failed: %v", err)
 	}
 
-	// Verify file exists
 	if _, err := os.Stat(sessionPath); os.IsNotExist(err) {
 		t.Fatal("Session file was not created")
 	}
 
-	// Load session
 	loadedData, err := loadSession(sessionPath)
 	if err != nil {
 		t.Fatalf("loadSession failed: %v", err)
@@ -256,8 +252,6 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 	tmpDir := t.TempDir()
 	sessionPath := filepath.Join(tmpDir, "test-messages.alaya")
 
-	// Create content parts simulating a realistic agent conversation:
-	// user → assistant(reasoning+text+toolcall) → tool(result) → assistant(reasoning+text)
 	var id uint64
 	nextID := func() uint64 { id++; return id }
 
@@ -289,23 +283,19 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 		},
 	}
 
-	// Save
 	if err := session.saveContentToFile(sessionPath, session.Contents); err != nil {
 		t.Fatalf("saveContentToFile failed: %v", err)
 	}
 
-	// Load
 	loaded, err := loadSession(sessionPath)
 	if err != nil {
 		t.Fatalf("loadSession failed: %v", err)
 	}
 
-	// Verify content parts are preserved
 	if len(loaded.Contents) != len(contents) {
 		t.Fatalf("Content count mismatch: got %d, want %d", len(loaded.Contents), len(contents))
 	}
 
-	// Check first content part (user)
 	if loaded.Contents[0].GetRole() != llm.RoleUser {
 		t.Errorf("First content role mismatch: got %s", loaded.Contents[0].GetRole())
 	}
@@ -313,7 +303,6 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 		t.Errorf("First content text mismatch: got %v", loaded.Contents[0])
 	}
 
-	// Check assistant parts (indices 1-3: reasoning + text + toolcall)
 	if loaded.Contents[1].GetRole() != llm.RoleAssistant {
 		t.Errorf("Content[1] role mismatch: got %s", loaded.Contents[1].GetRole())
 	}
@@ -327,12 +316,10 @@ func TestSaveAndLoadSession_WithMessages(t *testing.T) {
 		t.Errorf("Content[3] should be ToolInputPart, got %T", loaded.Contents[3])
 	}
 
-	// Check tool result (index 4)
 	if loaded.Contents[4].GetRole() != llm.RoleTool {
 		t.Errorf("Content[4] role mismatch: got %s", loaded.Contents[4].GetRole())
 	}
 
-	// Check final assistant parts (indices 5-6: reasoning + text)
 	if loaded.Contents[5].GetRole() != llm.RoleAssistant {
 		t.Errorf("Content[5] role mismatch: got %s", loaded.Contents[5].GetRole())
 	}
@@ -373,7 +360,6 @@ func TestMarkdownFormat_HumanReadable(t *testing.T) {
 		t.Fatalf("saveContentToFile failed: %v", err)
 	}
 
-	// Read raw file content
 	raw, err := os.ReadFile(sessionPath)
 	if err != nil {
 		t.Fatalf("ReadFile failed: %v", err)
@@ -421,7 +407,6 @@ func TestReasoningOnlyMessage(t *testing.T) {
 		t.Fatalf("saveContentToFile failed: %v", err)
 	}
 
-	// Load and verify
 	loaded, err := loadSession(sessionPath)
 	if err != nil {
 		t.Fatalf("loadSession failed: %v", err)
@@ -431,12 +416,10 @@ func TestReasoningOnlyMessage(t *testing.T) {
 		t.Fatalf("Expected 2 content parts, got %d", len(loaded.Contents))
 	}
 
-	// Check first part (user)
 	if loaded.Contents[0].GetRole() != llm.RoleUser {
 		t.Errorf("First part should be user, got %s", loaded.Contents[0].GetRole())
 	}
 
-	// Check second part (reasoning only)
 	if loaded.Contents[1].GetRole() != llm.RoleAssistant {
 		t.Errorf("Second part should be assistant, got %s", loaded.Contents[1].GetRole())
 	}
@@ -475,23 +458,19 @@ func TestTextAndReasoningInSameMessage(t *testing.T) {
 		t.Fatalf("saveContentToFile failed: %v", err)
 	}
 
-	// Load and verify
 	loaded, err := loadSession(sessionPath)
 	if err != nil {
 		t.Fatalf("loadSession failed: %v", err)
 	}
 
-	// All 3 content parts must be preserved
 	if len(loaded.Contents) != 3 {
 		t.Fatalf("Expected 3 content parts (user, reasoning, text), got %d", len(loaded.Contents))
 	}
 
-	// Check first part is user
 	if loaded.Contents[0].GetRole() != llm.RoleUser {
 		t.Errorf("First part should be user, got %s", loaded.Contents[0].GetRole())
 	}
 
-	// Check second part is assistant reasoning
 	if loaded.Contents[1].GetRole() != llm.RoleAssistant {
 		t.Errorf("Second part should be assistant, got %s", loaded.Contents[1].GetRole())
 	}
@@ -501,7 +480,6 @@ func TestTextAndReasoningInSameMessage(t *testing.T) {
 		t.Errorf("Reasoning text mismatch: %s", rp.Text)
 	}
 
-	// Check third part is assistant text
 	if loaded.Contents[2].GetRole() != llm.RoleAssistant {
 		t.Errorf("Third part should be assistant, got %s", loaded.Contents[2].GetRole())
 	}
@@ -535,7 +513,6 @@ func TestModelSetWhileTaskRunning(t *testing.T) {
 		},
 	}
 
-	// Add a test model to the manager
 	testModel := modelConfig{
 		ID:           1,
 		Name:         "Test Model",
@@ -619,7 +596,6 @@ func TestDisplayMessagesWithToolCalls(t *testing.T) {
 		&llm.TextPart{Text: "Found 2 files!", ContentPartMeta: llm.ContentPartMeta{HistoryID: nextID(), Role: llm.RoleAssistant}},
 	}
 
-	// Create session data with flat ContentParts
 	sessionData := &sessionData{
 		Contents: contents,
 		sessionMeta: sessionMeta{
@@ -634,7 +610,6 @@ func TestDisplayMessagesWithToolCalls(t *testing.T) {
 		t.Fatalf("Failed to format session: %v", err)
 	}
 
-	// Parse back
 	loadedData, err := LoadSessionFromBytes(raw)
 	if err != nil {
 		t.Fatalf("Failed to load session: %v", err)
@@ -645,7 +620,6 @@ func TestDisplayMessagesWithToolCalls(t *testing.T) {
 		t.Error("Content should be populated after loading")
 	}
 
-	// Create mock output and send content parts
 	mockOutput := &mockOutput{}
 	for _, part := range loadedData.Contents {
 		tag, body, err := contentPartJSON(part, wireID(part.GetHistoryID()))
@@ -660,7 +634,6 @@ func TestDisplayMessagesWithToolCalls(t *testing.T) {
 		t.Error("Content did not write any output")
 	}
 
-	// Parse the output data to check what frame was sent
 	outputStr := string(mockOutput.data)
 
 	// User message should be in frame
@@ -781,7 +754,6 @@ func TestFrameFormatRecursionProtection(t *testing.T) {
 	var id uint64
 	nextID := func() uint64 { id++; return id }
 
-	// Create a session that contains what looks like session markers in tool output
 	contents := []llm.ContentPart{
 		&llm.TextPart{Text: "Read the session file", ContentPartMeta: llm.ContentPartMeta{HistoryID: nextID(), Role: llm.RoleUser}},
 		&llm.ToolInputPart{
@@ -807,12 +779,10 @@ func TestFrameFormatRecursionProtection(t *testing.T) {
 		},
 	}
 
-	// Save
 	if err := session.saveContentToFile(sessionPath, session.Contents); err != nil {
 		t.Fatalf("saveContentToFile failed: %v", err)
 	}
 
-	// Load
 	loaded, err := loadSession(sessionPath)
 	if err != nil {
 		t.Fatalf("loadSession failed: %v", err)
@@ -1035,7 +1005,6 @@ func TestLoadOrNewSessionVersionMismatch(t *testing.T) {
 	tmpDir := t.TempDir()
 	sessionPath := filepath.Join(tmpDir, "old-session.alaya")
 
-	// Write a session file with missing version
 	if err := os.WriteFile(sessionPath, []byte("---\ncreated_at: 2024-01-15T10:30:00Z\nupdated_at: 2024-01-15T10:30:00Z\n---\n"), 0600); err != nil {
 		t.Fatalf("failed to write session file: %v", err)
 	}

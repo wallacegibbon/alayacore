@@ -215,7 +215,6 @@ func (t *HTTPTransport) SendReceive(ctx context.Context, req jsonrpcRequest) (js
 // Close shuts down the transport.
 func (t *HTTPTransport) Close() error {
 	t.closeOnce.Do(func() {
-		// Close POST SSE stream if active.
 		t.postSSEMu.Lock()
 		if t.postSSEStream != nil {
 			t.postSSEStream.Close()

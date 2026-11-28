@@ -10,7 +10,6 @@ import (
 // TestSessionSavePreservesTextWithToolCalls verifies that text content parts
 // are preserved when saving/loading sessions with tool calls.
 func TestSessionSavePreservesTextWithToolCalls(t *testing.T) {
-	// Build flat ContentParts with roles
 	var id uint64
 	nextID := func() uint64 { id++; return id }
 
@@ -47,7 +46,6 @@ func TestSessionSavePreservesTextWithToolCalls(t *testing.T) {
 		Contents: contents,
 	}
 
-	// Format to markdown (frame format)
 	raw, err := formatSessionMarkdown(data)
 	if err != nil {
 		t.Fatalf("Failed to format session: %v", err)
@@ -55,7 +53,6 @@ func TestSessionSavePreservesTextWithToolCalls(t *testing.T) {
 
 	t.Logf("Serialized session size: %d bytes", len(raw))
 
-	// Parse back
 	loaded, err := parseSessionData(raw)
 	if err != nil {
 		t.Fatalf("Failed to parse session: %v", err)

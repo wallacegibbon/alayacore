@@ -168,7 +168,6 @@ func (r *toolRenderer) BuildInner(width int, _ bool, styles *Styles) ([]visualLi
 		}
 	}
 
-	// Append output with a "───" separator — uniform across all tools
 	// (parameters/results divider; edit_file and write_file included).
 	// Output rows are plain text (dim Body color under overlays); the
 	// separator keeps its muted color.

@@ -32,7 +32,6 @@ func TestHandleToolInputEvent(t *testing.T) {
 		t.Errorf("Expected ToolStatusPending, got %v", wb.WindowAt(0).RawStatus())
 	}
 
-	// Send a result
 	wb.HandleToolOutput("tool123", "output text", false, 0)
 
 	// Check status was updated
@@ -40,7 +39,6 @@ func TestHandleToolInputEvent(t *testing.T) {
 		t.Errorf("Expected ToolStatusSuccess, got %v", wb.WindowAt(0).RawStatus())
 	}
 
-	// Send a result with error
 	wb.HandleToolOutput("tool123", "error output", true, 0)
 
 	// Check status was updated
@@ -78,7 +76,6 @@ func TestRenderWindowContentWithStatus(t *testing.T) {
 		t.Errorf("Expected bare argument in content, got: %s", stripANSI(content))
 	}
 
-	// Send result with success
 	wb.HandleToolOutput("tool123", "output", false, 0)
 
 	// Test rendering with success status: input + "───" + output
@@ -87,7 +84,6 @@ func TestRenderWindowContentWithStatus(t *testing.T) {
 		t.Errorf("Expected input --- output, got: %s", stripANSI(content))
 	}
 
-	// Send result with error
 	wb.HandleToolOutput("tool123", "error output", true, 0)
 
 	// Test rendering with error status

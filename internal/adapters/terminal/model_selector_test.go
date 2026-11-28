@@ -108,7 +108,6 @@ func TestFuzzyMatch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Convert to lowercase for both (as the function expects)
 			result := FuzzyMatch(strings.ToLower(tt.search), strings.ToLower(tt.target))
 			if result != tt.expected {
 				t.Errorf("FuzzyMatch(%q, %q) = %v, expected %v", tt.search, tt.target, result, tt.expected)
@@ -121,7 +120,6 @@ func TestModelSelectorCtrlCClearsSearch(t *testing.T) {
 	styles := DefaultStyles()
 	ms := NewModelSelector(styles)
 
-	// Set up some test models
 	models := []protocol.ModelInfo{
 		{Name: "OpenAI GPT-4", ProtocolType: "openai", ModelName: "gpt-4"},
 		{Name: "Zhipu / GLM-5", ProtocolType: "anthropic", ModelName: "glm-5"},
@@ -146,12 +144,10 @@ func TestModelSelectorCtrlCClearsSearch(t *testing.T) {
 	msg := KeyPressMsg(Key{Code: 'c', Mod: ModCtrl})
 	ms, results := ms.Update(msg)
 
-	// Check that search input is cleared
 	if ms.FilterInput.Value() != "" {
 		t.Errorf("Ctrl+C should clear search input, got %q", ms.FilterInput.Value())
 	}
 
-	// Check that all models are shown again after clearing
 	if len(ms.filteredModels) != len(models) {
 		t.Errorf("Expected %d filtered models after clear, got %d", len(models), len(ms.filteredModels))
 	}
@@ -166,7 +162,6 @@ func TestModelSelectorSetModelsUpdatesFilteredModels(t *testing.T) {
 	styles := DefaultStyles()
 	ms := NewModelSelector(styles)
 
-	// Set up initial models
 	models := []protocol.ModelInfo{
 		{Name: "OpenAI GPT-4", ProtocolType: "openai", ModelName: "gpt-4"},
 		{Name: "Zhipu / GLM-5", ProtocolType: "anthropic", ModelName: "glm-5"},
@@ -206,7 +201,6 @@ func TestModelSelectorSetModelsUpdatesFilteredModels(t *testing.T) {
 		t.Errorf("Expected 2 filtered models matching 'gpt' after SetModels, got %d", len(ms.filteredModels))
 	}
 
-	// Clear search and verify all 3 models are shown
 	ms.FilterInput = ms.FilterInput.WithValue("")
 	ms = ms.updateFilteredModels()
 	if len(ms.filteredModels) != 3 {
@@ -218,7 +212,6 @@ func TestModelSelectorLoadModelsPreservesSelection(t *testing.T) {
 	styles := DefaultStyles()
 	ms := NewModelSelector(styles)
 
-	// Set up initial models via LoadModels
 	models := []protocol.ModelInfo{
 		{ID: 1, Name: "Model A", ProtocolType: "openai", ModelName: "model-a"},
 		{ID: 2, Name: "Model B", ProtocolType: "anthropic", ModelName: "model-b"},

@@ -293,7 +293,6 @@ func (w *Window) HandleToolInput(data protocol.ToolInputData, historyID uint64) 
 	}
 	if tr, ok := w.renderer.(*toolRenderer); ok {
 		if data.Name != "" && len(data.Input) == 0 {
-			// Start frame — set name, keep existing input
 			tr.setName(data.Name)
 			if tr.toolInput == "" {
 				tr.setToolInput(string(data.Input))
@@ -308,7 +307,6 @@ func (w *Window) HandleToolInput(data protocol.ToolInputData, historyID uint64) 
 				tr.setName("_")
 			}
 			tr.setToolInput(string(data.Input))
-			// Complete input arrived, clear delta preview.
 			tr.deltaBuffer = ""
 		}
 		if tr.status == ToolStatusNone {
@@ -915,7 +913,6 @@ func (w *Window) UpdateLineCountFast(width int) (int, bool) {
 
 // renderLineCountFromCache tries to get line count from the renderer's cache.
 func (w *Window) renderLineCountFromCache(width int) (int, bool) {
-	// Check if renderer supports fast line count
 	type lineCounter interface {
 		TryLineCount(width int) (int, bool)
 	}

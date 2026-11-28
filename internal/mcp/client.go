@@ -173,7 +173,6 @@ func (c *Client) Connect(ctx context.Context) error {
 		return ErrNeedsAuth
 	}
 
-	// Set up OAuth auth provider if configured.
 	c.setupAuth(transport)
 
 	c.storeTransport(transport)
@@ -277,7 +276,6 @@ func (c *Client) ListTools(ctx context.Context) ([]Tool, error) {
 		}
 	}
 
-	// Parse header mappings and filter out invalid tool definitions.
 	valid := make([]Tool, 0, len(tools))
 	for i := range tools {
 		t := &tools[i]
@@ -292,15 +290,12 @@ func (c *Client) ListTools(ctx context.Context) ([]Tool, error) {
 	}
 	tools = valid
 
-	// Update tools cache with parsed header mappings for x-mcp-header
-	// support. Rebuilt against the filtered slice so pointers stay valid.
+	// Rebuilt against the filtered slice so pointers stay valid.
 	c.toolsCache = make(map[string]*Tool, len(tools))
 	for i := range tools {
 		c.toolsCache[tools[i].Name] = &tools[i]
 	}
 
-	// Push tool header mappings to the adapter for Mcp-Param-{Name}
-	// injection on subsequent tools/call requests.
 	if ha, ok := c.adapter.(HTTPAdapter); ok {
 		ha.SetToolHeaderMappings(tools)
 	}
@@ -404,8 +399,7 @@ func (c *Client) Close() error {
 		ch := c.closedCh
 		close(ch)
 
-		// Notify adapter before closing transport.
-		// Use a short timeout for best-effort cleanup (e.g. session DELETE).
+		// Best effort: a short timeout for cleanup (e.g. session DELETE).
 		if c.adapter != nil {
 			cleanupCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()

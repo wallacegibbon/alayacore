@@ -51,7 +51,6 @@ func deltaHasPipeLine(delta string) bool {
 	lineStart := 0
 	for i := 0; i <= len(delta); i++ {
 		if i == len(delta) || delta[i] == '\n' {
-			// Skip leading spaces/tabs, then check for '|'.
 			j := lineStart
 			for j < i && (delta[j] == ' ' || delta[j] == '\t') {
 				j++

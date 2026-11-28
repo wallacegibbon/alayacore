@@ -63,7 +63,6 @@ func parseHeaderMappings(schema json.RawMessage) []HeaderMapping {
 					ParamType:  prop.Type,
 				})
 			}
-			// Skip properties with x-mcp-header but unsupported type.
 			continue
 		}
 
@@ -180,11 +179,9 @@ func needsBase64Encoding(s string) bool {
 	if strings.HasPrefix(s, "=?base64?") && strings.HasSuffix(s, "?=") {
 		return true
 	}
-	// Check for leading/trailing whitespace.
 	if s[0] == ' ' || s[0] == '\t' || s[len(s)-1] == ' ' || s[len(s)-1] == '\t' {
 		return true
 	}
-	// Check for non-ASCII or control characters.
 	for _, r := range s {
 		if r < 0x20 || r > 0x7E {
 			return true

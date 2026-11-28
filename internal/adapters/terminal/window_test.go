@@ -217,7 +217,6 @@ func TestWindowBufferDiff(t *testing.T) {
 	t.Run("diff window shows minimal prefixes", func(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
 
-		// Create a diff with unchanged, added, and removed lines
 		content := "edit_file: test.txt\n" +
 			"  unchanged line 1\n" +
 			"- old content\n" +
@@ -233,7 +232,6 @@ func TestWindowBufferDiff(t *testing.T) {
 
 		rendered := wb.GetAll(-1, false)
 
-		// Check that unchanged lines have space prefix
 		if !strings.Contains(rendered, "  unchanged line 1") {
 			t.Error("Unchanged line 1 should have space prefix")
 		}
@@ -241,7 +239,6 @@ func TestWindowBufferDiff(t *testing.T) {
 			t.Error("Unchanged line 2 should have space prefix")
 		}
 
-		// Check that changed line shows - on one line, + on next
 		if !strings.Contains(rendered, "- old content") {
 			t.Error("Changed old content should have - prefix")
 		}
@@ -249,12 +246,10 @@ func TestWindowBufferDiff(t *testing.T) {
 			t.Error("Changed new content should have + prefix")
 		}
 
-		// Check that removed line shows - prefix
 		if !strings.Contains(rendered, "- removed line") {
 			t.Error("Removed line should have - prefix")
 		}
 
-		// Check that added line shows + prefix
 		if !strings.Contains(rendered, "+ added line") {
 			t.Error("Added line should have + prefix")
 		}
@@ -390,7 +385,6 @@ func TestWindowBufferDiff(t *testing.T) {
 	t.Run("user and assistant messages fold defaults", func(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
 
-		// Create windows for different tag types
 		wb.AppendOrUpdate(tagUserText, "user-1", "User message")
 		wb.AppendOrUpdate(tagAssistantText, "assistant-1", "Assistant message")
 		wb.HandleToolInputEvent(protocol.ToolInputData{CallID: "tool-1", Name: "test_tool", Input: json.RawMessage("Tool output")}, 0)
@@ -482,7 +476,6 @@ func TestWindowBufferVisibility(t *testing.T) {
 	t.Run("delta window becomes visible when non-whitespace added", func(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
 
-		// Start with whitespace-only content
 		wb.AppendOrUpdate(tagAssistantText, "delta-1", "\n\n")
 		if wb.WindowAt(0).Visible {
 			t.Error("Delta window with only newlines should NOT be visible initially")
@@ -498,13 +491,11 @@ func TestWindowBufferVisibility(t *testing.T) {
 	t.Run("whitespace before content preserves visibility", func(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
 
-		// Start with whitespace
 		wb.AppendOrUpdate(tagAssistantText, "delta-1", "  \n  ")
 		if wb.WindowAt(0).Visible {
 			t.Error("Delta window with only whitespace should NOT be visible")
 		}
 
-		// Add more whitespace - still not visible
 		wb.AppendOrUpdate(tagAssistantText, "delta-1", "\t")
 		if wb.WindowAt(0).Visible {
 			t.Error("Delta window should still not be visible with only whitespace")
@@ -526,7 +517,6 @@ func TestWindowBufferVisibility(t *testing.T) {
 	t.Run("non-visible windows are not rendered", func(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
 
-		// Create visible and non-visible windows
 		wb.AppendOrUpdate(tagAssistantText, "delta-1", "\n\n")  // Not visible
 		wb.AppendOrUpdate(tagAssistantText, "delta-2", "Hello") // Visible
 		wb.AppendOrUpdate(tagAssistantText, "delta-3", "  ")    // Not visible
@@ -542,7 +532,6 @@ func TestWindowBufferVisibility(t *testing.T) {
 			t.Error("Rendered content should contain 'World'")
 		}
 
-		// Count windows - should only have 2 visible ones
 		if visible := visibleWindows(wb); visible != 2 {
 			t.Errorf("visible windows = %d, want 2", visible)
 		}
@@ -551,7 +540,6 @@ func TestWindowBufferVisibility(t *testing.T) {
 	t.Run("line heights only count visible windows", func(t *testing.T) {
 		wb := NewWindowBuffer(80, DefaultStyles())
 
-		// Create visible and non-visible windows
 		wb.AppendOrUpdate(tagAssistantText, "delta-1", "Hello\nWorld") // Visible, 2 lines
 		wb.AppendOrUpdate(tagAssistantText, "delta-2", "\n\n\n")       // Not visible
 

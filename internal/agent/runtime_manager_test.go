@@ -120,7 +120,6 @@ func TestFormatRuntimeConfig(t *testing.T) {
 	config := runtimeConfig{ActiveModel: "Test Model"}
 	result := formatRuntimeConfig(config)
 
-	// Check that it contains the expected content
 	if !strings.Contains(result, `active_model: "Test Model"`) {
 		t.Errorf("Expected output to contain active_model, got: %s", result)
 	}

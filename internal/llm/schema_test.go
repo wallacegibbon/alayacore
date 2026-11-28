@@ -26,12 +26,10 @@ func TestGenerateSchema(t *testing.T) {
 		t.Fatalf("Generated invalid JSON: %v", err)
 	}
 
-	// Check type
 	if result["type"] != "object" {
 		t.Errorf("Expected type 'object', got %v", result["type"])
 	}
 
-	// Check required fields
 	required, ok := result["required"].([]any)
 	if !ok {
 		t.Fatal("required field is not an array")
@@ -40,13 +38,11 @@ func TestGenerateSchema(t *testing.T) {
 		t.Errorf("Expected 2 required fields, got %d", len(required))
 	}
 
-	// Check properties
 	props, ok := result["properties"].(map[string]any)
 	if !ok {
 		t.Fatal("properties is not an object")
 	}
 
-	// Check name field (string)
 	nameField, ok := props["name"].(map[string]any)
 	if !ok {
 		t.Fatal("name property is not an object")
@@ -58,7 +54,6 @@ func TestGenerateSchema(t *testing.T) {
 		t.Errorf("Unexpected name description: %v", nameField["description"])
 	}
 
-	// Check count field (int → integer)
 	countField, ok := props["count"].(map[string]any)
 	if !ok {
 		t.Fatal("count property is not an object")
@@ -67,7 +62,6 @@ func TestGenerateSchema(t *testing.T) {
 		t.Errorf("Expected count type 'integer', got %v", countField["type"])
 	}
 
-	// Check rate field (float64 → number)
 	rateField, ok := props["rate"].(map[string]any)
 	if !ok {
 		t.Fatal("rate property is not an object")
@@ -76,7 +70,6 @@ func TestGenerateSchema(t *testing.T) {
 		t.Errorf("Expected rate type 'number', got %v", rateField["type"])
 	}
 
-	// Check enabled field (bool → boolean)
 	enabledField, ok := props["enabled"].(map[string]any)
 	if !ok {
 		t.Fatal("enabled property is not an object")
@@ -85,7 +78,6 @@ func TestGenerateSchema(t *testing.T) {
 		t.Errorf("Expected enabled type 'boolean', got %v", enabledField["type"])
 	}
 
-	// Check enum field
 	typeField, ok := props["type"].(map[string]any)
 	if !ok {
 		t.Fatal("type property is not an object")

@@ -214,7 +214,6 @@ func (aw AttachmentOverlay) updateForKeyMsg(msg KeyMsg) (AttachmentOverlay, []Re
 	fl, result := aw.FilteredListCore.HandleKey(msg)
 	aw.FilteredListCore = fl
 
-	// Handle Enter selection in the list after HandleKey returns.
 	if key == keyEnter && result.Handled && !fl.FilterInputFocused {
 		aw = aw.handleEnter()
 		fl = aw.FilteredListCore

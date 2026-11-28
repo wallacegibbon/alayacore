@@ -290,7 +290,6 @@ func (hw HelpOverlay) Update(msg Msg) (HelpOverlay, []Result) {
 	fl, result := hw.FilteredListCore.HandleKey(keyMsg)
 	hw.FilteredListCore = fl
 
-	// Check if Enter was pressed on a command item
 	var pendingCmd string
 	if key == keyEnter && result.Handled && !fl.FilterInputFocused {
 		if hw.SelectedIdx >= 0 && hw.SelectedIdx < hw.filteredLen() {

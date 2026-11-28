@@ -40,11 +40,9 @@ func TestDetectIsIdempotent(t *testing.T) {
 }
 
 func TestDetectEnvOverride(t *testing.T) {
-	// Save and restore the env var.
 	orig := os.Getenv("ALAYACORE_SHELL")
 	defer os.Setenv("ALAYACORE_SHELL", orig)
 
-	// Reset the detection state so Detect() runs again.
 	detection.once = sync.Once{}
 	detection.shell = nil
 

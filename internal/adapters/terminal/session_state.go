@@ -233,7 +233,6 @@ func (s *sessionState) updateTheme(name string, themeData *theme.Theme) {
 	if themeData != nil {
 		s.activeThemeData = themeData
 	} else {
-		// Look up from cached list
 		for _, ti := range s.cachedThemeList {
 			if ti.Name == name {
 				s.activeThemeData = ti.Theme
@@ -290,7 +289,6 @@ func (s *sessionState) updateMCPProgress(status, server string) {
 		if prevStatus == "" || prevStatus == protocol.MCPStatusDone {
 			s.mcpServers = nil
 		}
-		// Add to list if not already present.
 		found := false
 		for _, n := range s.mcpServers {
 			if n == server {
@@ -302,7 +300,6 @@ func (s *sessionState) updateMCPProgress(status, server string) {
 			s.mcpServers = append(s.mcpServers, server)
 		}
 	case protocol.MCPStatusConnected, protocol.MCPStatusFailed:
-		// Remove from list.
 		for i, n := range s.mcpServers {
 			if n == server {
 				s.mcpServers = append(s.mcpServers[:i], s.mcpServers[i+1:]...)

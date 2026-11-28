@@ -91,7 +91,6 @@ func NewStdioTransport(command string, args []string, env map[string]string, deb
 		return nil, fmt.Errorf("create stdout pipe: %w", err)
 	}
 
-	// Set environment variables.
 	if len(env) > 0 {
 		cmd.Env = append(cmd.Environ(), mapToEnvSlice(env)...)
 	}
@@ -152,7 +151,6 @@ func NewStdioTransport(command string, args []string, env map[string]string, deb
 		fmt.Fprintf(debugWriter, "MCP debug log started for: %s %v\n", command, args)
 	}
 
-	// Start dedicated reader goroutine.
 	t.readerWg.Add(1)
 	go t.readLoop()
 
@@ -300,11 +298,9 @@ func (t *StdioTransport) Send(ctx context.Context, req jsonrpcRequest) error {
 // by request ID. On context cancellation, the pending request is unregistered
 // and the response is discarded when it arrives — no transport disruption.
 func (t *StdioTransport) SendReceive(ctx context.Context, req jsonrpcRequest) (json.RawMessage, error) {
-	// Create a buffered channel for this request's response.
 	respCh := make(chan jsonrpcResponse, 1)
 
-	// Register the pending request before sending, so there's no race
-	// between a fast response arriving and registration.
+	// Registered before sending, so a fast response cannot arrive first.
 	t.pendingMu.Lock()
 	select {
 	case <-t.done:
@@ -327,7 +323,6 @@ func (t *StdioTransport) SendReceive(ctx context.Context, req jsonrpcRequest) (j
 	default:
 	}
 
-	// Remove from pending map on any exit path.
 	var success bool
 	defer func() {
 		if !success {
@@ -341,7 +336,6 @@ func (t *StdioTransport) SendReceive(ctx context.Context, req jsonrpcRequest) (j
 		return nil, fmt.Errorf("send: %w", err)
 	}
 
-	// Wait for the matching response.
 	select {
 	case resp, ok := <-respCh:
 		if !ok {
@@ -408,10 +402,8 @@ func (t *StdioTransport) Close() error {
 			}
 		}
 
-		// Wait for readLoop to finish processing pending responses.
 		t.readerWg.Wait()
 
-		// Close debug log file if open.
 		if t.debugWriter != nil {
 			t.debugWriter.Close()
 		}

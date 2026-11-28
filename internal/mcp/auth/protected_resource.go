@@ -84,7 +84,6 @@ func fetchProtectedResourceWellKnown(ctx context.Context, client *http.Client, s
 // fetchProtectedResourceFrom401 sends an unauthenticated request to the
 // MCP server and parses the WWW-Authenticate header from the 401 response.
 func fetchProtectedResourceFrom401(ctx context.Context, client *http.Client, serverURL string) (*ProtectedResourceMetadata, error) {
-	// Send an empty JSON-RPC request to trigger 401.
 	body := `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}`
 	req, err := http.NewRequestWithContext(ctx, "POST", serverURL, strings.NewReader(body))
 	if err != nil {
@@ -103,7 +102,6 @@ func fetchProtectedResourceFrom401(ctx context.Context, client *http.Client, ser
 		return nil, fmt.Errorf("expected 401, got %d", resp.StatusCode)
 	}
 
-	// Parse WWW-Authenticate header for resource_metadata.
 	authHeader := resp.Header.Get("WWW-Authenticate")
 	if authHeader == "" {
 		return nil, fmt.Errorf("no WWW-Authenticate header in 401 response")
@@ -151,7 +149,6 @@ func fetchProtectedResourceFrom401(ctx context.Context, client *http.Client, ser
 //
 //	WWW-Authenticate: Bearer resource_metadata="https://example.com/.well-known/oauth-protected-resource/mcp"
 func extractResourceMetadataURL(authHeader string) string {
-	// Look for resource_metadata="..." in the header.
 	marker := `resource_metadata=`
 	idx := strings.Index(authHeader, marker)
 	if idx < 0 {

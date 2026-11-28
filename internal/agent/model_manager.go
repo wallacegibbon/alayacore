@@ -136,7 +136,6 @@ func (mm *modelManager) loadFromFile(path string) error {
 
 	models, msgs := parseModelConfig(string(data), filepath.Base(path))
 
-	// Reset ID counter and generate IDs for models (start from 1; 0 is reserved as "no model")
 	mm.nextID = 1
 	for i := range models {
 		models[i].ID = mm.nextID
@@ -159,7 +158,6 @@ func (mm *modelManager) loadFromFile(path string) error {
 
 // createDefaultConfig creates a default model config file
 func (mm *modelManager) createDefaultConfig(path string) error {
-	// Ensure parent directory exists
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err

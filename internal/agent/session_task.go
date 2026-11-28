@@ -623,8 +623,6 @@ func cleanIncompleteToolInputs(contents []llm.ContentPart) []llm.ContentPart {
 		return contents
 	}
 
-	// Find the last assistant segment and remove ToolInputParts from it.
-	// Work backwards: find where the last batch of assistant parts starts.
 	lastIdx := len(contents) - 1
 	for lastIdx >= 0 && contents[lastIdx].GetRole() != llm.RoleAssistant {
 		lastIdx--
@@ -641,13 +639,11 @@ func cleanIncompleteToolInputs(contents []llm.ContentPart) []llm.ContentPart {
 		}
 	}
 
-	// Find the start of this assistant segment
 	startIdx := lastIdx
 	for startIdx > 0 && contents[startIdx-1].GetRole() == llm.RoleAssistant {
 		startIdx--
 	}
 
-	// Check if any tool calls in this segment
 	hasToolCalls := false
 	for _, part := range contents[startIdx : lastIdx+1] {
 		if _, ok := part.(*llm.ToolInputPart); ok {
@@ -659,7 +655,6 @@ func cleanIncompleteToolInputs(contents []llm.ContentPart) []llm.ContentPart {
 		return contents
 	}
 
-	// Filter out ToolInputParts from the last assistant segment
 	filtered := make([]llm.ContentPart, 0, len(contents))
 	filtered = append(filtered, contents[:startIdx]...)
 	for _, part := range contents[startIdx : lastIdx+1] {
@@ -1075,7 +1070,6 @@ func (s *Session) runTaskContinue(ctx context.Context) {
 	lastPart := contents[len(contents)-1]
 	if lastPart.GetRole() == llm.RoleAssistant {
 		// Assistant message — LLM was interrupted mid-response.
-		// Append "Continue" as a user message to tell it to pick up where it left off.
 		part := &llm.TextPart{Text: "Continue"}
 		s.finalizeUserPart(part)
 		contents = append(contents, part)

@@ -37,7 +37,6 @@ func (h *GenericHandler) FormatCall(input json.RawMessage) string {
 	if err := json.Compact(&buf, input); err == nil {
 		input = buf.Bytes()
 	}
-	// Add newline at end so output starts on new line
 	return fmt.Sprintf("%s: %s\n", h.name, string(input))
 }
 
@@ -74,7 +73,6 @@ func (h *ExecuteCommandHandler) FormatCall(input json.RawMessage) string {
 	if args.WorkDir != "" {
 		text += "\n" + dirMarker(escapeNewlines(args.WorkDir))
 	}
-	// Add newline at end so output starts on new line
 	return fmt.Sprintf("execute_command: %s\n", text)
 }
 
@@ -94,7 +92,6 @@ func (h *ReadFileHandler) FormatCall(input json.RawMessage) string {
 	if args.NumLines > 0 {
 		parts = append(parts, fmt.Sprintf("count=%d", args.NumLines))
 	}
-	// Add newline at end so output starts on new line
 	return fmt.Sprintf("read_file: %s\n", strings.Join(parts, ", "))
 }
 
@@ -175,7 +172,6 @@ func (h *SearchContentHandler) FormatCall(input json.RawMessage) string {
 		parts = append(parts, fmt.Sprintf("limit %d", args.MaxLines))
 	}
 
-	// Add newline at end so output starts on new line
 	return fmt.Sprintf("search_content: %s\n", strings.Join(parts, ", "))
 }
 

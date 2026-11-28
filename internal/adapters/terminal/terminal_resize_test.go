@@ -9,7 +9,6 @@ import (
 // TestTerminalResizeWindowCursorValidation tests that the window cursor is properly
 // validated when the terminal is resized.
 func TestTerminalResizeWindowCursorValidation(t *testing.T) {
-	// Create a terminal with initial size
 	output := NewTerminalOutput(DefaultStyles())
 	input := nopWriteCloser{}
 	terminal := NewTerminal(Options{
@@ -18,12 +17,10 @@ func TestTerminalResizeWindowCursorValidation(t *testing.T) {
 		Theme: theme.DefaultTheme(), ThemeName: "theme-dark",
 	})
 
-	// Add some windows to the buffer
 	output.windowBuffer.AppendOrUpdate(tagAssistantText, "window-1", "Content 1")
 	output.windowBuffer.AppendOrUpdate(tagAssistantText, "window-2", "Content 2")
 	output.windowBuffer.AppendOrUpdate(tagAssistantText, "window-3", "Content 3")
 
-	// Set cursor to the middle window
 	terminal.display = terminal.display.WithWindowCursor(1)
 	if terminal.display.GetWindowCursor() != 1 {
 		t.Errorf("Expected cursor at 1, got %d", terminal.display.GetWindowCursor())
@@ -59,7 +56,6 @@ func TestTerminalResizeClampsWindowCursor(t *testing.T) {
 		Theme: theme.DefaultTheme(), ThemeName: "theme-dark",
 	})
 
-	// Add windows
 	output.windowBuffer.AppendOrUpdate(tagAssistantText, "window-1", "Short")
 	output.windowBuffer.AppendOrUpdate(tagAssistantText, "window-2", "Content")
 
@@ -93,7 +89,6 @@ func TestTerminalResizeClampsWindowCursor(t *testing.T) {
 // TestTerminalResizeUpdatesDisplayContent tests that display content is
 // immediately re-rendered when the terminal is resized (fixes blank display bug).
 func TestTerminalResizeUpdatesDisplayContent(t *testing.T) {
-	// Create a terminal with initial size
 	output := NewTerminalOutput(DefaultStyles())
 	input := nopWriteCloser{}
 	terminal := NewTerminal(Options{
@@ -102,11 +97,9 @@ func TestTerminalResizeUpdatesDisplayContent(t *testing.T) {
 		Theme: theme.DefaultTheme(), ThemeName: "theme-dark",
 	})
 
-	// Add content that will wrap differently at different widths
 	longContent := "This is a long line of text that will wrap differently depending on the terminal width"
 	output.windowBuffer.AppendOrUpdate(tagAssistantText, "window-1", longContent)
 
-	// Get the initial view
 	terminal.display = terminal.display.updateContent()
 	initialView := terminal.display.View()
 	initialContent := initialView.Content
@@ -123,7 +116,6 @@ func TestTerminalResizeUpdatesDisplayContent(t *testing.T) {
 		t.Fatalf("Expected *Terminal, got %T", model)
 	}
 
-	// Get the view after resize
 	resizedView := terminal.display.View()
 	resizedContent := resizedView.Content
 

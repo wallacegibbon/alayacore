@@ -193,7 +193,6 @@ func (wb *WindowBuffer) HandleToolInputEvent(data protocol.ToolInputData, histor
 		return
 	}
 
-	// Create new window with tool renderer
 	w := NewWindow(data.CallID, wire.TagAssistantF, wb.styles)
 	w.HistoryID = historyID
 	w.Folded = true
@@ -237,7 +236,6 @@ func (wb *WindowBuffer) HandleToolInputDelta(id, name, delta string, historyID u
 	}
 
 	w := wb.windows[idx]
-	// Apply the delta to the tool renderer.
 	if tr, ok := w.renderer.(*toolRenderer); ok {
 		tr.AppendDelta(delta)
 	}
@@ -1119,7 +1117,6 @@ func (wb *WindowBuffer) renderAll(windowCursorIndex int, blocked bool) string {
 	var sb strings.Builder
 	firstWritten := false
 	for i, w := range wb.windows {
-		// Skip non-visible windows entirely
 		if !w.Visible {
 			continue
 		}

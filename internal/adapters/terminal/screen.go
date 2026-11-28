@@ -330,7 +330,6 @@ func (s *Screen) Render(content string, cur *ScreenCursor, fullScreen bool) erro
 	}
 	// cur == nil: the cursor stays hidden (already hidden at frame start).
 
-	// Close the synchronized update; the terminal paints the frame now.
 	buf = append(buf, ansi.ResetModeSynchronizedOutput...)
 	if err := s.writeAll(buf); err != nil {
 		return fmt.Errorf("terminal: render: %w", err)
@@ -773,7 +772,6 @@ func diffFrameRows(oldContent, newContent string, width int) []byte {
 					buf = append(buf, overlayTextAt(ov, width, r)...)
 				}
 			}
-			// Skip every terminal row of this line.
 			end := base.frameRow.row + base.terminalRows
 			for i < len(rows) && rows[i] < end {
 				i++

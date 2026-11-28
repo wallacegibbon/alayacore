@@ -252,7 +252,6 @@ func TestModelManagerGetLoadErrors(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "model.conf")
 
-	// Write a config with intentional issues
 	badConfig := `name: "Bad Model"
 protocol_type: "unknown_type"
 base_url: ":://invalid"
@@ -269,7 +268,6 @@ model_name: ""
 		t.Fatal("expected errors from invalid config, got none")
 	}
 
-	// Check specific errors are present
 	var foundProto, foundURL, foundModelName bool
 	for _, m := range msgs {
 		if strings.Contains(m, "unknown protocol_type") {

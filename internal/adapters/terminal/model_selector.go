@@ -170,12 +170,10 @@ func (ms ModelSelector) Update(msg Msg) (ModelSelector, []Result) {
 	fl, result := ms.FilteredListCore.HandleKey(keyMsg)
 	ms.FilteredListCore = fl
 
-	// Handle Ctrl+R reload regardless of focus
 	if key == keyCtrlR {
 		return ms, []Result{ReloadModelsMsg{}}
 	}
 
-	// Handle Enter selection in the list.
 	if key == keyEnter && result.Handled && !fl.FilterInputFocused {
 		if len(ms.filteredModels) > 0 && fl.SelectedIdx >= 0 {
 			ms.activeModel = &ms.filteredModels[fl.SelectedIdx]

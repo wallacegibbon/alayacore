@@ -165,7 +165,6 @@ func executeMCPTool(ctx context.Context, manager *Manager, serverName, toolName 
 		return nil, err // already wrapped by client.CallTool
 	}
 
-	// Convert MCP CallToolResult content to AlayaCore ContentParts.
 	parts := make([]llm.ContentPart, 0, len(result.Content))
 	for _, content := range result.Content {
 		part := convertToolContent(content, serverName)
@@ -452,7 +451,6 @@ func walkSchema(node map[string]any, depth int) error {
 		return fmt.Errorf("schema nesting exceeds maximum depth of %d", maxSchemaDepth)
 	}
 
-	// Check for external $ref.
 	if ref, ok := node["$ref"]; ok {
 		refStr, ok := ref.(string)
 		if ok && (len(refStr) > 0) {

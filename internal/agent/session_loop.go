@@ -49,7 +49,6 @@ func (s *Session) run() {
 	// we read from mcpService.Events() in the main select below.
 	s.mcpService.Start(s.sessionCtx)
 
-	// Start the I/O pump goroutine.
 	s.inputMsgCh = make(chan inputMsg, 100)
 	go s.inputPump()
 
@@ -149,7 +148,6 @@ func (s *Session) handleMCPEvent(evt *mcp.InitEvent) {
 		return
 	}
 
-	// Send system message to the UI (progress updates, auth prompts, etc.)
 	if action.SystemMsg != nil {
 		s.writeSystemMsg(*action.SystemMsg)
 	}
@@ -159,7 +157,6 @@ func (s *Session) handleMCPEvent(evt *mcp.InitEvent) {
 		s.writeErrorf("MCP: %v", evt.Error)
 	}
 
-	// Apply InitDone results.
 	if action.ApplyResult {
 		if action.Tools != nil {
 			s.BaseTools = append(s.BaseTools, action.Tools...)
@@ -179,7 +176,6 @@ func (s *Session) handleMCPEvent(evt *mcp.InitEvent) {
 			serverCount, len(action.Tools))
 	}
 
-	// Log abort messages.
 	if action.Aborted {
 		s.writeError("MCP initialization canceled.")
 	}

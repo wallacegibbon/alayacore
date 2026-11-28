@@ -410,7 +410,6 @@ func buildSession(cfg SessionConfig, data *sessionData) *Session {
 	// there — one field on the service, not a copy on the session that the task
 	// goroutine would have to keep in step.
 
-	// Set up MCP service (manages init lifecycle).
 	s.mcpService = newMCPService(cfg.MCPInit)
 
 	// Session load + replay are synchronous and complete by construction

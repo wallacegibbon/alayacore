@@ -241,14 +241,12 @@ func (a *AdapterV20251125) OnTransportReady(ctx context.Context, transport *HTTP
 	a.getSSEMu.Lock()
 	defer a.getSSEMu.Unlock()
 
-	// Reset closed channel if previous GET stream finished.
 	select {
 	case <-a.getSSEClosed:
 		a.getSSEClosed = make(chan struct{})
 	default:
 	}
 
-	// Check transport is still alive before starting a new stream.
 	select {
 	case <-transport.Done():
 		return io.ErrClosedPipe
@@ -258,7 +256,6 @@ func (a *AdapterV20251125) OnTransportReady(ctx context.Context, transport *HTTP
 	getCtx, cancel := context.WithCancel(ctx)
 	a.getSSECancel = cancel
 
-	// Store transport references for session cleanup on close.
 	a.httpClient = transport.httpClient
 	a.endpointURL = transport.endpointURL
 

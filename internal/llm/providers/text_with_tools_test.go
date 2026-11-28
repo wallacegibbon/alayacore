@@ -32,7 +32,6 @@ func TestTextWithToolCalls(t *testing.T) {
 	}))
 	defer server.Close()
 
-	// Create provider
 	provider, err := providers.NewOpenAI(providers.BaseConfig{
 		APIKey:  "test-key",
 		BaseURL: server.URL,
@@ -49,7 +48,6 @@ func TestTextWithToolCalls(t *testing.T) {
 		t.Fatalf("Failed to stream: %v", err)
 	}
 
-	// Collect events
 	var textReceived strings.Builder
 	var stepComplete *llm.StepCompleteEvent
 
@@ -76,7 +74,6 @@ func TestTextWithToolCalls(t *testing.T) {
 	t.Logf("Message role: %s", "(assistant)")
 	t.Logf("Message content parts: %d", len(msg))
 
-	// Check for text part
 	hasText := false
 	hasToolCall := false
 	for _, part := range msg {

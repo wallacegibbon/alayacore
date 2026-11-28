@@ -45,7 +45,7 @@ func (a *Adapter) Start() int {
 
 	terminalOutput := NewTerminalOutput(NewStyles(theme.DefaultTheme()))
 
-	// Get terminal size before creating the TUI (so we can size the loading screen)
+	// Read before the TUI exists: the loading screen is sized from it.
 	initialWidth, initialHeight := getTerminalSize()
 	terminalOutput.SetScreenWidth(initialWidth)
 
@@ -54,11 +54,9 @@ func (a *Adapter) Start() int {
 	// the read end (pipeReader) once loading completes.
 	pipeReader, pipeWriter := io.Pipe()
 
-	// Create Terminal model in loading mode. The loading screen uses the
-	// embedded default theme (theme.DefaultTheme()) — no file I/O needed
-	// for the brief startup phase. The session will load all theme files
-	// exactly once via sendThemeListMsg() and broadcast the full data,
-	// which the adapter caches and applies when loading completes.
+	// Loading mode uses the embedded default theme — no file I/O for the brief
+	// startup phase. The session loads the theme files once and broadcasts them;
+	// the adapter caches that and applies it when loading completes.
 	t := NewTerminal(Options{
 		Out:          terminalOutput,
 		Input:        pipeWriter,
@@ -72,9 +70,8 @@ func (a *Adapter) Start() int {
 	t.loading = true // enter async loading mode
 	t.pipeReader = pipeReader
 
-	// Create and run the program.
-	// Run automatically opens the real TTY when stdin is piped
-	// (Unix: /dev/tty, Windows: CONIN$ + CONOUT$).
+	// Run opens the real TTY when stdin is piped (Unix: /dev/tty,
+	// Windows: CONIN$ + CONOUT$).
 	finalModel, err := Run(t)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error running terminal UI: %v\n", err)

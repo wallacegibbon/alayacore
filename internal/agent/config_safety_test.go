@@ -94,7 +94,6 @@ func TestRuntimeManager_SpecialChars_RoundTrip(t *testing.T) {
 		t.Fatalf("SetActiveModel failed: %v", err)
 	}
 
-	// Create a fresh manager and load from the same file
 	rm2 := newRuntimeManager(runtimePath)
 	got := rm2.getActiveModel()
 	if got != specialName {

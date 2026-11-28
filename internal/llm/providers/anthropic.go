@@ -215,10 +215,8 @@ func (p *AnthropicProvider) StreamMessages(
 	// fit degrades to slow, never to a rejected request.
 	contents = llm.FitImagesForSend(contents)
 
-	// Convert messages to Anthropic format
 	apiMessages := anthropicConvertContents(contents)
 
-	// Convert tools to Anthropic format
 	apiTools := make([]anthropicTool, 0, len(tools))
 	for _, tool := range tools {
 		apiTools = append(apiTools, anthropicTool{
@@ -228,7 +226,6 @@ func (p *AnthropicProvider) StreamMessages(
 		})
 	}
 
-	// Build system messages array
 	systemMessages := make([]anthropicSystemMessage, 0, 2)
 	if systemPrompt != "" {
 		systemMessages = append(systemMessages, anthropicSystemMessage{Type: anthropicBlockTypeText, Text: systemPrompt})
@@ -255,7 +252,6 @@ func (p *AnthropicProvider) StreamMessages(
 		body["tools"] = apiTools
 	}
 
-	// Build and send HTTP request
 	req, err := p.buildRequest(ctx, "/v1/messages", body)
 	if err != nil {
 		return nil, err

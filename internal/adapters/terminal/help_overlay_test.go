@@ -36,19 +36,16 @@ func TestHelpOverlayNavigation(t *testing.T) {
 		t.Errorf("Expected selectedIdx to be 1 (first non-header), got %d", hw.SelectedIdx)
 	}
 
-	// Move down
 	hw, _ = hw.Update(KeyPressMsg(Key{Code: 'j'}))
 	if hw.SelectedIdx != 2 {
 		t.Errorf("Expected selectedIdx to be 2 after j, got %d", hw.SelectedIdx)
 	}
 
-	// Move down again
 	hw, _ = hw.Update(KeyPressMsg(Key{Code: 'j'}))
 	if hw.SelectedIdx != 3 {
 		t.Errorf("Expected selectedIdx to be 3 after second j, got %d", hw.SelectedIdx)
 	}
 
-	// Move up
 	hw, _ = hw.Update(KeyPressMsg(Key{Code: 'k'}))
 	if hw.SelectedIdx != 2 {
 		t.Errorf("Expected selectedIdx to be 2 after k, got %d", hw.SelectedIdx)
@@ -76,13 +73,11 @@ func TestHelpOverlaySkipsSectionHeaders(t *testing.T) {
 		t.Errorf("Expected selectedIdx to be 1, got %d", hw.SelectedIdx)
 	}
 
-	// Move down should skip header at index 2 and land on index 3
 	hw, _ = hw.Update(KeyPressMsg(Key{Code: 'j'}))
 	if hw.SelectedIdx != 3 {
 		t.Errorf("Expected selectedIdx to be 3 (skipping header), got %d", hw.SelectedIdx)
 	}
 
-	// Move up should skip header at index 2 and land on index 1
 	hw, _ = hw.Update(KeyPressMsg(Key{Code: 'k'}))
 	if hw.SelectedIdx != 1 {
 		t.Errorf("Expected selectedIdx to be 1 (skipping header up), got %d", hw.SelectedIdx)
@@ -100,27 +95,22 @@ func TestHelpOverlayNavigationBoundary(t *testing.T) {
 	}
 	hw = hw.Open()
 
-	// Tab to list
 	hw, _ = hw.Update(KeyPressMsg(Key{Code: KeyTab}))
 
-	// Start at index 1
 	if hw.SelectedIdx != 1 {
 		t.Errorf("Expected selectedIdx to be 1, got %d", hw.SelectedIdx)
 	}
 
-	// Move up at top - should stay at 1
 	hw, _ = hw.Update(KeyPressMsg(Key{Code: 'k'}))
 	if hw.SelectedIdx != 1 {
 		t.Errorf("Expected selectedIdx to stay at 1 at top, got %d", hw.SelectedIdx)
 	}
 
-	// Move down to last item
 	hw, _ = hw.Update(KeyPressMsg(Key{Code: 'j'}))
 	if hw.SelectedIdx != 2 {
 		t.Errorf("Expected selectedIdx to be 2, got %d", hw.SelectedIdx)
 	}
 
-	// Move down at bottom - should stay at 2
 	hw, _ = hw.Update(KeyPressMsg(Key{Code: 'j'}))
 	if hw.SelectedIdx != 2 {
 		t.Errorf("Expected selectedIdx to stay at 2 at bottom, got %d", hw.SelectedIdx)
@@ -226,7 +216,6 @@ func TestHelpOverlayBuildHelpItems(t *testing.T) {
 		t.Fatal("Expected non-empty help items")
 	}
 
-	// Count sections and items
 	sections := 0
 	commands := 0
 	for _, item := range items {
@@ -266,7 +255,6 @@ func TestHelpOverlayEnterOnCommand(t *testing.T) {
 	styles := DefaultStyles()
 	hw := NewHelpOverlay(styles)
 
-	// Set up items with a :command at index 1
 	hw.items = []HelpItem{
 		{ID: 1, IsSection: true, Description: "Commands"},
 		{ID: 2, Key: ":quit", Description: "Exit application", Type: HelpItemCommand},
@@ -305,7 +293,6 @@ func TestHelpOverlayEnterOnCommandStripsArgs(t *testing.T) {
 	styles := DefaultStyles()
 	hw := NewHelpOverlay(styles)
 
-	// Set up items with argument syntax in the key
 	hw.items = []HelpItem{
 		{ID: 1, IsSection: true, Description: "Commands"},
 		{ID: 2, Key: ":continue", Description: "Retry last prompt", Type: HelpItemCommand},
@@ -316,7 +303,6 @@ func TestHelpOverlayEnterOnCommandStripsArgs(t *testing.T) {
 
 	// Helper to extract command from the results (must Tab to list first)
 	getCmd := func(hw HelpOverlay) string {
-		// Open returns with search focused; Tab to list
 		hw2, _ := hw.Update(KeyPressMsg(Key{Code: KeyTab}))
 		hw2, results := hw2.Update(KeyPressMsg(Key{Code: KeyEnter}))
 		_ = hw2
@@ -353,7 +339,6 @@ func TestHelpOverlayEnterOnKeyBinding(t *testing.T) {
 	styles := DefaultStyles()
 	hw := NewHelpOverlay(styles)
 
-	// Set up items with a key binding (not a :command)
 	hw.items = []HelpItem{
 		{ID: 1, IsSection: true, Description: "Global Shortcuts"},
 		{ID: 2, Key: "Ctrl+H", Description: "Open help window"},
@@ -411,7 +396,6 @@ func TestHelpOverlayFilter(t *testing.T) {
 		t.Error("Expected ':quit' in filtered items after typing 'quit'")
 	}
 
-	// Clear filter with ctrl+c
 	hw, _ = hw.Update(KeyPressMsg(Key{Code: 'c', Mod: ModCtrl}))
 	if hw.filteredLen() != totalItems {
 		t.Errorf("Expected all items after clear, got %d", hw.filteredLen())
@@ -523,12 +507,10 @@ func TestHelpOverlayHeaderReappearsOnScrollBack(t *testing.T) {
 		t.Fatal("Header should be visible at start")
 	}
 
-	// Move down past the visible area to push header out of view
 	for i := 0; i < SelectorListRows; i++ {
 		hw = hw.moveDown()
 	}
 
-	// Header should be out of view now
 	if hw.ScrollIdx == 0 {
 		t.Fatal("Expected scrollIdx > 0 after scrolling down")
 	}

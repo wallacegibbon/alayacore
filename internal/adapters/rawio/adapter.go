@@ -38,7 +38,6 @@ func (a *Adapter) Start() int {
 		return 1
 	}
 
-	// Wait for the session to finish.
 	<-session.Done()
 
 	return 0

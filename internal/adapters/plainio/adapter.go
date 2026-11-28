@@ -105,7 +105,6 @@ func (a *Adapter) Start() int {
 	output.onMCPConnected = flow.Connected
 	output.onMCPDone = flow.Abort
 
-	// Load session
 	session, inputWriter, err := app.StartSession(a.Config, output, nil)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -172,8 +171,7 @@ func (a *Adapter) Start() int {
 	}
 	go readStdin()
 
-	// Wait for EOF (Ctrl-D), :quit, or session completion. Task errors
-	// are reported by the output and never terminate the session.
+	// Task errors are reported by the output and never terminate the session.
 	code := 0
 	select {
 	case code = <-exitCh:

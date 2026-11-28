@@ -19,17 +19,14 @@ func BenchmarkWindowBufferDelta(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
-	// Create 100 windows (simulating a long conversation)
 	for i := 0; i < 100; i++ {
 		id := fmt.Sprintf("msg%d", i)
 		content := strings.Repeat("This is a test message with some content.\n", 5)
 		wb.AppendOrUpdate("AT", id, content)
 	}
 
-	// Pre-render to ensure everything is cached
 	_ = wb.GetTotalLines()
 
-	// Get the last window's ID for delta updates
 	lastID := "msg99"
 
 	b.ResetTimer()
@@ -37,7 +34,6 @@ func BenchmarkWindowBufferDelta(b *testing.B) {
 		// Simulate delta update - append to existing window
 		wb.AppendOrUpdate("AT", lastID, " additional text")
 
-		// Trigger rendering (what happens on each update)
 		_ = wb.GetTotalLines()
 	}
 }
@@ -48,23 +44,19 @@ func BenchmarkWindowBufferDeltaNewWindow(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
-	// Create 100 initial windows
 	for i := 0; i < 100; i++ {
 		id := fmt.Sprintf("msg%d", i)
 		content := strings.Repeat("This is a test message with some content.\n", 5)
 		wb.AppendOrUpdate("AT", id, content)
 	}
 
-	// Pre-render to ensure everything is cached
 	_ = wb.GetTotalLines()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		// Create a NEW window each time (simulates new message in conversation)
 		id := fmt.Sprintf("newmsg%d", b.N*1000+i)
 		wb.AppendOrUpdate("AT", id, "New message content.\n")
 
-		// Trigger rendering
 		_ = wb.GetTotalLines()
 	}
 }
@@ -78,7 +70,6 @@ func BenchmarkWindowBufferDeltaSingleWindow(b *testing.B) {
 	// Single window
 	wb.AppendOrUpdate("AT", "msg0", strings.Repeat("Initial content\n", 10))
 
-	// Pre-render
 	_ = wb.GetTotalLines()
 
 	b.ResetTimer()
@@ -99,14 +90,12 @@ func BenchmarkWindowBufferGetWindowLineRange(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
-	// Create 100 windows
 	for i := 0; i < 100; i++ {
 		id := fmt.Sprintf("msg%d", i)
 		content := strings.Repeat("Content line\n", 5)
 		wb.AppendOrUpdate("AT", id, content)
 	}
 
-	// Ensure line heights are calculated
 	_ = wb.GetTotalLines()
 
 	b.ResetTimer()
@@ -121,14 +110,12 @@ func BenchmarkWindowBufferGetAll(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
-	// Create 100 windows
 	for i := 0; i < 100; i++ {
 		id := fmt.Sprintf("msg%d", i)
 		content := strings.Repeat("This is a test message with some content.\n", 5)
 		wb.AppendOrUpdate("AT", id, content)
 	}
 
-	// Set up viewport for virtual rendering
 	wb.SetViewportPosition(0, 30)
 	_ = wb.GetTotalLines()
 
@@ -143,18 +130,15 @@ func BenchmarkWindowBufferDeltaWithGetAll(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
-	// Create 100 windows (simulating a long conversation)
 	for i := 0; i < 100; i++ {
 		id := fmt.Sprintf("msg%d", i)
 		content := strings.Repeat("This is a test message with some content.\n", 5)
 		wb.AppendOrUpdate("AT", id, content)
 	}
 
-	// Set up viewport for virtual rendering
 	wb.SetViewportPosition(0, 30)
 	_ = wb.GetTotalLines()
 
-	// Get the last window's ID for delta updates
 	lastID := "msg99"
 
 	b.ResetTimer()
@@ -177,14 +161,12 @@ func BenchmarkVirtualRenderingWindowCursorMovement(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
-	// Create 100 windows
 	for i := 0; i < 100; i++ {
 		id := fmt.Sprintf("msg%d", i)
 		content := strings.Repeat("This is a test message with some content.\n", 5)
 		wb.AppendOrUpdate("AT", id, content)
 	}
 
-	// Set up viewport
 	wb.SetViewportPosition(0, 30)
 	_ = wb.GetTotalLines()
 
@@ -209,14 +191,12 @@ func BenchmarkVirtualRenderingWindowCursorMovementSingle(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
-	// Create 100 windows
 	for i := 0; i < 100; i++ {
 		id := fmt.Sprintf("msg%d", i)
 		content := strings.Repeat("This is a test message with some content.\n", 5)
 		wb.AppendOrUpdate("AT", id, content)
 	}
 
-	// Set up viewport
 	wb.SetViewportPosition(0, 30)
 	_ = wb.GetTotalLines()
 
@@ -239,22 +219,18 @@ func BenchmarkStreamingUpdateWithIncremental(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
-	// Create 50 existing windows (conversation history)
 	for i := 0; i < 50; i++ {
 		id := fmt.Sprintf("msg%d", i)
 		content := strings.Repeat("Historical message content.\n", 3)
 		wb.AppendOrUpdate("AT", id, content)
 	}
 
-	// Set up viewport
 	wb.SetViewportPosition(0, 30)
 	_ = wb.GetTotalLines()
 
-	// Create streaming window with initial content
 	historyID := "stream-current"
 	wb.AppendOrUpdate("AT", historyID, "Starting...")
 
-	// Pre-render to populate wrappedLines cache
 	_ = wb.GetTotalLines()
 	_ = wb.GetAll(-1, false)
 
@@ -272,18 +248,15 @@ func BenchmarkStreamingUpdateWithoutIncremental(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
-	// Create 50 existing windows
 	for i := 0; i < 50; i++ {
 		id := fmt.Sprintf("msg%d", i)
 		content := strings.Repeat("Historical message content.\n", 3)
 		wb.AppendOrUpdate("AT", id, content)
 	}
 
-	// Set up viewport
 	wb.SetViewportPosition(0, 30)
 	_ = wb.GetTotalLines()
 
-	// Create streaming window
 	historyID := "stream-current"
 	wb.AppendOrUpdate("AT", historyID, "Starting...")
 	_ = wb.GetTotalLines()
@@ -309,7 +282,6 @@ func BenchmarkStreamingSmallDelta(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
-	// Create 20 existing windows
 	for i := 0; i < 20; i++ {
 		id := fmt.Sprintf("msg%d", i)
 		content := strings.Repeat("Content.\n", 5)
@@ -335,7 +307,6 @@ func BenchmarkJustAppendUpdate(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
-	// Create 20 existing windows
 	for i := 0; i < 20; i++ {
 		id := fmt.Sprintf("msg%d", i)
 		content := strings.Repeat("Content.\n", 5)
@@ -357,7 +328,6 @@ func BenchmarkJustEnsureLineHeights(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
-	// Create 20 existing windows
 	for i := 0; i < 20; i++ {
 		id := fmt.Sprintf("msg%d", i)
 		content := strings.Repeat("Content.\n", 5)
@@ -432,7 +402,6 @@ func BenchmarkSingleWindowStreamingDebug(b *testing.B) {
 	wb.AppendOrUpdate("AT", historyID, "initial content")
 	_ = wb.GetTotalLines()
 
-	// Check initial state
 	w := wb.WindowAt(0)
 	fmt.Printf("Initial: wrappedLines=%d, content=%q, cache.valid=%v\n",
 		0, w.RawContent(), false)
@@ -462,7 +431,6 @@ func BenchmarkLongContentStreaming(b *testing.B) {
 	wb := NewWindowBuffer(80, styles)
 
 	historyID := "stream"
-	// Start with content long enough to wrap
 	wb.AppendOrUpdate("AT", historyID, strings.Repeat("This is a line that will wrap. ", 10))
 	_ = wb.GetTotalLines()
 
@@ -530,7 +498,6 @@ func BenchmarkDirectAppendDebug(_ *testing.B) {
 		fmt.Printf("After AppendContent %d: wrappedLines=%d, cache.valid=%v\n",
 			i+1, 0, false)
 
-		// Check fast path condition
 		fmt.Printf("  Fast path check: len(wrappedLines)=%d, cache.width-4=%d, innerWidth=76\n",
 			0, 0-4)
 
@@ -588,14 +555,12 @@ func BenchmarkStreamingUpdateWithVirtualRendering(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
-	// Create 100 windows - user is viewing the middle
 	for i := 0; i < 100; i++ {
 		id := fmt.Sprintf("msg%d", i)
 		content := strings.Repeat("Historical message content.\n", 3)
 		wb.AppendOrUpdate("AT", id, content)
 	}
 
-	// Set up viewport in the MIDDLE of content (virtual rendering should help here)
 	wb.SetViewportPosition(150, 30) // Middle of ~300 lines
 	_ = wb.GetTotalLines()
 
@@ -613,7 +578,6 @@ func BenchmarkStreamingUpdateWithoutVirtualRendering(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
-	// Create 100 windows - user is viewing the middle
 	for i := 0; i < 100; i++ {
 		id := fmt.Sprintf("msg%d", i)
 		content := strings.Repeat("Historical message content.\n", 3)
@@ -637,14 +601,12 @@ func BenchmarkGetAllWithVirtual(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
-	// Create 100 windows
 	for i := 0; i < 100; i++ {
 		id := fmt.Sprintf("msg%d", i)
 		content := strings.Repeat("Historical message content.\n", 3)
 		wb.AppendOrUpdate("AT", id, content)
 	}
 
-	// Set up viewport
 	wb.SetViewportPosition(150, 30)
 	_ = wb.GetTotalLines()
 
@@ -658,7 +620,6 @@ func BenchmarkGetAllWithoutVirtual(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
-	// Create 100 windows
 	for i := 0; i < 100; i++ {
 		id := fmt.Sprintf("msg%d", i)
 		content := strings.Repeat("Historical message content.\n", 3)
@@ -706,7 +667,6 @@ func BenchmarkGetAllWithoutVirtual(b *testing.B) {
 func BenchmarkWindowBufferResize(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
 
-	// Build state once
 	wb := NewWindowBuffer(80, styles)
 	for j := 0; j < 50; j++ {
 		id := fmt.Sprintf("msg%d", j)
@@ -733,14 +693,12 @@ func BenchmarkVirtualRenderingScroll(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
-	// Create 100 windows
 	for i := 0; i < 100; i++ {
 		id := fmt.Sprintf("msg%d", i)
 		content := strings.Repeat("This is a test message with some content.\n", 5)
 		wb.AppendOrUpdate("AT", id, content)
 	}
 
-	// Set up viewport
 	wb.SetViewportPosition(0, 30)
 	_ = wb.GetTotalLines()
 
@@ -767,7 +725,6 @@ func BenchmarkGetWindowLineRangeCached(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
-	// Create 100 windows
 	for i := 0; i < 100; i++ {
 		id := fmt.Sprintf("msg%d", i)
 		content := strings.Repeat("Content line\n", 5)
@@ -851,7 +808,6 @@ func BenchmarkFullWrappingPath(b *testing.B) {
 	historyID := "msg0"
 	wb.AppendOrUpdate("AT", historyID, strings.Repeat("Initial content line\n", 10))
 
-	// Ensure content is populated so GetTotalLines has work to do
 	_ = wb.GetTotalLines()
 	idx := wb.idIndex[historyID]
 
@@ -943,7 +899,6 @@ func BenchmarkGetAllDimmed(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
-	// Create 20 windows (mix of AT, UT, AF types)
 	for i := 0; i < 10; i++ {
 		id := fmt.Sprintf("at-%d", i)
 		wb.AppendOrUpdate("AT", id, "This is assistant text content that will be styled and wrapped. "+
@@ -984,18 +939,15 @@ func BenchmarkRenderBlockedTransition(b *testing.B) {
 	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
-	// Create 20 windows with cached render
 	for i := 0; i < 20; i++ {
 		id := fmt.Sprintf("msg-%d", i)
 		wb.AppendOrUpdate("AT", id, strings.Repeat("Message content line.\n", 3))
 	}
 
-	// Pre-render with normal styles
 	_ = wb.GetAll(-1, false)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		// Toggle blocked: normal → dimmed
 		_ = wb.GetAll(-1, true)
 		// Toggle back: dimmed → normal
 		_ = wb.GetAll(-1, false)

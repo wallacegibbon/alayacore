@@ -284,7 +284,6 @@ func (p *OpenAIProvider) StreamMessages(
 	}
 	apiMessages = append(apiMessages, openaiConvertContents(contents, p.reasoningField)...)
 
-	// Convert tools to OpenAI format
 	apiTools := make([]openAITool, 0, len(tools))
 	for _, tool := range tools {
 		apiTools = append(apiTools, openAITool{
@@ -330,7 +329,6 @@ func (p *OpenAIProvider) StreamMessages(
 		body["max_completion_tokens"] = p.maxTokens
 	}
 
-	// Build and send HTTP request
 	req, err := p.buildRequest(ctx, "/chat/completions", body)
 	if err != nil {
 		return nil, err

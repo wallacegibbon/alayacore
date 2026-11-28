@@ -193,9 +193,9 @@ func (to *outputWriter) writeColored(tag string, value string) {
 		}
 		to.pendTextDelta(d.ID, displayTag, d.Text)
 
-	// Complete authoritative content — already delivered via deltas during
-	// live streaming, but carries the authoritative content during replay.
-	// Only display if no window exists yet (replay case).
+	// Live streaming already delivered this through deltas; the complete frame
+	// carries the authoritative content during replay, and is only displayed
+	// when no window exists yet.
 	case wire.TagAssistantX:
 		d, ok := protocol.DecodeContent(value)
 		if !ok {
@@ -247,7 +247,6 @@ func (to *outputWriter) writeColored(tag string, value string) {
 			name = info.Name
 		}
 
-		// Format the input for display.
 		if len(fd.Input) == 0 {
 			fd.Input = json.RawMessage(name + ": \n")
 		} else {
@@ -712,14 +711,12 @@ func (to *outputWriter) handleSystemToolConfirm(callID string) {
 	if callID == "" {
 		return
 	}
-	// Look up the tool info from the function data window for a richer message.
 	toolName := ""
 	toolInput := ""
 	if info := to.windowBuffer.GetFunctionInfo(callID); info != nil {
 		toolName = info.Name
 		toolInput = info.Input
 	}
-	// Store pending state for the Terminal's confirm overlay.
 	to.status.addToolConfirmPending(callID, toolName, toolInput)
 }
 

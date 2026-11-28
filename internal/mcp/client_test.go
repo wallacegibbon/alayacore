@@ -283,7 +283,6 @@ func TestClientStateTransitions(t *testing.T) {
 		t.Errorf("initial state = %d, want %d", client.State(), StateDisconnected)
 	}
 
-	// Close without connecting.
 	if err := client.Close(); err != nil {
 		t.Errorf("Close() error = %v", err)
 	}
@@ -367,7 +366,6 @@ func TestToolsToAgentTools(t *testing.T) {
 		}
 	}
 
-	// Check descriptions include server name.
 	for _, tool := range agentTools {
 		if tool.Definition.Description == "" {
 			t.Errorf("tool %q has empty description", tool.Definition.Name)

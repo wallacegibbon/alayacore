@@ -149,7 +149,6 @@ func (m Terminal) handleThemeSelectorKeys(msg KeyMsg) (Terminal, Cmd) {
 		return m, cmd
 	}
 
-	// Apply preview theme with debounce on any navigation or filter change.
 	previewTheme := ts.GetPreviewTheme()
 	if previewTheme != nil {
 		m.themePreviewID++

@@ -49,7 +49,6 @@ func FormatKeyValue(v any) string {
 
 		key, opts, _ := strings.Cut(tag, ",")
 
-		// Skip fields tagged with config:"-"
 		if key == "-" {
 			continue
 		}

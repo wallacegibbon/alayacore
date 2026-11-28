@@ -151,7 +151,6 @@ func TestIncrementalPathIsUsed(t *testing.T) {
 	styles := NewStyles(theme.DefaultTheme())
 	wb := NewWindowBuffer(80, styles)
 
-	// Create a streaming window with initial content
 	wb.AppendOrUpdate("AT", "stream", "This is some initial content that will be wrapped.")
 	wb.SetViewportPosition(0, 30)
 
@@ -159,7 +158,6 @@ func TestIncrementalPathIsUsed(t *testing.T) {
 	_ = wb.GetTotalLines()
 	_ = wb.GetAll(-1, false)
 
-	// Find the window and verify the renderer is a textRenderer
 	idx, ok := wb.idIndex["stream"]
 	if !ok {
 		t.Fatal("stream window not found")
@@ -172,8 +170,6 @@ func TestIncrementalPathIsUsed(t *testing.T) {
 		t.Fatal("wrappedLines should be populated after first render")
 	}
 
-	// Append a delta — this should use the incremental path,
-	// keeping wrappedLines populated for TryLineCount.
 	wb.AppendOrUpdate("AT", "stream", " more content")
 
 	// TryLineCount should return a valid count without full render

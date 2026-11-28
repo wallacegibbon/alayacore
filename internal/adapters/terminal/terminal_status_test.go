@@ -102,13 +102,10 @@ func TestStatusBarReasoningRidesWithModelWithoutHighlight(t *testing.T) {
 }
 
 func TestStatusBarShowsCurrentStepsDuringProgress(t *testing.T) {
-	// Create output writer and simulate task in progress
 	out := NewTerminalOutput(DefaultStyles())
 
-	// Simulate task in progress
 	out.handleSystemFrame(`{"type":"task","data":{"in_progress":true,"current_step":7,"max_steps":20,"context_tokens":0,"context_limit":0}}`)
 
-	// Create terminal with the output writer
 	styles := DefaultStyles()
 	terminal := &Terminal{
 		out:               out,
@@ -128,10 +125,8 @@ func TestStatusBarShowsCurrentStepsDuringProgress(t *testing.T) {
 		hasFocus:          true,
 	}
 
-	// Update status
 	*terminal = terminal.updateStatus()
 
-	// Check that status shows current step progress
 	expectedSubstring := "7/20"
 	plain := stripANSI(terminal.statusLeft)
 	if !containsSubstring(plain, expectedSubstring) {
@@ -140,14 +135,12 @@ func TestStatusBarShowsCurrentStepsDuringProgress(t *testing.T) {
 }
 
 func TestStatusBarShowsLastStepsAfterCompletion(t *testing.T) {
-	// Create output writer and simulate a task that ran 5 of 10 steps
 	out := NewTerminalOutput(DefaultStyles())
 
 	out.handleSystemFrame(`{"type":"task","data":{"in_progress":true,"current_step":5,"max_steps":10,"context_tokens":0,"context_limit":0}}`)
 	// Completion broadcast carries current_step zeroed.
 	out.handleSystemFrame(`{"type":"task","data":{"in_progress":false,"current_step":0,"max_steps":10,"context_tokens":0,"context_limit":0}}`)
 
-	// Create terminal with the output writer
 	styles := DefaultStyles()
 	terminal := &Terminal{
 		out:               out,
@@ -167,10 +160,8 @@ func TestStatusBarShowsLastStepsAfterCompletion(t *testing.T) {
 		hasFocus:          true,
 	}
 
-	// Update status
 	*terminal = terminal.updateStatus()
 
-	// Check that the status shows the last run's summary
 	expectedSubstring := "5/10"
 	plain := stripANSI(terminal.statusLeft)
 	if !containsSubstring(plain, expectedSubstring) {

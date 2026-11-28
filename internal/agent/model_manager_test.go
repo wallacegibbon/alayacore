@@ -268,7 +268,6 @@ model_name: "mini"`,
 }
 
 func TestModelManagerReloadResetsIDs(t *testing.T) {
-	// Create a temporary config file
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "model.conf")
 
@@ -302,7 +301,6 @@ model_name: "model-b"
 		t.Errorf("expected second model ID to be 2, got %d", models[1].ID)
 	}
 
-	// Add a model to bump the nextID counter
 	newID := mm.AddModel(modelConfig{
 		Name:         "Model C",
 		ProtocolType: "openai",

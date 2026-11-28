@@ -17,7 +17,6 @@ func TestEnsureWindowCursorVisible_OversizedWindowDoesNotOscillate(t *testing.T)
 	wb.AppendOrUpdate(tagAssistantText, "window-1", "Small window")
 	wb.AppendOrUpdate(tagAssistantText, "window-2", strings.Repeat("line\n", 100))
 
-	// Set viewport height to 50 (smaller than window-2 which is ~100 lines)
 	display = display.WithHeight(50)
 	display = display.updateContent()
 
@@ -372,7 +371,6 @@ func TestScrollWindowCursorToTop_PositionsWindowAtTop(t *testing.T) {
 	wb := NewWindowBuffer(80, DefaultStyles())
 	display := NewDisplayModel(wb, DefaultStyles())
 
-	// Create several windows with some content
 	for i := range 10 {
 		wb.AppendOrUpdate(tagUserText, "prompt-"+strings.Repeat("x", i+1),
 			strings.Repeat("line\n", 5))
@@ -426,7 +424,6 @@ func TestScrollWindowCursorToTop_PartiallyVisibleWindowMovesToTop(t *testing.T) 
 	display = display.WithHeight(5)
 	display = display.updateContent()
 
-	// Set cursor to a window and ensure it's visible (but not at top)
 	display = display.WithWindowCursor(5)
 	display = display.EnsureWindowCursorVisible()
 	display = display.updateContent()
@@ -502,7 +499,6 @@ func TestScrollWindowCursorToTop_AlreadyAtTopIsStable(t *testing.T) {
 
 	yOffset1 := display.scrollView.YOffset()
 
-	// Call again — should be stable
 	display = display.ScrollWindowCursorToTop()
 	display = display.updateContent()
 

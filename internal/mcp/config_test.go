@@ -53,7 +53,6 @@ url: "https://public.example.com/mcp"
 		t.Fatalf("expected 3 configs, got %d", len(configs))
 	}
 
-	// Check first config (myapi)
 	c0 := configs[0]
 	if c0.Name != "myapi" {
 		t.Errorf("expected name 'myapi', got %q", c0.Name)
@@ -77,7 +76,6 @@ url: "https://public.example.com/mcp"
 		t.Errorf("expected scopes [read write], got %v", c0.Auth.Scopes)
 	}
 
-	// Check second config (filesystem — stdio)
 	c1 := configs[1]
 	if c1.Name != "filesystem" {
 		t.Errorf("expected name 'filesystem', got %q", c1.Name)
@@ -95,7 +93,6 @@ url: "https://public.example.com/mcp"
 		t.Errorf("expected no auth for filesystem, got %v", c1.Auth)
 	}
 
-	// Check third config (public — no auth)
 	c2 := configs[2]
 	if c2.Name != "public" {
 		t.Errorf("expected name 'public', got %q", c2.Name)

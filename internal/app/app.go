@@ -73,7 +73,6 @@ func Setup(cfg *config.Settings) (*Config, error) {
 		return nil, fmt.Errorf("invalid --builtin-tools: %w", err)
 	}
 
-	// Collect startup errors from all sources.
 	var startupErrors []string
 	startupErrors = append(startupErrors, skillsManager.GetLoadErrors()...)
 
@@ -90,7 +89,6 @@ func Setup(cfg *config.Settings) (*Config, error) {
 	// System Prompt Construction (base — without MCP sections)
 	// ========================================================================
 
-	// Build the default system prompt
 	systemPrompt := systemPromptBase
 
 	// Only include SKILLS section when skills are actually available
@@ -130,18 +128,15 @@ func Setup(cfg *config.Settings) (*Config, error) {
 // parsing errors. The Init is NOT started yet — the session starts
 // it when the main event loop begins.
 func initMCPAsync(cfg *config.Settings) (*mcp.Initializer, []string) {
-	// Load MCP configurations from mcp.conf
 	mcpConfigs, startupErrors := mcp.LoadConfigs(cfg)
 	if len(mcpConfigs) == 0 {
 		return nil, startupErrors
 	}
 
-	// Set debug mode from global config.
 	for i := range mcpConfigs {
 		mcpConfigs[i].DebugDir = cfg.DebugLogDir
 	}
 
-	// Set up token persistence for all MCP servers.
 	if tokenStore := createTokenStore(cfg); tokenStore != nil {
 		for i := range mcpConfigs {
 			mcpConfigs[i].TokenStore = tokenStore

@@ -60,7 +60,6 @@ func (rm *runtimeManager) load() error {
 	data, err := os.ReadFile(rm.path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// Create the file with default content
 			return rm.write(rm.config)
 		}
 		return err
@@ -81,7 +80,6 @@ func (rm *runtimeManager) write(cfg runtimeConfig) error {
 		return nil
 	}
 
-	// Ensure directory exists
 	dir := filepath.Dir(rm.path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err

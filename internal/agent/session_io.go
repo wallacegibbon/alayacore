@@ -697,9 +697,8 @@ func (s *Session) handleModelLoad() (any, error) {
 		return nil, &cmdErr{Code: protocol.ErrCodeIOReadFailed, Message: fmt.Sprintf("model_load: failed to load models: %v", err)}
 	}
 
-	// Apply the successfully loaded models regardless of validation
-	// outcome — then fail the command if any model block was rejected.
-	// The user must see these errors to fix their config.
+	// The loaded models are applied before the rejection is reported: the user
+	// needs the errors to fix the config.
 	s.modelService.ResolveActiveModel()
 	if model := mm.getActive(); model != nil {
 		if err := s.SwitchModel(model); err != nil {

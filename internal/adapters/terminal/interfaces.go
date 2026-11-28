@@ -110,7 +110,6 @@ type OutputWriter interface {
 	ConsumeSessionClosed() bool // returns true if the session ended (SM "session" closed frame)
 	ConsumeTaskStarted() bool   // returns true if a task began since the last call (idle → in-progress edge)
 
-	// Update signaling
 	FlushPendingDeltas() // flushes accumulated delta frames to WindowBuffer
 	DrainDirty() bool    // returns true if display was dirty, clears the flag
 	WindowBuffer() *WindowBuffer
