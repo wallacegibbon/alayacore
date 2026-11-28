@@ -612,10 +612,12 @@ func (to *outputWriter) handleCommandOut(value string) {
 func (to *outputWriter) handleSystemTask(m protocol.TaskMsg) {
 	if to.status.updateTask(m.InProgress, m.CurrentStep, m.MaxSteps, m.ContextTokens, m.StepTPS, m.TTFTMS) {
 		// Task completion edge: settle tool windows left pending by
-		// abnormal paths (canceled confirmation, malformed/dropped frames).
-		// Normal tools already settled via their UF frames before this
-		// frame arrived (toolWg.Wait precedes handleTaskDone), so only
-		// genuine stragglers are affected.
+		// abnormal paths (malformed frames, a dropped or never-written
+		// UF). A step settles the calls it left unanswered itself, before
+		// the task can even be done; what reaches this edge is the frame
+		// that never arrived. Normal tools already settled via their UF
+		// frames before this frame arrived (toolWg.Wait precedes
+		// handleTaskDone), so only genuine stragglers are affected.
 		to.windowBuffer.SettleUnfinishedTools()
 	}
 }

@@ -14,7 +14,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"strings"
 	"testing"
 )
 
@@ -122,7 +121,7 @@ func TestCutStreamSettlesTheHalfStreamedToolCall(t *testing.T) {
 // Serial mode queues every call until the stream ends, so a step that dies first
 // runs none of them — and each one is a window with a spinner that has nothing
 // behind it. They are settled too, and the tool itself never runs.
-func TestCutStreamSettlesCallsSerialModeNeverRan(t *testing.T) {
+func TestSerialStepSettlesTheCallsItNeverRan(t *testing.T) {
 	fastRetries(t)
 	var ran int
 	p := &streamScriptProvider{script: []streamScript{{
@@ -196,11 +195,8 @@ func TestAnsweredToolCallIsNotSettled(t *testing.T) {
 	}
 
 	got := rec.only(t)
-	if strings.Contains(got.text, errToolCallIncomplete.Error()) {
-		t.Fatalf("answered call was settled as unanswered: %+v", got)
-	}
 	if got.text != "written" {
-		t.Errorf("tool output = %q, want the result itself", got.text)
+		t.Errorf("tool output = %q, want the result itself — an answered call must not be settled", got.text)
 	}
 	// The salvage keeps a real pair: the call and its result stayed in history.
 	if ids := toolCallIDs(result.Contents); len(ids) != 1 || ids[0] != "call_1" {

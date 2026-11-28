@@ -545,12 +545,11 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 	// hands calls to it, and the collection below asks it to finish.
 	runner := a.newToolRunner(callbacks, resultCh, &toolWg)
 
-	// Every tool window this step opened is settled here, whatever the step did:
-	// the frame that opened it was the step's to send, so the frame that closes
-	// it is too. Registered before the salvage below so it runs after it (defers
-	// are LIFO), where the drain has already collected every result a tool
-	// goroutine managed to deliver — the difference between a call that answered
-	// and one that never will.
+	// Settle whatever this step leaves unanswered, on the way out (see
+	// settleUnansweredToolCalls). Registered before the salvage below so it runs
+	// after it — defers are LIFO — because the drain there is what collects the
+	// results a tool goroutine did manage to deliver, and that is the difference
+	// between a call that answered and one that never will.
 	defer func() { settleUnansweredToolCalls(callbacks, assembler, results) }()
 
 	defer func() {
@@ -764,13 +763,14 @@ var errToolCallIncomplete = errors.New("tool call did not complete")
 // without a result, so none of them is left spinning.
 //
 // A window is opened by the first frame about a call and closed by the frame that
-// answers it (UF). Whatever ends a step — a provider stream cut mid-answer, a
-// cancel, a panic in a tool — one shape reaches the adapter as a window with
-// nothing behind it: a call whose arguments never finished streaming (no part, so
-// no result can ever arrive), a call serial mode queued and never ran, a call
-// canceled while awaiting confirmation, a call whose tool panicked. On screen
-// they are one bug: a spinner turning for a tool that is not running,
-// indistinguishable from one that is, and it keeps turning until the task ends.
+// answers it (UF). However a step ends — a provider stream cut mid-answer, a
+// cancel, a panic in a tool — what it can leave the adapter holding is the same:
+// a window with nothing behind it. The call's arguments never finished streaming,
+// so it never became a part and no result can arrive; or serial mode queued it and
+// never ran it; or it was canceled while awaiting confirmation; or its tool
+// panicked. On screen those are one bug: a spinner turning for a tool that is not
+// running, indistinguishable from one that is, and it keeps turning until the task
+// ends.
 //
 // So the obligation is the step's, and it is stated once, here, rather than at
 // each path that can end one: every call a step announced is either answered or

@@ -92,7 +92,7 @@ If the idle scan (31ns/tick) ever matters, replace it with an
 sites in `window.go` / `window_buffer.go` — not before profile data
 demands it.
 
-## Safety net: step-boundary settlement
+## Settlement: the step, then the task edge
 
 `InvalidateRunningToolSpinners` keeps the spinner alive, but nothing in the tick
 path can settle a window whose result frame never arrives. That settlement has

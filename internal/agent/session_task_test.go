@@ -404,11 +404,10 @@ func TestRunTaskSettlesAHalfStreamedToolCall(t *testing.T) {
 		t.Fatalf("provider calls = %d, want 2 (the cut step, then its continuation)", provider.calls)
 	}
 
-	// One UF frame for call_1, an error carrying the settlement sentence: the
-	// window the AF start opened is closed by it.
-	var settled []protocol.ToolOutputData
-	settleAt, notifyAt := -1, -1
-	frame := 0
+	// The two frames a user watching the screen needs, in order: the window's
+	// settlement, then the notice that explains the wait.
+	var order []string
+	var settled *protocol.ToolOutputData
 	r := strings.NewReader(out.String())
 	for {
 		tag, value, err := wiretest.NextFrame(r)
@@ -419,38 +418,32 @@ func TestRunTaskSettlesAHalfStreamedToolCall(t *testing.T) {
 		case wire.TagUserF:
 			var d protocol.ToolOutputData
 			if json.Unmarshal([]byte(value), &d) == nil && d.CallID == "call_1" {
-				settled = append(settled, d)
-				if settleAt < 0 {
-					settleAt = frame
+				order = append(order, "settled "+d.CallID)
+				if settled == nil {
+					settled = &d
 				}
 			}
 		case wire.TagSystemMsg:
 			env, err := protocol.ParseSystemMsg(value)
-			if err == nil && env.Type == string(protocol.MsgTypeNotify) && notifyAt < 0 {
-				notifyAt = frame
+			if err == nil && env.Type == string(protocol.MsgTypeNotify) {
+				order = append(order, "notify")
 			}
 		}
-		frame++
 	}
-	if len(settled) != 1 {
-		t.Fatalf("UF frames for call_1 = %d, want 1 (the settlement)", len(settled))
+	if got := strings.Join(order, ", "); got != "settled call_1, notify" {
+		t.Fatalf("frames = %q, want the settlement before the notice, once each", got)
 	}
-	if !settled[0].IsError {
+	// The settlement frame answers the window the AF start opened, and it answers
+	// it with an error: a window settled as a success would show ✓.
+	if !settled.IsError {
 		t.Error("the settlement frame is not marked as an error; the window would not show ✗")
 	}
 	var text string
-	for _, item := range settled[0].Output {
+	for _, item := range settled.Output {
 		text += item.Text
 	}
 	if !strings.Contains(text, "tool call did not complete") {
 		t.Errorf("settlement text = %q, want it to say the call did not complete", text)
-	}
-	if settleAt < 0 || notifyAt < 0 {
-		t.Fatalf("frames = %d and notify at %d; both must be present", settleAt, notifyAt)
-	}
-	if settleAt > notifyAt {
-		t.Errorf("settlement frame at %d, retry notice at %d: the window must be settled before the notice explains the wait",
-			settleAt, notifyAt)
 	}
 	// The half-streamed call cannot be replayed, so it is not in the history the
 	// continuation was built from.

@@ -381,9 +381,14 @@ func (wb *WindowBuffer) InvalidateRunningToolSpinners() bool {
 // frame (UF) as errors. Called when the task completion frame arrives:
 // on normal paths every tool settles via its UF frame before the task
 // frame (toolWg.Wait precedes handleTaskDone), so any window still
-// pending/none here was left behind by an abnormal path — a canceled
-// confirmation, a malformed frame, a dropped UF — and would otherwise
-// spin forever (see docs/internal/tool-spinner-refresh.md).
+// pending/none here was left behind by an abnormal path — a malformed
+// frame, a dropped or never-written UF — and would otherwise spin forever
+// (see docs/internal/tool-spinner-refresh.md).
+//
+// It is the coarse half of the settlement, and the only half this package
+// owns: a step settles the calls it leaves unanswered itself
+// (llm.settleUnansweredToolCalls), so what is left for the task edge is the
+// frame that never arrived at all.
 //
 // The window's status becomes ToolStatusError (✗) and, when it has no
 // output yet, a short explanation is shown so the user knows the tool

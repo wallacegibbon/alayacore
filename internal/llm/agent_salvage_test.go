@@ -57,9 +57,10 @@ func TestStreamSalvagesExecutedToolsOnCancel(t *testing.T) {
 	var gotContents []ContentPart
 	finishCalled := 0
 	// outputEvents records the display frames fired via OnToolOutput: the
-	// canceled confirmation tool (c2) must still settle its UI window
-	// with a UF error frame, even though it never ran and stays out of
-	// the salvaged history.
+	// canceled confirmation tool (c2) must still settle its UI window with a
+	// UF error frame, even though it never ran and stays out of the salvaged
+	// history. It is the step's settlement that answers it, on the way out —
+	// runToolCall runs nothing and writes no frame of its own.
 	var outputEvents []struct {
 		id  string
 		err error

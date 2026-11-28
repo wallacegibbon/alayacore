@@ -287,7 +287,14 @@ During session replay the tool call is a single AF frame with both `name` and `i
   authoritative**: adapters may drop or ignore it, and the final `UF` frame
   always overwrites any preview content.
 
-A tool call (AF) without a matching UF is still in progress. Each `.txt` sample below shows one frame in this lifecycle.
+A tool call (AF) without a matching UF is still in progress — while the step that
+announced it runs. A step that ends without a result for a call it opened sends
+that call's `UF` itself, with `is_error:true` and one short line of explanation
+(`tool call did not complete`): the arguments were cut off mid-stream, or the call
+was canceled, skipped, or failed. So an adapter never has to age a pending call
+out on its own, and the only AF that stays unanswered is one whose session ended
+first — the settlement belongs to the step, not to the frame that happened to be
+missing. Each `.txt` sample below shows one frame in this lifecycle.
 
 ## Example: Text Prompt Flow (with streaming deltas)
 
@@ -566,8 +573,10 @@ after one the transcript an adapter has accumulated is not the session's
    close the connection, show a notification).
 
 6. **Missing UF**: A tool call (AF) without a matching UF is still in progress.
-   If the session ends before all tool calls complete, pending tool calls are
-   abandoned — no UF will arrive for them.
+   A step that ends without a result settles its own calls with an error `UF`
+   (see [Function Lifecycle](#function-lifecycle-af-uf)), so the case left over
+   is the session ending first: if stdout ends before a step can settle what it
+   opened, those calls are abandoned — no UF will arrive for them.
 
 7. **History ID collision**: History IDs are assigned monotonically. During
    live streaming they come from a single counter; during replay they are
