@@ -391,7 +391,7 @@ func (wb *WindowBuffer) InvalidateRunningToolSpinners() bool {
 // frame that never arrived at all.
 //
 // The window's status becomes ToolStatusError (✗) and, when it has no
-// output yet, a short explanation is shown so the user knows the tool
+// output yet, toolCallIncompleteNote is shown so the user knows the tool
 // never ran to completion rather than failed with real output. Returns
 // the number of windows settled.
 func (wb *WindowBuffer) SettleUnfinishedTools() int {
@@ -408,7 +408,7 @@ func (wb *WindowBuffer) SettleUnfinishedTools() int {
 		}
 		tr.status = ToolStatusError
 		if tr.output == "" {
-			tr.setOutput("tool did not complete before the task ended")
+			tr.setOutput(toolCallIncompleteNote)
 		}
 		w.Invalidate()
 		wb.markDirty(i)
@@ -416,6 +416,19 @@ func (wb *WindowBuffer) SettleUnfinishedTools() int {
 	}
 	return settled
 }
+
+// toolCallIncompleteNote is what a window settled at the task edge says, and it
+// is deliberately the sentence a step writes for the calls it leaves unanswered
+// (llm.settleUnansweredToolCalls): to a reader those are one event — a window
+// that stopped without a result — so one name, not two.
+//
+// A second copy for a reason of layering, not taste: an adapter may not call
+// agent code (docs/architecture.md), so this package cannot reach the llm
+// constant, and protocol — the vocabulary both sides already speak — is not
+// where the model layer may look for a display sentence. Each copy is spelled
+// out in its own package's test, which is how this tree pins a user-facing
+// sentence; this comment is what a change to either has to see.
+const toolCallIncompleteNote = "tool call did not complete"
 
 // Clear removes all windows.
 // AppendUserContent appends a user content frame to the window identified by id.

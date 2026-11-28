@@ -102,8 +102,8 @@ func TestCutStreamSettlesTheHalfStreamedToolCall(t *testing.T) {
 	if got.id != "call_1" {
 		t.Errorf("settled call = %q, want %q", got.id, "call_1")
 	}
-	if got.text != errToolCallIncomplete.Error() {
-		t.Errorf("settled output = %q, want %q", got.text, errToolCallIncomplete.Error())
+	if got.text != "tool call did not complete" {
+		t.Errorf("settled output = %q, want the settlement sentence", got.text)
 	}
 	if !got.isErr {
 		t.Error("the settlement frame is not an error frame; the window would show ✓")

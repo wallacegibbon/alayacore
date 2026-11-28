@@ -132,7 +132,9 @@ task completion frame arrives (`in_progress` true→false, detected by
 `sessionState.updateTask`'s completion edge and handled in
 `outputWriter.handleSystemTask`), every tool window still in the running states
 (`ToolStatusNone`/`ToolStatusPending`) is settled to `ToolStatusError` (✗) with an
-explanation when it has no output.
+explanation when it has no output — the same sentence the step writes
+(`toolCallIncompleteNote`, one layer up from `errToolCallIncomplete`), because one
+event with two names would cost a reader a guess.
 
 This is safe by construction: on normal paths every tool settles via its `UF`
 frame before the task frame is written (`toolWg.Wait` precedes `handleTaskDone`),

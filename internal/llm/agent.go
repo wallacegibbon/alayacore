@@ -756,7 +756,10 @@ func (a *Agent) streamEvents(ctx context.Context, events iter.Seq2[StreamEvent, 
 }
 
 // errToolCallIncomplete is what the window of a call that never finished shows.
-// It states the only thing the step knows for certain: no result is coming.
+// It states the only thing the step knows for certain: no result is coming. The
+// task edge says the same sentence for the stragglers it settles
+// (terminal's toolCallIncompleteNote) — one event, one name, however it got
+// there.
 var errToolCallIncomplete = errors.New("tool call did not complete")
 
 // settleUnansweredToolCalls closes the tool windows this step opened and left

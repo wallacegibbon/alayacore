@@ -99,7 +99,7 @@ func TestSettleUnfinishedTools(t *testing.T) {
 	if got := tr("pending").status; got != ToolStatusError {
 		t.Errorf("pending status = %v, want ToolStatusError", got)
 	}
-	if got := tr("pending").output; got != "tool did not complete before the task ended" {
+	if got := tr("pending").output; got != "tool call did not complete" {
 		t.Errorf("pending output = %q, want the settlement explanation", got)
 	}
 	if got := tr("partial").status; got != ToolStatusError {
@@ -209,8 +209,9 @@ func TestUnansweredToolSettlesFromItsFrame(t *testing.T) {
 		t.Fatal("a half-streamed call is animating; the tick refresh must see it")
 	}
 
-	// The settlement the step writes on its way out: a UF frame with an error
-	// and no result behind it.
+	// The settlement the step writes on its way out: a UF frame carrying an error
+	// and no result behind it (the sentence is the core's; the adapter only draws
+	// it).
 	wb.HandleToolOutput("call_1", "tool call did not complete", true, 7)
 
 	rendered := stripANSI(wb.GetAll(-1, false))
@@ -220,8 +221,8 @@ func TestUnansweredToolSettlesFromItsFrame(t *testing.T) {
 	// The folded row keeps the arguments that did arrive, and the explanation is
 	// the window's body (what unfolding shows).
 	body := stripANSI(wb.RenderWindowContent(wb.WindowAt(0), 76))
-	if !strings.Contains(body, "tool call did not complete") {
-		t.Errorf("settled window must show the explanation, got %q", body)
+	if !strings.Contains(body, `{"path":"/tmp/x","old`) {
+		t.Errorf("settled window must keep the arguments that streamed, got %q", body)
 	}
 	if wb.InvalidateRunningToolSpinners() {
 		t.Error("a settled call must not keep the spinner refresh alive")
